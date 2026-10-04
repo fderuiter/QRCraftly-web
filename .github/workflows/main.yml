@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths: &workflow_paths
       - 'src/**'
+      - 'crates/**'
       - 'public/**'
       - 'scripts/**'
       - 'e2e/**'
@@ -159,6 +160,41 @@ jobs:
       - name: "Report Coverage"
         if: github.event_name == 'pull_request'
         uses: davelosert/vitest-coverage-report-action@c4bbc33a89b7ace0e63d35f1f7d4bcee31155a73 # v2
+
+  # JOB: Rust WebAssembly modules (#1182, ADR 0033). Installs the toolchain pinned in
+  # crates/rust-toolchain.toml with the runner's own rustup, checks the crates, and
+  # proves every committed src/wasm/*.wasm rebuilds byte-for-byte.
+  wasm-reproducible:
+    name: WebAssembly Reproducible Build
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+
+      - name: Install the pinned Rust toolchain
+        working-directory: crates
+        run: rustup toolchain install
+
+      - name: Check formatting
+        working-directory: crates
+        run: cargo fmt --all --check
+
+      - name: Run Clippy
+        working-directory: crates
+        run: |
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo clippy --locked --target wasm32-unknown-unknown -- -D warnings
+
+      - name: Run Rust tests
+        working-directory: crates
+        run: cargo test --locked
+
+      - name: Rebuild and compare the committed modules
+        run: pnpm run wasm:check
 
   # JOB E2E: Playwright Cross-Browser Tests
   # Runs against the exact `dist` the Build job produced, so CI builds the app once.
@@ -351,7 +387,7 @@ jobs:
   # no longer reports. It is also what auto-merge waits on (see RELEASING.md).
   ci:
     name: CI
-    needs: [setup, dependency-audit, static-validation, test, e2e, build]
+    needs: [setup, dependency-audit, static-validation, test, wasm-reproducible, e2e, build]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
