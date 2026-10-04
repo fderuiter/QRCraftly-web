@@ -20,4 +20,11 @@ export const copy: ToolCopy = {
         }
       ]
     },
+  faqs: [
+    {
+      question: 'Is the animated QR stream a problem for people sensitive to flashing light?',
+      answer:
+        'It can be. The sender shows a high-contrast pattern that changes 8 to 24 times a second, which is faster than the three flashes a second that accessibility guidelines treat as a seizure risk. Before the first transfer of a visit you see a notice. If your device asks for reduced motion, the pace starts at Steady, the slowest, and you confirm once more before the stream starts. Pause, or the Escape key, stops the pattern at once, and the animation stays inside the QR code itself: nothing else on the screen flashes. If flashing light affects you, look away or ask someone else to hold the phone.',
+    },
+  ],
 };

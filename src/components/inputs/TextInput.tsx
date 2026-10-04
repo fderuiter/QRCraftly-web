@@ -1,5 +1,7 @@
 import React from "react";
-import { TextData } from "../../types";
+import { TextData, QRType } from "../../types";
+import { describeViolation } from "@/packages/qr-payload";
+import { findBlockingViolation } from "./linkViolations";
 import { TextAreaField } from "../ui/FormFields";
 
 interface TextInputProps {
@@ -8,6 +10,8 @@ interface TextInputProps {
 }
 
 export const TextInput: React.FC<TextInputProps> = ({ data, onChange }) => {
+  const violation = findBlockingViolation(QRType.TEXT, data);
+
   return (
     <div>
       <TextAreaField
@@ -19,6 +23,7 @@ export const TextInput: React.FC<TextInputProps> = ({ data, onChange }) => {
         value={data.text}
         onChange={(e) => onChange({ text: e.target.value })}
         showCharCount
+        error={violation ? describeViolation(violation) : undefined}
       />
     </div>
   );

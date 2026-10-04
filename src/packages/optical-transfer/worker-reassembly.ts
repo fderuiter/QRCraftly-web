@@ -17,95 +17,58 @@
 */
 
 import { FountainReassembler } from './lib/fountain/reassembler';
-
-export interface HandshakeMetadata {
-  fileName?: string;
-  fileSize?: number;
-  mimeType?: string;
-  sha256?: string;
-}
-
-export interface InitWorkerMessage extends HandshakeMetadata {
-  type: 'INIT' | 'ALLOCATE';
-  fileSize: number;
-  totalChunks?: number;
-  chunkSize?: number;
-}
-
-export interface ChunkWorkerMessage {
-  type: 'CHUNK' | 'PROCESS_CHUNK';
-  index: number;
-  total?: number;
-  totalChunks?: number;
-  base64: string;
-  chunkSize?: number;
-}
+import { parseKeyCode, parseKeyQr } from './lib/prism/words';
 
 export interface FountainWorkerMessage {
   type: 'FOUNTAIN_DROPLET' | 'DROPLET';
+  /** Decoded QR text: a Prism frame, a key QR, or a legacy `ur:bytes/` droplet. */
   droplet: string;
-}
-
-export interface LegacyReassemblyMessage {
-  type: 'START_REASSEMBLY';
-  chunks: Array<{ index: number; base64: string }>;
-  totalChunks: number;
 }
 
 export interface ClearWorkerMessage {
   type: 'CLEAR' | 'RESET';
 }
 
-/** Ignore a fountain session that already finished (from `COMPLETE.session`), e.g. after "Receive another". */
+/** Ignore a session that already finished (from `COMPLETE.session`), e.g. after "Receive another". */
 export interface IgnoreSessionMessage {
   type: 'IGNORE_SESSION';
   session: string;
 }
 
-export type FileReassemblyIncomingMessage =
-  | InitWorkerMessage
-  | ChunkWorkerMessage
-  | FountainWorkerMessage
-  | LegacyReassemblyMessage
-  | ClearWorkerMessage
-  | IgnoreSessionMessage;
+/** The key code of a private transfer, as the person typed it. */
+export interface SetKeyMessage {
+  type: 'SET_KEY';
+  code: string;
+}
 
-let allocatedBuffer: Uint8Array | null = null;
-let totalChunksCount: number | null = null;
-let targetFileSize: number | null = null;
-let knownChunkSize: number | null = null;
-let receivedIndices: Set<number> = new Set();
-let handshakeMetadata: HandshakeMetadata | null = null;
-let fountainReassembler: FountainReassembler | null = null;
-let fountainFinalizing = false;
+/** The person's answer to an offer to switch to another stream. */
+export interface SwitchDecisionMessage {
+  type: 'SWITCH_DECISION';
+  session: string;
+  accept: boolean;
+}
+
+export type FileReassemblyIncomingMessage =
+  | FountainWorkerMessage
+  | ClearWorkerMessage
+  | IgnoreSessionMessage
+  | SetKeyMessage
+  | SwitchDecisionMessage;
+
+let reassembler: FountainReassembler | null = null;
+let finalizing = false;
 
 function post(message: Record<string, unknown>, transfer: Transferable[] = []): void {
   self.postMessage(message, { transfer });
 }
 
 function resetWorkerState(): void {
-  allocatedBuffer = null;
-  totalChunksCount = null;
-  targetFileSize = null;
-  knownChunkSize = null;
-  receivedIndices = new Set();
-  handshakeMetadata = null;
-  // Reset rather than drop the reassembler: it remembers the finished session and ignores its droplets.
-  fountainReassembler?.reset();
-  fountainFinalizing = false;
+  // Reset rather than drop the reassembler: it remembers the finished session and ignores its frames.
+  reassembler?.reset();
+  finalizing = false;
 }
 
-/**
- * Feeds one droplet to the stateless reassembler; on completion decompresses,
- * verifies the SHA-256 from the session header and posts the file.
- */
-async function handleFountainDroplet(droplet: string): Promise<void> {
-  if (fountainFinalizing) return;
-  if (!fountainReassembler) fountainReassembler = new FountainReassembler();
-  const reassembler = fountainReassembler;
-
-  const snapshot = reassembler.ingest(droplet);
-  if (!snapshot) return;
+function postProgress(snapshot: NonNullable<ReturnType<FountainReassembler['snapshot']>>): void {
   post({
     type: 'PROGRESS',
     progress: snapshot.progress,
@@ -115,249 +78,112 @@ async function handleFountainDroplet(droplet: string): Promise<void> {
     dropletsReceived: snapshot.dropletsReceived,
     isFountain: true,
   });
+}
 
-  if (!reassembler.isComplete) return;
-  fountainFinalizing = true;
+/** Posts what the reassembler wants the person to see: a message, a manifest, an offer. */
+function postNotices(active: FountainReassembler): void {
+  const rejection = active.takeRejection();
+  if (rejection) post({ type: 'ERROR', error: rejection, isFountain: true });
+  const manifest = active.takeManifest();
+  if (manifest) post({ type: 'MANIFEST', manifest, needsKey: active.needsKey });
+  const offer = active.takeSwitchOffer();
+  if (offer) post({ type: 'SWITCH_OFFER', offer });
+}
+
+/** On completion, opens the files, verifies them and posts them. */
+async function finishIfComplete(active: FountainReassembler): Promise<void> {
+  if (finalizing || !active.isComplete) return;
+  finalizing = true;
   try {
-    const { data, header } = await reassembler.finalize();
-    const bufCopy = new Uint8Array(data);
-    post(
-      {
-        type: 'COMPLETE',
-        buffer: bufCopy.buffer,
-        handshake: {
-          fileName: header.fileName || `received_file_${Date.now()}.bin`,
-          fileSize: header.fileSize,
-          mimeType: header.mimeType || 'application/octet-stream',
-          sha256: header.sha256,
-        },
-        compression: header.compression,
-        isFountain: true,
-        session: reassembler.finishedSessionKey,
+    const { files } = await active.finalize();
+    const copies = files.map(({ data, header }) => ({
+      buffer: new Uint8Array(data).buffer,
+      handshake: {
+        fileName: header.fileName || `received_file_${Date.now()}.bin`,
+        fileSize: header.fileSize,
+        mimeType: header.mimeType || 'application/octet-stream',
+        sha256: header.sha256,
       },
-      [bufCopy.buffer]
+      compression: header.compression,
+    }));
+    const transfer = copies.map((copy) => copy.buffer);
+    const [first] = copies;
+    post(
+      files.length === 1
+        ? { type: 'COMPLETE', ...first, isFountain: true, session: active.finishedSessionKey }
+        : { type: 'COMPLETE', files: copies, isFountain: true, session: active.finishedSessionKey },
+      transfer
     );
   } catch (err: unknown) {
-    post({ type: 'ERROR', error: err instanceof Error ? err.message : 'Fountain reassembly failed', isFountain: true });
+    post({ type: 'ERROR', error: err instanceof Error ? err.message : 'Reassembly failed', isFountain: true });
   } finally {
     resetWorkerState();
   }
 }
 
-function decodeBase64ToBytes(base64Str: string): Uint8Array {
-  const binaryString = atob(base64Str);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let j = 0; j < len; j++) {
-    bytes[j] = binaryString.charCodeAt(j);
+/** Applies a key code: from the key box or from a key QR the camera read. */
+async function handleKey(active: FountainReassembler, secret: Uint8Array | null): Promise<void> {
+  if (!secret) {
+    post({ type: 'KEY_STATUS', accepted: false });
+    return;
   }
-  return bytes;
+  active.setKey(secret);
+  post({ type: 'KEY_STATUS', accepted: true });
+  postNotices(active);
+  // The transfer may have finished while it waited for its key.
+  await finishIfComplete(active);
+}
+
+/**
+ * Feeds one frame to the stateless reassembler. A manifest is announced as soon as it is accepted;
+ * on completion the files are decrypted, decompressed, verified against the manifest and posted.
+ */
+async function handleFrame(text: string): Promise<void> {
+  if (finalizing) return;
+  if (!reassembler) reassembler = new FountainReassembler();
+  const active = reassembler;
+
+  const keySecret = parseKeyQr(text);
+  if (keySecret) {
+    await handleKey(active, keySecret);
+    return;
+  }
+
+  const snapshot = active.ingest(text);
+  postNotices(active);
+  if (!snapshot) return;
+  postProgress(snapshot);
+  await finishIfComplete(active);
 }
 
 self.onmessage = async (e: MessageEvent<FileReassemblyIncomingMessage>) => {
   const data = e.data;
   if (!data || typeof data !== 'object') return;
 
-
   try {
     if (data.type === 'CLEAR' || data.type === 'RESET') {
       resetWorkerState();
       return;
     }
-
+    if (!reassembler) reassembler = new FountainReassembler();
     if (data.type === 'IGNORE_SESSION') {
-      if (!fountainReassembler) fountainReassembler = new FountainReassembler();
-      fountainReassembler.ignoreSession(data.session);
+      reassembler.ignoreSession(data.session);
       return;
     }
-
-    // --- Fountain Droplet Ingestion (stateless entry, no handshake) ---
+    if (data.type === 'SET_KEY') {
+      await handleKey(reassembler, parseKeyCode(data.code));
+      return;
+    }
+    if (data.type === 'SWITCH_DECISION') {
+      if (data.accept) reassembler.acceptSwitch(data.session);
+      else reassembler.declineSwitch(data.session);
+      postNotices(reassembler);
+      return;
+    }
     if (data.type === 'FOUNTAIN_DROPLET' || data.type === 'DROPLET') {
-      await handleFountainDroplet(data.droplet);
-      return;
-    }
-
-    // --- Legacy Chunking Ingestion ---
-    if (data.type === 'INIT' || data.type === 'ALLOCATE') {
-      resetWorkerState();
-      const msg = data;
-      if (typeof msg.fileSize === 'number' && msg.fileSize > 0) {
-        targetFileSize = msg.fileSize;
-        allocatedBuffer = new Uint8Array(msg.fileSize);
-      }
-      if (typeof msg.totalChunks === 'number' && msg.totalChunks > 0) {
-        totalChunksCount = msg.totalChunks;
-      }
-      if (typeof msg.chunkSize === 'number' && msg.chunkSize > 0) {
-        knownChunkSize = msg.chunkSize;
-      }
-      handshakeMetadata = {
-        fileName: msg.fileName,
-        fileSize: msg.fileSize,
-        mimeType: msg.mimeType,
-        sha256: msg.sha256,
-      };
-      return;
-    }
-
-    if (data.type === 'CHUNK' || data.type === 'PROCESS_CHUNK') {
-      const msg = data;
-      const index = msg.index;
-      const base64 = msg.base64;
-      const tot = msg.totalChunks ?? msg.total;
-
-      if (typeof tot === 'number' && tot > 0) {
-        totalChunksCount = tot;
-      }
-
-      if (receivedIndices.has(index)) {
-        return;
-      }
-
-      const decodedBytes = decodeBase64ToBytes(base64);
-
-      if (typeof msg.chunkSize === 'number' && msg.chunkSize > 0) {
-        knownChunkSize = msg.chunkSize;
-      } else if (!knownChunkSize && totalChunksCount) {
-        if (index < totalChunksCount - 1 || totalChunksCount === 1) {
-          knownChunkSize = decodedBytes.length;
-        }
-      }
-
-      if (!allocatedBuffer) {
-        if (targetFileSize && targetFileSize > 0) {
-          allocatedBuffer = new Uint8Array(targetFileSize);
-        } else if (knownChunkSize && totalChunksCount) {
-          if (index === totalChunksCount - 1) {
-            targetFileSize = (totalChunksCount - 1) * knownChunkSize + decodedBytes.length;
-          } else {
-            targetFileSize = totalChunksCount * knownChunkSize;
-          }
-          allocatedBuffer = new Uint8Array(targetFileSize);
-        } else if (totalChunksCount === 1) {
-          targetFileSize = decodedBytes.length;
-          allocatedBuffer = new Uint8Array(targetFileSize);
-        }
-      }
-
-      let offset = 0;
-      if (knownChunkSize) {
-        offset = index * knownChunkSize;
-      } else if (totalChunksCount && index === totalChunksCount - 1 && targetFileSize) {
-        offset = targetFileSize - decodedBytes.length;
-      }
-
-      if (allocatedBuffer) {
-        if (allocatedBuffer.length < offset + decodedBytes.length) {
-          const newLen = Math.max(allocatedBuffer.length, offset + decodedBytes.length);
-          const expanded = new Uint8Array(newLen);
-          expanded.set(allocatedBuffer, 0);
-          allocatedBuffer = expanded;
-          targetFileSize = newLen;
-        }
-        allocatedBuffer.set(decodedBytes, offset);
-
-        const currentEnd = offset + decodedBytes.length;
-        if (handshakeMetadata?.fileSize && currentEnd > handshakeMetadata.fileSize) {
-          handshakeMetadata.fileSize = currentEnd;
-        }
-
-        if (!handshakeMetadata?.fileSize && totalChunksCount && index === totalChunksCount - 1) {
-          targetFileSize = currentEnd;
-        }
-      }
-
-      receivedIndices.add(index);
-
-      const total = totalChunksCount || 1;
-      const current = receivedIndices.size;
-      const progress = Math.round((current / total) * 100);
-
-      post({
-        type: 'PROGRESS',
-        progress,
-        current,
-        total,
-        index,
-      });
-
-      if (totalChunksCount && receivedIndices.size >= totalChunksCount) {
-        if (!allocatedBuffer) {
-          throw new Error('Reassembly failed: No buffer allocated.');
-        }
-
-        const exactLength = handshakeMetadata?.fileSize || targetFileSize || allocatedBuffer.length;
-        const finalBuffer = allocatedBuffer.subarray(0, exactLength);
-        const transferableData = new Uint8Array(finalBuffer);
-        const bufferToTransfer = transferableData.buffer;
-
-        post(
-          {
-            type: 'COMPLETE',
-            buffer: bufferToTransfer,
-            handshake: handshakeMetadata,
-          },
-          [bufferToTransfer]
-        );
-
-        resetWorkerState();
-      }
-      return;
-    }
-
-    if (data.type === 'START_REASSEMBLY') {
-      const msg = data;
-      const { chunks, totalChunks } = msg;
-
-      if (!chunks || chunks.length !== totalChunks) {
-        post({
-          type: 'ERROR',
-          error: `Incomplete chunk set: received ${chunks?.length || 0} of ${totalChunks}`,
-        });
-        return;
-      }
-
-      chunks.sort((a, b) => a.index - b.index);
-
-      const byteChunks: Uint8Array[] = [];
-      let totalBytes = 0;
-
-      for (let i = 0; i < chunks.length; i++) {
-        const bytes = decodeBase64ToBytes(chunks[i].base64);
-        byteChunks.push(bytes);
-        totalBytes += bytes.length;
-
-        const progress = Math.round(((i + 1) / totalChunks) * 100);
-        post({
-          type: 'PROGRESS',
-          progress,
-          current: i + 1,
-          total: totalChunks,
-        });
-      }
-
-      const combined = new Uint8Array(totalBytes);
-      let offset = 0;
-      for (const chunk of byteChunks) {
-        combined.set(chunk, offset);
-        offset += chunk.length;
-      }
-
-      post(
-        {
-          type: 'COMPLETE',
-          buffer: combined.buffer,
-        },
-        [combined.buffer]
-      );
-
-      resetWorkerState();
+      await handleFrame(data.droplet);
     }
   } catch (err: unknown) {
-    post({
-      type: 'ERROR',
-      error: err instanceof Error && err.message ? err.message : 'Unknown reassembly error',
-    });
+    post({ type: 'ERROR', error: err instanceof Error && err.message ? err.message : 'Unknown reassembly error' });
   }
 };
-

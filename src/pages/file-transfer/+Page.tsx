@@ -17,7 +17,8 @@
 */
 
 import React from 'react';
-import { Play, Square, Upload, FileUp, Cpu, Sliders, Activity } from 'lucide-react';
+import { Play, Square, Pause, Upload, FileUp, FolderUp, Cpu, Sliders, Activity } from 'lucide-react';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Progress } from '@/components/ui/Progress';
@@ -46,6 +47,23 @@ import { resolveDomainForPath } from '@/utils/metadataEngine';
 import { usePageContext } from 'vike-react/usePageContext';
 import { contentRegistry } from '@/data/contentRegistry';
 import { copy } from '@/data/copy/file-transfer';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import {
+  PAUSED_ANNOUNCEMENT,
+  PAUSE_HINT,
+  PHOTOSENSITIVITY_NOTICE,
+  REDUCED_MOTION_CONFIRM_BODY,
+  REDUCED_MOTION_CONFIRM_TITLE,
+} from '@/utils/photosensitivity';
+
+/**
+ * Set when the first transfer of this page visit starts, so the photosensitivity notice shows only
+ * once per visit. Kept in memory: nothing is stored, and a reload shows the notice again.
+ */
+let photosensitivityNoticeSeen = false;
+
+/** `webkitdirectory` is not in React's input types; browsers that support it list the picked folder's files. */
+const FOLDER_INPUT_PROPS: React.InputHTMLAttributes<HTMLInputElement> & { webkitdirectory: string } = { webkitdirectory: '' };
 
 const DENSITY_OPTIONS: ReadonlyArray<{ value: TransferDensity; label: string; hint: string }> = [
   { value: 'reliable', label: 'Reliable', hint: 'Small QR codes for older phones, dim rooms or a shaky hand.' },
@@ -75,7 +93,6 @@ function formatDuration(seconds: number): string {
 function FileTransferToolInner() {
   const [isDraggingFile, setIsDraggingFile] = React.useState(false);
   const config = useQRStoreSelector(s => s.config);
-  const scannabilityFallbackActive = useQRStoreSelector(s => s.isScannabilityFallbackActive);
   const store = useQRStore();
 
   // Logo images
@@ -85,8 +102,16 @@ function FileTransferToolInner() {
   // Hook into the unified animated QR sender
   const {
     selectedFile,
-    setSelectedFile,
+    selectedFiles,
+    setSelectedFiles,
+    isPrivate,
+    setIsPrivate,
+    keyFrame,
+    keyCanvasRef,
+    showKeyQr,
+    hideKeyQr,
     isTransferring,
+    isPaused,
     isVerifyingHandshake,
     handshakeError,
     progress,
@@ -102,6 +127,8 @@ function FileTransferToolInner() {
     canvasRef,
     startTransfer,
     stopTransfer,
+    pauseTransfer,
+    resumeTransfer,
     handleFileChange,
     simulate50MBFile,
   } = useOpticalSender({
@@ -109,20 +136,71 @@ function FileTransferToolInner() {
     logoImg,
     borderLogoImg,
     renderFrame: paintTransferFrame,
-    scannabilityFallbackActive,
   });
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const folderInputRef = React.useRef<HTMLInputElement | null>(null);
+  // Only some browsers can pick a folder; the button appears once the page knows.
+  const [folderSupported, setFolderSupported] = React.useState(false);
+  React.useEffect(() => {
+    setFolderSupported('webkitdirectory' in document.createElement('input'));
+  }, []);
+
+  // Photosensitivity safeguards (#1148).
+  const reducedMotion = usePrefersReducedMotion();
+  const [noticeSeen, setNoticeSeen] = React.useState(photosensitivityNoticeSeen);
+  const [confirmingMotion, setConfirmingMotion] = React.useState(false);
+  const confirmButtonRef = React.useRef<HTMLButtonElement | null>(null);
+
+  // Reduced motion starts at the slowest pace.
+  React.useEffect(() => {
+    if (!reducedMotion) return;
+    const slowest = TRANSFER_SPEEDS[0];
+    setDensity(slowest.density);
+    setFps(slowest.fps);
+  }, [reducedMotion, setDensity, setFps]);
+
+  // Escape stops the flashing at once, wherever focus is.
+  React.useEffect(() => {
+    if (!isTransferring || isPaused) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') pauseTransfer();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isTransferring, isPaused, pauseTransfer]);
+
+  // The confirm opens under the Start button: move focus to it so keyboard users land on the choice.
+  React.useEffect(() => {
+    if (confirmingMotion) confirmButtonRef.current?.focus();
+  }, [confirmingMotion]);
+
+  const beginTransfer = () => {
+    photosensitivityNoticeSeen = true;
+    setNoticeSeen(true);
+    setConfirmingMotion(false);
+    startTransfer();
+  };
+  const handleStart = () => {
+    if (reducedMotion) {
+      setConfirmingMotion(true);
+      return;
+    }
+    beginTransfer();
+  };
+  const showNotice = !noticeSeen && selectedFile !== null && !isTransferring;
 
   // Upper bound before compression: text-like files usually need far fewer frames.
+  const selectedSize = React.useMemo(() => selectedFiles.reduce((sum, item) => sum + item.size, 0), [selectedFiles]);
+  const selectedLabel = selectedFiles.length > 1 ? `${selectedFiles.length} files` : (selectedFile?.name ?? '');
   const estimate = React.useMemo(() => {
     if (!selectedFile) return null;
     try {
-      return estimateTransferFrames(selectedFile.size, density);
+      return estimateTransferFrames(selectedSize, density);
     } catch {
       return null;
     }
-  }, [selectedFile, density]);
+  }, [selectedFile, selectedSize, density]);
   // Fountain streams never end: show frames against the typical number a receiver needs.
   const framesNeeded = fountainInfo ? Math.ceil(fountainInfo.k * 1.15) : totalFrames;
   const senderPercent = fountainInfo
@@ -158,9 +236,9 @@ function FileTransferToolInner() {
       fileInputRef.current.value = '';
     }
 
-    const file = event.dataTransfer.files?.[0];
-    if (file) {
-      setSelectedFile(file);
+    const dropped = Array.from(event.dataTransfer.files ?? []);
+    if (dropped.length > 0) {
+      setSelectedFiles(dropped);
       stopTransfer();
     }
   };
@@ -204,17 +282,36 @@ function FileTransferToolInner() {
                 >
                   <FileUp className="size-6 text-fg-muted" aria-hidden="true" />
                   <span className="max-w-full truncate text-xs font-medium text-fg-muted">
-                    {selectedFile ? selectedFile.name : 'Choose file or drag & drop'}
+                    {selectedFile ? selectedLabel : 'Choose files or drag & drop'}
                   </span>
                   <input
                     ref={fileInputRef}
                     type="file"
                     className="hidden"
                     aria-label="Choose a file to send"
+                    multiple
                     onChange={handleFileChange}
                     disabled={isTransferring}
                   />
                 </label>
+
+                {folderSupported && (
+                  <>
+                    <Button variant="outline" onClick={() => folderInputRef.current?.click()} disabled={isTransferring} fullWidth>
+                      <FolderUp className="size-4" aria-hidden="true" />
+                      Send a folder
+                    </Button>
+                    <input
+                      ref={folderInputRef}
+                      type="file"
+                      className="hidden"
+                      aria-label="Choose a folder to send"
+                      onChange={handleFileChange}
+                      disabled={isTransferring}
+                      {...FOLDER_INPUT_PROPS}
+                    />
+                  </>
+                )}
 
                 {import.meta.env.DEV && (
                   <Button
@@ -232,12 +329,12 @@ function FileTransferToolInner() {
               {selectedFile && (
                 <div className="space-y-2 rounded-xl border border-line-subtle bg-surface-sunken p-4 text-xs">
                   <div className="flex justify-between gap-3">
-                    <span className="text-fg-muted">Name:</span>
-                    <span className="max-w-45 truncate font-semibold text-fg-soft">{selectedFile.name}</span>
+                    <span className="text-fg-muted">{selectedFiles.length > 1 ? 'Files:' : 'Name:'}</span>
+                    <span className="max-w-45 truncate font-semibold text-fg-soft">{selectedLabel}</span>
                   </div>
                   <div className="flex justify-between gap-3">
                     <span className="text-fg-muted">Size:</span>
-                    <span className="font-mono text-fg-soft">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</span>
+                    <span className="font-mono text-fg-soft">{(selectedSize / 1024 / 1024).toFixed(2)} MB</span>
                   </div>
                 </div>
               )}
@@ -268,8 +365,15 @@ function FileTransferToolInner() {
                 <p className="text-xs text-fg-muted">{activeSpeed?.hint ?? 'Custom values set under Advanced.'}</p>
                 <p className="text-sm font-semibold text-fg" data-testid="speed-estimate" aria-live="polite">
                   {estimatedSeconds !== null && selectedFile
-                    ? `~${formatShortDuration(estimatedSeconds)} for this ${formatFileSize(selectedFile.size)} file`
+                    ? `~${formatShortDuration(estimatedSeconds)} for ${selectedFiles.length > 1 ? `these ${selectedFiles.length} files` : 'this'} ${formatFileSize(selectedSize)}${selectedFiles.length > 1 ? '' : ' file'}`
                     : 'Choose a file to see how long it will take.'}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <ToggleSwitch id="private-transfer" label="Private transfer" checked={isPrivate} onChange={setIsPrivate} disabled={isTransferring} />
+                <p className="text-xs text-fg-muted">
+                  Encrypts the file and its name. You read a key code to the receiver, who enters it before the file opens. Someone filming the stream cannot read the file without the code.
                 </p>
               </div>
 
@@ -328,9 +432,9 @@ function FileTransferToolInner() {
                   Transfer QR
                 </h2>
                 {hasFile && (
-                  <Badge tone={isTransferring ? 'success' : 'neutral'}>
-                    <span aria-hidden="true" className={`size-1.5 rounded-full ${isTransferring ? 'bg-success motion-safe:animate-pulse' : 'bg-line-strong'}`} />
-                    {isTransferring ? 'Transmitting' : 'Ready'}
+                  <Badge tone={isTransferring && !isPaused ? 'success' : 'neutral'}>
+                    <span aria-hidden="true" className={`size-1.5 rounded-full ${isTransferring && !isPaused ? 'bg-success motion-safe:animate-pulse' : 'bg-line-strong'}`} />
+                    {isPaused ? 'Paused' : isTransferring ? 'Transmitting' : 'Ready'}
                   </Badge>
                 )}
               </div>
@@ -359,31 +463,80 @@ function FileTransferToolInner() {
                 </div>
               )}
 
-              {/* Start / Stop comes before the stream so it follows the settings directly on mobile. */}
+              {/* Start / Pause / Stop come before the stream so they follow the settings directly on mobile. */}
               <div className={`mb-4 flex gap-3 ${hasFile ? '' : 'hidden'}`}>
                 {!isTransferring ? (
                   <Button
                     variant="primary"
                     fullWidth
-                    onClick={startTransfer}
+                    onClick={handleStart}
                     disabled={isVerifyingHandshake}
                     aria-label="Start file transfer"
+                    aria-describedby={showNotice ? 'photosensitivity-notice' : undefined}
                   >
                     <Play className="size-4" aria-hidden="true" />
                     {isVerifyingHandshake ? 'Checking QR…' : 'Start Transfer'}
                   </Button>
                 ) : (
-                  <Button
-                    variant="error"
-                    fullWidth
-                    onClick={stopTransfer}
-                    aria-label="Stop file transfer"
-                  >
-                    <Square className="size-4" aria-hidden="true" />
-                    Stop Transfer
-                  </Button>
+                  <>
+                    <Button
+                      variant="secondary"
+                      fullWidth
+                      onClick={isPaused ? resumeTransfer : pauseTransfer}
+                      aria-keyshortcuts={isPaused ? undefined : 'Escape'}
+                    >
+                      {isPaused ? <Play className="size-4" aria-hidden="true" /> : <Pause className="size-4" aria-hidden="true" />}
+                      {isPaused ? 'Resume' : 'Pause'}
+                    </Button>
+                    <Button variant="error" fullWidth onClick={stopTransfer} aria-label="Stop file transfer">
+                      <Square className="size-4" aria-hidden="true" />
+                      Stop Transfer
+                    </Button>
+                  </>
                 )}
               </div>
+
+              {/* A live region that is always present, so the notice is announced when it appears. */}
+              <div role="status" aria-live="polite">
+                {showNotice && (
+                  <p
+                    id="photosensitivity-notice"
+                    className="mb-4 rounded-xl border border-warning-line bg-warning-soft p-3 text-sm text-warning"
+                    data-testid="photosensitivity-notice"
+                  >
+                    {PHOTOSENSITIVITY_NOTICE}
+                  </p>
+                )}
+                {isPaused && <p className="sr-only">{PAUSED_ANNOUNCEMENT}</p>}
+              </div>
+
+              {confirmingMotion && !isTransferring && (
+                <div
+                  role="group"
+                  aria-labelledby="motion-confirm-title"
+                  className="mb-4 rounded-xl border border-warning-line bg-warning-soft p-3 text-sm text-warning"
+                  data-testid="reduced-motion-confirm"
+                >
+                  <p id="motion-confirm-title" className="font-semibold">
+                    {REDUCED_MOTION_CONFIRM_TITLE}
+                  </p>
+                  <p className="mt-1">{REDUCED_MOTION_CONFIRM_BODY}</p>
+                  <div className="mt-3 flex gap-3">
+                    <Button ref={confirmButtonRef} variant="primary" size="sm" onClick={beginTransfer}>
+                      Start anyway
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => setConfirmingMotion(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {isTransferring && (
+                <p className="mb-4 text-xs text-fg-muted" data-testid="pause-hint">
+                  {PAUSE_HINT}
+                </p>
+              )}
 
               {selectedFile && !isTransferring && !handshakeError && <PairingGuide />}
 
@@ -427,6 +580,42 @@ function FileTransferToolInner() {
                       <div className="font-mono text-sm font-semibold text-fg-soft">{transferStats.frameBufferMemory}</div>
                     </div>
                   </div>
+                  {fountainInfo?.keyCode && (
+                    <div className="space-y-2 rounded-lg border border-line bg-surface p-3" data-testid="sender-key-panel">
+                      <p className="font-semibold text-fg">Key code</p>
+                      <p className="font-mono text-sm font-semibold break-words text-fg-soft" data-testid="sender-key-code">
+                        {fountainInfo.keyCode}
+                      </p>
+                      <p className="text-fg-muted">Tell the receiver these words, or hold the button to show a QR code they can scan. Do not show the code on a screen the camera can see.</p>
+                      <Button
+                        variant="outline"
+                        onPointerDown={showKeyQr}
+                        onPointerUp={hideKeyQr}
+                        onPointerLeave={hideKeyQr}
+                        onPointerCancel={hideKeyQr}
+                        onBlur={hideKeyQr}
+                        onKeyDown={(event) => {
+                          if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) showKeyQr();
+                        }}
+                        onKeyUp={hideKeyQr}
+                      >
+                        Hold to show key QR
+                      </Button>
+                      <canvas
+                        ref={keyCanvasRef}
+                        className={`mx-auto aspect-square w-48 rounded-lg bg-surface ${keyFrame ? '' : 'hidden'}`}
+                        role="img"
+                        aria-label="Key code QR"
+                        width={512}
+                        height={512}
+                      />
+                    </div>
+                  )}
+                  {fountainInfo && (
+                    <p className="text-fg-muted" data-testid="sender-fingerprint">
+                      Transfer code <span className="font-mono font-semibold text-fg-soft">{fountainInfo.fingerprint}</span>. The receiver shows the same four words once it has read the transfer details. If they differ, it is reading another device.
+                    </p>
+                  )}
                   {fountainInfo && (
                     <p className="text-fg-muted">
                       The stream keeps going after the first pass so a receiver can join late or miss frames. Stop once the receiver shows Transfer Complete.
@@ -447,7 +636,7 @@ function FileTransferToolInner() {
                     height={512}
                   />
                   {/* A soft band sweeps the sending QR while it plays (motion-safe only). */}
-                  {isTransferring && (
+                  {isTransferring && !isPaused && (
                     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden motion-reduce:hidden">
                       <div className="h-1/3 w-full bg-linear-to-b from-transparent via-accent/20 to-transparent motion-safe:animate-scan-sweep" />
                     </div>

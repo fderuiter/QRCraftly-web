@@ -1,6 +1,7 @@
 import React from "react";
 import { VCardData } from "../../types";
 import { TextField } from "../ui/FormFields";
+import { LinkHints, hintsId } from "./FieldHints";
 import { isDangerousUrl } from "../../utils/security";
 import { FormBlock } from "../ui/FormBlock";
 import {
@@ -101,7 +102,9 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         value={data.website}
         onChange={(e) => onChange({ website: e.target.value })}
         error={websiteError}
+        aria-describedby={hintsId("vcard-website")}
       />
+      {!websiteError && <LinkHints fieldId="vcard-website" address={data.website} />}
 
       <FormBlock legend="Address" isSubFieldset={true}>
         <div className={SUB_CONTAINER_SPACING_CLASSES}>

@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { useOpticalSender, useOpticalReceiver } from '../client';
-import { FountainReassembler, createFountainSession, encodeSessionMessage, FountainEncoder } from '../index';
+import { FountainReassembler, PrismStream, TRANSFER_DENSITY_PROFILES, createPrismSession, crc32 } from '../index';
 import { receiverOptions, senderOptions } from './fixtures';
 
 
@@ -37,7 +37,6 @@ describe('Optical Transfer Client Hooks', () => {
       expect(result.current.isVerifyingHandshake).toBe(false);
       expect(result.current.progress).toBe(0);
       expect(result.current.density).toBe('balanced');
-      expect(result.current.fountainMode).toBe(true);
       expect(result.current.fps).toBe(15);
     });
 
@@ -54,7 +53,7 @@ describe('Optical Transfer Client Hooks', () => {
       expect(result.current.selectedFile?.name).toBe('simulation_50mb_payload.bin');
       expect(result.current.selectedFile?.size).toBe(50 * 1024 * 1024);
     });
-    it('starts a fountain broadcast without a handshake frame and never restarts the stream', async () => {
+    it('starts a broadcast without a handshake frame and never restarts the stream', async () => {
       const { result } = renderHook(() =>
         useOpticalSender(senderOptions())
       );
@@ -71,9 +70,8 @@ describe('Optical Transfer Client Hooks', () => {
           worker.dispatchMessage({
             type: 'INITIALIZED',
             totalFrames: 2,
-            chunkSize: 40,
             sha256: 'abc',
-            fountain: { k: 2, density: 'fast', symbolSize: 40, compression: 'deflate-raw', messageLength: 80 },
+            fountain: { k: 2, density: 'fast', symbolSize: 40, compression: 'deflate-raw', messageLength: 80, fingerprint: 'AB12-CD34' },
           });
           for (let index = 0; index < 6; index++) {
             worker.dispatchMessage({ type: 'FRAME', index, total: 2, size: 21, data: new Uint8Array(441) });
@@ -87,11 +85,12 @@ describe('Optical Transfer Client Hooks', () => {
 
       await waitFor(() => expect(result.current.isTransferring).toBe(true));
       const start = sent.find(m => m.type === 'START');
-      // The density picks the droplet size and ECC in the worker; the legacy chunk size is not sent.
-      expect(start?.payload).toMatchObject({ fountainMode: true, density: 'fast' });
+      // The density picks the symbol size and ECC in the worker.
+      expect(start?.payload).toMatchObject({ density: 'fast' });
       expect(start?.payload).not.toHaveProperty('chunkSize');
+      expect(start?.payload).not.toHaveProperty('fountainMode');
       expect(result.current.handshakeVerified).toBe(true);
-      expect(result.current.fountainInfo).toEqual({ k: 2, density: 'fast', symbolSize: 40, compression: 'deflate-raw' });
+      expect(result.current.fountainInfo).toEqual({ k: 2, density: 'fast', symbolSize: 40, compression: 'deflate-raw', fingerprint: 'AB12-CD34' });
 
       // Play past K = 2: every droplet is ACKed and its pool slot recycled; no START restart.
       await waitFor(() => expect(result.current.currentFrameIndex).toBeGreaterThanOrEqual(5), { timeout: 3000 });
@@ -137,9 +136,8 @@ describe('Optical Transfer Client Hooks', () => {
     it('should initialize with standard defaults', () => {
       const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
 
-      expect(result.current.chunks.size).toBe(0);
-      expect(result.current.totalChunks).toBeNull();
-      expect(result.current.securityAlert).toBeNull();
+      expect(result.current.manifest).toBeNull();
+      expect(result.current.fountainStats).toBeNull();
       expect(result.current.isScanning).toBe(false);
       expect(result.current.receiverMode).toBe('camera');
     });
@@ -155,11 +153,15 @@ describe('Optical Transfer Client Hooks', () => {
         }
         if (message.type !== 'FOUNTAIN_DROPLET' || !message.droplet) return;
         const snap = reassembler.ingest(message.droplet);
+        const manifest = reassembler.takeManifest();
+        if (manifest) worker.dispatchMessage({ type: 'MANIFEST', manifest });
         if (!snap) return;
         worker.dispatchMessage({ type: 'PROGRESS', progress: snap.progress, current: snap.resolved, total: snap.k, rank: snap.rank, dropletsReceived: snap.dropletsReceived, isFountain: true });
         if (!reassembler.isComplete) return;
         try {
-          const { data, header } = await reassembler.finalize();
+          const {
+          files: [{ data, header }],
+        } = await reassembler.finalize();
           worker.dispatchMessage({ type: 'COMPLETE', buffer: data.slice().buffer, handshake: { fileName: header.fileName, fileSize: header.fileSize, mimeType: header.mimeType, sha256: header.sha256 }, isFountain: true });
         } catch (err) {
           worker.dispatchMessage({ type: 'ERROR', error: (err as Error).message, isFountain: true });
@@ -167,26 +169,32 @@ describe('Optical Transfer Client Hooks', () => {
       });
     }
 
-    it('reassembles a fountain stream joined mid-stream with drops, without any handshake', async () => {
+    it('reassembles a stream joined mid-stream with drops, from the manifest alone', async () => {
       installFountainWorker();
       const text = 'Hook-level fountain reception. '.repeat(30);
-      const { encoder, header } = await createFountainSession(new TextEncoder().encode(text), { fileName: 'hook.txt', mimeType: 'text/plain' });
-      const { result } = renderHook(() => useOpticalReceiver(receiverOptions({ autoDownload: false, handshakeRequired: true })));
+      const { stream, manifest } = await createPrismSession(new TextEncoder().encode(text), {
+        fileName: 'hook.txt',
+        mimeType: 'text/plain',
+        errorCorrectionLevel: TRANSFER_DENSITY_PROFILES.balanced.errorCorrectionLevel,
+        maxVersion: TRANSFER_DENSITY_PROFILES.balanced.maxVersion,
+      });
+      const { result } = renderHook(() => useOpticalReceiver(receiverOptions({ autoDownload: false })));
 
-      for (let index = 4; index < encoder.k * 4 && !result.current.receiverSuccess; index++) {
-        if (index % 4 === 0) continue;
+      for (let index = 4; index < stream.k * 6 + 40 && !result.current.receiverSuccess; index++) {
+        if (index % 4 === 1) continue;
         await act(async () => {
-          await result.current.handleFrame(encoder.dropletStringForIndex(index));
+          result.current.handleFrame(stream.frameText(index));
           await new Promise(resolve => setTimeout(resolve, 0));
         });
       }
 
       await waitFor(() => expect(result.current.receiverSuccess).toBe(true));
       expect(result.current.receiverError).toBeNull();
-      expect(result.current.handshake).toMatchObject({ fileName: 'hook.txt', sha256: header.sha256 });
+      expect(result.current.manifest).toMatchObject({ files: [{ name: 'hook.txt' }] });
+      expect(result.current.handshake).toMatchObject({ fileName: 'hook.txt', sha256: manifest.files[0].sha256 });
       expect(new TextDecoder().decode(result.current.reassembledData!)).toBe(text);
-      expect(result.current.fountainStats).toMatchObject({ k: encoder.k, rank: encoder.k, progress: 100, etaSeconds: 0 });
-      expect(result.current.fountainStats!.dropletsReceived).toBeGreaterThanOrEqual(encoder.k);
+      expect(result.current.fountainStats).toMatchObject({ k: stream.k, rank: stream.k, progress: 100, etaSeconds: 0 });
+      expect(result.current.fountainStats!.dropletsReceived).toBeGreaterThanOrEqual(stream.k);
       expect(result.current.fountainStats!.fps).toBeGreaterThanOrEqual(0);
       globalThis.mockWorkerControl.setInterceptor(null);
     });
@@ -194,14 +202,24 @@ describe('Optical Transfer Client Hooks', () => {
     it('refuses to deliver a fountain file whose SHA-256 does not verify', async () => {
       installFountainWorker();
       const bytes = new TextEncoder().encode('forged content');
-      const encoder = new FountainEncoder(
-        encodeSessionMessage({ fileName: 'x.txt', mimeType: 'text/plain', fileSize: bytes.length, sha256: 'aa'.repeat(32), compression: 'none' }, bytes),
-        { blockSize: 16 }
-      );
+      const stream = new PrismStream(bytes, {
+        version: 1,
+        files: [{ name: 'x.txt', size: bytes.length, mimeType: 'text/plain', sha256: 'aa'.repeat(32) }],
+        compression: 'none',
+        transferLength: bytes.length,
+        symbolSize: 16,
+        transferCrc32: crc32(bytes),
+        salt: new Uint8Array(0),
+        encryption: 0,
+        layout: 0,
+        unpackedLength: 0,
+        unpackedSha256: new Uint8Array(0),
+        entryCount: 0,
+      });
       const { result } = renderHook(() => useOpticalReceiver(receiverOptions({ autoDownload: true })));
-      for (let index = 0; index < encoder.k; index++) {
+      for (let index = 0; index < stream.k * 3 + 40 && !result.current.receiverError; index++) {
         await act(async () => {
-          await result.current.handleFrame(encoder.dropletStringForIndex(index));
+          result.current.handleFrame(stream.frameText(index));
           await new Promise(resolve => setTimeout(resolve, 0));
         });
       }
@@ -218,8 +236,7 @@ describe('Optical Transfer Client Hooks', () => {
         result.current.handleClear();
       });
 
-      expect(result.current.chunks.size).toBe(0);
-      expect(result.current.totalChunks).toBeNull();
+      expect(result.current.manifest).toBeNull();
       expect(result.current.handshake).toBeNull();
       expect(result.current.receiverError).toBeNull();
       expect(result.current.fountainStats).toBeNull();

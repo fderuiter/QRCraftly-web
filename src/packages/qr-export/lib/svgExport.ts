@@ -25,6 +25,7 @@ import { SafeUrlPipeline, normalizeUrl } from '@/utils/url';
 import { getCachedAsset } from '@/utils/assetCache';
 import { sanitizeSvg } from '@/utils/security';
 
+import { validateConfig } from '@/packages/qr-payload';
 import { buildMatrix, loadQrEncoder, type ModuleRenderOptions } from '@/packages/qr-matrix';
 import { loadMosaicSource } from '@/packages/qr-matrix/mosaic';
 
@@ -120,6 +121,17 @@ function makeImgProxy(src: string | null): HTMLImageElement | null {
   return { src } as unknown as HTMLImageElement;
 }
 
+/** Thrown by {@link generateQRSvg} when the payload fails validation; `violations` holds the codes. */
+export class PayloadRejectedError extends Error {
+  readonly violations: readonly string[];
+
+  constructor(violations: readonly string[]) {
+    super(`QR payload rejected: ${violations.join(', ')}`);
+    this.name = 'PayloadRejectedError';
+    this.violations = violations;
+  }
+}
+
 /**
  * Generates a fully self-contained SVG string that visually matches the QR
  * code that would be rendered to a canvas with the same configuration.
@@ -132,13 +144,24 @@ function makeImgProxy(src: string | null): HTMLImageElement | null {
  * Logos (both center and border) are fetched and embedded as base64 data-URLs
  * so the resulting `.svg` file works without an internet connection.
  *
+ * The payload is validated first (`validateConfig`); a failing payload rejects with
+ * {@link PayloadRejectedError}. Set `skipPayloadValidation` only for trusted internal callers.
+ *
  * @param config  The QR code configuration.
  * @returns A promise that resolves to the SVG XML string.
  */
 export async function generateQRSvg(
   config: QRConfig,
-  options?: { onLogoOmitted?: () => void; renderOptions?: ModuleRenderOptions }
+  options?: { onLogoOmitted?: () => void; renderOptions?: ModuleRenderOptions; skipPayloadValidation?: boolean }
 ): Promise<string> {
+  // Defence in depth: no caller can render an unvalidated payload unless it opts out explicitly.
+  if (!options?.skipPayloadValidation) {
+    const violations = validateConfig(config);
+    if (violations.length > 0) {
+      throw new PayloadRejectedError(violations);
+    }
+  }
+
   // The encoder is loaded lazily so `qrcode` stays out of the main bundle.
   const modules = buildMatrix(config, await loadQrEncoder());
   const moduleCount = modules.size;

@@ -1,5 +1,6 @@
 ---
 status: accepted
+superseded_in_part_by: 0031
 ---
 
 # Transfer Density Profiles and Stream Scanning

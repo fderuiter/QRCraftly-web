@@ -55,7 +55,7 @@ async function openReceiver(receiver: Page) {
 const isComplete = (receiver: Page) => () => receiver.getByTestId('inline-complete-panel').isVisible();
 
 async function blocksDecoded(receiver: Page): Promise<number> {
-  const text = (await receiver.getByTestId('fountain-rank').textContent().catch(() => null)) ?? '';
+  const text = (await receiver.getByTestId('fountain-rank').textContent({ timeout: 500 }).catch(() => null)) ?? '';
   return Number(/^(\d+)/.exec(text)?.[1] ?? 0);
 }
 
@@ -102,6 +102,16 @@ test.describe('Optical file transfer', () => {
         .poll(async () => Number(/^(\d+)/.exec((await sender.getByTestId('sender-frames').textContent()) ?? '')?.[1] ?? 0))
         .toBeGreaterThanOrEqual(5);
       await openReceiver(receiver);
+
+      // The manifest shows the file's name and type before any of its data has decoded, and its
+      // transfer code matches the one on the sender's screen.
+      await relayFrames(sender, receiver, { drop: n => n % 4 === 0, until: () => receiver.getByTestId('manifest-info').isVisible(), timeoutMs: 30_000 });
+      await expect(receiver.getByTestId('manifest-name')).toHaveText('firmware.bin');
+      await expect(receiver.getByTestId('manifest-type')).toHaveText('application/octet-stream');
+      const code = await sender.getByTestId('sender-fingerprint').locator('span').textContent();
+      await expect(receiver.getByTestId('manifest-fingerprint')).toHaveText(code ?? 'missing');
+      await expect(receiver.getByTestId('inline-complete-panel')).toBeHidden();
+
       await relayUntilComplete(sender, receiver, { drop: n => n % 4 === 0 });
 
       await expectDownloadedCopy(receiver, file);
@@ -177,6 +187,44 @@ test.describe('Optical file transfer', () => {
       await expect(receiver.getByTestId('fountain-rank')).toHaveCount(0);
     });
 
+    test('asks before saving risky file types and shows the real extension', async ({ page: receiver, context }) => {
+      await installSyntheticCamera(context);
+      const sender = await context.newPage();
+      // The name hides an executable behind a document extension.
+      const exe = { name: 'invoice.pdf.exe', mimeType: 'application/x-msdownload', buffer: randomBytes(1024) };
+      const html = { name: 'page.html', mimeType: 'text/html', buffer: Buffer.from('<p>hello</p>'.repeat(40)) };
+
+      await openSender(sender, exe);
+      await openReceiver(receiver);
+      await relayUntilComplete(sender, receiver);
+
+      // The whole name wraps in view, with the type called out on its own line.
+      await expect(receiver.getByTestId('received-file-name')).toHaveText('invoice.pdf.exe');
+      await expect(receiver.getByTestId('received-file-type')).toContainText('.exe, application/x-msdownload');
+      await expect(receiver.getByTestId('received-file-notices')).toContainText('The real type is .exe');
+
+      // First click opens the confirmation; nothing is saved yet.
+      await receiver.getByRole('button', { name: 'Save', exact: true }).click();
+      const confirmation = receiver.getByTestId('risky-file-confirmation');
+      await expect(confirmation).toContainText('can run programs on your device');
+      await receiver.getByRole('button', { name: 'Cancel' }).click();
+      await expect(confirmation).not.toBeVisible();
+
+      await receiver.getByRole('button', { name: 'Save', exact: true }).click();
+      const downloadPromise = receiver.waitForEvent('download');
+      await receiver.getByRole('button', { name: 'Save anyway' }).click();
+      expect((await downloadPromise).suggestedFilename()).toBe(exe.name);
+
+      // An .html file is active content too.
+      await sender.getByRole('button', { name: 'Stop file transfer' }).click();
+      await sender.getByLabel('Choose a file to send').setInputFiles(html);
+      await sender.getByRole('button', { name: 'Start file transfer' }).click();
+      await receiver.getByRole('button', { name: 'Receive another file' }).click();
+      await relayUntilComplete(sender, receiver);
+      await receiver.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(receiver.getByTestId('risky-file-confirmation')).toBeVisible();
+    });
+
     test('works between two phone-sized screens', async ({ browser }) => {
       const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
       try {
@@ -193,6 +241,57 @@ test.describe('Optical file transfer', () => {
       } finally {
         await context.close();
       }
+    });
+  });
+
+  test.describe('photosensitivity safeguards (#1148)', () => {
+    const notice = 'This screen will flash a rapidly changing pattern.';
+    const file = { name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('hello '.repeat(200)) };
+
+    async function chooseFile(sender: Page) {
+      await sender.goto('/file-transfer');
+      await sender.waitForSelector('main[data-hydrated="true"]');
+      await sender.getByLabel('Choose a file to send').setInputFiles(file);
+    }
+
+    test('warns before the first start, then Pause and Escape freeze the stream on screen', async ({ page }) => {
+      await chooseFile(page);
+      await expect(page.getByTestId('photosensitivity-notice')).toContainText(notice);
+      await expect(page.getByRole('status').filter({ hasText: notice })).toHaveCount(1);
+
+      await page.getByRole('button', { name: 'Start file transfer' }).click();
+      await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId('photosensitivity-notice')).toHaveCount(0);
+
+      // Pause freezes the canvas: two reads a moment apart are the same picture.
+      const picture = () => page.getByRole('img', { name: 'Transfer QR code' }).evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
+      await page.getByRole('button', { name: 'Pause' }).click();
+      await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
+      const frozen = await picture();
+      await page.waitForTimeout(600);
+      expect(await picture()).toBe(frozen);
+
+      // Escape does the same from wherever focus is.
+      await page.getByRole('button', { name: 'Resume' }).click();
+      await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
+    });
+
+    test.describe('with reduced motion', () => {
+      test.use({ contextOptions: { reducedMotion: 'reduce' } });
+
+      test('starts at the slowest pace and needs a second confirm', async ({ page }) => {
+        await chooseFile(page);
+        await expect(page.getByRole('radio', { name: 'Steady', exact: true })).toBeChecked();
+
+        await page.getByRole('button', { name: 'Start file transfer' }).click();
+        await expect(page.getByTestId('reduced-motion-confirm')).toContainText('Your device asks for reduced motion');
+        await expect(page.getByRole('button', { name: 'Pause' })).toHaveCount(0);
+
+        await page.getByRole('button', { name: 'Start anyway' }).click();
+        await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 20_000 });
+      });
     });
   });
 

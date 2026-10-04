@@ -182,6 +182,10 @@ test.describe('Throttled Interactive Performance Testing', () => {
       await page.getByLabel('Select Cyber Circuit pattern').click({ force: true });
       await page.evaluate(() => new Promise<void>((resolve) => requestIdleCallback(() => resolve(), { timeout: 5_000 })));
 
+      // Put the caret at the end first: after the warm-up click it can sit at the start, and a
+      // character typed before "https://" is now blocked as an unsupported scheme.
+      await urlInput.focus();
+      await urlInput.press('End');
       const typing = await measure(() => urlInput.press('x'));
       await page.evaluate(() => new Promise<void>((resolve) => requestIdleCallback(() => resolve(), { timeout: 5_000 })));
       const pattern = await measure(() => page.getByLabel('Select Starburst pattern').click({ force: true }));

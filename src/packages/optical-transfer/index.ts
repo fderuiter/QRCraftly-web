@@ -50,7 +50,7 @@ export {
 } from './lib/fountain/envelope';
 export { cborEncode, cborDecode, type CborValue } from './lib/fountain/cbor';
 export { encodeBytewordsMinimal, decodeBytewordsMinimal } from './lib/fountain/bytewords';
-export { crc32, crc32Hex } from './lib/fountain/crc32';
+export { crc32, crc32c, crc32Hex } from './lib/fountain/crc32';
 export {
   type DropletMetadata,
   type FountainDroplet,
@@ -65,7 +65,6 @@ export {
   decompressTransferPayload,
   resolveFountainSymbolSize,
   resolveTransferDensity,
-  estimateTransferFrames,
   TRANSFER_DENSITY_PROFILES,
   DEFAULT_TRANSFER_DENSITY,
   maxDropletStringLength,
@@ -79,16 +78,197 @@ export {
   type StreamErrorCorrection,
 } from './lib/fountain/session';
 export {
+  MAX_BUNDLE_ENTRIES,
+  MAX_RECEIVE_BYTES,
+  MAX_RECEIVE_MESSAGE_BYTES,
+} from './lib/limits';
+export {
   FountainReassembler,
   FountainRateTracker,
   type FountainProgress,
   type FountainTelemetry,
 } from './lib/fountain/reassembler';
 
+export { encodeBase45, decodeBase45, base45Length } from './lib/prism/base45';
 export {
-  StreamLookaheadReceiver,
-  type StreamLookaheadConfig,
-  DANGEROUS_SCHEMES,
-  decodeHtmlEntities,
-  recursiveDecode,
-} from './lib/streamLookahead';
+  PRISM_VERSION,
+  FLAG_ENCRYPTED,
+  FRAME_OVERHEAD,
+  encodeDataFrame,
+  encodeManifestFrame,
+  encodeFeedbackFrame,
+  createReceiverNonce,
+  decodeFrame,
+  looksLikePrismFrame,
+  type PrismFrame,
+  type FeedbackLayer,
+  type FeedbackReport,
+  type FrameRejection,
+  type FrameDecodeResult,
+} from './lib/prism/frame';
+export {
+  MAX_MANIFEST_NAME_BYTES,
+  encodeManifest,
+  decodeManifest,
+  sessionIdOf,
+  fitFileName,
+  type PrismManifest,
+  type PrismFileEntry,
+  type PrismManifestInfo,
+  type ManifestResult,
+  type ManifestRejection,
+} from './lib/prism/manifest';
+export {
+  MANIFEST_INTERVAL,
+  PrismStream,
+  createPrismSession,
+  createPrismBundleSession,
+  prismFrameCapacity,
+  prismSymbolSize,
+  estimateTransferFrames,
+  type PrismStreamOptions,
+  type PrismSessionOptions,
+} from './lib/prism/session';
+export { packBundle, unpackBundle, sanitizeRelativePath, type BundleSource, type BundleFile } from './lib/prism/bundle';
+export {
+  hmacSha256,
+  hkdfSha256,
+  deriveKeys,
+  privateSessionId,
+  encryptBlock,
+  decryptBlock,
+  generateSecret,
+  type PrivateKeys,
+} from './lib/prism/crypto';
+export { bytesToWords, wordsToBytes, fingerprintWords, formatKeyCode, parseKeyCode, keyQrText, parseKeyQr, KEY_CODE_WORDS, KEY_SECRET_BYTES } from './lib/prism/words';
+
+export { PrismReceiver } from './lib/prism/receiver';
+
+// Multi-code transfer (#1142). Off unless a caller opts in through `planMultiCode`; nothing in the app imports these yet.
+export {
+  MIN_MODULE_CSS_PX,
+  TILE_QUIET_MODULES,
+  TILE_LAYOUTS,
+  alphanumericCapacityL,
+  qrModuleCount,
+  tileFrameCapacity,
+  tileSymbolPlan,
+  layoutFootprint,
+  modulePxFor,
+  selectLayout,
+  type TileLayout,
+  type TileLayoutId,
+  type TileSymbolPlan,
+  type ScreenSize,
+  type LayoutChoice,
+  type LayoutOptions,
+} from './lib/multicode/layout';
+export {
+  tileGroup,
+  tileSlot,
+  tileFrameIndex,
+  tilesChangingAt,
+  tilesIntactAcross,
+  worstIntactFraction,
+} from './lib/multicode/stagger';
+export {
+  measureRefreshInterval,
+  refreshRateFromInterval,
+  holdForTargetFps,
+  effectiveFps,
+  createVsyncPacer,
+  type PacerTick,
+  type FrameClock,
+  type VsyncPacer,
+  type VsyncPacerOptions,
+} from './lib/multicode/pacing';
+export {
+  TileTracker,
+  predictTileRects,
+  createSymbolDedup,
+  type Rect,
+  type TileCrop,
+  type TrackPlan,
+  type CropResult,
+  type SymbolDedup,
+  type TileTrackerOptions,
+} from './lib/multicode/tracker';
+export {
+  decoderPoolSize,
+  createDecoderPool,
+  type DecoderPool,
+  type DecoderPoolOptions,
+  type DecoderPoolStats,
+  type PoolSizeOptions,
+} from './lib/multicode/pool';
+export { planMultiCode, type MultiCodeOptions, type MultiCodePlan } from './lib/multicode/plan';
+export {
+  MULTI_RATE_PROFILES,
+  isBeaconFrame,
+  classifyFrameText,
+  createMultiRateSender,
+  type MultiRateProfile,
+  type MultiRateProfileName,
+  type MultiRateFrame,
+  type MultiRateSender,
+  type MultiRateSenderOptions,
+} from './lib/multicode/multirate';
+export { layerHint, ROBUST_LAYER_HINT, STALL_HINT, type LayerObservation } from './lib/multicode/layerHint';
+
+// Webcam back channel (#1146). Off unless a caller opts in through `createFeedbackLink().enable()`; nothing in the app imports these yet.
+export {
+  SPEED_LADDER,
+  SWITCHABLE_SYMBOL_SIZE,
+  MAX_RECEIVERS,
+  RECEIVER_EXPIRY_MS,
+  SETTLE_MS,
+  RISE_AFTER_MS,
+  switchableProfile,
+  createSpeedController,
+  type ControllerDecision,
+  type SpeedController,
+  type SpeedControllerOptions,
+} from './lib/feedback/controller';
+export {
+  createFeedbackLink,
+  type CameraPermission,
+  type FeedbackLink,
+  type FeedbackLinkOptions,
+  type FeedbackLinkState,
+} from './lib/feedback/link';
+
+// Colour layer (#1147). Off: `createColourSender` returns null unless a caller passes `enabled: true`, and nothing in the app imports these.
+export {
+  CALIBRATION_SWATCHES,
+  ColourCalibrator,
+  fitCrossTalk,
+  splitChannels,
+  type CalibrationEvent,
+  type CrossTalkModel,
+  type GreyPlane,
+  type Matrix3,
+  type Rgb,
+  type RgbaImage,
+} from './lib/colour/crosstalk';
+export { beaconPatchRects, meanColour, samplePatch, tileRectsFromBeacon } from './lib/colour/geometry';
+export { EMIT_DARK, EMIT_LIGHT, composeBeacon, composeColourTile, type ComposeOptions, type ModuleGrid } from './lib/colour/compose';
+export {
+  COLOUR_FALLBACK_BEACONS,
+  COLOUR_FALLBACK_HINT,
+  COLOUR_PROFILE,
+  createColourSender,
+  shouldFallBackToMono,
+  type ColourFrame,
+  type ColourLinkReport,
+  type ColourProfile,
+  type ColourSender,
+  type ColourSenderOptions,
+} from './lib/colour/profile';
+export {
+  ColourReceiver,
+  type ColourFallbackReason,
+  type ColourReceiverOptions,
+  type ColourState,
+  type ColourStats,
+  type DecodedCode,
+} from './lib/colour/receiver';

@@ -3,7 +3,7 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(self), microphone=(), geolocation=(self), payment=()
-  Strict-Transport-Security: max-age=63072000
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
 
 # Preview and workers.dev copies of the site are never indexed; qrcraftly.com is the canonical host.
 https://:subdomain.fpderuiter.workers.dev/*

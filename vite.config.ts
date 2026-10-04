@@ -129,6 +129,8 @@ export default defineConfig(() => {
                 '**/node_modules/**',
                 '**/dist/**',
                 'e2e/**',
+                // Agent worktrees are copies of the repository, not part of it.
+                '.claude/**',
               ],
             },
           },
@@ -152,6 +154,8 @@ export default defineConfig(() => {
                 '**/node_modules/**',
                 '**/dist/**',
                 'e2e/**',
+                // Agent worktrees are copies of the repository, not part of it.
+                '.claude/**',
               ],
             },
           },

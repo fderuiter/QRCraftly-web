@@ -33,6 +33,23 @@ export function isLazyWasm(relativePath) {
   return relativePath.endsWith('.wasm');
 }
 
+// The experimental optical channel probe (#1162) carries this string, so its chunk can be told apart
+// whatever the bundler names it. Keep it in step with `PROBE_CHUNK_MARKER` in
+// src/pages/dev-sandbox/optical-probe/ProbeApp.tsx.
+export const OPTICAL_PROBE_MARKER = 'qrcraftly-optical-probe-chunk';
+
+/**
+ * Whether a file is the experimental optical channel probe (#1162). It is a measuring tool behind
+ * the `VITE_OPTICAL_MODEM` flag, loaded only by its own unlinked page, so it stays out of the
+ * site-total ceiling. It is never part of a page's first load, which is measured separately.
+ * @param {string} relativePath
+ * @param {Buffer} content
+ * @returns {boolean}
+ */
+export function isOpticalProbe(relativePath, content) {
+  return /\.m?js$/.test(relativePath) && content.includes(OPTICAL_PROBE_MARKER);
+}
+
 /**
  * Whether a file is shipped JavaScript or CSS, the only files the site-total ceiling counts.
  * @param {string} relativePath
@@ -133,7 +150,7 @@ export function verifyBundleSize(distDir, limitKb, wasmLimitKb = MAX_LAZY_WASM_G
       wasmGzipSize += gzipped.length;
       continue;
     }
-    if (isGeneratedMedia(posixPath) || !isShippedCode(posixPath)) continue;
+    if (isGeneratedMedia(posixPath) || isOpticalProbe(posixPath, content) || !isShippedCode(posixPath)) continue;
     totalRawSize += content.length;
     totalGzipSize += gzipped.length;
   }

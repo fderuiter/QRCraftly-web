@@ -654,7 +654,7 @@ describe('QRScanner Component', () => {
       await decode('https://example.com/menu');
 
       expect(screen.getByTestId('scan-result-host')).toHaveTextContent('example.com');
-      expect(screen.getByText(/Encrypted link with a plain address/)).toBeInTheDocument();
+      expect(screen.getByText(/No warning signs found in the address/)).toBeInTheDocument();
       const open = screen.getByRole('link', { name: 'Open link' });
       expect(open).toHaveAttribute('href', 'https://example.com/menu');
       expect(open).toHaveAttribute('target', '_blank');
@@ -691,6 +691,44 @@ describe('QRScanner Component', () => {
       expect(screen.getByText(/mixes letters from different alphabets/)).toBeInTheDocument();
       expect(screen.getByText(/not encrypted/)).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Edit in generator' })).not.toBeInTheDocument();
+    });
+
+    it('lists cautions and notes for a disguised link, never calling it safe', async () => {
+      const { container } = render(<QRScanner />);
+      await settle();
+      await decode('https://paypal.com@bit.ly:8443/x');
+
+      expect(screen.getByRole('list', { name: 'Cautions' })).toHaveTextContent(/Everything before the @/);
+      expect(screen.getByRole('list', { name: 'Notes' })).toHaveTextContent(/shortened link/);
+      expect(screen.queryByText(/No warning signs/)).not.toBeInTheDocument();
+      expect(screen.getByTestId('scan-result').textContent?.toLowerCase()).not.toMatch(/\bsafe\b/);
+      expect(await axe(container)).toHaveNoViolations();
+    });
+
+    it('warns about an open Wi-Fi network', async () => {
+      render(<QRScanner />);
+      await settle();
+      await decode('WIFI:T:nopass;S:Lobby;;');
+      expect(screen.getByRole('list', { name: 'Cautions about this code' })).toHaveTextContent(/no password/);
+    });
+
+    it('hides a Wi-Fi password until asked, and shares without it by default', async () => {
+      const share = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+      const { container } = render(<QRScanner />);
+      await settle();
+      await decode('WIFI:T:WPA;S:Cafe;P:hunter2;;');
+      expect(screen.getByTestId('scan-result').textContent).not.toContain('hunter2');
+      fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+      expect(share).toHaveBeenLastCalledWith({ text: expect.not.stringContaining('hunter2') });
+      expect(await axe(container)).toHaveNoViolations();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Show the secret' }));
+      expect(screen.getByTestId('scan-result').textContent).toContain('hunter2');
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Include the secret when sharing' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+      expect(share).toHaveBeenLastCalledWith({ text: 'WIFI:T:WPA;S:Cafe;P:hunter2;;' });
+      Reflect.deleteProperty(navigator, 'share');
     });
 
     it('summarises a WiFi code and copies its text', async () => {

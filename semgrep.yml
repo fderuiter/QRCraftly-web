@@ -5,11 +5,62 @@ rules:
           - pattern: |
               <a href={$X} ...> ... </a>
           - pattern: |
+              <ButtonLink href={$X} ...> ... </ButtonLink>
+          - pattern: |
               window.location.href = $X
+          - pattern: |
+              location.href = $X
+          - pattern: |
+              window.location.assign($X)
+          - pattern: |
+              location.assign($X)
+          - pattern: |
+              window.location.replace($X)
+          - pattern: |
+              location.replace($X)
+          - pattern: |
+              window.open($X, ...)
+          - pattern: |
+              $EL.href = $X
+          - pattern: |
+              navigate($X, ...)
+          - pattern: |
+              navigate($X)
       - pattern-not: |
           <a href="..." ...> ... </a>
       - pattern-not: |
+          <ButtonLink href="..." ...> ... </ButtonLink>
+      - pattern-not: |
           window.location.href = "..."
+      - pattern-not: |
+          location.href = "..."
+      - pattern-not: |
+          window.location.assign("...")
+      - pattern-not: |
+          location.assign("...")
+      - pattern-not: |
+          window.location.replace("...")
+      - pattern-not: |
+          location.replace("...")
+      - pattern-not: |
+          window.open("...", ...)
+      - pattern-not: |
+          $EL.href = "..."
+      - pattern-not: |
+          navigate("...", ...)
+      - pattern-not: |
+          navigate("...")
+      - pattern-not: |
+          <ButtonLink href={`#${...}`} ...> ... </ButtonLink>
+      - pattern-not: |
+          <a href={`#${...}`} ...> ... </a>
+      - metavariable-regex:
+          metavariable: $X
+          regex: '^(?!`#)'
+      - pattern-not-inside: |
+          !isDangerousUrl($X) && ...
+      - pattern-not-inside: |
+          $A && !isDangerousUrl($X) && ...
       - pattern-not-inside: |
           if (!isDangerousUrl($X)) {
             ...
@@ -20,9 +71,9 @@ rules:
           } else {
             ...
           }
-    message: "Variables passed to href or location must be verified with isDangerousUrl to prevent XSS/Open Redirect."
+    message: "Variables passed to href, location, window.open or navigate() must be verified with isDangerousUrl to prevent XSS/Open Redirect. A Blob URL from URL.createObjectURL is the one exception: mark it with a nosemgrep comment that says so."
     languages: [typescript, javascript]
-    severity: WARNING
+    severity: ERROR
 
   - id: require-safejsonldstringify
     patterns:
@@ -43,12 +94,30 @@ rules:
               `tel:${$X}`
           - pattern: |
               "tel:" + $X
+          - pattern: |
+              `sms:${$X}`
+          - pattern: |
+              "sms:" + $X
+          - pattern: |
+              `smsto:${$X}`
+          - pattern: |
+              "smsto:" + $X
       - pattern-not-inside: |
           cleanPhoneNumber(...)
       - pattern-not: |
-          `tel:${cleanPhoneNumber($X)}`
+          `tel:${cleanPhoneNumber(...)}`
       - pattern-not: |
-          "tel:" + cleanPhoneNumber($X)
-    message: "Phone numbers must be sanitized with cleanPhoneNumber before constructing a tel: URI."
+          "tel:" + cleanPhoneNumber(...)
+      - pattern-not: |
+          `sms:${encodeDialString(cleanPhoneNumber(...))}`
+      - pattern-not: |
+          `sms:${cleanPhoneNumber(...)}`
+      - pattern-not: |
+          "sms:" + cleanPhoneNumber(...)
+      - pattern-not: |
+          `smsto:${cleanPhoneNumber(...)}`
+      - pattern-not: |
+          "smsto:" + cleanPhoneNumber(...)
+    message: "Phone numbers must be sanitized with cleanPhoneNumber before constructing a tel:, sms: or smsto: URI."
     languages: [typescript, javascript]
-    severity: WARNING
+    severity: ERROR

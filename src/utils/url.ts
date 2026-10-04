@@ -32,7 +32,39 @@ export const SafeUrlPipeline = {
     'wscript:',
     'mocha:',
     'about:',
+    // OS and application handlers that can launch programs or install software (#1153).
+    'intent:',
+    'itms-services:',
+    'ms-msdt:',
+    'search-ms:',
+    'ms-officecmd:',
+    'jar:',
+    'view-source:',
   ],
+
+  /**
+   * Schemes the Website URL and Meeting types accept: those types exist to link to something a
+   * person opens, so anything outside this list is refused rather than blocklisted.
+   */
+  LINK_SCHEME_ALLOWLIST: new Set([
+    'http',
+    'https',
+    'ftp',
+    'mailto',
+    'tel',
+    'sms',
+    'smsto',
+    'geo',
+    'maps',
+    'zoommtg',
+    'zoomus',
+    'msteams',
+    'webex',
+    'skype',
+    'facetime',
+    'tg',
+    'whatsapp',
+  ]),
 
   decodeHtmlEntities(str: string): string {
     return str.replace(/&#(?:[xX]([0-9a-fA-F]+)|([0-9]+));?/g, (_match, hex, dec) => {
@@ -112,6 +144,18 @@ export const SafeUrlPipeline = {
     return this.OPAQUE_SCHEMES.has(match[1].toLowerCase());
   },
 
+  /**
+   * Returns the lowercase scheme of a URL that starts with a real one (see {@link hasExplicitScheme}),
+   * or null for scheme-less input such as `example.com`.
+   */
+  getScheme(url: string | undefined): string | null {
+    if (!url) return null;
+    const stripped = url.replace(this.REGEX_URL_UNSAFE_CHARS, '');
+    if (!this.hasExplicitScheme(stripped)) return null;
+    const match = /^([a-z][a-z0-9+.-]*):/i.exec(stripped);
+    return match ? match[1].toLowerCase() : null;
+  },
+
   normalize(url: string | undefined): string {
     if (!url) return '';
     
@@ -172,52 +216,4 @@ export const shouldNormalizeUrl = (url: string | undefined): boolean => {
   const isLocalhost = /^localhost(?::\d+)?(?:[/?#]|$)/i.test(url);
 
   return hasDot || isWww || isLocalhost;
-};
-
-/**
- * Protocol schemes flagged as potentially hazardous in streaming inputs.
- */
-export const DANGEROUS_SCHEMES = SafeUrlPipeline.DANGEROUS_PROTOCOLS;
-
-/**
- * Decodes hexadecimal, decimal, and named HTML entities.
- */
-export const decodeHtmlEntities = (str: string): string => {
-  return SafeUrlPipeline.decodeHtmlEntities(str);
-};
-
-/**
- * Recursively decodes percent-encoded characters and HTML entities up to 10 levels deep.
- * @param input - The obfuscated string to decode.
- * @param maxDepth - The maximum recursion depth limit.
- * @returns The recursively decoded plain text string.
- */
-export const recursiveDecode = (input: string, maxDepth = 10): string => {
-  let prev = '';
-  let curr = input;
-  let depth = 0;
-
-  while (curr !== prev && depth < maxDepth) {
-    prev = curr;
-
-    // Try percent decoding
-    try {
-      curr = decodeURIComponent(curr);
-    } catch {
-      // Fallback: decode only valid percent-encoded hex sequences (%HH)
-      curr = curr.replace(/%([0-9a-fA-F]{2})/g, (match, hex) => {
-        try {
-          return decodeURIComponent(match);
-        } catch {
-          return String.fromCharCode(parseInt(hex, 16));
-        }
-      });
-    }
-
-    // Try HTML entity decoding
-    curr = SafeUrlPipeline.decodeHtmlEntities(curr);
-    depth++;
-  }
-
-  return curr;
 };

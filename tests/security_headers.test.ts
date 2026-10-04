@@ -64,6 +64,19 @@ describe('public/_headers security headers', () => {
     expect(headers.get('strict-transport-security')).toMatch(/^max-age=\d+/);
   });
 
+  it('sends HSTS for subdomains too, without the preload flag, which is a separate decision (#1160)', () => {
+    const hsts = readGlobalHeaders().get('strict-transport-security') ?? '';
+    expect(hsts).toMatch(/;\s*includeSubDomains\b/);
+    expect(hsts).not.toMatch(/preload/);
+    expect(Number(/max-age=(\d+)/.exec(hsts)?.[1])).toBeGreaterThanOrEqual(31536000);
+  });
+
+  it('upgrades insecure subresource requests through the page policy (#1160)', () => {
+    expect(fs.readFileSync(path.resolve(path.dirname(HEADERS_PATH), '../src/layouts/Head.tsx'), 'utf8')).toContain(
+      "form-action 'self';"
+    );
+  });
+
   it('allowlists no third-party font hosts (#970)', () => {
     expect(fs.readFileSync(HEADERS_PATH, 'utf8')).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
   });

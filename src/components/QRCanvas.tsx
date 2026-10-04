@@ -21,7 +21,7 @@ import { QRConfig, SocialFormat, TemplateStyle, QRModules } from '../types';
 import { drawQR, drawQRInternal } from '../utils/qrRenderer';
 import { drawWithTemplate, SOCIAL_DIMENSIONS } from '@/packages/qr-export';
 import { useImage } from '../hooks/useImage';
-import { validateConfig } from '@/packages/qr-payload';
+import { validateConfig, describeViolation } from '@/packages/qr-payload';
 import { Alert } from './ui/Alert';
 import { useOptionalQRStoreSelector } from '../context/QRContext';
 import { loadMosaicSource } from '@/packages/qr-matrix/mosaic';
@@ -815,26 +815,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
           >
             <div className="mt-2 space-y-1.5">
               {violations.map((v, i) => {
-                let msg = v;
-                if (v === 'URI_INJECTION_VIOLATION') {
-                  msg = 'Unsafe URL scheme or malicious protocol detected.';
-                } else if (v === 'URL_STRUCTURE_VIOLATION') {
-                  msg = 'Malformed URL structure.';
-                } else if (v === 'EMAIL_STRUCTURE_VIOLATION') {
-                  msg = 'Invalid email address structure.';
-                } else if (v === 'LATITUDE_OUT_OF_BOUNDS_VIOLATION') {
-                  msg = 'Latitude must remain between -90 and 90 degrees.';
-                } else if (v === 'LONGITUDE_OUT_OF_BOUNDS_VIOLATION') {
-                  msg = 'Longitude must remain between -180 and 180 degrees.';
-                } else if (v === 'EVENT_MISSING_SUMMARY') {
-                  msg = 'Event title/summary is required.';
-                } else if (v === 'EVENT_MISSING_START') {
-                  msg = 'Event start date/time is required.';
-                } else if (v === 'EVENT_CHRONOLOGICAL_VIOLATION') {
-                  msg = 'Event end date/time cannot be before start date/time.';
-                } else if (v === 'SMS_PHONE_STRUCTURE_VIOLATION') {
-                  msg = 'SMS phone number contains invalid characters, letters, or line-breaks.';
-                }
+                const msg = describeViolation(v);
                 return (
                   <p key={i} className="text-sm font-medium text-danger">
                     {msg}

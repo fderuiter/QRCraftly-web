@@ -167,6 +167,7 @@ Lighthouse CI runs on every Pull Request to audit performance, accessibility, be
   - `adr/`: Architectural Decision Records.
   - `public/`: Public guides, UI component catalog, edge architecture, scaling, and compliance specifications.
   - `SECURITY.md`: Security policy, Content Security Policy, and vulnerability reporting.
+  - `ABUSE_PROTECTIONS.md`: What QRCraftly does to stop harmful codes and to protect people who scan codes or receive files, and its limits.
   - `WORKFLOWS.md`: Branching model and CI pipeline.
   - `agents/`: Instructions for AI agents (issue tracker, triage labels, domain docs).
 - `e2e/`: Playwright end-to-end tests.

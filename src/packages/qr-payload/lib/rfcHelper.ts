@@ -147,7 +147,8 @@ export interface FormattedDateTime {
  * Formats an ISO datetime string (from datetime-local) into iCalendar local datetime.
  * Handles UTC indicators ('Z') and timezone offsets properly.
  * @param dateString - The raw ISO date-time string.
- * @returns Formatted value and timezone identifier (if present).
+ * @returns Formatted value and timezone identifier (if present). The value is empty when the
+ * string is not a date.
  */
 export const formatEventDateTime = (dateString: string | undefined): FormattedDateTime => {
   if (!dateString) return { value: '' };
@@ -167,7 +168,9 @@ export const formatEventDateTime = (dateString: string | undefined): FormattedDa
 
   const date = new Date(cleanDateString);
   if (Number.isNaN(date.getTime())) {
-    return { value: dateString };
+    // Never emit the raw string: it would reach DTSTART/DTEND unescaped, so a newline in it
+    // could add properties to the event (#1160). `EventContract.validate` reports the bad date.
+    return { value: '' };
   }
 
   let formatted = '';

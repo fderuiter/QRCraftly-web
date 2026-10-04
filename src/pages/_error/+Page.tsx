@@ -79,6 +79,7 @@ export default function Page() {
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {QUICK_LINKS.map(([label, href]) => (
             <li key={href}>
+              {/* nosemgrep: require-isdangerousurl -- QUICK_LINKS is a fixed list of internal paths */}
               <ButtonLink href={href} variant="outline" fullWidth>
                 {label}
               </ButtonLink>

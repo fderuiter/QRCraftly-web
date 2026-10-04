@@ -3,6 +3,7 @@ import { PaymentData, CryptoNetwork } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { isDangerousUrl } from "../../utils/security";
 import { FormBlock } from "../ui/FormBlock";
+import { checkCryptoAddress } from "@/packages/qr-payload";
 
 interface PaymentInputProps {
   data: PaymentData;
@@ -15,7 +16,11 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
 }) => {
   const addressError = data.address && isDangerousUrl(data.address)
     ? "Unsafe URL scheme or malicious protocol detected."
-    : undefined;
+    : data.address &&
+        data.network !== CryptoNetwork.CUSTOM &&
+        checkCryptoAddress(data.network, data.address) === "invalid"
+      ? "This address does not pass its built-in check: it has a typo or is not a real address. Money sent to it can be lost. You can still make the code."
+      : undefined;
 
   return (
     <FormBlock legend="Crypto Payment">

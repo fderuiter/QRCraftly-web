@@ -26,6 +26,7 @@ import {
   CsvParseError,
   MAX_BULK_CSV_ROWS,
   MAX_BULK_CSV_CHARS,
+  type CsvRow,
   type CsvTable,
   type ZipEntry,
   previewRow,
@@ -42,6 +43,8 @@ import { SelectField } from '../ui/FormFields';
 import { useToast } from '../ui/Toast';
 import { useQRStoreSelector } from '@/context/QRContext';
 import { generateQRSvg, rasterizeSvgToCanvas } from '@/packages/qr-export';
+import { validateConfig, describeViolation } from '@/packages/qr-payload';
+import { analyseLink } from '@/packages/link-safety';
 import { triggerFileDownload } from '@/utils/downloadManager';
 import { FileSpreadsheet, Upload, AlertTriangle, Loader2 } from 'lucide-react';
 
@@ -53,6 +56,13 @@ export interface BulkCsvInputProps {
 interface RowError {
   rowIndex: number;
   message: string;
+}
+
+/** A row left out of the batch because its payload failed the same checks as the single generator. */
+interface SkippedRow {
+  /** 1-based data row number (the header is not counted). */
+  rowNumber: number;
+  reason: string;
 }
 
 /** Row count above which the main-thread processing warning is shown. */
@@ -113,6 +123,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   const [isGenerating, setIsGenerating] = useState(false);
   const [completedCount, setCompletedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [skippedRows, setSkippedRows] = useState<SkippedRow[]>([]);
 
   const outcome = useMemo(() => parseContent(data.csvContent), [data.csvContent]);
   const columns = useMemo(() => outcome.table?.headers ?? [], [outcome]);
@@ -127,6 +138,16 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   const exportFormat = data.exportFormat || 'png';
   const rowCount = rows.length;
   const preview = useMemo(() => previewRow(data.csvContent, payloadCol), [data.csvContent, payloadCol]);
+
+  // Rows whose address looks disguised (a lookalike, a shortener, an IP address). Only a hint:
+  // they are still generated, and the people who own the file may well mean them.
+  const unusualRows = useMemo(() => {
+    if (!payloadCol) return [];
+    return rows.flatMap((row, index) => {
+      const cautions = analyseLink((row[payloadCol] ?? '').trim()).filter((finding) => finding.severity === 'caution');
+      return cautions.length > 0 ? [{ rowNumber: index + 1, message: cautions.map((finding) => finding.message).join(' ') }] : [];
+    });
+  }, [rows, payloadCol]);
 
   // Store the detected column defaults so the selection survives re-renders.
   useEffect(() => {
@@ -186,9 +207,30 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       return;
     }
 
-    const targetRows = rows.filter((row) => hasPayload(row, payloadCol));
+    // Every row goes through the same validation as the single generator (script and data links,
+    // schemes outside the allowlist, hidden characters). Blocked rows are skipped and listed.
+    const skipped: SkippedRow[] = [];
+    const targetRows: CsvRow[] = [];
+    rows.forEach((row, index) => {
+      if (!hasPayload(row, payloadCol)) return;
+      const value = (row[payloadCol] ?? '').trim();
+      const violations = validateConfig({ ...currentConfig, value, type: QRType.URL });
+      if (violations.length > 0) {
+        skipped.push({ rowNumber: index + 1, reason: violations.map(describeViolation).join(' ') });
+      } else {
+        targetRows.push(row);
+      }
+    });
+    setSkippedRows(skipped);
     if (targetRows.length === 0) {
-      addToast({ type: 'error', message: 'No valid rows found to generate QR codes.', duration: 4000 });
+      addToast({
+        type: 'error',
+        message:
+          skipped.length > 0
+            ? 'Every row was blocked by the safety checks, so no ZIP was made.'
+            : 'No valid rows found to generate QR codes.',
+        duration: 5000,
+      });
       return;
     }
 
@@ -225,13 +267,16 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       }
 
       const zipFileName = data.fileName
-        ? `${data.fileName.replace(/\.[^/.]+$/, '')}-qrcodes.zip`
+        ? `${sanitizeFileStem(data.fileName.replace(/\.[^/.]+$/, ''), 'qr-codes')}-qrcodes.zip`
         : 'qr-codes-batch.zip';
       triggerFileDownload(createZip(entries), zipFileName, 'application/zip');
 
       addToast({
         type: 'success',
-        message: `Generated and downloaded ZIP with ${targetRows.length} QR codes!`,
+        message:
+          skipped.length > 0
+            ? `Downloaded a ZIP with ${targetRows.length} QR codes. ${skipped.length} unsafe ${skipped.length === 1 ? 'row was' : 'rows were'} skipped.`
+            : `Generated and downloaded ZIP with ${targetRows.length} QR codes!`,
         duration: 5000,
       });
     } catch (err) {
@@ -295,6 +340,33 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
               {fileInput('Change CSV or TXT file')}
             </label>
           </div>
+
+          {skippedRows.length > 0 && (
+            <Alert variant="warning" title={`${skippedRows.length} ${skippedRows.length === 1 ? 'row was' : 'rows were'} skipped`}>
+              <p>These rows were left out of the ZIP because their content failed the safety checks:</p>
+              <ul className="mt-2 max-h-40 list-disc space-y-1 overflow-y-auto pl-5 text-xs" data-testid="bulk-skipped-rows">
+                {skippedRows.map((row) => (
+                  <li key={row.rowNumber}>
+                    Row {row.rowNumber}: {row.reason}
+                  </li>
+                ))}
+              </ul>
+            </Alert>
+          )}
+
+          {unusualRows.length > 0 && (
+            <Alert variant="info" title={`${unusualRows.length} ${unusualRows.length === 1 ? 'address looks' : 'addresses look'} unusual`}>
+              <p>These rows are still included. Check that each one is what you mean:</p>
+              <ul className="mt-2 max-h-40 list-disc space-y-1 overflow-y-auto pl-5 text-xs" data-testid="bulk-unusual-rows">
+                {unusualRows.slice(0, 50).map((row) => (
+                  <li key={row.rowNumber}>
+                    Row {row.rowNumber}: {row.message}
+                  </li>
+                ))}
+              </ul>
+              {unusualRows.length > 50 && <p className="mt-1 text-xs">And {unusualRows.length - 50} more.</p>}
+            </Alert>
+          )}
 
           {outcome.error && (
             <Alert variant="error" title="Could not read this CSV">
@@ -427,6 +499,11 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
           >
             {completedCount} of {totalCount} QR codes generated
           </p>
+          {skippedRows.length > 0 && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              {skippedRows.length} unsafe {skippedRows.length === 1 ? 'row' : 'rows'} skipped. The list stays on screen when this finishes.
+            </p>
+          )}
           <Progress labelledBy="batch-progress-status" value={completedCount} max={totalCount} />
         </div>
       </Modal>

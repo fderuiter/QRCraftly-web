@@ -17,8 +17,12 @@
 */
 
 import { FountainDecoder } from './decoder';
-import { parseDropletString } from './envelope';
-import { FountainSessionHeader, openFountainSession } from './session';
+import { isFountainDropletString, parseDropletString } from './envelope';
+import { PrismReceiver } from '../prism/receiver';
+import type { OpenedTransfer } from '../prism/session';
+import type { PrismManifestInfo } from '../prism/manifest';
+import { openFountainSession } from './session';
+import { LARGE_BLOCK_COUNT } from '../limits';
 
 /**
  * Decoder progress snapshot reported after each accepted droplet.
@@ -39,14 +43,20 @@ export interface FountainProgress {
 /** Consecutive droplets from a different session before the reassembler switches to it. */
 const SESSION_SWITCH_THRESHOLD = 8;
 
+/** Key prefix that tells a Prism session from a `ur:bytes/` one in {@link FountainReassembler.finishedSessionKey}. */
+const PRISM_KEY_PREFIX = 'prism:';
+
 /**
- * Stateless-entry reassembler: accepts `ur:bytes/` droplets in any order from
- * any point in the stream, and on completion verifies and opens the session
- * (header parse, `deflate-raw` decompression, SHA-256 check). Shared by the
- * reassembly worker and the main-thread receiver fallback.
+ * Stateless-entry reassembler: accepts Prism frames and legacy `ur:bytes/` droplets in any order
+ * from any point in the stream, and on completion verifies and opens the session
+ * (decompression within the announced size, SHA-256 check). Shared by the reassembly worker and
+ * the main-thread receiver fallback.
  */
 export class FountainReassembler {
   private decoder = new FountainDecoder();
+  private readonly prism = new PrismReceiver();
+  /** Which format the stream being decoded uses; set by the last accepted frame. */
+  private format: 'ur' | 'prism' = 'prism';
   private foreignStreak = 0;
   private currentSession: string | null = null;
   /**
@@ -60,7 +70,61 @@ export class FountainReassembler {
    * @returns Completion state.
    */
   public get isComplete(): boolean {
-    return this.decoder.isComplete;
+    return this.format === 'prism' ? this.prism.isComplete : this.decoder.isComplete;
+  }
+
+  /**
+   * The manifest accepted since the last call, once, so the page can show the file's name, size and
+   * type before any data has been decoded.
+   * @returns The manifest, or null when there is no new one.
+   */
+  public takeManifest(): PrismManifestInfo | null {
+    return this.prism.takeAnnouncement();
+  }
+
+  /**
+   * A message the person should see (a newer format, a size over the limit), once.
+   * @returns The message, or null.
+   */
+  public takeRejection(): string | null {
+    return this.prism.takeRejection();
+  }
+
+  /**
+   * Another stream the person may switch to, once.
+   * @returns The offered stream, or null.
+   */
+  public takeSwitchOffer(): PrismManifestInfo | null {
+    return this.prism.takeSwitchOffer();
+  }
+
+  /**
+   * Switches to an offered stream.
+   * @param id Session ID from the offer.
+   */
+  public acceptSwitch(id: string): void {
+    this.prism.acceptSwitch(id);
+  }
+
+  /**
+   * Keeps the current stream and stops offering the other.
+   * @param id Session ID from the offer.
+   */
+  public declineSwitch(id: string): void {
+    this.prism.declineSwitch(id);
+  }
+
+  /**
+   * Sets the key code secret of a private transfer.
+   * @param secret The bytes the key code stands for.
+   */
+  public setKey(secret: Uint8Array): void {
+    this.prism.setKey(secret);
+  }
+
+  /** True while a private transfer is waiting for its key code. */
+  public get needsKey(): boolean {
+    return this.prism.needsKey;
   }
 
   /**
@@ -68,6 +132,7 @@ export class FountainReassembler {
    * @returns Progress or null.
    */
   public snapshot(): FountainProgress | null {
+    if (this.format === 'prism') return this.prism.snapshot();
     const { k } = this.decoder;
     if (k === null) return null;
     return {
@@ -85,12 +150,25 @@ export class FountainReassembler {
    * @returns A progress snapshot when the droplet was accepted, otherwise null.
    */
   public ingest(text: string): FountainProgress | null {
-    if (this.decoder.isComplete) return null;
+    if (!isFountainDropletString(text)) {
+      if (this.format === 'ur' && this.decoder.isComplete) return null;
+      if (this.format === 'prism' && this.prism.isComplete) return null;
+      const progress = this.prism.ingest(text);
+      if (progress) this.format = 'prism';
+      return progress;
+    }
+    if (this.format === 'prism' ? this.prism.isComplete : this.decoder.isComplete) return null;
     const parsed = parseDropletString(text);
     if (!parsed) return null;
     const { k, messageLength, checksum } = parsed.meta;
     const session = `${k}:${messageLength}:${checksum}:${parsed.data.length}`;
     if (session === this.finishedSession) return null;
+
+    // A stream claiming a very large block count must repeat before decoder tables (tens of MB)
+    // are built for it, so a flood of one-off bogus droplets cannot churn memory.
+    if (this.decoder.k === null && parsed.meta.k > LARGE_BLOCK_COUNT && !this.confirmLargeSession(parsed.meta)) {
+      return null;
+    }
 
     if (!this.decoder.matchesSession(parsed.meta, parsed.data.length)) {
       this.foreignStreak += 1;
@@ -104,20 +182,31 @@ export class FountainReassembler {
     if (this.decoder.dropletsReceived === before) return null;
     this.currentSession = session;
     this.finishedSession = null;
+    this.format = 'ur';
     return this.snapshot();
+  }
+
+  private candidate: { key: string; count: number } | null = null;
+
+  /** True once the same large-K session has been seen {@link SESSION_SWITCH_THRESHOLD} times in a row. */
+  private confirmLargeSession(meta: { k: number; messageLength: number; checksum: number }): boolean {
+    const key = `${meta.k}:${meta.messageLength}:${meta.checksum}`;
+    this.candidate = this.candidate?.key === key ? { key, count: this.candidate.count + 1 } : { key, count: 1 };
+    return this.candidate.count >= SESSION_SWITCH_THRESHOLD;
   }
 
   /**
    * Reconstructs, decompresses and SHA-256-verifies the transferred file.
-   * @returns The verified file bytes and its session header.
+   * @returns The verified files with their session headers.
    * @throws Error on incomplete decoding or any integrity failure.
    */
-  public async finalize(): Promise<{ data: Uint8Array; header: FountainSessionHeader }> {
+  public async finalize(): Promise<OpenedTransfer> {
+    if (this.format === 'prism') return this.prism.finalize();
     const message = this.decoder.finalize();
     if (!message) throw new Error('Fountain decoding is not complete.');
     const opened = await openFountainSession(message);
     this.finishedSession = this.currentSession;
-    return opened;
+    return { files: [opened] };
   }
 
   /**
@@ -125,6 +214,7 @@ export class FountainReassembler {
    * @returns The session key or null.
    */
   public get finishedSessionKey(): string | null {
+    if (this.format === 'prism' && this.prism.finishedSessionId) return `${PRISM_KEY_PREFIX}${this.prism.finishedSessionId}`;
     return this.finishedSession;
   }
 
@@ -133,16 +223,19 @@ export class FountainReassembler {
    * @param key A {@link finishedSessionKey} value.
    */
   public ignoreSession(key: string): void {
-    this.finishedSession = key;
+    if (key.startsWith(PRISM_KEY_PREFIX)) this.prism.ignoreSession(key.slice(PRISM_KEY_PREFIX.length));
+    else this.finishedSession = key;
   }
 
   /**
    * Clears all state for a new stream. The finished session is kept, so its droplets stay ignored.
    */
   public reset(): void {
+    this.prism.reset();
     this.decoder.reset();
     this.foreignStreak = 0;
     this.currentSession = null;
+    this.candidate = null;
   }
 }
 

@@ -72,7 +72,7 @@ if (typeof globalThis.DOMParser === 'undefined') {
   }
 }
 
-import { generateQRSvg, rasterizeSvgToCanvas, validateSvgScannability } from '../index';
+import { generateQRSvg, PayloadRejectedError, rasterizeSvgToCanvas, validateSvgScannability } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
 import { QRStyle, QRConfig, SocialFormat, TemplateStyle, QRType } from '@/types';
 
@@ -83,6 +83,20 @@ function parseAndAssertValidSvg(svgString: string): Document {
   expect(parserErrors.length).toBe(0);
   return doc;
 }
+
+describe('generateQRSvg payload validation (#1152)', () => {
+  it.each(['javascript:alert(1)', 'data:text/html,<script>alert(1)</script>', 'itms-services://?action=download-manifest'])(
+    'rejects %s',
+    async (value) => {
+      await expect(generateQRSvg({ ...DEFAULT_CONFIG, type: QRType.TEXT, value })).rejects.toBeInstanceOf(PayloadRejectedError);
+    },
+  );
+
+  it('lets a trusted caller opt out explicitly', async () => {
+    const svg = await generateQRSvg({ ...DEFAULT_CONFIG, type: QRType.TEXT, value: 'javascript:alert(1)' }, { skipPayloadValidation: true });
+    expect(svg).toContain('<svg');
+  });
+});
 
 describe('generateQRSvg', () => {
   it('returns a valid SVG string for a basic URL', async () => {

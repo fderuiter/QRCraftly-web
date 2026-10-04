@@ -199,7 +199,7 @@ describe('File Transfer Page & Pipeline', () => {
     render(<Page />);
 
     const file = new File(['payload'], 'dropped.txt', { type: 'text/plain' });
-    const fileInput = screen.getByText('Choose file or drag & drop').closest('label');
+    const fileInput = screen.getByText('Choose files or drag & drop').closest('label');
 
     expect(fileInput).not.toBeNull();
     fireEvent.drop(fileInput!, { dataTransfer: { files: [file] } });
@@ -352,7 +352,7 @@ describe('File Transfer Page & Pipeline', () => {
     render(<Page />);
 
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const dropZone = screen.getByText('Choose file or drag & drop').closest('label');
+    const dropZone = screen.getByText('Choose files or drag & drop').closest('label');
 
     expect(fileInput).not.toBeNull();
     expect(dropZone).not.toBeNull();

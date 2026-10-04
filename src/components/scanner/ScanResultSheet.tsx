@@ -23,8 +23,11 @@ import {
   Calendar,
   Check,
   Copy,
+  Eye,
+  EyeOff,
   CreditCard,
   FileSpreadsheet,
+  Info,
   Link,
   Mail,
   MapPin,
@@ -33,7 +36,6 @@ import {
   QrCode,
   RefreshCw,
   Share2,
-  ShieldCheck,
   Type,
   UserSquare2,
   Video,
@@ -42,6 +44,7 @@ import {
 import { QRType } from '@/types';
 import { Button, ButtonLink } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { isDangerousUrl } from '@/utils/security';
 import type { ScanDescription } from './describeScan';
 
 const TYPE_ICONS: Record<QRType, React.ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' }>> = {
@@ -89,20 +92,18 @@ function canShare(): boolean {
 export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, editLabel = 'Edit in generator', onScanAnother }) => {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [revealed, setRevealed] = useState(false);
+  const [shareSecret, setShareSecret] = useState(false);
   const Icon = scan.blocked ? Ban : TYPE_ICONS[scan.type];
   const { link } = scan;
-  const warnings = link
-    ? [
-        !link.secure && 'This link is not encrypted (http). Anything you send on the page can be read on the way.',
-        link.mixedScripts &&
-          'The address mixes letters from different alphabets, a common trick to imitate a well-known site.',
-        link.international && !link.mixedScripts && `The address uses international characters. Its plain form is ${link.asciiHost}.`,
-      ].filter((warning): warning is string => typeof warning === 'string')
-    : [];
+  const cautions = link?.findings.filter((finding) => finding.severity === 'caution') ?? [];
+  const notes = link?.findings.filter((finding) => finding.severity === 'info') ?? [];
 
   // Move focus to the result so keyboard and screen reader users land on it.
   useEffect(() => {
     headingRef.current?.focus();
+    setRevealed(false);
+    setShareSecret(false);
   }, [scan]);
 
   const copy = async () => {
@@ -115,7 +116,7 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
   };
 
   const share = () => {
-    navigator.share({ text: scan.text }).catch(() => undefined);
+    navigator.share({ text: shareSecret ? scan.text : scan.shareText }).catch(() => undefined);
   };
 
   return (
@@ -146,23 +147,44 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
         </div>
       )}
 
+      {scan.cautions.length > 0 && (
+        <ul className="space-y-1 rounded-lg border border-warning-line bg-warning-soft p-3 text-sm text-warning" aria-label="Cautions about this code">
+          {scan.cautions.map((caution) => (
+            <li key={caution} className="flex gap-1.5">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              {caution}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {link && (
         <div className="rounded-lg border border-line bg-surface-sunken p-3">
           <p className="text-xs font-semibold tracking-wide text-fg-muted uppercase">Opens</p>
           <p className="text-xl font-bold break-all text-fg" data-testid="scan-result-host">
             {link.host}
           </p>
-          {warnings.length === 0 ? (
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-success">
-              <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
-              Encrypted link with a plain address. Check it is the site you expect before opening it.
+          {link.findings.length === 0 && (
+            <p className="mt-1 text-sm text-fg-muted">
+              No warning signs found in the address. That is not a guarantee: check it is the site you expect before opening it.
             </p>
-          ) : (
-            <ul className="mt-2 space-y-1 text-sm text-warning">
-              {warnings.map((warning) => (
-                <li key={warning} className="flex gap-1.5">
+          )}
+          {cautions.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm text-warning" aria-label="Cautions">
+              {cautions.map((finding) => (
+                <li key={finding.code} className="flex gap-1.5">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                  {warning}
+                  {finding.message}
+                </li>
+              ))}
+            </ul>
+          )}
+          {notes.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm text-fg-muted" aria-label="Notes">
+              {notes.map((finding) => (
+                <li key={finding.code} className="flex gap-1.5">
+                  <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  {finding.message}
                 </li>
               ))}
             </ul>
@@ -175,10 +197,27 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
           {scan.summary.map((row) => (
             <React.Fragment key={row.label}>
               <dt className="font-medium text-fg-muted">{row.label}</dt>
-              <dd className="break-all text-fg">{row.value}</dd>
+              <dd className="break-all text-fg">
+                <bdi>{row.secret && !revealed ? '\u2022'.repeat(8) : row.value}</bdi>
+              </dd>
             </React.Fragment>
           ))}
         </dl>
+      )}
+
+      {scan.hasSecret && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="secondary" size="sm" aria-pressed={revealed} onClick={() => setRevealed((value) => !value)}>
+            {revealed ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+            {revealed ? 'Hide the secret' : 'Show the secret'}
+          </Button>
+          {canShare() && !scan.blocked && (
+            <label className="flex items-center gap-2 text-sm text-fg">
+              <input type="checkbox" checked={shareSecret} onChange={(event) => setShareSecret(event.target.checked)} />
+              Include the secret when sharing
+            </label>
+          )}
+        </div>
       )}
 
       <div>
@@ -186,10 +225,11 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
           Content
         </p>
         <pre
+          dir="auto"
           className="rounded-lg border border-line bg-surface p-3 font-mono text-sm break-all whitespace-pre-wrap text-fg"
           aria-labelledby="scan-result-text-label"
         >
-          {scan.text}
+          {revealed ? scan.revealedText : scan.displayText}
         </pre>
       </div>
 
@@ -198,7 +238,7 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
           {copyState === 'copied' ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
           {copyState === 'copied' ? 'Copied' : 'Copy'}
         </Button>
-        {link && (
+        {link && !isDangerousUrl(link.href) && (
           <ButtonLink variant="primary" size="sm" href={link.href} target="_blank" rel="noopener noreferrer">
             <Link className="size-4" aria-hidden="true" />
             Open link

@@ -104,6 +104,16 @@ describe('BulkCsvInput Component', () => {
     expect(formatSelect.value).toBe('png');
   });
 
+  it('lists unusual addresses without leaving them out (#1159)', () => {
+    const csvContent = 'URL,Name\nhttps://example.com/1,A\nhttps://paypa1.com/login,B\nhttps://192.168.0.1/,C';
+    renderWithProvider(<BulkCsvInput data={{ ...initialData, csvContent, fileName: 'x.csv' }} onChange={vi.fn()} />);
+    const list = screen.getByTestId('bulk-unusual-rows');
+    expect(list).toHaveTextContent(/Row 2: .*imitates paypal/);
+    expect(list).toHaveTextContent(/Row 3: .*number instead of a name/);
+    expect(list).not.toHaveTextContent('Row 1');
+    expect(screen.getByText(/2 addresses look unusual/)).toBeInTheDocument();
+  });
+
   it('displays warning when CSV contains over 100 rows', () => {
     // Generate CSV with 105 rows
     const header = 'URL,Name\n';
@@ -195,6 +205,53 @@ describe('BulkCsvInput Component', () => {
         'application/zip'
       );
     });
+  });
+
+  it('skips rows with dangerous payloads, lists them, and still zips the rest (#1152)', async () => {
+    const csvContent = [
+      'URL,Name',
+      'https://example.com/ok,Good',
+      'javascript:alert(1),Bad1',
+      'data:text/html;base64,PHNjcmlwdD4=,Bad2',
+      'intent://x#Intent;scheme=http;end,Bad3',
+      'mailto:a@example.com,Mail',
+    ].join('\n');
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent,
+      payloadColumn: 'URL',
+      filenameColumn: 'Name',
+      exportFormat: 'svg',
+      fileName: `../evil${String.fromCharCode(0x202e)}fdp.csv`,
+    };
+
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
+
+    await waitFor(() => expect(downloadManager.triggerFileDownload).toHaveBeenCalled());
+    expect(zipEntryNames(downloadedZip())).toEqual(['Good.svg', 'Mail.svg']);
+    // The ZIP name built from the uploaded file name is sanitised too.
+    expect(vi.mocked(downloadManager.triggerFileDownload).mock.calls[0][1]).toBe('_evilfdp-qrcodes.zip');
+
+    const list = await screen.findByTestId('bulk-skipped-rows');
+    expect(list.textContent).toContain('Row 2');
+    expect(list.textContent).toContain('Row 3');
+    expect(list.textContent).toContain('Row 4');
+    expect(list.textContent).not.toContain('Row 1:');
+  });
+
+  it('makes no ZIP when every row is blocked', async () => {
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent: 'URL,Name\njavascript:alert(1),A',
+      payloadColumn: 'URL',
+      filenameColumn: 'Name',
+      exportFormat: 'svg',
+    };
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
+    expect(await screen.findByTestId('bulk-skipped-rows')).toBeInTheDocument();
+    expect(downloadManager.triggerFileDownload).not.toHaveBeenCalled();
   });
 
   it('skips rows without a payload and de-duplicates file names after confirmation', async () => {

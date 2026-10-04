@@ -19,6 +19,7 @@
 import { cborDecode, cborEncode, cborHeadLength } from './cbor';
 import { FountainEncoder, defaultMaxSeq } from './encoder';
 import { FOUNTAIN_URI_PREFIX } from './envelope';
+import { MAX_RECEIVE_BYTES, formatLimit } from '../limits';
 
 /**
  * Payload compression applied before fountain encoding.
@@ -48,14 +49,14 @@ export interface FountainSessionHeader {
   compression: TransferCompression;
 }
 
-function hexToBytes(hex: string): Uint8Array {
+export function hexToBytes(hex: string): Uint8Array {
   const clean = /^[0-9a-f]*$/i.test(hex) && hex.length % 2 === 0 ? hex : '';
   const out = new Uint8Array(clean.length / 2);
   for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
   return out;
 }
 
-function bytesToHex(bytes: Uint8Array): string {
+export function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 }
 
@@ -128,14 +129,46 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return bytesToHex(new Uint8Array(digest));
 }
 
+/** Thrown when decompressed output passes the size the session header declared. */
+export class DecompressionLimitError extends Error {
+  constructor(limit: number) {
+    super(`The transfer expands to more than the ${limit} bytes it declared, so it was stopped.`);
+    this.name = 'DecompressionLimitError';
+  }
+}
+
+/**
+ * Pipes `input` through a (de)compression stream. With `limit`, output is written straight into one
+ * preallocated buffer and the stream is cancelled the moment it passes `limit` bytes, so a deflate
+ * bomb never allocates more than the declared size. Without it, parts are collected and joined.
+ */
 async function runTransform(
   input: Uint8Array,
-  stream: { readable: ReadableStream<Uint8Array>; writable: WritableStream<BufferSource> }
+  stream: { readable: ReadableStream<Uint8Array>; writable: WritableStream<BufferSource> },
+  limit?: number
 ): Promise<Uint8Array> {
   const writer = stream.writable.getWriter();
   const written = writer.write(new Uint8Array(input)).then(() => writer.close());
   written.catch(() => {});
   const reader = stream.readable.getReader();
+
+  if (limit !== undefined) {
+    const buffer = new Uint8Array(limit);
+    let length = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (length + value.length > limit) {
+        await reader.cancel().catch(() => {});
+        throw new DecompressionLimitError(limit);
+      }
+      buffer.set(value, length);
+      length += value.length;
+    }
+    await written;
+    return length === limit ? buffer : buffer.slice(0, length);
+  }
+
   const parts: Uint8Array[] = [];
   let total = 0;
   for (;;) {
@@ -186,14 +219,20 @@ export async function compressForTransfer(
  * Reverses {@link compressForTransfer} with `DecompressionStream('deflate-raw')`.
  * @param data Received payload.
  * @param compression Compression flag from the session header.
+ * @param expectedSize Size the header declares. Decompression stops as soon as the output passes it.
  * @returns The original file bytes.
+ * @throws DecompressionLimitError when the output would exceed `expectedSize`.
  */
-export async function decompressTransferPayload(data: Uint8Array, compression: TransferCompression): Promise<Uint8Array> {
+export async function decompressTransferPayload(
+  data: Uint8Array,
+  compression: TransferCompression,
+  expectedSize?: number
+): Promise<Uint8Array> {
   if (compression === 'none') return data;
   if (typeof DecompressionStream === 'undefined') {
     throw new Error('This browser cannot decompress the transfer (DecompressionStream unavailable).');
   }
-  return runTransform(data, new DecompressionStream('deflate-raw'));
+  return runTransform(data, new DecompressionStream('deflate-raw'), expectedSize);
 }
 
 /** Highest QR version any transfer density may produce (ISO/IEC 18004). */
@@ -207,7 +246,7 @@ export const MIN_SYMBOL_SIZE = 8;
 export type StreamErrorCorrection = 'L' | 'M' | 'Q' | 'H';
 
 /** Alphanumeric-mode character capacity per QR version 1-20 (ISO/IEC 18004 Table 7). */
-const ALPHANUMERIC_CAPACITY: Record<StreamErrorCorrection, readonly number[]> = {
+export const ALPHANUMERIC_CAPACITY: Record<StreamErrorCorrection, readonly number[]> = {
   L: [25, 47, 77, 114, 154, 195, 224, 279, 335, 395, 468, 535, 619, 667, 758, 854, 938, 1046, 1153, 1249],
   M: [20, 38, 61, 90, 122, 154, 178, 221, 262, 311, 366, 419, 483, 528, 600, 656, 734, 816, 909, 970],
   Q: [16, 29, 47, 67, 87, 108, 125, 157, 189, 221, 259, 296, 352, 376, 426, 470, 531, 574, 644, 702],
@@ -302,25 +341,6 @@ export function resolveFountainSymbolSize(
   throw new RangeError(`File is too large to stream within QR version ${version} at ECC ${ecc}.`);
 }
 
-/**
- * Estimates how many QR frames a receiver must scan to rebuild a file of
- * `fileSize` bytes, before compression. Robust Soliton decoding typically needs
- * about 10-20% more droplets than source blocks; the estimate uses 15%.
- * @param fileSize File size in bytes.
- * @param density Transfer density.
- * @returns Symbol size and the estimated frame count.
- */
-export function estimateTransferFrames(
-  fileSize: number,
-  density: TransferDensity = DEFAULT_TRANSFER_DENSITY
-): { symbolSize: number; k: number; frames: number } {
-  const profile = TRANSFER_DENSITY_PROFILES[density];
-  // Session header (name, type, size, SHA-256) plus CBOR framing: about 64 bytes plus the name.
-  const messageLength = Math.max(1, fileSize) + 128;
-  const { symbolSize, k } = resolveFountainSymbolSize(messageLength, profile.errorCorrectionLevel, MAX_SYMBOL_SIZE, profile.maxVersion);
-  return { symbolSize, k, frames: Math.ceil(k * 1.15) };
-}
-
 /** Inputs for {@link createFountainSession}. */
 export interface FountainSessionOptions {
   fileName: string;
@@ -374,7 +394,15 @@ export async function createFountainSession(
 export async function openFountainSession(message: Uint8Array): Promise<{ data: Uint8Array; header: FountainSessionHeader }> {
   const decoded = decodeSessionMessage(message);
   if (!decoded) throw new Error('Malformed fountain session header.');
-  const data = await decompressTransferPayload(decoded.payload, decoded.header.compression);
+  const { fileSize } = decoded.header;
+  if (!Number.isSafeInteger(fileSize) || fileSize < 0) {
+    throw new Error('Malformed fountain session header: invalid file size.');
+  }
+  // Refuse an oversized claim before any buffer is allocated.
+  if (fileSize > MAX_RECEIVE_BYTES) {
+    throw new Error(`File transfer rejected: the sender claims ${fileSize} bytes, more than the ${formatLimit(MAX_RECEIVE_BYTES)} limit.`);
+  }
+  const data = await decompressTransferPayload(decoded.payload, decoded.header.compression, fileSize);
   if (data.length !== decoded.header.fileSize) {
     throw new Error('Integrity validation failed! Reconstructed size does not match the session header.');
   }

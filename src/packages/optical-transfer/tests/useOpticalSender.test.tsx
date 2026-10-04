@@ -41,7 +41,7 @@ describe('useOpticalSender', () => {
     }
   });
 
-  it('should initialize with standard defaults and lower visual density (< 256 bytes)', () => {
+  it('should initialize with standard defaults', () => {
     const { result } = renderHook(() =>
       useOpticalSender(senderOptions())
     );
@@ -50,9 +50,7 @@ describe('useOpticalSender', () => {
     expect(result.current.isTransferring).toBe(false);
     expect(result.current.progress).toBe(0);
     expect(result.current.fps).toBe(15);
-    expect(result.current.chunkSize).toBeLessThan(256);
-    // Fountain mode is the default; the balanced density sizes its droplets.
-    expect(result.current.fountainMode).toBe(true);
+    // The balanced density sizes the symbols.
     expect(result.current.density).toBe('balanced');
     expect(result.current.currentPass).toBe(1);
   });
@@ -272,6 +270,33 @@ describe('useOpticalSender', () => {
     globalThis.mockWorkerControl.setInterceptor(null);
   });
 
+  it('pauses on the current frame at once, paints nothing while paused, and resumes (#1148)', async () => {
+    const options = senderOptions();
+    const { result } = await startWithFrames(options);
+    await waitFor(() => expect(result.current.isTransferring).toBe(true));
+    await waitFor(() => expect(options.renderFrame).toHaveBeenCalled());
+    expect(result.current.isPaused).toBe(false);
+
+    act(() => result.current.pauseTransfer());
+    expect(result.current.isPaused).toBe(true);
+    expect(result.current.isTransferring).toBe(true);
+    const paintedAtPause = vi.mocked(options.renderFrame).mock.calls.length;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(vi.mocked(options.renderFrame).mock.calls.length).toBe(paintedAtPause);
+
+    act(() => result.current.resumeTransfer());
+    expect(result.current.isPaused).toBe(false);
+    await waitFor(() => expect(vi.mocked(options.renderFrame).mock.calls.length).toBeGreaterThan(paintedAtPause));
+
+    // Stopping clears the pause, and pausing a stream that is not playing does nothing.
+    act(() => result.current.pauseTransfer());
+    act(() => result.current.stopTransfer());
+    expect(result.current.isPaused).toBe(false);
+    act(() => result.current.pauseTransfer());
+    expect(result.current.isPaused).toBe(false);
+    globalThis.mockWorkerControl.setInterceptor(null);
+  });
+
   it('keeps playback paused when the injected verifier rejects the first frame', async () => {
     const options = senderOptions({ verifyFrame: vi.fn(async () => false) });
     const { result } = await startWithFrames(options);
@@ -283,10 +308,8 @@ describe('useOpticalSender', () => {
     globalThis.mockWorkerControl.setInterceptor(null);
   });
 
-  it('drops maze bridges from the checked legacy handshake frame while the scannability fallback is active', async () => {
+  it('never paints decoration on transfer frames, whatever the page style', async () => {
     const options = senderOptions({
-      fountainMode: false,
-      scannabilityFallbackActive: true,
       config: { ...senderOptions().config, isMazeEnabled: true, isMazeBridgesEnabled: true },
     });
     const { result } = await startWithFrames(options);
@@ -294,7 +317,15 @@ describe('useOpticalSender', () => {
     await waitFor(() => expect(result.current.isTransferring).toBe(true));
     expect(options.verifyFrame).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ isMazeEnabled: true, isMazeBridgesEnabled: false }),
+      expect.objectContaining({ isMazeEnabled: false, isMazeBridgesEnabled: false }),
+      null,
+      null
+    );
+    await waitFor(() => expect(options.renderFrame).toHaveBeenCalled());
+    expect(options.renderFrame).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ isMazeEnabled: false, isMazeBridgesEnabled: false }),
       null,
       null
     );

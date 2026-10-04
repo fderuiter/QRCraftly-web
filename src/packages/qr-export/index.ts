@@ -18,6 +18,7 @@
 
 export {
   generateQRSvg,
+  PayloadRejectedError,
   rasterizeSvgToCanvas,
   validateSvgScannability,
 } from './lib/svgExport';

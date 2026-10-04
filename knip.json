@@ -20,13 +20,14 @@
   "ignoreExportsUsedInFile": true,
   "ignoreFiles": [
     "src/packages/*/index.ts",
-    "src/packages/scannability/opticalSimulation.ts"
+    "src/packages/scannability/opticalSimulation.ts",
+    "tests/semgrep/**"
   ],
   "ignoreIssues": {
     "src/packages/*/*.ts": ["types"],
     "src/packages/scannability/**": ["exports", "types"]
   },
-  "ignoreBinaries": ["shellcheck"],
+  "ignoreBinaries": ["shellcheck", "semgrep"],
   "ignoreDependencies": ["wrangler", "lint-staged"],
   "husky": false,
   "rules": {

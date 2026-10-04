@@ -28,6 +28,7 @@ import {
   getNeighborsForSeq,
   createPrng,
   serializeDroplet,
+  MAX_RECEIVE_MESSAGE_BYTES,
   parseDropletString,
   isFountainDropletString,
   cborEncode,
@@ -51,6 +52,7 @@ import {
   DEFAULT_TRANSFER_DENSITY,
   resolveTransferDensity,
   estimateTransferFrames,
+  MANIFEST_INTERVAL,
 } from '../index';
 
 /** Deterministic pseudo-random bytes (incompressible). */
@@ -180,6 +182,19 @@ describe('BC-UR droplet envelope', () => {
     // The body is a BC-UR fragment: CBOR [seq, k, messageLen, checksum, data]
     const body = decodeBytewordsMinimal(str.split('/')[2]);
     expect(cborDecode(body!)).toEqual([42, 10, 48, 0xa1b2c3d4, droplet.data]);
+  });
+
+  it('rejects a droplet claiming more than the receive limit, or a huge block count (#1154)', () => {
+    const claim = (k: number, messageLength: number, data = new Uint8Array(32)) =>
+      serializeDroplet({ seq: 1, k, messageLength, checksum: 1, degree: 1, indices: [0], data });
+    // Valid shape: k fragments of 32 bytes.
+    expect(parseDropletString(claim(10, 10 * 32 - 5))).not.toBeNull();
+    // A claim of 134 MB (k * 32 B) fits the arithmetic but not the receive limit.
+    expect(parseDropletString(claim(1 << 22, (1 << 22) * 32 - 1))).toBeNull();
+    // k above the absolute cap.
+    expect(parseDropletString(claim((1 << 22) + 1, (1 << 22) + 1))).toBeNull();
+    // Just under the receive limit is still accepted.
+    expect(parseDropletString(claim(MAX_RECEIVE_MESSAGE_BYTES / 32, MAX_RECEIVE_MESSAGE_BYTES - 1))).not.toBeNull();
   });
 
   it('rejects malformed, mismatched or corrupted droplets', () => {
@@ -506,8 +521,8 @@ describe('Fountain session layer', () => {
     expect(balanced.symbolSize).toBeLessThan(fast.symbolSize);
     expect(fast.frames).toBeLessThan(balanced.frames);
     expect(balanced.frames).toBeLessThan(reliable.frames);
-    // Robust Soliton needs about 15% more droplets than source blocks.
-    expect(balanced.frames).toBe(Math.ceil(balanced.k * 1.15));
+    // About 15% more symbols than source blocks, and one frame in sixteen is a manifest.
+    expect(balanced.frames).toBe(Math.ceil((balanced.k * 1.15 * MANIFEST_INTERVAL) / (MANIFEST_INTERVAL - 1)));
     expect(estimateTransferFrames(12 * 1024)).toEqual(balanced);
   });
 
@@ -537,7 +552,9 @@ describe('Fountain session layer', () => {
     while (!reassembler.isComplete && index < encoder.k * 4) {
       reassembler.ingest(encoder.dropletStringForIndex(index++));
     }
-    const { data, header: received } = await reassembler.finalize();
+    const {
+      files: [{ data, header: received }],
+    } = await reassembler.finalize();
     expect(data).toEqual(file);
     expect(received).toEqual(header);
 
@@ -577,7 +594,7 @@ describe('FountainReassembler & telemetry', () => {
     const reassembler = new FountainReassembler();
     let index = 0;
     while (!reassembler.isComplete) reassembler.ingest(a.encoder.dropletStringForIndex(index++));
-    expect((await reassembler.finalize()).header.fileName).toBe('a.bin');
+    expect((await reassembler.finalize()).files[0].header.fileName).toBe('a.bin');
 
     // A camera still pointed at the finished stream must not start receiving the same file again.
     reassembler.reset();
@@ -615,5 +632,35 @@ describe('FountainReassembler & telemetry', () => {
     expect(tracker.telemetry({ k: 10, rank: 10, resolved: 10, dropletsReceived: 12, progress: 100 }, 1000).etaSeconds).toBe(0);
     tracker.reset();
     expect(tracker.telemetry({ k: 10, rank: 1, resolved: 1, dropletsReceived: 1, progress: 10 }, 5000).etaSeconds).toBeNull();
+  });
+});
+
+describe('large block counts are confirmed before decoder tables are built (#1154)', () => {
+  it('needs 8 consistent droplets for a stream claiming k > 65,536', () => {
+    const reassembler = new FountainReassembler();
+    const k = 100_000;
+    const droplet = (seq: number) =>
+      serializeDroplet({ seq, k, messageLength: k * 32 - 1, checksum: 7, degree: 1, indices: [0], data: new Uint8Array(32) });
+
+    for (let seq = 1; seq <= 7; seq++) {
+      expect(reassembler.ingest(droplet(seq))).toBeNull();
+    }
+    expect(reassembler.snapshot()).toBeNull();
+    expect(reassembler.ingest(droplet(8))).not.toBeNull();
+  });
+
+  it('does not let one-off bogus droplets build tables', () => {
+    const reassembler = new FountainReassembler();
+    for (let i = 0; i < 20; i++) {
+      const k = 100_000 + i;
+      const text = serializeDroplet({ seq: 1, k, messageLength: k * 32 - 1, checksum: i, degree: 1, indices: [0], data: new Uint8Array(32) });
+      expect(reassembler.ingest(text)).toBeNull();
+    }
+    expect(reassembler.snapshot()).toBeNull();
+  });
+
+  it('accepts ordinary streams on the first droplet', () => {
+    const encoder = new FountainEncoder(new Uint8Array(500).fill(7), { blockSize: 32, maxSeq: 1000 });
+    expect(new FountainReassembler().ingest(encoder.nextDropletString())).not.toBeNull();
   });
 });

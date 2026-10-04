@@ -1,6 +1,6 @@
 ---
 status: accepted
-superseded_in_part_by: 0021
+superseded_in_part_by: 0021, 0024
 ---
 
 # Rateless Fountain Codes and Multi-Tier Scanning for Air-Gapped Optical Transfer
