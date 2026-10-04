@@ -60,6 +60,29 @@ describe('useOpticalReceiver', () => {
     expect(result.current.chunks.has(0)).toBe(true);
   });
 
+  it('rejects a legacy handshake claiming 2 GB before anything is allocated (#1154)', async () => {
+    const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
+
+    await act(async () => {
+      await result.current.handleFrame('H|x.bin|2000000000|application/octet-stream|' + 'a'.repeat(64));
+    });
+
+    expect(result.current.receiverError).toMatch(/File transfer rejected: the sender claims 2000000000 bytes/);
+    expect(result.current.handshake).toBeNull();
+  });
+
+  it('rejects a legacy handshake without a valid SHA-256 (#1154)', async () => {
+    const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
+
+    for (const bad of ['', 'abc', 'g'.repeat(64)]) {
+      await act(async () => {
+        await result.current.handleFrame(`H|x.bin|10|text/plain|${bad}`);
+      });
+      expect(result.current.receiverError).toMatch(/no valid SHA-256 hash/);
+      expect(result.current.handshake).toBeNull();
+    }
+  });
+
   it('should ignore data frames when no handshake frame has been scanned', async () => {
     const addToast = vi.fn();
     const { result } = renderHook(() => useOpticalReceiver(receiverOptions({ addToast })));
@@ -148,7 +171,7 @@ describe('useOpticalReceiver', () => {
     const { result } = renderHook(() => useOpticalReceiver(options));
 
     await act(async () => {
-      await result.current.handleFrame('H|test.txt|6|text/plain|wrongsha256hashvalue');
+      await result.current.handleFrame('H|test.txt|6|text/plain|0000000000000000000000000000000000000000000000000000000000000000');
     });
 
     await act(async () => {
@@ -176,23 +199,23 @@ describe('useOpticalReceiver', () => {
 
     // 1. Process first file's handshake and first frame
     await act(async () => {
-      await result.current.handleFrame('H|file1.txt|10|text/plain|sha111');
+      await result.current.handleFrame('H|file1.txt|10|text/plain|1111111111111111111111111111111111111111111111111111111111111111');
     });
     await act(async () => {
       await result.current.handleFrame('F|0|2|Zm9v');
     });
 
-    expect(result.current.handshake?.sha256).toBe('sha111');
+    expect(result.current.handshake?.sha256).toBe('1111111111111111111111111111111111111111111111111111111111111111');
     expect(result.current.chunks.has(0)).toBe(true);
     expect(result.current.totalChunks).toBe(2);
 
     // 2. Process a different file handshake (different SHA-256)
     await act(async () => {
-      await result.current.handleFrame('H|file2.txt|20|text/plain|sha222');
+      await result.current.handleFrame('H|file2.txt|20|text/plain|2222222222222222222222222222222222222222222222222222222222222222');
     });
 
     // Verify all states are atomically cleared/updated
-    expect(result.current.handshake?.sha256).toBe('sha222');
+    expect(result.current.handshake?.sha256).toBe('2222222222222222222222222222222222222222222222222222222222222222');
     expect(result.current.handshake?.fileName).toBe('file2.txt');
     expect(result.current.chunks.size).toBe(0);
     expect(result.current.totalChunks).toBeNull();
@@ -213,7 +236,7 @@ describe('useOpticalReceiver', () => {
 
     // Send first handshake
     await act(async () => {
-      await result.current.handleFrame('H|file1.txt|10|text/plain|sha111');
+      await result.current.handleFrame('H|file1.txt|10|text/plain|1111111111111111111111111111111111111111111111111111111111111111');
     });
 
     // Send a frame containing a partial protocol fragment (e.g., 'java')
@@ -225,7 +248,7 @@ describe('useOpticalReceiver', () => {
 
     // Now, send a different file handshake (this resets/clears the lookahead buffer for the new file)
     await act(async () => {
-      await result.current.handleFrame('H|file2.txt|20|text/plain|sha222');
+      await result.current.handleFrame('H|file2.txt|20|text/plain|2222222222222222222222222222222222222222222222222222222222222222');
     });
 
     // Send 'java' then 'script:' in file2 to complete 'java' + 'script:' reassembly and verify detection triggers
@@ -243,7 +266,7 @@ describe('useOpticalReceiver', () => {
     const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
 
     await act(async () => {
-      await result.current.handleFrame('H|test.txt|10|text/plain|sha256');
+      await result.current.handleFrame('H|test.txt|10|text/plain|3333333333333333333333333333333333333333333333333333333333333333');
     });
 
     // 'java' in base64 is 'amF2YQ=='
@@ -264,7 +287,7 @@ describe('useOpticalReceiver', () => {
     const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
 
     await act(async () => {
-      await result.current.handleFrame('H|test.txt|10|text/plain|sha256');
+      await result.current.handleFrame('H|test.txt|10|text/plain|3333333333333333333333333333333333333333333333333333333333333333');
     });
 
     // 'hello' in base64 is 'aGVsbG8='
@@ -326,6 +349,19 @@ describe('useOpticalReceiver', () => {
       expect(result.current.fileValidationError).toBeNull();
       expect(result.current.isScanning).toBe(true);
       expect(global.URL.createObjectURL).toHaveBeenCalledWith(file);
+    });
+
+    it('rejects a video over the upload limit (#1154)', () => {
+      const { result } = renderHook(() => useOpticalReceiver(receiverOptions({ initialMode: 'file' })));
+      const file = new File(['x'], 'huge.mp4', { type: 'video/mp4' });
+      Object.defineProperty(file, 'size', { value: 501 * 1024 * 1024 });
+
+      act(() => {
+        expect(result.current.handleFileUpload(file)).toBe(false);
+      });
+
+      expect(result.current.fileValidationError).toBe('This video is too large to scan. The limit is 500 MB.');
+      expect(global.URL.createObjectURL).not.toHaveBeenCalled();
     });
 
     it('should reject invalid file types, set fileValidationError, and block Object URL creation', () => {

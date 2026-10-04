@@ -17,6 +17,7 @@
 */
 
 import { FountainReassembler } from './lib/fountain/reassembler';
+import { MAX_RECEIVE_BYTES, formatLimit } from './lib/limits';
 
 export interface HandshakeMetadata {
   fileName?: string;
@@ -144,6 +145,13 @@ async function handleFountainDroplet(droplet: string): Promise<void> {
   }
 }
 
+/** Throws before any allocation when a size claimed by the stream passes the receive limit. */
+function assertWithinReceiveLimit(size: number): void {
+  if (!Number.isFinite(size) || size < 0 || size > MAX_RECEIVE_BYTES) {
+    throw new Error(`File transfer rejected: the sender claims a size beyond the ${formatLimit(MAX_RECEIVE_BYTES)} limit.`);
+  }
+}
+
 function decodeBase64ToBytes(base64Str: string): Uint8Array {
   const binaryString = atob(base64Str);
   const len = binaryString.length;
@@ -182,6 +190,7 @@ self.onmessage = async (e: MessageEvent<FileReassemblyIncomingMessage>) => {
       resetWorkerState();
       const msg = data;
       if (typeof msg.fileSize === 'number' && msg.fileSize > 0) {
+        assertWithinReceiveLimit(msg.fileSize);
         targetFileSize = msg.fileSize;
         allocatedBuffer = new Uint8Array(msg.fileSize);
       }
@@ -225,6 +234,9 @@ self.onmessage = async (e: MessageEvent<FileReassemblyIncomingMessage>) => {
       }
 
       if (!allocatedBuffer) {
+        if (typeof knownChunkSize === 'number' && typeof totalChunksCount === 'number') {
+          assertWithinReceiveLimit(knownChunkSize * totalChunksCount);
+        }
         if (targetFileSize && targetFileSize > 0) {
           allocatedBuffer = new Uint8Array(targetFileSize);
         } else if (knownChunkSize && totalChunksCount) {
@@ -250,6 +262,7 @@ self.onmessage = async (e: MessageEvent<FileReassemblyIncomingMessage>) => {
       if (allocatedBuffer) {
         if (allocatedBuffer.length < offset + decodedBytes.length) {
           const newLen = Math.max(allocatedBuffer.length, offset + decodedBytes.length);
+          assertWithinReceiveLimit(newLen);
           const expanded = new Uint8Array(newLen);
           expanded.set(allocatedBuffer, 0);
           allocatedBuffer = expanded;

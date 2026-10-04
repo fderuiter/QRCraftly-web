@@ -267,7 +267,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
 
       // Scan initial handshake
       await act(async () => {
-        scanSuccessCallback!("H|test.txt|100|text/plain|sha256");
+        scanSuccessCallback!("H|test.txt|100|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
       });
 
       // Scan unique frame index 0
@@ -305,7 +305,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
 
       // Scan initial handshake
       await act(async () => {
-        scanSuccessCallback!("H|test.txt|100|text/plain|sha256");
+        scanSuccessCallback!("H|test.txt|100|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
       });
 
       // Scan frame index 0
@@ -322,7 +322,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
 
       // Scan handshake again after reset
       await act(async () => {
-        scanSuccessCallback!("H|test.txt|100|text/plain|sha256");
+        scanSuccessCallback!("H|test.txt|100|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
       });
 
       // Scan frame index 0 again - should be processed since cache was cleared
@@ -343,7 +343,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
 
       // Scan initial handshake
       await act(async () => {
-        scanSuccessCallback!("H|test.txt|100|text/plain|sha256");
+        scanSuccessCallback!("H|test.txt|100|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
       });
 
       // Scan frame index 0
@@ -370,7 +370,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
 
       // Scan initial handshake
       await act(async () => {
-        scanSuccessCallback!("H|test.txt|100|text/plain|sha256");
+        scanSuccessCallback!("H|test.txt|100|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
       });
 
       // Scan frame index 0 again - should be processed because starting a new session resets tracking cache
@@ -414,7 +414,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
       expect(scanSuccessCallback).toBeDefined();
 
       await act(async () => {
-        scanSuccessCallback!("H|test.txt|1000|text/plain|sha256");
+        scanSuccessCallback!("H|test.txt|1000|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
       });
 
       await act(async () => {
@@ -685,7 +685,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
 
       // Scan handshake first
       await act(async () => {
-        scanSuccessCallback!('H|test.txt|100|text/plain|sha256');
+        scanSuccessCallback!('H|test.txt|100|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
       });
 
       // Scan frame 0 and frame 1

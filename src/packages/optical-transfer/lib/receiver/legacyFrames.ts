@@ -20,9 +20,16 @@
 import type { HandshakeInfo } from '../contracts';
 import { sha256Hex } from '../fountain/session';
 import { DANGEROUS_SCHEMES } from '../streamLookahead';
+import { MAX_RECEIVE_BYTES } from '../limits';
 
 /** Largest legacy `F|` stream the receiver accepts. */
 const MAX_LEGACY_CHUNKS = 5000;
+
+/** Largest chunk the legacy sender produces (it caps `chunkSize` below 256 bytes). */
+const MAX_LEGACY_CHUNK_BYTES = 256;
+
+/** Largest file a legacy stream can legitimately describe: its chunk limit times its chunk size. */
+export const MAX_LEGACY_FILE_BYTES = Math.min(MAX_LEGACY_CHUNKS * MAX_LEGACY_CHUNK_BYTES, MAX_RECEIVE_BYTES);
 
 /** A legacy `F|index|total|base64` data frame. */
 export interface LegacyChunkFrame {
@@ -70,8 +77,18 @@ export function parseLegacyHandshake(text: string): HandshakeInfo {
     throw new Error('Malformed handshake frame received.');
   }
   const fileSize = parseInt(parts[2], 10);
-  if (isNaN(fileSize)) {
+  if (isNaN(fileSize) || fileSize < 0 || String(fileSize) !== parts[2].trim()) {
     throw new Error('Invalid file size in handshake.');
+  }
+  // Reject an oversized claim before anything is allocated.
+  if (fileSize > MAX_LEGACY_FILE_BYTES) {
+    throw new Error(
+      `File transfer rejected: the sender claims ${fileSize} bytes, more than the ${(MAX_LEGACY_FILE_BYTES / 1e6).toFixed(1)} MB this kind of stream can carry.`
+    );
+  }
+  // An empty or malformed hash would skip the integrity check, so it is required.
+  if (!/^[0-9a-f]{64}$/i.test(parts[4])) {
+    throw new Error('File transfer rejected: the handshake has no valid SHA-256 hash, so the file could not be verified.');
   }
   return { fileName: parts[1], fileSize, mimeType: parts[3], sha256: parts[4] };
 }

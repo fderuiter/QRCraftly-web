@@ -19,6 +19,7 @@
 import { DropletMetadata, FountainDroplet } from './contracts';
 import { cborEncode, cborDecode } from './cbor';
 import { decodeBytewordsMinimal, encodeBytewordsMinimal } from './bytewords';
+import { MAX_RECEIVE_MESSAGE_BYTES } from '../limits';
 
 /** Canonical (lowercase) BC-UR type prefix for fountain droplets. */
 export const FOUNTAIN_URI_PREFIX = 'ur:bytes/';
@@ -81,7 +82,9 @@ export function parseDropletString(str: string): { meta: DropletMetadata; data: 
     !isUint(messageLength) ||
     !isUint(checksum, MAX_UINT32) ||
     !(data instanceof Uint8Array) ||
-    data.length === 0
+    data.length === 0 ||
+    // A claim larger than the receive limit is rejected before any decoder state exists.
+    messageLength > MAX_RECEIVE_MESSAGE_BYTES
   ) {
     return null;
   }

@@ -23,6 +23,7 @@ import {
   sha256Hex,
   encodeSessionMessage,
   FountainEncoder,
+  MAX_RECEIVE_BYTES,
   TRANSFER_DENSITY_PROFILES,
   type TransferDensity,
 } from '../index';
@@ -244,5 +245,60 @@ describe('Fountain sender and receiver workers', () => {
     await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: 'UR:BYTES/1-1/NOTBYTEWORDS' } });
     await reassemblyHandler({ data: { type: 'DROPLET', droplet: 'hello' } });
     expect(posted).toHaveLength(0);
+  });
+
+  describe('receive limits (#1154)', () => {
+    it('rejects an INIT claiming 2 GB without allocating', async () => {
+      const spy = vi.spyOn(globalThis, 'Uint8Array');
+      await reassemblyHandler({ data: { type: 'INIT', fileName: 'x', fileSize: 2_000_000_000, mimeType: 'a/b', sha256: 'a'.repeat(64) } });
+      const biggest = Math.max(0, ...spy.mock.calls.map(call => {
+        const [first] = call as unknown[];
+        return typeof first === 'number' ? first : 0;
+      }));
+      spy.mockRestore();
+      expect(biggest).toBeLessThan(MAX_RECEIVE_BYTES);
+      const error = posted.find(m => m.type === 'ERROR');
+      expect(String(error?.error)).toMatch(/beyond the 100 MB limit/);
+    });
+
+    it('rejects chunks whose implied size passes the limit', async () => {
+      await reassemblyHandler({ data: { type: 'INIT', fileSize: 0, totalChunks: 5000, chunkSize: 255 } });
+      await reassemblyHandler({ data: { type: 'CHUNK', index: 0, totalChunks: 5000, chunkSize: 1 << 30, base64: 'Zm9v' } });
+      expect(posted.some(m => m.type === 'ERROR')).toBe(true);
+    });
+
+    it('stops a deflate bomb at the size the header declares', async () => {
+      // 8 MB of zeros deflate to a few KB; the header lies and declares 1 KB.
+      const bomb = new Uint8Array(8 * 1024 * 1024);
+      const stream = new Blob([bomb]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+      const compressed = new Uint8Array(await new Response(stream).arrayBuffer());
+      expect(compressed.length).toBeLessThan(64 * 1024);
+
+      const message = encodeSessionMessage(
+        { fileName: 'bomb.bin', mimeType: 'application/octet-stream', fileSize: 1024, sha256: '0'.repeat(64), compression: 'deflate-raw' },
+        compressed
+      );
+      const encoder = new FountainEncoder(message, { blockSize: 64, maxSeq: 100_000 });
+      for (let i = 0; i < encoder.k * 3; i++) {
+        await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: encoder.nextDropletString() } });
+        if (posted.some(m => m.type === 'ERROR' || m.type === 'COMPLETE')) break;
+      }
+      const error = posted.find(m => m.type === 'ERROR');
+      expect(posted.some(m => m.type === 'COMPLETE')).toBe(false);
+      expect(String(error?.error)).toMatch(/expands to more than the 1024 bytes/);
+    });
+
+    it('rejects a header that claims more than the receive limit', async () => {
+      const message = encodeSessionMessage(
+        { fileName: 'huge.bin', mimeType: 'application/octet-stream', fileSize: 2_000_000_000, sha256: '0'.repeat(64), compression: 'none' },
+        new Uint8Array(64)
+      );
+      const encoder = new FountainEncoder(message, { blockSize: 64, maxSeq: 10_000 });
+      for (let i = 0; i < encoder.k * 3; i++) {
+        await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: encoder.nextDropletString() } });
+        if (posted.some(m => m.type === 'ERROR' || m.type === 'COMPLETE')) break;
+      }
+      expect(String(posted.find(m => m.type === 'ERROR')?.error)).toMatch(/more than the 100 MB limit/);
+    });
   });
 });

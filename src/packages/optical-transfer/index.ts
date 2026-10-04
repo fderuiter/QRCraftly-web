@@ -63,6 +63,7 @@ export {
   decodeSessionMessage,
   compressForTransfer,
   decompressTransferPayload,
+  DecompressionLimitError,
   resolveFountainSymbolSize,
   resolveTransferDensity,
   estimateTransferFrames,
@@ -78,6 +79,12 @@ export {
   type TransferDensityProfile,
   type StreamErrorCorrection,
 } from './lib/fountain/session';
+export {
+  MAX_RECEIVE_BYTES,
+  MAX_RECEIVE_MESSAGE_BYTES,
+  MAX_VIDEO_UPLOAD_BYTES,
+  formatLimit,
+} from './lib/limits';
 export {
   FountainReassembler,
   FountainRateTracker,

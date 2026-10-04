@@ -31,6 +31,7 @@ import {
   parseLegacyChunk,
   parseLegacyHandshake,
 } from './legacyFrames';
+import { MAX_VIDEO_UPLOAD_BYTES, formatLimit } from '../limits';
 import { detachVideoSource, isVideoFile, playQuietly, spawnReassemblyWorker } from './media';
 
 type ReceiverToast = {
@@ -312,6 +313,15 @@ export function useOpticalReceiver({
       revokeVideoUrl();
       setVideoFile(null);
       const errorMsg = 'Invalid file type. Please upload a supported video file (e.g. MP4, WebM).';
+      setFileValidationError(errorMsg);
+      addToast?.({ type: 'error', message: errorMsg, duration: 5000 });
+      return false;
+    }
+
+    if (file.size > MAX_VIDEO_UPLOAD_BYTES) {
+      revokeVideoUrl();
+      setVideoFile(null);
+      const errorMsg = `This video is too large to scan. The limit is ${formatLimit(MAX_VIDEO_UPLOAD_BYTES)}.`;
       setFileValidationError(errorMsg);
       addToast?.({ type: 'error', message: errorMsg, duration: 5000 });
       return false;

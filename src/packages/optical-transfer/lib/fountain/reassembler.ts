@@ -19,6 +19,7 @@
 import { FountainDecoder } from './decoder';
 import { parseDropletString } from './envelope';
 import { FountainSessionHeader, openFountainSession } from './session';
+import { LARGE_BLOCK_COUNT } from '../limits';
 
 /**
  * Decoder progress snapshot reported after each accepted droplet.
@@ -92,6 +93,12 @@ export class FountainReassembler {
     const session = `${k}:${messageLength}:${checksum}:${parsed.data.length}`;
     if (session === this.finishedSession) return null;
 
+    // A stream claiming a very large block count must repeat before decoder tables (tens of MB)
+    // are built for it, so a flood of one-off bogus droplets cannot churn memory.
+    if (this.decoder.k === null && parsed.meta.k > LARGE_BLOCK_COUNT && !this.confirmLargeSession(parsed.meta)) {
+      return null;
+    }
+
     if (!this.decoder.matchesSession(parsed.meta, parsed.data.length)) {
       this.foreignStreak += 1;
       if (this.foreignStreak < SESSION_SWITCH_THRESHOLD) return null;
@@ -105,6 +112,15 @@ export class FountainReassembler {
     this.currentSession = session;
     this.finishedSession = null;
     return this.snapshot();
+  }
+
+  private candidate: { key: string; count: number } | null = null;
+
+  /** True once the same large-K session has been seen {@link SESSION_SWITCH_THRESHOLD} times in a row. */
+  private confirmLargeSession(meta: { k: number; messageLength: number; checksum: number }): boolean {
+    const key = `${meta.k}:${meta.messageLength}:${meta.checksum}`;
+    this.candidate = this.candidate?.key === key ? { key, count: this.candidate.count + 1 } : { key, count: 1 };
+    return this.candidate.count >= SESSION_SWITCH_THRESHOLD;
   }
 
   /**
@@ -143,6 +159,7 @@ export class FountainReassembler {
     this.decoder.reset();
     this.foreignStreak = 0;
     this.currentSession = null;
+    this.candidate = null;
   }
 }
 
