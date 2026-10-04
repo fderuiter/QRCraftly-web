@@ -234,6 +234,57 @@ test.describe('Optical file transfer', () => {
     });
   });
 
+  test.describe('photosensitivity safeguards (#1148)', () => {
+    const notice = 'This screen will flash a rapidly changing pattern.';
+    const file = { name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('hello '.repeat(200)) };
+
+    async function chooseFile(sender: Page) {
+      await sender.goto('/file-transfer');
+      await sender.waitForSelector('main[data-hydrated="true"]');
+      await sender.getByLabel('Choose a file to send').setInputFiles(file);
+    }
+
+    test('warns before the first start, then Pause and Escape freeze the stream on screen', async ({ page }) => {
+      await chooseFile(page);
+      await expect(page.getByTestId('photosensitivity-notice')).toContainText(notice);
+      await expect(page.getByRole('status').filter({ hasText: notice })).toHaveCount(1);
+
+      await page.getByRole('button', { name: 'Start file transfer' }).click();
+      await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByTestId('photosensitivity-notice')).toHaveCount(0);
+
+      // Pause freezes the canvas: two reads a moment apart are the same picture.
+      const picture = () => page.getByRole('img', { name: 'Transfer QR code' }).evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
+      await page.getByRole('button', { name: 'Pause' }).click();
+      await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
+      const frozen = await picture();
+      await page.waitForTimeout(600);
+      expect(await picture()).toBe(frozen);
+
+      // Escape does the same from wherever focus is.
+      await page.getByRole('button', { name: 'Resume' }).click();
+      await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
+    });
+
+    test.describe('with reduced motion', () => {
+      test.use({ contextOptions: { reducedMotion: 'reduce' } });
+
+      test('starts at the slowest pace and needs a second confirm', async ({ page }) => {
+        await chooseFile(page);
+        await expect(page.getByRole('radio', { name: 'Steady', exact: true })).toBeChecked();
+
+        await page.getByRole('button', { name: 'Start file transfer' }).click();
+        await expect(page.getByTestId('reduced-motion-confirm')).toContainText('Your device asks for reduced motion');
+        await expect(page.getByRole('button', { name: 'Pause' })).toHaveCount(0);
+
+        await page.getByRole('button', { name: 'Start anyway' }).click();
+        await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 20_000 });
+      });
+    });
+  });
+
   test('explains a blocked camera and offers the video file route', async ({ page, context }) => {
     await installSyntheticCamera(context, { deny: true });
     await page.goto('/file-transfer/receive');

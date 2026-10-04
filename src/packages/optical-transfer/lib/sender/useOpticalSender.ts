@@ -95,6 +95,8 @@ export function useOpticalSender({
 }: UseOpticalSenderOptions) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
+  /** True while a running stream is paused: the last frame stays on screen and nothing animates (#1148). */
+  const [isPaused, setIsPaused] = useState(false);
   const [isVerifyingHandshake, setIsVerifyingHandshake] = useState(false);
   const [handshakeError, setHandshakeError] = useState<string | null>(null);
   const [handshakeVerified, setHandshakeVerified] = useState(false);
@@ -135,6 +137,7 @@ export function useOpticalSender({
   const renderFrameRef = useRef(renderFrame);
   const verifyFrameRef = useRef(verifyFrame);
   const isTransferringRef = useRef(false);
+  const isPausedRef = useRef(false);
   const isVerifyingHandshakeRef = useRef(false);
   const currentPlayIndexRef = useRef(0);
   const fpsRef = useRef(fps);
@@ -185,6 +188,8 @@ export function useOpticalSender({
   const stopTransfer = useCallback(() => {
     setIsTransferring(false);
     isTransferringRef.current = false;
+    setIsPaused(false);
+    isPausedRef.current = false;
     setIsVerifyingHandshake(false);
     isVerifyingHandshakeRef.current = false;
     setHandshakeError(null);
@@ -207,7 +212,7 @@ export function useOpticalSender({
 
   const runAnimationLoop = useCallback(() => {
     const loop = () => {
-      if (!isTransferringRef.current) return;
+      if (!isTransferringRef.current || isPausedRef.current) return;
 
       const now = performance.now();
 
@@ -431,6 +436,27 @@ export function useOpticalSender({
     });
   }, [selectedFile, chunkSize, density, config.errorCorrectionLevel, stopTransfer, handleWorkerMessage, fountainMode]);
 
+  /** Freezes the stream on its current frame at once. Escape and the Pause button call this. */
+  const pauseTransfer = useCallback(() => {
+    if (!isTransferringRef.current || isPausedRef.current) return;
+    isPausedRef.current = true;
+    setIsPaused(true);
+    if (animationIdRef.current) {
+      cancelAnimationFrame(animationIdRef.current);
+      animationIdRef.current = null;
+    }
+  }, []);
+
+  /** Carries on from the frame where the stream was paused. */
+  const resumeTransfer = useCallback(() => {
+    if (!isTransferringRef.current || !isPausedRef.current) return;
+    isPausedRef.current = false;
+    setIsPaused(false);
+    lastFrameTimeRef.current = performance.now();
+    lastRenderSuccessTimeRef.current = performance.now();
+    runAnimationLoop();
+  }, [runAnimationLoop]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (fileList && fileList.length > 0) {
@@ -460,6 +486,7 @@ export function useOpticalSender({
     selectedFile,
     setSelectedFile,
     isTransferring,
+    isPaused,
     isVerifyingHandshake,
     handshakeVerified,
     handshakeError,
@@ -480,6 +507,8 @@ export function useOpticalSender({
     canvasRef,
     startTransfer,
     stopTransfer,
+    pauseTransfer,
+    resumeTransfer,
     handleFileChange,
     simulate50MBFile,
   };

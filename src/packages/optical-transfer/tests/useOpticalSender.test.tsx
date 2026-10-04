@@ -272,6 +272,33 @@ describe('useOpticalSender', () => {
     globalThis.mockWorkerControl.setInterceptor(null);
   });
 
+  it('pauses on the current frame at once, paints nothing while paused, and resumes (#1148)', async () => {
+    const options = senderOptions();
+    const { result } = await startWithFrames(options);
+    await waitFor(() => expect(result.current.isTransferring).toBe(true));
+    await waitFor(() => expect(options.renderFrame).toHaveBeenCalled());
+    expect(result.current.isPaused).toBe(false);
+
+    act(() => result.current.pauseTransfer());
+    expect(result.current.isPaused).toBe(true);
+    expect(result.current.isTransferring).toBe(true);
+    const paintedAtPause = vi.mocked(options.renderFrame).mock.calls.length;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(vi.mocked(options.renderFrame).mock.calls.length).toBe(paintedAtPause);
+
+    act(() => result.current.resumeTransfer());
+    expect(result.current.isPaused).toBe(false);
+    await waitFor(() => expect(vi.mocked(options.renderFrame).mock.calls.length).toBeGreaterThan(paintedAtPause));
+
+    // Stopping clears the pause, and pausing a stream that is not playing does nothing.
+    act(() => result.current.pauseTransfer());
+    act(() => result.current.stopTransfer());
+    expect(result.current.isPaused).toBe(false);
+    act(() => result.current.pauseTransfer());
+    expect(result.current.isPaused).toBe(false);
+    globalThis.mockWorkerControl.setInterceptor(null);
+  });
+
   it('keeps playback paused when the injected verifier rejects the first frame', async () => {
     const options = senderOptions({ verifyFrame: vi.fn(async () => false) });
     const { result } = await startWithFrames(options);
