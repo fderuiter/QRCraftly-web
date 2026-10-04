@@ -1,6 +1,7 @@
 import React from "react";
 import { EventData } from "../../types";
 import { TextField, TextAreaField } from "../ui/FormFields";
+import { LinkHints, firstWebAddress, hintsId } from "./FieldHints";
 import { CONTAINER_SPACING_CLASSES } from "../ui/styles";
 
 interface EventInputProps {
@@ -43,8 +44,10 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
         maxLength={300}
         value={data.location}
         onChange={(e) => onChange({ location: e.target.value })}
+        aria-describedby={hintsId("event-location")}
         showCharCount
       />
+      <LinkHints fieldId="event-location" address={firstWebAddress(data.location)} />
       <TextAreaField
         id="event-description"
         label="Description"
@@ -53,8 +56,10 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
         maxLength={2000}
         value={data.description}
         onChange={(e) => onChange({ description: e.target.value })}
+        aria-describedby={hintsId("event-description")}
         showCharCount
       />
+      <LinkHints fieldId="event-description" address={firstWebAddress(data.description)} />
     </div>
   );
 };

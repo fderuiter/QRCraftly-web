@@ -3,6 +3,7 @@ import { MeetingData, QRType } from "../../types";
 import { describeViolation } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
 import { TextField } from "../ui/FormFields";
+import { LinkHints, hintsId } from "./FieldHints";
 import { parseMeetingUrl } from "../../utils/meetingParsers";
 import { FormBlock } from "../ui/FormBlock";
 import { announcePolitely } from "../../utils/a11y";
@@ -55,7 +56,9 @@ export const MeetingInput: React.FC<MeetingInputProps> = ({
         value={data.url}
         onChange={(e) => onChange({ url: e.target.value })}
         error={violation ? describeViolation(violation) : undefined}
+        aria-describedby={hintsId("meeting-url")}
       />
+      {!violation && <LinkHints fieldId="meeting-url" address={data.url} />}
 
       {data.url && parsed.service !== "unknown" && (
         <div className="space-y-1 rounded-lg border border-line bg-slate-50 p-3 text-xs dark:bg-slate-800/60">

@@ -4,6 +4,7 @@ import { TextField } from "../ui/FormFields";
 import { normalizeUrl } from "../../utils/url";
 import { describeViolation } from "@/packages/qr-payload";
 import { QRType } from "../../types";
+import { LinkHints, hintsId } from './FieldHints';
 import { findBlockingViolation } from "./linkViolations";
 
 /**
@@ -50,7 +51,9 @@ export const UrlInput: React.FC<UrlInputProps> = ({ data, onChange }) => {
             }
           }}
           error={urlError}
+          aria-describedby={hintsId('url-input')}
         />
+        {!urlError && <LinkHints fieldId="url-input" address={data.url} />}
       </div>
     </div>
   );

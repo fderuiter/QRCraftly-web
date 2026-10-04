@@ -104,6 +104,16 @@ describe('BulkCsvInput Component', () => {
     expect(formatSelect.value).toBe('png');
   });
 
+  it('lists unusual addresses without leaving them out (#1159)', () => {
+    const csvContent = 'URL,Name\nhttps://example.com/1,A\nhttps://paypa1.com/login,B\nhttps://192.168.0.1/,C';
+    renderWithProvider(<BulkCsvInput data={{ ...initialData, csvContent, fileName: 'x.csv' }} onChange={vi.fn()} />);
+    const list = screen.getByTestId('bulk-unusual-rows');
+    expect(list).toHaveTextContent(/Row 2: .*imitates paypal/);
+    expect(list).toHaveTextContent(/Row 3: .*number instead of a name/);
+    expect(list).not.toHaveTextContent('Row 1');
+    expect(screen.getByText(/2 addresses look unusual/)).toBeInTheDocument();
+  });
+
   it('displays warning when CSV contains over 100 rows', () => {
     // Generate CSV with 105 rows
     const header = 'URL,Name\n';

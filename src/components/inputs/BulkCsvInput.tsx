@@ -44,6 +44,7 @@ import { useToast } from '../ui/Toast';
 import { useQRStoreSelector } from '@/context/QRContext';
 import { generateQRSvg, rasterizeSvgToCanvas } from '@/packages/qr-export';
 import { validateConfig, describeViolation } from '@/packages/qr-payload';
+import { analyseLink } from '@/packages/link-safety';
 import { triggerFileDownload } from '@/utils/downloadManager';
 import { FileSpreadsheet, Upload, AlertTriangle, Loader2 } from 'lucide-react';
 
@@ -137,6 +138,16 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   const exportFormat = data.exportFormat || 'png';
   const rowCount = rows.length;
   const preview = useMemo(() => previewRow(data.csvContent, payloadCol), [data.csvContent, payloadCol]);
+
+  // Rows whose address looks disguised (a lookalike, a shortener, an IP address). Only a hint:
+  // they are still generated, and the people who own the file may well mean them.
+  const unusualRows = useMemo(() => {
+    if (!payloadCol) return [];
+    return rows.flatMap((row, index) => {
+      const cautions = analyseLink((row[payloadCol] ?? '').trim()).filter((finding) => finding.severity === 'caution');
+      return cautions.length > 0 ? [{ rowNumber: index + 1, message: cautions.map((finding) => finding.message).join(' ') }] : [];
+    });
+  }, [rows, payloadCol]);
 
   // Store the detected column defaults so the selection survives re-renders.
   useEffect(() => {
@@ -340,6 +351,20 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
                   </li>
                 ))}
               </ul>
+            </Alert>
+          )}
+
+          {unusualRows.length > 0 && (
+            <Alert variant="info" title={`${unusualRows.length} ${unusualRows.length === 1 ? 'address looks' : 'addresses look'} unusual`}>
+              <p>These rows are still included. Check that each one is what you mean:</p>
+              <ul className="mt-2 max-h-40 list-disc space-y-1 overflow-y-auto pl-5 text-xs" data-testid="bulk-unusual-rows">
+                {unusualRows.slice(0, 50).map((row) => (
+                  <li key={row.rowNumber}>
+                    Row {row.rowNumber}: {row.message}
+                  </li>
+                ))}
+              </ul>
+              {unusualRows.length > 50 && <p className="mt-1 text-xs">And {unusualRows.length - 50} more.</p>}
             </Alert>
           )}
 
