@@ -535,7 +535,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
     ])('saves %s with a single click and no risk confirmation (#1155)', async (fileName, mimeType) => {
       await receiveFile(fileName, mimeType);
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /download file/i }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
       });
       expect(screen.queryByTestId('risky-file-confirmation')).not.toBeInTheDocument();
       await waitFor(() => expect(global.URL.createObjectURL).toHaveBeenCalled());
@@ -548,7 +548,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
     ])('asks for a second click before saving %s (#1155)', async (fileName, mimeType) => {
       await receiveFile(fileName, mimeType);
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /download file/i }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
       });
       expect(screen.getByTestId('risky-file-confirmation')).toHaveTextContent('can run programs on your device');
       expect(global.URL.createObjectURL).not.toHaveBeenCalled();
@@ -560,7 +560,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
       expect(global.URL.createObjectURL).not.toHaveBeenCalled();
 
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /download file/i }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
       });
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: 'Save anyway' }));

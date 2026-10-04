@@ -26,6 +26,7 @@ import {
   CsvParseError,
   MAX_BULK_CSV_ROWS,
   MAX_BULK_CSV_CHARS,
+  type CsvRow,
   type CsvTable,
   type ZipEntry,
   previewRow,

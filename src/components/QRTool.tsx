@@ -32,6 +32,7 @@ import { Modal } from './ui/Modal';
 import { useLeadingDebounce } from '@/hooks/useDebounce';
 import { useQRDownload, BLOCKED_EXPORT_MESSAGE, ExportStatus, AssetOptions, type ExportFormat } from '@/hooks/useQRDownload';
 import { getExportRiskPolicy } from '@/utils/exportRiskPolicy';
+import { isDangerousUrl } from '@/utils/security';
 import { useToast } from './ui/Toast';
 import { useScannability } from '@/hooks/useScannability';
 import { ScannabilityIndicator } from '@/components/ScannabilityIndicator';
