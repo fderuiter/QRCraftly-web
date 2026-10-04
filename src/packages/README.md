@@ -84,13 +84,13 @@ Boundary checks run automatically during `pnpm run lint` and CI.
 
 ### `optical-transfer` (`@/packages/optical-transfer`)
 
-- **Purpose**: Air-gapped, one-way optical data transmission via animated QR code streams. Uses a pure TypeScript rateless fountain codec (Luby Transform over $\text{GF}(2)$ with peeling plus Gaussian-elimination fallback) framed as BC-UR `ur:bytes/` parts (CBOR + Bytewords + CRC-32), `deflate-raw` pre-compression, a SHA-256-verified session header, recycled preallocated frame pools, stream lookahead sanitization, and dedicated Web Workers. See [ADR 0014](../../docs/adr/0014-rateless-fountain-codes-for-airgapped-optical-transfer.md).
+- **Purpose**: Air-gapped, one-way optical data transmission via animated QR code streams. Uses a pure TypeScript rateless fountain codec (Luby Transform over $\text{GF}(2)$ with peeling plus Gaussian-elimination fallback) framed as Prism frames (Base45 text, a CBOR manifest with the SHA-256 and a CRC-32C per frame; `ur:bytes/` is read for one release), `deflate-raw` pre-compression, recycled preallocated frame pools, and dedicated Web Workers. See [ADR 0014](../../docs/adr/0014-rateless-fountain-codes-for-airgapped-optical-transfer.md) and [ADR 0024](../../docs/adr/0024-prism-frame-format.md).
 - **Entry Points**:
   - `index.ts`: Primary public API: the handshake scannability gate (`verifyHandshakeFrame` with injectable worker/checker factories), `PreallocatedFramePool`, `StreamLookaheadReceiver`, fountain codec primitives (`FountainEncoder`, `FountainDecoder`, `solveGF2`, Robust Soliton helpers), BC-UR envelope (`serializeDroplet`, `parseDropletString`, `cborEncode`/`cborDecode`, Bytewords, `crc32`), session layer (`createFountainSession`, `openFountainSession`, `compressForTransfer`, `resolveFountainSymbolSize`), `FountainReassembler`, `FountainRateTracker`, and contracts.
   - `client.ts`: Headless React hooks. `useOpticalSender` broadcasts fountain droplets by default, with no handshake frame and every QR at version 7 or lower; the caller injects `renderFrame` and the scannability fallback flag. `useOpticalReceiver` provides stateless entry and exposes `fountainStats` telemetry (droplets vs K, rank, FPS, ETA); the caller injects `saveFile`; the camera comes from `useQrScanner`'s Camera Session and its error is exposed as `cameraError`. Also exports UI state types.
   - `checksum.ts`: `crc32` alone, for callers such as the Bulk CSV zip writer that must not pull in the handshake gate and its jsQR decoder.
-  - `worker-slice.ts`: Background Web Worker: hashing, `deflate-raw` compression (skipped when it saves less than 5%), density-bounded symbol sizing, and QR matrix generation for droplets or legacy chunks.
-  - `worker-reassembly.ts`: Background Web Worker: fountain reassembly (peeling + GF(2) elimination), decompression and SHA-256 verification, plus legacy chunk reassembly.
+  - `worker-slice.ts`: Background Web Worker: hashing, `deflate-raw` compression (skipped when it saves less than 5%), density-bounded symbol sizing, and QR matrix generation for Prism frames.
+  - `worker-reassembly.ts`: Background Web Worker: fountain reassembly (peeling + GF(2) elimination), manifest checks, decompression and SHA-256 verification.
 
 ### `bulk-csv` (`@/packages/bulk-csv`)
 

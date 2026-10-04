@@ -55,7 +55,7 @@ async function openReceiver(receiver: Page) {
 const isComplete = (receiver: Page) => () => receiver.getByTestId('inline-complete-panel').isVisible();
 
 async function blocksDecoded(receiver: Page): Promise<number> {
-  const text = (await receiver.getByTestId('fountain-rank').textContent().catch(() => null)) ?? '';
+  const text = (await receiver.getByTestId('fountain-rank').textContent({ timeout: 500 }).catch(() => null)) ?? '';
   return Number(/^(\d+)/.exec(text)?.[1] ?? 0);
 }
 
@@ -102,6 +102,16 @@ test.describe('Optical file transfer', () => {
         .poll(async () => Number(/^(\d+)/.exec((await sender.getByTestId('sender-frames').textContent()) ?? '')?.[1] ?? 0))
         .toBeGreaterThanOrEqual(5);
       await openReceiver(receiver);
+
+      // The manifest shows the file's name and type before any of its data has decoded, and its
+      // transfer code matches the one on the sender's screen.
+      await relayFrames(sender, receiver, { drop: n => n % 4 === 0, until: () => receiver.getByTestId('manifest-info').isVisible(), timeoutMs: 30_000 });
+      await expect(receiver.getByTestId('manifest-name')).toHaveText('firmware.bin');
+      await expect(receiver.getByTestId('manifest-type')).toHaveText('application/octet-stream');
+      const code = await sender.getByTestId('sender-fingerprint').locator('span').textContent();
+      await expect(receiver.getByTestId('manifest-fingerprint')).toHaveText(code ?? 'missing');
+      await expect(receiver.getByTestId('inline-complete-panel')).toBeHidden();
+
       await relayUntilComplete(sender, receiver, { drop: n => n % 4 === 0 });
 
       await expectDownloadedCopy(receiver, file);

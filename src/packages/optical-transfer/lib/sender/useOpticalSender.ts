@@ -18,9 +18,9 @@
 
 
 import type React from 'react';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { QRConfig, QRErrorCorrectionLevel } from '@/types';
-import { PreallocatedFramePool, shuffleInPlace } from '../framePool';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { QRConfig } from '@/types';
+import { PreallocatedFramePool } from '../framePool';
 import { sanitizeStreamConfig, verifyHandshakeFrame, type HandshakeFrameVerifier } from '../handshake';
 import type { SliceWorkerOutgoingMessage, TransferStats } from '../contracts';
 import { DEFAULT_TRANSFER_DENSITY, type TransferCompression, type TransferDensity } from '../fountain/session';
@@ -50,31 +50,22 @@ export interface UseOpticalSenderOptions {
   borderLogoImg: HTMLImageElement | null;
   /** Paints each frame onto `canvasRef`. */
   renderFrame: TransferFrameRenderer;
-  /**
-   * True while the app's Scannability Health check has fallen back to a simpler render; maze
-   * bridges are then dropped from the handshake frame.
-   */
-  scannabilityFallbackActive?: boolean;
   /** Scannability gate run on the first frame before playback. Defaults to `verifyHandshakeFrame`. */
   verifyFrame?: HandshakeFrameVerifier;
-  /**
-   * Broadcast a rateless BC-UR fountain stream (default). Every frame is a
-   * self-describing droplet, so there is no handshake frame and receivers can
-   * join at any point. Set to false for the legacy `H|`/`F|` carousel.
-   */
-  fountainMode?: boolean;
 }
 
-/** Fountain session details reported by the slice worker. */
+/** Session details reported by the slice worker. */
 export interface SenderFountainInfo {
   /** Source block count K. */
   k: number;
-  /** Effective bytes per droplet after the density's QR version clamp. */
+  /** Effective bytes per symbol after the density's QR version clamp. */
   symbolSize: number;
-  /** Density the droplets were sized for. */
+  /** Density the frames were sized for. */
   density: TransferDensity;
   /** Whether the payload was deflate-raw compressed or sent verbatim. */
   compression: TransferCompression;
+  /** Short form of the session ID, shown on both screens so the two can be compared. */
+  fingerprint: string;
 }
 
 const HANDSHAKE_FAILURE_SUFFIX =
@@ -89,9 +80,7 @@ export function useOpticalSender({
   logoImg,
   borderLogoImg,
   renderFrame,
-  scannabilityFallbackActive = false,
   verifyFrame = verifyHandshakeFrame,
-  fountainMode = true,
 }: UseOpticalSenderOptions) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
@@ -103,8 +92,6 @@ export function useOpticalSender({
   const [progress, setProgress] = useState(0);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [totalFrames, setTotalFrames] = useState(0);
-  /** Legacy carousel only: bytes per `F|` frame. Fountain streams size droplets from `density`. */
-  const [chunkSize, setChunkSize] = useState(180);
   const [density, setDensity] = useState<TransferDensity>(DEFAULT_TRANSFER_DENSITY);
   const [fountainInfo, setFountainInfo] = useState<SenderFountainInfo | null>(null);
   const [fps, setFps] = useState(15);
@@ -116,22 +103,13 @@ export function useOpticalSender({
     startTime: 0,
   });
 
-  const effectiveConfig = useMemo(() => {
-    if (scannabilityFallbackActive) {
-      return { ...config, isMazeBridgesEnabled: false };
-    }
-    return config;
-  }, [config, scannabilityFallbackActive]);
-
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const framePoolRef = useRef<PreallocatedFramePool>(new PreallocatedFramePool(64));
-  const fountainModeRef = useRef(fountainMode);
   const passCountRef = useRef<number>(1);
-  const shuffledOrderRef = useRef<number[]>([]);
 
   // Refs for background loop
-  const configRef = useRef(effectiveConfig);
+  const configRef = useRef(config);
   const logoImgRef = useRef(logoImg);
   const borderLogoImgRef = useRef(borderLogoImg);
   const renderFrameRef = useRef(renderFrame);
@@ -147,7 +125,7 @@ export function useOpticalSender({
   const lastRenderSuccessTimeRef = useRef(0);
 
   useEffect(() => {
-    configRef.current = effectiveConfig;
+    configRef.current = config;
     logoImgRef.current = logoImg;
     borderLogoImgRef.current = borderLogoImg;
     renderFrameRef.current = renderFrame;
@@ -156,8 +134,7 @@ export function useOpticalSender({
     isVerifyingHandshakeRef.current = isVerifyingHandshake;
     fpsRef.current = fps;
     totalFramesRef.current = totalFrames;
-    fountainModeRef.current = fountainMode;
-  }, [fountainMode, effectiveConfig, logoImg, borderLogoImg, renderFrame, verifyFrame, isTransferring, isVerifyingHandshake, fps, totalFrames]);
+  }, [config, logoImg, borderLogoImg, renderFrame, verifyFrame, isTransferring, isVerifyingHandshake, fps, totalFrames]);
 
   // Terminate background worker on unmount
   useEffect(() => {
@@ -172,17 +149,11 @@ export function useOpticalSender({
     };
   }, []);
 
-  /** Paints a frame: the legacy handshake frame keeps the full style, every other frame is sanitized. */
-  const paint = useCallback((frame: TransferFrame, styled: boolean) => {
+  /** Paints a frame. Transfer frames are always sanitized: no logo, no decoration that could cost a read. */
+  const paint = useCallback((frame: TransferFrame) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    renderFrameRef.current(
-      canvas,
-      frame,
-      styled ? configRef.current : sanitizeStreamConfig(configRef.current),
-      styled ? logoImgRef.current : null,
-      styled ? borderLogoImgRef.current : null
-    );
+    renderFrameRef.current(canvas, frame, sanitizeStreamConfig(configRef.current), null, null);
   }, []);
 
   const stopTransfer = useCallback(() => {
@@ -204,7 +175,6 @@ export function useOpticalSender({
     framePoolRef.current.clear();
     passCountRef.current = 1;
     setCurrentPass(1);
-    shuffledOrderRef.current = [];
     currentPlayIndexRef.current = 0;
     setCurrentFrameIndex(0);
     setProgress(0);
@@ -241,57 +211,30 @@ export function useOpticalSender({
 
         const playIdx = currentPlayIndexRef.current;
         const pool = framePoolRef.current;
-        const isFountain = fountainModeRef.current;
-        const isPass1 = isFountain || passCountRef.current === 1;
 
-        const targetFrameIndex = isPass1
-          ? playIdx
-          : (shuffledOrderRef.current[playIdx] ?? playIdx);
-
-        const frame = pool.getFrame(targetFrameIndex);
+        const frame = pool.getFrame(playIdx);
         if (frame) {
-          paint(frame, targetFrameIndex === 0 && !isFountain);
+          paint(frame);
 
           const total = totalFramesRef.current || 1;
-          setCurrentFrameIndex(targetFrameIndex + 1);
+          setCurrentFrameIndex(playIdx + 1);
 
-          if (isPass1 && workerRef.current) {
+          if (workerRef.current) {
             workerRef.current.postMessage({
               type: 'ACK',
-              payload: { index: targetFrameIndex },
+              payload: { index: playIdx },
             });
           }
 
-          if (isFountain) {
-            // Rateless: droplets play once in order and their pool slot is recycled.
-            pool.delete(targetFrameIndex);
-            setProgress(Math.min(100, Math.round(((playIdx + 1) / total) * 100)));
-            const passNumber = Math.floor(playIdx / total) + 1;
-            if (passNumber !== passCountRef.current) {
-              passCountRef.current = passNumber;
-              setCurrentPass(passNumber);
-            }
-            currentPlayIndexRef.current = playIdx + 1;
-          } else {
-            setProgress(Math.round(((playIdx + 1) / total) * 100));
-            const nextPlayIdx = playIdx + 1;
-            if (nextPlayIdx >= total) {
-              if (passCountRef.current === 1) {
-                passCountRef.current = 2;
-                setCurrentPass(2);
-                const order = Array.from({ length: total }, (_, i) => i);
-                shuffleInPlace(order);
-                shuffledOrderRef.current = order;
-              } else {
-                passCountRef.current += 1;
-                setCurrentPass(passCountRef.current);
-                shuffleInPlace(shuffledOrderRef.current);
-              }
-              currentPlayIndexRef.current = 0;
-            } else {
-              currentPlayIndexRef.current = nextPlayIdx;
-            }
+          // Rateless: frames play once in order and their pool slot is recycled.
+          pool.delete(playIdx);
+          setProgress(Math.min(100, Math.round(((playIdx + 1) / total) * 100)));
+          const passNumber = Math.floor(playIdx / total) + 1;
+          if (passNumber !== passCountRef.current) {
+            passCountRef.current = passNumber;
+            setCurrentPass(passNumber);
           }
+          currentPlayIndexRef.current = playIdx + 1;
 
           lastRenderSuccessTimeRef.current = now;
         }
@@ -307,15 +250,8 @@ export function useOpticalSender({
   const gateFirstFrame = useCallback(async (frame: TransferFrame) => {
     isVerifyingHandshakeRef.current = false;
 
-    // Legacy streams gate on the styled handshake frame; fountain streams
-    // have no handshake, so the first droplet is checked as it will be shown.
-    const isFountain = fountainModeRef.current;
-    const isScannable = await verifyFrameRef.current(
-      frame,
-      isFountain ? sanitizeStreamConfig(configRef.current) : configRef.current,
-      isFountain ? null : logoImgRef.current,
-      isFountain ? null : borderLogoImgRef.current
-    );
+    // The first frame is checked as it will be shown: sanitized, without a logo.
+    const isScannable = await verifyFrameRef.current(frame, sanitizeStreamConfig(configRef.current), null, null);
 
     setIsVerifyingHandshake(false);
 
@@ -329,7 +265,7 @@ export function useOpticalSender({
     }
 
     setHandshakeVerified(false);
-    setHandshakeError(`${isFountain ? 'Transfer' : 'Handshake'} QR frame ${HANDSHAKE_FAILURE_SUFFIX}`);
+    setHandshakeError(`Transfer QR frame ${HANDSHAKE_FAILURE_SUFFIX}`);
     setIsTransferring(false);
     isTransferringRef.current = false;
     if (workerRef.current) {
@@ -352,16 +288,13 @@ export function useOpticalSender({
       }
 
       case 'INITIALIZED': {
-        setFountainInfo(
-          message.fountain
-            ? {
-                k: message.fountain.k,
-                symbolSize: message.fountain.symbolSize,
-                compression: message.fountain.compression,
-                density: message.fountain.density,
-              }
-            : null
-        );
+        setFountainInfo({
+          k: message.fountain.k,
+          symbolSize: message.fountain.symbolSize,
+          compression: message.fountain.compression,
+          density: message.fountain.density,
+          fingerprint: message.fountain.fingerprint,
+        });
         break;
       }
 
@@ -399,7 +332,6 @@ export function useOpticalSender({
     currentPlayIndexRef.current = 0;
     passCountRef.current = 1;
     setCurrentPass(1);
-    shuffledOrderRef.current = [];
     framePoolRef.current.clear();
     lastFrameTimeRef.current = performance.now();
     lastRenderSuccessTimeRef.current = performance.now();
@@ -416,25 +348,8 @@ export function useOpticalSender({
       worker.onmessage = (e: MessageEvent<SliceWorkerOutgoingMessage | null>) => handleWorkerMessage(e.data);
     }
 
-    // Legacy frames follow the appearance ECC (raised to Q); fountain droplets take theirs from the density.
-    const legacyEcc =
-      config.errorCorrectionLevel === QRErrorCorrectionLevel.H || config.errorCorrectionLevel === QRErrorCorrectionLevel.Q
-        ? config.errorCorrectionLevel
-        : QRErrorCorrectionLevel.Q;
-
-    workerRef.current.postMessage({
-      type: 'START',
-      payload: fountainMode
-        ? { file: selectedFile, fps: fpsRef.current, fountainMode, density }
-        : {
-            file: selectedFile,
-            chunkSize: chunkSize < 256 ? chunkSize : 180,
-            errorCorrectionLevel: legacyEcc,
-            fps: fpsRef.current,
-            fountainMode,
-          },
-    });
-  }, [selectedFile, chunkSize, density, config.errorCorrectionLevel, stopTransfer, handleWorkerMessage, fountainMode]);
+    workerRef.current.postMessage({ type: 'START', payload: { file: selectedFile, fps: fpsRef.current, density } });
+  }, [selectedFile, density, stopTransfer, handleWorkerMessage]);
 
   /** Freezes the stream on its current frame at once. Escape and the Pause button call this. */
   const pauseTransfer = useCallback(() => {
@@ -493,14 +408,11 @@ export function useOpticalSender({
     progress,
     currentFrameIndex,
     totalFrames,
-    chunkSize,
-    setChunkSize,
     density,
     setDensity,
     fps,
     setFps,
     currentPass,
-    fountainMode,
     fountainInfo,
     framePoolRef,
     transferStats,

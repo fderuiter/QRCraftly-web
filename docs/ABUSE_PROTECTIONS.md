@@ -99,12 +99,12 @@ Camera results need two agreeing reads. Images are decoded off the main thread, 
 ## Receiving files over the camera
 
 - **Strict frame parsing.** Fountain frames must match a strict pattern; CBOR is parsed with a depth limit and no indefinite lengths or trailing bytes; lengths must agree (`src/packages/optical-transfer/lib/fountain/envelope.ts`, `cbor.ts`).
-- **Size caps.** A receive is limited to 100 MiB (`MAX_RECEIVE_BYTES`, `lib/limits.ts`). A header that claims more, an implausible droplet length, a legacy handshake that claims more, and a video file over 500 MB are refused before anything is allocated. Decompression is streamed into a buffer sized by the header and cancelled at that limit, so a small stream cannot expand into gigabytes. A stream with more than 65,536 blocks needs 8 identical frames in a row before the receiver builds tables for it.
-- **Integrity.** A file is only offered once its size and SHA-256 match the session header (`session.ts`). The legacy handshake must carry a 64-character hash. Corrupted frames fail their CRC-32 first.
+- **Size caps.** A receive is limited to 100 MiB (`MAX_RECEIVE_BYTES`, `lib/limits.ts`). A header that claims more, an implausible droplet length, and a video file over 500 MB are refused before anything is allocated. Decompression is streamed into a buffer sized by the header and cancelled at that limit, so a small stream cannot expand into gigabytes. A stream with more than 65,536 blocks needs 8 identical frames in a row before the receiver builds tables for it.
+- **Integrity.** A file is only offered once its size and SHA-256 match the manifest (`prism/manifest.ts`). Corrupted frames fail their CRC-32C first, and a manifest whose hash does not match its session ID is ignored.
 - **Stream switching.** A different stream must appear for 8 consecutive frames before the receiver switches to it, and a finished stream is ignored afterwards.
 - **Names and types.** The file name is sanitised (`sanitizeFileName`) and shown in full with its real extension. A claimed type that does not match the extension is replaced by `application/octet-stream` with a notice, and a double extension like `invoice.pdf.exe` is called out. Executable and script types (`.exe`, `.msi`, `.bat`, `.ps1`, `.js`, `.jar`, `.apk`, `.html` and the rest of the list in `src/utils/fileNames.ts`) are never saved automatically: the Save button asks "This kind of file can run programs on your device. Only save it if you trust the sender." and then reads "Save anyway".
 - **No preview of active content.** Only PNG, JPEG, GIF, WebP, PDF and plain text can be opened in a tab or shown as a thumbnail, using the effective type. SVG, HTML and everything else is saved, never rendered. Downloads use a Blob URL with the `download` attribute, and the site sends `X-Content-Type-Options: nosniff`.
-- **Legacy carousel.** The older `H|`/`F|` format is limited to 5,000 chunks and needs its handshake frame first. Its text-frame scheme check is a starts-with test.
+- **Old formats.** The `H|`/`F|` carousel is gone. `ur:bytes/` frames are still read for one release and go through the same size caps.
 
 ## Platform protections
 

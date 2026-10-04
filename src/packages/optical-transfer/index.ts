@@ -50,7 +50,7 @@ export {
 } from './lib/fountain/envelope';
 export { cborEncode, cborDecode, type CborValue } from './lib/fountain/cbor';
 export { encodeBytewordsMinimal, decodeBytewordsMinimal } from './lib/fountain/bytewords';
-export { crc32, crc32Hex } from './lib/fountain/crc32';
+export { crc32, crc32c, crc32Hex } from './lib/fountain/crc32';
 export {
   type DropletMetadata,
   type FountainDroplet,
@@ -65,7 +65,6 @@ export {
   decompressTransferPayload,
   resolveFountainSymbolSize,
   resolveTransferDensity,
-  estimateTransferFrames,
   TRANSFER_DENSITY_PROFILES,
   DEFAULT_TRANSFER_DENSITY,
   maxDropletStringLength,
@@ -89,12 +88,38 @@ export {
   type FountainTelemetry,
 } from './lib/fountain/reassembler';
 
+export { encodeBase45, decodeBase45, base45Length } from './lib/prism/base45';
 export {
-  StreamLookaheadReceiver,
-  type StreamLookaheadConfig,
-  DANGEROUS_SCHEMES,
-  decodeHtmlEntities,
-  recursiveDecode,
-} from './lib/streamLookahead';
-
-export { findDangerousScheme } from './lib/receiver/legacyFrames';
+  PRISM_VERSION,
+  FLAG_ENCRYPTED,
+  FRAME_OVERHEAD,
+  encodeDataFrame,
+  encodeManifestFrame,
+  decodeFrame,
+  looksLikePrismFrame,
+  type PrismFrame,
+  type FrameRejection,
+  type FrameDecodeResult,
+} from './lib/prism/frame';
+export {
+  MAX_MANIFEST_NAME_BYTES,
+  encodeManifest,
+  decodeManifest,
+  sessionIdOf,
+  fitFileName,
+  type PrismManifest,
+  type PrismFileEntry,
+  type PrismManifestInfo,
+  type ManifestResult,
+  type ManifestRejection,
+} from './lib/prism/manifest';
+export {
+  MANIFEST_INTERVAL,
+  PrismStream,
+  createPrismSession,
+  prismFrameCapacity,
+  prismSymbolSize,
+  estimateTransferFrames,
+  type PrismStreamOptions,
+  type PrismSessionOptions,
+} from './lib/prism/session';

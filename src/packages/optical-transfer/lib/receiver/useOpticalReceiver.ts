@@ -19,19 +19,13 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQrScanner } from '@/packages/optical-scanner/client';
-import { StreamLookaheadReceiver } from '../streamLookahead';
 import type { HandshakeInfo } from '../contracts';
 import { isFountainDropletString } from '../fountain/envelope';
 import { FountainRateTracker, type FountainTelemetry } from '../fountain/reassembler';
-import {
-  assertIntegrity,
-  decodeChunkText,
-  findDangerousScheme,
-  legacyChunkRejection,
-  parseLegacyChunk,
-  parseLegacyHandshake,
-} from './legacyFrames';
+import { sha256Hex } from '../fountain/session';
 import { MAX_VIDEO_UPLOAD_BYTES, formatLimit } from '../limits';
+import { looksLikePrismFrame } from '../prism/frame';
+import type { PrismManifestInfo } from '../prism/manifest';
 import { analyseReceivedFile } from '@/utils/fileNames';
 import { detachVideoSource, isVideoFile, playQuietly, spawnReassemblyWorker } from './media';
 
@@ -48,21 +42,13 @@ export interface UseOpticalReceiverOptions {
   /** Saves a verified file. */
   saveFile: ReceivedFileSaver;
   addToast?: (toast: ReceiverToast) => void;
-  /**
-   * Require an `H|` handshake before accepting legacy `F|` chunk frames.
-   * Fountain (`ur:bytes/`) streams are always accepted from any point: their
-   * session header (file name, SHA-256, compression flag) travels inside the
-   * fountain message and is verified before download.
-   */
-  handshakeRequired?: boolean;
-  streamMode?: 'text' | 'binary';
   autoDownload?: boolean;
   initialMode?: 'camera' | 'file';
 }
 
 /** Messages posted by the reassembly worker. */
 interface ReassemblyWorkerMessage {
-  type?: 'PROGRESS' | 'COMPLETE' | 'ERROR';
+  type?: 'PROGRESS' | 'COMPLETE' | 'ERROR' | 'MANIFEST';
   progress?: number;
   current?: number;
   total?: number;
@@ -70,10 +56,12 @@ interface ReassemblyWorkerMessage {
   error?: string;
   handshake?: HandshakeInfo | null;
   isFountain?: boolean;
-  /** Key of the fountain session that just completed. */
+  /** Key of the session that just completed. */
   session?: string | null;
   rank?: number;
   dropletsReceived?: number;
+  /** The transfer's manifest, announced as soon as it is accepted. */
+  manifest?: PrismManifestInfo;
 }
 
 /** Longest pause between camera samples while receiving a stream. */
@@ -88,8 +76,6 @@ const FILE_RECEIVED_MESSAGE = 'File completely received & offline binary reconst
 export function useOpticalReceiver({
   saveFile,
   addToast,
-  handshakeRequired = true,
-  streamMode = 'text',
   autoDownload = true,
   initialMode = 'camera',
 }: UseOpticalReceiverOptions) {
@@ -98,10 +84,9 @@ export function useOpticalReceiver({
   const [videoObjectUrl, setVideoObjectUrl] = useState<string | null>(null);
   const [fileValidationError, setFileValidationError] = useState<string | null>(null);
 
-  const [chunks, setChunks] = useState<Set<number>>(new Set());
-  const [totalChunks, setTotalChunks] = useState<number | null>(null);
   const [handshake, setHandshake] = useState<HandshakeInfo | null>(null);
-  const [securityAlert, setSecurityAlert] = useState<string | null>(null);
+  /** What the sender announced, available before any data has been decoded. */
+  const [manifest, setManifest] = useState<PrismManifestInfo | null>(null);
   const [receiverError, setReceiverError] = useState<string | null>(null);
   const [receiverSuccess, setReceiverSuccess] = useState<boolean>(false);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
@@ -113,14 +98,11 @@ export function useOpticalReceiver({
   const rateTrackerRef = useRef(new FountainRateTracker());
 
   const workerRef = useRef<Worker | null>(null);
-  /** The last fountain session received, so a fresh worker ignores its droplets. */
+  /** The last session received, so a fresh worker ignores its frames. */
   const finishedSessionRef = useRef<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const lookaheadRef = useRef<StreamLookaheadReceiver | null>(null);
-  const processedIndicesRef = useRef<Set<number>>(new Set());
   const handshakeRef = useRef<HandshakeInfo | null>(null);
   const videoObjectUrlRef = useRef<string | null>(null);
-  const hasShownMissingHandshakeToastRef = useRef<boolean>(false);
   const reassembledDataRef = useRef<Uint8Array | null>(null);
 
   const autoDownloadRef = useRef(autoDownload);
@@ -137,10 +119,6 @@ export function useOpticalReceiver({
   useEffect(() => {
     saveFileRef.current = saveFile;
   }, [saveFile]);
-
-  useEffect(() => {
-    lookaheadRef.current = new StreamLookaheadReceiver({ mode: streamMode });
-  }, [streamMode]);
 
   // The scanner's Camera Session owns the camera stream (#1097); frames go to handleFrame.
   const handleFrameRef = useRef<(decodedText: string) => void>(() => {});
@@ -164,12 +142,12 @@ export function useOpticalReceiver({
   const cameraError = 'error' in cameraState ? cameraState.error : null;
 
   /** Saves a verified file under its announced name and tells the user. */
-  const deliverFile = useCallback((data: Uint8Array, hs: HandshakeInfo | null, fallbackPrefix: string) => {
+  const deliverFile = useCallback((data: Uint8Array, hs: HandshakeInfo | null) => {
     setDownloadTriggered(true);
     // The name and type are chosen by whoever is showing the stream: save the sanitised name and a
     // MIME type that agrees with it.
     const analysis = analyseReceivedFile(
-      hs?.fileName || `${fallbackPrefix}_${Date.now()}.bin`,
+      hs?.fileName || `received_file_${Date.now()}.bin`,
       hs?.mimeType || 'application/octet-stream'
     );
     saveFileRef.current(data, analysis.safeName, analysis.mimeType);
@@ -197,11 +175,18 @@ export function useOpticalReceiver({
     setIsVerifying(false);
   }, []);
 
+  /** Checks bytes against the SHA-256 the transfer announced. */
+  const assertIntegrity = useCallback(async (data: Uint8Array, expected: string) => {
+    const actual = await sha256Hex(data);
+    if (actual.toLowerCase() !== expected.toLowerCase()) {
+      throw new Error(`Integrity validation failed! SHA-256 hash does not match.\nExpected: ${expected}\nActual: ${actual}`);
+    }
+  }, []);
+
   const handleWorkerComplete = useCallback(async (message: ReassemblyWorkerMessage) => {
-    const { buffer, handshake: workerHandshake, isFountain, session } = message;
+    const { buffer, handshake: workerHandshake, session } = message;
     if (session) finishedSessionRef.current = session;
-    if (isFountain && workerHandshake) {
-      // Stateless entry: the session header replaces the handshake frame.
+    if (workerHandshake) {
       handshakeRef.current = workerHandshake;
       setHandshake(workerHandshake);
       setFountainStats(prev => (prev ? { ...prev, rank: prev.k, resolved: prev.k, progress: 100, etaSeconds: 0 } : prev));
@@ -225,7 +210,7 @@ export function useOpticalReceiver({
       // confirming on the completion panel, so auto-download skips them.
       const risky = analyseReceivedFile(activeHandshake?.fileName ?? '', activeHandshake?.mimeType ?? '').risky;
       if (autoDownloadRef.current && !risky) {
-        deliverFile(reassembled, activeHandshake, 'received_file');
+        deliverFile(reassembled, activeHandshake);
       }
     } catch (err) {
       failReassembly(err);
@@ -233,7 +218,7 @@ export function useOpticalReceiver({
       setCompilationStatus(null);
       setIsVerifying(false);
     }
-  }, [stopStream, deliverFile, failReassembly]);
+  }, [stopStream, deliverFile, failReassembly, assertIntegrity]);
 
   const initWorker = useCallback(() => {
     if (!workerRef.current) {
@@ -241,10 +226,13 @@ export function useOpticalReceiver({
 
       worker.onmessage = (e: MessageEvent<ReassemblyWorkerMessage>) => {
         const message = e.data;
-        const { type, progress, current, total, isFountain, rank, dropletsReceived } = message;
+        const { type, progress, current, total, rank, dropletsReceived } = message;
 
-        if (type === 'PROGRESS' && isFountain) {
-          // A fresh fountain decode (after a failed one) clears the old error.
+        if (type === 'MANIFEST' && message.manifest) {
+          setReceiverError(null);
+          setManifest(message.manifest);
+        } else if (type === 'PROGRESS') {
+          // A fresh decode (after a failed one) clears the old error.
           setReceiverError(null);
           setFountainStats(
             rateTrackerRef.current.telemetry(
@@ -252,8 +240,6 @@ export function useOpticalReceiver({
               performance.now()
             )
           );
-        } else if (type === 'PROGRESS') {
-          setCompilationStatus(`Compiling file: ${current}/${total} chunks decoded (${progress}%)`);
         } else if (type === 'COMPLETE') {
           void handleWorkerComplete(message);
         } else if (type === 'ERROR') {
@@ -350,13 +336,10 @@ export function useOpticalReceiver({
   const handleClear = useCallback(() => {
     terminateWorker();
     setFountainStats(null);
+    setManifest(null);
     rateTrackerRef.current.reset();
-    setChunks(new Set());
-    setTotalChunks(null);
     setHandshake(null);
     handshakeRef.current = null;
-    hasShownMissingHandshakeToastRef.current = false;
-    setSecurityAlert(null);
     setReceiverError(null);
     setFileValidationError(null);
     setReceiverSuccess(false);
@@ -367,174 +350,40 @@ export function useOpticalReceiver({
     setCompilationStatus(null);
     revokeVideoUrl();
     setVideoFile(null);
-    processedIndicesRef.current.clear();
-    lookaheadRef.current = new StreamLookaheadReceiver({ mode: streamMode });
     addToast?.({ type: 'info', message: 'Receiver state has been reset.', duration: 3000 });
-  }, [addToast, streamMode, terminateWorker, revokeVideoUrl]);
+  }, [addToast, terminateWorker, revokeVideoUrl]);
 
-  const reconstructAndValidateFile = useCallback(async (
-    activeChunks?: { get: (index: number) => string | undefined } | Set<number>,
-    total?: number,
-    activeHandshake?: HandshakeInfo
-  ) => {
+  /** Saves the received file, after checking it once more against the announced SHA-256. */
+  const saveReceivedFile = useCallback(async () => {
     try {
       setIsVerifying(true);
       setReceiverError(null);
-      const data = reassembledDataRef.current || reassembledData;
-      const hs = activeHandshake || handshakeRef.current;
-
-      if (data) {
-        if (hs) {
-          await assertIntegrity(data, hs.sha256);
-        } else if (handshakeRequired) {
-          throw new Error('Transfer blocked: missing handshake metadata. Cannot verify SHA-256 integrity hash.');
-        }
-
-        setReceiverSuccess(true);
-        setReceiverError(null);
-        deliverFile(data, hs, 'received_file');
-      } else if (activeChunks && 'get' in activeChunks && typeof activeChunks.get === 'function' && typeof total === 'number') {
-        const worker = initWorker();
-        const chunksToSend: Array<{ index: number; base64: string }> = [];
-        for (let i = 0; i < total; i++) {
-          const base64 = activeChunks.get(i);
-          if (!base64) {
-            setDownloadTriggered(false);
-            throw new Error(`Missing frame chunk at index ${i}`);
-          }
-          chunksToSend.push({ index: i, base64 });
-        }
-        worker.postMessage({
-          type: 'START_REASSEMBLY',
-          chunks: chunksToSend,
-          totalChunks: total,
-        });
-      }
+      const data = reassembledDataRef.current;
+      const hs = handshakeRef.current;
+      if (!data || !hs) return;
+      await assertIntegrity(data, hs.sha256);
+      setReceiverSuccess(true);
+      deliverFile(data, hs);
     } catch (err) {
       failReassembly(err);
     } finally {
       setIsVerifying(false);
       setCompilationStatus(null);
     }
-  }, [reassembledData, initWorker, handshakeRequired, deliverFile, failReassembly]);
+  }, [assertIntegrity, deliverFile, failReassembly]);
 
-  /** Stops scanning after a blocked frame. */
-  const haltScanning = useCallback(() => {
-    setIsScanning(false);
-    stopStream();
-  }, [stopStream]);
-
-  const handleFrame = useCallback(async (decodedText: string) => {
+  const handleFrame = useCallback((decodedText: string) => {
     if (!decodedText || receiverSuccess || isVerifying) return;
-
-    // Fountain droplets are always accepted, even after an error: the worker starts a
-    // fresh decode, so a failed transfer recovers by simply scanning on.
-    if (isFountainDropletString(decodedText)) {
-      rateTrackerRef.current.record(performance.now());
-      initWorker().postMessage({ type: 'FOUNTAIN_DROPLET', droplet: decodedText });
-      return;
-    }
-    if (receiverError && !decodedText.startsWith('H|')) return;
-
-    const chunk = parseLegacyChunk(decodedText);
-    if (chunk) {
-      const rejection = legacyChunkRejection(chunk);
-      if (rejection) {
-        setReceiverError(rejection);
-        haltScanning();
-        addToast?.({ type: 'error', message: rejection, duration: 5000 });
-        return;
-      }
-      if (handshakeRequired && !handshakeRef.current) {
-        setReceiverError('Handshake metadata required before processing data frames.');
-        if (addToast && !hasShownMissingHandshakeToastRef.current) {
-          hasShownMissingHandshakeToastRef.current = true;
-          addToast({
-            type: 'error',
-            message: 'Transfer blocked: missing handshake metadata. Scan handshake QR first.',
-            duration: 5000,
-          });
-        }
-        return;
-      }
-      if (processedIndicesRef.current.has(chunk.index)) {
-        return;
-      }
-      processedIndicesRef.current.add(chunk.index);
-    }
-
-    if (streamMode === 'text') {
-      const dangerousMatch = findDangerousScheme(decodedText);
-      if (dangerousMatch) {
-        setSecurityAlert(`Dangerous protocol detected and blocked: ${dangerousMatch}`);
-        haltScanning();
-        return;
-      }
-    }
-
-    try {
-      if (!lookaheadRef.current) {
-        lookaheadRef.current = new StreamLookaheadReceiver({ mode: streamMode });
-      }
-      if (decodedText.startsWith('F|')) {
-        if (chunk) lookaheadRef.current.receive(decodeChunkText(chunk.base64));
-      } else if (!decodedText.startsWith('H|')) {
-        lookaheadRef.current.receive(decodedText);
-      }
-    } catch (err) {
-      setSecurityAlert((err instanceof Error && err.message) || 'Dangerous protocol split across frames blocked!');
-      haltScanning();
-      return;
-    }
-
-    try {
-      if (decodedText.startsWith('H|')) {
-        const next = parseLegacyHandshake(decodedText);
-        const isNewFile = !handshakeRef.current || handshakeRef.current.sha256 !== next.sha256;
-        if (isNewFile) {
-          processedIndicesRef.current.clear();
-          hasShownMissingHandshakeToastRef.current = false;
-          lookaheadRef.current = new StreamLookaheadReceiver({ mode: streamMode });
-          handshakeRef.current = next;
-
-          setChunks(new Set());
-          setTotalChunks(null);
-          setReceiverError(null);
-          setReceiverSuccess(false);
-          setDownloadTriggered(false);
-          setReassembledData(null);
-          reassembledDataRef.current = null;
-          setCompilationStatus(null);
-          setIsVerifying(false);
-          setHandshake(next);
-
-          initWorker().postMessage({ type: 'INIT', ...next });
-        }
-      } else if (chunk) {
-        setTotalChunks(chunk.total);
-        setChunks(prev => {
-          if (prev.has(chunk.index)) return prev;
-          const next = new Set(prev);
-          next.add(chunk.index);
-          return next;
-        });
-
-        initWorker().postMessage({
-          type: 'CHUNK',
-          index: chunk.index,
-          totalChunks: chunk.total,
-          base64: chunk.base64,
-        });
-      }
-    } catch (err) {
-      setReceiverError((err instanceof Error && err.message) || 'An error occurred during scan decoding.');
-    }
-  }, [receiverSuccess, isVerifying, handshakeRequired, haltScanning, streamMode, receiverError, addToast, initWorker]);
+    // Every other code the camera sees (a poster, a URL) is not part of a transfer.
+    if (!isFountainDropletString(decodedText) && !looksLikePrismFrame(decodedText)) return;
+    // Frames are always accepted, even after an error: the worker starts a fresh decode, so a
+    // failed transfer recovers by simply scanning on.
+    rateTrackerRef.current.record(performance.now());
+    initWorker().postMessage({ type: 'FOUNTAIN_DROPLET', droplet: decodedText });
+  }, [receiverSuccess, isVerifying, initWorker]);
 
   useEffect(() => {
-    handleFrameRef.current = (data) => {
-      void handleFrame(data);
-    };
+    handleFrameRef.current = handleFrame;
   }, [handleFrame]);
 
   useEffect(() => {
@@ -567,9 +416,6 @@ export function useOpticalReceiver({
   }, [cameraStatus]);
 
   const startCameraSession = useCallback(async () => {
-    setSecurityAlert(null);
-    processedIndicesRef.current.clear();
-    hasShownMissingHandshakeToastRef.current = false;
     initWorker();
     setIsScanning(true);
     const video = videoRef.current;
@@ -585,21 +431,6 @@ export function useOpticalReceiver({
   }, [stopStream, addToast, flushVideoHardware]);
 
   useEffect(() => {
-    if (totalChunks !== null && chunks.size === totalChunks && !downloadTriggered) {
-      revokeVideoUrl();
-      if (autoDownload && !analyseReceivedFile((handshake || handshakeRef.current)?.fileName ?? '', (handshake || handshakeRef.current)?.mimeType ?? '').risky) {
-        setDownloadTriggered(true);
-        stopCameraSession();
-        reconstructAndValidateFile(chunks, totalChunks, handshake || handshakeRef.current || undefined);
-      } else if (isScanning) {
-        stopCameraSession();
-        setIsScanning(false);
-        addToast?.({ type: 'success', message: 'Scan complete! Camera stream shut down.', duration: 3000 });
-      }
-    }
-  }, [chunks, totalChunks, downloadTriggered, handshake, reconstructAndValidateFile, stopCameraSession, autoDownload, isScanning, addToast, revokeVideoUrl]);
-
-  useEffect(() => {
     return () => {
       stopAdaptiveScanning();
       stopStream();
@@ -610,10 +441,8 @@ export function useOpticalReceiver({
   }, [stopAdaptiveScanning, stopStream, terminateWorker, flushVideoHardware, revokeVideoUrl]);
 
   return {
-    chunks,
-    totalChunks,
     handshake,
-    securityAlert,
+    manifest,
     receiverError,
     receiverSuccess,
     isVerifying,
@@ -623,12 +452,11 @@ export function useOpticalReceiver({
     cameraError,
     reassembledData,
     videoRef,
-    lookaheadRef,
     handleClear,
     handleFrame,
     startCameraSession,
     stopCameraSession,
-    reconstructAndValidateFile,
+    saveReceivedFile,
     compilationStatus,
     fountainStats,
     receiverMode,

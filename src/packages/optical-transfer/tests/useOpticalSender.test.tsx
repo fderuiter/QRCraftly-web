@@ -41,7 +41,7 @@ describe('useOpticalSender', () => {
     }
   });
 
-  it('should initialize with standard defaults and lower visual density (< 256 bytes)', () => {
+  it('should initialize with standard defaults', () => {
     const { result } = renderHook(() =>
       useOpticalSender(senderOptions())
     );
@@ -50,9 +50,7 @@ describe('useOpticalSender', () => {
     expect(result.current.isTransferring).toBe(false);
     expect(result.current.progress).toBe(0);
     expect(result.current.fps).toBe(15);
-    expect(result.current.chunkSize).toBeLessThan(256);
-    // Fountain mode is the default; the balanced density sizes its droplets.
-    expect(result.current.fountainMode).toBe(true);
+    // The balanced density sizes the symbols.
     expect(result.current.density).toBe('balanced');
     expect(result.current.currentPass).toBe(1);
   });
@@ -310,10 +308,8 @@ describe('useOpticalSender', () => {
     globalThis.mockWorkerControl.setInterceptor(null);
   });
 
-  it('drops maze bridges from the checked legacy handshake frame while the scannability fallback is active', async () => {
+  it('never paints decoration on transfer frames, whatever the page style', async () => {
     const options = senderOptions({
-      fountainMode: false,
-      scannabilityFallbackActive: true,
       config: { ...senderOptions().config, isMazeEnabled: true, isMazeBridgesEnabled: true },
     });
     const { result } = await startWithFrames(options);
@@ -321,7 +317,15 @@ describe('useOpticalSender', () => {
     await waitFor(() => expect(result.current.isTransferring).toBe(true));
     expect(options.verifyFrame).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ isMazeEnabled: true, isMazeBridgesEnabled: false }),
+      expect.objectContaining({ isMazeEnabled: false, isMazeBridgesEnabled: false }),
+      null,
+      null
+    );
+    await waitFor(() => expect(options.renderFrame).toHaveBeenCalled());
+    expect(options.renderFrame).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ isMazeEnabled: false, isMazeBridgesEnabled: false }),
       null,
       null
     );

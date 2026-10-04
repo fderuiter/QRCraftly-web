@@ -22,7 +22,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import Page from './+Page';
 import { ToastProvider } from '@/components/ui/Toast';
-import { FountainReassembler, StreamLookaheadReceiver, createFountainSession } from '@/packages/optical-transfer';
+import { FountainReassembler, TRANSFER_DENSITY_PROFILES, createPrismSession } from '@/packages/optical-transfer';
+
+/** A Prism stream for a text file, as a sender would show it. */
+async function prismStream(content: string, fileName = 'note.txt', mimeType = 'text/plain') {
+  const { errorCorrectionLevel, maxVersion } = TRANSFER_DENSITY_PROFILES.balanced;
+  const { stream } = await createPrismSession(new TextEncoder().encode(content), { fileName, mimeType, errorCorrectionLevel, maxVersion });
+  return stream;
+}
 
 let scanSuccessCallback: ((data: string) => void) | undefined;
 
@@ -85,7 +92,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
     
     // Check buttons
     expect(screen.getByRole('button', { name: /activate camera scanner/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /simulate out-of-order/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /simulate prism stream/i })).toBeInTheDocument();
   });
 
   it('does not expose simulation or security-testing controls in production', () => {
@@ -97,9 +104,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
     );
 
     expect(screen.queryByText('Simulation & Validation Testing')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /simulate out-of-order/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /simulate dangerous scheme/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /simulate split threat/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /simulate prism stream/i })).not.toBeInTheDocument();
   });
 
   it('can activate and deactivate the camera scanner', async () => {
@@ -149,294 +154,26 @@ describe('File Transfer Receive Page & Pipeline', () => {
     expect(screen.queryByTestId('camera-error')).not.toBeInTheDocument();
   });
 
-  it('simulates out-of-order packet reassembly and triggers offline download on complete', async () => {
+  it('ignores codes that are not part of a transfer, whatever they say', async () => {
     render(
       <ToastProvider>
         <Page />
       </ToastProvider>
     );
 
-    const simButton = screen.getByRole('button', { name: /simulate out-of-order/i });
-    
-    await act(async () => {
-      fireEvent.click(simButton);
-    });
-
-    // Wait for setTimeouts inside simulation to execute
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-    });
-
-    // Legacy streams show a plain progress readout; the per-part grid is gone.
-    expect(screen.getByText('10 / 10 parts')).toBeInTheDocument();
-    expect(screen.queryByTestId('progress-grid')).not.toBeInTheDocument();
-
-    // Verify the inline complete panel replaced the active camera space
-    expect(screen.getByTestId('inline-complete-panel')).toBeInTheDocument();
-    expect(screen.getByText('Transfer Complete')).toBeInTheDocument();
-
-    // The legacy panel shows the same name, type, size and hash as the fountain panel.
-    const legacySummary = screen.getByTestId('received-file-summary');
-    expect(legacySummary).toHaveTextContent('simulated_file.txt');
-    expect(screen.getByTestId('received-file-type')).toHaveTextContent('.txt, text/plain');
-    expect(legacySummary).toHaveTextContent('SHA-256');
-
-    // Verify no download is automatically initiated before user confirmation
-    expect(global.URL.createObjectURL).not.toHaveBeenCalled();
-
-    // Click the Save button inside the complete panel
-    const downloadBtn = screen.getByRole('button', { name: /^save$/i });
-    expect(downloadBtn).toBeInTheDocument();
-    
-    await act(async () => {
-      fireEvent.click(downloadBtn);
-    });
-
-    // Verify that createObjectURL is eventually called for client-side download reconstruction
-    await waitFor(() => {
-      expect(global.URL.createObjectURL).toHaveBeenCalled();
-    });
-  });
-
-  it('terminates session and triggers a security alert when restricted scheme (javascript:) is scanned', async () => {
-    render(
-      <ToastProvider>
-        <Page />
-      </ToastProvider>
-    );
-
-    const simButton = screen.getByRole('button', { name: /simulate dangerous scheme/i });
-    
-    await act(async () => {
-      fireEvent.click(simButton);
-    });
-
-    // Security alert is rendered
-    expect(screen.getByText(/Security Intercepted/i)).toBeInTheDocument();
-    expect(screen.getByText(/Dangerous protocol detected and blocked: javascript:/i)).toBeInTheDocument();
-    
-    // Scanner is inactive
-    expect(screen.getByText('Camera is off')).toBeInTheDocument();
-  });
-
-  it('lookahead receiver intercepts and terminates a split protocol threat across frames', async () => {
-    render(
-      <ToastProvider>
-        <Page />
-      </ToastProvider>
-    );
-
-    const simButton = screen.getByRole('button', { name: /simulate split threat/i });
-    
-    await act(async () => {
-      fireEvent.click(simButton);
-    });
-
-    // Wait for the 100ms deferred frame
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 200));
-    });
-
-    expect(screen.getByText(/Security Intercepted/i)).toBeInTheDocument();
-    expect(screen.getByText(/MaliciousStreamError: Detected dangerous protocol prefix "javascript:" split across frames./i)).toBeInTheDocument();
-    expect(screen.getByText('Camera is off')).toBeInTheDocument();
-  });
-
-  it('no longer offers a Compatibility mode toggle and always keeps text safety checks on', async () => {
-    render(
-      <ToastProvider>
-        <Page />
-      </ToastProvider>
-    );
-
-    expect(screen.queryByRole('switch', { name: /compatibility mode/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Compatibility mode/i)).not.toBeInTheDocument();
-
-    const simDangerousButton = screen.getByRole('button', { name: /simulate dangerous scheme/i });
-    await act(async () => {
-      fireEvent.click(simDangerousButton);
-    });
-    expect(screen.getByText(/Security Intercepted/i)).toBeInTheDocument();
-  });
-
-  describe('Synchronous Page-Level QR Frame Deduplication', () => {
-    it('should track processed frame indices and synchronously discard duplicates before downstream lookahead', async () => {
-      const receiveSpy = vi.spyOn(StreamLookaheadReceiver.prototype, 'receive');
-      render(
-        <ToastProvider>
-          <Page />
-        </ToastProvider>
-      );
-
-      // Verify callback was captured
-      expect(scanSuccessCallback).toBeDefined();
-
-      // Scan initial handshake
+    for (const other of ["javascript:alert('x')", 'https://example.com', 'H|a.txt|10|text/plain|' + 'a'.repeat(64), 'F|0|2|Zm9v']) {
       await act(async () => {
-        scanSuccessCallback!("H|test.txt|100|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        scanSuccessCallback!(other);
       });
+    }
 
-      // Scan unique frame index 0
-      await act(async () => {
-        scanSuccessCallback!("F|0|3|Y2h1bmsw");
-      });
-
-      expect(receiveSpy).toHaveBeenCalledTimes(1);
-      expect(receiveSpy).toHaveBeenLastCalledWith("chunk0");
-
-      // Scan duplicate frame index 0 - should be discarded synchronously
-      await act(async () => {
-        scanSuccessCallback!("F|0|3|Y2h1bmsw");
-      });
-
-      // StreamLookaheadReceiver.receive should NOT be called again
-      expect(receiveSpy).toHaveBeenCalledTimes(1);
-
-      // Scan a new unique frame index 1 - should be processed
-      await act(async () => {
-        scanSuccessCallback!("F|1|3|Y2h1bmsx");
-      });
-
-      expect(receiveSpy).toHaveBeenCalledTimes(2);
-      expect(receiveSpy).toHaveBeenLastCalledWith("chunk1");
-    });
-
-    it('should clear the tracking cache when receiver state is reset', async () => {
-      const receiveSpy = vi.spyOn(StreamLookaheadReceiver.prototype, 'receive');
-      render(
-        <ToastProvider>
-          <Page />
-        </ToastProvider>
-      );
-
-      // Scan initial handshake
-      await act(async () => {
-        scanSuccessCallback!("H|test.txt|100|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-      });
-
-      // Scan frame index 0
-      await act(async () => {
-        scanSuccessCallback!("F|0|3|Y2h1bmsw");
-      });
-      expect(receiveSpy).toHaveBeenCalledTimes(1);
-
-      // Reset the receiver state
-      const clearButton = screen.getByRole('button', { name: /clear transfer progress/i });
-      await act(async () => {
-        fireEvent.click(clearButton);
-      });
-
-      // Scan handshake again after reset
-      await act(async () => {
-        scanSuccessCallback!("H|test.txt|100|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-      });
-
-      // Scan frame index 0 again - should be processed since cache was cleared
-      await act(async () => {
-        scanSuccessCallback!("F|0|3|Y2h1bmsw");
-      });
-      // It will be processed on a new StreamLookaheadReceiver instance
-      expect(receiveSpy).toHaveBeenCalledTimes(2);
-    });
-
-    it('should clear the tracking cache when a new scanner session starts', async () => {
-      const receiveSpy = vi.spyOn(StreamLookaheadReceiver.prototype, 'receive');
-      render(
-        <ToastProvider>
-          <Page />
-        </ToastProvider>
-      );
-
-      // Scan initial handshake
-      await act(async () => {
-        scanSuccessCallback!("H|test.txt|100|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-      });
-
-      // Scan frame index 0
-      await act(async () => {
-        scanSuccessCallback!("F|0|3|Y2h1bmsw");
-      });
-      expect(receiveSpy).toHaveBeenCalledTimes(1);
-
-      // Click Activate to initialize state, then Deactivate
-      const activateButton = screen.getByRole('button', { name: /activate camera scanner/i });
-      await act(async () => {
-        fireEvent.click(activateButton);
-      });
-      
-      const deactivateButton = screen.getByRole('button', { name: /deactivate camera scanner/i });
-      await act(async () => {
-        fireEvent.click(deactivateButton);
-      });
-
-      // Click Activate Camera Scanner again to start a new session
-      await act(async () => {
-        fireEvent.click(activateButton);
-      });
-
-      // Scan initial handshake
-      await act(async () => {
-        scanSuccessCallback!("H|test.txt|100|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-      });
-
-      // Scan frame index 0 again - should be processed because starting a new session resets tracking cache
-      await act(async () => {
-        scanSuccessCallback!("F|0|3|Y2h1bmsw");
-      });
-      expect(receiveSpy).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('Adaptive Progress Rendering and Validation for File Transfers', () => {
-    it('rejects transfers with more than 5000 chunks and displays a user-friendly error message', async () => {
-      render(
-        <ToastProvider>
-          <Page />
-        </ToastProvider>
-      );
-
-      expect(scanSuccessCallback).toBeDefined();
-
-      await act(async () => {
-        scanSuccessCallback!("F|0|5001|Zm9v");
-      });
-
-      // Verify error message is rendered
-      const errorAlert = screen.getByTestId('receiver-error');
-      expect(errorAlert).toBeInTheDocument();
-      expect(errorAlert).toHaveTextContent('File transfer rejected: exceeds the maximum limit of 5000 chunks.');
-
-      // Verify grid is not in the document
-      expect(screen.queryByTestId('progress-grid')).not.toBeInTheDocument();
-    });
-
-    it('shows a progress readout without a per-part grid for legacy chunk streams', async () => {
-      render(
-        <ToastProvider>
-          <Page />
-        </ToastProvider>
-      );
-
-      expect(scanSuccessCallback).toBeDefined();
-
-      await act(async () => {
-        scanSuccessCallback!("H|test.txt|1000|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-      });
-
-      await act(async () => {
-        scanSuccessCallback!("F|0|150|Zm9v");
-      });
-
-      expect(screen.getByTestId('legacy-progress')).toBeInTheDocument();
-      expect(screen.getByText('1 / 150 parts')).toBeInTheDocument();
-      expect(screen.queryByTestId('progress-grid')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('chunk-block-0')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('fallback-progress-card')).not.toBeInTheDocument();
-    });
+    expect(screen.getByText('Ready to scan')).toBeInTheDocument();
+    expect(screen.queryByTestId('receiver-error')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('manifest-info')).not.toBeInTheDocument();
   });
 
   describe('Rateless fountain reception', () => {
-    /** Routes reassembly-worker droplets through a real FountainReassembler. */
+    /** Routes reassembly-worker frames through a real FountainReassembler. */
     function installFountainWorker() {
       const reassembler = new FountainReassembler();
       globalThis.mockWorkerControl.setInterceptor(async (message: any, worker: any) => {
@@ -447,6 +184,8 @@ describe('File Transfer Receive Page & Pipeline', () => {
         }
         if (message.type !== 'FOUNTAIN_DROPLET') return;
         const snap = reassembler.ingest(message.droplet);
+        const manifest = reassembler.takeManifest();
+        if (manifest) worker.dispatchMessage({ type: 'MANIFEST', manifest });
         if (!snap) return;
         worker.dispatchMessage({ type: 'PROGRESS', progress: snap.progress, current: snap.resolved, total: snap.k, rank: snap.rank, dropletsReceived: snap.dropletsReceived, isFountain: true });
         if (!reassembler.isComplete) return;
@@ -459,10 +198,10 @@ describe('File Transfer Receive Page & Pipeline', () => {
       globalThis.mockWorkerControl.setInterceptor(null);
     });
 
-    it('shows droplets/K, rank, FPS and ETA telemetry and verifies SHA-256 before download', async () => {
+    it('shows the file details from the manifest, then telemetry, and verifies SHA-256 before download', async () => {
       installFountainWorker();
       const text = 'Page-level fountain telemetry. '.repeat(40);
-      const { encoder } = await createFountainSession(new TextEncoder().encode(text), { fileName: 'fountain.txt', mimeType: 'text/plain' });
+      const stream = await prismStream(text, 'fountain.txt');
 
       render(
         <ToastProvider>
@@ -470,26 +209,38 @@ describe('File Transfer Receive Page & Pipeline', () => {
         </ToastProvider>
       );
 
-      // Join mid-stream: the first droplet seen is #6, no handshake frame ever arrives.
+      // The first frame is the manifest: the file's name, size and type show before any data decodes.
       await act(async () => {
-        scanSuccessCallback!(encoder.dropletStringForIndex(5));
+        scanSuccessCallback!(stream.frameText(0));
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+      expect(screen.getByTestId('manifest-info')).toBeInTheDocument();
+      expect(screen.getByTestId('manifest-name')).toHaveTextContent('fountain.txt');
+      expect(screen.getByTestId('manifest-size')).toHaveTextContent('1.2 KB');
+      expect(screen.getByTestId('manifest-type')).toHaveTextContent('text/plain');
+      expect(screen.getByTestId('manifest-fingerprint')).toHaveTextContent(stream.fingerprint);
+      expect(screen.queryByText('Ready to scan')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('fountain-telemetry')).not.toBeInTheDocument();
+
+      // Join mid-stream: the next frame seen is #6.
+      await act(async () => {
+        scanSuccessCallback!(stream.frameText(5));
         await new Promise(resolve => setTimeout(resolve, 10));
       });
 
       expect(screen.getByTestId('fountain-telemetry')).toBeInTheDocument();
       expect(screen.getByTestId('fountain-droplets')).toHaveTextContent(/^1$/);
-      // A repair droplet may not raise the rank on its own.
-      expect(screen.getByTestId('fountain-rank')).toHaveTextContent(new RegExp(`^[01] / ${encoder.k}$`));
+      // A repair symbol may not raise the rank on its own.
+      expect(screen.getByTestId('fountain-rank')).toHaveTextContent(new RegExp(`^[01] / ${stream.k}$`));
       expect(screen.getByTestId('fountain-fps')).toHaveTextContent(/fps/);
       expect(screen.getByTestId('fountain-eta')).toBeInTheDocument();
       expect(screen.getByRole('progressbar', { name: /blocks decoded/i })).toBeInTheDocument();
-      expect(screen.queryByTestId('progress-grid')).not.toBeInTheDocument();
       expect(screen.queryByTestId('receiver-error')).not.toBeInTheDocument();
 
-      for (let index = 6; index < encoder.k * 4; index++) {
+      for (let index = 6; index < stream.k * 6 + 40; index++) {
         if (index % 3 === 0) continue; // dropped frames
         await act(async () => {
-          scanSuccessCallback!(encoder.dropletStringForIndex(index));
+          scanSuccessCallback!(stream.frameText(index));
           await new Promise(resolve => setTimeout(resolve, 0));
         });
         if (screen.queryByTestId('inline-complete-panel')) break;
@@ -500,7 +251,8 @@ describe('File Transfer Receive Page & Pipeline', () => {
       const summary = screen.getByTestId('received-file-summary');
       expect(summary).toHaveTextContent('fountain.txt');
       expect(summary).toHaveTextContent("1.2 KB");
-      expect(screen.getByTestId('fountain-rank')).toHaveTextContent(`${encoder.k} / ${encoder.k}`);
+      expect(screen.getByTestId('fountain-rank')).toHaveTextContent(`${stream.k} / ${stream.k}`);
+      expect(screen.queryByTestId('manifest-info')).not.toBeInTheDocument();
       expect(global.URL.createObjectURL).not.toHaveBeenCalled();
 
       const downloadBtn = screen.getByRole('button', { name: /^save$/i });
@@ -510,17 +262,33 @@ describe('File Transfer Receive Page & Pipeline', () => {
       await waitFor(() => expect(global.URL.createObjectURL).toHaveBeenCalled());
     });
 
-    async function receiveFile(fileName: string, mimeType: string) {
+    it('shows only a sanitised name for the announced file', async () => {
       installFountainWorker();
-      const { encoder } = await createFountainSession(new TextEncoder().encode('Risky type check. '.repeat(30)), { fileName, mimeType });
+      const stream = await prismStream('x'.repeat(100), `report${String.fromCharCode(0x202e)}fdp.exe`, 'application/pdf');
       render(
         <ToastProvider>
           <Page />
         </ToastProvider>
       );
-      for (let index = 0; index < encoder.k * 4; index++) {
+      await act(async () => {
+        scanSuccessCallback!(stream.frameText(0));
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+      expect(screen.getByTestId('manifest-name')).toHaveTextContent('reportfdp.exe');
+      expect(screen.getByTestId('manifest-name').textContent).not.toContain(String.fromCharCode(0x202e));
+    });
+
+    async function receiveFile(fileName: string, mimeType: string) {
+      installFountainWorker();
+      const stream = await prismStream('Risky type check. '.repeat(30), fileName, mimeType);
+      render(
+        <ToastProvider>
+          <Page />
+        </ToastProvider>
+      );
+      for (let index = 0; index < stream.k * 6 + 40; index++) {
         await act(async () => {
-          scanSuccessCallback!(encoder.dropletStringForIndex(index));
+          scanSuccessCallback!(stream.frameText(index));
           await new Promise(resolve => setTimeout(resolve, 0));
         });
         if (screen.queryByTestId('inline-complete-panel')) break;
@@ -576,19 +344,16 @@ describe('File Transfer Receive Page & Pipeline', () => {
 
     it('clears a completed transfer and scans again with Receive another file', async () => {
       installFountainWorker();
-      const { encoder } = await createFountainSession(new TextEncoder().encode('first file '.repeat(30)), {
-        fileName: 'first.txt',
-        mimeType: 'text/plain',
-      });
+      const stream = await prismStream('first file '.repeat(30), 'first.txt');
       render(
         <ToastProvider>
           <Page />
         </ToastProvider>
       );
 
-      for (let index = 0; index < encoder.k * 4 && !screen.queryByTestId('inline-complete-panel'); index++) {
+      for (let index = 0; index < stream.k * 6 + 40 && !screen.queryByTestId('inline-complete-panel'); index++) {
         await act(async () => {
-          scanSuccessCallback!(encoder.dropletStringForIndex(index));
+          scanSuccessCallback!(stream.frameText(index));
           await new Promise(resolve => setTimeout(resolve, 0));
         });
       }
@@ -601,7 +366,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
       expect(screen.getByRole('button', { name: /deactivate camera scanner/i })).toBeInTheDocument();
     });
 
-    it('runs the development fountain simulation end-to-end', async () => {
+    it('runs the development Prism simulation end-to-end', async () => {
       installFountainWorker();
       render(
         <ToastProvider>
@@ -610,7 +375,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
       );
 
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /simulate fountain stream/i }));
+        fireEvent.click(screen.getByRole('button', { name: /simulate prism stream/i }));
       });
       await act(async () => {
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -753,24 +518,15 @@ describe('File Transfer Receive Page & Pipeline', () => {
         fireEvent.change(fileInput, { target: { files: [validFile] } });
       });
 
-      // Scan handshake first
-      await act(async () => {
-        scanSuccessCallback!('H|test.txt|100|text/plain|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
-      });
+      const stream = await prismStream('Recorded transfer. '.repeat(30), 'recorded.txt');
+      for (let index = 0; index < stream.k * 6 + 40 && !screen.queryByTestId('inline-complete-panel'); index++) {
+        await act(async () => {
+          scanSuccessCallback!(stream.frameText(index));
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+      }
 
-      // Scan frame 0 and frame 1
-      await act(async () => {
-        scanSuccessCallback!('F|0|2|Zm9v');
-      });
-      await act(async () => {
-        scanSuccessCallback!('F|1|2|YmFy');
-      });
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      });
-
-      expect(screen.getByTestId('inline-complete-panel')).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId('inline-complete-panel')).toBeInTheDocument());
       expect(screen.getByText('Transfer Complete')).toBeInTheDocument();
     });
   });

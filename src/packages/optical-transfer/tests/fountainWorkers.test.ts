@@ -19,12 +19,16 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import QRCode from 'qrcode';
 import {
+  PrismStream,
   createPrng,
+  crc32,
+  decodeFrame,
   sha256Hex,
   encodeSessionMessage,
   FountainEncoder,
   MAX_RECEIVE_BYTES,
   TRANSFER_DENSITY_PROFILES,
+  type PrismManifest,
   type TransferDensity,
 } from '../index';
 
@@ -47,20 +51,39 @@ function randomBytes(length: number, seed: number): Uint8Array {
   return Uint8Array.from({ length }, () => Math.floor(prng() * 256));
 }
 
-async function startFountain(
-  file: Blob,
-  options: { errorCorrectionLevel?: string; chunkSize?: number; density?: string } = {}
-) {
-  const { errorCorrectionLevel = 'Q', chunkSize, density } = options;
-  await sliceHandler({ data: { type: 'START', payload: { file, fountainMode: true, fps: 15, errorCorrectionLevel, chunkSize, density } } });
+async function startFountain(file: Blob, options: { density?: string } = {}) {
+  await sliceHandler({ data: { type: 'START', payload: { file, fps: 15, density: options.density } } });
   return posted.find(m => m.type === 'INITIALIZED') as
     | {
         totalFrames: number;
-        chunkSize: number;
         sha256: string;
-        fountain: { k: number; symbolSize: number; compression: string; density: TransferDensity };
+        fountain: { k: number; symbolSize: number; compression: string; density: TransferDensity; fingerprint: string };
       }
     | undefined;
+}
+
+/** Builds a Prism stream by hand, for a manifest that differs from what the sender would write. */
+function handmadeStream(message: Uint8Array, overrides: Partial<PrismManifest> & { size: number; sha256: string }): PrismStream {
+  const { size, sha256, ...rest } = overrides;
+  return new PrismStream(message, {
+    version: 1,
+    files: [{ name: 'f.bin', size, mimeType: 'application/octet-stream', sha256 }],
+    compression: 'none',
+    transferLength: message.length,
+    symbolSize: 16,
+    transferCrc32: crc32(message),
+    salt: new Uint8Array(0),
+    encryption: 0,
+    ...rest,
+  });
+}
+
+/** Feeds frames to the reassembly worker until it answers with COMPLETE or ERROR. */
+async function feedUntilDone(stream: PrismStream, count = stream.k * 3 + 40) {
+  for (let i = 0; i < count; i++) {
+    await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: stream.frameText(i) } });
+    if (posted.some(m => m.type === 'ERROR' || m.type === 'COMPLETE')) break;
+  }
 }
 
 /** ACKs frames one by one so the lookahead pipeline keeps generating. */
@@ -101,24 +124,27 @@ describe('Fountain sender and receiver workers', () => {
     vi.restoreAllMocks();
   });
 
-  it('emits self-describing BC-UR droplets with no handshake frame, within QR version 7 when reliable', async () => {
+  it('emits self-describing Prism frames, data within QR version 7 when reliable', async () => {
     const text = 'Air-gapped optical transfer, rateless edition. '.repeat(60);
     const file = new File([text], 'notes.txt', { type: 'text/plain' });
     const init = await startFountain(file, { density: 'reliable' });
 
     expect(init?.fountain.compression).toBe('deflate-raw');
-    expect(init?.fountain.symbolSize).toBeLessThanOrEqual(100);
+    expect(init?.fountain.symbolSize).toBeGreaterThan(32);
+    expect(init?.fountain.fingerprint).toMatch(/^[0-9A-F]{4}-[0-9A-F]{4}$/);
     expect(init?.totalFrames).toBe(init?.fountain.k);
     expect(init?.sha256).toBe(await sha256Hex(new TextEncoder().encode(text)));
 
     await pump(20);
     expect(qrCalls.length).toBeGreaterThan(20);
     for (const call of qrCalls) {
-      expect(call.text.startsWith('UR:BYTES/')).toBe(true);
-      expect(call.text.startsWith('H|')).toBe(false);
-      expect(call.version).toBeLessThanOrEqual(7);
+      const decoded = decodeFrame(call.text);
+      expect(decoded.ok).toBe(true);
       expect(call.ecc).toBe('Q');
+      // Only the occasional manifest frame may be a larger code than the data frames.
+      if (decoded.ok && decoded.frame.type === 'data') expect(call.version).toBeLessThanOrEqual(7);
     }
+    expect(decodeFrame(qrCalls[0].text)).toMatchObject({ ok: true, frame: { type: 'manifest' } });
   });
 
   it('keeps broadcasting past K until STOP and never reports COMPLETE', async () => {
@@ -139,16 +165,17 @@ describe('Fountain sender and receiver workers', () => {
   });
 
   it.each(['reliable', 'balanced', 'fast'] as const)(
-    'keeps %s droplets within the density QR version and ECC, whatever the page ECC',
+    'keeps %s data frames within the density QR version and ECC',
     async density => {
       const { maxVersion, errorCorrectionLevel } = TRANSFER_DENSITY_PROFILES[density];
-      const init = await startFountain(new File([randomBytes(6000, 5)], 'd.bin'), { density, errorCorrectionLevel: 'H' });
+      const init = await startFountain(new File([randomBytes(6000, 5)], 'd.bin'), { density });
       expect(init?.fountain.density).toBe(density);
       await pump(10);
       expect(qrCalls.length).toBeGreaterThan(10);
       for (const call of qrCalls) {
         expect(call.ecc).toBe(errorCorrectionLevel);
-        expect(call.version).toBeLessThanOrEqual(maxVersion);
+        const decoded = decodeFrame(call.text);
+        if (decoded.ok && decoded.frame.type === 'data') expect(call.version).toBeLessThanOrEqual(maxVersion);
       }
     }
   );
@@ -165,13 +192,9 @@ describe('Fountain sender and receiver workers', () => {
     expect(sizes[1]).toBeLessThan(sizes[2]);
   });
 
-  it('defaults unknown densities to balanced and honours a smaller requested symbol size', async () => {
-    const init = await startFountain(new File([randomBytes(400, 9)], 'h.bin'), {
-      chunkSize: 12,
-      density: 'turbo',
-    });
+  it('defaults unknown densities to balanced', async () => {
+    const init = await startFountain(new File([randomBytes(400, 9)], 'h.bin'), { density: 'turbo' });
     expect(init?.fountain.density).toBe('balanced');
-    expect(init?.fountain.symbolSize).toBeLessThanOrEqual(12);
   });
 
   it.each([
@@ -227,7 +250,21 @@ describe('Fountain sender and receiver workers', () => {
     expect(complete!.handshake.sha256).toBe(await sha256Hex(output));
   });
 
-  it('posts an ERROR (never COMPLETE) when the session SHA-256 does not match', async () => {
+  it('posts an ERROR (never COMPLETE) when the file SHA-256 does not match the manifest', async () => {
+    const stream = handmadeStream(new TextEncoder().encode('forged'), { size: 6, sha256: 'ff'.repeat(32) });
+    await feedUntilDone(stream);
+    expect(posted.some(m => m.type === 'COMPLETE')).toBe(false);
+    expect(posted.find(m => m.type === 'ERROR')).toMatchObject({ isFountain: true, error: expect.stringMatching(/SHA-256/) });
+  });
+
+  it('announces the manifest to the page before any data is decoded', async () => {
+    const stream = handmadeStream(randomBytes(400, 5), { size: 400, sha256: 'ab'.repeat(32) });
+    await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: stream.frameText(0) } });
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toMatchObject({ type: 'MANIFEST', manifest: { totalSize: 400, files: [{ name: 'f.bin', size: 400 }] } });
+  });
+
+  it('still posts an ERROR for a forged legacy ur:bytes session', async () => {
     const bytes = new TextEncoder().encode('forged');
     const message = encodeSessionMessage(
       { fileName: 'f.txt', mimeType: 'text/plain', fileSize: bytes.length, sha256: 'ff'.repeat(32), compression: 'none' },
@@ -248,26 +285,34 @@ describe('Fountain sender and receiver workers', () => {
   });
 
   describe('receive limits (#1154)', () => {
-    it('rejects an INIT claiming 2 GB without allocating', async () => {
-      const spy = vi.spyOn(globalThis, 'Uint8Array');
-      await reassemblyHandler({ data: { type: 'INIT', fileName: 'x', fileSize: 2_000_000_000, mimeType: 'a/b', sha256: 'a'.repeat(64) } });
-      const biggest = Math.max(0, ...spy.mock.calls.map(call => {
-        const [first] = call as unknown[];
-        return typeof first === 'number' ? first : 0;
-      }));
-      spy.mockRestore();
-      expect(biggest).toBeLessThan(MAX_RECEIVE_BYTES);
-      const error = posted.find(m => m.type === 'ERROR');
-      expect(String(error?.error)).toMatch(/beyond the 100 MB limit/);
+    it('rejects a manifest claiming 2 GB without allocating', async () => {
+      const stream = handmadeStream(new Uint8Array(64), { size: 2_000_000_000, sha256: 'a'.repeat(64) });
+      const frame = stream.frameText(0);
+      const before = process.memoryUsage().arrayBuffers;
+      await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: frame } });
+      // Nothing close to the claimed 2 GB (or even the 100 MB limit) was allocated for it.
+      expect(process.memoryUsage().arrayBuffers - before).toBeLessThan(MAX_RECEIVE_BYTES / 2);
+      expect(posted.some(m => m.type === 'MANIFEST')).toBe(false);
+      expect(String(posted.find(m => m.type === 'ERROR')?.error)).toMatch(/beyond the 100 MB limit/);
     });
 
-    it('rejects chunks whose implied size passes the limit', async () => {
-      await reassemblyHandler({ data: { type: 'INIT', fileSize: 0, totalChunks: 5000, chunkSize: 255 } });
-      await reassemblyHandler({ data: { type: 'CHUNK', index: 0, totalChunks: 5000, chunkSize: 1 << 30, base64: 'Zm9v' } });
+    it('rejects a manifest whose transfer length passes the limit', async () => {
+      const stream = handmadeStream(new Uint8Array(64), { size: 64, sha256: 'a'.repeat(64), transferLength: MAX_RECEIVE_BYTES * 2 });
+      await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: stream.frameText(0) } });
       expect(posted.some(m => m.type === 'ERROR')).toBe(true);
+      expect(posted.some(m => m.type === 'PROGRESS')).toBe(false);
     });
 
-    it('stops a deflate bomb at the size the header declares', async () => {
+    it('stops a deflate bomb at the size the manifest declares', async () => {
+      const bomb = new Uint8Array(8 * 1024 * 1024);
+      const compressed = new Uint8Array(await new Response(new Blob([bomb]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+      const stream = handmadeStream(compressed, { size: 1024, sha256: '0'.repeat(64), compression: 'deflate-raw', symbolSize: 64 });
+      await feedUntilDone(stream);
+      expect(posted.some(m => m.type === 'COMPLETE')).toBe(false);
+      expect(String(posted.find(m => m.type === 'ERROR')?.error)).toMatch(/expands to more than the 1024 bytes/);
+    });
+
+    it('stops a legacy deflate bomb at the size the header declares', async () => {
       // 8 MB of zeros deflate to a few KB; the header lies and declares 1 KB.
       const bomb = new Uint8Array(8 * 1024 * 1024);
       const stream = new Blob([bomb]).stream().pipeThrough(new CompressionStream('deflate-raw'));

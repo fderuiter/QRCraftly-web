@@ -132,6 +132,18 @@ _Avoid_: Mid-stream scan, instant sync, handshake-free mode
 An individual rateless fountain packet produced by XOR-combining a pseudo-random subset of source blocks according to a degree distribution.
 _Avoid_: Packet chunk, fountain slice, stream bit
 
+**Prism Frame**:
+One animated-QR frame of an optical transfer: Base45 text holding a short header (version, type, session ID, symbol IDs), one or more droplet symbols or a manifest, and a CRC-32C. Frames are independent, so a receiver can join at any point.
+_Avoid_: Packet, ur part, chunk
+
+**Transfer Manifest**:
+The sender's description of a transfer (file names, sizes, types, SHA-256, symbol size) sent as the first frame and repeated, so the receiver can check limits and show what is arriving before the file completes.
+_Avoid_: Header, handshake, session header
+
+**Session ID**:
+The first 6 bytes of the SHA-256 of the manifest. It ties every frame to one transfer and lets a receiver ignore a manifest that does not match.
+_Avoid_: Stream ID, transfer token
+
 **Transfer Density**:
 The sender's choice of how much data each droplet QR carries (Reliable, Balanced or Fast). It sets the highest QR version and the error correction level of every droplet, independent of the QR appearance.
 _Avoid_: Chunk size, max data per QR, QR speed
@@ -145,7 +157,7 @@ The discrete probability distribution governing how many source blocks are XOR-c
 _Avoid_: Block weight, degree spread, combination ratio
 
 **Optical Transfer Engine**:
-A consolidated deep module encapsulating rateless fountain coding, contiguous frame memory pooling, stream lookahead security validation, and off-thread slicing and reassembly behind unified entry-point seams.
+A consolidated deep module encapsulating rateless fountain coding, contiguous frame memory pooling, Prism frame validation, and off-thread slicing and reassembly behind unified entry-point seams.
 _Avoid_: Transfer helper, animated QR manager, file transfer utility
 
 ### Environment & Tooling Invariants

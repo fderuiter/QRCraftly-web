@@ -237,46 +237,6 @@ describe('fileSliceWorker', () => {
     expect(frameCalls[0][0].index).toBe(3);
   });
 
-  it('sends COMPLETE when last frame is ACKed', async () => {
-    const postMessageSpy = vi.fn();
-    scope.postMessage = postMessageSpy;
-
-    const dummyBlob = new Blob(['one'], { type: 'text/plain' });
-
-    await workerHandler({
-      data: {
-        type: 'START',
-        payload: {
-          file: dummyBlob,
-          chunkSize: 5,
-          fps: 15
-        }
-      }
-    });
-
-    await new Promise(resolve => setTimeout(resolve, 10));
-    postMessageSpy.mockClear();
-
-    await workerHandler({
-      data: {
-        type: 'ACK',
-        payload: { index: 0 }
-      }
-    });
-    await new Promise(resolve => setTimeout(resolve, 10));
-
-    await workerHandler({
-      data: {
-        type: 'ACK',
-        payload: { index: 1 }
-      }
-    });
-    await new Promise(resolve => setTimeout(resolve, 10));
-
-    const completeCalls = postMessageSpy.mock.calls.filter(c => c[0].type === 'COMPLETE');
-    expect(completeCalls.length).toBe(1);
-  });
-
   it('posts ERROR message when SHA-256 computation fails', async () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
@@ -688,6 +648,7 @@ describe('fileSliceWorker State Cache', () => {
 
     // Ensure frame sequence numbers start cleanly at index 0 for the active session
     expect(frameMessages[0].index).toBe(0);
-    expect(frameMessages[0].total).toBe(Math.ceil(file2.size / 10) + 1);
+    const initialized = postedMessages.filter((m) => m.type === 'INITIALIZED');
+    expect(frameMessages[0].total).toBe(initialized[initialized.length - 1].totalFrames);
   });
 });

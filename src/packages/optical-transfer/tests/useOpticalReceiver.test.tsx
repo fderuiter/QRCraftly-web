@@ -21,8 +21,31 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { useOpticalReceiver } from '../client';
-import { createFountainSession } from '../index';
+import {
+  PrismStream,
+  TRANSFER_DENSITY_PROFILES,
+  createFountainSession,
+  createPrismSession,
+  crc32,
+  crc32c,
+  decodeBase45,
+  encodeBase45,
+  encodeDataFrame,
+} from '../index';
 import { receiverOptions } from './fixtures';
+
+const balanced = TRANSFER_DENSITY_PROFILES.balanced;
+const text = (value: string) => new TextEncoder().encode(value);
+
+async function streamFor(content: string, fileName = 'note.txt', mimeType = 'text/plain') {
+  const { stream } = await createPrismSession(text(content), {
+    fileName,
+    mimeType,
+    errorCorrectionLevel: balanced.errorCorrectionLevel,
+    maxVersion: balanced.maxVersion,
+  });
+  return stream;
+}
 
 describe('useOpticalReceiver', () => {
 
@@ -39,279 +62,148 @@ describe('useOpticalReceiver', () => {
   it('should initialize with standard defaults', () => {
     const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
 
-    expect(result.current.chunks.size).toBe(0);
-    expect(result.current.totalChunks).toBeNull();
-    expect(result.current.securityAlert).toBeNull();
+    expect(result.current.manifest).toBeNull();
+    expect(result.current.fountainStats).toBeNull();
+    expect(result.current.receiverError).toBeNull();
     expect(result.current.isScanning).toBe(false);
   });
 
-  it('should process simulated normal data frames when handshake is present', async () => {
-    const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
-
-    await act(async () => {
-      await result.current.handleFrame('H|test.txt|6|text/plain|c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2');
-    });
-
-    await act(async () => {
-      await result.current.handleFrame('F|0|2|Zm9v');
-    });
-
-    expect(result.current.totalChunks).toBe(2);
-    expect(result.current.chunks.has(0)).toBe(true);
-  });
-
-  it('rejects a legacy handshake claiming 2 GB before anything is allocated (#1154)', async () => {
-    const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
-
-    await act(async () => {
-      await result.current.handleFrame('H|x.bin|2000000000|application/octet-stream|' + 'a'.repeat(64));
-    });
-
-    expect(result.current.receiverError).toMatch(/File transfer rejected: the sender claims 2000000000 bytes/);
-    expect(result.current.handshake).toBeNull();
-  });
-
-  it('rejects a legacy handshake without a valid SHA-256 (#1154)', async () => {
-    const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
-
-    for (const bad of ['', 'abc', 'g'.repeat(64)]) {
-      await act(async () => {
-        await result.current.handleFrame(`H|x.bin|10|text/plain|${bad}`);
-      });
-      expect(result.current.receiverError).toMatch(/no valid SHA-256 hash/);
-      expect(result.current.handshake).toBeNull();
-    }
-  });
-
-  it('should ignore data frames when no handshake frame has been scanned', async () => {
-    const addToast = vi.fn();
-    const { result } = renderHook(() => useOpticalReceiver(receiverOptions({ addToast })));
-
-    await act(async () => {
-      await result.current.handleFrame('F|0|2|Zm9v');
-    });
-
-    expect(result.current.chunks.size).toBe(0);
-    expect(result.current.receiverError).toContain('Handshake metadata required');
-    expect(addToast).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'error',
-      message: expect.stringContaining('missing handshake metadata'),
-    }));
-  });
-
-  it('keeps accepting fountain droplets after an error and clears it once decoding progresses', async () => {
+  it('ignores every code that is not part of a transfer without waking the worker', async () => {
     const posted: string[] = [];
-    globalThis.mockWorkerControl.setInterceptor((message: { type: string }, worker: { dispatchMessage: (m: unknown) => void }) => {
-      posted.push(message.type);
-      if (message.type === 'FOUNTAIN_DROPLET') {
-        worker.dispatchMessage({ type: 'PROGRESS', progress: 10, current: 1, total: 10, rank: 1, dropletsReceived: 1, isFountain: true });
-      }
-    });
+    globalThis.mockWorkerControl.setInterceptor((message: { type: string }) => posted.push(message.type));
     try {
       const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
-
-      await act(async () => {
-        await result.current.handleFrame('F|0|2|Zm9v');
-      });
-      expect(result.current.receiverError).toContain('Handshake metadata required');
-
-      const { encoder } = await createFountainSession(new TextEncoder().encode('recover'), { fileName: 'r.txt', mimeType: 'text/plain' });
-      await act(async () => {
-        await result.current.handleFrame(encoder.dropletStringForIndex(0));
-      });
-
-      await waitFor(() => expect(posted).toContain('FOUNTAIN_DROPLET'));
-      await waitFor(() => expect(result.current.receiverError).toBeNull());
+      for (const other of ['https://example.com', 'javascript:alert(1)', 'H|test.txt|6|text/plain|abc', 'F|0|2|Zm9v', 'lowercase text']) {
+        await act(async () => {
+          result.current.handleFrame(other);
+        });
+      }
+      expect(posted).not.toContain('FOUNTAIN_DROPLET');
+      expect(result.current.fountainStats).toBeNull();
+      expect(result.current.receiverError).toBeNull();
     } finally {
       globalThis.mockWorkerControl.setInterceptor(null);
     }
   });
 
-  it('should intercept dangerous schemes immediately', async () => {
+  it('shows the file name, size and type from the first manifest frame', async () => {
+    const stream = await streamFor('hello prism '.repeat(40), 'hello.txt');
     const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
 
     await act(async () => {
-      await result.current.handleFrame('javascript:alert(1)');
+      result.current.handleFrame(stream.frameText(0));
     });
 
-    expect(result.current.securityAlert).toContain('Dangerous protocol detected and blocked');
+    await waitFor(() => expect(result.current.manifest).not.toBeNull());
+    expect(result.current.manifest).toMatchObject({ files: [{ name: 'hello.txt', mimeType: 'text/plain', size: 480 }], totalSize: 480 });
+    expect(result.current.manifest?.fingerprint).toBe(stream.fingerprint);
+    expect(result.current.receiverSuccess).toBe(false);
   });
 
   it('should compile, verify SHA-256, and reassemble files via background worker', async () => {
     const addToast = vi.fn();
     const options = receiverOptions({ addToast });
+    const stream = await streamFor('Prism frames carry bytes. '.repeat(30));
     const { result } = renderHook(() => useOpticalReceiver(options));
 
-    await act(async () => {
-      await result.current.handleFrame('H|test.txt|6|text/plain|c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2');
-    });
+    for (let i = 5; i < stream.k * 4 + 40 && !result.current.receiverSuccess; i++) {
+      await act(async () => {
+        result.current.handleFrame(stream.frameText(i));
+        await new Promise(resolve => setTimeout(resolve, 0));
+      });
+    }
+    await waitFor(() => expect(result.current.receiverSuccess).toBe(true));
 
-    await act(async () => {
-      await result.current.handleFrame('F|0|2|Zm9v');
-    });
-
-    await act(async () => {
-      await result.current.handleFrame('F|1|2|YmFy');
-    });
-
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    });
-
-    expect(result.current.receiverSuccess).toBe(true);
-    expect(options.saveFile).toHaveBeenCalledWith(expect.any(Uint8Array), 'test.txt', 'text/plain');
-    expect(addToast).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'success',
-    }));
+    expect(options.saveFile).toHaveBeenCalledWith(expect.any(Uint8Array), 'note.txt', 'text/plain');
+    expect(addToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'success' }));
   });
 
-  it('should abort download and emit toast error when computed SHA-256 hash does not match handshake hash', async () => {
+  it('should abort download and emit toast error when the file SHA-256 does not match the manifest', async () => {
     const addToast = vi.fn();
     const options = receiverOptions({ addToast });
+    const message = text('forged content');
+    const stream = new PrismStream(message, {
+      version: 1,
+      files: [{ name: 'f.txt', size: message.length, mimeType: 'text/plain', sha256: '00'.repeat(32) }],
+      compression: 'none',
+      transferLength: message.length,
+      symbolSize: 16,
+      transferCrc32: crc32(message),
+      salt: new Uint8Array(0),
+      encryption: 0,
+    });
     const { result } = renderHook(() => useOpticalReceiver(options));
 
-    await act(async () => {
-      await result.current.handleFrame('H|test.txt|6|text/plain|0000000000000000000000000000000000000000000000000000000000000000');
-    });
-
-    await act(async () => {
-      await result.current.handleFrame('F|0|2|Zm9v');
-    });
-
-    await act(async () => {
-      await result.current.handleFrame('F|1|2|YmFy');
-    });
-
-    await waitFor(() => {
-      expect(result.current.receiverError).toContain('Integrity validation failed');
-    });
+    for (let i = 0; i < stream.k * 3 + 40 && !result.current.receiverError; i++) {
+      await act(async () => {
+        result.current.handleFrame(stream.frameText(i));
+        await new Promise(resolve => setTimeout(resolve, 0));
+      });
+    }
+    await waitFor(() => expect(result.current.receiverError).toContain('Integrity validation failed'));
 
     expect(result.current.receiverSuccess).toBe(false);
     expect(options.saveFile).not.toHaveBeenCalled();
-    expect(addToast).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'error',
-      message: expect.stringContaining('Integrity validation failed'),
-    }));
   });
 
-  it('should synchronously and atomically reset state and frame-tracking memory when a new file handshake with a different SHA-256 is detected', async () => {
-    const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
-
-    // 1. Process first file's handshake and first frame
-    await act(async () => {
-      await result.current.handleFrame('H|file1.txt|10|text/plain|1111111111111111111111111111111111111111111111111111111111111111');
+  it('keeps accepting frames after an error and clears it once decoding progresses', async () => {
+    const stream = await streamFor('recover '.repeat(20));
+    const posted: string[] = [];
+    let first = true;
+    globalThis.mockWorkerControl.setInterceptor((message: { type: string }, worker: { dispatchMessage: (m: unknown) => void }) => {
+      posted.push(message.type);
+      if (message.type !== 'FOUNTAIN_DROPLET') return;
+      worker.dispatchMessage(
+        first
+          ? { type: 'ERROR', error: 'Something went wrong', isFountain: true }
+          : { type: 'PROGRESS', progress: 10, current: 1, total: 10, rank: 1, dropletsReceived: 1, isFountain: true }
+      );
+      first = false;
     });
-    await act(async () => {
-      await result.current.handleFrame('F|0|2|Zm9v');
-    });
+    try {
+      const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
 
-    expect(result.current.handshake?.sha256).toBe('1111111111111111111111111111111111111111111111111111111111111111');
-    expect(result.current.chunks.has(0)).toBe(true);
-    expect(result.current.totalChunks).toBe(2);
+      await act(async () => {
+        result.current.handleFrame(stream.frameText(1));
+      });
+      await waitFor(() => expect(result.current.receiverError).toBe('Something went wrong'));
 
-    // 2. Process a different file handshake (different SHA-256)
-    await act(async () => {
-      await result.current.handleFrame('H|file2.txt|20|text/plain|2222222222222222222222222222222222222222222222222222222222222222');
-    });
-
-    // Verify all states are atomically cleared/updated
-    expect(result.current.handshake?.sha256).toBe('2222222222222222222222222222222222222222222222222222222222222222');
-    expect(result.current.handshake?.fileName).toBe('file2.txt');
-    expect(result.current.chunks.size).toBe(0);
-    expect(result.current.totalChunks).toBeNull();
-    expect(result.current.receiverSuccess).toBe(false);
-
-    // 3. Process first frame of new file (which has same index '0')
-    // If memory wasn't reset, this would be discarded as a duplicate of the previous file's frame 0!
-    await act(async () => {
-      await result.current.handleFrame('F|0|2|YmFy');
-    });
-
-    expect(result.current.chunks.has(0)).toBe(true);
-    expect(result.current.totalChunks).toBe(2);
+      await act(async () => {
+        result.current.handleFrame(stream.frameText(2));
+      });
+      await waitFor(() => expect(result.current.receiverError).toBeNull());
+      expect(posted.filter(type => type === 'FOUNTAIN_DROPLET')).toHaveLength(2);
+    } finally {
+      globalThis.mockWorkerControl.setInterceptor(null);
+    }
   });
 
-  it('should reset the lookahead validation security engine concurrently with the frame cache for new file handshakes', async () => {
-    const { result } = renderHook(() => useOpticalReceiver(receiverOptions({ streamMode: 'text' })));
-
-    // Send first handshake
-    await act(async () => {
-      await result.current.handleFrame('H|file1.txt|10|text/plain|1111111111111111111111111111111111111111111111111111111111111111');
-    });
-
-    // Send a frame containing a partial protocol fragment (e.g., 'java')
-    await act(async () => {
-      await result.current.handleFrame('java');
-    });
-
-    expect(result.current.securityAlert).toBeNull();
-
-    // Now, send a different file handshake (this resets/clears the lookahead buffer for the new file)
-    await act(async () => {
-      await result.current.handleFrame('H|file2.txt|20|text/plain|2222222222222222222222222222222222222222222222222222222222222222');
-    });
-
-    // Send 'java' then 'script:' in file2 to complete 'java' + 'script:' reassembly and verify detection triggers
-    await act(async () => {
-      await result.current.handleFrame('java');
-    });
-    await act(async () => {
-      await result.current.handleFrame('script:');
-    });
-
-    expect(result.current.securityAlert).not.toBeNull();
-  });
-
-  it('should block split-payload attacks (e.g., java and script:) across frames immediately', async () => {
+  it('tells the person when a stream uses a newer format version', async () => {
+    const bytes = decodeBase45(encodeDataFrame({ sessionId: Uint8Array.from([1, 2, 3, 4, 5, 6]), firstSymbol: 1, symbols: [Uint8Array.from([9])] })) ?? new Uint8Array();
+    bytes[0] = (bytes[0] & 0xf0) | 9;
+    new DataView(bytes.buffer).setUint32(bytes.length - 4, crc32c(bytes.subarray(0, bytes.length - 4)));
     const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
 
     await act(async () => {
-      await result.current.handleFrame('H|test.txt|10|text/plain|3333333333333333333333333333333333333333333333333333333333333333');
+      result.current.handleFrame(encodeBase45(bytes));
     });
 
-    // 'java' in base64 is 'amF2YQ=='
-    await act(async () => {
-      await result.current.handleFrame('F|0|2|amF2YQ==');
-    });
-
-    // 'script:alert(1)' in base64 is 'c2NyaXB0OmFsZXJ0KDEp'
-    await act(async () => {
-      await result.current.handleFrame('F|1|2|c2NyaXB0OmFsZXJ0KDEp');
-    });
-
-    expect(result.current.securityAlert).toContain('MaliciousStreamError: Detected dangerous protocol prefix "javascript:" split across frames.');
-    expect(result.current.isScanning).toBe(false);
+    await waitFor(() => expect(result.current.receiverError).toMatch(/newer version/));
   });
 
-  it('should not block legitimate QR codes containing standard data', async () => {
-    const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
+  it('still receives a legacy ur:bytes stream', async () => {
+    const options = receiverOptions();
+    const { encoder } = await createFountainSession(text('legacy stream '.repeat(20)), { fileName: 'old.txt', mimeType: 'text/plain' });
+    const { result } = renderHook(() => useOpticalReceiver(options));
 
-    await act(async () => {
-      await result.current.handleFrame('H|test.txt|10|text/plain|3333333333333333333333333333333333333333333333333333333333333333');
-    });
-
-    // 'hello' in base64 is 'aGVsbG8='
-    await act(async () => {
-      await result.current.handleFrame('F|0|2|aGVsbG8=');
-    });
-
-    // ' world' in base64 is 'IHdvcmxk'
-    await act(async () => {
-      await result.current.handleFrame('F|1|2|IHdvcmxk');
-    });
-
-    expect(result.current.securityAlert).toBeNull();
-  });
-
-  it('should reject transfers exceeding 5,000 chunks', async () => {
-    const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
-
-    await act(async () => {
-      await result.current.handleFrame('F|0|5001|Zm9v');
-    });
-
-    expect(result.current.receiverError).toBe('File transfer rejected: exceeds the maximum limit of 5000 chunks.');
-    expect(result.current.isScanning).toBe(false);
+    for (let i = 3; i < encoder.k * 4 + 20 && !result.current.receiverSuccess; i++) {
+      await act(async () => {
+        result.current.handleFrame(encoder.dropletStringForIndex(i));
+        await new Promise(resolve => setTimeout(resolve, 0));
+      });
+    }
+    await waitFor(() => expect(result.current.receiverSuccess).toBe(true));
+    expect(options.saveFile).toHaveBeenCalledWith(expect.any(Uint8Array), 'old.txt', 'text/plain');
   });
 
   describe('Dual-Mode Receiver & Object URL Management', () => {

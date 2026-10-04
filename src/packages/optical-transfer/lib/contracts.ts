@@ -19,7 +19,7 @@
 import type { TransferCompression, TransferDensity } from './fountain/session';
 
 /**
- * Handshake metadata exchanged at the beginning of legacy streams or derived from droplet headers.
+ * What a finished transfer announced about its file: name, size, type and SHA-256.
  */
 export interface HandshakeInfo {
   fileName: string;
@@ -42,12 +42,8 @@ export interface TransferStats {
 /** START payload accepted by the slice worker. */
 export interface SliceStartPayload {
   file?: Blob;
-  chunkSize?: number;
-  errorCorrectionLevel?: string;
   fps?: number;
-  /** Rateless BC-UR fountain broadcast (default in `useOpticalSender`). */
-  fountainMode?: boolean;
-  /** Fountain only: QR version ceiling and ECC of the droplets. Replaces `errorCorrectionLevel`. */
+  /** QR version ceiling and error correction of the frames. */
   density?: TransferDensity;
 }
 
@@ -58,20 +54,21 @@ export type SliceWorkerIncomingMessage =
   | { type: 'HEAL'; payload?: { lastAckedIndex?: unknown } }
   | { type: 'STOP' };
 
-/** Fountain session details reported on INITIALIZED. */
+/** Session details reported on INITIALIZED. */
 export interface FountainInitInfo {
   k: number;
-  /** Density the droplets were sized for. */
+  /** Density the frames were sized for. */
   density: TransferDensity;
   symbolSize: number;
   compression: TransferCompression;
   messageLength: number;
+  /** Short form of the session ID, e.g. `A1B2-C3D4`, for sender and receiver to compare. */
+  fingerprint: string;
 }
 
 /** Messages the slice worker emits. */
 export type SliceWorkerOutgoingMessage =
   | { type: 'FRAME'; index: number; total: number; size: number; data: Uint8Array }
   | { type: 'PROGRESS'; index: number; total: number; fileName?: string; fileSize?: number }
-  | { type: 'INITIALIZED'; totalFrames: number; chunkSize: number; sha256: string; fountain: FountainInitInfo | null }
-  | { type: 'COMPLETE' }
+  | { type: 'INITIALIZED'; totalFrames: number; sha256: string; fountain: FountainInitInfo }
   | { type: 'ERROR'; message: string };

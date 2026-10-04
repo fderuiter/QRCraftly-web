@@ -19,19 +19,31 @@
 /**
  * CRC-32 (ISO-HDLC / IEEE 802.3, reflected polynomial 0xEDB88320) as used by
  * BC-UR (BCR-2020-005) for message checksums and by Bytewords (BCR-2020-012)
- * for the trailing 4-byte integrity check.
+ * for the trailing 4-byte integrity check; and CRC-32C (Castagnoli) for Prism frames. Both are
+ * table-driven and share one loop.
  */
-const CRC_TABLE: Uint32Array = (() => {
+function buildTable(polynomial: number): Uint32Array {
   const table = new Uint32Array(256);
   for (let i = 0; i < 256; i++) {
     let c = i;
     for (let j = 0; j < 8; j++) {
-      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      c = c & 1 ? polynomial ^ (c >>> 1) : c >>> 1;
     }
     table[i] = c >>> 0;
   }
   return table;
-})();
+}
+
+function checksum(table: Uint32Array, bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) {
+    crc = (crc >>> 8) ^ table[(crc ^ bytes[i]) & 0xff];
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+const CRC32_TABLE = buildTable(0xedb88320);
+const CRC32C_TABLE = buildTable(0x82f63b78);
 
 /**
  * Computes the CRC-32 of a byte array as an unsigned 32-bit integer.
@@ -39,11 +51,17 @@ const CRC_TABLE: Uint32Array = (() => {
  * @returns The unsigned CRC-32 value.
  */
 export function crc32(bytes: Uint8Array): number {
-  let crc = 0xffffffff;
-  for (let i = 0; i < bytes.length; i++) {
-    crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ bytes[i]) & 0xff];
-  }
-  return (crc ^ 0xffffffff) >>> 0;
+  return checksum(CRC32_TABLE, bytes);
+}
+
+/**
+ * Computes the CRC-32C (Castagnoli, reflected polynomial 0x82F63B78) of a byte array, the checksum
+ * that closes every Prism frame. Its error detection is stronger than CRC-32's for short messages.
+ * @param bytes Input bytes.
+ * @returns The unsigned CRC-32C value.
+ */
+export function crc32c(bytes: Uint8Array): number {
+  return checksum(CRC32C_TABLE, bytes);
 }
 
 /**

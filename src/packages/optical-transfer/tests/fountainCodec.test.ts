@@ -52,6 +52,7 @@ import {
   DEFAULT_TRANSFER_DENSITY,
   resolveTransferDensity,
   estimateTransferFrames,
+  MANIFEST_INTERVAL,
 } from '../index';
 
 /** Deterministic pseudo-random bytes (incompressible). */
@@ -520,8 +521,8 @@ describe('Fountain session layer', () => {
     expect(balanced.symbolSize).toBeLessThan(fast.symbolSize);
     expect(fast.frames).toBeLessThan(balanced.frames);
     expect(balanced.frames).toBeLessThan(reliable.frames);
-    // Robust Soliton needs about 15% more droplets than source blocks.
-    expect(balanced.frames).toBe(Math.ceil(balanced.k * 1.15));
+    // About 15% more symbols than source blocks, and one frame in sixteen is a manifest.
+    expect(balanced.frames).toBe(Math.ceil((balanced.k * 1.15 * MANIFEST_INTERVAL) / (MANIFEST_INTERVAL - 1)));
     expect(estimateTransferFrames(12 * 1024)).toEqual(balanced);
   });
 

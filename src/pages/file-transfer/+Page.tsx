@@ -89,7 +89,6 @@ function formatDuration(seconds: number): string {
 function FileTransferToolInner() {
   const [isDraggingFile, setIsDraggingFile] = React.useState(false);
   const config = useQRStoreSelector(s => s.config);
-  const scannabilityFallbackActive = useQRStoreSelector(s => s.isScannabilityFallbackActive);
   const store = useQRStore();
 
   // Logo images
@@ -126,7 +125,6 @@ function FileTransferToolInner() {
     logoImg,
     borderLogoImg,
     renderFrame: paintTransferFrame,
-    scannabilityFallbackActive,
   });
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -537,6 +535,11 @@ function FileTransferToolInner() {
                       <div className="font-mono text-sm font-semibold text-fg-soft">{transferStats.frameBufferMemory}</div>
                     </div>
                   </div>
+                  {fountainInfo && (
+                    <p className="text-fg-muted" data-testid="sender-fingerprint">
+                      Transfer code <span className="font-mono font-semibold text-fg-soft">{fountainInfo.fingerprint}</span>. The receiver shows the same code once it has read the file details.
+                    </p>
+                  )}
                   {fountainInfo && (
                     <p className="text-fg-muted">
                       The stream keeps going after the first pass so a receiver can join late or miss frames. Stop once the receiver shows Transfer Complete.

@@ -17,8 +17,8 @@
 */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { createFountainSession } from '@/packages/optical-transfer';
-import { Play, Square, Camera, AlertTriangle, Activity, Cpu, Trash2, Upload, ScanLine } from 'lucide-react';
+import { createPrismSession, TRANSFER_DENSITY_PROFILES } from '@/packages/optical-transfer';
+import { Play, Square, Camera, Activity, Cpu, Trash2, Upload, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -38,6 +38,8 @@ import { ChunkConstellation } from '@/components/transfer/ChunkConstellation';
 import { TransferComplete } from '@/components/transfer/TransferComplete';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { playChime, vibrate } from '@/utils/feedback';
+import { analyseReceivedFile } from '@/utils/fileNames';
+import { formatFileSize } from '@/utils/transferSpeed';
 
 /**
  * Formats an ETA in seconds for the telemetry panel.
@@ -81,9 +83,7 @@ function FileTransferReceiveInner() {
 
   // Use the unified animated QR receiver hook
   const {
-    chunks,
-    totalChunks,
-    securityAlert,
+    manifest,
     receiverError,
     isScanning,
     cameraError,
@@ -93,7 +93,7 @@ function FileTransferReceiveInner() {
     startCameraSession,
     stopCameraSession,
     downloadTriggered,
-    reconstructAndValidateFile,
+    saveReceivedFile,
     handshake,
     compilationStatus,
     fountainStats,
@@ -107,15 +107,17 @@ function FileTransferReceiveInner() {
   } = useOpticalReceiver({
     saveFile: triggerFileDownload,
     addToast,
-    // Legacy F| chunks still need an H| handshake; fountain droplets carry their own verified session header.
-    handshakeRequired: true,
     autoDownload: false,
   });
 
-  const isFountainComplete = fountainStats !== null && receiverSuccess;
-  const isComplete = isFountainComplete || (totalChunks !== null && chunks.size === totalChunks);
+  const isComplete = fountainStats !== null && receiverSuccess;
   // Clearing only makes sense once something has been received or loaded.
-  const hasProgress = chunks.size > 0 || totalChunks !== null || fountainStats !== null || videoFile !== null || isComplete;
+  const hasProgress = fountainStats !== null || manifest !== null || videoFile !== null || isComplete;
+  // The name comes from whoever is showing the stream: show the sanitised form.
+  const announced = useMemo(
+    () => (manifest ? { ...manifest, file: manifest.files[0], safeName: analyseReceivedFile(manifest.files[0].name, manifest.files[0].mimeType).safeName } : null),
+    [manifest]
+  );
 
   // Drag and drop handlers for video file upload
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -166,73 +168,31 @@ function FileTransferReceiveInner() {
     if (receiverMode === 'camera') void startCameraSession();
   }, [handleClear, receiverMode, startCameraSession]);
 
-  // Handle manual compile and download on user click
+  // The file is saved on the person's click, after one more integrity check.
   const handleManualDownload = useCallback(() => {
     if (!isComplete) return;
-    reconstructAndValidateFile(chunks, totalChunks ?? undefined, handshake || undefined);
-  }, [chunks, totalChunks, handshake, isComplete, reconstructAndValidateFile]);
+    void saveReceivedFile();
+  }, [isComplete, saveReceivedFile]);
+
   // Simulation controls
-  const simulateOutOfOrder = () => {
+  // Rateless Prism stream joined mid-stream with ~30% of frames dropped.
+  const simulatePrismStream = async () => {
     handleClear();
-    const message = "Congratulations! Out-of-order packet reassembly and recovery is working flawlessly!";
-    const total = 10;
-    const size = Math.ceil(message.length / total);
-    const simulatedFrames: string[] = [];
-
-    const sha256 = "c67d1359e2dbf94943e81f0e0d9edbc3614e6bc3ec2bec04f527ed4c3f845886";
-    handleFrame(`H|simulated_file.txt|${message.length}|text/plain|${sha256}`);
-
-    for (let i = 0; i < total; i++) {
-      const chunkText = message.slice(i * size, (i + 1) * size);
-      const base64 = btoa(chunkText);
-      simulatedFrames.push(`F|${i}|${total}|${base64}`);
-    }
-
-    // Sequence: 1-5 (indices 0-4), then 8-10 (indices 7-9), then 6-7 (indices 5-6)
-    const scanOrder = [0, 1, 2, 3, 4, 7, 8, 9, 5, 6];
-    let delay = 0;
-    scanOrder.forEach((idx) => {
-      setTimeout(() => {
-        handleFrame(simulatedFrames[idx]);
-      }, delay);
-      delay += 100;
-    });
-  };
-
-  // Rateless fountain stream joined mid-stream with ~30% of frames dropped.
-  const simulateFountainStream = async () => {
-    handleClear();
-    const text = 'Fountain-coded air-gapped transfer: join at any frame, lose any frame. '.repeat(8);
-    const { encoder } = await createFountainSession(new TextEncoder().encode(text), {
-      fileName: 'fountain_demo.txt',
+    const text = 'Prism-coded air-gapped transfer: join at any frame, lose any frame. '.repeat(8);
+    const { stream } = await createPrismSession(new TextEncoder().encode(text), {
+      fileName: 'prism_demo.txt',
       mimeType: 'text/plain',
+      errorCorrectionLevel: TRANSFER_DENSITY_PROFILES.balanced.errorCorrectionLevel,
+      maxVersion: TRANSFER_DENSITY_PROFILES.balanced.maxVersion,
     });
     let delay = 0;
-    for (let index = 7; index < encoder.k * 4; index++) {
+    for (let index = 7; index < stream.k * 4 + 32; index++) {
       if (index % 10 < 3) continue;
-      const droplet = encoder.dropletStringForIndex(index);
-      setTimeout(() => handleFrame(droplet), delay);
+      const frame = stream.frameText(index);
+      setTimeout(() => handleFrame(frame), delay);
       delay += 20;
     }
   };
-
-  const simulateRestrictedSchema = () => {
-    handleFrame("javascript:alert('malicious')");
-  };
-
-  const simulateSplitRestricted = () => {
-    handleClear();
-    setTimeout(() => {
-      handleFrame("java");
-    }, 0);
-    setTimeout(() => {
-      handleFrame("script:alert('malicious')");
-    }, 100);
-  };
-
-  // Re-calculate statistics
-  const receivedCount = chunks.size;
-  const receivedParts = useMemo(() => new Set(chunks.keys()), [chunks]);
 
   return (
     <div className="w-full">
@@ -285,14 +245,6 @@ function FileTransferReceiveInner() {
               />
 
               <div className="flex flex-col gap-3">
-                {securityAlert && (
-                  <div>
-                    <Alert variant="error" title="Security Intercepted">
-                      {securityAlert}
-                    </Alert>
-                  </div>
-                )}
-
                 {receiverError && (
                   <div data-testid="receiver-error">
                     <Alert variant="error" title="Transfer Error">
@@ -442,6 +394,22 @@ function FileTransferReceiveInner() {
                 </div>
               )}
 
+              {announced && !isComplete && (
+                <div className="space-y-2 rounded-xl border border-line-subtle bg-surface-sunken p-4 text-xs" data-testid="manifest-info">
+                  <p className="text-fg-muted">The sender is sending</p>
+                  <p className="text-sm font-semibold break-all text-fg" data-testid="manifest-name">{announced.safeName}</p>
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-fg-muted">
+                    <dt>Size</dt>
+                    <dd className="font-mono text-fg-soft" data-testid="manifest-size">{formatFileSize(announced.totalSize)}</dd>
+                    <dt>Type</dt>
+                    <dd className="font-mono break-all text-fg-soft" data-testid="manifest-type">{announced.file.mimeType || 'unknown'}</dd>
+                    <dt>Transfer code</dt>
+                    <dd className="font-mono text-fg-soft" data-testid="manifest-fingerprint">{announced.fingerprint}</dd>
+                  </dl>
+                  <p className="text-fg-muted">The transfer code matches the one on the sender&apos;s screen. If it does not, you are reading someone else&apos;s stream.</p>
+                </div>
+              )}
+
               {fountainStats ? (
                 <div className="space-y-4 rounded-xl border border-line-subtle bg-surface-sunken p-4 text-xs" data-testid="fountain-telemetry">
                   <ChunkConstellation total={fountainStats.k} received={fountainStats.rank} etaSeconds={fountainStats.etaSeconds} formatEta={formatEta} label="Blocks decoded" />
@@ -473,24 +441,13 @@ function FileTransferReceiveInner() {
                     </div>
                   </dl>
                 </div>
-              ) : totalChunks !== null ? (
-                <div className="space-y-4 rounded-xl border border-line-subtle bg-surface-sunken p-4 text-xs" data-testid="legacy-progress">
-                  <ChunkConstellation total={totalChunks} received={receivedParts} etaSeconds={null} formatEta={formatEta} label="Parts received" />
-
-                  <div className="pt-2">
-                    <div className="text-fg-muted">Received</div>
-                    <div className="font-mono text-sm font-semibold text-fg-soft">
-                      {receivedCount} / {totalChunks} parts
-                    </div>
-                  </div>
-                </div>
-              ) : (
+              ) : !announced ? (
                 <EmptyState
                   illustration={<ScanLine className="size-6" />}
                   title="Ready to scan"
                   body="Start an animated QR file transfer from the sender."
                 />
-              )}
+              ) : null}
             </section>
 
             {import.meta.env.DEV && (
@@ -504,35 +461,11 @@ function FileTransferReceiveInner() {
                   <div className="grid grid-cols-1 gap-2">
                     <Button
                       variant="outline"
-                      onClick={simulateOutOfOrder}
+                      onClick={simulatePrismStream}
                       className="justify-start text-left"
                     >
                       <Activity className="size-4 text-accent" aria-hidden="true" />
-                      Simulate Out-of-Order (10 blocks)
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={simulateFountainStream}
-                      className="justify-start text-left"
-                    >
-                      <Activity className="size-4 text-accent" aria-hidden="true" />
-                      Simulate Fountain Stream (mid-stream, 30% loss)
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={simulateRestrictedSchema}
-                      className="justify-start text-left text-warning"
-                    >
-                      <AlertTriangle className="size-4" aria-hidden="true" />
-                      Simulate Dangerous Scheme (javascript:)
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={simulateSplitRestricted}
-                      className="justify-start text-left text-danger"
-                    >
-                      <AlertTriangle className="size-4" aria-hidden="true" />
-                      Simulate Split Threat (java + script:)
+                      Simulate Prism Stream (mid-stream, 30% loss)
                     </Button>
                   </div>
                 </section>
@@ -563,8 +496,8 @@ function FileTransferReceiveInner() {
                     fileSize={reassembledData?.length ?? handshake?.fileSize ?? 0}
                     mimeType={handshake?.mimeType ?? ''}
                     sha256={handshake?.sha256}
-                    verified={isFountainComplete}
-                    data={isFountainComplete ? reassembledData : null}
+                    verified={isComplete}
+                    data={isComplete ? reassembledData : null}
                     saved={downloadTriggered}
                     onSave={handleManualDownload}
                     onReceiveAnother={receiveAnother}
