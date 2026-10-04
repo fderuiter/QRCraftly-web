@@ -259,7 +259,7 @@ describe('fileSliceWorker', () => {
 
     const errorCalls = postMessageSpy.mock.calls.filter(c => c[0].type === 'ERROR');
     expect(errorCalls.length).toBe(1);
-    expect(errorCalls[0][0].message).toContain('Hashing failed: Mocked hash error');
+    expect(errorCalls[0][0].message).toContain('Encoding failed: Mocked hash error');
 
     digestSpy.mockRestore();
   });
@@ -392,7 +392,7 @@ describe('fileSliceWorker', () => {
     await new Promise(resolve => setTimeout(resolve, 10));
     const errorCalls = postMessageSpy.mock.calls.filter(c => c[0].type === 'ERROR');
     expect(errorCalls.length).toBe(1);
-    expect(errorCalls[0][0].message).toBe('Hashing failed: Mocked string hash error');
+    expect(errorCalls[0][0].message).toBe('Encoding failed: Mocked string hash error');
 
     digestSpy.mockRestore();
   });

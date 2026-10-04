@@ -124,7 +124,7 @@ export function TransferComplete({ fileName, fileSize, mimeType: announcedType, 
       <div className="max-w-full min-w-0">
         <h3 className="text-lg font-bold text-fg">Transfer Complete</h3>
         {verified ? (
-          <p className="mt-1 text-xs text-fg-muted">The file was rebuilt on this device and its SHA-256 checksum matches the sender’s.</p>
+          <p className="mt-1 text-xs text-fg-muted">File arrived intact (SHA-256 verified).</p>
         ) : (
           <p className="mt-1 text-xs text-fg-muted">All parts were received. Your file is ready to save.</p>
         )}

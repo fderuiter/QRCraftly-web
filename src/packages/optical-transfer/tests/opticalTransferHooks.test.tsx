@@ -159,7 +159,9 @@ describe('Optical Transfer Client Hooks', () => {
         worker.dispatchMessage({ type: 'PROGRESS', progress: snap.progress, current: snap.resolved, total: snap.k, rank: snap.rank, dropletsReceived: snap.dropletsReceived, isFountain: true });
         if (!reassembler.isComplete) return;
         try {
-          const { data, header } = await reassembler.finalize();
+          const {
+          files: [{ data, header }],
+        } = await reassembler.finalize();
           worker.dispatchMessage({ type: 'COMPLETE', buffer: data.slice().buffer, handshake: { fileName: header.fileName, fileSize: header.fileSize, mimeType: header.mimeType, sha256: header.sha256 }, isFountain: true });
         } catch (err) {
           worker.dispatchMessage({ type: 'ERROR', error: (err as Error).message, isFountain: true });
@@ -209,6 +211,10 @@ describe('Optical Transfer Client Hooks', () => {
         transferCrc32: crc32(bytes),
         salt: new Uint8Array(0),
         encryption: 0,
+        layout: 0,
+        unpackedLength: 0,
+        unpackedSha256: new Uint8Array(0),
+        entryCount: 0,
       });
       const { result } = renderHook(() => useOpticalReceiver(receiverOptions({ autoDownload: true })));
       for (let index = 0; index < stream.k * 3 + 40 && !result.current.receiverError; index++) {

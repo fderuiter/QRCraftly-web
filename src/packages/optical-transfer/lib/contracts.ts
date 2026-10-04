@@ -41,7 +41,12 @@ export interface TransferStats {
 
 /** START payload accepted by the slice worker. */
 export interface SliceStartPayload {
+  /** The file to send. */
   file?: Blob;
+  /** Several files, or a folder (each File's `webkitRelativePath` is its path). Takes precedence over `file`. */
+  files?: File[];
+  /** Encrypt the transfer under a new key code the sender reads out. */
+  private?: boolean;
   fps?: number;
   /** QR version ceiling and error correction of the frames. */
   density?: TransferDensity;
@@ -52,6 +57,8 @@ export type SliceWorkerIncomingMessage =
   | { type: 'START'; payload?: SliceStartPayload }
   | { type: 'ACK'; payload?: { index?: number } }
   | { type: 'HEAL'; payload?: { lastAckedIndex?: unknown } }
+  /** Asks for the key QR of a private transfer; answered with KEY_FRAME. */
+  | { type: 'KEY_QR' }
   | { type: 'STOP' };
 
 /** Session details reported on INITIALIZED. */
@@ -62,8 +69,12 @@ export interface FountainInitInfo {
   symbolSize: number;
   compression: TransferCompression;
   messageLength: number;
-  /** Short form of the session ID, e.g. `A1B2-C3D4`, for sender and receiver to compare. */
+  /** Four words from the session ID, e.g. `bafe lomu kiza tose`, for sender and receiver to compare. */
   fingerprint: string;
+  /** Files in the transfer. */
+  fileCount: number;
+  /** The words of a private transfer's key code, to read out or type; absent for a plain transfer. */
+  keyCode?: string;
 }
 
 /** Messages the slice worker emits. */
@@ -71,4 +82,5 @@ export type SliceWorkerOutgoingMessage =
   | { type: 'FRAME'; index: number; total: number; size: number; data: Uint8Array }
   | { type: 'PROGRESS'; index: number; total: number; fileName?: string; fileSize?: number }
   | { type: 'INITIALIZED'; totalFrames: number; sha256: string; fountain: FountainInitInfo }
+  | { type: 'KEY_FRAME'; size: number; data: Uint8Array }
   | { type: 'ERROR'; message: string };

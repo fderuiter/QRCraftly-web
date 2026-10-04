@@ -25,6 +25,7 @@ import { FountainRateTracker, type FountainTelemetry } from '../fountain/reassem
 import { sha256Hex } from '../fountain/session';
 import { MAX_VIDEO_UPLOAD_BYTES, formatLimit } from '../limits';
 import { looksLikePrismFrame } from '../prism/frame';
+import { looksLikeKeyQr } from '../prism/words';
 import type { PrismManifestInfo } from '../prism/manifest';
 import { analyseReceivedFile } from '@/utils/fileNames';
 import { detachVideoSource, isVideoFile, playQuietly, spawnReassemblyWorker } from './media';
@@ -46,9 +47,24 @@ export interface UseOpticalReceiverOptions {
   initialMode?: 'camera' | 'file';
 }
 
+/** One file of a finished bundle, held in memory until the person saves it. */
+export interface ReceivedBundleFile {
+  name: string;
+  mimeType: string;
+  size: number;
+  sha256: string;
+  data: Uint8Array;
+}
+
+/** One finished file as the worker posts it. */
+interface WorkerFile {
+  buffer: ArrayBuffer;
+  handshake: HandshakeInfo;
+}
+
 /** Messages posted by the reassembly worker. */
 interface ReassemblyWorkerMessage {
-  type?: 'PROGRESS' | 'COMPLETE' | 'ERROR' | 'MANIFEST';
+  type?: 'PROGRESS' | 'COMPLETE' | 'ERROR' | 'MANIFEST' | 'KEY_STATUS' | 'SWITCH_OFFER';
   progress?: number;
   current?: number;
   total?: number;
@@ -62,6 +78,14 @@ interface ReassemblyWorkerMessage {
   dropletsReceived?: number;
   /** The transfer's manifest, announced as soon as it is accepted. */
   manifest?: PrismManifestInfo;
+  /** With MANIFEST: the transfer is private and still waiting for its key code. */
+  needsKey?: boolean;
+  /** With KEY_STATUS: whether the key code was readable. */
+  accepted?: boolean;
+  /** With SWITCH_OFFER: another stream in view. */
+  offer?: PrismManifestInfo;
+  /** With COMPLETE: the files of a bundle. */
+  files?: WorkerFile[];
 }
 
 /** Longest pause between camera samples while receiving a stream. */
@@ -95,6 +119,14 @@ export function useOpticalReceiver({
   const [reassembledData, setReassembledData] = useState<Uint8Array | null>(null);
   const [compilationStatus, setCompilationStatus] = useState<string | null>(null);
   const [fountainStats, setFountainStats] = useState<FountainTelemetry | null>(null);
+  /** True while a private transfer is in view and no key code has opened it. */
+  const [needsKey, setNeedsKey] = useState(false);
+  /** Whether the last key code was readable: null before one was entered. */
+  const [keyAccepted, setKeyAccepted] = useState<boolean | null>(null);
+  /** Another stream the receiver offers to switch to. */
+  const [switchOffer, setSwitchOffer] = useState<PrismManifestInfo | null>(null);
+  /** The files of a finished multi-file transfer. */
+  const [bundle, setBundle] = useState<ReceivedBundleFile[] | null>(null);
   const rateTrackerRef = useRef(new FountainRateTracker());
 
   const workerRef = useRef<Worker | null>(null);
@@ -184,8 +216,21 @@ export function useOpticalReceiver({
   }, []);
 
   const handleWorkerComplete = useCallback(async (message: ReassemblyWorkerMessage) => {
-    const { buffer, handshake: workerHandshake, session } = message;
+    const { buffer, handshake: workerHandshake, session, files } = message;
     if (session) finishedSessionRef.current = session;
+    setNeedsKey(false);
+    setSwitchOffer(null);
+    if (files) {
+      // Several files: each was verified against its own hash in the worker. They are saved one by
+      // one or as an archive, never automatically.
+      setBundle(files.map(({ buffer: data, handshake: hs }) => ({ name: hs.fileName, mimeType: hs.mimeType, size: hs.fileSize, sha256: hs.sha256, data: new Uint8Array(data) })));
+      setFountainStats(prev => (prev ? { ...prev, rank: prev.k, resolved: prev.k, progress: 100, etaSeconds: 0 } : prev));
+      setIsScanning(false);
+      stopStream();
+      setReceiverSuccess(true);
+      setReceiverError(null);
+      return;
+    }
     if (workerHandshake) {
       handshakeRef.current = workerHandshake;
       setHandshake(workerHandshake);
@@ -231,6 +276,11 @@ export function useOpticalReceiver({
         if (type === 'MANIFEST' && message.manifest) {
           setReceiverError(null);
           setManifest(message.manifest);
+          setNeedsKey(Boolean(message.needsKey));
+        } else if (type === 'KEY_STATUS') {
+          setKeyAccepted(Boolean(message.accepted));
+        } else if (type === 'SWITCH_OFFER' && message.offer) {
+          setSwitchOffer(message.offer);
         } else if (type === 'PROGRESS') {
           // A fresh decode (after a failed one) clears the old error.
           setReceiverError(null);
@@ -337,6 +387,10 @@ export function useOpticalReceiver({
     terminateWorker();
     setFountainStats(null);
     setManifest(null);
+    setNeedsKey(false);
+    setKeyAccepted(null);
+    setSwitchOffer(null);
+    setBundle(null);
     rateTrackerRef.current.reset();
     setHandshake(null);
     handshakeRef.current = null;
@@ -375,7 +429,7 @@ export function useOpticalReceiver({
   const handleFrame = useCallback((decodedText: string) => {
     if (!decodedText || receiverSuccess || isVerifying) return;
     // Every other code the camera sees (a poster, a URL) is not part of a transfer.
-    if (!isFountainDropletString(decodedText) && !looksLikePrismFrame(decodedText)) return;
+    if (!isFountainDropletString(decodedText) && !looksLikePrismFrame(decodedText) && !looksLikeKeyQr(decodedText)) return;
     // Frames are always accepted, even after an error: the worker starts a fresh decode, so a
     // failed transfer recovers by simply scanning on.
     rateTrackerRef.current.record(performance.now());
@@ -385,6 +439,25 @@ export function useOpticalReceiver({
   useEffect(() => {
     handleFrameRef.current = handleFrame;
   }, [handleFrame]);
+
+  /** Gives the worker the key code a person typed. The result arrives as `keyAccepted`. */
+  const submitKeyCode = useCallback((code: string) => {
+    setKeyAccepted(null);
+    initWorker().postMessage({ type: 'SET_KEY', code });
+  }, [initWorker]);
+
+  /** Answers the offer to switch to another stream. */
+  const answerSwitch = useCallback((accept: boolean) => {
+    const offer = switchOffer;
+    if (!offer) return;
+    setSwitchOffer(null);
+    initWorker().postMessage({ type: 'SWITCH_DECISION', session: offer.sessionId, accept });
+    if (accept) {
+      setManifest(offer);
+      setFountainStats(null);
+      rateTrackerRef.current.reset();
+    }
+  }, [switchOffer, initWorker]);
 
   useEffect(() => {
     // Camera mode is started by startCameraSession: the session attaches the stream and runs the
@@ -443,6 +516,12 @@ export function useOpticalReceiver({
   return {
     handshake,
     manifest,
+    needsKey,
+    keyAccepted,
+    submitKeyCode,
+    switchOffer,
+    answerSwitch,
+    bundle,
     receiverError,
     receiverSuccess,
     isVerifying,

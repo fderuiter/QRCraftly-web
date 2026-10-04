@@ -40,6 +40,10 @@ QRCraftly runs no analytics, telemetry or diagnostics of its own, and keeps no l
 - **State Isolation:** The application does not store user input in URL query parameters (e.g., `?data=...`), ensuring that sensitive data does not leak into browser history, proxy logs, or server access logs.
 - **Pre-Build Storage Privacy AST Auditor:** Automated static analysis (`scripts/storage_privacy_ast_auditor.js`) inspects all browser persistent storage calls prior to compilation. Detected storage operations are validated against an explicit allowlist of authorized preference, theme, and brand template identifiers (`qrcraftly:theme`, `qrcraftly:brand-templates`, `__test__`), preventing unapproved storage patterns or transient QR payload data from reaching persistent storage.
 
+### 4. Private file transfers
+
+File transfer can encrypt the stream with a key code that stays on the two screens (AES-256-GCM, key derived with HKDF-SHA-256). This protects against a camera that sees the sender's screen but does not have the key. It does not hide that a transfer is happening, and anyone who learns the key code can read the file. The key code is never written to storage or sent over the network.
+
 ## Certification Note
 
 While this software is architected to support HIPAA compliance by preventing PHI from reaching the server, "HIPAA Certification" is a process that applies to the _organization_ and its _practices_, not just the software. This tool provides the _technical safeguards_ (specifically regarding Transmission Security and Data Integrity) to allow you to use it within a compliant environment.

@@ -18,7 +18,8 @@
 
 import QRCode, { type QRCodeErrorCorrectionLevel } from 'qrcode';
 import { TRANSFER_DENSITY_PROFILES, resolveTransferDensity, sha256Hex } from './lib/fountain/session';
-import { createPrismSession, type PrismStream } from './lib/prism/session';
+import { createPrismBundleSession, createPrismSession, type PrismSession, type PrismStream } from './lib/prism/session';
+import { keyQrText, parseKeyCode } from './lib/prism/words';
 import type {
   FountainInitInfo,
   SliceStartPayload,
@@ -36,6 +37,8 @@ let activeGeneratingSessionId = 0;
 let fileSHA256 = '';
 let lookaheadLimit = 3;
 let stream: PrismStream | null = null;
+/** Text of the key QR of the running private transfer; null for a plain one. */
+let keyQr: string | null = null;
 
 // Keyed by the Blob/File instance so a cached hash can never be reused for different content.
 const hashCache = new WeakMap<Blob, string>();
@@ -46,6 +49,11 @@ function post(message: SliceWorkerOutgoingMessage, transfer: Transferable[] = []
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/** The path a file is announced under: its place in a picked folder, or its name. */
+function pathOf(blob: Blob): string {
+  return blob instanceof File && blob.webkitRelativePath ? blob.webkitRelativePath : fileNameOf(blob);
 }
 
 function fileNameOf(blob: Blob): string {
@@ -100,9 +108,11 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
   currentSessionId++;
   const sessionId = currentSessionId;
 
-  const source = payload?.file ?? null;
+  const sources = payload?.files && payload.files.length > 0 ? payload.files : payload?.file ? [payload.file] : [];
+  const source = sources[0] ?? null;
   file = source;
   stream = null;
+  keyQr = null;
 
   const fps = payload?.fps || 15;
   lookaheadLimit = Math.min(16, Math.max(3, Math.ceil(fps * 0.2)));
@@ -112,40 +122,45 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
     return;
   }
 
-  let bytes: Uint8Array;
-  try {
-    bytes = new Uint8Array(await source.arrayBuffer());
-    if (sessionId !== currentSessionId) return;
-    const cachedHash = hashCache.get(source);
-    if (cachedHash !== undefined) {
-      fileSHA256 = cachedHash;
-    } else {
-      fileSHA256 = await sha256Hex(bytes);
-      if (sessionId !== currentSessionId) return;
-      hashCache.set(source, fileSHA256);
-    }
-  } catch (err: unknown) {
-    if (sessionId !== currentSessionId) return;
-    post({ type: 'ERROR', message: `Hashing failed: ${errorMessage(err)}` });
-    return;
-  }
-
   let info: FountainInitInfo;
+  let totalSize = 0;
   try {
     const density = resolveTransferDensity(payload?.density);
     const profile = TRANSFER_DENSITY_PROFILES[density];
     // Frames use the density's ECC, not the page's appearance ECC.
     errorCorrectionLevel = profile.errorCorrectionLevel;
-    const session = await createPrismSession(bytes, {
+    const sessionOptions = {
       fileName: fileNameOf(source),
       mimeType: source.type,
       errorCorrectionLevel,
       maxVersion: profile.maxVersion,
-      sha256: fileSHA256,
-    });
+      private: payload?.private === true,
+    };
+
+    let session: PrismSession;
+    if (sources.length === 1 && !sessionOptions.private) {
+      const bytes = new Uint8Array(await source.arrayBuffer());
+      if (sessionId !== currentSessionId) return;
+      totalSize = bytes.length;
+      const cachedHash = hashCache.get(source);
+      fileSHA256 = cachedHash ?? (await sha256Hex(bytes));
+      if (sessionId !== currentSessionId) return;
+      hashCache.set(source, fileSHA256);
+      session = await createPrismSession(bytes, { ...sessionOptions, sha256: fileSHA256 });
+    } else {
+      const loaded = [];
+      for (const item of sources) {
+        loaded.push({ path: pathOf(item), mimeType: item.type, data: new Uint8Array(await item.arrayBuffer()) });
+        if (sessionId !== currentSessionId) return;
+      }
+      totalSize = loaded.reduce((sum, item) => sum + item.data.length, 0);
+      fileSHA256 = '';
+      session = await createPrismBundleSession(loaded, sessionOptions);
+    }
     if (sessionId !== currentSessionId) return;
     stream = session.stream;
     totalFrames = session.stream.k;
+    if (session.keyCode) keyQr = keyQrText(parseKeyCode(session.keyCode) ?? new Uint8Array(0));
     info = {
       k: session.stream.k,
       density,
@@ -153,6 +168,8 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
       compression: session.manifest.compression,
       messageLength: session.manifest.transferLength,
       fingerprint: session.stream.fingerprint,
+      fileCount: sources.length,
+      keyCode: session.keyCode,
     };
   } catch (err: unknown) {
     if (sessionId !== currentSessionId) return;
@@ -163,10 +180,28 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
   nextIndexToGenerate = 0;
   lastAckedIndex = -1;
 
-  post({ type: 'PROGRESS', index: 0, total: totalFrames, fileName: fileNameOf(source), fileSize: source.size });
+  post({
+    type: 'PROGRESS',
+    index: 0,
+    total: totalFrames,
+    fileName: sources.length > 1 ? `${sources.length} files` : fileNameOf(source),
+    fileSize: totalSize,
+  });
   post({ type: 'INITIALIZED', totalFrames, sha256: fileSHA256, fountain: info });
 
   await processPipeline(sessionId);
+}
+
+/** Posts the module matrix of the key QR, a code with room to spare so a phone reads it from across a desk. */
+function postKeyQr(): void {
+  if (!keyQr) return;
+  try {
+    const { size, data } = QRCode.create(keyQr, { errorCorrectionLevel: 'M' }).modules;
+    const matrix = new Uint8Array(data);
+    post({ type: 'KEY_FRAME', size, data: matrix }, [matrix.buffer]);
+  } catch (err: unknown) {
+    post({ type: 'ERROR', message: `Failed to generate the key code: ${errorMessage(err)}` });
+  }
 }
 
 async function handleAck(index: number | undefined): Promise<void> {
@@ -181,6 +216,7 @@ function handleStop(): void {
   currentSessionId++;
   file = null;
   stream = null;
+  keyQr = null;
   nextIndexToGenerate = 0;
   lastAckedIndex = -1;
   totalFrames = 0;
@@ -212,6 +248,9 @@ self.onmessage = async (e: MessageEvent<SliceWorkerIncomingMessage | null>) => {
       await processPipeline(currentSessionId);
       break;
     }
+    case 'KEY_QR':
+      postKeyQr();
+      break;
     case 'STOP':
       handleStop();
       break;

@@ -552,7 +552,9 @@ describe('Fountain session layer', () => {
     while (!reassembler.isComplete && index < encoder.k * 4) {
       reassembler.ingest(encoder.dropletStringForIndex(index++));
     }
-    const { data, header: received } = await reassembler.finalize();
+    const {
+      files: [{ data, header: received }],
+    } = await reassembler.finalize();
     expect(data).toEqual(file);
     expect(received).toEqual(header);
 
@@ -592,7 +594,7 @@ describe('FountainReassembler & telemetry', () => {
     const reassembler = new FountainReassembler();
     let index = 0;
     while (!reassembler.isComplete) reassembler.ingest(a.encoder.dropletStringForIndex(index++));
-    expect((await reassembler.finalize()).header.fileName).toBe('a.bin');
+    expect((await reassembler.finalize()).files[0].header.fileName).toBe('a.bin');
 
     // A camera still pointed at the finished stream must not start receiving the same file again.
     reassembler.reset();

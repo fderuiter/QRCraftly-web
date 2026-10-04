@@ -38,10 +38,21 @@ const sender = vi.hoisted(() => ({
   setFps: vi.fn(),
 }));
 
+const helloFile = new File(['hello'], 'hello.txt', { type: 'text/plain' });
+const helloFiles = [helloFile];
+
 vi.mock('@/packages/optical-transfer/client', () => ({
   useOpticalSender: () => ({
-    selectedFile: new File(['hello'], 'hello.txt', { type: 'text/plain' }),
+    selectedFile: helloFile,
+    selectedFiles: helloFiles,
     setSelectedFile: vi.fn(),
+    setSelectedFiles: vi.fn(),
+    isPrivate: false,
+    setIsPrivate: vi.fn(),
+    keyFrame: null,
+    keyCanvasRef: { current: null },
+    showKeyQr: vi.fn(),
+    hideKeyQr: vi.fn(),
     isTransferring: false,
     isPaused: false,
     isVerifyingHandshake: false,

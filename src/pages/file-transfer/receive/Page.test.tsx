@@ -189,7 +189,9 @@ describe('File Transfer Receive Page & Pipeline', () => {
         if (!snap) return;
         worker.dispatchMessage({ type: 'PROGRESS', progress: snap.progress, current: snap.resolved, total: snap.k, rank: snap.rank, dropletsReceived: snap.dropletsReceived, isFountain: true });
         if (!reassembler.isComplete) return;
-        const { data, header } = await reassembler.finalize();
+        const {
+          files: [{ data, header }],
+        } = await reassembler.finalize();
         worker.dispatchMessage({ type: 'COMPLETE', buffer: data.slice().buffer, handshake: { fileName: header.fileName, fileSize: header.fileSize, mimeType: header.mimeType, sha256: header.sha256 }, isFountain: true });
       });
     }
@@ -247,7 +249,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
       }
 
       await waitFor(() => expect(screen.getByTestId('inline-complete-panel')).toBeInTheDocument());
-      expect(screen.getByText(/SHA-256 checksum matches the sender/)).toBeInTheDocument();
+      expect(screen.getByText(/File arrived intact \(SHA-256 verified\)/)).toBeInTheDocument();
       const summary = screen.getByTestId('received-file-summary');
       expect(summary).toHaveTextContent('fountain.txt');
       expect(summary).toHaveTextContent("1.2 KB");

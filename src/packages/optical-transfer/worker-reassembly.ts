@@ -17,10 +17,11 @@
 */
 
 import { FountainReassembler } from './lib/fountain/reassembler';
+import { parseKeyCode, parseKeyQr } from './lib/prism/words';
 
 export interface FountainWorkerMessage {
   type: 'FOUNTAIN_DROPLET' | 'DROPLET';
-  /** Decoded QR text: a Prism frame, or a legacy `ur:bytes/` droplet. */
+  /** Decoded QR text: a Prism frame, a key QR, or a legacy `ur:bytes/` droplet. */
   droplet: string;
 }
 
@@ -34,7 +35,25 @@ export interface IgnoreSessionMessage {
   session: string;
 }
 
-export type FileReassemblyIncomingMessage = FountainWorkerMessage | ClearWorkerMessage | IgnoreSessionMessage;
+/** The key code of a private transfer, as the person typed it. */
+export interface SetKeyMessage {
+  type: 'SET_KEY';
+  code: string;
+}
+
+/** The person's answer to an offer to switch to another stream. */
+export interface SwitchDecisionMessage {
+  type: 'SWITCH_DECISION';
+  session: string;
+  accept: boolean;
+}
+
+export type FileReassemblyIncomingMessage =
+  | FountainWorkerMessage
+  | ClearWorkerMessage
+  | IgnoreSessionMessage
+  | SetKeyMessage
+  | SwitchDecisionMessage;
 
 let reassembler: FountainReassembler | null = null;
 let finalizing = false;
@@ -49,23 +68,7 @@ function resetWorkerState(): void {
   finalizing = false;
 }
 
-/**
- * Feeds one frame to the stateless reassembler. A manifest is announced as soon as it is accepted;
- * on completion the file is decompressed, verified against the manifest and posted.
- */
-async function handleFrame(text: string): Promise<void> {
-  if (finalizing) return;
-  if (!reassembler) reassembler = new FountainReassembler();
-  const active = reassembler;
-
-  const snapshot = active.ingest(text);
-
-  const rejection = active.takeRejection();
-  if (rejection) post({ type: 'ERROR', error: rejection, isFountain: true });
-  const manifest = active.takeManifest();
-  if (manifest) post({ type: 'MANIFEST', manifest });
-  if (!snapshot) return;
-
+function postProgress(snapshot: NonNullable<ReturnType<FountainReassembler['snapshot']>>): void {
   post({
     type: 'PROGRESS',
     progress: snapshot.progress,
@@ -75,33 +78,82 @@ async function handleFrame(text: string): Promise<void> {
     dropletsReceived: snapshot.dropletsReceived,
     isFountain: true,
   });
+}
 
-  if (!active.isComplete) return;
+/** Posts what the reassembler wants the person to see: a message, a manifest, an offer. */
+function postNotices(active: FountainReassembler): void {
+  const rejection = active.takeRejection();
+  if (rejection) post({ type: 'ERROR', error: rejection, isFountain: true });
+  const manifest = active.takeManifest();
+  if (manifest) post({ type: 'MANIFEST', manifest, needsKey: active.needsKey });
+  const offer = active.takeSwitchOffer();
+  if (offer) post({ type: 'SWITCH_OFFER', offer });
+}
+
+/** On completion, opens the files, verifies them and posts them. */
+async function finishIfComplete(active: FountainReassembler): Promise<void> {
+  if (finalizing || !active.isComplete) return;
   finalizing = true;
   try {
-    const { data, header } = await active.finalize();
-    const bufCopy = new Uint8Array(data);
-    post(
-      {
-        type: 'COMPLETE',
-        buffer: bufCopy.buffer,
-        handshake: {
-          fileName: header.fileName || `received_file_${Date.now()}.bin`,
-          fileSize: header.fileSize,
-          mimeType: header.mimeType || 'application/octet-stream',
-          sha256: header.sha256,
-        },
-        compression: header.compression,
-        isFountain: true,
-        session: active.finishedSessionKey,
+    const { files } = await active.finalize();
+    const copies = files.map(({ data, header }) => ({
+      buffer: new Uint8Array(data).buffer,
+      handshake: {
+        fileName: header.fileName || `received_file_${Date.now()}.bin`,
+        fileSize: header.fileSize,
+        mimeType: header.mimeType || 'application/octet-stream',
+        sha256: header.sha256,
       },
-      [bufCopy.buffer]
+      compression: header.compression,
+    }));
+    const transfer = copies.map((copy) => copy.buffer);
+    const [first] = copies;
+    post(
+      files.length === 1
+        ? { type: 'COMPLETE', ...first, isFountain: true, session: active.finishedSessionKey }
+        : { type: 'COMPLETE', files: copies, isFountain: true, session: active.finishedSessionKey },
+      transfer
     );
   } catch (err: unknown) {
     post({ type: 'ERROR', error: err instanceof Error ? err.message : 'Reassembly failed', isFountain: true });
   } finally {
     resetWorkerState();
   }
+}
+
+/** Applies a key code: from the key box or from a key QR the camera read. */
+async function handleKey(active: FountainReassembler, secret: Uint8Array | null): Promise<void> {
+  if (!secret) {
+    post({ type: 'KEY_STATUS', accepted: false });
+    return;
+  }
+  active.setKey(secret);
+  post({ type: 'KEY_STATUS', accepted: true });
+  postNotices(active);
+  // The transfer may have finished while it waited for its key.
+  await finishIfComplete(active);
+}
+
+/**
+ * Feeds one frame to the stateless reassembler. A manifest is announced as soon as it is accepted;
+ * on completion the files are decrypted, decompressed, verified against the manifest and posted.
+ */
+async function handleFrame(text: string): Promise<void> {
+  if (finalizing) return;
+  if (!reassembler) reassembler = new FountainReassembler();
+  const active = reassembler;
+
+  const keySecret = parseKeyQr(text);
+  if (keySecret) {
+    await handleKey(active, keySecret);
+    return;
+  }
+
+  const snapshot = active.ingest(text);
+  postNotices(active);
+  if (!snapshot) return;
+  postProgress(snapshot);
+  await finishIfComplete(active);
 }
 
 self.onmessage = async (e: MessageEvent<FileReassemblyIncomingMessage>) => {
@@ -113,9 +165,19 @@ self.onmessage = async (e: MessageEvent<FileReassemblyIncomingMessage>) => {
       resetWorkerState();
       return;
     }
+    if (!reassembler) reassembler = new FountainReassembler();
     if (data.type === 'IGNORE_SESSION') {
-      if (!reassembler) reassembler = new FountainReassembler();
       reassembler.ignoreSession(data.session);
+      return;
+    }
+    if (data.type === 'SET_KEY') {
+      await handleKey(reassembler, parseKeyCode(data.code));
+      return;
+    }
+    if (data.type === 'SWITCH_DECISION') {
+      if (data.accept) reassembler.acceptSwitch(data.session);
+      else reassembler.declineSwitch(data.session);
+      postNotices(reassembler);
       return;
     }
     if (data.type === 'FOUNTAIN_DROPLET' || data.type === 'DROPLET') {

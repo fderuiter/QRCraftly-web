@@ -78,6 +78,7 @@ export {
   type StreamErrorCorrection,
 } from './lib/fountain/session';
 export {
+  MAX_BUNDLE_ENTRIES,
   MAX_RECEIVE_BYTES,
   MAX_RECEIVE_MESSAGE_BYTES,
 } from './lib/limits';
@@ -117,9 +118,22 @@ export {
   MANIFEST_INTERVAL,
   PrismStream,
   createPrismSession,
+  createPrismBundleSession,
   prismFrameCapacity,
   prismSymbolSize,
   estimateTransferFrames,
   type PrismStreamOptions,
   type PrismSessionOptions,
 } from './lib/prism/session';
+export { packBundle, unpackBundle, sanitizeRelativePath, type BundleSource, type BundleFile } from './lib/prism/bundle';
+export {
+  hmacSha256,
+  hkdfSha256,
+  deriveKeys,
+  privateSessionId,
+  encryptBlock,
+  decryptBlock,
+  generateSecret,
+  type PrivateKeys,
+} from './lib/prism/crypto';
+export { bytesToWords, wordsToBytes, fingerprintWords, formatKeyCode, parseKeyCode, keyQrText, parseKeyQr, KEY_CODE_WORDS, KEY_SECRET_BYTES } from './lib/prism/words';

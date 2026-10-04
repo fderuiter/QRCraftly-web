@@ -127,3 +127,7 @@ Camera results need two agreeing reads. Images are decoded off the main thread, 
 ## What QRCraftly will never do to fix these
 
 No link reputation lookups, no URL expansion through a server, no analytics on what people scan or make, and no accounts. Every protection must work offline and must not get in the way of someone making or scanning an ordinary code.
+
+## Private transfers and bundles
+
+Private mode and bundle handling are specified in [ADR 0025](./adr/0025-private-transfers-and-bundles.md). A receiver with a key set accepts only private transfers, and bundle paths are sanitized before any file is offered for saving.

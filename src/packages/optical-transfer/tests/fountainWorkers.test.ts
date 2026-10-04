@@ -74,6 +74,10 @@ function handmadeStream(message: Uint8Array, overrides: Partial<PrismManifest> &
     transferCrc32: crc32(message),
     salt: new Uint8Array(0),
     encryption: 0,
+    layout: 0,
+    unpackedLength: 0,
+    unpackedSha256: new Uint8Array(0),
+    entryCount: 0,
     ...rest,
   });
 }
@@ -131,7 +135,7 @@ describe('Fountain sender and receiver workers', () => {
 
     expect(init?.fountain.compression).toBe('deflate-raw');
     expect(init?.fountain.symbolSize).toBeGreaterThan(32);
-    expect(init?.fountain.fingerprint).toMatch(/^[0-9A-F]{4}-[0-9A-F]{4}$/);
+    expect(init?.fountain.fingerprint).toMatch(/^[a-z]{4}( [a-z]{4}){3}$/);
     expect(init?.totalFrames).toBe(init?.fountain.k);
     expect(init?.sha256).toBe(await sha256Hex(new TextEncoder().encode(text)));
 

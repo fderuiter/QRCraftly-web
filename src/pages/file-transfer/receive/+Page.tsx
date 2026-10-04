@@ -36,6 +36,8 @@ import { triggerFileDownload } from '@/utils/downloadManager';
 import { QRProvider } from '@/context/QRContext';
 import { ChunkConstellation } from '@/components/transfer/ChunkConstellation';
 import { TransferComplete } from '@/components/transfer/TransferComplete';
+import { BundleComplete } from '@/components/transfer/BundleComplete';
+import { KeyCodeEntry } from '@/components/transfer/KeyCodeEntry';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { playChime, vibrate } from '@/utils/feedback';
 import { analyseReceivedFile } from '@/utils/fileNames';
@@ -104,6 +106,12 @@ function FileTransferReceiveInner() {
     fileValidationError,
     handleFileUpload,
     reassembledData,
+    needsKey,
+    keyAccepted,
+    submitKeyCode,
+    switchOffer,
+    answerSwitch,
+    bundle,
   } = useOpticalReceiver({
     saveFile: triggerFileDownload,
     addToast,
@@ -114,10 +122,24 @@ function FileTransferReceiveInner() {
   // Clearing only makes sense once something has been received or loaded.
   const hasProgress = fountainStats !== null || manifest !== null || videoFile !== null || isComplete;
   // The name comes from whoever is showing the stream: show the sanitised form.
-  const announced = useMemo(
-    () => (manifest ? { ...manifest, file: manifest.files[0], safeName: analyseReceivedFile(manifest.files[0].name, manifest.files[0].mimeType).safeName } : null),
-    [manifest]
-  );
+  const announced = useMemo(() => {
+    if (!manifest) return null;
+    // A private or multi-file transfer lists no single file up front.
+    const file = manifest.files[0] ?? null;
+    return { ...manifest, file, safeName: file ? analyseReceivedFile(file.name, file.mimeType).safeName : null };
+  }, [manifest]);
+
+  /** Saves every received file in one ZIP. The archive code loads only when it is needed. */
+  const saveBundleZip = useCallback(async () => {
+    if (!bundle) return;
+    try {
+      const { createZip } = await import('@/packages/bulk-csv');
+      const zip = createZip(bundle.map((file) => ({ name: file.name, data: file.data })));
+      triggerFileDownload(zip, 'qrcraftly-files.zip', 'application/zip');
+    } catch (error) {
+      addToast({ type: 'error', message: error instanceof Error ? error.message : 'The archive could not be made.', duration: 5000 });
+    }
+  }, [bundle, addToast]);
 
   // Drag and drop handlers for video file upload
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -245,6 +267,31 @@ function FileTransferReceiveInner() {
               />
 
               <div className="flex flex-col gap-3">
+                {needsKey && <KeyCodeEntry onSubmit={submitKeyCode} accepted={keyAccepted} />}
+
+                {switchOffer && (
+                  <div data-testid="switch-offer" role="alert">
+                    <Alert variant="warning" title="Another transfer is in view">
+                      <p>
+                        {switchOffer.encrypted
+                          ? 'A private transfer'
+                          : switchOffer.bundle
+                            ? `${switchOffer.entryCount > 0 ? `${switchOffer.entryCount} files` : 'Several files'}`
+                            : analyseReceivedFile(switchOffer.files[0].name, switchOffer.files[0].mimeType).safeName}{' '}
+                        ({switchOffer.fingerprint}) is also on screen. Switching drops what you have received so far.
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button variant="primary" size="sm" onClick={() => answerSwitch(true)}>
+                          Switch to it
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => answerSwitch(false)}>
+                          Keep this one
+                        </Button>
+                      </div>
+                    </Alert>
+                  </div>
+                )}
+
                 {receiverError && (
                   <div data-testid="receiver-error">
                     <Alert variant="error" title="Transfer Error">
@@ -397,12 +444,18 @@ function FileTransferReceiveInner() {
               {announced && !isComplete && (
                 <div className="space-y-2 rounded-xl border border-line-subtle bg-surface-sunken p-4 text-xs" data-testid="manifest-info">
                   <p className="text-fg-muted">The sender is sending</p>
-                  <p className="text-sm font-semibold break-all text-fg" data-testid="manifest-name">{announced.safeName}</p>
+                  <p className="text-sm font-semibold break-all text-fg" data-testid="manifest-name">
+                    {announced.encrypted
+                      ? 'A private transfer'
+                      : announced.safeName ?? (announced.entryCount > 0 ? `${announced.entryCount} files` : 'Several files')}
+                  </p>
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-fg-muted">
                     <dt>Size</dt>
-                    <dd className="font-mono text-fg-soft" data-testid="manifest-size">{formatFileSize(announced.totalSize)}</dd>
+                    <dd className="font-mono text-fg-soft" data-testid="manifest-size">{announced.encrypted ? 'hidden' : formatFileSize(announced.totalSize)}</dd>
                     <dt>Type</dt>
-                    <dd className="font-mono break-all text-fg-soft" data-testid="manifest-type">{announced.file.mimeType || 'unknown'}</dd>
+                    <dd className="font-mono break-all text-fg-soft" data-testid="manifest-type">
+                      {announced.encrypted ? 'hidden' : announced.file ? announced.file.mimeType || 'unknown' : 'several files'}
+                    </dd>
                     <dt>Transfer code</dt>
                     <dd className="font-mono text-fg-soft" data-testid="manifest-fingerprint">{announced.fingerprint}</dd>
                   </dl>
@@ -490,7 +543,14 @@ function FileTransferReceiveInner() {
 
               {/* Video frame box with targeting guide or dropzone */}
               <div className={`relative w-full overflow-hidden rounded-2xl ${receiverMode === 'camera' && !isScanning && !isComplete ? '' : 'border border-line-subtle bg-slate-950'} ${isComplete ? '' : 'aspect-square'}`}>
-                {isComplete ? (
+                {isComplete && bundle ? (
+                  <BundleComplete
+                    files={bundle}
+                    onSaveFile={triggerFileDownload}
+                    onSaveAll={() => void saveBundleZip()}
+                    onReceiveAnother={receiveAnother}
+                  />
+                ) : isComplete ? (
                   <TransferComplete
                     fileName={handshake?.fileName ?? 'received-file'}
                     fileSize={reassembledData?.length ?? handshake?.fileSize ?? 0}

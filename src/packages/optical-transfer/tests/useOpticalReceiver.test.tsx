@@ -31,6 +31,10 @@ import {
   decodeBase45,
   encodeBase45,
   encodeDataFrame,
+  createPrismBundleSession,
+  createPrng,
+  keyQrText,
+  parseKeyCode,
 } from '../index';
 import { receiverOptions } from './fixtures';
 
@@ -131,6 +135,10 @@ describe('useOpticalReceiver', () => {
       transferCrc32: crc32(message),
       salt: new Uint8Array(0),
       encryption: 0,
+      layout: 0,
+      unpackedLength: 0,
+      unpackedSha256: new Uint8Array(0),
+      entryCount: 0,
     });
     const { result } = renderHook(() => useOpticalReceiver(options));
 
@@ -407,5 +415,120 @@ describe('useOpticalReceiver', () => {
       unmount();
       expect(track.stop).toHaveBeenCalled();
     });
+  });
+});
+
+describe('useOpticalReceiver: private transfers, several files and stream switching', () => {
+  beforeEach(() => {
+    global.URL.createObjectURL = vi.fn(() => 'mock-download-url');
+    global.URL.revokeObjectURL = vi.fn();
+  });
+
+  async function feedAll(result: { current: ReturnType<typeof useOpticalReceiver> }, stream: { frameText(i: number): string; k: number }, count = 0) {
+    for (let i = count; i < stream.k * 4 + 40 && !result.current.receiverSuccess; i++) {
+      await act(async () => {
+        result.current.handleFrame(stream.frameText(i));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
+  }
+
+  it('asks for the key code of a private transfer, takes the typed code, and opens the file', async () => {
+    const { stream, keyCode } = await createPrismSession(text('private words '.repeat(30)), {
+      fileName: 'plan.txt',
+      mimeType: 'text/plain',
+      errorCorrectionLevel: balanced.errorCorrectionLevel,
+      maxVersion: balanced.maxVersion,
+      private: true,
+    });
+    const options = receiverOptions({ autoDownload: true });
+    const { result } = renderHook(() => useOpticalReceiver(options));
+    await feedAll(result, stream);
+    await waitFor(() => expect(result.current.needsKey).toBe(true));
+    expect(result.current.manifest).toMatchObject({ encrypted: true, files: [] });
+    expect(result.current.receiverSuccess).toBe(false);
+
+    await act(async () => {
+      result.current.submitKeyCode('not a key');
+    });
+    await waitFor(() => expect(result.current.keyAccepted).toBe(false));
+
+    await act(async () => {
+      result.current.submitKeyCode(keyCode ?? '');
+    });
+    await waitFor(() => expect(result.current.receiverSuccess).toBe(true));
+    expect(result.current.needsKey).toBe(false);
+    expect(options.saveFile).toHaveBeenCalledWith(expect.any(Uint8Array), 'plan.txt', 'text/plain');
+  });
+
+  it('lets a key QR in front of the camera unlock the transfer', async () => {
+    const { stream, keyCode } = await createPrismSession(text('key qr '.repeat(30)), {
+      fileName: 'qr.txt',
+      mimeType: 'text/plain',
+      errorCorrectionLevel: balanced.errorCorrectionLevel,
+      maxVersion: balanced.maxVersion,
+      private: true,
+    });
+    const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
+    await feedAll(result, stream);
+    await waitFor(() => expect(result.current.needsKey).toBe(true));
+    await act(async () => {
+      result.current.handleFrame(keyQrText(parseKeyCode(keyCode ?? '') ?? new Uint8Array()));
+    });
+    await waitFor(() => expect(result.current.receiverSuccess).toBe(true));
+  });
+
+  it('hands over several files together and saves none of them on its own', async () => {
+    const { stream } = await createPrismBundleSession(
+      [
+        { path: 'a/one.txt', mimeType: 'text/plain', data: text('one '.repeat(50)) },
+        { path: 'two.bin', mimeType: 'application/octet-stream', data: new Uint8Array([1, 2, 3, 4, 5]) },
+      ],
+      { fileName: '', mimeType: '', errorCorrectionLevel: balanced.errorCorrectionLevel, maxVersion: balanced.maxVersion }
+    );
+    const options = receiverOptions({ autoDownload: true });
+    const { result } = renderHook(() => useOpticalReceiver(options));
+    await feedAll(result, stream);
+    await waitFor(() => expect(result.current.bundle).not.toBeNull());
+    expect(result.current.bundle?.map((file) => file.name)).toEqual(['a/one.txt', 'two.bin']);
+    expect(result.current.bundle?.[1].data).toEqual(new Uint8Array([1, 2, 3, 4, 5]));
+    expect(result.current.receiverSuccess).toBe(true);
+    expect(options.saveFile).not.toHaveBeenCalled();
+  });
+
+  it('offers to switch to another stream and only switches when the person agrees', async () => {
+    const make = async (name: string, seed: number) =>
+      (
+        await createPrismSession(Uint8Array.from({ length: 2500 }, ((prng) => () => Math.floor(prng() * 256))(createPrng(seed))), {
+          fileName: name,
+          mimeType: 'application/octet-stream',
+          errorCorrectionLevel: balanced.errorCorrectionLevel,
+          maxVersion: balanced.maxVersion,
+        })
+      ).stream;
+    const a = await make('a.bin', 3);
+    const b = await make('b.bin', 5);
+    const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
+    for (let i = 0; i < 6; i++) {
+      await act(async () => {
+        result.current.handleFrame(a.frameText(i));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
+    for (let i = 0; i < 24; i++) {
+      await act(async () => {
+        result.current.handleFrame(b.frameText(i));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    }
+    await waitFor(() => expect(result.current.switchOffer).not.toBeNull());
+    expect(result.current.switchOffer?.files[0].name).toBe('b.bin');
+    expect(result.current.manifest?.files[0].name).toBe('a.bin');
+
+    await act(async () => {
+      result.current.answerSwitch(false);
+    });
+    expect(result.current.switchOffer).toBeNull();
+    expect(result.current.manifest?.files[0].name).toBe('a.bin');
   });
 });

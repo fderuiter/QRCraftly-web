@@ -70,6 +70,10 @@ function sampleManifest(overrides: Partial<PrismManifest> = {}): PrismManifest {
     transferCrc32: 0xdeadbeef,
     salt: new Uint8Array(0),
     encryption: 0,
+    layout: 0,
+    unpackedLength: 0,
+    unpackedSha256: new Uint8Array(0),
+    entryCount: 0,
     ...overrides,
   };
 }
@@ -269,7 +273,9 @@ describe('Prism session end to end', () => {
     const { stream } = await createPrismSession(file, { fileName: 'photo.bin', mimeType: 'application/octet-stream', ...options });
     const { reassembler, announcedAt, completedAt } = await receive(stream, 37, (i) => i % 3 === 0);
     expect(completedAt).toBeGreaterThan(announcedAt);
-    const { data, header } = await reassembler.finalize();
+    const {
+      files: [{ data, header }],
+    } = await reassembler.finalize();
     expect(data).toEqual(file);
     expect(header).toMatchObject({ fileName: 'photo.bin', fileSize: 3000, sha256: await sha256Hex(file) });
   });
@@ -284,7 +290,7 @@ describe('Prism session end to end', () => {
     }
     expect(reassembler.isComplete).toBe(false);
     expect(manifest).toMatchObject({ totalSize: 4000, files: [{ name: 'budget.xlsx', mimeType: 'application/vnd.ms-excel', size: 4000 }] });
-    expect(manifest?.fingerprint).toMatch(/^[0-9A-F]{4}-[0-9A-F]{4}$/);
+    expect(manifest?.fingerprint).toMatch(/^[a-z]{4}( [a-z]{4}){3}$/);
     expect(stream.fingerprint).toBe(manifest?.fingerprint);
   });
 
@@ -293,7 +299,7 @@ describe('Prism session end to end', () => {
     const { stream, manifest } = await createPrismSession(file, { fileName: 'notes.txt', mimeType: 'text/plain', ...options });
     expect(manifest.compression).toBe('deflate-raw');
     const { reassembler } = await receive(stream, 0, () => false);
-    expect((await reassembler.finalize()).data).toEqual(file);
+    expect((await reassembler.finalize()).files[0].data).toEqual(file);
   });
 
   it('ignores frames of another session until it has repeated, then switches', async () => {
@@ -307,7 +313,7 @@ describe('Prism session end to end', () => {
     for (let i = 6; i < 8; i++) reassembler.ingest(a.frameText(i));
     expect(reassembler.snapshot()?.dropletsReceived).toBeGreaterThan(0);
     const { reassembler: done } = await receive(b, 0, () => false, new FountainReassembler());
-    expect((await done.finalize()).header.fileName).toBe('b.bin');
+    expect((await done.finalize()).files[0].header.fileName).toBe('b.bin');
   });
 
   it('refuses a manifest whose session ID does not match its contents', async () => {
@@ -358,7 +364,7 @@ describe('Prism session end to end', () => {
     const { encoder } = await createFountainSession(file, { fileName: 'old.txt', mimeType: 'text/plain' });
     const reassembler = new FountainReassembler();
     for (let i = 5; i < encoder.k * 4 && !reassembler.isComplete; i++) reassembler.ingest(encoder.dropletStringForIndex(i));
-    expect((await reassembler.finalize()).data).toEqual(file);
+    expect((await reassembler.finalize()).files[0].data).toEqual(file);
   });
 
   it('ignores a finished session until another one arrives', async () => {

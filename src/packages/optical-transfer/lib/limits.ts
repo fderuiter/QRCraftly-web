@@ -30,6 +30,12 @@ export const MAX_RECEIVE_BYTES = 100 * 1024 * 1024;
  */
 export const MAX_RECEIVE_MESSAGE_BYTES = MAX_RECEIVE_BYTES + 1024 * 1024;
 
+/** Most files one transfer carries. */
+export const MAX_BUNDLE_ENTRIES = 1000;
+
+/** Room a bundle's file index gets beyond the files' own bytes. */
+export const MAX_INDEX_BYTES = 1024 * 1024;
+
 /** Source block count above which a new stream must repeat 8 times before decoder tables are built. */
 export const LARGE_BLOCK_COUNT = 1 << 16;
 

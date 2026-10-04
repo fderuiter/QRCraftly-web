@@ -19,8 +19,9 @@
 import { FountainDecoder } from './decoder';
 import { isFountainDropletString, parseDropletString } from './envelope';
 import { PrismReceiver } from '../prism/receiver';
+import type { OpenedTransfer } from '../prism/session';
 import type { PrismManifestInfo } from '../prism/manifest';
-import { FountainSessionHeader, openFountainSession } from './session';
+import { openFountainSession } from './session';
 import { LARGE_BLOCK_COUNT } from '../limits';
 
 /**
@@ -87,6 +88,43 @@ export class FountainReassembler {
    */
   public takeRejection(): string | null {
     return this.prism.takeRejection();
+  }
+
+  /**
+   * Another stream the person may switch to, once.
+   * @returns The offered stream, or null.
+   */
+  public takeSwitchOffer(): PrismManifestInfo | null {
+    return this.prism.takeSwitchOffer();
+  }
+
+  /**
+   * Switches to an offered stream.
+   * @param id Session ID from the offer.
+   */
+  public acceptSwitch(id: string): void {
+    this.prism.acceptSwitch(id);
+  }
+
+  /**
+   * Keeps the current stream and stops offering the other.
+   * @param id Session ID from the offer.
+   */
+  public declineSwitch(id: string): void {
+    this.prism.declineSwitch(id);
+  }
+
+  /**
+   * Sets the key code secret of a private transfer.
+   * @param secret The bytes the key code stands for.
+   */
+  public setKey(secret: Uint8Array): void {
+    this.prism.setKey(secret);
+  }
+
+  /** True while a private transfer is waiting for its key code. */
+  public get needsKey(): boolean {
+    return this.prism.needsKey;
   }
 
   /**
@@ -159,16 +197,16 @@ export class FountainReassembler {
 
   /**
    * Reconstructs, decompresses and SHA-256-verifies the transferred file.
-   * @returns The verified file bytes and its session header.
+   * @returns The verified files with their session headers.
    * @throws Error on incomplete decoding or any integrity failure.
    */
-  public async finalize(): Promise<{ data: Uint8Array; header: FountainSessionHeader }> {
+  public async finalize(): Promise<OpenedTransfer> {
     if (this.format === 'prism') return this.prism.finalize();
     const message = this.decoder.finalize();
     if (!message) throw new Error('Fountain decoding is not complete.');
     const opened = await openFountainSession(message);
     this.finishedSession = this.currentSession;
-    return opened;
+    return { files: [opened] };
   }
 
   /**

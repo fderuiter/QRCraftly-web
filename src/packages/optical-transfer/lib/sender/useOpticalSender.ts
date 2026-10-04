@@ -64,8 +64,12 @@ export interface SenderFountainInfo {
   density: TransferDensity;
   /** Whether the payload was deflate-raw compressed or sent verbatim. */
   compression: TransferCompression;
-  /** Short form of the session ID, shown on both screens so the two can be compared. */
+  /** Four words from the session ID, shown on both screens so the two can be compared. */
   fingerprint: string;
+  /** Files in the transfer. */
+  fileCount: number;
+  /** The words of a private transfer's key code; absent when the transfer is not private. */
+  keyCode?: string;
 }
 
 const HANDSHAKE_FAILURE_SUFFIX =
@@ -82,7 +86,13 @@ export function useOpticalSender({
   renderFrame,
   verifyFrame = verifyHandshakeFrame,
 }: UseOpticalSenderOptions) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  /** Encrypt the next transfer under a key code (#1144). */
+  const [isPrivate, setIsPrivate] = useState(false);
+  /** The key QR, while the person holds the button that shows it. */
+  const [keyFrame, setKeyFrame] = useState<TransferFrame | null>(null);
+  const selectedFile = selectedFiles[0] ?? null;
+  const setSelectedFile = useCallback((file: File | null) => setSelectedFiles(file ? [file] : []), []);
   const [isTransferring, setIsTransferring] = useState(false);
   /** True while a running stream is paused: the last frame stays on screen and nothing animates (#1148). */
   const [isPaused, setIsPaused] = useState(false);
@@ -104,6 +114,8 @@ export function useOpticalSender({
   });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  /** Canvas of the key QR; painted whenever `keyFrame` is set. */
+  const keyCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const framePoolRef = useRef<PreallocatedFramePool>(new PreallocatedFramePool(64));
   const passCountRef = useRef<number>(1);
@@ -156,6 +168,12 @@ export function useOpticalSender({
     renderFrameRef.current(canvas, frame, sanitizeStreamConfig(configRef.current), null, null);
   }, []);
 
+  useEffect(() => {
+    if (keyFrame && keyCanvasRef.current) {
+      renderFrameRef.current(keyCanvasRef.current, keyFrame, sanitizeStreamConfig(configRef.current), null, null);
+    }
+  }, [keyFrame]);
+
   const stopTransfer = useCallback(() => {
     setIsTransferring(false);
     isTransferringRef.current = false;
@@ -165,6 +183,7 @@ export function useOpticalSender({
     isVerifyingHandshakeRef.current = false;
     setHandshakeError(null);
     setHandshakeVerified(false);
+    setKeyFrame(null);
     if (workerRef.current) {
       workerRef.current.postMessage({ type: 'STOP' });
     }
@@ -294,7 +313,14 @@ export function useOpticalSender({
           compression: message.fountain.compression,
           density: message.fountain.density,
           fingerprint: message.fountain.fingerprint,
+          fileCount: message.fountain.fileCount,
+          keyCode: message.fountain.keyCode,
         });
+        break;
+      }
+
+      case 'KEY_FRAME': {
+        setKeyFrame({ size: message.size, data: message.data });
         break;
       }
 
@@ -320,7 +346,7 @@ export function useOpticalSender({
   }, [gateFirstFrame, stopTransfer]);
 
   const startTransfer = useCallback(() => {
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
 
     stopTransfer();
 
@@ -337,8 +363,8 @@ export function useOpticalSender({
     lastRenderSuccessTimeRef.current = performance.now();
 
     setTransferFile({
-      fileName: selectedFile.name,
-      fileSize: selectedFile.size,
+      fileName: selectedFiles.length > 1 ? `${selectedFiles.length} files` : selectedFiles[0].name,
+      fileSize: selectedFiles.reduce((sum, item) => sum + item.size, 0),
       startTime: Date.now(),
     });
 
@@ -348,8 +374,13 @@ export function useOpticalSender({
       worker.onmessage = (e: MessageEvent<SliceWorkerOutgoingMessage | null>) => handleWorkerMessage(e.data);
     }
 
-    workerRef.current.postMessage({ type: 'START', payload: { file: selectedFile, fps: fpsRef.current, density } });
-  }, [selectedFile, density, stopTransfer, handleWorkerMessage]);
+    const files = selectedFiles.length > 1 ? { files: selectedFiles } : { file: selectedFiles[0] };
+    workerRef.current.postMessage({ type: 'START', payload: { ...files, fps: fpsRef.current, density, private: isPrivate } });
+  }, [selectedFiles, density, isPrivate, stopTransfer, handleWorkerMessage]);
+
+  /** Shows the key QR for as long as the person holds the button; it never plays with the stream. */
+  const showKeyQr = useCallback(() => workerRef.current?.postMessage({ type: 'KEY_QR' }), []);
+  const hideKeyQr = useCallback(() => setKeyFrame(null), []);
 
   /** Freezes the stream on its current frame at once. Escape and the Pause button call this. */
   const pauseTransfer = useCallback(() => {
@@ -375,7 +406,7 @@ export function useOpticalSender({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (fileList && fileList.length > 0) {
-      setSelectedFile(fileList[0]);
+      setSelectedFiles(Array.from(fileList));
       stopTransfer();
     }
     if (e.target) {
@@ -399,7 +430,15 @@ export function useOpticalSender({
 
   return {
     selectedFile,
+    selectedFiles,
     setSelectedFile,
+    setSelectedFiles,
+    isPrivate,
+    setIsPrivate,
+    keyFrame,
+    keyCanvasRef,
+    showKeyQr,
+    hideKeyQr,
     isTransferring,
     isPaused,
     isVerifyingHandshake,

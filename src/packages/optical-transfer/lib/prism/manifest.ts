@@ -19,8 +19,9 @@
 import { sha256 } from '@/utils/sha256';
 import { cborDecode, cborEncode } from '../fountain/cbor';
 import { bytesToHex, hexToBytes, type TransferCompression } from '../fountain/session';
-import { MAX_RECEIVE_BYTES, MAX_RECEIVE_MESSAGE_BYTES } from '../limits';
+import { MAX_BUNDLE_ENTRIES, MAX_INDEX_BYTES, MAX_RECEIVE_BYTES, MAX_RECEIVE_MESSAGE_BYTES } from '../limits';
 import { SESSION_ID_BYTES } from './frame';
+import { fingerprintWords } from './words';
 
 /** One file a transfer announces. The hash and size are what the receiver verifies against. */
 export interface PrismFileEntry {
@@ -49,9 +50,23 @@ export interface PrismManifest {
   transferCrc32: number;
   /** Key-derivation salt of a private transfer; empty otherwise. */
   salt: Uint8Array;
-  /** Encryption scheme: 0 is none. */
+  /** Encryption scheme: 0 is none, 1 is AES-256-GCM (a private transfer). */
   encryption: number;
+  /**
+   * How the message is laid out. 0: it is the single file described by `files`. 1: it begins with a
+   * file index, so `files` is empty and the index is read after the message is rebuilt.
+   */
+  layout: number;
+  /** Length of the unpacked message of a layout-1 transfer; bounds decompression. 0 for layout 0. */
+  unpackedLength: number;
+  /** SHA-256 of the unpacked message of a layout-1 transfer that is not private; empty otherwise. */
+  unpackedSha256: Uint8Array;
+  /** Files in a layout-1 transfer that is not private; 0 when unknown or private. */
+  entryCount: number;
 }
+
+export const LAYOUT_SINGLE = 0;
+export const LAYOUT_BUNDLE = 1;
 
 export const MANIFEST_VERSION = 1;
 /** Longest file name a manifest carries, in UTF-8 bytes. Longer names are shortened by the sender. */
@@ -102,6 +117,10 @@ export function encodeManifest(manifest: PrismManifest): Uint8Array {
     manifest.transferCrc32,
     manifest.salt,
     manifest.encryption,
+    manifest.layout,
+    manifest.unpackedLength,
+    manifest.unpackedSha256,
+    manifest.entryCount,
   ]);
 }
 
@@ -129,6 +148,12 @@ export interface PrismManifestInfo {
   /** Number of source blocks. */
   k: number;
   transferLength: number;
+  /** True for a private transfer: its file list is encrypted and a key code is needed. */
+  encrypted: boolean;
+  /** True when the files are listed inside the transfer, so only a count (if any) is known up front. */
+  bundle: boolean;
+  /** Files in a bundle, 0 when it is not announced. */
+  entryCount: number;
 }
 
 function isUint(value: unknown, max: number): value is number {
@@ -156,9 +181,13 @@ export function decodeManifest(bytes: Uint8Array): ManifestResult {
   } catch {
     return MALFORMED;
   }
-  if (!Array.isArray(value) || value.length < 8 || value[0] !== MANIFEST_VERSION) return MALFORMED;
-  const [, files, compression, transferLength, symbolSize, transferCrc32, salt, encryption] = value;
-  if (!Array.isArray(files) || files.length < 1 || files.length > MAX_MANIFEST_FILES) return MALFORMED;
+  if (!Array.isArray(value) || value.length < 12 || value[0] !== MANIFEST_VERSION) return MALFORMED;
+  const [, files, compression, transferLength, symbolSize, transferCrc32, salt, encryption, layout, unpackedLength, unpackedSha256, entryCount] = value;
+  if (layout !== LAYOUT_SINGLE && layout !== LAYOUT_BUNDLE) return MALFORMED;
+  // A bundle lists its files inside the message, so the manifest lists none.
+  if (!Array.isArray(files) || (layout === LAYOUT_SINGLE ? files.length < 1 || files.length > MAX_MANIFEST_FILES : files.length !== 0)) {
+    return MALFORMED;
+  }
 
   const entries: PrismFileEntry[] = [];
   let total = 0;
@@ -191,12 +220,23 @@ export function decodeManifest(bytes: Uint8Array): ManifestResult {
     !isUint(transferCrc32, 0xffffffff) ||
     !(salt instanceof Uint8Array) ||
     salt.length > 32 ||
-    !isUint(encryption, 255)
+    !isUint(encryption, 255) ||
+    !isUint(unpackedLength, Number.MAX_SAFE_INTEGER) ||
+    !(unpackedSha256 instanceof Uint8Array) ||
+    (unpackedSha256.length !== 0 && unpackedSha256.length !== 32) ||
+    !isUint(entryCount, MAX_BUNDLE_ENTRIES) ||
+    (layout === LAYOUT_BUNDLE && unpackedLength < 1) ||
+    (layout === LAYOUT_SINGLE && (unpackedLength !== 0 || unpackedSha256.length !== 0 || entryCount !== 0))
   ) {
     return MALFORMED;
   }
   // A claim past the receive limit is refused here, before any buffer exists for it.
-  if (total > MAX_RECEIVE_BYTES || transferLength > MAX_RECEIVE_MESSAGE_BYTES || Math.ceil(transferLength / symbolSize) > MAX_SOURCE_BLOCKS) {
+  if (
+    total > MAX_RECEIVE_BYTES ||
+    unpackedLength > MAX_RECEIVE_BYTES + MAX_INDEX_BYTES ||
+    transferLength > MAX_RECEIVE_MESSAGE_BYTES ||
+    Math.ceil(transferLength / symbolSize) > MAX_SOURCE_BLOCKS
+  ) {
     return TOO_LARGE;
   }
   return {
@@ -210,6 +250,10 @@ export function decodeManifest(bytes: Uint8Array): ManifestResult {
       transferCrc32,
       salt,
       encryption,
+      layout,
+      unpackedLength,
+      unpackedSha256,
+      entryCount,
     },
   };
 }
@@ -221,15 +265,17 @@ export function decodeManifest(bytes: Uint8Array): ManifestResult {
  * @returns The display facts.
  */
 export function describeManifest(manifest: PrismManifest, sessionId: string): PrismManifestInfo {
-  const upper = sessionId.toUpperCase();
   return {
     sessionId,
-    fingerprint: `${upper.slice(0, 4)}-${upper.slice(4, 8)}`,
+    fingerprint: fingerprintWords(hexToBytes(sessionId)),
     files: manifest.files,
-    totalSize: manifest.files.reduce((sum, file) => sum + file.size, 0),
+    totalSize: manifest.layout === LAYOUT_BUNDLE ? manifest.unpackedLength : manifest.files.reduce((sum, file) => sum + file.size, 0),
     compression: manifest.compression,
     symbolSize: manifest.symbolSize,
     k: Math.ceil(manifest.transferLength / manifest.symbolSize),
     transferLength: manifest.transferLength,
+    encrypted: manifest.encryption !== 0,
+    bundle: manifest.layout === LAYOUT_BUNDLE,
+    entryCount: manifest.entryCount,
   };
 }

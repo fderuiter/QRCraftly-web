@@ -27,14 +27,30 @@ import {
   decompressTransferPayload,
   sha256Hex,
   bytesToHex,
+  hexToBytes,
   type FountainSessionHeader,
   type StreamErrorCorrection,
   type TransferDensity,
 } from '../fountain/session';
 import { MAX_RECEIVE_BYTES, formatLimit } from '../limits';
 import { base45Length } from './base45';
-import { FRAME_OVERHEAD, MAX_SYMBOL_ID, encodeDataFrame, encodeManifestFrame } from './frame';
+import { unpackBundle, packBundle, type BundleFile, type BundleSource } from './bundle';
 import {
+  ENCRYPTION_AES_GCM,
+  ENCRYPTION_OVERHEAD,
+  decryptBlock,
+  deriveKeys,
+  encryptBlock,
+  generateSalt,
+  generateSecret,
+  privateSessionId,
+  type PrivateKeys,
+} from './crypto';
+import { formatKeyCode } from './words';
+import { FLAG_ENCRYPTED, FRAME_OVERHEAD, MAX_SYMBOL_ID, encodeDataFrame, encodeManifestFrame } from './frame';
+import {
+  LAYOUT_BUNDLE,
+  LAYOUT_SINGLE,
   MANIFEST_VERSION,
   MAX_MANIFEST_MIME_BYTES,
   MAX_PRISM_SYMBOL_SIZE,
@@ -97,6 +113,8 @@ export function estimateTransferFrames(
 
 /** Options for {@link PrismStream}. */
 export interface PrismStreamOptions {
+  /** Keys of a private transfer: the session ID is then an HMAC only their holder can make. */
+  keys?: PrivateKeys;
   /** Symbols per data frame (default 1). */
   symbolsPerFrame?: number;
   /** Frames between manifests (default {@link MANIFEST_INTERVAL}). */
@@ -117,6 +135,7 @@ export class PrismStream {
   /** Short form of the session ID for the sender and receiver to compare. */
   public readonly fingerprint: string;
   private readonly manifestText: string;
+  private readonly flags: number;
   private readonly interval: number;
 
   constructor(message: Uint8Array, manifest: PrismManifest, options: PrismStreamOptions = {}) {
@@ -124,9 +143,10 @@ export class PrismStream {
     this.symbolsPerFrame = Math.max(1, Math.floor(options.symbolsPerFrame ?? 1));
     this.interval = Math.max(2, Math.floor(options.manifestInterval ?? MANIFEST_INTERVAL));
     const manifestBytes = encodeManifest(manifest);
-    this.sessionId = sessionIdOf(manifestBytes);
+    this.sessionId = options.keys ? privateSessionId(options.keys, manifestBytes) : sessionIdOf(manifestBytes);
     this.fingerprint = describeManifest(manifest, bytesToHex(this.sessionId)).fingerprint;
-    this.manifestText = encodeManifestFrame({ sessionId: this.sessionId, manifest: manifestBytes });
+    this.flags = manifest.encryption !== 0 ? FLAG_ENCRYPTED : 0;
+    this.manifestText = encodeManifestFrame({ sessionId: this.sessionId, manifest: manifestBytes, flags: this.flags });
     const blocks = Math.max(1, Math.ceil(message.length / manifest.symbolSize));
     // Symbol IDs are 24 bits. The ceiling is a multiple of the frame's symbol count, so a frame never
     // straddles the point where the stream wraps back to repair symbols.
@@ -148,11 +168,16 @@ export class PrismStream {
     // The symbols of a frame have consecutive IDs, so one that would run past the ceiling starts earlier.
     const start = Math.min(this.encoder.seqForIndex(first), this.encoder.maxSeq - this.symbolsPerFrame + 1);
     const droplets = Array.from({ length: this.symbolsPerFrame }, (_, offset) => this.encoder.getDroplet(start + offset));
-    return encodeDataFrame({ sessionId: this.sessionId, firstSymbol: droplets[0].seq, symbols: droplets.map((droplet) => droplet.data) });
+    return encodeDataFrame({
+      sessionId: this.sessionId,
+      firstSymbol: droplets[0].seq,
+      symbols: droplets.map((droplet) => droplet.data),
+      flags: this.flags,
+    });
   }
 }
 
-/** Inputs for {@link createPrismSession}. */
+/** Inputs for {@link createPrismSession} and {@link createPrismBundleSession}. */
 export interface PrismSessionOptions {
   fileName: string;
   mimeType: string;
@@ -163,61 +188,148 @@ export interface PrismSessionOptions {
   /** Precomputed SHA-256 of `bytes`, to avoid hashing twice. */
   sha256?: string;
   symbolsPerFrame?: number;
+  /** Encrypt the transfer under a new key code. The file list is then encrypted too. */
+  private?: boolean;
 }
 
-/**
- * Builds a sender session: compresses the file, writes the manifest and returns the frame stream.
- * @param bytes - The original file bytes.
- * @param options - File metadata and density.
- * @returns The stream, its manifest and the chosen symbol size.
- */
-export async function createPrismSession(
-  bytes: Uint8Array,
-  options: PrismSessionOptions
-): Promise<{ stream: PrismStream; manifest: PrismManifest; symbolSize: number }> {
-  const sha256 = options.sha256 ?? (await sha256Hex(bytes));
-  const { data, compression } = await compressForTransfer(bytes, options.mimeType);
+/** What a sender session hands back. */
+export interface PrismSession {
+  stream: PrismStream;
+  manifest: PrismManifest;
+  symbolSize: number;
+  /** The words of a private transfer's key code, shown to the sender; absent for a plain transfer. */
+  keyCode?: string;
+}
+
+/** Fields a plain single-file manifest has no use for. */
+const NO_BUNDLE = { layout: LAYOUT_SINGLE, unpackedLength: 0, unpackedSha256: new Uint8Array(0), entryCount: 0 } as const;
+
+function clampMime(mimeType: string): string {
+  const mime = mimeType || 'application/octet-stream';
+  return new TextEncoder().encode(mime).length > MAX_MANIFEST_MIME_BYTES ? 'application/octet-stream' : mime;
+}
+
+/** Chooses the symbol size and builds the stream for a finished message. */
+function buildStream(
+  message: Uint8Array,
+  options: Pick<PrismSessionOptions, 'errorCorrectionLevel' | 'maxVersion' | 'requestedSymbolSize' | 'symbolsPerFrame'>,
+  fields: Omit<PrismManifest, 'transferLength' | 'symbolSize' | 'transferCrc32'>,
+  keys?: PrivateKeys
+): { stream: PrismStream; manifest: PrismManifest; symbolSize: number } {
   const symbolsPerFrame = options.symbolsPerFrame ?? 1;
   const fitted = prismSymbolSize(options.errorCorrectionLevel, options.maxVersion, symbolsPerFrame);
   const symbolSize = Math.max(MIN_PRISM_SYMBOL_SIZE, Math.min(fitted, options.requestedSymbolSize ?? fitted));
-  const mimeType = options.mimeType || 'application/octet-stream';
-  const manifest: PrismManifest = {
-    version: MANIFEST_VERSION,
-    files: [
-      {
-        name: fitFileName(options.fileName || 'file'),
-        size: bytes.length,
-        mimeType: new TextEncoder().encode(mimeType).length > MAX_MANIFEST_MIME_BYTES ? 'application/octet-stream' : mimeType,
-        sha256,
-      },
-    ],
-    compression,
-    transferLength: data.length,
-    symbolSize,
-    transferCrc32: crc32(data),
-    salt: new Uint8Array(0),
-    encryption: 0,
-  };
-  return { stream: new PrismStream(data, manifest, { symbolsPerFrame }), manifest, symbolSize };
+  const manifest: PrismManifest = { ...fields, transferLength: message.length, symbolSize, transferCrc32: crc32(message) };
+  return { stream: new PrismStream(message, manifest, { symbolsPerFrame, keys }), manifest, symbolSize };
 }
 
 /**
- * Opens a reconstructed transfer: decompresses it within the announced size and checks the size
- * and SHA-256 against the manifest.
+ * Builds a sender session for one file: compresses it, writes the manifest and returns the frame
+ * stream. A private session carries the file as a one-file bundle so its name stays inside the
+ * encrypted part.
+ * @param bytes - The original file bytes.
+ * @param options - File metadata and density.
+ * @returns The stream, its manifest and the chosen symbol size; the key code when private.
+ */
+export async function createPrismSession(bytes: Uint8Array, options: PrismSessionOptions): Promise<PrismSession> {
+  if (options.private) {
+    return createPrismBundleSession([{ path: options.fileName || 'file', mimeType: options.mimeType, data: bytes }], options);
+  }
+  const sha256 = options.sha256 ?? (await sha256Hex(bytes));
+  const { data, compression } = await compressForTransfer(bytes, options.mimeType);
+  const built = buildStream(data, options, {
+    version: MANIFEST_VERSION,
+    files: [{ name: fitFileName(options.fileName || 'file'), size: bytes.length, mimeType: clampMime(options.mimeType), sha256 }],
+    compression,
+    salt: new Uint8Array(0),
+    encryption: 0,
+    ...NO_BUNDLE,
+  });
+  return built;
+}
+
+/**
+ * Builds a sender session for several files, or for one file that is sent privately. The files
+ * and their index are laid out as one message, compressed once and, when private, encrypted.
+ * @param sources - The files.
+ * @param options - Density and whether to encrypt; `fileName`, `mimeType` and `sha256` are ignored.
+ * @returns The stream, its manifest and the chosen symbol size; the key code when private.
+ * @throws RangeError when there are too many files or bytes.
+ */
+export async function createPrismBundleSession(sources: readonly BundleSource[], options: PrismSessionOptions): Promise<PrismSession> {
+  const { message: unpacked } = await packBundle(sources);
+  const { data: compressed, compression } = await compressForTransfer(unpacked);
+  const fields = {
+    version: MANIFEST_VERSION,
+    files: [],
+    compression,
+    layout: LAYOUT_BUNDLE,
+    unpackedLength: unpacked.length,
+  };
+  if (!options.private) {
+    return buildStream(compressed, options, {
+      ...fields,
+      salt: new Uint8Array(0),
+      encryption: 0,
+      unpackedSha256: hexToBytes(await sha256Hex(unpacked)),
+      entryCount: sources.length,
+    });
+  }
+  const secret = generateSecret();
+  const salt = generateSalt();
+  const keys = deriveKeys(secret, salt);
+  const sealed = await encryptBlock(keys, compressed);
+  const built = buildStream(
+    sealed,
+    options,
+    // Nothing about the plaintext is announced: no hash, no count, no names.
+    { ...fields, salt, encryption: ENCRYPTION_AES_GCM, unpackedSha256: new Uint8Array(0), entryCount: 0 },
+    keys
+  );
+  return { ...built, keyCode: formatKeyCode(secret) };
+}
+
+/** A transfer that has been rebuilt, decrypted, decompressed and checked. */
+export interface OpenedTransfer {
+  files: Array<{ data: Uint8Array; header: FountainSessionHeader }>;
+}
+
+function headerOf(file: { name: string; mimeType: string; size: number; sha256: string }, compression: PrismManifest['compression']): FountainSessionHeader {
+  return { fileName: file.name, mimeType: file.mimeType, fileSize: file.size, sha256: file.sha256, compression };
+}
+
+/**
+ * Opens a reconstructed transfer: decrypts it when it is private, decompresses it within the
+ * announced size and checks every size and SHA-256 against what was announced.
  * @param message - The reassembled message.
  * @param manifest - The manifest the session was announced with.
- * @returns The verified file and its header.
- * @throws Error when decompression fails or the size or hash does not match.
+ * @param keys - The transfer's keys when it is private.
+ * @returns The verified files.
+ * @throws Error when a key is missing or wrong, decompression fails, or a size or hash does not match.
  */
-export async function openPrismSession(
-  message: Uint8Array,
-  manifest: PrismManifest
-): Promise<{ data: Uint8Array; header: FountainSessionHeader }> {
+export async function openPrismSession(message: Uint8Array, manifest: PrismManifest, keys?: PrivateKeys): Promise<OpenedTransfer> {
+  let body = message;
+  if (manifest.encryption !== 0) {
+    if (manifest.encryption !== ENCRYPTION_AES_GCM || !keys) throw new Error('This transfer is private. Enter its key code to open it.');
+    if (message.length < ENCRYPTION_OVERHEAD) throw new Error('This private transfer is damaged.');
+    body = await decryptBlock(keys, message);
+  }
+
+  if (manifest.layout === LAYOUT_BUNDLE) {
+    const unpacked = await decompressTransferPayload(body, manifest.compression, manifest.unpackedLength);
+    if (unpacked.length !== manifest.unpackedLength) throw new Error('Integrity validation failed! Reconstructed size does not match the manifest.');
+    if (manifest.unpackedSha256.length === 32 && (await sha256Hex(unpacked)) !== bytesToHex(manifest.unpackedSha256)) {
+      throw new Error('Integrity validation failed! SHA-256 mismatch.');
+    }
+    const files: BundleFile[] = await unpackBundle(unpacked);
+    return { files: files.map((file) => ({ data: file.data, header: headerOf({ ...file, name: file.path }, manifest.compression) })) };
+  }
+
   const [file] = manifest.files;
   if (file.size > MAX_RECEIVE_BYTES) {
     throw new Error(`File transfer rejected: the sender claims ${file.size} bytes, more than the ${formatLimit(MAX_RECEIVE_BYTES)} limit.`);
   }
-  const data = await decompressTransferPayload(message, manifest.compression, file.size);
+  const data = await decompressTransferPayload(body, manifest.compression, file.size);
   if (data.length !== file.size) {
     throw new Error('Integrity validation failed! Reconstructed size does not match the manifest.');
   }
@@ -225,8 +337,5 @@ export async function openPrismSession(
   if (actual !== file.sha256) {
     throw new Error(`Integrity validation failed! SHA-256 mismatch.\nExpected: ${file.sha256}\nActual: ${actual}`);
   }
-  return {
-    data,
-    header: { fileName: file.name, mimeType: file.mimeType, fileSize: file.size, sha256: file.sha256, compression: manifest.compression },
-  };
+  return { files: [{ data, header: headerOf(file, manifest.compression) }] };
 }
