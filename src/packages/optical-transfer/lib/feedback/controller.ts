@@ -115,7 +115,8 @@ export interface SpeedController {
  * Creates the controller for one send. It follows the weakest receiver: the sender never runs
  * faster than the worst of the receivers it sees can read.
  * - **Back off fast.** A receiver that reads a lower layer than the one sent drops the sender to that
- *   layer at once; one that reads under half the frames costs one rung. Each back-off doubles the wait
+ *   layer at once (one rung when it reads no dense layer at all); one that reads under half the frames
+ *   costs one rung. Each back-off doubles the wait
  *   before the next climb.
  * - **Add slowly.** One rung up only after every receiver read the current layer well for
  *   {@link RISE_AFTER_MS} (more after a back-off), then reports are set aside for {@link SETTLE_MS}.
@@ -159,7 +160,8 @@ export function createSpeedController(options: SpeedControllerOptions): SpeedCon
     const lowest = Math.min(...waiting.map((receiver) => receiver.rank));
     const current = rung + 1;
     if (lowest < current && rung > 0) {
-      moveTo(Math.max(0, lowest - 1), now, true);
+      // A receiver that reads nothing dense says nothing about which rung it could read: step down one.
+      moveTo(Math.max(0, lowest === 0 ? rung - 1 : lowest - 1), now, true);
       return;
     }
     if (rung > 0 && waiting.some((receiver) => receiver.success < LOW_SUCCESS)) {

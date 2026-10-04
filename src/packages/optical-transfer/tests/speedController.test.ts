@@ -72,6 +72,11 @@ describe('speed controller (#1146)', () => {
     expect(controller.report(report('aaaa0001', 'steady'), SESSION, 0).profile).toBe('steady');
   });
 
+  it('steps down one rung, not to the floor, when a receiver reads no dense layer', () => {
+    const controller = createSpeedController({ sessionId: SESSION, initial: 'fast' });
+    expect(controller.report(report('aaaa0001', 'none', { frameSuccessRate: 0.05 }), SESSION, 0).profile).toBe('balanced');
+  });
+
   it('backs off one rung when a receiver reads under half the frames, and waits longer before the next climb', () => {
     const controller = createSpeedController({ sessionId: SESSION, initial: 'fast' });
     expect(controller.report(report('aaaa0001', 'fast', { frameSuccessRate: 0.3 }), SESSION, 0).profile).toBe('balanced');

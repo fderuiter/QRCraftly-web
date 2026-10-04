@@ -48,6 +48,7 @@
     "bench:transfer": "tsx scripts/bench_transfer.ts",
     "bench:outer-code": "tsx scripts/bench_outer_code.ts",
     "bench:optical": "tsx scripts/bench_optical.ts",
+    "bench:feedback": "tsx scripts/bench_feedback.ts",
     "bench:optical-ladder": "tsx scripts/bench_optical_ladder.ts",
     "bench:optical-gpu": "tsx scripts/optical_gpu_conformance.ts",
     "resource-quota-report": "node scripts/resource-quota-report.js",
