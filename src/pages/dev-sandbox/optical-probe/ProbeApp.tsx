@@ -2,7 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { CheckboxField, SelectField, TextField } from '@/components/ui/FormFields';
-import { ProbeRun, drawProbeFrame, formatProbeReport, probeSequence, type ProbeCamera, type ProbeMeta, type ProbePattern } from '@/packages/optical-modem';
+import {
+  FrameRateMeter,
+  ProbeRun,
+  drawProbeFrame,
+  formatProbeReport,
+  grantedSettings,
+  probeSequence,
+  watchFrames,
+  type FrameTick,
+  type ProbeCamera,
+  type ProbeMeta,
+  type ProbePattern,
+} from '@/packages/optical-modem';
 import { PHOTOSENSITIVITY_NOTICE } from '@/utils/photosensitivity';
 
 /**
@@ -164,8 +176,8 @@ function Receiver({ meta }: ReceiverProps) {
         video: { facingMode: 'environment', width: { ideal: want4k ? 3840 : 1920 }, height: { ideal: want4k ? 2160 : 1080 }, frameRate: { ideal: 60 } },
       });
       streamRef.current = stream;
-      const settings = stream.getVideoTracks()[0].getSettings();
-      cameraRef.current = { width: settings.width ?? 0, height: settings.height ?? 0, frameRate: settings.frameRate ?? 0 };
+      const granted = grantedSettings(stream.getVideoTracks()[0]);
+      cameraRef.current = { ...granted };
       runRef.current = new ProbeRun({ ...meta, camera: cameraRef.current });
       const video = videoRef.current;
       if (!video) throw new Error('No video element');
@@ -175,19 +187,14 @@ function Receiver({ meta }: ReceiverProps) {
       let cancelled = false;
       let busy = false;
       let lastAnalysis = 0;
-      let delivered = 0;
-      let windowStart = performance.now();
-      const schedule = (callback: (now: number) => void): void => {
-        if (typeof video.requestVideoFrameCallback === 'function') video.requestVideoFrameCallback((now) => callback(now));
-        else requestAnimationFrame(callback);
-      };
-      const onFrame = (now: number): void => {
-        if (cancelled) return;
-        delivered++;
-        if (now - windowStart >= 2000) {
-          if (cameraRef.current) cameraRef.current.deliveredFps = (delivered * 1000) / (now - windowStart);
-          delivered = 0;
-          windowStart = now;
+      let lastRateUpdate = 0;
+      const meter = new FrameRateMeter(2000);
+      const onFrame = (tick: FrameTick): void => {
+        const { now } = tick;
+        meter.record(tick);
+        if (now - lastRateUpdate >= 2000 && cameraRef.current) {
+          cameraRef.current.deliveredFps = meter.fps;
+          lastRateUpdate = now;
         }
         const canvas = canvasRef.current;
         const context = canvas?.getContext('2d', { willReadFrequently: true });
@@ -209,12 +216,12 @@ function Receiver({ meta }: ReceiverProps) {
             busy = false;
           }, 0);
         }
-        schedule(onFrame);
       };
+      const watcher = watchFrames(video, onFrame);
       stopLoopRef.current = () => {
         cancelled = true;
+        watcher.stop();
       };
-      schedule(onFrame);
     } catch (error) {
       setState('error');
       setMessage(error instanceof Error ? error.message : 'The camera could not be opened.');

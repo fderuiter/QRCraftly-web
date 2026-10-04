@@ -17,12 +17,14 @@
 */
 
 import { getConstellation } from './constellation';
-import { acquireFrame, drawFrame, readDataCells, type AcquireFailure } from './frame';
+import { acquireFrame, drawFrame, type AcquireFailure } from './frame';
+import { kernelUniforms, runReferenceKernel, type KernelUniforms } from './kernel';
 import { MODEM_VERSION, type FrameHeader } from './header';
 import { BAND_ROWS, type GridGeometry, type RgbaImage } from './layout';
 import { createRng } from './prng';
 import { MODEM_GEOMETRIES, type ModemProfile } from './profile';
 import { rsDecode, rsEncode, type RsResult } from './rs';
+import type { SampledGrid } from './sample';
 
 /** What a profile can carry in one frame. */
 export interface FrameCapacity {
@@ -123,6 +125,11 @@ export interface DecodeOptions {
   soft?: boolean;
   /** A cell with a confidence below this (0 to 255) marks the bytes it carries as unsure. */
   threshold?: number;
+  /**
+   * Samples the data cells in place of the reference kernel (a GPU kernel, for example). It gets the
+   * same inputs and has to give the same bytes; return null to have the reference kernel do it.
+   */
+  sampleGrid?: (image: RgbaImage, uniforms: KernelUniforms) => SampledGrid | null;
 }
 
 /** Confidence under which a cell's bytes count as erasures, unless told otherwise. */
@@ -164,7 +171,8 @@ export function decodeModemFrame(image: RgbaImage, options: DecodeOptions = {}):
   } catch {
     return { ok: false, reason: 'invalid-header' };
   }
-  const grid = readDataCells(image, acquired.frame);
+  const uniforms = kernelUniforms(acquired.frame);
+  const grid = options.sampleGrid?.(image, uniforms) ?? runReferenceKernel(image, uniforms);
   const bits = capacity.bitsPerCell;
   const stream = new Uint8Array(capacity.streamBytes);
   const sure = new Uint8Array(capacity.streamBytes).fill(255);

@@ -171,16 +171,17 @@ export interface SampledGrid {
  * @param h - Homography.
  * @param layout - Frame layout.
  * @param palette - Live calibration colours.
+ * @param rowOffset - Frame row of the first data row.
  * @returns The symbol and confidence of every data cell.
  */
-export function sampleDataGrid(image: RgbaImage, h: Float32Array, layout: FrameLayout, palette: Palette): SampledGrid {
+export function sampleDataGrid(image: RgbaImage, h: Float32Array, layout: Pick<FrameLayout, 'cols' | 'dataCells'>, palette: Pick<Palette, 'symbols'>, rowOffset: number = BAND_ROWS): SampledGrid {
   const symbols = new Uint8Array(layout.dataCells);
   const confidence = new Uint8Array(layout.dataCells);
   const means = new Uint8Array(layout.dataCells * 3);
   const cell = new Int32Array(3);
   for (let i = 0; i < layout.dataCells; i++) {
     const col = i % layout.cols;
-    sampleCell(image, h, col, BAND_ROWS + (i - col) / layout.cols, cell, 0);
+    sampleCell(image, h, col, rowOffset + (i - col) / layout.cols, cell, 0);
     const match = classifyColour(cell[0], cell[1], cell[2], palette.symbols);
     symbols[i] = match.symbol;
     confidence[i] = match.confidence;

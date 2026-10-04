@@ -28,3 +28,13 @@ export {
   type FrameCapacity,
 } from './lib/codec';
 export { MODEM_PROFILES, type ModemProfile } from './lib/profile';
+export {
+  KERNEL_MAX_SYMBOLS,
+  runReferenceKernel,
+  compareGrids,
+  type KernelUniforms,
+  type GridDifference,
+} from './lib/kernel';
+export type { SampledGrid } from './lib/sample';
+export { FRAGMENT_SHADER, VERTEX_SHADER } from './lib/shader';
+export { grantedSettings, watchFrames, FrameRateMeter, type StreamGrant, type FrameTick, type FrameWatcher } from './lib/frameSource';
