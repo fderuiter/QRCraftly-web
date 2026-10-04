@@ -343,7 +343,7 @@ describe('private transfer end to end', () => {
     for (let i = 0; i < stream.k * 4; i++) {
       const decoded = decodeFrame(stream.frameText(i));
       if (!decoded.ok) continue;
-      if (decoded.frame.type === 'manifest') {
+      if (decoded.frame.type !== 'data') {
         reassembler.ingest(stream.frameText(i));
         continue;
       }

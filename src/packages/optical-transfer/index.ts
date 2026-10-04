@@ -96,9 +96,13 @@ export {
   FRAME_OVERHEAD,
   encodeDataFrame,
   encodeManifestFrame,
+  encodeFeedbackFrame,
+  createReceiverNonce,
   decodeFrame,
   looksLikePrismFrame,
   type PrismFrame,
+  type FeedbackLayer,
+  type FeedbackReport,
   type FrameRejection,
   type FrameDecodeResult,
 } from './lib/prism/frame';

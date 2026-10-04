@@ -173,7 +173,7 @@ describe('Prism frames', () => {
     expect(decodeFrame(encodeBase45(bytes))).toEqual({ ok: false, reason: 'unsupported-version', version: PRISM_VERSION + 1 });
   });
 
-  it('refuses a feedback frame and an unknown flag', () => {
+  it('refuses a feedback-typed frame without a feedback payload, and an unknown flag', () => {
     const base = decodeBase45(encodeDataFrame({ sessionId: SESSION, firstSymbol: 1, symbols: [Uint8Array.from([9])] })) ?? new Uint8Array();
     const reseal = (bytes: Uint8Array) => {
       new DataView(bytes.buffer).setUint32(bytes.length - 4, crc32c(bytes.subarray(0, bytes.length - 4)));
@@ -181,7 +181,7 @@ describe('Prism frames', () => {
     };
     const feedback = base.slice();
     feedback[1] = (2 << 5) | (feedback[1] & 0x1f);
-    expect(reseal(feedback)).toMatchObject({ ok: false, reason: 'unsupported-type' });
+    expect(reseal(feedback)).toMatchObject({ ok: false, reason: 'malformed' });
     const flagged = base.slice();
     flagged[1] |= 0b10000;
     expect(reseal(flagged)).toMatchObject({ ok: false });

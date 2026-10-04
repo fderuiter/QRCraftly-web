@@ -185,6 +185,8 @@ export class PrismReceiver {
       }
       return null;
     }
+    // A feedback frame is the receiver-to-sender channel; a stream never carries file data in it.
+    if (decoded.frame.type === 'feedback') return null;
     return decoded.frame.type === 'manifest' ? this.ingestManifest(decoded.frame) : this.ingestData(decoded.frame);
   }
 

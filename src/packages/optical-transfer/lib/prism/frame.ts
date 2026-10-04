@@ -40,7 +40,8 @@ const MAGIC = 0b1010;
 
 export const FRAME_DATA = 0;
 export const FRAME_MANIFEST = 1;
-/* Type 2 is reserved for the receiver-to-sender channel (webcam duplex); this version never produces it. */
+/** Type 2 is the receiver-to-sender channel (the optional webcam back channel, #1146); it carries no file data. */
+export const FRAME_FEEDBACK = 2;
 
 export const FLAG_ENCRYPTED = 0b00001;
 export const FLAG_MULTI_BLOCK = 0b00010;
@@ -65,7 +66,29 @@ export type PrismFrame =
       count: number;
       symbols: Uint8Array;
     }
-  | { type: 'manifest'; flags: number; sessionId: string; manifest: Uint8Array };
+  | { type: 'manifest'; flags: number; sessionId: string; manifest: Uint8Array }
+  | ({ type: 'feedback'; flags: number; sessionId: string } & FeedbackReport);
+
+/** The densest layer a receiver reads: nothing dense (beacons only, or nothing), or a profile's dense layer. */
+export type FeedbackLayer = 'none' | 'steady' | 'balanced' | 'fast';
+const FEEDBACK_LAYERS: readonly FeedbackLayer[] = ['none', 'steady', 'balanced', 'fast'];
+
+/** What a receiver tells the sender (#1146). Fractions are quantised on the wire: 16 bits and 8 bits. */
+export interface FeedbackReport {
+  /** Random per-session receiver nonce as 8 lowercase hex characters. It names no device or person. */
+  nonce: string;
+  /** Share of the file decoded, 0 to 1. */
+  fractionDecoded: number;
+  /** Share of the frames the receiver expected that it read, 0 to 1. */
+  frameSuccessRate: number;
+  densestLayer: FeedbackLayer;
+  /** The file is complete and verified: the sender can stop. */
+  done: boolean;
+}
+
+export const FEEDBACK_NONCE_BYTES = 4;
+/** nonce, fraction (2), success rate, layer, done. */
+const FEEDBACK_PAYLOAD_BYTES = FEEDBACK_NONCE_BYTES + 2 + 1 + 1 + 1;
 
 /** Why a text is not an accepted frame. */
 export type FrameRejection =
@@ -148,10 +171,53 @@ export function encodeManifestFrame(options: { sessionId: Uint8Array; manifest: 
 }
 
 /**
+ * Builds a feedback frame: the receiver's report to the sender, shown as a small QR code. It holds
+ * no file data and a receiver never ingests one.
+ * @param options.sessionId - The 6-byte ID of the session being received.
+ * @param options.nonce - A random per-session receiver nonce (see {@link createReceiverNonce}).
+ * @returns The Base45 text to put in a QR code.
+ */
+export function encodeFeedbackFrame(options: { sessionId: Uint8Array; nonce: Uint8Array; fractionDecoded: number; frameSuccessRate: number; densestLayer: FeedbackLayer; done: boolean }): string {
+  if (options.nonce.length !== FEEDBACK_NONCE_BYTES) throw new RangeError('A receiver nonce is 4 bytes.');
+  const payload = new Uint8Array(FEEDBACK_PAYLOAD_BYTES);
+  payload.set(options.nonce, 0);
+  const unit = (value: number) => Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+  new DataView(payload.buffer).setUint16(FEEDBACK_NONCE_BYTES, Math.round(unit(options.fractionDecoded) * 0xffff));
+  payload[FEEDBACK_NONCE_BYTES + 2] = Math.round(unit(options.frameSuccessRate) * 0xff);
+  payload[FEEDBACK_NONCE_BYTES + 3] = FEEDBACK_LAYERS.indexOf(options.densestLayer);
+  payload[FEEDBACK_NONCE_BYTES + 4] = options.done ? 1 : 0;
+  return build(FRAME_FEEDBACK, 0, options.sessionId, 0, 1, undefined, payload);
+}
+
+/**
+ * A fresh random receiver nonce. It lives in memory for one receive and is never stored.
+ * @returns 4 random bytes.
+ */
+export function createReceiverNonce(): Uint8Array {
+  return crypto.getRandomValues(new Uint8Array(FEEDBACK_NONCE_BYTES));
+}
+
+function readFeedback(payload: Uint8Array): FeedbackReport | null {
+  if (payload.length !== FEEDBACK_PAYLOAD_BYTES) return null;
+  const layer = FEEDBACK_LAYERS[payload[FEEDBACK_NONCE_BYTES + 3]];
+  const done = payload[FEEDBACK_NONCE_BYTES + 4];
+  if (layer === undefined || done > 1) return null;
+  const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+  return {
+    nonce: bytesToHex(payload.subarray(0, FEEDBACK_NONCE_BYTES)),
+    fractionDecoded: view.getUint16(FEEDBACK_NONCE_BYTES) / 0xffff,
+    frameSuccessRate: payload[FEEDBACK_NONCE_BYTES + 2] / 0xff,
+    densestLayer: layer,
+    done: done === 1,
+  };
+}
+
+/**
  * Cheap check that a decoded QR text is the start of a Prism frame, so a receiver can ignore every
  * other code its camera sees without decoding it fully.
  * @param text - Text read from a QR code.
- * @returns True when it is Base45 and its first byte is the Prism magic.
+ * @returns True when it is Base45 and its first byte is the Prism magic. A feedback frame is one too:
+ * a receiver ignores it after {@link decodeFrame} tells it apart.
  */
 export function looksLikePrismFrame(text: string): boolean {
   if (text.length < 3 || !isBase45(text)) return false;
@@ -192,6 +258,10 @@ export function decodeFrame(text: string): FrameDecodeResult {
   if (type === FRAME_MANIFEST) {
     if (payload.length === 0) return { ok: false, reason: 'malformed' };
     return { ok: true, frame: { type: 'manifest', flags, sessionId, manifest: payload } };
+  }
+  if (type === FRAME_FEEDBACK) {
+    const report = readFeedback(payload);
+    return report ? { ok: true, frame: { type: 'feedback', flags, sessionId, ...report } } : { ok: false, reason: 'malformed' };
   }
   if (type !== FRAME_DATA) return { ok: false, reason: 'unsupported-type' };
   if (count === 0 || payload.length === 0 || payload.length % count !== 0) return { ok: false, reason: 'malformed' };
