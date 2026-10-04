@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Camera, Copy, FileImage, RefreshCw, Upload } from 'lucide-react';
 import {
   useQrScanner,
@@ -10,6 +10,7 @@ import { Button } from './ui/Button';
 import { ScannerCameraControls } from './ScannerCameraControls';
 import { EmptyState } from './ui/EmptyState';
 import { SegmentedControl } from './ui/SegmentedControl';
+import { useViewfinderGeometry, toViewfinder, type Geometry } from './scanner/viewfinderGeometry';
 import { ScanResultSheet } from './scanner/ScanResultSheet';
 import { describeScan, scanHeadline, type ScanDescription } from './scanner/describeScan';
 
@@ -120,55 +121,6 @@ function usePinchZoom(zoom: { min: number; max: number; value: number } | null, 
     if (pointers.current.size < 2) start.current = null;
   };
   return { onPointerDown, onPointerMove, onPointerUp: onPointerEnd, onPointerCancel: onPointerEnd };
-}
-
-interface Geometry {
-  /** Viewfinder size on screen. */
-  cw: number;
-  ch: number;
-  /** Camera frame size. */
-  vw: number;
-  vh: number;
-}
-
-/** Tracks the viewfinder's size and the camera frame's size, to place the reticle. */
-function useViewfinderGeometry(
-  containerRef: React.RefObject<HTMLDivElement | null>,
-  videoRef: React.RefObject<HTMLVideoElement | null>,
-  active: boolean
-): Geometry | null {
-  const [geometry, setGeometry] = useState<Geometry | null>(null);
-  useLayoutEffect(() => {
-    const container = containerRef.current;
-    const video = videoRef.current;
-    if (!active || !container || !video) return undefined;
-    const measure = () => {
-      const { width: cw, height: ch } = container.getBoundingClientRect();
-      const { videoWidth: vw, videoHeight: vh } = video;
-      setGeometry(cw > 0 && ch > 0 && vw > 0 && vh > 0 ? { cw, ch, vw, vh } : null);
-    };
-    measure();
-    video.addEventListener('loadedmetadata', measure);
-    video.addEventListener('resize', measure);
-    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
-    observer?.observe(container);
-    return () => {
-      video.removeEventListener('loadedmetadata', measure);
-      video.removeEventListener('resize', measure);
-      observer?.disconnect();
-    };
-  }, [active, containerRef, videoRef]);
-  return geometry;
-}
-
-/**
- * Maps a point in the camera frame to the viewfinder, which shows the frame with
- * `object-fit: cover` (and mirrored for a user-facing camera).
- */
-function toViewfinder(point: { x: number; y: number }, g: Geometry, mirrored: boolean) {
-  const scale = Math.max(g.cw / g.vw, g.ch / g.vh);
-  const x = (g.cw - g.vw * scale) / 2 + point.x * scale;
-  return { x: mirrored ? g.cw - x : x, y: (g.ch - g.vh * scale) / 2 + point.y * scale };
 }
 
 /**

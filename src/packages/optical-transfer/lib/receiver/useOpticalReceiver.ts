@@ -18,7 +18,7 @@
 
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useQrScanner } from '@/packages/optical-scanner/client';
+import { useQrScanner, type ScanCorners } from '@/packages/optical-scanner/client';
 import type { HandshakeInfo } from '../contracts';
 import { isFountainDropletString } from '../fountain/envelope';
 import { FountainRateTracker, type FountainTelemetry } from '../fountain/reassembler';
@@ -90,6 +90,8 @@ interface ReassemblyWorkerMessage {
 
 /** Longest pause between camera samples while receiving a stream. */
 const STREAM_MAX_SAMPLING_DELAY_MS = 150;
+/** How long the lock-on brackets stay after the last code the camera read. */
+const LOCK_ON_HOLD_MS = 400;
 
 const FILE_RECEIVED_MESSAGE = 'File completely received & offline binary reconstruction triggered!';
 
@@ -152,6 +154,19 @@ export function useOpticalReceiver({
     saveFileRef.current = saveFile;
   }, [saveFile]);
 
+  // Where the code the camera last read sits in the frame, for the lock-on brackets. It clears
+  // when no code was read for a moment, so the brackets do not hang on an empty frame.
+  const [lockOn, setLockOn] = useState<ScanCorners | null>(null);
+  const lockOnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markLockOn = useCallback((corners: ScanCorners | null) => {
+    if (lockOnTimer.current) clearTimeout(lockOnTimer.current);
+    setLockOn(corners);
+    if (corners) lockOnTimer.current = setTimeout(() => setLockOn(null), LOCK_ON_HOLD_MS);
+  }, []);
+  useEffect(() => () => {
+    if (lockOnTimer.current) clearTimeout(lockOnTimer.current);
+  }, []);
+
   // The scanner's Camera Session owns the camera stream (#1097); frames go to handleFrame.
   const handleFrameRef = useRef<(decodedText: string) => void>(() => {});
   const {
@@ -162,7 +177,10 @@ export function useOpticalReceiver({
     stopScanning: stopAdaptiveScanning,
   } = useQrScanner({
     videoRef,
-    onScanSuccess: (data) => handleFrameRef.current(data),
+    onScanSuccess: (data, result) => {
+      markLockOn(result?.corners ?? null);
+      handleFrameRef.current(data);
+    },
     // An animated stream changes frame every ~66 ms, so sampling may never back off
     // to the single-code scanner's 1 fps floor. The worker's backpressure still bounds load.
     maxSamplingDelay: STREAM_MAX_SAMPLING_DELAY_MS,
@@ -529,6 +547,8 @@ export function useOpticalReceiver({
     isScanning,
     /** Why the camera could not be started (denied, missing, in use), or null. */
     cameraError,
+    /** Corners of the code the camera read a moment ago (for the lock-on brackets), or null. */
+    lockOn,
     reassembledData,
     videoRef,
     handleClear,

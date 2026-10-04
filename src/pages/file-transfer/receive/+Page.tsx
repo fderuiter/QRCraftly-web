@@ -38,6 +38,7 @@ import { ChunkConstellation } from '@/components/transfer/ChunkConstellation';
 import { TransferComplete } from '@/components/transfer/TransferComplete';
 import { BundleComplete } from '@/components/transfer/BundleComplete';
 import { KeyCodeEntry } from '@/components/transfer/KeyCodeEntry';
+import { LockOnBrackets } from '@/components/transfer/LockOnBrackets';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { playChime, vibrate } from '@/utils/feedback';
 import { analyseReceivedFile } from '@/utils/fileNames';
@@ -82,6 +83,7 @@ function FileTransferReceiveInner() {
 
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
 
   // Use the unified animated QR receiver hook
   const {
@@ -89,6 +91,7 @@ function FileTransferReceiveInner() {
     receiverError,
     isScanning,
     cameraError,
+    lockOn,
     videoRef,
     handleClear,
     handleFrame,
@@ -542,7 +545,7 @@ function FileTransferReceiveInner() {
               </div>
 
               {/* Video frame box with targeting guide or dropzone */}
-              <div className={`relative w-full overflow-hidden rounded-2xl ${receiverMode === 'camera' && !isScanning && !isComplete ? '' : 'border border-line-subtle bg-slate-950'} ${isComplete ? '' : 'aspect-square'}`}>
+              <div ref={viewportRef} className={`relative w-full overflow-hidden rounded-2xl ${receiverMode === 'camera' && !isScanning && !isComplete ? '' : 'border border-line-subtle bg-slate-950'} ${isComplete ? '' : 'aspect-square'}`}>
                 {isComplete && bundle ? (
                   <BundleComplete
                     files={bundle}
@@ -563,13 +566,16 @@ function FileTransferReceiveInner() {
                     onReceiveAnother={receiveAnother}
                   />
                 ) : isScanning || (receiverMode === 'file' && videoFile) ? (
-                  <video
-                    ref={videoRef}
-                    className="size-full object-cover"
-                    playsInline
-                    muted
-                    loop
-                  />
+                  <>
+                    <video
+                      ref={videoRef}
+                      className="size-full object-cover"
+                      playsInline
+                      muted
+                      loop
+                    />
+                    <LockOnBrackets containerRef={viewportRef} videoRef={videoRef} active={isScanning} corners={lockOn} />
+                  </>
                 ) : receiverMode === 'file' ? (
                   <div
                     role="button"

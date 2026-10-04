@@ -23,6 +23,7 @@ export type {
   CameraSessionStartOptions,
 } from './lib/cameraSession';
 export type { CameraScanResult } from './lib/cameraEngine';
+export type { ScanCorners } from './lib/contracts';
 
 const IDLE_CAMERA: CameraSessionState = { status: 'idle' };
 
