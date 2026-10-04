@@ -98,9 +98,15 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
 
+      # Our own script instead of a third-party action (#1183). It falls back to
+      # every tracked file when it can't compute a diff, so the scanner fails safe.
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: node scripts/ci/changed_files.js
 
       - name: Run Sequential Static Validation
         run: pnpm run lint
@@ -111,7 +117,7 @@ jobs:
       - name: Run Secret Scanning Guardrail
         if: steps.changed-files.outputs.any_changed == 'true'
         env:
-          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.files }}
         run: node scripts/secret-scanner.js
 
       - name: Set up Python
