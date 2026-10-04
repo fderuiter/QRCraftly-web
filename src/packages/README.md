@@ -115,3 +115,9 @@ Boundary checks run automatically during `pnpm run lint` and CI.
   - `index.ts`: constellations (`getConstellation`, `constellationId`), the probe sequence and its frames (`probeSequence`, `probeGeometries`, `drawProbeFrame`), the probe receiver analysis (`ProbeRun`, `formatProbeReport`) and the simulator (`simulateCapture`) and the reference codec (`encodeModemFrame`, `decodeModemFrame`, `frameCapacity`, `MODEM_PROFILES`; [ADR 0028](../../docs/adr/0028-optical-modem-frame-format.md)), the reference decode kernel and its shader source (`runReferenceKernel`, `compareGrids`, `FRAGMENT_SHADER`) and the camera frame source (`watchFrames`, `FrameRateMeter`, `grantedSettings`), and the profile ladder (`LADDER`, `ladderSchedule`, `lockedSchedule`, `LinkTracker`, `linkLabel`; [ADR 0030](../../docs/adr/0030-optical-profile-ladder.md)).
   - `gpu.ts`: the WebGL 2 decode kernel (`createGpuKernel`, `createVerifiedGpuKernel`, `selfTestGpuKernel`, `GPU_FALLBACK_MESSAGES`). Separate so that importing the root never pulls the GL code in.
   - `flag.ts`: `isOpticalModemEnabled()`, the build flag. Kept tiny on purpose: pages import it statically and it must not pull the modem into a first load.
+
+### `wasm-runtime` (`@/packages/wasm-runtime`)
+
+- **Purpose**: Loads QRCraftly's own Rust WebAssembly modules ([ADR 0033](../../docs/adr/0033-rust-webassembly-modules.md), [RUST.md](../../docs/RUST.md)): same-origin compile with a per-URL cache, import-free instantiation, and typed helpers for copying bytes in and out, freeing on every path and turning traps and status codes into a `WasmModuleError`.
+- **Entry Points**:
+  - `index.ts`: `compileWasmUrl`, `compileWasmBytes`, `instantiateWasm`, `WasmInstance`, `WasmModuleError`, `checkStatus`, `resolveSameOrigin`, `ABI_VERSION`, `WASM_STATUS`.

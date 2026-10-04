@@ -294,6 +294,9 @@ export function useOpticalReceiver({
       const worker = spawnReassemblyWorker();
 
       worker.onmessage = (e: MessageEvent<ReassemblyWorkerMessage>) => {
+        // A worker that was stopped (a reset, or a BC-UR stream that turned out to be the real one)
+        // may still have messages in flight; they no longer describe this receiver.
+        if (workerRef.current !== worker) return;
         const message = e.data;
         const { type, progress, current, total, rank, dropletsReceived } = message;
 
@@ -322,6 +325,7 @@ export function useOpticalReceiver({
       };
 
       worker.onerror = (e) => {
+        if (workerRef.current !== worker) return;
         resetAfterWorkerError(e.message || 'Background worker error.');
       };
 
@@ -465,6 +469,10 @@ export function useOpticalReceiver({
         if (outcome.status === 'progress') {
           setBcurProgress({ received: outcome.received, total: outcome.total });
         } else if (outcome.status === 'complete') {
+          // The stream was a real BC-UR one, so the droplet path was reading parts it cannot use
+          // and may have failed on them. Stop it and drop its error.
+          terminateWorker();
+          setReceiverError(null);
           setBcur(outcome.result);
           setBcurProgress(null);
           setIsScanning(false);
@@ -480,7 +488,7 @@ export function useOpticalReceiver({
     // failed transfer recovers by simply scanning on.
     rateTrackerRef.current.record(performance.now());
     initWorker().postMessage({ type: 'FOUNTAIN_DROPLET', droplet: decodedText });
-  }, [receiverSuccess, isVerifying, bcur, initWorker, stopStream]);
+  }, [receiverSuccess, isVerifying, bcur, initWorker, stopStream, terminateWorker]);
 
   useEffect(() => {
     handleFrameRef.current = handleFrame;

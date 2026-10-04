@@ -31,7 +31,8 @@ export const FORBIDDEN_IMPORTS = [
 // 3. Whitelisted files in src/ that are authorized to perform network requests (fetch)
 export const AUTHORIZED_NETWORK_FILES = new Set([
   'src/packages/qr-export/lib/svgExport.ts',
-  'src/packages/optical-scanner/lib/zxingModule.ts' // Same-origin GET of the scanner's own zxing-wasm reader (ADR 0023)
+  'src/packages/optical-scanner/lib/zxingModule.ts', // Same-origin GET of the scanner's own zxing-wasm reader (ADR 0023)
+  'src/packages/wasm-runtime/index.ts' // Same-origin GET of QRCraftly's own Rust WebAssembly modules (ADR 0033)
 ]);
 
 /**

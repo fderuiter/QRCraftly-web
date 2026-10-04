@@ -43,3 +43,6 @@ jules/*
 .pnpm-store/
 quota-report.md
 .lighthouseci/
+
+# Rust build output (the committed modules live in src/wasm/)
+crates/target/
