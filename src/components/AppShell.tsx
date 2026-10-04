@@ -34,6 +34,8 @@ const COMPANY_LINKS = [
   ['Security Policy', '/security#security'],
   ['Privacy Architecture', '/security#compliance'],
   ['Open-Source Licenses', '/acknowledgements'],
+  ['App Privacy Policy', '/privacy'],
+  ['App Support', '/support'],
 ] as const;
 
 /**

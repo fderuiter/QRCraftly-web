@@ -35,6 +35,8 @@ export const ROUTES = [
   '/bulk-csv-qr-code',
   '/about',
   '/acknowledgements',
+  '/privacy',
+  '/support',
   '/guides',
   '/guides/why-qr-codes-stop-working',
   '/guides/static-vs-dynamic-qr-codes',

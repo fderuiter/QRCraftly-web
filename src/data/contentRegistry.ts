@@ -494,6 +494,26 @@ export const auxiliaryRegistry: Record<string, AuxiliaryContent> = {
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty
   },
+  "privacy": {
+    "id": "privacy",
+    "name": "QRCraftly App Privacy Policy",
+    "seoTitle": "QRCraftly for iPhone, iPad and Mac: Privacy Policy",
+    "description": "Privacy policy for QRCraftly: QR Code Studio on iPhone, iPad and Mac. The app collects no data, makes no network connections and works entirely on your device.",
+    "image": "/og/privacy.png",
+    "imageAlt": "QRCraftly for iPhone, iPad and Mac: Privacy Policy",
+    "personas": [TargetPersona.SecurityConsciousEnterprise],
+    "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty
+  },
+  "support": {
+    "id": "support",
+    "name": "QRCraftly App Support",
+    "seoTitle": "QRCraftly for iPhone, iPad and Mac: Support",
+    "description": "Help for QRCraftly: QR Code Studio on iPhone, iPad and Mac: codes that won't scan, camera access, Camera Transfer, privacy and how to contact us.",
+    "image": "/og/support.png",
+    "imageAlt": "QRCraftly for iPhone, iPad and Mac: Support",
+    "personas": [TargetPersona.SecurityConsciousEnterprise],
+    "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty
+  },
   "guides": {
     "id": "guides",
     "name": "QR Code Guides",
