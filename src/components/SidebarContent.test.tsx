@@ -3,6 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { SidebarContent, getAboutHeading } from './SidebarContent';
 import { contentRegistry } from '@/data/contentRegistry';
 import { typeGuides } from '@/data/typeGuides';
+import { PageCopyContext } from '@/data/copy/PageCopyContext';
+import { pageCopy } from '../../tests/utils/pageCopy';
+
+const renderSidebar = (toolId: string) =>
+  render(
+    <PageCopyContext.Provider value={pageCopy(toolId)}>
+      <SidebarContent toolId={toolId} />
+    </PageCopyContext.Provider>
+  );
 
 describe('getAboutHeading', () => {
   it('does not prefix names that already begin with "About"', () => {
@@ -18,13 +27,13 @@ describe('getAboutHeading', () => {
 
 describe('SidebarContent', () => {
   it('never renders an "About About" heading for a registry entry named "About ..."', () => {
-    render(<SidebarContent toolId="about" />);
+    renderSidebar('about');
     expect(screen.queryByRole('heading', { name: /About About/i })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'About QRCraftly' })).toBeInTheDocument();
   });
 
   it('keeps the "About" prefix for tool entries', () => {
-    render(<SidebarContent toolId="wifi-qr-code" />);
+    renderSidebar('wifi-qr-code');
     expect(screen.getByRole('heading', { level: 2, name: /^About WiFi/ })).toBeInTheDocument();
   });
 });
@@ -36,9 +45,9 @@ describe('SidebarContent FAQs and intro', () => {
   ];
 
   it.each(generatorIds)('renders its own FAQ answers as text for %s, even while collapsed', (toolId) => {
-    const faqs = contentRegistry[toolId].faqs ?? [];
+    const faqs = pageCopy(toolId).faqs ?? [];
     expect(faqs.length).toBeGreaterThanOrEqual(4);
-    const { container } = render(<SidebarContent toolId={toolId} />);
+    const { container } = renderSidebar(toolId);
     // Answers must be in the rendered HTML so crawlers that do not run JS can read them.
     for (const faq of faqs) {
       expect(container.textContent).toContain(faq.answer);
@@ -46,15 +55,15 @@ describe('SidebarContent FAQs and intro', () => {
   });
 
   it('gives each generator page questions of its own', () => {
-    const indexQuestions = new Set((contentRegistry['index'].faqs ?? []).map((f) => f.question));
+    const indexQuestions = new Set((pageCopy('index').faqs ?? []).map((f) => f.question));
     for (const toolId of generatorIds.filter((id) => id !== 'index')) {
-      const own = (contentRegistry[toolId].faqs ?? []).filter((f) => !indexQuestions.has(f.question));
+      const own = (pageCopy(toolId).faqs ?? []).filter((f) => !indexQuestions.has(f.question));
       expect(own.length, toolId).toBeGreaterThanOrEqual(2);
     }
   });
 
   it('shows the homepage intro with a link to the pledge', () => {
-    render(<SidebarContent toolId="index" />);
+    renderSidebar('index');
     expect(screen.getByText(contentRegistry['index'].intro ?? '')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Read the no-ads pledge' })).toHaveAttribute('href', '/free-forever');
   });
@@ -62,7 +71,7 @@ describe('SidebarContent FAQs and intro', () => {
 
 describe('SidebarContent internal linking (#1031)', () => {
   it('shows breadcrumbs, an example picture with alt text and related generator pages', () => {
-    render(<SidebarContent toolId="wifi-qr-code" />);
+    renderSidebar('wifi-qr-code');
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument();
     const example = screen.getByRole('img', { name: /Example of a QR code made with the WiFi QR Code Generator/ });
     expect(example).toHaveAttribute('src', '/examples/wifi-qr-code.svg');
@@ -71,7 +80,7 @@ describe('SidebarContent internal linking (#1031)', () => {
   });
 
   it('leaves the example and related list off pages that are not generators', () => {
-    render(<SidebarContent toolId="security" />);
+    renderSidebar('security');
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'More QR code types' })).not.toBeInTheDocument();
   });
@@ -85,7 +94,7 @@ describe('Generator page template (#1029)', () => {
   const words = (text: string) => text.trim().split(/\s+/).length;
 
   it.each(typePages)('%s carries 600 to 1,000 words under the template headings', (toolId) => {
-    const { container } = render(<SidebarContent toolId={toolId} />);
+    const { container } = renderSidebar(toolId);
     const total = words(container.textContent ?? '');
     expect(total).toBeGreaterThanOrEqual(600);
     expect(total).toBeLessThanOrEqual(1000);
@@ -110,7 +119,7 @@ describe('Generator page template (#1029)', () => {
   });
 
   it('puts the related links after the FAQ', () => {
-    render(<SidebarContent toolId="wifi-qr-code" />);
+    renderSidebar('wifi-qr-code');
     const faq = screen.getByRole('heading', { name: 'Frequently Asked Questions' });
     const related = screen.getByRole('heading', { name: 'More QR code types' });
     expect(faq.compareDocumentPosition(related) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

@@ -18,15 +18,8 @@
 
 import type { TypeGuide } from './typeGuides';
 
-/** The copy of one landing page: a preset generator (#1035, #1037) or the checker (#1036). */
+/** The long copy of one landing page: a preset generator (#1035, #1037) or the checker (#1036). */
 export interface LandingCopy {
-  name: string;
-  seoTitle: string;
-  heading: string;
-  /** Meta description, 155 characters at most. */
-  description: string;
-  imageAlt: string;
-  features: string[];
   howTo: { name: string; description: string; steps: { name: string; text: string }[] };
   faqs: { question: string; answer: string }[];
   /** Long-form sections; the checker has its own page and leaves this out. */
@@ -35,19 +28,6 @@ export interface LandingCopy {
 
 export const landingPageContent: Record<string, LandingCopy> = {
   'mosaic-qr-code': {
-    name: 'Image QR Code Generator',
-    seoTitle: 'Image QR Code Generator: Your Picture, No AI, Never Uploaded | QRCraftly',
-    heading: 'Image QR Code Generator (Mosaic)',
-    description:
-      'Turn your own picture into a QR code that still scans. No AI and no upload: your image is tiled into the code in your browser. Free, no sign-up, no ads.',
-    imageAlt: 'A QR code whose modules are tiled from a sunset picture, made with the QRCraftly image QR code generator',
-    features: [
-      'Your own picture is tiled into the QR code, not an AI rendering of it',
-      'Halftone keeps more image detail, and Tiles is bolder and scans from further away',
-      'Every module keeps its dark or light value, so error correction is left for damage',
-      'The image is processed on your device and is never uploaded',
-      'Download as PNG, JPEG, WebP or SVG',
-    ],
     howTo: {
       name: 'How to Make an Image QR Code',
       description: 'Put a picture into a QR code in four steps, all in your browser.',
@@ -117,21 +97,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'The picture is read by your browser, reduced to one colour per module and discarded when you close the tab. It is never uploaded, and it is not stored: saved style templates leave the image out on purpose.',
     },
   },
-
   'qr-code-with-logo': {
-    name: 'QR Code with Logo Generator',
-    seoTitle: 'Free QR Code with Logo Generator: No Sign-up, Never Expires | QRCraftly',
-    heading: 'Free QR Code Generator with Logo',
-    description:
-      'Add your logo to a QR code and keep it scannable. High error correction is set for you and the scan badge warns you if the logo is too big. Free, no ads.',
-    imageAlt: 'A QR code with a logo in the centre, made with the QRCraftly QR code with logo generator',
-    features: [
-      'High error correction (H) is already set, which leaves room for a logo',
-      'The Logo section opens for you, below the code',
-      'A warning appears when the logo covers too much of the code',
-      'Custom colours and shapes, with a contrast check',
-      'Download as PNG, JPEG, WebP or SVG',
-    ],
     howTo: {
       name: 'How to Add a Logo to a QR Code',
       description: 'Put your logo in the middle of a QR code and check that it still scans.',
@@ -195,21 +161,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'Your link and your logo are processed in your browser only. The logo is held in memory while the page is open, and QRCraftly never uploads or stores it.',
     },
   },
-
   'google-review-qr-code': {
-    name: 'Google Review QR Code Generator',
-    seoTitle: 'Free Google Review QR Code Generator: No Sign-up | QRCraftly',
-    heading: 'Free Google Review QR Code Generator',
-    description:
-      'Make a QR code that opens your Google review form. Paste your review link, download the code. Free, no sign-up, no ads, and no tracking added to your link.',
-    imageAlt: 'A QR code that opens a Google review page, made with the QRCraftly Google review QR code generator',
-    features: [
-      'Opens your own review link, so customers can leave a review in a tap',
-      'Instructions below for finding your review link',
-      'A plain link code: no account, no tracking added and no expiry',
-      'Colours and a logo to match your business',
-      'Download as PNG, JPEG, WebP or SVG',
-    ],
     howTo: {
       name: 'How to Make a Google Review QR Code',
       description: 'Get your review link from Google, then turn it into a QR code.',
@@ -273,21 +225,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'The link is placed into the code in your browser. QRCraftly never contacts Google about it and never adds tracking, so it cannot tell who scans the code or how often.',
     },
   },
-
   'menu-qr-code': {
-    name: 'Menu QR Code Generator',
-    seoTitle: 'Free Menu QR Code Generator: Never Expires, No Sign-up | QRCraftly',
-    heading: 'Free Menu QR Code Generator',
-    description:
-      'Make a restaurant menu QR code that never expires. Link it to your menu page or PDF, download it and print it. Free, no sign-up, no ads, no monthly fee.',
-    imageAlt: 'A QR code for a restaurant menu, made with the QRCraftly menu QR code generator',
-    features: [
-      'A static code that never expires and never asks for a subscription',
-      'Link it to a menu page or a PDF you host yourself',
-      'Update the menu without reprinting, by changing the page behind the link',
-      'Custom colours and a logo for your restaurant',
-      'Download as PNG, JPEG, WebP or SVG for print',
-    ],
     howTo: {
       name: 'How to Make a Menu QR Code',
       description: 'Link a menu you already host to a QR code for tables, windows and takeaway bags.',
@@ -351,21 +289,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'Your menu link is placed into the code in your browser and never sent to QRCraftly. There is no tracking, so we cannot see who scans your code, and neither can anyone else through us.',
     },
   },
-
   'instagram-qr-code': {
-    name: 'Instagram QR Code Generator',
-    seoTitle: 'Free Instagram QR Code Generator: Link to Your Profile | QRCraftly',
-    heading: 'Free Instagram QR Code Generator',
-    description:
-      'Make a QR code that opens your Instagram profile. Type your username, style the code and download it. Free, no sign-up, no ads, and it never expires.',
-    imageAlt: 'A QR code that opens an Instagram profile, made with the QRCraftly Instagram QR code generator',
-    features: [
-      'Type your username and the profile link is built for you',
-      'The link opens in the Instagram app when it is installed',
-      'A static code that never expires',
-      'Colours and a logo to match your brand',
-      'Download as PNG, JPEG, WebP or SVG',
-    ],
     howTo: {
       name: 'How to Make an Instagram QR Code',
       description: 'Turn your Instagram username into a code that opens your profile.',
@@ -428,21 +352,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'Your username is turned into a link in your browser. QRCraftly does not contact Instagram, does not log what you type and adds no tracking to the code.',
     },
   },
-
   'whatsapp-qr-code': {
-    name: 'WhatsApp QR Code Generator',
-    seoTitle: 'Free WhatsApp QR Code Generator: Chat Link, No Sign-up | QRCraftly',
-    heading: 'Free WhatsApp QR Code Generator',
-    description:
-      'Make a QR code that opens a WhatsApp chat with you. Add your number to a wa.me link and download the code. Free, no sign-up, no ads, never expires.',
-    imageAlt: 'A QR code that opens a WhatsApp chat, made with the QRCraftly WhatsApp QR code generator',
-    features: [
-      'Builds on a standard wa.me chat link',
-      'Optionally add a ready-typed first message',
-      'A static code that never expires',
-      'Colours and a logo to match your business',
-      'Download as PNG, JPEG, WebP or SVG',
-    ],
     howTo: {
       name: 'How to Make a WhatsApp QR Code',
       description: 'Turn your WhatsApp number into a tap-to-chat code.',
@@ -506,21 +416,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'The number is placed into the code in your browser. QRCraftly never sees it, never contacts WhatsApp and adds no tracking, but anyone who scans the code can read the number inside it.',
     },
   },
-
   'pdf-qr-code': {
-    name: 'PDF QR Code Generator',
-    seoTitle: 'Free PDF QR Code Generator: Link to a Hosted PDF | QRCraftly',
-    heading: 'Free PDF QR Code Generator',
-    description:
-      'Make a QR code that opens a PDF at its web link. We do not host files: put the PDF online, paste the link and download the code. Free, no sign-up, no ads.',
-    imageAlt: 'A QR code that opens a PDF document link, made with the QRCraftly PDF QR code generator',
-    features: [
-      'Links to a PDF you already host, such as a brochure, menu, manual or flyer',
-      'Honest about hosting: QRCraftly never stores your file',
-      'A static code that never expires',
-      'Colours and a logo to match your document',
-      'Download as PNG, JPEG, WebP or SVG',
-    ],
     howTo: {
       name: 'How to Make a PDF QR Code',
       description: 'Host your PDF, then turn its link into a QR code.',
@@ -584,21 +480,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'The link is placed into the code in your browser. QRCraftly does not see the link or the file, and it adds no tracking, so we cannot tell who scans the code. Where you host the PDF is up to you, and that host sees the downloads.',
     },
   },
-
   'qr-code-checker': {
-    name: 'QR Code Checker',
-    seoTitle: 'QR Code Checker: Test If Your QR Code Scans, Nothing Uploaded | QRCraftly',
-    heading: 'QR Code Checker',
-    description:
-      'Check any QR code from an image: see what it holds and whether it scans, even after print blur. Nothing is uploaded and there is no sign-up.',
-    imageAlt: 'The QRCraftly QR code checker showing what a QR code holds and whether it scans',
-    features: [
-      'Upload, drop or paste a picture of any QR code, even one made elsewhere',
-      'Shows what the code holds, with the real address of a link',
-      'Screen scan, link safety and print simulation checks',
-      'Plain-language advice when a code is fragile',
-      'Runs entirely in your browser, with nothing uploaded',
-    ],
     howTo: {
       name: 'How to Check a QR Code',
       description: 'Test any QR code image in three steps.',

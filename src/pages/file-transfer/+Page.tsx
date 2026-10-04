@@ -42,6 +42,7 @@ import { generateSchema } from '@/utils/schemaGenerator';
 import { resolveDomainForPath } from '@/utils/metadataEngine';
 import { usePageContext } from 'vike-react/usePageContext';
 import { contentRegistry } from '@/data/contentRegistry';
+import { copy } from '@/data/copy/file-transfer';
 
 const DENSITY_OPTIONS: ReadonlyArray<{ value: TransferDensity; label: string; hint: string }> = [
   { value: 'reliable', label: 'Reliable', hint: 'Small QR codes for older phones, dim rooms or a shaky hand.' },
@@ -431,7 +432,7 @@ export default function Page() {
   const pageContext = usePageContext();
   const urlPathname = pageContext?.urlPathname ?? '/file-transfer';
   const resolvedDomain = resolveDomainForPath(urlPathname);
-  const schemaData = generateSchema(contentRegistry['file-transfer'], resolvedDomain, urlPathname);
+  const schemaData = generateSchema({ ...contentRegistry['file-transfer'], ...copy }, resolvedDomain, urlPathname);
 
   return (
     <QRProvider>

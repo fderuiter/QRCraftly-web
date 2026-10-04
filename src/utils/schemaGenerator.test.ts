@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { generateSchema } from './schemaGenerator';
+import type { ToolCopy } from '../data/copy/types';
 import { ToolContent, SchemaType, SchemaCategory, TargetPersona, StrategicValueCategory } from '../data/contentRegistry';
 import { safeJsonLdStringify } from './security';
 
 describe('schemaGenerator', () => {
-  const dummyContent: ToolContent = {
+  const dummyContent: ToolContent & ToolCopy = {
     id: 'wifi',
     name: 'WiFi QR Code Generator',
     description: 'Generate free wifi qr code',
@@ -31,7 +32,7 @@ describe('schemaGenerator', () => {
     ]
   };
 
-  const aboutContent: ToolContent = {
+  const aboutContent: ToolContent & ToolCopy = {
     id: 'about',
     name: 'About QRCraftly',
     description: 'We are a secure QR code generator',
@@ -102,7 +103,7 @@ describe('schemaGenerator', () => {
   });
 
   it('handles howTo without supply or faq list', () => {
-    const contentNoSupply: ToolContent = {
+    const contentNoSupply: ToolContent & ToolCopy = {
       ...dummyContent,
       howTo: {
         name: 'Steps',
@@ -140,7 +141,7 @@ describe('schemaGenerator', () => {
   });
 
   it('handles tool content without howTo', () => {
-    const noHowTo: ToolContent = {
+    const noHowTo: ToolContent & ToolCopy = {
       ...dummyContent,
       howTo: undefined,
     };

@@ -19,6 +19,8 @@
 import QRTool from '@/components/QRTool';
 import { JsonLdScript } from '@/components/ui/JsonLdScript';
 import { contentRegistry } from '@/data/contentRegistry';
+import { copy } from '@/data/copy/index';
+import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { generateSchema } from '@/utils/schemaGenerator';
 import { resolveDomainForPath } from '@/utils/metadataEngine';
 import { usePageContext } from 'vike-react/usePageContext';
@@ -34,12 +36,14 @@ export default function Page() {
   const pageContext = usePageContext();
   const urlPathname = pageContext?.urlPathname ?? '/';
   const resolvedDomain = resolveDomainForPath(urlPathname);
-  const schemaData = generateSchema(contentRegistry['index'], resolvedDomain, urlPathname);
+  const schemaData = generateSchema({ ...contentRegistry['index'], ...copy }, resolvedDomain, urlPathname);
 
   return (
     <>
       <JsonLdScript data={schemaData} />
-      <QRTool toolId="index" />
+      <PageCopyContext.Provider value={copy}>
+        <QRTool toolId="index" />
+      </PageCopyContext.Provider>
           </>
   );
 }

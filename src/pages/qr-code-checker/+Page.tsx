@@ -24,6 +24,8 @@ import type { ScanDescription } from '@/components/scanner/describeScan';
 import { SidebarContent } from '@/components/SidebarContent';
 import { JsonLdScript } from '@/components/ui/JsonLdScript';
 import { contentRegistry } from '@/data/contentRegistry';
+import { PageCopyContext } from '@/data/copy/PageCopyContext';
+import { landingPageContent } from '@/data/landingPageContent';
 import { QR_TYPE_ROUTES } from '@/data/navigation';
 import { stageGeneratorContent } from '@/context/QRContext';
 import { resolveDomainForPath } from '@/utils/metadataEngine';
@@ -57,7 +59,8 @@ export default function Page() {
   const pageContext = usePageContext();
   const urlPathname = pageContext?.urlPathname ?? '/qr-code-checker';
   const content = contentRegistry['qr-code-checker'];
-  const schemaData = generateSchema(content, resolveDomainForPath(urlPathname), urlPathname);
+  const copy = landingPageContent['qr-code-checker'];
+  const schemaData = generateSchema({ ...content, howTo: copy.howTo, faqs: copy.faqs }, resolveDomainForPath(urlPathname), urlPathname);
 
   return (
     <>
@@ -82,7 +85,9 @@ export default function Page() {
           ))}
         </ul>
 
-        <SidebarContent toolId="qr-code-checker" />
+        <PageCopyContext.Provider value={copy}>
+          <SidebarContent toolId="qr-code-checker" />
+        </PageCopyContext.Provider>
 
         <nav aria-labelledby="related-title" className="mt-10">
           <h2 id="related-title" className="mb-3 text-2xl font-bold text-fg">

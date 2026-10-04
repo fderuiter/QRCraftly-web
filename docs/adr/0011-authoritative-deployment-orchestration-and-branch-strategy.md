@@ -33,7 +33,7 @@ We establish a clear division of responsibility between **GitHub Actions** and *
      - ShellCheck static analysis and secret scanning.
      - Vitest unit tests with strict coverage thresholds (`pnpm test`).
      - Playwright cross-browser end-to-end tests (`pnpm run test:e2e`).
-     - Production application compilation (`pnpm run build`) including postbuild CSP hash injection and service worker generation, followed by the gzipped bundle size budget (`scripts/check-bundle-size.js`: 262 KB first load per page, 650 KB ceiling on shipped JavaScript and CSS) as a separate CI step.
+     - Production application compilation (`pnpm run build`) including postbuild CSP hash injection and service worker generation, followed by the gzipped bundle size budget (`scripts/check-bundle-size.js`: 260 KB first load per page, 650 KB ceiling on shipped JavaScript and CSS) as a separate CI step.
    - Broken CLI deployment commands (`wrangler pages deploy`) inside GitHub Actions are decommissioned.
 
 2. **Cloudflare Workers Builds for Edge Branch Routing**:

@@ -1,6 +1,5 @@
 import { getPublicDomain, getSanitizedPath } from "../utils/metadataEngine";
-import { toolFaqs } from "./toolFaqs";
-import { landingPageContent } from "./landingPageContent";
+import { landingPageMeta } from "./landingPageMeta";
 
 export enum SchemaType {
   SoftwareApplication = "SoftwareApplication",
@@ -43,13 +42,6 @@ export interface ToolContent {
   ogImage?: string;
   ogImageAlt?: string;
   features: string[];
-  howTo?: {
-    name: string;
-    description: string;
-    supply?: { name: string }[];
-    steps: { name: string; text: string }[];
-  };
-  faqs?: { question: string; answer: string }[];
   schemaType: SchemaType | SchemaType[];
   schemaCategory: SchemaCategory;
   personas: TargetPersona[];
@@ -100,7 +92,7 @@ export function isToolContent(item: unknown): item is ToolContent {
  * share image, address and schema.org type come from here, so each page needs one copy block.
  */
 function landingEntry(id: string): ToolContent {
-  const copy = landingPageContent[id];
+  const copy = landingPageMeta[id];
   return {
     id,
     name: copy.name,
@@ -115,8 +107,6 @@ function landingEntry(id: string): ToolContent {
     schemaCategory: SchemaCategory.UtilitiesApplication,
     personas: [TargetPersona.HealthcareLegal, TargetPersona.SecurityConsciousEnterprise],
     valueProposition: StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    howTo: copy.howTo,
-    faqs: copy.faqs,
   };
 }
 
@@ -134,28 +124,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.HealthcareLegal, TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": [
-      {
-        "question": "Is QRCraftly free?",
-        "answer": "QRCraftly is completely free to use. No sign-up, no login, and no hidden fees. Just generate your QR codes instantly."
-      },
-      {
-        "question": "Does QRCraftly show ads?",
-        "answer": "No, and it never will. QRCraftly is not ad supported; the project would be shut down before it ever showed an ad. Read the QRCraftly Pledge at /free-forever."
-      },
-      {
-        "question": "Does QRCraftly track users?",
-        "answer": "No. QRCraftly has no analytics, no tracking cookies, no tracking pixels and no third-party scripts. Our host, Cloudflare, handles each page request (IP address, browser, page address and time) to serve the site and block attacks, but the content of your QR codes is never part of any request."
-      },
-      {
-        "question": "Is my data secure?",
-        "answer": "Yes. Your content is processed entirely in your browser and is never sent to a server. QRCraftly has no diagnostics or reporting of any kind."
-      },
-      {
-        "question": "Is QRCraftly open source?",
-        "answer": "Our code is open for inspection and contribution. We believe in transparency."
-      }
-    ]
   },
   "free-forever": {
     "id": "free-forever",
@@ -175,28 +143,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.HealthcareLegal, TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": [
-      {
-        "question": "Is there a QR code generator with no ads?",
-        "answer": "Yes. QRCraftly is not ad supported and never will be. There are no banner ads, sponsored placements, affiliate links or paid upgrades."
-      },
-      {
-        "question": "Does QRCraftly track me?",
-        "answer": "No. There are no analytics, tracking cookies, tracking pixels or third-party scripts, and the site's Content Security Policy blocks connections to any other server. Cloudflare, which hosts the site, sees ordinary request information such as your IP address to deliver pages, but never the content of your QR codes."
-      },
-      {
-        "question": "Is my QR code data sent to a server?",
-        "answer": "No. QR codes are generated entirely in your browser. What you type, upload or scan never leaves your device."
-      },
-      {
-        "question": "Do QRCraftly QR codes expire?",
-        "answer": "No. QRCraftly makes static QR codes: the content is stored in the code itself, so there is no account, subscription or server that could switch it off. A code you make today keeps working as long as the thing it points to exists."
-      },
-      {
-        "question": "What happens if QRCraftly can't pay for itself?",
-        "answer": "It will be shut down before it ever shows an ad. The only way the project would change hands is an outright purchase of the whole project."
-      }
-    ]
   },
   "email-qr-code": {
     "id": "email-qr-code",
@@ -216,25 +162,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.HealthcareLegal],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": toolFaqs["email-qr-code"],
-    "howTo": {
-      "name": "How to Create an Email QR Code",
-      "description": "Generate a QR code that opens a drafted email.",
-      "steps": [
-        {
-          "name": "Enter Details",
-          "text": "Fill in the recipient, subject, and body of the email."
-        },
-        {
-          "name": "Customize",
-          "text": "Choose a style and color for your QR code."
-        },
-        {
-          "name": "Download",
-          "text": "Save the QR code and print it on business cards or flyers."
-        }
-      ]
-    }
   },
   "event-qr-code": {
     "id": "event-qr-code",
@@ -254,25 +181,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": toolFaqs["event-qr-code"],
-    "howTo": {
-      "name": "How to Create an Event QR Code",
-      "description": "Generate a QR code that prompts users to add an event to their calendar.",
-      "steps": [
-        {
-          "name": "Enter Event Details",
-          "text": "Fill in the event title, start and end date, location, and description."
-        },
-        {
-          "name": "Customize",
-          "text": "Choose a style and color for your QR code."
-        },
-        {
-          "name": "Download",
-          "text": "Download the image and share or print it."
-        }
-      ]
-    }
   },
   "index": {
     "id": "index",
@@ -295,25 +203,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.HealthcareLegal, TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "howTo": {
-      "name": "How to Create a URL QR Code",
-      "description": "Convert any website URL into a scannable QR code instantly.",
-      "steps": [
-        {
-          "name": "Enter URL",
-          "text": "Paste your website address (URL) into the input field."
-        },
-        {
-          "name": "Customize Design",
-          "text": "Adjust colors, add a logo, or change the pattern style."
-        },
-        {
-          "name": "Download QR Code",
-          "text": "Save your custom QR code as a PNG, JPEG or WebP image, or as an SVG vector file."
-        }
-      ]
-    },
-    "faqs": toolFaqs["index"]
   },
   "location-qr-code": {
     "id": "location-qr-code",
@@ -333,25 +222,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.HealthcareLegal],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": toolFaqs["location-qr-code"],
-    "howTo": {
-      "name": "How to Create a Location QR Code",
-      "description": "Generate a QR code that opens a location in maps.",
-      "steps": [
-        {
-          "name": "Enter Coordinates",
-          "text": "Input the latitude and longitude of the location."
-        },
-        {
-          "name": "Customize",
-          "text": "Adjust colors, patterns, and style to fit your design."
-        },
-        {
-          "name": "Download",
-          "text": "Save the QR code and use it on invites or signage."
-        }
-      ]
-    }
   },
   "meeting-qr-code": {
     "id": "meeting-qr-code",
@@ -371,25 +241,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": toolFaqs["meeting-qr-code"],
-    "howTo": {
-      "name": "How to Create a Meeting QR Code",
-      "description": "Generate a QR code that directs users to a virtual meeting.",
-      "steps": [
-        {
-          "name": "Paste Meeting Link",
-          "text": "Copy and paste your virtual meeting invite URL."
-        },
-        {
-          "name": "Customize",
-          "text": "Choose patterns, colors, and add a center logo."
-        },
-        {
-          "name": "Download",
-          "text": "Save and distribute the QR code to your meeting attendees."
-        }
-      ]
-    }
   },
   "payment-qr-code": {
     "id": "payment-qr-code",
@@ -409,25 +260,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.BusinessApplication,
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": toolFaqs["payment-qr-code"],
-    "howTo": {
-      "name": "How to Create a Payment QR Code",
-      "description": "Generate a QR code to receive cryptocurrency payments.",
-      "steps": [
-        {
-          "name": "Select Network",
-          "text": "Choose the cryptocurrency network (e.g., Bitcoin, Ethereum)."
-        },
-        {
-          "name": "Enter Address",
-          "text": "Paste your wallet address and optional amount."
-        },
-        {
-          "name": "Customize & Download",
-          "text": "Style your QR code and save it."
-        }
-      ]
-    }
   },
   "phone-qr-code": {
     "id": "phone-qr-code",
@@ -447,25 +279,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.HealthcareLegal],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": toolFaqs["phone-qr-code"],
-    "howTo": {
-      "name": "How to Create a Phone QR Code",
-      "description": "Create a QR code that prompts the user to dial a number.",
-      "steps": [
-        {
-          "name": "Enter Number",
-          "text": "Input the phone number you want people to call."
-        },
-        {
-          "name": "Customize",
-          "text": "Choose colors and styles for your QR code."
-        },
-        {
-          "name": "Download",
-          "text": "Download the image for print or digital use."
-        }
-      ]
-    }
   },
   "sms-qr-code": {
     "id": "sms-qr-code",
@@ -485,25 +298,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.HealthcareLegal],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": toolFaqs["sms-qr-code"],
-    "howTo": {
-      "name": "How to Create an SMS QR Code",
-      "description": "Generate a QR code that opens a drafted text message.",
-      "steps": [
-        {
-          "name": "Enter Details",
-          "text": "Fill in the recipient number and the message text."
-        },
-        {
-          "name": "Customize",
-          "text": "Select a pattern and color for your QR code."
-        },
-        {
-          "name": "Download",
-          "text": "Download the image and share it."
-        }
-      ]
-    }
   },
   "social-qr-code": {
     "id": "social-qr-code",
@@ -523,25 +317,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.SocialNetworkingApplication,
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": toolFaqs["social-qr-code"],
-    "howTo": {
-      "name": "How to Create a Social QR Code",
-      "description": "Generate a QR code that links directly to your social profile.",
-      "steps": [
-        {
-          "name": "Select Platform & Handle",
-          "text": "Choose the social platform and enter your username or handle."
-        },
-        {
-          "name": "Customize",
-          "text": "Design your QR code with unique styles and colors."
-        },
-        {
-          "name": "Download & Share",
-          "text": "Save the QR code and place it on your social graphics or packaging."
-        }
-      ]
-    }
   },
   "bulk-csv-qr-code": {
     "id": "bulk-csv-qr-code",
@@ -560,34 +335,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "howTo": {
-      "name": "How to Generate Bulk QR Codes from a CSV File",
-      "description": "Upload a CSV file, map payload and filename columns, and download generated QR codes as a ZIP package.",
-      "steps": [
-        {
-          "name": "Upload File",
-          "text": "Choose or drop your .csv or .txt file into the bulk CSV upload area."
-        },
-        {
-          "name": "Map Columns",
-          "text": "Select which CSV column contains the QR payload and which column specifies output filenames."
-        },
-        {
-          "name": "Export ZIP Archive",
-          "text": "Select PNG or SVG export format and click Generate ZIP Package to download your batch."
-        }
-      ]
-    },
-    "faqs": [
-      {
-        "question": "Is my CSV file uploaded to a server?",
-        "answer": "No. Your CSV file is parsed and processed entirely inside your browser using client-side JavaScript. What you upload never leaves your device."
-      },
-      {
-        "question": "What formats are supported for batch QR code export?",
-        "answer": "You can export your batch QR codes in PNG raster or SVG vector format packaged inside a single downloadable ZIP archive."
-      }
-    ]
   },
   "text-qr-code": {
     "id": "text-qr-code",
@@ -607,25 +354,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.HealthcareLegal, TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": toolFaqs["text-qr-code"],
-    "howTo": {
-      "name": "How to Create a Text QR Code",
-      "description": "Convert plain text into a scannable QR code.",
-      "steps": [
-        {
-          "name": "Enter Text",
-          "text": "Type or paste your text content into the input field."
-        },
-        {
-          "name": "Customize",
-          "text": "Adjust colors, patterns, and add a logo if desired."
-        },
-        {
-          "name": "Download",
-          "text": "Download your QR code in PNG, JPEG, or WebP format."
-        }
-      ]
-    }
   },
   "vcard-qr-code": {
     "id": "vcard-qr-code",
@@ -645,25 +373,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.BusinessApplication,
     "personas": [TargetPersona.HealthcareLegal, TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": toolFaqs["vcard-qr-code"],
-    "howTo": {
-      "name": "How to Create a vCard QR Code",
-      "description": "Create a digital business card that can be scanned to save contact info.",
-      "steps": [
-        {
-          "name": "Enter Contact Info",
-          "text": "Fill in your name, phone, email, and other contact details."
-        },
-        {
-          "name": "Customize",
-          "text": "Add your logo or choose colors to match your brand."
-        },
-        {
-          "name": "Download",
-          "text": "Download the QR code for your business cards."
-        }
-      ]
-    }
   },
   "wifi-qr-code": {
     "id": "wifi-qr-code",
@@ -683,34 +392,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "faqs": toolFaqs["wifi-qr-code"],
-    "howTo": {
-      "name": "How to Create a WiFi QR Code",
-      "description": "Generate a QR code to share your WiFi network instantly.",
-      "supply": [
-        { "name": "WiFi Network Name (SSID)" },
-        { "name": "WiFi Password" },
-        { "name": "Encryption Type" }
-      ],
-      "steps": [
-        {
-          "name": "Enter Network Name",
-          "text": "Input your WiFi SSID (Network Name) into the designated field."
-        },
-        {
-          "name": "Enter Password",
-          "text": "Enter your WiFi password. Your data remains local and secure."
-        },
-        {
-          "name": "Select Encryption",
-          "text": "Choose your network encryption type (WPA/WPA2 is most common)."
-        },
-        {
-          "name": "Download or Share",
-          "text": "Click 'Download' to save the QR code or scan it directly from the screen."
-        }
-      ]
-    }
   },
   "file-transfer": {
     "id": "file-transfer",
@@ -729,24 +410,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.DeveloperApplication,
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.AsynchronousWebWorkerDiagnostics,
-    "howTo": {
-      "name": "How to Transfer Files via Animated QR Codes",
-      "description": "Share files sequentially through QR code animations.",
-      "steps": [
-        {
-          "name": "Select File",
-          "text": "Select any file or use the high-load simulation button."
-        },
-        {
-          "name": "Set Pacing",
-          "text": "Adjust the speed and chunk size to fit your receiving camera."
-        },
-        {
-          "name": "Scan Animation",
-          "text": "Scan the animated QR code stream sequentially with the receiver device."
-        }
-      ]
-    }
   },
   "arcade": {
     "id": "arcade",
@@ -768,46 +431,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.AsynchronousWebWorkerDiagnostics,
-    "howTo": {
-      "name": "How to Stress-Test a QR Code in the QR Arcade",
-      "description": "Damage a QR code on purpose and see how much it can lose before scanners fail.",
-      "steps": [
-        {
-          "name": "Bring your design",
-          "text": "Select Stress Test in Arcade under the generator preview, or open the Arcade and enter any text or URL."
-        },
-        {
-          "name": "Choose a mode",
-          "text": "Use Arcade Blaster to shoot the code apart, or Damage Simulator to strike exact modules and launch barrages."
-        },
-        {
-          "name": "Watch both verdicts",
-          "text": "The health bar tracks the Reed-Solomon budget and finder patterns; the live scanner shows whether a real decoder can still read the code."
-        },
-        {
-          "name": "Rebuild and compare",
-          "text": "Rebuild or heal the code, change the error correction level, and try again to compare how much damage each level survives."
-        }
-      ]
-    },
-    "faqs": [
-      {
-        "question": "Why does the code fail when a corner square is hit, even with budget left?",
-        "answer": "Scanners use the three 7x7 finder patterns to locate the grid. Once more than 20% of one is destroyed, alignment fails regardless of the remaining error correction budget."
-      },
-      {
-        "question": "What is the difference between the health bar and the live scanner?",
-        "answer": "The health bar is an instant mathematical model of Reed-Solomon capacity across interleaved blocks. The live scanner actually decodes the damaged image with BarcodeDetector or a Web Worker, so it is empirical proof of readability."
-      },
-      {
-        "question": "Is my QR content uploaded?",
-        "answer": "No. The design is passed from the generator in memory only and every scan runs on your device. Nothing is stored, placed in the URL or sent over the network."
-      },
-      {
-        "question": "What happened to Destroy the QR and the Damage Simulator game?",
-        "answer": "Both games are now modes of the QR Arcade. The old /destroy-the-qr and /game addresses redirect to Arcade Blaster and Damage Simulator."
-      }
-    ]
   },
   "qr-code-scanner": {
     "id": "qr-code-scanner",
@@ -830,50 +453,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.HealthcareLegal, TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "howTo": {
-      "name": "How to Scan a QR Code Online",
-      "description": "Read a QR code with your camera or from an image, without installing an app.",
-      "steps": [
-        {
-          "name": "Start the camera or choose an image",
-          "text": "Press Start camera and allow camera access, or switch to Image and choose a photo or screenshot. You can also paste a screenshot or drop an image on the scanner."
-        },
-        {
-          "name": "Point at the code",
-          "text": "Hold the QR code inside the square. When it is read, the square locks onto the code and the result opens."
-        },
-        {
-          "name": "Check the result",
-          "text": "The scanner shows what the code holds and, for a link, the real web address it opens. Script links are blocked."
-        },
-        {
-          "name": "Copy, open or edit",
-          "text": "Copy the content, open the link, share it, or open it in the generator to make your own version."
-        }
-      ]
-    },
-    "faqs": [
-      {
-        "question": "Is my image or camera video uploaded?",
-        "answer": "No. The camera video and any image you choose, paste or drop are read in your browser on your device. Nothing is sent to a server, and the camera turns off when you leave or a code is found."
-      },
-      {
-        "question": "Do I need to install an app to scan a QR code?",
-        "answer": "No. The scanner works in any modern browser on phones and computers. It uses the browser's built-in barcode reader where there is one, and a reader bundled with the page everywhere else."
-      },
-      {
-        "question": "Can I scan a QR code from a screenshot?",
-        "answer": "Yes. Choose the screenshot, paste it with Ctrl+V (Cmd+V on a Mac), use Paste image, or drop it on the scanner."
-      },
-      {
-        "question": "How do I know a scanned link is safe?",
-        "answer": "Before anything opens, the scanner shows the real address the link goes to, decodes international addresses and warns when letters from different alphabets are mixed to imitate a known site. Links that would run a script are blocked. A link only opens when you press Open link."
-      },
-      {
-        "question": "Why does the browser ask for camera permission?",
-        "answer": "The browser asks only after you press Start camera, never when the page loads. If you would rather not allow it, scan from an image instead."
-      }
-    ]
   },
   "qr-code-checker": landingEntry("qr-code-checker"),
   "mosaic-qr-code": landingEntry("mosaic-qr-code"),
@@ -901,34 +480,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.HealthcareLegal, TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
-    "howTo": {
-      "name": "How to Verify Security and Privacy Settings",
-      "description": "Review security transparency guidelines and report vulnerabilities.",
-      "steps": [
-        {
-          "name": "Review Privacy Architecture",
-          "text": "Inspect our zero-transit privacy framework and local browser execution model."
-        },
-        {
-          "name": "Audit Open Source Code",
-          "text": "Verify security implementations directly in our open-source codebase."
-        },
-        {
-          "name": "Submit Vulnerability Reports",
-          "text": "Report security findings through our secure disclosure portal."
-        }
-      ]
-    },
-    "faqs": [
-      {
-        "question": "Does QRCraftly store my QR code data on a server?",
-        "answer": "No. Standard static QR codes are generated entirely client-side inside your browser without transmitting sensitive payload data to external servers."
-      },
-      {
-        "question": "Is QRCraftly compliant with HIPAA and GDPR?",
-        "answer": "Yes. Because data processing occurs locally on the client device without centralized data retention, QRCraftly aligns with strict GDPR and HIPAA privacy standards."
-      }
-    ]
   }
 };
 

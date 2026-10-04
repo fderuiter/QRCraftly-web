@@ -22,6 +22,7 @@ import { Ban, EyeOff, Laptop, Gift } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { JsonLdScript } from '@/components/ui/JsonLdScript';
 import { contentRegistry } from '@/data/contentRegistry';
+import { copy } from '@/data/copy/free-forever';
 import {
   PLEDGE_AFFORDABLE,
   PLEDGE_COLLECTED,
@@ -51,7 +52,7 @@ export default function Page() {
   const pageContext = usePageContext();
   const urlPathname = pageContext?.urlPathname ?? '/free-forever';
   const resolvedDomain = resolveDomainForPath(urlPathname);
-  const schemaData = generateSchema(contentRegistry['free-forever'], resolvedDomain, urlPathname);
+  const schemaData = generateSchema({ ...contentRegistry['free-forever'], ...copy }, resolvedDomain, urlPathname);
 
   return (
     <>

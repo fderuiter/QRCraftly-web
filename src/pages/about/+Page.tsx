@@ -24,6 +24,7 @@ import { GENERATOR_FOOTER_LINKS, TOOL_LINKS } from '@/data/navigation';
 import { isDangerousUrl } from '@/utils/security';
 import { JsonLdScript } from '@/components/ui/JsonLdScript';
 import { contentRegistry } from '@/data/contentRegistry';
+import { copy } from '@/data/copy/about';
 import { generateSchema } from '@/utils/schemaGenerator';
 import { resolveDomainForPath } from '@/utils/metadataEngine';
 import { usePageContext } from 'vike-react/usePageContext';
@@ -73,7 +74,7 @@ export default function Page() {
   const pageContext = usePageContext();
   const urlPathname = pageContext?.urlPathname ?? '/about';
   const resolvedDomain = resolveDomainForPath(urlPathname);
-  const schemaData = generateSchema(contentRegistry['about'], resolvedDomain, urlPathname);
+  const schemaData = generateSchema({ ...contentRegistry['about'], ...copy }, resolvedDomain, urlPathname);
 
   return (
     <>

@@ -19,6 +19,7 @@
 import { QRTypePage } from '@/components/QRTypePage';
 import { QRType } from '@/types';
 import { contentRegistry } from '@/data/contentRegistry';
+import { copy } from '@/data/copy/meeting-qr-code';
 import { generateSchema } from '@/utils/schemaGenerator';
 import { resolveDomainForPath } from '@/utils/metadataEngine';
 import { usePageContext } from 'vike-react/usePageContext';
@@ -30,7 +31,7 @@ export default function Page() {
   const pageContext = usePageContext();
   const urlPathname = pageContext?.urlPathname ?? '/meeting-qr-code';
   const resolvedDomain = resolveDomainForPath(urlPathname);
-  const schemaData = generateSchema(contentRegistry['meeting-qr-code'], resolvedDomain, urlPathname);
+  const schemaData = generateSchema({ ...contentRegistry['meeting-qr-code'], ...copy }, resolvedDomain, urlPathname);
 
-  return <QRTypePage type={QRType.MEETING} title="Meeting QR Code" schemaData={schemaData} toolId="meeting-qr-code" />;
+  return <QRTypePage type={QRType.MEETING} title="Meeting QR Code" schemaData={schemaData} toolId="meeting-qr-code" copy={copy} />;
 }

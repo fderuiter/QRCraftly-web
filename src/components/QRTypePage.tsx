@@ -22,6 +22,8 @@ import { DEFAULT_CONFIG } from '@/constants';
 import { QRType, type QRConfig } from '@/types';
 import { PresetOpenSections } from '@/components/StyleControls';
 import { JsonLdScript } from '@/components/ui/JsonLdScript';
+import { PageCopyContext } from '@/data/copy/PageCopyContext';
+import type { ToolCopy } from '@/data/copy/types';
 
 interface QRTypePageProps {
   /** The QR code type to pre-select. */
@@ -32,11 +34,16 @@ interface QRTypePageProps {
   schemaData: unknown;
   /** The tool ID for loading content. */
   toolId: string;
+  /** The page's how-to steps and FAQs, which its content section shows. */
+  copy?: ToolCopy;
   /** Settings a landing page asks for; they win over appearance kept from earlier routes. */
   presetConfig?: Partial<QRConfig>;
   /** Appearance sections that start expanded. */
   openSections?: readonly string[];
 }
+
+/** Copy used when a page has none of its own. */
+const NO_COPY: ToolCopy = {};
 
 /** Appearance sections that start expanded when a page asks for none. */
 const NO_SECTIONS: readonly string[] = [];
@@ -45,7 +52,7 @@ const NO_SECTIONS: readonly string[] = [];
  * A reusable page component for specific QR code type landing pages.
  * It sets up the QRTool with the correct type and injects the provided schema.org data.
  */
-export const QRTypePage: React.FC<QRTypePageProps> = ({ type, title, schemaData, toolId, presetConfig, openSections = NO_SECTIONS }) => {
+export const QRTypePage: React.FC<QRTypePageProps> = ({ type, title, schemaData, toolId, copy, presetConfig, openSections = NO_SECTIONS }) => {
   const config = {
     ...DEFAULT_CONFIG,
     type,
@@ -54,9 +61,11 @@ export const QRTypePage: React.FC<QRTypePageProps> = ({ type, title, schemaData,
   return (
     <>
       <JsonLdScript data={schemaData} />
-      <PresetOpenSections.Provider value={openSections}>
-        <QRTool initialConfig={config} presetConfig={presetConfig} title={title} toolId={toolId} />
-      </PresetOpenSections.Provider>
+      <PageCopyContext.Provider value={copy ?? NO_COPY}>
+        <PresetOpenSections.Provider value={openSections}>
+          <QRTool initialConfig={config} presetConfig={presetConfig} title={title} toolId={toolId} />
+        </PresetOpenSections.Provider>
+      </PageCopyContext.Provider>
     </>
   );
 };

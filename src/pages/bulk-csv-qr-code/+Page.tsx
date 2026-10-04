@@ -19,6 +19,7 @@
 import { QRTypePage } from '@/components/QRTypePage';
 import { QRType } from '@/types';
 import { contentRegistry } from '@/data/contentRegistry';
+import { copy } from '@/data/copy/bulk-csv-qr-code';
 import { generateSchema } from '@/utils/schemaGenerator';
 import { resolveDomainForPath } from '@/utils/metadataEngine';
 import { usePageContext } from 'vike-react/usePageContext';
@@ -30,7 +31,7 @@ export default function Page() {
   const pageContext = usePageContext();
   const urlPathname = pageContext?.urlPathname ?? '/bulk-csv-qr-code';
   const resolvedDomain = resolveDomainForPath(urlPathname);
-  const schemaData = generateSchema(contentRegistry['bulk-csv-qr-code'], resolvedDomain, urlPathname);
+  const schemaData = generateSchema({ ...contentRegistry['bulk-csv-qr-code'], ...copy }, resolvedDomain, urlPathname);
 
-  return <QRTypePage type={QRType.BULK_CSV} title="Bulk CSV Batch QR Code" schemaData={schemaData} toolId="bulk-csv-qr-code" />;
+  return <QRTypePage type={QRType.BULK_CSV} title="Bulk CSV Batch QR Code" schemaData={schemaData} toolId="bulk-csv-qr-code" copy={copy} />;
 }

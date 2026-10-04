@@ -24,6 +24,8 @@ import type { ScanDescription } from '@/components/scanner/describeScan';
 import { SidebarContent } from '@/components/SidebarContent';
 import { JsonLdScript } from '@/components/ui/JsonLdScript';
 import { contentRegistry } from '@/data/contentRegistry';
+import { PageCopyContext } from '@/data/copy/PageCopyContext';
+import { copy } from '@/data/copy/qr-code-scanner';
 import { QR_TYPE_ROUTES } from '@/data/navigation';
 import { stageGeneratorContent } from '@/context/QRContext';
 import { resolveDomainForPath } from '@/utils/metadataEngine';
@@ -58,7 +60,7 @@ export default function Page() {
   const pageContext = usePageContext();
   const urlPathname = pageContext?.urlPathname ?? '/qr-code-scanner';
   const content = contentRegistry['qr-code-scanner'];
-  const schemaData = generateSchema(content, resolveDomainForPath(urlPathname), urlPathname);
+  const schemaData = generateSchema({ ...content, ...copy }, resolveDomainForPath(urlPathname), urlPathname);
 
   return (
     <>
@@ -84,7 +86,9 @@ export default function Page() {
           ))}
         </ul>
 
-        <SidebarContent toolId="qr-code-scanner" />
+        <PageCopyContext.Provider value={copy}>
+          <SidebarContent toolId="qr-code-scanner" />
+        </PageCopyContext.Provider>
 
         <nav aria-labelledby="related-title" className="mt-10">
           <h2 id="related-title" className="mb-3 text-2xl font-bold text-fg">

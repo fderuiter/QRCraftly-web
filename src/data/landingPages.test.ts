@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest';
 import { contentRegistry } from '@/data/contentRegistry';
 import { LANDING_GALLERIES, LANDING_PAGE_IDS, LANDING_PRESETS } from '@/data/landingPages';
 import { landingPageContent } from '@/data/landingPageContent';
+import { landingPageMeta } from '@/data/landingPageMeta';
 import { getRelatedTypePages } from '@/data/relatedPages';
 import { typeGuides } from '@/data/typeGuides';
 import { USE_CASE_LINKS } from '@/data/navigation';
@@ -50,15 +51,15 @@ describe('landing pages (#1035, #1036, #1037)', () => {
       expect(guide, id).toBeDefined();
       expect(wordCount(guide.intro), id).toBeGreaterThanOrEqual(40);
       expect(wordCount(guide.intro), id).toBeLessThanOrEqual(60);
-      expect(contentRegistry[id].howTo?.steps.length, id).toBeGreaterThanOrEqual(3);
-      expect(contentRegistry[id].faqs?.length, id).toBeGreaterThanOrEqual(3);
+      expect(landingPageContent[id].howTo?.steps.length, id).toBeGreaterThanOrEqual(3);
+      expect(landingPageContent[id].faqs?.length, id).toBeGreaterThanOrEqual(3);
     }
   });
 
   it('never claims AI, and says plainly that files are not hosted', () => {
     expect(landingPageContent['mosaic-qr-code'].faqs[0].answer).toMatch(/^No\./);
-    expect(JSON.stringify(landingPageContent['mosaic-qr-code'].seoTitle)).toMatch(/No AI/);
-    expect(landingPageContent['pdf-qr-code'].description).toMatch(/do not host/);
+    expect(JSON.stringify(landingPageMeta['mosaic-qr-code'].seoTitle)).toMatch(/No AI/);
+    expect(landingPageMeta['pdf-qr-code'].description).toMatch(/do not host/);
     expect(landingPageContent['menu-qr-code'].howTo.steps[0].text).toMatch(/does not host/);
   });
 

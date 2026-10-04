@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { contentRegistry, auxiliaryRegistry, SchemaType, SchemaCategory, TargetPersona, StrategicValueCategory, hasValidOgImage, isToolContent, getMetadataForPath, getMetadataForPageContext, legacyRouteRegistry } from './contentRegistry';
 import { CONTAINMENT_PROFILES } from '@/packages/qr-payload';
+import { pageCopy } from '../../tests/utils/pageCopy';
 
 describe('Content Registry Validation', () => {
   const STRICT_NO_CONTROL = CONTAINMENT_PROFILES.STRICT_NO_CONTROL;
 
   it('should conform to ToolContent schema and have no control characters', () => {
     Object.entries(contentRegistry).forEach(([key, tool]) => {
+      const { howTo, faqs } = pageCopy(key);
       // 1. Structure validation
       expect(tool.id, `File src/data/contentRegistry.ts - Tool '${key}': Missing or invalid 'id'`).toBeTypeOf('string');
       expect(tool.name, `File src/data/contentRegistry.ts - Tool '${key}': Missing or invalid 'name'`).toBeTypeOf('string');
@@ -14,16 +16,16 @@ describe('Content Registry Validation', () => {
       expect(tool.description, `File src/data/contentRegistry.ts - Tool '${key}': Missing or invalid 'description'`).toBeTypeOf('string');
       expect(tool.seoTitle, `File src/data/contentRegistry.ts - Tool '${key}': Missing or invalid 'seoTitle'`).toBeTypeOf('string');
       expect(Array.isArray(tool.features), `File src/data/contentRegistry.ts - Tool '${key}': 'features' must be an array`).toBe(true);
-      if (tool.faqs !== undefined) {
-        expect(Array.isArray(tool.faqs), `File src/data/contentRegistry.ts - Tool '${key}': 'faqs' must be an array`).toBe(true);
+      if (faqs !== undefined) {
+        expect(Array.isArray(faqs), `File src/data/contentRegistry.ts - Tool '${key}': 'faqs' must be an array`).toBe(true);
       }
 
-      if (tool.howTo) {
-        expect(tool.howTo.name, `File src/data/contentRegistry.ts - Tool '${key}': 'howTo.name' missing or invalid`).toBeTypeOf('string');
-        expect(tool.howTo.description, `File src/data/contentRegistry.ts - Tool '${key}': 'howTo.description' missing or invalid`).toBeTypeOf('string');
-        expect(Array.isArray(tool.howTo.steps), `File src/data/contentRegistry.ts - Tool '${key}': 'howTo.steps' must be an array`).toBe(true);
-        if (tool.howTo.supply) {
-          expect(Array.isArray(tool.howTo.supply), `File src/data/contentRegistry.ts - Tool '${key}': 'howTo.supply' must be an array`).toBe(true);
+      if (howTo) {
+        expect(howTo.name, `File src/data/contentRegistry.ts - Tool '${key}': 'howTo.name' missing or invalid`).toBeTypeOf('string');
+        expect(howTo.description, `File src/data/contentRegistry.ts - Tool '${key}': 'howTo.description' missing or invalid`).toBeTypeOf('string');
+        expect(Array.isArray(howTo.steps), `File src/data/contentRegistry.ts - Tool '${key}': 'howTo.steps' must be an array`).toBe(true);
+        if (howTo.supply) {
+          expect(Array.isArray(howTo.supply), `File src/data/contentRegistry.ts - Tool '${key}': 'howTo.supply' must be an array`).toBe(true);
         }
       }
 
@@ -49,22 +51,22 @@ describe('Content Registry Validation', () => {
         checkString(feature, `features[${index}]`);
       });
 
-      if (tool.howTo) {
-        checkString(tool.howTo.name, 'howTo.name');
-        checkString(tool.howTo.description, 'howTo.description');
-        if (tool.howTo.supply) {
-          tool.howTo.supply.forEach((item, index) => {
+      if (howTo) {
+        checkString(howTo.name, 'howTo.name');
+        checkString(howTo.description, 'howTo.description');
+        if (howTo.supply) {
+          howTo.supply.forEach((item, index) => {
             checkString(item.name, `howTo.supply[${index}].name`);
           });
         }
-        tool.howTo.steps.forEach((step, index) => {
+        howTo.steps.forEach((step, index) => {
           checkString(step.name, `howTo.steps[${index}].name`);
           checkString(step.text, `howTo.steps[${index}].text`);
         });
       }
 
-      if (tool.faqs) {
-        tool.faqs.forEach((faq, index) => {
+      if (faqs) {
+        faqs.forEach((faq, index) => {
           expect(faq.question, `File src/data/contentRegistry.ts - Tool '${key}': 'faqs[${index}].question' missing or invalid`).toBeTypeOf('string');
           expect(faq.answer, `File src/data/contentRegistry.ts - Tool '${key}': 'faqs[${index}].answer' missing or invalid`).toBeTypeOf('string');
           checkString(faq.question, `faqs[${index}].question`);
@@ -154,7 +156,7 @@ describe('Content Registry Validation', () => {
       const tool = contentRegistry[toolId];
       expect(tool, `Tool '${toolId}' must exist in contentRegistry`).toBeDefined();
 
-      const schema = generateSchema(tool, 'https://qrcraftly.com', `/${toolId}`);
+      const schema = generateSchema({ ...tool, ...pageCopy(toolId) }, 'https://qrcraftly.com', `/${toolId}`);
       expect(schema, `Schema for '${toolId}' must be generated`).toBeDefined();
       expect(schema['@context']).toBe('https://schema.org');
 

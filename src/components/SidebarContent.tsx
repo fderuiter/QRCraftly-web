@@ -1,4 +1,7 @@
+import { useContext } from 'react';
 import { contentRegistry } from '@/data/contentRegistry';
+import { copy as indexCopy } from '@/data/copy/index';
+import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { LANDING_GALLERIES } from '@/data/landingPages';
 import { getExampleImage, getRelatedTypePages } from '@/data/relatedPages';
 import { typeGuides } from '@/data/typeGuides';
@@ -54,12 +57,13 @@ function GuideList({ heading, items }: { heading: string; items: readonly string
  */
 export function SidebarContent({ toolId }: SidebarContentProps) {
   const content = contentRegistry[toolId];
+  const copy = useContext(PageCopyContext);
 
   if (!content) return null;
 
-  const displayFaqs = (content.faqs && content.faqs.length > 0) 
-    ? content.faqs 
-    : contentRegistry['index'].faqs;
+  const displayFaqs = (copy.faqs && copy.faqs.length > 0) 
+    ? copy.faqs 
+    : indexCopy.faqs;
 
   const example = getExampleImage(toolId);
   const related = getRelatedTypePages(toolId);
@@ -112,12 +116,12 @@ export function SidebarContent({ toolId }: SidebarContentProps) {
         </section>
       )}
 
-      {content.howTo && content.howTo.steps && content.howTo.steps.length > 0 && (
+      {copy.howTo && copy.howTo.steps && copy.howTo.steps.length > 0 && (
         <section className="mb-10">
-          <h2 className="mb-5 text-2xl font-bold text-fg">{content.howTo.name}</h2>
-          {content.howTo.description && <p className="mb-5 text-sm text-fg-muted">{content.howTo.description}</p>}
+          <h2 className="mb-5 text-2xl font-bold text-fg">{copy.howTo.name}</h2>
+          {copy.howTo.description && <p className="mb-5 text-sm text-fg-muted">{copy.howTo.description}</p>}
           <div className="space-y-4">
-            {content.howTo.steps.map((step, idx) => (
+            {copy.howTo.steps.map((step, idx) => (
               <div key={idx} className="flex gap-4 rounded-xl border border-line bg-surface-sunken p-4">
                 <div className="flex size-8 flex-shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent">
                   {idx + 1}

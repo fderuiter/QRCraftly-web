@@ -8,6 +8,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { JsonLdScript } from '@/components/ui/JsonLdScript';
 import { ArticleHeading, ArticleLayout, type ArticleSection } from '@/components/ArticleLayout';
 import { contentRegistry } from '@/data/contentRegistry';
+import { PageCopyContext } from '@/data/copy/PageCopyContext';
+import { copy } from '@/data/copy/security';
 import { generateSchema } from '@/utils/schemaGenerator';
 import { resolveDomainForPath } from '@/utils/metadataEngine';
 import { SidebarContent } from '@/components/SidebarContent';
@@ -161,7 +163,7 @@ export default function Page() {
   const pageContext = usePageContext();
   const urlPathname = pageContext?.urlPathname ?? '/security';
   const resolvedDomain = resolveDomainForPath(urlPathname);
-  const schemaData = generateSchema(contentRegistry['security'], resolvedDomain, urlPathname);
+  const schemaData = generateSchema({ ...contentRegistry['security'], ...copy }, resolvedDomain, urlPathname);
 
   return (
     <>
@@ -211,7 +213,9 @@ export default function Page() {
           </ButtonLink>
         </section>
 
-        <SidebarContent toolId="security" />
+        <PageCopyContext.Provider value={copy}>
+          <SidebarContent toolId="security" />
+        </PageCopyContext.Provider>
       </ArticleLayout>
     </>
   );

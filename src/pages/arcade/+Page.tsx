@@ -22,6 +22,8 @@ import { ArcadeApp } from '@/components/arcade/ArcadeApp';
 import { SidebarContent } from '@/components/SidebarContent';
 import { JsonLdScript } from '@/components/ui/JsonLdScript';
 import { contentRegistry } from '@/data/contentRegistry';
+import { PageCopyContext } from '@/data/copy/PageCopyContext';
+import { copy } from '@/data/copy/arcade';
 import { resolveDomainForPath } from '@/utils/metadataEngine';
 import { generateSchema } from '@/utils/schemaGenerator';
 
@@ -33,14 +35,16 @@ import { generateSchema } from '@/utils/schemaGenerator';
 export default function Page() {
   const pageContext = usePageContext();
   const urlPathname = pageContext?.urlPathname ?? '/arcade';
-  const schemaData = generateSchema(contentRegistry['arcade'], resolveDomainForPath(urlPathname), urlPathname);
+  const schemaData = generateSchema({ ...contentRegistry['arcade'], ...copy }, resolveDomainForPath(urlPathname), urlPathname);
 
   return (
     <>
       <JsonLdScript data={schemaData} />
       <ArcadeApp />
       <div className="mx-auto max-w-3xl px-4 pb-12">
-        <SidebarContent toolId="arcade" />
+        <PageCopyContext.Provider value={copy}>
+          <SidebarContent toolId="arcade" />
+        </PageCopyContext.Provider>
       </div>
     </>
   );

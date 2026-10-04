@@ -19,6 +19,7 @@
 import { QRTypePage } from '@/components/QRTypePage';
 import { contentRegistry } from '@/data/contentRegistry';
 import { LANDING_PRESETS } from '@/data/landingPages';
+import { landingPageContent } from '@/data/landingPageContent';
 import { generateSchema } from '@/utils/schemaGenerator';
 import { resolveDomainForPath } from '@/utils/metadataEngine';
 import { usePageContext } from 'vike-react/usePageContext';
@@ -35,7 +36,8 @@ export function LandingPage({ id }: { id: string }) {
   const pageContext = usePageContext();
   const urlPathname = pageContext?.urlPathname ?? `/${id}`;
   const preset = LANDING_PRESETS[id];
-  const schemaData = generateSchema(contentRegistry[id], resolveDomainForPath(urlPathname), urlPathname);
+  const copy = landingPageContent[id];
+  const schemaData = generateSchema({ ...contentRegistry[id], howTo: copy.howTo, faqs: copy.faqs }, resolveDomainForPath(urlPathname), urlPathname);
 
   return (
     <QRTypePage
@@ -43,6 +45,7 @@ export function LandingPage({ id }: { id: string }) {
       title={preset.title}
       schemaData={schemaData}
       toolId={id}
+      copy={copy}
       presetConfig={preset.presetConfig}
       openSections={preset.openSections}
     />

@@ -130,7 +130,7 @@ pnpm run lint
 ```
 
 **Bundle Size Check:**
-CI fails if any page's first load (its HTML, CSS and startup scripts, gzipped) exceeds 262 KB, or if the JavaScript and CSS in `dist/client` together exceed 650 KB (`scripts/check-bundle-size.js`; the scanner's lazily loaded `.wasm` reader has its own 450 KB budget). `pnpm build` does not run this check; run it yourself after a build:
+CI fails if any page's first load (its HTML, CSS and startup scripts, gzipped) exceeds 260 KB, or if the JavaScript and CSS in `dist/client` together exceed 650 KB (`scripts/check-bundle-size.js`; the scanner's lazily loaded `.wasm` reader has its own 450 KB budget). `pnpm build` does not run this check; run it yourself after a build:
 
 ```bash
 pnpm build
@@ -195,7 +195,7 @@ Lighthouse CI runs on every Pull Request to audit performance, accessibility, be
   - `constants.ts`: Default configurations and preset data.
 - `scripts/`: Utility scripts.
   - `contrast_check.js`: Checks WCAG contrast compliance for UI elements.
-  - `check-bundle-size.js`: Per-page first-load budget (262 KB gzipped), a loose 650 KB ceiling on shipped JavaScript and CSS and a separate 450 KB budget for the lazily loaded scanner WebAssembly, run in CI.
+  - `check-bundle-size.js`: Per-page first-load budget (260 KB gzipped), a loose 650 KB ceiling on shipped JavaScript and CSS and a separate 450 KB budget for the lazily loaded scanner WebAssembly, run in CI.
   - `vite/thirdPartyLicenses.ts`: Builds the acknowledgements data and checks `vite/shipped-packages.json` against the client bundle (`pnpm run licenses:sync` rewrites the list).
   - `storage_privacy_ast_auditor.js`: Blocks browser storage keys that are not on the allowlist.
 - `tests/`: Vitest tests for the repository scripts and CI tooling.

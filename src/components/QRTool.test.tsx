@@ -23,6 +23,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import jsQR from 'jsqr';
 import { renderToString } from 'react-dom/server';
 import { contentRegistry } from '@/data/contentRegistry';
+import { PageCopyContext } from '@/data/copy/PageCopyContext';
+import { pageCopy } from '../../tests/utils/pageCopy';
 import { axe } from 'vitest-axe';
 
 vi.mock('jsqr', () => ({
@@ -918,11 +920,11 @@ describe('Generator workspace structure (#795, #802)', { timeout: 20000 }, () =>
   });
 
   it('server-renders the instructions and FAQ', () => {
-    const html = renderToString(<ToastProvider><QRTool toolId="wifi-qr-code" /></ToastProvider>);
-    const content = contentRegistry['wifi-qr-code'];
+    const html = renderToString(<PageCopyContext.Provider value={pageCopy('wifi-qr-code')}><ToastProvider><QRTool toolId="wifi-qr-code" /></ToastProvider></PageCopyContext.Provider>);
+    const content = pageCopy('wifi-qr-code');
     expect(html).toContain('Frequently Asked Questions');
     expect(html).toContain(content.howTo?.name ?? 'How to');
-    const faqs = content.faqs && content.faqs.length > 0 ? content.faqs : contentRegistry['index'].faqs ?? [];
+    const faqs = content.faqs && content.faqs.length > 0 ? content.faqs : pageCopy('index').faqs ?? [];
     expect(faqs.length).toBeGreaterThan(0);
     expect(html).toContain(faqs[0].question.replace(/&/g, '&amp;').replace(/'/g, '&#x27;'));
   });

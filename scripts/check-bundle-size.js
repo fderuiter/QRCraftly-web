@@ -15,7 +15,7 @@ const DIST_DIR = path.resolve(__dirname, '../dist/client');
 // What one visitor downloads to open one page (#1106): its HTML, the CSS and the scripts it loads
 // at startup (static imports, not lazy chunks, workers or the wasm reader). The worst page is the
 // number that matters for load time, so this is the budget that catches JavaScript bloat.
-export const MAX_PAGE_FIRST_LOAD_KB = 262;
+export const MAX_PAGE_FIRST_LOAD_KB = 260;
 // A loose backstop on the JavaScript and CSS in dist/client, so shipped code cannot grow unseen.
 // Pre-rendered HTML is left out: every new page adds some, and the per-page budget already
 // bounds each page's own HTML. Measured at 563 KB on 2026-10-03.

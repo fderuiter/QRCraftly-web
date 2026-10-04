@@ -1,4 +1,5 @@
 import type { Guide } from '../data/guides';
+import type { ToolCopy } from '../data/copy/types';
 import { ToolContent, AuxiliaryContent, getContentForPath, getContentById } from '../data/contentRegistry';
 import { resolveDomainForPath, resolvePublicUrl, JsonLdObject } from './metadataEngine';
 
@@ -28,13 +29,13 @@ const APP_VERSION: string = typeof __APP_VERSION__ === 'string' ? __APP_VERSION_
  * @returns Structured JSON-LD schema graph.
  */
 export function generateSchema(
-  contentOrPath: ToolContent | AuxiliaryContent | string,
+  contentOrPath: ((ToolContent | AuxiliaryContent) & ToolCopy) | string,
   resolvedDomain?: string,
   requestPath?: string
   // Free-form JSON-LD document; callers index into its graph loosely (see schemaGenerator.test.ts).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any {
-  let content: ToolContent | AuxiliaryContent | undefined;
+  let content: ((ToolContent | AuxiliaryContent) & ToolCopy) | undefined;
 
   if (typeof contentOrPath === 'string') {
     content = getContentForPath(contentOrPath) || getContentById(contentOrPath);
@@ -67,7 +68,7 @@ export function generateSchema(
       }
     ];
 
-    const faqs = (content as ToolContent).faqs;
+    const faqs = (content as ToolContent & ToolCopy).faqs;
     if (faqs && faqs.length > 0) {
       aboutGraph.push({
         "@type": "FAQPage",
@@ -95,7 +96,7 @@ export function generateSchema(
     };
   }
 
-  const toolContent = content as ToolContent;
+  const toolContent = content as ToolContent & ToolCopy;
   const typeValue = toolContent.schemaType || "WebApplication";
   const categoryValue = toolContent.schemaCategory || "UtilitiesApplication";
 
