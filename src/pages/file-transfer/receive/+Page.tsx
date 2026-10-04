@@ -16,13 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { createFountainSession } from '@/packages/optical-transfer';
-import { Play, Square, Camera, AlertTriangle, Activity, Cpu, Trash2, CheckCircle2, Upload, ScanLine } from 'lucide-react';
+import { Play, Square, Camera, AlertTriangle, Activity, Cpu, Trash2, Upload, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Progress } from '@/components/ui/Progress';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -35,6 +34,10 @@ import { useToast } from '@/components/ui/Toast';
 import { useOpticalReceiver } from '@/packages/optical-transfer/client';
 import { triggerFileDownload } from '@/utils/downloadManager';
 import { QRProvider } from '@/context/QRContext';
+import { ChunkConstellation } from '@/components/transfer/ChunkConstellation';
+import { TransferComplete } from '@/components/transfer/TransferComplete';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
+import { playChime, vibrate } from '@/utils/feedback';
 
 /**
  * Formats an ETA in seconds for the telemetry panel.
@@ -46,17 +49,6 @@ function formatEta(seconds: number | null): string {
   if (seconds < 1) return '<1 s';
   if (seconds < 60) return `${Math.ceil(seconds)} s`;
   return `${Math.floor(seconds / 60)} min ${Math.ceil(seconds % 60)} s`;
-}
-
-/**
- * Formats a byte count for the completion summary.
- * @param bytes Size in bytes.
- * @returns For example "812 B", "8.0 KB" or "1.25 MB".
- */
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 /**
@@ -158,6 +150,16 @@ function FileTransferReceiveInner() {
     }
   }, [handleFileUpload]);
 
+  // A short buzz when the file arrives, and a chime only if the person turned sound on.
+  const [soundOn, setSoundOn] = useState(false);
+  useEffect(() => {
+    if (!isComplete) return;
+    vibrate([30, 50, 30]);
+    if (soundOn) playChime();
+    // Fires once per finished transfer; flipping the sound switch afterwards must not replay it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isComplete]);
+
   /** Clears the finished transfer and, in camera mode, starts scanning for the next one. */
   const receiveAnother = useCallback(() => {
     handleClear();
@@ -230,8 +232,7 @@ function FileTransferReceiveInner() {
 
   // Re-calculate statistics
   const receivedCount = chunks.size;
-  const progressPercent = totalChunks ? Math.round((receivedCount / totalChunks) * 100) : 0;
-  const fountainPercent = fountainStats && fountainStats.k > 0 ? Math.round((fountainStats.rank / fountainStats.k) * 100) : 0;
+  const receivedParts = useMemo(() => new Set(chunks.keys()), [chunks]);
 
   return (
     <div className="w-full">
@@ -422,6 +423,8 @@ function FileTransferReceiveInner() {
               </div>
             </section>
 
+            <ToggleSwitch id="receive-sound" label="Play a chime when the file arrives" checked={soundOn} onChange={setSoundOn} />
+
             {/* Beta notice after the primary actions so they stay in the first mobile viewport. */}
             <BetaNotice />
           </>
@@ -440,13 +443,8 @@ function FileTransferReceiveInner() {
               )}
 
               {fountainStats ? (
-                <div className="space-y-3 rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-xs dark:border-slate-900 dark:bg-slate-900/40" data-testid="fountain-telemetry">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-slate-500">Decoded:</span>
-                    <span className="font-mono font-bold text-fg">{fountainPercent}%</span>
-                  </div>
-
-                  <Progress size="sm" label="Decoding rank" value={fountainStats.rank} max={fountainStats.k} />
+                <div className="space-y-4 rounded-xl border border-line-subtle bg-surface-sunken p-4 text-xs" data-testid="fountain-telemetry">
+                  <ChunkConstellation total={fountainStats.k} received={fountainStats.rank} etaSeconds={fountainStats.etaSeconds} formatEta={formatEta} label="Blocks decoded" />
 
                   <dl className="grid grid-cols-2 gap-4 pt-2">
                     <div>
@@ -476,15 +474,8 @@ function FileTransferReceiveInner() {
                   </dl>
                 </div>
               ) : totalChunks !== null ? (
-                <div className="space-y-3 rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-xs dark:border-slate-900 dark:bg-slate-900/40" data-testid="legacy-progress">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-slate-500">Progress:</span>
-                    <span className="font-mono font-bold text-fg">{progressPercent}%</span>
-                  </div>
-
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                    <div className="h-full bg-teal-600 transition-all duration-150" style={{ width: `${progressPercent}%` }} />
-                  </div>
+                <div className="space-y-4 rounded-xl border border-line-subtle bg-surface-sunken p-4 text-xs" data-testid="legacy-progress">
+                  <ChunkConstellation total={totalChunks} received={receivedParts} etaSeconds={null} formatEta={formatEta} label="Parts received" />
 
                   <div className="pt-2">
                     <div className="text-fg-muted">Received</div>
@@ -567,48 +558,17 @@ function FileTransferReceiveInner() {
               {/* Video frame box with targeting guide or dropzone */}
               <div className={`relative w-full overflow-hidden rounded-2xl ${receiverMode === 'camera' && !isScanning && !isComplete ? '' : 'border border-line-subtle bg-slate-950'} ${isComplete ? '' : 'aspect-square'}`}>
                 {isComplete ? (
-                  <div className="flex size-full flex-col items-center justify-center gap-4 bg-slate-900 p-6 text-center text-slate-100 dark:bg-slate-950" data-testid="inline-complete-panel">
-                    <div className="rounded-full bg-emerald-500/10 p-3 text-emerald-400">
-                      <CheckCircle2 className="size-10" aria-hidden="true" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-100">Transfer Complete</h3>
-                      <p className="mt-1 text-xs text-slate-300">
-                        {isFountainComplete
-                          ? 'The file was rebuilt on this device and its SHA-256 checksum matches the sender’s.'
-                          : `All ${totalChunks} parts were received. Your file is ready to download.`}
-                      </p>
-                      {isFountainComplete && handshake && (
-                        <dl className="mt-3 space-y-1 text-left text-xs text-slate-300" data-testid="received-file-summary">
-                          <div className="flex gap-2">
-                            <dt className="text-slate-400">File</dt>
-                            <dd className="min-w-0 truncate font-semibold text-slate-100">{handshake.fileName}</dd>
-                          </div>
-                          <div className="flex gap-2">
-                            <dt className="text-slate-400">Size</dt>
-                            <dd className="font-mono">{formatBytes(reassembledData?.length ?? handshake.fileSize)}</dd>
-                          </div>
-                          <div className="flex gap-2">
-                            <dt className="text-slate-400">SHA-256</dt>
-                            <dd className="font-mono" title={handshake.sha256}>{`${handshake.sha256.slice(0, 12)}…${handshake.sha256.slice(-6)}`}</dd>
-                          </div>
-                        </dl>
-                      )}
-                    </div>
-                    <div className="mt-2 flex flex-wrap justify-center gap-2">
-                      <Button
-                        variant={downloadTriggered ? "outline" : "primary"}
-                        onClick={handleManualDownload}
-                        className="font-semibold shadow-lg shadow-teal-500/20 hover:shadow-teal-500/35"
-                        aria-label={downloadTriggered ? "Download Again" : "Download File"}
-                      >
-                        {downloadTriggered ? "Download Again" : "Download File"}
-                      </Button>
-                      <Button variant="outline" onClick={receiveAnother}>
-                        Receive another file
-                      </Button>
-                    </div>
-                  </div>
+                  <TransferComplete
+                    fileName={handshake?.fileName ?? 'received-file'}
+                    fileSize={reassembledData?.length ?? handshake?.fileSize ?? 0}
+                    mimeType={handshake?.mimeType ?? ''}
+                    sha256={handshake?.sha256}
+                    verified={isFountainComplete}
+                    data={isFountainComplete ? reassembledData : null}
+                    saved={downloadTriggered}
+                    onSave={handleManualDownload}
+                    onReceiveAnother={receiveAnother}
+                  />
                 ) : isScanning || (receiverMode === 'file' && videoFile) ? (
                   <video
                     ref={videoRef}

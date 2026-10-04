@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import React, { Suspense, useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Button, ButtonLink } from "./ui/Button";
 import { Badge } from "./ui/Badge";
 import { Tooltip } from "./ui/Tooltip";
@@ -46,6 +46,12 @@ import { MiniPreview } from './MiniPreview';
 import { getScanVerdict, type ScanFix, type ScanVerdict } from '@/packages/scannability';
 import { GeneratorCommands } from './command/GeneratorCommands';
 import { useUndoToast } from '@/hooks/useUndoToast';
+import { SegmentedControl } from './ui/SegmentedControl';
+import { Skeleton } from './ui/Skeleton';
+import { PREVIEW_VIEWS, type PreviewView } from './mockups/previewViews';
+
+// The "In the wild" scenes, viewing test and PNG export load only when a view other than Flat is chosen.
+const MockupView = React.lazy(() => import('./mockups/MockupView'));
 
 /** One-line promise under every generator heading. */
 const GENERATOR_SUBTITLE = 'No sign-up, no ads, never expires.';
@@ -125,6 +131,8 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   const [gateAction, setGateAction] = useState<(() => void | Promise<void>) | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [previewView, setPreviewView] = useState<PreviewView>('flat');
+  const moduleCount = useQRStoreSelector(s => s.moduleCount);
 
   // Focus preservation refs for originating buttons
   const downloadButtonRef = useRef<HTMLButtonElement>(null);
@@ -467,6 +475,24 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                           <Share2 className="size-5" aria-hidden="true" />
                        </Button>
                      </Tooltip>
+                   )}
+                </div>
+
+                {/* Tertiary, after the export row so the QR and Download stay in the first screen: see the code on a poster, card, table tent, screen or sticker. */}
+                <div className="mt-5 space-y-3" data-testid="in-the-wild">
+                   <p id="preview-view-label" className="text-sm font-semibold text-fg-soft">In the wild</p>
+                   <SegmentedControl<PreviewView>
+                      appearance="tiles"
+                      labelledBy="preview-view-label"
+                      className="grid-cols-3"
+                      options={PREVIEW_VIEWS}
+                      value={previewView}
+                      onChange={setPreviewView}
+                   />
+                   {previewView !== 'flat' && (
+                      <Suspense fallback={<Skeleton className="aspect-4/3 w-full rounded-xl" />}>
+                         <MockupView sourceRef={canvasRef} renderKey={debouncedConfig} config={effectiveConfig} moduleCount={moduleCount} view={previewView} />
+                      </Suspense>
                    )}
                 </div>
 

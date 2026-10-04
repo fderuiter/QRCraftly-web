@@ -36,11 +36,11 @@ interface TransferFile {
   buffer: Buffer;
 }
 
-async function openSender(sender: Page, file: TransferFile, density?: 'Reliable' | 'Balanced' | 'Fast') {
+async function openSender(sender: Page, file: TransferFile, speed?: 'Steady' | 'Balanced' | 'Fast') {
   await sender.goto('/file-transfer');
   await sender.waitForSelector('main[data-hydrated="true"]');
   await sender.getByLabel('Choose a file to send').setInputFiles(file);
-  if (density) await sender.getByRole('radio', { name: density, exact: true }).click();
+  if (speed) await sender.getByRole('radio', { name: speed, exact: true }).click();
   await sender.getByRole('button', { name: 'Start file transfer' }).click();
   await expect(sender.getByRole('button', { name: 'Stop file transfer' })).toBeVisible({ timeout: 20_000 });
 }
@@ -75,7 +75,7 @@ async function expectDownloadedCopy(receiver: Page, file: TransferFile) {
   await expect(summary.getByTitle(sha256)).toBeVisible();
 
   const downloadPromise = receiver.waitForEvent('download');
-  await receiver.getByRole('button', { name: 'Download File' }).click();
+  await receiver.getByRole('button', { name: 'Save', exact: true }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe(file.name);
   const received = await readFile(await download.path());
@@ -111,7 +111,7 @@ test.describe('Optical file transfer', () => {
       await installSyntheticCamera(context);
       const sender = await context.newPage();
       const file = { name: 'notes.bin', mimeType: 'application/octet-stream', buffer: randomBytes(5 * 1024) };
-      await openSender(sender, file, 'Reliable');
+      await openSender(sender, file, 'Steady');
       await openReceiver(receiver);
 
       await relayFrames(sender, receiver, { until: async () => (await blocksDecoded(receiver)) >= 40, timeoutMs: 60_000 });
