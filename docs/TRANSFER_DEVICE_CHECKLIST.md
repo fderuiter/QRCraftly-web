@@ -31,6 +31,17 @@ Run each of these at least once with the 256 KB file:
 - A receiver camera at 30 fps and at 60 fps, where the phone offers both.
 - Glare from a window on the sender's screen.
 
+## Multi-code frames (#1142)
+
+The bench simulates the display and the camera, so these need a phone before the feature leaves its flag:
+
+- Goodput of 2x2 v25 (1080p sender) and 1 x v40 against the bench's rates, with the receiver camera at 30 fps and at 60 fps.
+- Whether the real camera resolves a 4 px module at the distance people hold it, and how many modules of drift per frame the 3-module crop margin survives with a hand-held phone.
+- How often tracking is lost (full searches per minute) in a normal hold.
+- Real decodes per second with the pool the receiver picks, and whether the preview and the sender page keep their frame rate.
+- Torn frames: record the share of tiles that decode on a 60 Hz and a 120 Hz sender, staggered and not.
+- The refresh rate the sender measures, against the display's real rate (power saving can change it mid-transfer).
+
 ## Tiers
 
 | Tier | Target                    |

@@ -27,17 +27,17 @@ Block size 64 bytes. "Frames needed" is the distinct frames that reached the dec
 | clean      | 100   | 100    | 0      | 1.000                      | 1.000 | 1.000 | 1.000              | 0.1 ms               |
 | join       | 100   | 100    | 0      | 1.080                      | 1.320 | 1.480 | 1.080              | 0.7 ms               |
 | loss-10    | 100   | 100    | 0      | 1.060                      | 1.330 | 1.440 | 1.200              | 0.6 ms               |
-| loss-30    | 100   | 100    | 0      | 1.060                      | 1.270 | 1.520 | 1.540              | 0.6 ms               |
+| loss-30    | 100   | 100    | 0      | 1.060                      | 1.270 | 1.520 | 1.540              | 0.7 ms               |
 | burst      | 100   | 100    | 0      | 1.070                      | 1.290 | 1.360 | 1.270              | 0.6 ms               |
 | duplicates | 100   | 100    | 0      | 1.060                      | 1.330 | 1.440 | 1.200              | 0.6 ms               |
-| clean      | 1000  | 30     | 0      | 1.000                      | 1.000 | 1.000 | 1.000              | 0.8 ms               |
-| join       | 1000  | 30     | 0      | 1.050                      | 1.652 | 1.709 | 1.050              | 17.5 ms              |
-| loss-10    | 1000  | 30     | 0      | 1.052                      | 1.512 | 1.529 | 1.156              | 18.0 ms              |
-| loss-30    | 1000  | 30     | 0      | 1.033                      | 1.257 | 1.263 | 1.479              | 25.4 ms              |
-| burst      | 1000  | 30     | 0      | 1.042                      | 1.483 | 1.498 | 1.261              | 20.7 ms              |
-| duplicates | 1000  | 30     | 0      | 1.052                      | 1.512 | 1.529 | 1.156              | 23.3 ms              |
+| clean      | 1000  | 30     | 0      | 1.000                      | 1.000 | 1.000 | 1.000              | 0.7 ms               |
+| join       | 1000  | 30     | 0      | 1.050                      | 1.652 | 1.709 | 1.050              | 18.0 ms              |
+| loss-10    | 1000  | 30     | 0      | 1.052                      | 1.512 | 1.529 | 1.156              | 18.1 ms              |
+| loss-30    | 1000  | 30     | 0      | 1.033                      | 1.257 | 1.263 | 1.479              | 22.4 ms              |
+| burst      | 1000  | 30     | 0      | 1.042                      | 1.483 | 1.498 | 1.261              | 21.4 ms              |
+| duplicates | 1000  | 30     | 0      | 1.052                      | 1.512 | 1.529 | 1.156              | 18.5 ms              |
 | join       | 10000 | 4      | 0      | 1.128                      | 1.194 | 1.194 | 1.128              | 3.2 s                |
-| loss-30    | 10000 | 4      | 0      | 1.132                      | 1.135 | 1.135 | 1.605              | 3.3 s                |
+| loss-30    | 10000 | 4      | 0      | 1.132                      | 1.135 | 1.135 | 1.605              | 3.5 s                |
 
 ## Optical channel simulator
 
@@ -45,59 +45,112 @@ Real QR frames of one droplet each (error correction L), degraded and decoded wi
 
 | Condition       | Frame | Block | Module px | Decoded | Decode time | KB/s at 30 fps | KB/s at 60 fps | Tier at 60 fps |
 | --------------- | ----- | ----- | --------- | ------- | ----------- | -------------- | -------------- | -------------- |
-| ideal           | 720p  | 128 B | 10        | 100%    | 47.3 ms     | 2.5            | 2.5            | below tier 1   |
-| soft-focus      | 720p  | 128 B | 10        | 100%    | 43 ms       | 2.7            | 2.7            | below tier 1   |
-| blurry          | 720p  | 128 B | 10        | 100%    | 56.8 ms     | 2.1            | 2.1            | below tier 1   |
-| grainy          | 720p  | 128 B | 10        | 100%    | 657.4 ms    | 0.2            | 0.2            | below tier 1   |
-| dim-screen      | 720p  | 128 B | 10        | 100%    | 36.6 ms     | 3.2            | 3.2            | below tier 1   |
-| tilted          | 720p  | 128 B | 10        | 0%      | 43.9 ms     | 0              | 0              | below tier 1   |
-| rolling-shutter | 720p  | 128 B | 10        | 100%    | 39.1 ms     | 3              | 3              | below tier 1   |
-| ideal           | 720p  | 256 B | 8         | 100%    | 43.4 ms     | 5.4            | 5.4            | below tier 1   |
-| soft-focus      | 720p  | 256 B | 8         | 100%    | 41.1 ms     | 5.7            | 5.7            | below tier 1   |
-| blurry          | 720p  | 256 B | 8         | 100%    | 45.1 ms     | 5.2            | 5.2            | below tier 1   |
-| grainy          | 720p  | 256 B | 8         | 100%    | 629.2 ms    | 0.4            | 0.4            | below tier 1   |
-| dim-screen      | 720p  | 256 B | 8         | 100%    | 41.3 ms     | 5.6            | 5.6            | below tier 1   |
-| tilted          | 720p  | 256 B | 8         | 0%      | 50.3 ms     | 0              | 0              | below tier 1   |
-| rolling-shutter | 720p  | 256 B | 8         | 100%    | 38.8 ms     | 6              | 6              | below tier 1   |
-| ideal           | 720p  | 512 B | 6         | 100%    | 47 ms       | 9.9            | 9.9            | below tier 1   |
-| soft-focus      | 720p  | 512 B | 6         | 100%    | 55 ms       | 8.5            | 8.5            | below tier 1   |
-| blurry          | 720p  | 512 B | 6         | 100%    | 55.2 ms     | 8.4            | 8.4            | below tier 1   |
-| grainy          | 720p  | 512 B | 6         | 100%    | 630.9 ms    | 0.7            | 0.7            | below tier 1   |
-| dim-screen      | 720p  | 512 B | 6         | 100%    | 48.8 ms     | 9.5            | 9.5            | below tier 1   |
-| tilted          | 720p  | 512 B | 6         | 0%      | 57.8 ms     | 0              | 0              | below tier 1   |
-| rolling-shutter | 720p  | 512 B | 6         | 100%    | 53.5 ms     | 8.7            | 8.7            | below tier 1   |
-| ideal           | 1080p | 128 B | 15        | 100%    | 82.6 ms     | 1.4            | 1.4            | below tier 1   |
-| soft-focus      | 1080p | 128 B | 15        | 100%    | 87.7 ms     | 1.3            | 1.3            | below tier 1   |
-| blurry          | 1080p | 128 B | 15        | 100%    | 91.9 ms     | 1.3            | 1.3            | below tier 1   |
-| grainy          | 1080p | 128 B | 15        | 0%      | 1793.3 ms   | 0              | 0              | below tier 1   |
-| dim-screen      | 1080p | 128 B | 15        | 100%    | 82.5 ms     | 1.4            | 1.4            | below tier 1   |
-| tilted          | 1080p | 128 B | 15        | 0%      | 78.3 ms     | 0              | 0              | below tier 1   |
-| rolling-shutter | 1080p | 128 B | 15        | 100%    | 83.4 ms     | 1.4            | 1.4            | below tier 1   |
-| ideal           | 1080p | 256 B | 12        | 100%    | 79.4 ms     | 2.9            | 2.9            | below tier 1   |
-| soft-focus      | 1080p | 256 B | 12        | 100%    | 86.2 ms     | 2.7            | 2.7            | below tier 1   |
-| blurry          | 1080p | 256 B | 12        | 100%    | 87.5 ms     | 2.7            | 2.7            | below tier 1   |
-| grainy          | 1080p | 256 B | 12        | 88%     | 1709.9 ms   | 0.1            | 0.1            | below tier 1   |
-| dim-screen      | 1080p | 256 B | 12        | 100%    | 85.2 ms     | 2.7            | 2.7            | below tier 1   |
-| tilted          | 1080p | 256 B | 12        | 0%      | 90.6 ms     | 0              | 0              | below tier 1   |
-| rolling-shutter | 1080p | 256 B | 12        | 100%    | 75.8 ms     | 3.1            | 3.1            | below tier 1   |
-| ideal           | 1080p | 512 B | 9         | 100%    | 91 ms       | 5.1            | 5.1            | below tier 1   |
-| soft-focus      | 1080p | 512 B | 9         | 100%    | 99.1 ms     | 4.7            | 4.7            | below tier 1   |
-| blurry          | 1080p | 512 B | 9         | 100%    | 104.3 ms    | 4.5            | 4.5            | below tier 1   |
-| grainy          | 1080p | 512 B | 9         | 100%    | 1703.6 ms   | 0.3            | 0.3            | below tier 1   |
-| dim-screen      | 1080p | 512 B | 9         | 100%    | 105.2 ms    | 4.4            | 4.4            | below tier 1   |
-| tilted          | 1080p | 512 B | 9         | 0%      | 152.2 ms    | 0              | 0              | below tier 1   |
-| rolling-shutter | 1080p | 512 B | 9         | 100%    | 93 ms       | 5              | 5              | below tier 1   |
+| ideal           | 720p  | 128 B | 10        | 100%    | 57 ms       | 2              | 2              | below tier 1   |
+| soft-focus      | 720p  | 128 B | 10        | 100%    | 41.3 ms     | 2.8            | 2.8            | below tier 1   |
+| blurry          | 720p  | 128 B | 10        | 100%    | 49.5 ms     | 2.3            | 2.3            | below tier 1   |
+| grainy          | 720p  | 128 B | 10        | 100%    | 611.5 ms    | 0.2            | 0.2            | below tier 1   |
+| dim-screen      | 720p  | 128 B | 10        | 100%    | 35 ms       | 3.3            | 3.3            | below tier 1   |
+| tilted          | 720p  | 128 B | 10        | 0%      | 40.3 ms     | 0              | 0              | below tier 1   |
+| rolling-shutter | 720p  | 128 B | 10        | 100%    | 36 ms       | 3.2            | 3.2            | below tier 1   |
+| ideal           | 720p  | 256 B | 8         | 100%    | 40.3 ms     | 5.8            | 5.8            | below tier 1   |
+| soft-focus      | 720p  | 256 B | 8         | 100%    | 38.9 ms     | 6              | 6              | below tier 1   |
+| blurry          | 720p  | 256 B | 8         | 100%    | 41.7 ms     | 5.6            | 5.6            | below tier 1   |
+| grainy          | 720p  | 256 B | 8         | 100%    | 566 ms      | 0.4            | 0.4            | below tier 1   |
+| dim-screen      | 720p  | 256 B | 8         | 100%    | 37.5 ms     | 6.2            | 6.2            | below tier 1   |
+| tilted          | 720p  | 256 B | 8         | 0%      | 43 ms       | 0              | 0              | below tier 1   |
+| rolling-shutter | 720p  | 256 B | 8         | 100%    | 37.6 ms     | 6.2            | 6.2            | below tier 1   |
+| ideal           | 720p  | 512 B | 6         | 100%    | 49.1 ms     | 9.5            | 9.5            | below tier 1   |
+| soft-focus      | 720p  | 512 B | 6         | 100%    | 47.5 ms     | 9.8            | 9.8            | below tier 1   |
+| blurry          | 720p  | 512 B | 6         | 100%    | 58.3 ms     | 8              | 8              | below tier 1   |
+| grainy          | 720p  | 512 B | 6         | 100%    | 618.9 ms    | 0.8            | 0.8            | below tier 1   |
+| dim-screen      | 720p  | 512 B | 6         | 100%    | 43.3 ms     | 10.7           | 10.7           | below tier 1   |
+| tilted          | 720p  | 512 B | 6         | 0%      | 53.3 ms     | 0              | 0              | below tier 1   |
+| rolling-shutter | 720p  | 512 B | 6         | 100%    | 45.1 ms     | 10.3           | 10.3           | below tier 1   |
+| ideal           | 1080p | 128 B | 15        | 100%    | 75.1 ms     | 1.5            | 1.5            | below tier 1   |
+| soft-focus      | 1080p | 128 B | 15        | 100%    | 96.1 ms     | 1.2            | 1.2            | below tier 1   |
+| blurry          | 1080p | 128 B | 15        | 100%    | 95.9 ms     | 1.2            | 1.2            | below tier 1   |
+| grainy          | 1080p | 128 B | 15        | 0%      | 1730.6 ms   | 0              | 0              | below tier 1   |
+| dim-screen      | 1080p | 128 B | 15        | 100%    | 81.7 ms     | 1.4            | 1.4            | below tier 1   |
+| tilted          | 1080p | 128 B | 15        | 0%      | 83.9 ms     | 0              | 0              | below tier 1   |
+| rolling-shutter | 1080p | 128 B | 15        | 100%    | 83.5 ms     | 1.4            | 1.4            | below tier 1   |
+| ideal           | 1080p | 256 B | 12        | 100%    | 91.7 ms     | 2.5            | 2.5            | below tier 1   |
+| soft-focus      | 1080p | 256 B | 12        | 100%    | 90.4 ms     | 2.6            | 2.6            | below tier 1   |
+| blurry          | 1080p | 256 B | 12        | 100%    | 97 ms       | 2.4            | 2.4            | below tier 1   |
+| grainy          | 1080p | 256 B | 12        | 88%     | 1697.6 ms   | 0.1            | 0.1            | below tier 1   |
+| dim-screen      | 1080p | 256 B | 12        | 100%    | 79.6 ms     | 2.9            | 2.9            | below tier 1   |
+| tilted          | 1080p | 256 B | 12        | 0%      | 104.8 ms    | 0              | 0              | below tier 1   |
+| rolling-shutter | 1080p | 256 B | 12        | 100%    | 86.4 ms     | 2.7            | 2.7            | below tier 1   |
+| ideal           | 1080p | 512 B | 9         | 100%    | 104.8 ms    | 4.4            | 4.4            | below tier 1   |
+| soft-focus      | 1080p | 512 B | 9         | 100%    | 99.7 ms     | 4.7            | 4.7            | below tier 1   |
+| blurry          | 1080p | 512 B | 9         | 100%    | 107 ms      | 4.3            | 4.3            | below tier 1   |
+| grainy          | 1080p | 512 B | 9         | 100%    | 1692.6 ms   | 0.3            | 0.3            | below tier 1   |
+| dim-screen      | 1080p | 512 B | 9         | 100%    | 86.1 ms     | 5.4            | 5.4            | below tier 1   |
+| tilted          | 1080p | 512 B | 9         | 0%      | 106.6 ms    | 0              | 0              | below tier 1   |
+| rolling-shutter | 1080p | 512 B | 9         | 100%    | 105 ms      | 4.4            | 4.4            | below tier 1   |
 
 ## Time to send
 
-Using the best ideal-condition estimate (9.9 KB/s, 720p, 512 B blocks):
+Using the best ideal-condition estimate (9.5 KB/s, 720p, 512 B blocks):
 
 | File   | Frames at that block size | Time at the estimate |
 | ------ | ------------------------- | -------------------- |
-| 12 KB  | 27                        | 1.2 s                |
-| 256 KB | 564                       | 25.9 s               |
-| 2 MB   | 4506                      | 206.9 s              |
-| 20 MB  | 45056                     | 2068.7 s             |
+| 12 KB  | 27                        | 1.3 s                |
+| 256 KB | 564                       | 26.9 s               |
+| 2 MB   | 4506                      | 215.6 s              |
+| 20 MB  | 45056                     | 2155.8 s             |
+
+## Multi-code frames (#1142)
+
+Several QR codes ("tiles") per frame, error correction L, a 60 Hz display held for 2 refreshes (30 fps) and a camera frame the same size as the screen. Real Prism frames, QR codes, pixels, jsQR decodes, tile tracking, dedup and receiver; simulated display and camera. The camera is sharp, level and in sync with the display (except in the two torn rows), so these rates are an upper bound for the code and the decode chain, not a prediction for a phone. Goodput is file bytes divided by the simulated camera time until the receiver verified the file, manifest and coding overhead included. jsQR reads one code per image, so the full search is a scan over layout hypotheses; one search runs per transfer and tracked frames decode crops only.
+
+| Scenario                                 | Module px | File   | Camera frames | Goodput    | Searches | Tile reads | Dedup dropped | Crop decode (median) |
+| ---------------------------------------- | --------- | ------ | ------------- | ---------- | -------- | ---------- | ------------- | -------------------- |
+| mono 2x2 v25, 1080p, 30 fps              | 4         | 400 KB | 89            | 134.8 KB/s | 1        | 356        | 2             | 37 ms                |
+| 1 x v40, 1080p, 30 fps                   | 5         | 300 KB | 114           | 78.9 KB/s  | 1        | 114        | 0             | 113.4 ms             |
+| 3x2 v20, 1080p, 30 fps                   | 5         | 400 KB | 89            | 134.8 KB/s | 1        | 534        | 3             | 31.5 ms              |
+| 2x2 v20, 720p, 30 fps                    | 3         | 200 KB | 67            | 89.6 KB/s  | 1        | 268        | 2             | 18.7 ms              |
+| mono 2x2 v25, 1080p, 60 fps (hold 1)     | 4         | 400 KB | 88            | 272.7 KB/s | 1        | 352        | 0             | 37.8 ms              |
+| 2x2 v25, torn every frame, staggered     | 4         | 200 KB | 67            | 89.6 KB/s  | 1        | 216        | 6             | 35.8 ms              |
+| 2x2 v25, torn every frame, not staggered | 4         | 200 KB | 88            | 68.2 KB/s  | 1        | 217        | 9             | 35.6 ms              |
+
+### Torn frames
+
+A torn frame shows one picture above a row and the next picture below it. Each row below tears a 1080p frame at 9 rows spread over the codes, at every refresh where something changes, and counts the tiles whose own decode still returns a valid frame of the old or the new picture. "Staggered" changes the two diagonal groups on alternate refreshes; "not staggered" changes every tile together.
+
+| Layout  | Schedule  | Tiles kept, worst case | Tiles kept, mean | Tears tried |
+| ------- | --------- | ---------------------- | ---------------- | ----------- |
+| 2x2-v25 | staggered | 75%                    | 78%              | 72          |
+| 2x2-v25 | together  | 50%                    | 56%              | 36          |
+| 3x2-v20 | staggered | 67%                    | 81%              | 72          |
+| 3x2-v20 | together  | 50%                    | 61%              | 36          |
+| 1xv40   | staggered | 0%                     | 22%              | 36          |
+| 1xv40   | together  | 0%                     | 22%              | 36          |
+
+### Decoder threads
+
+Real worker threads (Node `worker_threads`) each decode one 2x2 v25 tile crop from a 1080p frame with jsQR in a loop. "Main thread lag" is the longest gap in a 16 ms timer on the main thread while they ran. This is this machine, loaded by other work, with 4 logical cores; it says nothing about a phone CPU or a browser UI thread.
+
+| Workers | Crop decodes per second | Main thread lag (max) |
+| ------- | ----------------------- | --------------------- |
+| 1       | 28                      | 1 ms                  |
+| 2       | 58                      | 4 ms                  |
+| 3       | 85                      | 4 ms                  |
+| 4       | 99                      | 6 ms                  |
+
+The shipped reader is zxing-wasm, not jsQR. One thread of it decoded 328 of the same crop per second (the wasm runs with the reader's default options: invert, rotate and downscale tries on). It was measured on one thread only, so the pool rows above are the jsQR scaling and not a zxing pool.
+
+### What this proves and what it does not (#1142)
+
+| Criterion                                                    | Bench result                                                                                                  | Status                                                                                                           |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Mono 2x2 v25, 1080p, 30 fps, at least 100 KB/s               | 134.8 KB/s in the simulation                                                                                  | Met in the simulation only. A real camera, lens and screen are not in it.                                        |
+| 1 x v40 at least 60 KB/s                                     | 78.9 KB/s in the simulation                                                                                   | Met in the simulation only.                                                                                      |
+| Staggered refresh keeps at least 50% of tiles per torn frame | 2x2 v25: worst 75%, mean 78% (together: worst 50%, mean 56%). 3x2 v20: worst 67%.                             | Met for the tiled layouts. A single code (1 x v40) cannot stagger: a tear through it loses it.                   |
+| At least 120 decodes per second without dropping UI frames   | jsQR, 4 threads here: 99 per second. zxing-wasm, 1 thread here: 328 per second. Main thread lag at most 6 ms. | Not shown. The 328 per second is a desktop-class core, not a mid-range phone, and Node has no browser UI thread. |
+| Hold is a whole number of refreshes                          | Unit test with a stepped frame clock (`multicode.test.ts`)                                                    | Met, tested.                                                                                                     |
+| Scanner page behaviour unchanged                             | No scanner file changed; the new code is imported by nothing in the app                                       | Met by construction.                                                                                             |
+
+Not measured at all: a real camera's focus, exposure and rolling shutter; whether a phone resolves 4 px modules; how often tracking is lost with a hand-held phone (the crop margin is 3 modules, so a camera that drifts more than that between frames falls back to a full search); decoding in browser workers on a phone; thermal throttling; and the receiver's capture request and `requestVideoFrameCallback` (not built yet). The 60 fps row assumes a camera that really captures 60 distinct frames per second. The full search here scans layout hypotheses with jsQR because it reads one code per image, so its cost is not the cost of zxing's multi-symbol read. The device list is in [the device checklist](TRANSFER_DEVICE_CHECKLIST.md).
 
 ## Reading these numbers
 
