@@ -36,6 +36,7 @@ import { triggerFileDownload } from '@/utils/downloadManager';
 import { QRProvider } from '@/context/QRContext';
 import { ChunkConstellation } from '@/components/transfer/ChunkConstellation';
 import { TransferComplete } from '@/components/transfer/TransferComplete';
+import { BcUrComplete } from '@/components/transfer/BcUrComplete';
 import { BundleComplete } from '@/components/transfer/BundleComplete';
 import { KeyCodeEntry } from '@/components/transfer/KeyCodeEntry';
 import { LockOnBrackets } from '@/components/transfer/LockOnBrackets';
@@ -92,6 +93,8 @@ function FileTransferReceiveInner() {
     isScanning,
     cameraError,
     lockOn,
+    bcur,
+    bcurProgress,
     videoRef,
     handleClear,
     handleFrame,
@@ -180,12 +183,12 @@ function FileTransferReceiveInner() {
   // A short buzz when the file arrives, and a chime only if the person turned sound on.
   const [soundOn, setSoundOn] = useState(false);
   useEffect(() => {
-    if (!isComplete) return;
+    if (!isComplete && !bcur) return;
     vibrate([30, 50, 30]);
     if (soundOn) playChime();
     // Fires once per finished transfer; flipping the sound switch afterwards must not replay it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isComplete]);
+  }, [isComplete, bcur]);
 
   /** Clears the finished transfer and, in camera mode, starts scanning for the next one. */
   const receiveAnother = useCallback(() => {
@@ -444,6 +447,12 @@ function FileTransferReceiveInner() {
                 </div>
               )}
 
+              {bcurProgress && !bcur && (
+                <p className="rounded-xl border border-line-subtle bg-surface-sunken p-4 text-xs text-fg-muted" role="status" data-testid="bcur-progress">
+                  Reading a wallet-style (BC-UR) stream: {bcurProgress.received} of {bcurProgress.total} parts seen.
+                </p>
+              )}
+
               {announced && !isComplete && (
                 <div className="space-y-2 rounded-xl border border-line-subtle bg-surface-sunken p-4 text-xs" data-testid="manifest-info">
                   <p className="text-fg-muted">The sender is sending</p>
@@ -546,7 +555,9 @@ function FileTransferReceiveInner() {
 
               {/* Video frame box with targeting guide or dropzone */}
               <div ref={viewportRef} className={`relative w-full overflow-hidden rounded-2xl ${receiverMode === 'camera' && !isScanning && !isComplete ? '' : 'border border-line-subtle bg-slate-950'} ${isComplete ? '' : 'aspect-square'}`}>
-                {isComplete && bundle ? (
+                {bcur ? (
+                  <BcUrComplete type={bcur.type} content={bcur.content} onSave={triggerFileDownload} onReceiveAnother={receiveAnother} />
+                ) : isComplete && bundle ? (
                   <BundleComplete
                     files={bundle}
                     onSaveFile={triggerFileDownload}

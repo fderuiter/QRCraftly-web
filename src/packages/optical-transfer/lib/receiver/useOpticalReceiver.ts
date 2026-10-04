@@ -19,6 +19,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQrScanner, type ScanCorners } from '@/packages/optical-scanner/client';
+import type { BcUrDecoder, BcUrResult } from '../../bcur';
 import type { HandshakeInfo } from '../contracts';
 import { isFountainDropletString } from '../fountain/envelope';
 import { FountainRateTracker, type FountainTelemetry } from '../fountain/reassembler';
@@ -121,6 +122,11 @@ export function useOpticalReceiver({
   const [reassembledData, setReassembledData] = useState<Uint8Array | null>(null);
   const [compilationStatus, setCompilationStatus] = useState<string | null>(null);
   const [fountainStats, setFountainStats] = useState<FountainTelemetry | null>(null);
+  // A stream in the real BC-UR format (what wallets show), read next to our own (#1149).
+  const [bcur, setBcur] = useState<BcUrResult | null>(null);
+  const [bcurProgress, setBcurProgress] = useState<{ received: number; total: number } | null>(null);
+  const bcurDecoderRef = useRef<BcUrDecoder | null>(null);
+  const bcurLoadingRef = useRef<Promise<BcUrDecoder> | null>(null);
   /** True while a private transfer is in view and no key code has opened it. */
   const [needsKey, setNeedsKey] = useState(false);
   /** Whether the last key code was readable: null before one was entered. */
@@ -409,6 +415,9 @@ export function useOpticalReceiver({
     setKeyAccepted(null);
     setSwitchOffer(null);
     setBundle(null);
+    setBcur(null);
+    setBcurProgress(null);
+    bcurDecoderRef.current?.reset();
     rateTrackerRef.current.reset();
     setHandshake(null);
     handshakeRef.current = null;
@@ -445,14 +454,33 @@ export function useOpticalReceiver({
   }, [assertIntegrity, deliverFile, failReassembly]);
 
   const handleFrame = useCallback((decodedText: string) => {
-    if (!decodedText || receiverSuccess || isVerifying) return;
+    if (!decodedText || receiverSuccess || isVerifying || bcur) return;
+    // A real BC-UR stream (a wallet's animated QR) is read by its own decoder, loaded on the first
+    // such code so the page does not carry it. Our own `ur:bytes` droplets look the same, so they
+    // also go on to the droplet path below; whichever stream is real completes.
+    if (/^ur:/i.test(decodedText)) {
+      void (bcurLoadingRef.current ??= import('../../bcur').then(({ BcUrDecoder: Decoder }) => new Decoder())).then((decoder) => {
+        bcurDecoderRef.current = decoder;
+        const outcome = decoder.ingest(decodedText);
+        if (outcome.status === 'progress') {
+          setBcurProgress({ received: outcome.received, total: outcome.total });
+        } else if (outcome.status === 'complete') {
+          setBcur(outcome.result);
+          setBcurProgress(null);
+          setIsScanning(false);
+          stopStream();
+        } else if (outcome.status === 'failed') {
+          setReceiverError(outcome.reason);
+        }
+      });
+    }
     // Every other code the camera sees (a poster, a URL) is not part of a transfer.
     if (!isFountainDropletString(decodedText) && !looksLikePrismFrame(decodedText) && !looksLikeKeyQr(decodedText)) return;
     // Frames are always accepted, even after an error: the worker starts a fresh decode, so a
     // failed transfer recovers by simply scanning on.
     rateTrackerRef.current.record(performance.now());
     initWorker().postMessage({ type: 'FOUNTAIN_DROPLET', droplet: decodedText });
-  }, [receiverSuccess, isVerifying, initWorker]);
+  }, [receiverSuccess, isVerifying, bcur, initWorker, stopStream]);
 
   useEffect(() => {
     handleFrameRef.current = handleFrame;
@@ -549,6 +577,10 @@ export function useOpticalReceiver({
     cameraError,
     /** Corners of the code the camera read a moment ago (for the lock-on brackets), or null. */
     lockOn,
+    /** A finished real BC-UR stream (type and content), or null. */
+    bcur,
+    /** Fragments seen of the BC-UR stream being read, or null. */
+    bcurProgress,
     reassembledData,
     videoRef,
     handleClear,

@@ -27,4 +27,4 @@ The density profiles of [ADR 0021](./0021-transfer-density-profiles-and-stream-s
 - More payload per frame, so fewer frames and a shorter transfer at every density. `pnpm run bench:transfer` reports the gain; see [the benchmark report](../TRANSFER_BENCHMARK.md).
 - A sender and a receiver on different releases only interoperate through the one-release `ur:bytes/` receive path.
 - Fields that later work needs (multi-block, encryption, feedback) are reserved in the format, so they do not need another version.
-- BC-UR interoperability is no longer free. An export to `ur:bytes/` for other wallets or tools is tracked separately (#1149).
+- BC-UR interoperability is no longer free. The receiver now reads real BC-UR multipart streams (BCR-2024-001) from wallets next to its own (#1149); sending in that format is still open.

@@ -22,5 +22,5 @@
  * look but use a different mixing schedule.
  */
 export { isBcUr } from './uri';
-export { BcUrDecoder, type BcUrIngest } from './decoder';
+export { BcUrDecoder, type BcUrIngest, type BcUrResult } from './decoder';
 export { BcUrEncoder } from './encoder';
