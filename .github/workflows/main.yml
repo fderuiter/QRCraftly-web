@@ -166,8 +166,8 @@ jobs:
     name: E2E Tests
     needs: build
     runs-on: ubuntu-latest
-    # About 730 tests on one worker take about 19 minutes; the cap leaves room for retries.
-    timeout-minutes: 30
+    # About 1,100 tests on one worker take about 28 minutes (2026-10-04); the cap leaves room for retries.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
