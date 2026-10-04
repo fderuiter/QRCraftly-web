@@ -151,7 +151,6 @@ export class ColourReceiver {
 
   private readTiles(image: RgbaImage, crops: readonly TileCrop[]): boolean {
     const results = crops.map((crop) => {
-      this.followWhite(image, crop.tile);
       let found: Rect | undefined;
       for (const plane of splitChannels(image, crop.rect, this.calibrator.model)) {
         this.counters.colourDecodes += 1;
@@ -162,6 +161,8 @@ export class ColourReceiver {
         this.take(hit.text);
         found ??= { x: hit.rect.x + crop.rect.x, y: hit.rect.y + crop.rect.y, width: hit.rect.width, height: hit.rect.height };
       }
+      // Only a crop that decoded was a tile: on a beacon frame the same box holds part of the beacon.
+      if (found) this.followWhite(image, crop.tile);
       return { tile: crop.tile, ok: found !== undefined, rect: found };
     });
     this.tracker.reportCrops(results);

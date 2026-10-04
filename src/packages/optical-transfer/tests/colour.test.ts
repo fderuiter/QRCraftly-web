@@ -151,6 +151,15 @@ describe('the calibrator follows white balance (#1147)', () => {
     for (const plane of splitChannels(image, null, calibrator.model)) expect(Math.abs(plane.data[0] - 255)).toBeLessThanOrEqual(2);
   });
 
+  it('does not rescale to a sample that is far from white (a box on the wrong thing)', () => {
+    const calibrator = new ColourCalibrator();
+    calibrator.update(patch());
+    // A strip that fell on the grey background, or on the dark modules of a code.
+    expect(calibrator.observeWhite([128, 128, 128])).toBe(false);
+    expect(calibrator.observeWhite([40, 40, 40])).toBe(false);
+    expect(calibrator.rescales).toBe(0);
+  });
+
   it('is only cheaper than a new patch: the model it keeps is the model a patch of that balance gives', () => {
     const rescaled = new ColourCalibrator();
     rescaled.update(patch());

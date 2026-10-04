@@ -56,6 +56,8 @@ export const MIN_CHANNEL_SWING = 40;
 export const MAX_FIT_RESIDUAL = 40;
 /** A channel's white level that moves by more than this many levels counts as white balance drift. */
 export const WHITE_DRIFT_LEVELS = 10;
+/** A quiet-zone white further than this share from the model's is taken for a bad sample (a box on the wrong thing), not for drift. */
+const MAX_WHITE_RESCALE = 0.3;
 /** Smallest ratio of the determinant to the product of the diagonal. Below it the channels are too mixed to separate. */
 const MIN_CONDITION = 0.25;
 
@@ -313,9 +315,11 @@ export class ColourCalibrator {
    * @returns True when the model was rescaled to follow it.
    */
   public observeWhite(white: Rgb): boolean {
-    if (!this.current || whiteShift(this.current.white, white) <= WHITE_DRIFT_LEVELS) return false;
-    const next = rescaleToWhite(this.current, white);
-    if (next === this.current) return false;
+    const model = this.current;
+    if (!model || whiteShift(model.white, white) <= WHITE_DRIFT_LEVELS) return false;
+    if (white.some((level, i) => Math.abs(level - model.white[i]) > MAX_WHITE_RESCALE * model.white[i])) return false;
+    const next = rescaleToWhite(model, white);
+    if (next === model) return false;
     this.current = next;
     this.rescaleCount += 1;
     return true;
