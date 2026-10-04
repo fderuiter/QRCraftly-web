@@ -32,7 +32,39 @@ export const SafeUrlPipeline = {
     'wscript:',
     'mocha:',
     'about:',
+    // OS and application handlers that can launch programs or install software (#1153).
+    'intent:',
+    'itms-services:',
+    'ms-msdt:',
+    'search-ms:',
+    'ms-officecmd:',
+    'jar:',
+    'view-source:',
   ],
+
+  /**
+   * Schemes the Website URL and Meeting types accept: those types exist to link to something a
+   * person opens, so anything outside this list is refused rather than blocklisted.
+   */
+  LINK_SCHEME_ALLOWLIST: new Set([
+    'http',
+    'https',
+    'ftp',
+    'mailto',
+    'tel',
+    'sms',
+    'smsto',
+    'geo',
+    'maps',
+    'zoommtg',
+    'zoomus',
+    'msteams',
+    'webex',
+    'skype',
+    'facetime',
+    'tg',
+    'whatsapp',
+  ]),
 
   decodeHtmlEntities(str: string): string {
     return str.replace(/&#(?:[xX]([0-9a-fA-F]+)|([0-9]+));?/g, (_match, hex, dec) => {
@@ -110,6 +142,18 @@ export const SafeUrlPipeline = {
     if (!match) return false;
     if (url.startsWith('//', match[0].length)) return true;
     return this.OPAQUE_SCHEMES.has(match[1].toLowerCase());
+  },
+
+  /**
+   * Returns the lowercase scheme of a URL that starts with a real one (see {@link hasExplicitScheme}),
+   * or null for scheme-less input such as `example.com`.
+   */
+  getScheme(url: string | undefined): string | null {
+    if (!url) return null;
+    const stripped = url.replace(this.REGEX_URL_UNSAFE_CHARS, '');
+    if (!this.hasExplicitScheme(stripped)) return null;
+    const match = /^([a-z][a-z0-9+.-]*):/i.exec(stripped);
+    return match ? match[1].toLowerCase() : null;
   },
 
   normalize(url: string | undefined): string {

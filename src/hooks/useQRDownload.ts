@@ -21,6 +21,7 @@ import { QRConfig, TemplateStyle, SocialFormat } from '../types';
 import { generateQRSvg, validateSvgScannability } from '@/packages/qr-export';
 import { useCapabilities } from './useCapabilities';
 import { ExportOptions } from '../utils/exportRiskPolicy';
+import { isDangerousUrl } from '../utils/security';
 
 /**
  * Error-like check that also accepts `DOMException`s, which are not `Error` instances in
@@ -41,6 +42,19 @@ const toError = (err: unknown): Error => {
 };
 
 export type { ExportOptions };
+
+/** Shown when an export is refused because the content is a script or data link. */
+export const BLOCKED_EXPORT_MESSAGE = "This code contains a script or data link and can't be exported.";
+
+/**
+ * Hard export block for dangerous content. Unlike the scannability pre-flight it cannot be
+ * bypassed with `allowUnsafe`, and it applies to every format, template and social layout.
+ */
+const blockedExport = (
+  config: QRConfig,
+  format: 'png' | 'jpeg' | 'webp' | 'svg' | 'clipboard' | 'share',
+): ExportStatus | null =>
+  isDangerousUrl(config.value) ? { success: false, format, error: new Error(BLOCKED_EXPORT_MESSAGE) } : null;
 
 /**
  * The export check bundles the jsQR decoder, so it is loaded on demand rather than with the page.
@@ -188,6 +202,8 @@ export function useQRDownload(
    * @param options - Optional export options (e.g. allowUnsafe to bypass scannability pre-flight checks).
    */
   const downloadToDevice = useCallback(async (format: 'png' | 'jpeg' | 'webp', options?: AssetOptions): Promise<ExportStatus> => {
+    const blocked = blockedExport(config, format);
+    if (blocked) return blocked;
     const canvas = qrRef.current?.querySelector('canvas');
     if (canvas) {
       if (!options?.allowUnsafe && !(await validateScannability(canvas))) {
@@ -208,7 +224,7 @@ export function useQRDownload(
       }
     }
     return { success: false, format, error: new Error('Canvas not found') };
-  }, [qrRef, getFilename, validateScannability]);
+  }, [qrRef, config, getFilename, validateScannability]);
 
   /**
    * Handles saving the QR code image, attempting to use the File System Access API
@@ -217,6 +233,8 @@ export function useQRDownload(
    * @param options - Optional export options (e.g. allowUnsafe to bypass scannability pre-flight checks).
    */
   const handleSaveAs = useCallback(async (format: 'png' | 'jpeg' | 'webp', options?: AssetOptions): Promise<ExportStatus> => {
+    const blocked = blockedExport(config, format);
+    if (blocked) return blocked;
     const canvas = qrRef.current?.querySelector('canvas');
     if (!canvas) return { success: false, format, error: new Error('Canvas not found') };
 
@@ -261,7 +279,7 @@ export function useQRDownload(
       // Fallback for browsers that don't support showSaveFilePicker (Safari, Firefox, Mobile)
       return downloadToDevice(format, options);
     }
-  }, [qrRef, getFilename, downloadToDevice, canSaveFilePicker, validateScannability]);
+  }, [qrRef, config, getFilename, downloadToDevice, canSaveFilePicker, validateScannability]);
 
   /**
    * Copies the QR code image directly to the clipboard.
@@ -269,6 +287,8 @@ export function useQRDownload(
    * @returns A boolean indicating if the copy operation was successful.
    */
   const handleCopy = useCallback(async (options?: ExportOptions): Promise<ExportStatus> => {
+    const blocked = blockedExport(config, 'clipboard');
+    if (blocked) return blocked;
     const canvas = qrRef.current?.querySelector('canvas');
     if (!canvas) return { success: false, format: 'clipboard', error: new Error('Canvas not found') };
 
@@ -292,7 +312,7 @@ export function useQRDownload(
       console.warn('Failed to copy to clipboard:', err);
       return { success: false, format: 'clipboard', error: toError(err) };
     }
-  }, [qrRef, validateScannability]);
+  }, [qrRef, config, validateScannability]);
 
   /**
    * Uses the Web Share API to share the QR code image directly to other apps.
@@ -300,6 +320,8 @@ export function useQRDownload(
    * @param options - Optional export options (e.g. allowUnsafe to bypass scannability pre-flight checks).
    */
   const handleShare = useCallback(async (options?: AssetOptions): Promise<ExportStatus> => {
+    const blocked = blockedExport(config, 'share');
+    if (blocked) return blocked;
     const canvas = qrRef.current?.querySelector('canvas');
     if (!canvas) return { success: false, format: 'share', error: new Error('Canvas not found') };
 
@@ -335,7 +357,7 @@ export function useQRDownload(
         }
       }, 'image/png');
     });
-  }, [qrRef, downloadToDevice, canShare, validateScannability, getFilename]);
+  }, [qrRef, config, downloadToDevice, canShare, validateScannability, getFilename]);
 
   /**
    * Generates a vector SVG file from the current QR configuration and triggers
@@ -356,6 +378,8 @@ export function useQRDownload(
   }, [config]);
 
   const handleSaveSvg = useCallback(async (options?: AssetOptions): Promise<ExportStatus> => {
+    const blocked = blockedExport(config, 'svg');
+    if (blocked) return blocked;
     try {
       const built = await buildSvg(options);
       if (!built) return { success: false, format: 'svg', error: new Error('SCAN_VALIDATION_FAILED') };

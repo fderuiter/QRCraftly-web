@@ -18,9 +18,9 @@
 
 import { renderHook, waitFor } from '@testing-library/react';
 import { ToastProvider } from '../components/ui/Toast';
-import { useQRDownload } from './useQRDownload';
+import { useQRDownload, BLOCKED_EXPORT_MESSAGE } from './useQRDownload';
 import { DEFAULT_CONFIG } from '../constants';
-import { QRConfig } from '../types';
+import { QRConfig, QRType, TemplateStyle, SocialFormat } from '../types';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import jsQR from 'jsqr';
 
@@ -666,5 +666,31 @@ describe('useQRDownload', () => {
         expect(appendSpy).toHaveBeenCalled();
       }
     );
+  });
+
+  describe('dangerous content (hard export block)', () => {
+    const dangerous = { ...DEFAULT_CONFIG, type: QRType.TEXT, value: 'javascript:alert(1)' } as QRConfig;
+
+    it.each(['png', 'svg', 'clipboard', 'share'] as const)('refuses %s even with allowUnsafe', async (format) => {
+      const { result } = renderHook(() => useQRDownload(mockQrRef, dangerous), { wrapper: ToastProvider });
+      const status = await result.current.exportAsset(format, { allowUnsafe: true });
+      expect(status.success).toBe(false);
+      expect(status.error?.message).toBe(BLOCKED_EXPORT_MESSAGE);
+      expect(mockCanvas.toDataURL).not.toHaveBeenCalled();
+    });
+
+    it('refuses template and social-format exports, which skip the scannability check', async () => {
+      const templated = { ...dangerous, templateStyle: TemplateStyle.SOLID_FRAME, socialFormat: SocialFormat.STORY_9_16 } as QRConfig;
+      const { result } = renderHook(() => useQRDownload(mockQrRef, templated), { wrapper: ToastProvider });
+      const status = await result.current.exportAsset('png', { allowUnsafe: true, directDownload: true });
+      expect(status.success).toBe(false);
+      expect(status.error?.message).toBe(BLOCKED_EXPORT_MESSAGE);
+    });
+
+    it('still exports ordinary content', async () => {
+      const { result } = renderHook(() => useQRDownload(mockQrRef, DEFAULT_CONFIG as QRConfig), { wrapper: ToastProvider });
+      const status = await result.current.exportAsset('png', { directDownload: true });
+      expect(status.success).toBe(true);
+    });
   });
 });

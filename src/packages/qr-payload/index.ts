@@ -31,6 +31,9 @@ export {
   sanitizeConfig,
 } from './lib/validators';
 
+// Plain-language messages for violation codes
+export { describeViolation } from './lib/violations';
+
 // Type-aware sample fallback payloads
 export {
   getSamplePayload,

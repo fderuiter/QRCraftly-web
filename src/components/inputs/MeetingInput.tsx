@@ -1,5 +1,7 @@
 import React, { useMemo, useEffect, useRef } from "react";
-import { MeetingData } from "../../types";
+import { MeetingData, QRType } from "../../types";
+import { describeViolation } from "@/packages/qr-payload";
+import { findBlockingViolation } from "./linkViolations";
 import { TextField } from "../ui/FormFields";
 import { parseMeetingUrl } from "../../utils/meetingParsers";
 import { FormBlock } from "../ui/FormBlock";
@@ -38,6 +40,8 @@ export const MeetingInput: React.FC<MeetingInputProps> = ({
     }
   }, [parsed.service, data.url]);
 
+  const violation = findBlockingViolation(QRType.MEETING, data);
+
   const serviceLabel =
     parsed.service !== "unknown" ? SERVICE_LABELS[parsed.service] : null;
 
@@ -50,6 +54,7 @@ export const MeetingInput: React.FC<MeetingInputProps> = ({
         placeholder="https://zoom.us/j/... or teams.microsoft.com/..."
         value={data.url}
         onChange={(e) => onChange({ url: e.target.value })}
+        error={violation ? describeViolation(violation) : undefined}
       />
 
       {data.url && parsed.service !== "unknown" && (

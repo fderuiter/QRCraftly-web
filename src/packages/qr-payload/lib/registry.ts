@@ -17,6 +17,7 @@
 */
 
 import { QRType, QRGeneratorContract } from '@/types';
+import { isDangerousUrl } from '@/utils/security';
 import { identifyProtocol, CONTAINMENT_PROFILES } from './protocol';
 import { WifiContract } from './generators/wifi';
 import { EmailContract } from './generators/email';
@@ -145,6 +146,13 @@ export function validatePayload(raw: string, type?: QRType): string[] {
   // Use stateless non-global regex to prevent lastIndex state leakage across validation calls
   if (CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(raw)) {
     violations.push('Payload contains invalid control or zero-width characters');
+  }
+
+  // Every type, not only link types: a Text, Phone or Wi-Fi payload that opens with a script or
+  // data scheme is refused too. The check is the starts-with-after-normalisation rule, so prose
+  // that merely mentions "javascript:" mid-sentence still passes.
+  if (isDangerousUrl(raw)) {
+    violations.push('URI_INJECTION_VIOLATION');
   }
 
   const generator = getGenerator(effectiveType);

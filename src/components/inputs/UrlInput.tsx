@@ -2,7 +2,9 @@ import React from "react";
 import { UrlData } from "../../types";
 import { TextField } from "../ui/FormFields";
 import { normalizeUrl } from "../../utils/url";
-import { isDangerousUrl } from "../../utils/security";
+import { describeViolation } from "@/packages/qr-payload";
+import { QRType } from "../../types";
+import { findBlockingViolation } from "./linkViolations";
 
 /**
  * Properties for the UrlInput component.
@@ -23,9 +25,8 @@ interface UrlInputProps {
  * @returns The rendered UrlInput component.
  */
 export const UrlInput: React.FC<UrlInputProps> = ({ data, onChange }) => {
-  const urlError = data.url && isDangerousUrl(data.url)
-    ? "Unsafe URL scheme or malicious protocol detected."
-    : undefined;
+  const violation = findBlockingViolation(QRType.URL, data);
+  const urlError = violation ? describeViolation(violation) : undefined;
 
   return (
     <div className="space-y-4">

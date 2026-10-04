@@ -30,7 +30,7 @@ import { ExportOptions as DownloadOptions, FORMAT_LABELS, clampSize, type Downlo
 import { usePopoverDismiss } from '@/hooks/usePopoverDismiss';
 import { Modal } from './ui/Modal';
 import { useLeadingDebounce } from '@/hooks/useDebounce';
-import { useQRDownload, ExportStatus, AssetOptions, type ExportFormat } from '@/hooks/useQRDownload';
+import { useQRDownload, BLOCKED_EXPORT_MESSAGE, ExportStatus, AssetOptions, type ExportFormat } from '@/hooks/useQRDownload';
 import { getExportRiskPolicy } from '@/utils/exportRiskPolicy';
 import { useToast } from './ui/Toast';
 import { useScannability } from '@/hooks/useScannability';
@@ -294,6 +294,11 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   const executeWithSafetyGate = (action: (options?: AssetOptions) => void | Promise<void>) => {
     if (isEmpty) {
       notifyEmpty();
+      return;
+    }
+    if (isDangerousUrl(config.value)) {
+      // A script or data link is refused outright: no "Export Anyway" for it.
+      addToast({ type: 'error', message: BLOCKED_EXPORT_MESSAGE, duration: 6000 });
       return;
     }
     if (getExportRiskPolicy({ status: scannabilityStatus, health }) === 'unsafe') {

@@ -17,10 +17,11 @@
 */
 
 import { useState, useRef, useEffect, ElementType } from "react";
-import { QRConfig, QRType, WifiData, VCardData, PaymentData, UrlData } from "../../types";
+import { QRConfig, QRType, WifiData, VCardData, PaymentData, UrlData, MeetingData, TextData } from "../../types";
 import { INPUT_REGISTRY, InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
 import { CONTAINMENT_PROFILES } from "@/packages/qr-payload";
+import { findBlockingViolation } from "./linkViolations";
 
 // `type` selects which member of the data union `data` is, so the casts below follow it.
 const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => {
@@ -45,9 +46,8 @@ const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => 
     if (payment.address && isDangerousUrl(payment.address)) {
       return false;
     }
-  } else if (type === QRType.URL) {
-    const url = data as UrlData;
-    if (url.url && isDangerousUrl(url.url)) {
+  } else if (type === QRType.URL || type === QRType.MEETING || type === QRType.TEXT) {
+    if (findBlockingViolation(type, data as UrlData | MeetingData | TextData)) {
       return false;
     }
   }

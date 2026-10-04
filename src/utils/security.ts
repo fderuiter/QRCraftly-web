@@ -160,6 +160,9 @@ export const validateImageUpload = (file: File): string | null => {
   return null;
 };
 
+/** Prefix of the violation code for a link scheme that is not on the allowlist; the scheme follows it. */
+export const UNSUPPORTED_SCHEME_PREFIX = 'UNSUPPORTED_SCHEME_VIOLATION:';
+
 /**
  * Common URL validation logic for both meeting and URL generators.
  *
@@ -169,8 +172,11 @@ export const validateImageUpload = (file: File): string | null => {
  */
 export const validateUrlAndInject = (raw: string, urlContainmentProfile: RegExp): string[] => {
   const violations: string[] = [];
+  const scheme = SafeUrlPipeline.getScheme(raw);
   if (isDangerousUrl(raw)) {
     violations.push('URI_INJECTION_VIOLATION');
+  } else if (scheme && !SafeUrlPipeline.LINK_SCHEME_ALLOWLIST.has(scheme)) {
+    violations.push(`${UNSUPPORTED_SCHEME_PREFIX}${scheme}`);
   } else if (!urlContainmentProfile.test(raw) && raw.startsWith('http')) {
     violations.push('URL_STRUCTURE_VIOLATION');
   }
