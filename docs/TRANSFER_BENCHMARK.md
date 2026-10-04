@@ -152,6 +152,10 @@ The shipped reader is zxing-wasm, not jsQR. One thread of it decoded 328 of the 
 
 Not measured at all: a real camera's focus, exposure and rolling shutter; whether a phone resolves 4 px modules; how often tracking is lost with a hand-held phone (the crop margin is 3 modules, so a camera that drifts more than that between frames falls back to a full search); decoding in browser workers on a phone; thermal throttling; and the receiver's capture request and `requestVideoFrameCallback` (not built yet). The 60 fps row assumes a camera that really captures 60 distinct frames per second. The full search here scans layout hypotheses with jsQR because it reads one code per image, so its cost is not the cost of zxing's multi-symbol read. The device list is in [the device checklist](TRANSFER_DEVICE_CHECKLIST.md).
 
+## Webcam back channel (#1146)
+
+A simulated back channel (feedback codes from the receiver, a webcam delay and loss) steers the sender up and down the Steady, Balanced and Fast profiles and stops it when every receiver is done. The figures, the model behind them and what they do not show are in [the feedback benchmark](FEEDBACK_BENCHMARK.md); run it with `pnpm run bench:feedback`. It is logic only: the sender's webcam, the receiver's corner code and the camera permission are not built.
+
 ## Reading these numbers
 
 - The coding overhead is the part a better code can improve. It is the "Frames needed" column, and it is the number to compare when a new code lands (#1141).

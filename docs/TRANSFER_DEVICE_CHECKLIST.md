@@ -42,6 +42,19 @@ The bench simulates the display and the camera, so these need a phone before the
 - Torn frames: record the share of tiles that decode on a 60 Hz and a 120 Hz sender, staggered and not.
 - The refresh rate the sender measures, against the display's real rate (power saving can change it mid-transfer).
 
+## Webcam back channel (#1146)
+
+The simulation (`docs/FEEDBACK_BENCHMARK.md`) fixes how a receiver's reads are modelled and gives the back channel a delay and a loss rate. None of that was measured. Before the feature leaves its flag, on a laptop sender and at least two receiver phones:
+
+- Whether the sender's webcam reads the receiver's small corner code at all: distance, angle, glare from the sender's own screen, and the screen brightness of the phone. Record the share of feedback codes read and the delay from the receiver's screen to a decoded report. The simulation assumes 4 refreshes a second, 150 ms and 20% missed.
+- The time from the receiver's "done" to the sender stopping, over at least 10 runs per phone. The target is 1 s at the worst case; the simulation's default channel gave 150 to 400 ms, and it went past 1 s in some runs when a report took 800 ms to decode, when four in five codes were missed, or when the receiver refreshed its code once a second.
+- Whether the receiver's real "frame success rate" and "densest layer" match what the sender needs: how the receiver counts frames it did not see, and how long its reading window should be (the simulation uses 1 s).
+- Whether the controller settles on the profile a person would pick by hand, and how often it probes a profile the phone cannot read (the simulation's probe costs about 6 percent of the goodput of a middle receiver).
+- The camera permission prompt: it must appear only after "Let the receiver steer" is turned on. Check denial, dismissing the prompt, no camera, and unplugging an external webcam mid-transfer, and that each falls back to the one-way stream with the chosen profile.
+- That the sender page keeps its frame rate while the webcam decodes feedback, and that the webcam light goes off when the person turns the option off or the transfer ends.
+- Two receivers at once: that the sender follows the weaker one and does not stop until both show "done".
+- Mixed sessions: the three profiles share one symbol size in the simulation (350 bytes) so a switch keeps one session. The shipped table uses different sizes, so a device run must confirm the shared size does not cost goodput on Steady.
+
 ## Tiers
 
 | Tier | Target                    |
