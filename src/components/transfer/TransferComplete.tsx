@@ -108,6 +108,7 @@ export function TransferComplete({ fileName, fileSize, mimeType: announcedType, 
   const open = () => {
     if (!data) return;
     const url = URL.createObjectURL(new Blob([data as BlobPart], { type: mimeType }));
+    // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
     window.open(url, '_blank', 'noopener');
     window.setTimeout(() => URL.revokeObjectURL(url), OPEN_URL_LIFETIME_MS);
   };

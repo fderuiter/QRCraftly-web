@@ -19,7 +19,7 @@ const DIST_CLIENT_DIR = path.join(__dirname, '../dist/client');
  *   through `blob:` object URLs (#969).
  * - No web-font CDN is used, so no third-party style/font origins are allowed (#970).
  */
-export const BASE_CSP_PATTERN = "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';";
+export const BASE_CSP_PATTERN = "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;";
 
 /**
  * Recursively search for HTML files in a directory.

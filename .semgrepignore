@@ -1,0 +1,2 @@
+# Fixtures that must trip the rules (see `pnpm run test:semgrep`)
+tests/semgrep/

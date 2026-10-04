@@ -44,6 +44,7 @@ import {
 import { QRType } from '@/types';
 import { Button, ButtonLink } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { isDangerousUrl } from '@/utils/security';
 import type { ScanDescription } from './describeScan';
 
 const TYPE_ICONS: Record<QRType, React.ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' }>> = {
@@ -237,7 +238,7 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
           {copyState === 'copied' ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
           {copyState === 'copied' ? 'Copied' : 'Copy'}
         </Button>
-        {link && (
+        {link && !isDangerousUrl(link.href) && (
           <ButtonLink variant="primary" size="sm" href={link.href} target="_blank" rel="noopener noreferrer">
             <Link className="size-4" aria-hidden="true" />
             Open link

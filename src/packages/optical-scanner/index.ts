@@ -6,6 +6,15 @@
 
 export { scanSource as scan } from './lib/sourceExtractor';
 
+/** Size limits for uploaded images: bytes and declared pixels (#1160). */
+export {
+  MAX_IMAGE_BYTES,
+  IMAGE_TOO_LARGE_BYTES_MESSAGE,
+  IMAGE_TOO_LARGE_PIXELS_MESSAGE,
+  readImageSize,
+  assertImageWithinLimits,
+} from './lib/imageLimits';
+
 export {
   createCameraScannerEngine,
   type CameraScannerEngine,

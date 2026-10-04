@@ -20,6 +20,7 @@ import { QRConfig, QRType } from '@/types';
 import {
   REGEX_STRICT_CONTROL_CHARS,
   REGEX_PRESERVE_FORMAT_CONTROL_CHARS,
+  REGEX_BIDI_CONTROL_CHARS,
 } from '@/utils/security';
 import { CONTAINMENT_PROFILES, identifyProtocol } from './protocol';
 import { validatePayload } from './registry';
@@ -37,6 +38,8 @@ export function validateConfig(config: QRConfig): string[] {
   const checkTextSink = (str: string | undefined, field: string) => {
     if (str && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(str)) {
       violations.push(`${field} contains invalid control or zero-width characters`);
+    } else if (str && CONTAINMENT_PROFILES.BIDI_CONTROL.test(str)) {
+      violations.push(`${field} contains hidden text-direction characters`);
     }
   };
 
@@ -61,21 +64,19 @@ export function validateConfig(config: QRConfig): string[] {
  */
 export function sanitizeConfig(config: QRConfig): QRConfig {
   const clean = { ...config };
-  if (clean.borderText) {
-    clean.borderText = clean.borderText.replace(REGEX_STRICT_CONTROL_CHARS, '');
-  }
-  if (clean.templateHeadline) {
-    clean.templateHeadline = clean.templateHeadline.replace(REGEX_STRICT_CONTROL_CHARS, '');
-  }
-  if (clean.templateSubtext) {
-    clean.templateSubtext = clean.templateSubtext.replace(REGEX_STRICT_CONTROL_CHARS, '');
-  }
+  const stripText = (text: string) => text.replace(REGEX_STRICT_CONTROL_CHARS, '').replace(REGEX_BIDI_CONTROL_CHARS, '');
+  if (clean.borderText) clean.borderText = stripText(clean.borderText);
+  if (clean.templateHeadline) clean.templateHeadline = stripText(clean.templateHeadline);
+  if (clean.templateSubtext) clean.templateSubtext = stripText(clean.templateSubtext);
   if (clean.value) {
     const type = clean.type || identifyProtocol(clean.value);
     if (type === QRType.VCARD || type === QRType.EVENT) {
       clean.value = clean.value.replace(REGEX_PRESERVE_FORMAT_CONTROL_CHARS, '');
     } else {
       clean.value = clean.value.replace(REGEX_STRICT_CONTROL_CHARS, '');
+    }
+    if (type === QRType.WIFI || type === QRType.PHONE || type === QRType.SMS) {
+      clean.value = clean.value.replace(REGEX_BIDI_CONTROL_CHARS, '');
     }
   }
   return clean;

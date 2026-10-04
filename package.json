@@ -30,6 +30,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:e2e": "playwright test",
+    "test:semgrep": "semgrep --test --config semgrep.yml tests/semgrep/semgrep.tsx --metrics=off --disable-version-check",
     "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
     "lint": "node scripts/dependency_compliance.js && node scripts/git_lineage_auditor.js && node scripts/storage_privacy_ast_auditor.js && node scripts/path_invariance_auditor.js && node scripts/static-path-tracker.js && pnpm run docs:lint && tsc --noEmit && pnpm run lint:boundaries && eslint . --max-warnings 0 && knip && knip --production --include files && node scripts/contrast_check.js && node scripts/design_token_audit.js && prettier --check . && node scripts/check-duplication.js",
     "lint:boundaries": "depcruise src",

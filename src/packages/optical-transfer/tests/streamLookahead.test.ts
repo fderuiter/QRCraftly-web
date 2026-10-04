@@ -4,6 +4,7 @@ import {
   DANGEROUS_SCHEMES,
   recursiveDecode,
   decodeHtmlEntities,
+  findDangerousScheme,
 } from '../index';
 
 describe('StreamLookahead Decoder Utilities', () => {
@@ -361,5 +362,17 @@ describe('StreamLookaheadReceiver', () => {
         expect(textReceiver.isActiveSession()).toBe(false);
       });
     });
+  });
+});
+
+describe('findDangerousScheme (#1160)', () => {
+  it('flags a frame that starts with a dangerous scheme, through hidden characters', () => {
+    expect(findDangerousScheme('javascript:alert(1)')).toBe('javascript:');
+    expect(findDangerousScheme('  J a v a\tScript:alert(1)')).toBe('javascript:');
+  });
+
+  it('does not flag text that merely contains one', () => {
+    expect(findDangerousScheme('Notes about: javascript: basics')).toBeUndefined();
+    expect(findDangerousScheme('See the file data:2026.csv or about:blank rules')).toBeUndefined();
   });
 });

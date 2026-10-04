@@ -174,7 +174,8 @@ describe('RFC Helper utilities', () => {
       expect(parseEventDateTime('')).toBe('');
 
       // Invalid date formats
-      expect(formatEventDateTime('invalid-date')).toEqual({ value: 'invalid-date' });
+      expect(formatEventDateTime('invalid-date')).toEqual({ value: '' });
+      expect(formatEventDateTime('2026-01-01\nATTENDEE:mailto:x@example.com').value).toBe('');
       expect(parseEventDateTime('not-matching-regex')).toBe('not-matching-regex');
 
       // keyParams without TZID

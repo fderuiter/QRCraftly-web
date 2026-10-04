@@ -223,6 +223,14 @@ export const EventContract: QRGeneratorContract<EventData> = {
       violations.push('EVENT_MISSING_START');
     }
 
+    // 2b. Dates that do not parse are rejected rather than written into DTSTART/DTEND (#1160)
+    const unreadable = [data.startDate, data.endDate].some(
+      (value) => value && value.trim() && formatEventDateTime(value).value === ''
+    );
+    if (unreadable) {
+      violations.push('EVENT_INVALID_DATE_VIOLATION');
+    }
+
     // 3. Check for Chronological Consistency (EVENT_CHRONOLOGICAL_VIOLATION)
     if (data.startDate && data.endDate) {
       const cleanStart = data.startDate.replace(/;TZID=[^;:\s\n]+/i, '');

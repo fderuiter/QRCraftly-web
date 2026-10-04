@@ -88,8 +88,10 @@ describe('Event generator', () => {
       description: '',
     };
     const str = constructEventString(data);
-    expect(str).toContain('DTSTART:');
-    expect(str).toContain('DTEND:');
+    // An unreadable date is left out, never written through as raw text (#1160).
+    expect(str).not.toContain('DTSTART');
+    expect(str).not.toContain('DTEND');
+    expect(str).not.toContain('invalid');
     expect(str).not.toContain('NaN');
   });
 
@@ -152,10 +154,10 @@ describe('Event generator', () => {
       'BEGIN:VEVENT\nSUMMARY:Meeting\nDTSTART:20260501T183000\nDTEND:20260501T193000\nEND:VEVENT';
     expect(EventContract.validate?.(validChronoWithEnd)).toEqual([]);
 
-    // Invalid dates in DTSTART/DTEND (should not trigger chronological violation since they are not valid numbers)
+    // Unreadable dates are rejected, and are not mistaken for a chronology problem (#1160)
     const invalidChronoDates =
       'BEGIN:VEVENT\nSUMMARY:Meeting\nDTSTART:invalid\nDTEND:invalid\nEND:VEVENT';
-    expect(EventContract.validate?.(invalidChronoDates)).toEqual([]);
+    expect(EventContract.validate?.(invalidChronoDates)).toEqual(['EVENT_INVALID_DATE_VIOLATION']);
   });
 
   it('rejects various obfuscated and embedded malicious protocol payloads in location and description', () => {

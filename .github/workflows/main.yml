@@ -19,6 +19,7 @@ on:
       - '.jscpd.json'
       - '.dependency-cruiser.cjs'
       - 'semgrep.yml'
+      - 'tests/semgrep/**'
       - 'requirements.txt'
       - 'playwright.config.ts'
       - 'vite.config.ts'
@@ -127,6 +128,9 @@ jobs:
         run: semgrep ci --config=semgrep.yml --metrics=off --disable-version-check
         env:
           SEMGREP_APP_TOKEN: "" # Local run only
+
+      - name: Test Semgrep rules
+        run: semgrep --test --config semgrep.yml tests/semgrep/semgrep.tsx --metrics=off --disable-version-check
 
   # JOB 3: Unit Tests
   test:

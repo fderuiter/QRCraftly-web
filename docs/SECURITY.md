@@ -89,7 +89,7 @@ To prevent performance bottlenecks during client-side hydration and SPA navigati
 
 To prevent DOM-based Cross-Site Scripting (DOM-XSS) via dynamic anchors and `href` bindings of user-controlled URLs, we enforce strict URL sanitization:
 
-- **Anchor Link Sanitization (`sanitizeHref`)**: Dynamic values destined for anchor `href` attributes are passed through `sanitizeHref` to ensure they only use safe, permitted schemes. This forces all URLs to start with safe, whitelisted prefixes: `http://`, `https://`, or relative paths starting with `/`. Any unsafe schemes (such as `javascript:`, `data:`, or `vbscript:`) are neutralized and fallback to `#`.
+- **Link scheme check (`isDangerousUrl`)**: Every dynamic value destined for an anchor `href`, `window.open`, `location` or `navigate()` call must pass `isDangerousUrl`, which refuses `javascript:`, `data:`, `vbscript:` and the other blocked schemes after decoding obfuscation. Semgrep enforces this (`require-isdangerousurl` in `semgrep.yml`, with fixtures in `tests/semgrep/`). The older `sanitizeHref` helper is gone: it would have let a protocol-relative `//host` address through and nothing used it.
 - **HTML Meta-Character Escaping (`escapeHtml`)**: In addition to scheme enforcement, values rendered as text nodes or embedded inside anchor tag `href` links are escaped. This safely converts characters like `&`, `<`, `>`, `"`, and `'` into their respective HTML entity equivalents (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`), entirely neutralizing DOM reinterpretation risks and ensuring robust DOM-XSS protection.
 
 ## No Server API

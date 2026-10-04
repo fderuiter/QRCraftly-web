@@ -47,6 +47,7 @@ const LINK_CLASSES = 'font-medium text-accent underline-offset-2 hover:underline
  */
 function openInGenerator(scan: ScanDescription) {
   stageGeneratorContent({ type: scan.type, value: scan.text });
+  // nosemgrep: require-isdangerousurl -- an internal route from a fixed table, not scanned text
   void navigate(QR_TYPE_ROUTES[scan.type]);
 }
 

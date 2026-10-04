@@ -27,7 +27,7 @@ import { THEME_INIT_SCRIPT } from '@/utils/theme';
  * Content Security Policy rendered as a meta tag on every page.
  * Kept byte-identical to `BASE_CSP_PATTERN` in `scripts/csp_hash_injector.js`.
  */
-const CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';";
+const CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests;";
 
 /**
  * HeadDefault Component

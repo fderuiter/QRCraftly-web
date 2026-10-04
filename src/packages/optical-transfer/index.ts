@@ -63,7 +63,6 @@ export {
   decodeSessionMessage,
   compressForTransfer,
   decompressTransferPayload,
-  DecompressionLimitError,
   resolveFountainSymbolSize,
   resolveTransferDensity,
   estimateTransferFrames,
@@ -82,8 +81,6 @@ export {
 export {
   MAX_RECEIVE_BYTES,
   MAX_RECEIVE_MESSAGE_BYTES,
-  MAX_VIDEO_UPLOAD_BYTES,
-  formatLimit,
 } from './lib/limits';
 export {
   FountainReassembler,
@@ -99,3 +96,5 @@ export {
   decodeHtmlEntities,
   recursiveDecode,
 } from './lib/streamLookahead';
+
+export { findDangerousScheme } from './lib/receiver/legacyFrames';

@@ -42,6 +42,10 @@ export const CONTAINMENT_PROFILES = {
   PLAIN_TEXT: /^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]*$/,
   // General check for zero-width and control characters in text fields (allowing \t, \n, \r)
   STRICT_NO_CONTROL: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]/,
+  // Text-direction controls (U+061C, U+200E/F, U+202A-202E, U+2066-2069). Real right-to-left text
+  // never needs them, but they let `gpj.exe` read as `exe.jpg`. Refused where they are never
+  // needed (Wi-Fi, phone, SMS, border and template text) and neutralised on display in the scanner.
+  BIDI_CONTROL: /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/,
   PRESERVE_FORMAT_CONTROL: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]/,
 };
 

@@ -18,7 +18,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { QRType } from '@/types';
-import { validatePayload, describeViolation } from '../index';
+import { validatePayload, validateConfig, sanitizeConfig, describeViolation } from '../index';
+import { DEFAULT_CONFIG } from '@/constants';
 import { UNSUPPORTED_SCHEME_PREFIX } from '@/utils/security';
 
 describe('dangerous schemes are refused in every QR type (#1153)', () => {
@@ -82,5 +83,47 @@ describe('describeViolation', () => {
   it('maps known codes and passes unknown ones through', () => {
     expect(describeViolation('URI_INJECTION_VIOLATION')).toMatch(/Unsafe URL scheme/);
     expect(describeViolation('Custom message')).toBe('Custom message');
+  });
+});
+
+describe('event dates (#1160)', () => {
+  const vevent = (start: string) => `BEGIN:VCALENDAR\nBEGIN:VEVENT\nSUMMARY:Launch\nDTSTART:${start}\nEND:VEVENT\nEND:VCALENDAR`;
+
+  it('rejects a date that does not parse instead of passing it through', () => {
+    expect(validatePayload(vevent('not-a-date'), QRType.EVENT)).toContain('EVENT_INVALID_DATE_VIOLATION');
+    expect(describeViolation('EVENT_INVALID_DATE_VIOLATION')).toMatch(/not a valid date/);
+  });
+
+  it('accepts a valid date', () => {
+    expect(validatePayload(vevent('20261003T100000Z'), QRType.EVENT)).not.toContain('EVENT_INVALID_DATE_VIOLATION');
+  });
+});
+
+describe('text-direction controls (#1160)', () => {
+  const rlo = String.fromCharCode(0x202e);
+  const isolate = String.fromCharCode(0x2066);
+  const arabic = String.fromCharCode(0x0645, 0x0631, 0x062d, 0x0628, 0x0627);
+
+  it.each([
+    [QRType.WIFI, `WIFI:T:WPA;S:Cafe${rlo}gpj;P:secret;;`],
+    [QRType.PHONE, `tel:+1555${rlo}0100`],
+    [QRType.SMS, `sms:+1555${isolate}0100?body=Hi`],
+  ])('refuses them in %s payloads', (type, payload) => {
+    expect(validatePayload(payload, type).join(' ')).toMatch(/text-direction/);
+  });
+
+  it('keeps real right-to-left text, and allows the controls where text needs them', () => {
+    expect(validatePayload(`WIFI:T:WPA;S:${arabic};P:secret;;`, QRType.WIFI)).toEqual([]);
+    expect(validatePayload(`${arabic} ${rlo}text`, QRType.TEXT)).toEqual([]);
+  });
+
+  it('refuses them in border and template text, and strips them on sanitising', () => {
+    const config = { ...DEFAULT_CONFIG, borderText: `Scan${rlo}me`, templateHeadline: `Hi${isolate}`, value: 'https://example.com' };
+    expect(validateConfig(config).join(' ')).toMatch(/Border Text contains hidden text-direction/);
+    expect(validateConfig(config).join(' ')).toMatch(/Template Headline contains hidden text-direction/);
+    const clean = sanitizeConfig(config);
+    expect(clean.borderText).toBe('Scanme');
+    expect(clean.templateHeadline).toBe('Hi');
+    expect(sanitizeConfig({ ...config, type: QRType.WIFI, value: `WIFI:S:a${rlo}b;;` }).value).toBe('WIFI:S:ab;;');
   });
 });

@@ -11,6 +11,7 @@ import { dispatchWorkerRequest, whenReaderOffered } from './workerRunner';
 import { decodeImageDataSync } from './decodeSync';
 import { decodeImageAtSizes, FILE_SCAN_MESSAGE, type FileScanRequest } from './imageFile';
 import { getNativeQrDetector, type NativeQrDetector } from './nativeDetector';
+import { assertImageWithinLimits } from './imageLimits';
 
 /** A large photo gets the multi-pass decoder at two sizes; allow a slow phone time for that. */
 const FILE_SCAN_TIMEOUT_MS = 10_000;
@@ -232,6 +233,7 @@ export async function scanSource(source: ScanSource, options: ScanOptions = {}):
       if (!mayBeImage(source)) {
         throw new Error(NOT_AN_IMAGE);
       }
+      await assertImageWithinLimits(source);
       const decoded = await scanImageFile(source, signal);
       if (signal?.aborted) {
         return { status: 'fail', data: null, error: 'ABORTED', durationMs: performance.now() - start };

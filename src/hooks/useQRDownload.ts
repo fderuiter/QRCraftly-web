@@ -214,6 +214,7 @@ export function useQRDownload(
         const link = document.createElement('a');
         const ext = getExtension(format);
         link.download = getFilename(ext, options?.filename);
+        // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
         link.href = url;
         document.body.appendChild(link);
         link.click();
@@ -388,6 +389,7 @@ export function useQRDownload(
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.download = getFilename('svg', options?.filename);
+      // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
       link.href = url;
       document.body.appendChild(link);
       link.click();
@@ -398,7 +400,7 @@ export function useQRDownload(
       console.warn('SVG export failed:', err);
       return { success: false, format: 'svg', error: toError(err) };
     }
-  }, [buildSvg, getFilename]);
+  }, [buildSvg, getFilename, config]);
 
   /**
    * Copies the SVG markup to the clipboard as text, for pasting into design tools or code.

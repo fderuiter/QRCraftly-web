@@ -111,12 +111,14 @@ export function decodeChunkText(base64: string): string {
 }
 
 /**
- * Finds a dangerous URI scheme in a single decoded frame, ignoring control and zero-width characters.
+ * Finds a dangerous URI scheme at the start of a single decoded frame, ignoring control and
+ * zero-width characters. Only the start counts: the text is shown or copied, never navigated to, so
+ * a name or sentence that merely contains `about:` is not an attack (#1160).
  * @returns The matched scheme, or undefined.
  */
 export function findDangerousScheme(text: string): string | undefined {
   const cleanText = text.replace(/[\x00-\x1F\x7F-\x9F\s\u200B-\u200D\uFEFF]+/g, '').toLowerCase();
-  return DANGEROUS_SCHEMES.find(scheme => cleanText.includes(scheme));
+  return DANGEROUS_SCHEMES.find(scheme => cleanText.startsWith(scheme));
 }
 
 /**

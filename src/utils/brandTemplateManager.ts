@@ -312,6 +312,7 @@ export function exportTemplateToJson(template: BrandTemplate): void {
   const fileName = `${slug}.qrcraftly.json`;
 
   const link = document.createElement('a');
+  // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
   link.href = url;
   link.download = fileName;
   document.body.appendChild(link);

@@ -49,6 +49,7 @@ export const safeJsonLdStringify = (data: unknown): string => {
  */
 export const REGEX_STRICT_CONTROL_CHARS = /[\x00-\x1F\x7F-\x9F]+/g;
 export const REGEX_PRESERVE_FORMAT_CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g;
+export const REGEX_BIDI_CONTROL_CHARS = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
 const REGEX_PHONE_STRIP = /[^0-9+*#\-().]/g;
 const REGEX_PHONE_STRIP_PRESERVE = /[^0-9+*#\-().;,]/g;
 const REGEX_SOCIAL_HANDLE_STRIP = /[^a-zA-Z0-9_.\-]/g;
@@ -62,27 +63,6 @@ const REGEX_SOCIAL_HANDLE_STRIP = /[^a-zA-Z0-9_.\-]/g;
  */
 export const isDangerousUrl = (url: string | undefined): boolean => {
   return SafeUrlPipeline.isDangerous(url);
-};
-
-/**
- * Safely sanitizes a URL string for use in an anchor href attribute.
- * Prevents DOM-based XSS (e.g., javascript:, data:, vbscript: protocols) by enforcing
- * safe prefixes (http://, https://, or relative paths starting with /).
- *
- * @param url The input URL string.
- * @returns A safe, sanitized URL string, or '#' if unsafe/invalid.
- */
-export const sanitizeHref = (url: string | undefined): string => {
-  if (!url) return '#';
-  const trimmed = url.trim();
-  if (
-    trimmed.startsWith('http://') ||
-    trimmed.startsWith('https://') ||
-    trimmed.startsWith('/')
-  ) {
-    return escapeHtml(trimmed);
-  }
-  return '#';
 };
 
 /**

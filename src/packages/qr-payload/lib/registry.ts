@@ -148,6 +148,14 @@ export function validatePayload(raw: string, type?: QRType): string[] {
     violations.push('Payload contains invalid control or zero-width characters');
   }
 
+  // Text-direction controls are refused where real text never needs them (#1160).
+  if (
+    (effectiveType === QRType.WIFI || effectiveType === QRType.PHONE || effectiveType === QRType.SMS) &&
+    CONTAINMENT_PROFILES.BIDI_CONTROL.test(raw)
+  ) {
+    violations.push('Payload contains hidden text-direction characters');
+  }
+
   // Every type, not only link types: a Text, Phone or Wi-Fi payload that opens with a script or
   // data scheme is refused too. The check is the starts-with-after-normalisation rule, so prose
   // that merely mentions "javascript:" mid-sentence still passes.
