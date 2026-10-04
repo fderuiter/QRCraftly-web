@@ -213,8 +213,8 @@ function drawScene(ctx: CanvasRenderingContext2D, s: Scene) {
  * @param props - Mode properties.
  * @returns The blaster.
  */
-export function BlasterMode({ target, settings, announce }: ModeProps) {
-  const matrix = useMemo(() => buildTargetMatrix(target.payload, target.ecc), [target.payload, target.ecc]);
+export function BlasterMode({ target, encoder, settings, announce }: ModeProps) {
+  const matrix = useMemo(() => buildTargetMatrix(target.payload, target.ecc, encoder), [target.payload, target.ecc, encoder]);
   const grid = useMemo(() => new MicroGrid(matrix), [matrix]);
   const [weapon, setWeapon] = useState<BlasterWeaponId>('plasma');
   const [autoFire, setAutoFire] = useState(false);

@@ -42,7 +42,7 @@ import { getLuminanceFromRgb } from '@/utils/colorUtils';
 import { DEFAULT_CONFIG } from '@/constants';
 import { SvgContext } from '@/packages/qr-export';
 import jsQR from 'jsqr';
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import type { QRConfig, QRModules, QRErrorCorrectionLevel } from '@/types';
 
 /** Encodes a payload with the real `qrcode` encoder. */

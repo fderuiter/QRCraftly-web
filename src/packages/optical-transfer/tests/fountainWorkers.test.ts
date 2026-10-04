@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
-import QRCode from 'qrcode';
+import type { QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
 import {
   PrismStream,
   createPrng,
@@ -43,6 +43,8 @@ const globalScope = globalThis as unknown as {
 
 let sliceHandler: Handler;
 let reassemblyHandler: Handler;
+/** The encoder instance the slice worker loaded, so its frames can be observed. */
+let QRCode: QrSymbolEncoder;
 let posted: Posted[] = [];
 let qrCalls: Array<{ text: string; ecc: string | undefined; version: number }> = [];
 
@@ -103,6 +105,7 @@ describe('Fountain sender and receiver workers', () => {
     vi.resetModules();
     await import('../worker-slice');
     sliceHandler = globalScope.onmessage as Handler;
+    QRCode = await (await import('@/packages/qr-matrix/encoder')).loadQrEncoder();
     vi.resetModules();
     await import('../worker-reassembly');
     reassemblyHandler = globalScope.onmessage as Handler;

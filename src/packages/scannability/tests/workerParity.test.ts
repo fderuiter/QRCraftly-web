@@ -5,7 +5,7 @@
  * frames (including a dangerous-URL payload) must produce identical results on both paths.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { performScannabilityCheck, type PixelFrame } from '../checker';
 
 /** Rasterizes a QR code into RGBA pixels (black on white, 4-module quiet zone). */

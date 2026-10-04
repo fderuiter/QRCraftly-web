@@ -1,6 +1,6 @@
 /*
     QRCraftly
-    Copyright (C) 2026 fderuiter
+    Copyright (C) 2025-2026 fderuiter
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,27 +17,26 @@
 */
 
 /**
- * Opt-in fake for the `qrcode` package, for tests that assert canvas geometry
- * against a known matrix instead of a real QR code.
+ * Opt-in fake QR encoder, for tests that assert canvas geometry against a known
+ * matrix instead of a real QR code.
  *
  * Usage in a test file:
  *
- *   vi.mock('qrcode', async () => (await import('../../tests/fixtures/fakeQrcode')).createFakeQrcodeModule());
- *   import QRCode from 'qrcode';
- *   useQrcodeAsCanvasEncoder(QRCode);
+ *   const QRCode = createFakeQrEncoder();
+ *   useCanvasEncoder(QRCode);
  */
 import { afterEach, beforeEach, vi } from 'vitest';
-import { fromQrcodePackage } from '../../src/packages/qr-matrix';
+import type { QrEncoder } from '../../src/packages/qr-matrix';
 import { setQrCanvasRuntime } from '../../src/utils/qrCanvasRuntime';
 
 const FAKE_SIZE = 21;
 
 /**
- * Builds a module shaped like `qrcode`: `create` returns a 21x21 matrix with two dark modules
+ * Builds an encoder whose `create` returns a 21x21 matrix with two dark modules
  * at (0, 0) and (10, 10). Tests override `create` or `modules.get` per case.
  */
-export function createFakeQrcodeModule() {
-  const create = vi.fn((value: string) => {
+export function createFakeQrEncoder() {
+  const create = vi.fn((value: string, _options?: unknown) => {
     if (!value) throw new Error('Value is required');
     return {
       modules: {
@@ -47,18 +46,15 @@ export function createFakeQrcodeModule() {
       },
     };
   });
-  const toCanvas = vi.fn().mockResolvedValue(undefined);
-  const toDataURL = vi.fn().mockResolvedValue('data:image/png;base64,mock');
-  return { create, toCanvas, toDataURL, default: { create, toCanvas, toDataURL } };
+  return { create };
 }
 
 /**
- * Makes `QRCanvas` encode with the given (usually mocked) `qrcode` module for every test in the file.
+ * Makes `QRCanvas` encode with the given encoder (usually a fake) for every test in the file.
  */
-export function useQrcodeAsCanvasEncoder(qrcode: Parameters<typeof fromQrcodePackage>[0]): void {
+export function useCanvasEncoder(encoder: QrEncoder): void {
   let restore: (() => void) | null = null;
   beforeEach(() => {
-    const encoder = fromQrcodePackage(qrcode);
     restore = setQrCanvasRuntime({ loadEncoder: () => encoder });
   });
   afterEach(() => {

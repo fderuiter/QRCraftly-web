@@ -7,7 +7,7 @@ import { TargetSettings } from '../src/components/arcade/TargetSettings';
 import type { ArcadeTarget } from '../src/packages/arcade/handoff';
 import { drawQRInternal } from '../src/utils/qrRenderer';
 import * as scannabilityChecker from '@/packages/scannability/checker';
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from './fixtures/qrEncoder';
 
 describe('Style-Adaptive Maze Clearance and Masking Suite', () => {
   const baseConfig: QRConfig = {

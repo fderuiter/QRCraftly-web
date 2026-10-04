@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//! Shared maths for every QRCraftly WebAssembly module (#1182).
+//! Shared maths for every QRCraftly WebAssembly module (#1182): GF(256),
+//! Reed-Solomon encoding, CRC-32 and the module allocator.
 //!
 //! `no_std` plus nothing else: integer arithmetic only, so every browser and
 //! every device computes the same bytes. Feature crates depend on this one and
@@ -28,6 +29,7 @@
 pub mod abi;
 pub mod crc32;
 pub mod gf256;
+pub mod reed_solomon;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;

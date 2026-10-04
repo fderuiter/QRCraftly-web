@@ -24,6 +24,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { SimulatorMode } from './SimulatorMode';
 import { TargetSettings } from './TargetSettings';
 import { useArcadeTarget } from './useArcadeTarget';
+import { useQrEncoder } from '@/hooks/useQrEncoder';
 
 const PANEL_ID = 'arcade-mode-panel';
 const tabId = (mode: ArcadeMode) => `arcade-tab-${mode}`;
@@ -61,6 +62,7 @@ function useModeParam(): [ArcadeMode, (mode: ArcadeMode) => void] {
 export function ArcadeApp() {
   const [mode, setMode] = useModeParam();
   const { target, updateTarget, resetToGenerator, hasGeneratorDesign } = useArcadeTarget();
+  const encoder = useQrEncoder();
   const [announcement, setAnnouncement] = useState('');
   const announce = useCallback((message: string) => setAnnouncement(message), []);
 
@@ -112,10 +114,14 @@ export function ArcadeApp() {
 
       <div id={PANEL_ID} role="tabpanel" aria-labelledby={tabId(mode)}>
         <p className="sr-only">{activeMode.description}</p>
-        {mode === 'blaster' ? (
-          <BlasterMode target={target} settings={settings} announce={announce} />
+        {!encoder ? (
+          <p className="py-16 text-center text-sm text-fg-muted" data-testid="arcade-loading">
+            Loading the target…
+          </p>
+        ) : mode === 'blaster' ? (
+          <BlasterMode target={target} encoder={encoder} settings={settings} announce={announce} />
         ) : (
-          <SimulatorMode target={target} settings={settings} announce={announce} />
+          <SimulatorMode target={target} encoder={encoder} settings={settings} announce={announce} />
         )}
       </div>
 

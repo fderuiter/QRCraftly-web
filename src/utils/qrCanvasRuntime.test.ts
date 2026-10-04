@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import QRCode from 'qrcode';
-import { fromQrcodePackage, type QrEncoder } from '@/packages/qr-matrix';
+import { type QrEncoder } from '@/packages/qr-matrix';
+import { qrEncoder } from '../../tests/fixtures/qrEncoder';
 import { getQrCanvasRuntime, setQrCanvasRuntime } from './qrCanvasRuntime';
 import { QRErrorCorrectionLevel } from '../types';
 
@@ -11,7 +11,7 @@ describe('qrCanvasRuntime', () => {
     expect(runtime.createMazeWorker()).toBeNull();
   });
 
-  it('loads the real qrcode encoder asynchronously by default', async () => {
+  it('loads the real encoder', async () => {
     const encoder = await getQrCanvasRuntime().loadEncoder();
     const { modules } = encoder.create('https://qrcraftly.com', { errorCorrectionLevel: QRErrorCorrectionLevel.M });
     expect(modules.size).toBeGreaterThanOrEqual(21);
@@ -19,9 +19,8 @@ describe('qrCanvasRuntime', () => {
     expect(modules.get(0, 0)).toBe(true);
   });
 
-  it('adapts qrcode modules to booleans', () => {
-    const encoder = fromQrcodePackage(QRCode);
-    const { modules } = encoder.create('hello', { errorCorrectionLevel: QRErrorCorrectionLevel.L });
+  it('reports modules as booleans', () => {
+    const { modules } = qrEncoder.create('hello', { errorCorrectionLevel: QRErrorCorrectionLevel.L });
     for (let c = 0; c < modules.size; c++) {
       expect(typeof modules.get(0, c)).toBe('boolean');
     }

@@ -18,6 +18,7 @@
 
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
+import type { QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
 import { createPrng, parseKeyCode, sha256Hex } from '../index';
 
 type Handler = (event: { data: unknown }) => Promise<void> | void;
@@ -31,6 +32,8 @@ const globalScope = globalThis as unknown as {
 
 let sliceHandler: Handler;
 let reassemblyHandler: Handler;
+/** The encoder instance the slice worker loaded, so its frames can be observed. */
+let sliceEncoder: QrSymbolEncoder;
 let posted: Posted[] = [];
 
 function randomBytes(length: number, seed: number): Uint8Array {
@@ -72,20 +75,20 @@ describe('private and multi-file transfer workers', () => {
     vi.resetModules();
     await import('../worker-slice');
     sliceHandler = globalScope.onmessage as Handler;
+    sliceEncoder = await (await import('@/packages/qr-matrix/encoder')).loadQrEncoder();
     vi.resetModules();
     await import('../worker-reassembly');
     reassemblyHandler = globalScope.onmessage as Handler;
   });
 
-  beforeEach(async () => {
+  beforeEach(() => {
     posted = [];
     frameTexts = [];
     globalScope.postMessage = (message: Posted) => {
       posted.push(message);
     };
-    const QRCode = (await import('qrcode')).default;
-    const original = QRCode.create.bind(QRCode);
-    vi.spyOn(QRCode, 'create').mockImplementation((text, options) => {
+    const original = sliceEncoder.create.bind(sliceEncoder);
+    vi.spyOn(sliceEncoder, 'create').mockImplementation((text, options) => {
       frameTexts.push(String(text));
       return original(text, options);
     });

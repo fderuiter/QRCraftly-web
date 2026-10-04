@@ -30,25 +30,6 @@ export interface QrEncoder {
 export type MatrixSource = Pick<QRConfig, 'type' | 'value' | 'errorCorrectionLevel'>;
 
 /**
- * Adapts the `qrcode` package, whose modules report 0 or 1, to the boolean `QRModules` contract.
- */
-export function fromQrcodePackage(qrcode: Pick<typeof import('qrcode'), 'create'>): QrEncoder {
-  return {
-    create: (value, options) => {
-      const { modules } = qrcode.create(value, options);
-      return { modules: { size: modules.size, get: (row, col) => Boolean(modules.get(row, col)) } };
-    },
-  };
-}
-
-/**
- * Loads the `qrcode` encoder lazily, so it stays out of the main bundle.
- */
-export function loadQrEncoder(): Promise<QrEncoder> {
-  return import('qrcode').then((mod) => fromQrcodePackage(mod.default ?? mod));
-}
-
-/**
  * Returns the exact string that gets encoded: URL payloads are normalized first
  * (for example `example.com` becomes `https://example.com`), everything else is unchanged.
  */
@@ -62,7 +43,7 @@ export function resolveEncodedValue(source: Pick<QRConfig, 'type' | 'value'>): s
  * configuration into modules, so the canvas, workers, animations and SVG export all encode
  * the same string.
  * @param source The payload type, value and error correction level.
- * @param encoder The encoder to use; callers load it with `loadQrEncoder` or inject a fake.
+ * @param encoder The encoder to use; callers load it with `loadQrEncoder` (./encoder) or inject a fake.
  * @throws When the encoder rejects the value (for example an empty or oversized payload).
  */
 export function buildMatrix(source: MatrixSource, encoder: QrEncoder): QRModules {

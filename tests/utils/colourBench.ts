@@ -30,7 +30,7 @@
  * thread; goodput is on the simulated camera clock and so assumes the decoder keeps up with the camera.
  */
 import jsQR from 'jsqr';
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from '../fixtures/qrEncoder';
 import {
   COLOUR_PROFILE,
   ColourReceiver,

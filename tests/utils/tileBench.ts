@@ -26,7 +26,7 @@
  * the display, apart from the tear scenario. Decode times are this machine's, one thread.
  */
 import jsQR from 'jsqr';
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from '../fixtures/qrEncoder';
 import {
   PrismReceiver,
   PrismStream,

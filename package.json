@@ -48,6 +48,7 @@
     "check-bundle-size": "node scripts/check-bundle-size.js",
     "bench:scanner": "tsx scripts/bench_scanner.ts",
     "bench:wasm": "tsx scripts/bench_wasm.ts",
+    "bench:qr-encode": "tsx scripts/bench_qr_encode.ts",
     "bench:transfer": "tsx scripts/bench_transfer.ts",
     "bench:outer-code": "tsx scripts/bench_outer_code.ts",
     "bench:colour": "tsx scripts/bench_colour.ts",
@@ -69,7 +70,6 @@
   "dependencies": {
     "jsqr": "^1.4.0",
     "lucide-react": "^1.31.0",
-    "qrcode": "^1.5.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "vike": "^0.4.247",
@@ -86,7 +86,6 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.4",
     "@types/node": "^22.20.4",
-    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^5.0.0",

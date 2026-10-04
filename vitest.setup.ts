@@ -22,8 +22,7 @@ import { terminateScannerWorker } from './src/packages/optical-scanner/scheduler
 import * as matchers from 'vitest-axe/matchers';
 import { vi, afterEach, expect } from 'vitest';
 import { InThreadWorker, assertStructuredCloneable } from './tests/utils/inThreadWorker';
-import QRCode from 'qrcode';
-import { fromQrcodePackage } from './src/packages/qr-matrix';
+import { qrEncoder } from './tests/fixtures/qrEncoder';
 import { setQrCanvasRuntime } from './src/utils/qrCanvasRuntime';
 
 
@@ -779,14 +778,14 @@ if (typeof URL.revokeObjectURL === 'undefined') {
 
 // ---------------------------------------------------------------------------
 // QRCanvas runtime: jsdom has no real Web Workers, so the canvas encodes with the
-// real `qrcode` package and builds mazes on the main thread. Tests that need a
-// fake encoder inject one locally with setQrCanvasRuntime.
+// real encoder (loaded synchronously from src/wasm/) and builds mazes on the main
+// thread. Tests that need a fake encoder inject one locally with setQrCanvasRuntime.
 // ---------------------------------------------------------------------------
 
 setQrCanvasRuntime({
   createMatrixWorker: () => null,
   createMazeWorker: () => null,
-  loadEncoder: () => fromQrcodePackage(QRCode),
+  loadEncoder: () => qrEncoder,
 });
 
 const originalImage = window.Image;

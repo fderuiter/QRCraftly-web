@@ -29,8 +29,10 @@ import {
   compileWasmBytes,
   compileWasmUrl,
   instantiateWasm,
+  instantiateWasmSync,
   resolveSameOrigin,
 } from '../index';
+import { pathToFileURL } from 'url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const selftestBytes = new Uint8Array(fs.readFileSync(path.resolve(here, '../../../wasm/selftest.wasm')));
@@ -153,7 +155,7 @@ describe('fetching modules', () => {
       .mockResolvedValueOnce(new Response('missing', { status: 404 }))
       .mockResolvedValueOnce(wasmResponse('application/wasm'));
     await expect(compileWasmUrl('/assets/selftest.wasm', { base: ORIGIN, fetchImpl })).rejects.toMatchObject({
-      kind: 'fetch',
+      kind: 'load',
     });
     await expect(compileWasmUrl('/assets/selftest.wasm', { base: ORIGIN, fetchImpl })).resolves.toBeInstanceOf(
       WebAssembly.Module,
@@ -167,5 +169,30 @@ describe('fetching modules', () => {
     await expect(compileWasmUrl('/assets/bad.wasm', { base: ORIGIN, fetchImpl })).rejects.toMatchObject({
       kind: 'compile',
     });
+  });
+
+  it('names the data-too-long status', () => {
+    expect(() => checkStatus(WASM_STATUS.DATA_TOO_LONG, 'qr_encode')).toThrow('qr_encode failed: data too long.');
+  });
+
+  it('instantiates synchronously for workers and Node, refusing imports', () => {
+    const instance = instantiateWasmSync(new WebAssembly.Module(selftestBytes));
+    expect(instance.fn('abi_version')()).toBe(ABI_VERSION);
+    expect(() => instantiateWasmSync(new WebAssembly.Module(IMPORTING_MODULE))).toThrow(WasmModuleError);
+  });
+
+  it('reads a file: URL from disk under Node, once, without fetching', async () => {
+    const fetchImpl = vi.fn();
+    const url = pathToFileURL(path.resolve(here, '../../../wasm/selftest.wasm'));
+    const module = await compileWasmUrl(url, { fetchImpl });
+    expect(await compileWasmUrl(url.href, { fetchImpl })).toBe(module);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect((await instantiateWasm(module)).fn('abi_version')()).toBe(ABI_VERSION);
+  });
+
+  it('reports a missing file and does not cache the failure', async () => {
+    const url = pathToFileURL(path.resolve(here, 'missing.wasm'));
+    await expect(compileWasmUrl(url)).rejects.toThrow();
+    await expect(compileWasmUrl(url)).rejects.toThrow();
   });
 });

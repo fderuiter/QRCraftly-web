@@ -28,15 +28,12 @@ import {
   QRType,
   QRConfig,
 } from '../types';
-import QRCode from 'qrcode';
-import { useQrcodeAsCanvasEncoder } from '../../tests/fixtures/fakeQrcode';
+import { createFakeQrEncoder, useCanvasEncoder } from '../../tests/fixtures/fakeQrEncoder';
+import { qrEncoder } from '../../tests/fixtures/qrEncoder';
 import { setQrCanvasRuntime } from '../utils/qrCanvasRuntime';
 import React from 'react';
 
-vi.mock('qrcode', async () => (await import('../../tests/fixtures/fakeQrcode')).createFakeQrcodeModule());
-
-/** The real encoder, for the border specs that render a genuine QR code instead of the fake 21x21 matrix. */
-const realQrcode = await vi.importActual<typeof import('qrcode')>('qrcode');
+const QRCode = createFakeQrEncoder();
 
 /**
  * getContext is already a mock from vitest.setup.ts, so `vi.spyOn` in the specs below reuses it and
@@ -98,7 +95,7 @@ function stubWindowImage(onCreate?: (image: object) => void) {
 }
 
 describe('QRCanvas Component', () => {
-  useQrcodeAsCanvasEncoder(QRCode);
+  useCanvasEncoder(QRCode);
 
   let mockContext: any;
   let mockModules: any;
@@ -636,7 +633,7 @@ describe('QRCanvas Component', () => {
 });
 
 describe('QRCanvas Rendering Logic Extended', () => {
-  useQrcodeAsCanvasEncoder(QRCode);
+  useCanvasEncoder(QRCode);
 
   let mockContext: any;
   let mockModules: any;
@@ -805,7 +802,7 @@ describe('QRCanvas Rendering Logic Extended', () => {
 });
 
 describe('QRCanvas Batch Rendering', () => {
-  useQrcodeAsCanvasEncoder(QRCode);
+  useCanvasEncoder(QRCode);
 
   let mockContext: any;
   let mockModules: any;
@@ -904,7 +901,7 @@ describe('QRCanvas Batch Rendering', () => {
 });
 
 describe('QRCanvas Circuit Style Bug', () => {
-  useQrcodeAsCanvasEncoder(QRCode);
+  useCanvasEncoder(QRCode);
 
   let mockModules: any;
 
@@ -1027,7 +1024,7 @@ describe('QRCanvas Circuit Style Bug', () => {
 });
 
 describe('QRCanvas Circuit Style Eye Bracket Bug', () => {
-  useQrcodeAsCanvasEncoder(QRCode);
+  useCanvasEncoder(QRCode);
 
   let mockContext: any;
   let mockModules: any;
@@ -1101,7 +1098,7 @@ describe('QRCanvas Circuit Style Eye Bracket Bug', () => {
 });
 
 describe('QRCanvas Performance Refactoring', () => {
-  useQrcodeAsCanvasEncoder(QRCode);
+  useCanvasEncoder(QRCode);
 
   let mockContext: any;
   let mockModules: any;
@@ -1218,7 +1215,7 @@ describe('QRCanvas Performance Refactoring', () => {
 });
 
 describe('QRCanvas Animation Loop', () => {
-  useQrcodeAsCanvasEncoder(QRCode);
+  useCanvasEncoder(QRCode);
 
   let mockContext: any;
   let rafCallback: any = null;
@@ -1396,7 +1393,8 @@ describe('QRCanvas Animation Loop', () => {
 });
 
 describe('QRCanvas Border Rendering', () => {
-  useQrcodeAsCanvasEncoder(realQrcode);
+  // The real encoder: these specs render a genuine QR code instead of the fake 21x21 matrix.
+  useCanvasEncoder(qrEncoder);
 
   const mockContext = createMockContext();
 
@@ -1475,7 +1473,8 @@ describe('QRCanvas Border Rendering', () => {
 });
 
 describe('QRCanvas Border Extended Features', () => {
-  useQrcodeAsCanvasEncoder(realQrcode);
+  // The real encoder: these specs render a genuine QR code instead of the fake 21x21 matrix.
+  useCanvasEncoder(qrEncoder);
 
   let mockContext: any;
   let createdImages: any[] = [];

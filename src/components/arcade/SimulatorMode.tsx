@@ -36,6 +36,7 @@ import {
 } from '@/packages/arcade';
 import { useEmpiricalScan, useLatestRef, useReducedMotion } from '@/packages/arcade/client';
 import type { ArcadeTarget } from '@/packages/arcade/handoff';
+import type { QrEncoder } from '@/packages/qr-matrix';
 import { ArcadeCockpit } from './ArcadeCockpit';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { DefeatModal } from './DefeatModal';
@@ -59,6 +60,8 @@ interface Ring {
 export interface ModeProps {
   /** Target under test. */
   target: ArcadeTarget;
+  /** The QR encoder that builds the target's matrix. */
+  encoder: QrEncoder;
   /** Target settings panel. */
   settings: React.ReactNode;
   /** Screen-reader announcements. */
@@ -118,8 +121,8 @@ function drawBoard(
  * @param props - Mode properties.
  * @returns The simulator.
  */
-export function SimulatorMode({ target, settings, announce }: ModeProps) {
-  const matrix = useMemo(() => buildTargetMatrix(target.payload, target.ecc), [target.payload, target.ecc]);
+export function SimulatorMode({ target, encoder, settings, announce }: ModeProps) {
+  const matrix = useMemo(() => buildTargetMatrix(target.payload, target.ecc, encoder), [target.payload, target.ecc, encoder]);
   const [damage, setDamage] = useState<ReadonlySet<number>>(() => new Set());
   const [weaponId, setWeaponId] = useState<SimulatorWeaponId>('pinpoint');
   const [latency, setLatency] = useState(0);

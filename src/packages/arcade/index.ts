@@ -19,7 +19,7 @@
 /**
  * QR Arcade engine: the headless game logic behind /arcade.
  *
- * - Target matrix: one `QRCode.create` per target, shared by both modes and the scan painter.
+ * - Target matrix: one encode per target, shared by both modes and the scan painter.
  * - Damage Simulator: circular module blasts, artillery barrages and Layer 1 analytics
  *   (Reed-Solomon budget, interleaved virtual blocks, 20% finder damage threshold).
  * - Arcade Blaster: 4x4 micro-cell damage grid, projectile/laser/particle physics and shake.

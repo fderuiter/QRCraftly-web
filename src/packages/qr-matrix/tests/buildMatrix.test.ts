@@ -17,9 +17,9 @@
 */
 
 import { describe, it, expect, vi } from 'vitest';
-import QRCode from 'qrcode';
 import { QRErrorCorrectionLevel, QRType } from '@/types';
-import { buildMatrix, fromQrcodePackage, loadQrEncoder, resolveEncodedValue, type QrEncoder } from '../index';
+import { qrEncoder } from '../../../../tests/fixtures/qrEncoder';
+import { buildMatrix, loadQrEncoder, resolveEncodedValue, type QrEncoder } from '../index';
 
 const fakeEncoder = (): QrEncoder & { create: ReturnType<typeof vi.fn> } => ({
   create: vi.fn(() => ({ modules: { size: 21, get: () => false } })),
@@ -62,7 +62,7 @@ describe('buildMatrix', () => {
   it('produces the same matrix for a bare domain and its normalized form with the real encoder', async () => {
     const encoder = await loadQrEncoder();
     const bare = buildMatrix({ type: QRType.URL, value: 'example.com', errorCorrectionLevel: QRErrorCorrectionLevel.M }, encoder);
-    const full = fromQrcodePackage(QRCode).create('https://example.com/', { errorCorrectionLevel: QRErrorCorrectionLevel.M }).modules;
+    const full = qrEncoder.create('https://example.com/', { errorCorrectionLevel: QRErrorCorrectionLevel.M }).modules;
     expect(bare.size).toBe(full.size);
     for (let r = 0; r < full.size; r++) {
       for (let c = 0; c < full.size; c++) {

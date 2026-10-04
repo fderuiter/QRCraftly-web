@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from './fixtures/qrEncoder';
 import { describe, expect, it } from 'vitest';
 import { COLOUR_FALLBACK_HINT, composeBeacon, composeColourTile, fitCrossTalk, qrModuleCount, samplePatch, splitChannels } from '../src/packages/optical-transfer/index';
 import { CLEAN_CHANNEL, COLOUR_BLIND_CHANNEL, REFERENCE_CHANNEL, capture, jsqrDecoders, runColourTransfer } from './utils/colourBench';

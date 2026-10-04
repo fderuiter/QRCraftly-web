@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import QRCode, { type QRCodeErrorCorrectionLevel } from 'qrcode';
+import { loadQrEncoder, type QrEccLetter, type QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
 import { TRANSFER_DENSITY_PROFILES, resolveTransferDensity, sha256Hex } from './lib/fountain/session';
 import { createPrismBundleSession, createPrismSession, type PrismSession, type PrismStream } from './lib/prism/session';
 import { keyQrText, parseKeyCode } from './lib/prism/words';
@@ -31,7 +31,9 @@ let file: Blob | null = null;
 let totalFrames = 0; // K: the first pass; the stream is rateless and runs past it
 let nextIndexToGenerate = 0;
 let lastAckedIndex = -1;
-let errorCorrectionLevel: QRCodeErrorCorrectionLevel = 'Q';
+let errorCorrectionLevel: QrEccLetter = 'Q';
+/** The QR encoder, loaded when the worker starts and awaited by the first START. */
+let encoder: QrSymbolEncoder | null = null;
 let currentSessionId = 0;
 let activeGeneratingSessionId = 0;
 let fileSHA256 = '';
@@ -39,6 +41,9 @@ let lookaheadLimit = 3;
 let stream: PrismStream | null = null;
 /** Text of the key QR of the running private transfer; null for a plain one. */
 let keyQr: string | null = null;
+
+// Start loading the encoder with the worker; a failed load is retried by the next START.
+loadQrEncoder().catch(() => undefined);
 
 // Keyed by the Blob/File instance so a cached hash can never be reused for different content.
 const hashCache = new WeakMap<Blob, string>();
@@ -65,10 +70,10 @@ function fileNameOf(blob: Blob): string {
  */
 function generateFrame(index: number, sessionId: number): void {
   const active = stream;
-  if (sessionId !== currentSessionId || !active) return;
+  if (sessionId !== currentSessionId || !active || !encoder) return;
 
   try {
-    const qr = QRCode.create(active.frameText(index), { errorCorrectionLevel });
+    const qr = encoder.create(active.frameText(index), { errorCorrectionLevel });
     const { size, data } = qr.modules;
     if (sessionId !== currentSessionId) return;
 
@@ -125,6 +130,8 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
   let info: FountainInitInfo;
   let totalSize = 0;
   try {
+    encoder = await loadQrEncoder();
+    if (sessionId !== currentSessionId) return;
     const density = resolveTransferDensity(payload?.density);
     const profile = TRANSFER_DENSITY_PROFILES[density];
     // Frames use the density's ECC, not the page's appearance ECC.
@@ -194,9 +201,9 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
 
 /** Posts the module matrix of the key QR, a code with room to spare so a phone reads it from across a desk. */
 function postKeyQr(): void {
-  if (!keyQr) return;
+  if (!keyQr || !encoder) return;
   try {
-    const { size, data } = QRCode.create(keyQr, { errorCorrectionLevel: 'M' }).modules;
+    const { size, data } = encoder.create(keyQr, { errorCorrectionLevel: 'M' }).modules;
     const matrix = new Uint8Array(data);
     post({ type: 'KEY_FRAME', size, data: matrix }, [matrix.buffer]);
   } catch (err: unknown) {

@@ -17,7 +17,7 @@
 */
 
 import { describe, expect, it } from 'vitest';
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import {
   FLAG_ENCRYPTED,
   FRAME_OVERHEAD,

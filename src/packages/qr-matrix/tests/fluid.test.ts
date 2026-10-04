@@ -17,6 +17,7 @@
 */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { qrEncoder } from '../../../../tests/fixtures/qrEncoder';
 import {
   isFinderPattern,
   isFinderSeparatorZone,
@@ -199,8 +200,7 @@ describe('fluid renderer', () => {
     });
 
     it('extracts strictly closed contour loops without cross-matrix jumps for full QR code matrices', async () => {
-      const QRCode = (await import('qrcode')).default;
-      const qr = QRCode.create('https://qrcraftly.com', { errorCorrectionLevel: 'M' });
+      const qr = qrEncoder.create('https://qrcraftly.com', { errorCorrectionLevel: 'M' });
       const mc = qr.modules.size;
       const grid = new Uint8Array(mc * mc);
       for (let r = 0; r < mc; r++) {

@@ -17,6 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
+import { qrEncoder } from '../../../../tests/fixtures/qrEncoder';
 import {
   addParticles,
   addShake,
@@ -121,7 +122,7 @@ describe('arena coordinates', () => {
 
 describe('projectile physics', () => {
   const A = BLASTER_ARENA;
-  const matrix = buildTargetMatrix('ARCADE', 'L');
+  const matrix = buildTargetMatrix('ARCADE', 'L', qrEncoder);
   const cellPx = A.qrSize / (matrix.size * MICRO_SUBDIVISION);
   // Centre of the top-left finder's outer ring micro-cell (0,0): always dark.
   const topLeft = { x: A.qrX + cellPx / 2, y: A.qrY + cellPx / 2 };

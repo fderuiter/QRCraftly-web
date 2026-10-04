@@ -17,8 +17,14 @@
 */
 
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
-import QRCode from 'qrcode';
+import { loadQrEncoder, type QrSymbolEncoder } from '../src/packages/qr-matrix/encoder';
 import { loadWorkerModule, type InThreadWorkerScope, type WorkerModuleUnderTest } from './utils/inThreadWorker';
+
+/** The encoder the worker loads: one instance per module graph, shared with this file. */
+let QRCode: QrSymbolEncoder;
+beforeAll(async () => {
+  QRCode = await loadQrEncoder();
+});
 
 describe('fileSliceWorker', () => {
   let workerHandler: WorkerModuleUnderTest['handle'];
@@ -278,7 +284,7 @@ describe('fileSliceWorker', () => {
     expect(postMessageSpy).not.toHaveBeenCalled();
   });
 
-  it('posts ERROR message when QRCode.create throws an error during frame generation', async () => {
+  it('posts ERROR message when the encoder throws an error during frame generation', async () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
 
@@ -417,18 +423,6 @@ describe('fileSliceWorker State Cache', () => {
     const spy = vi.fn((msg) => postedMessages.push(msg));
     scope.postMessage = spy;
     digestSpy = vi.spyOn(crypto.subtle, 'digest');
-    if ((QRCode.create as any).mockImplementation) {
-      (QRCode.create as any).mockImplementation((val: any) => {
-        if (!val) throw new Error('Value is required');
-        return {
-          modules: {
-            size: 21,
-            data: new Uint8Array(441),
-            get: (r: number, c: number) => (r === 0 && c === 0) || (r === 10 && c === 10),
-          }
-        };
-      });
-    }
   });
 
   afterEach(() => {

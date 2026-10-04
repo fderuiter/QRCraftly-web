@@ -1,6 +1,6 @@
 [package]
 name = "qrcraftly-core"
-description = "Shared maths for QRCraftly's WebAssembly modules: GF(256), CRC32 and the module allocator."
+description = "Shared maths for QRCraftly's WebAssembly modules: GF(256), Reed-Solomon, CRC32 and the module allocator."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
