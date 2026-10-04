@@ -46,6 +46,7 @@
     "check-bundle-size": "node scripts/check-bundle-size.js",
     "bench:scanner": "tsx scripts/bench_scanner.ts",
     "bench:transfer": "tsx scripts/bench_transfer.ts",
+    "bench:outer-code": "tsx scripts/bench_outer_code.ts",
     "resource-quota-report": "node scripts/resource-quota-report.js",
     "secret-scanner": "node scripts/secret-scanner.js",
     "typecheck": "tsc --noEmit",
