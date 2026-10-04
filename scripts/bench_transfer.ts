@@ -415,7 +415,13 @@ async function main(): Promise<void> {
   }
 
   if (args.includes('--write')) {
-    fs.writeFileSync(REPORT_PATH, render(codec, optical, tileSection));
+    // The colour block is written by `bench:colour` (it takes minutes of its own); keep what is there.
+    const previous = fs.existsSync(REPORT_PATH) ? fs.readFileSync(REPORT_PATH, 'utf8').replace(/\r?\n/g, '\n') : '';
+    const colourBlock = /<!-- colour-bench:start -->[\s\S]*?<!-- colour-bench:end -->/.exec(previous)?.[0];
+    const fresh = render(codec, optical, tileSection);
+    const marker = '## Reading these numbers';
+    const at = fresh.indexOf(marker);
+    fs.writeFileSync(REPORT_PATH, colourBlock && at >= 0 ? `${fresh.slice(0, at)}${colourBlock}\n\n${fresh.slice(at)}` : fresh);
     process.stdout.write(`wrote ${path.relative(REPO_ROOT, REPORT_PATH).split(path.sep).join('/')}\n`);
   }
   if (args.includes('--baseline')) {

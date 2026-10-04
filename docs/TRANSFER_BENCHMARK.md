@@ -156,6 +156,52 @@ Not measured at all: a real camera's focus, exposure and rolling shutter; whethe
 
 A simulated back channel (feedback codes from the receiver, a webcam delay and loss) steers the sender up and down the Steady, Balanced and Fast profiles and stops it when every receiver is done. The figures, the model behind them and what they do not show are in [the feedback benchmark](FEEDBACK_BENCHMARK.md); run it with `pnpm run bench:feedback`. It is logic only: the sender's webcam, the receiver's corner code and the camera permission are not built.
 
+<!-- colour-bench:start -->
+
+## Colour layer (#1147)
+
+Written by `pnpm run bench:colour --write` (minutes; `bench:transfer --write` keeps this block). The Colour profile (Fast with three Prism frames in every tile, one per colour channel, and the same beacons) against the monochrome Fast profile, 2x2 v25 tiles, error correction L, 1080p, 30 fps (a 60 Hz display held for 2 refreshes, one sender frame per camera frame), a 1000 KB random file. Real Prism frames, QR codes, pixels, jsQR decodes, cross-talk fit and correction, tile tracking, dedup and receiver; simulated screen and camera. The camera mixes the three channels through a 3x3 matrix, scales them with a white balance that shifts mid-transfer (red up 12%, blue down 14% over 10 frames from frame 24), shares colour over 2x2 pixels and adds per-pixel and per-8x8-block noise as a JPEG-like stand-in (it is not a JPEG codec). The camera is sharp, level and in sync with the display, so these rates are an upper bound for the code and decode chain, not a prediction for a phone. Goodput is file bytes divided by simulated camera time until the receiver verified the file, start-up included: Colour waits for its first beacon (one in 12 frames), the monochrome receiver is told where its tiles are and pays no wait.
+
+| Scenario                                            | Frames | Goodput    | Receiving from | Plane decodes per second needed | Decode time per camera frame | Fits, drift refits, rescales |
+| --------------------------------------------------- | ------ | ---------- | -------------- | ------------------------------- | ---------------------------- | ---------------------------- |
+| Mono Fast, clean camera                             | 327    | 91.7 KB/s  | frame 5        | 120                             | 163 ms                       | n/a                          |
+| Colour, clean camera                                | 136    | 220.6 KB/s | frame 14       | 328                             | 450.3 ms                     | 11, 0, 0                     |
+| Mono Fast, mild camera                              | 327    | 91.7 KB/s  | frame 5        | 120                             | 161.3 ms                     | n/a                          |
+| Colour, mild camera                                 | 136    | 220.6 KB/s | frame 14       | 328                             | 507.9 ms                     | 11, 0, 2                     |
+| Mono Fast, harsh camera                             | 327    | 91.7 KB/s  | frame 5        | 120                             | 170.9 ms                     | n/a                          |
+| Colour, harsh camera                                | 136    | 220.6 KB/s | frame 14       | 328                             | 550.1 ms                     | 11, 0, 2                     |
+| Colour, colour-blind camera (falls back to beacons) | 96     | 3.8 KB/s   | frame 24       | 0                               | 225 ms                       | 0, 0, 0                      |
+
+The harsh camera sends each channel 45% of the others and keeps 55% of its own: where the raw channels stop decoding (next table). The mild one keeps 76 to 80%. The colour-blind row is a camera whose three channels see the same mixture: the patch is rejected, colour is given up and the transfer finishes from the monochrome beacons alone, so its goodput is the beacon rate (a 12 KB file, not the size above). Goodput is the same on the three cameras because every tile read succeeded on all of them: at this noise level the correction decides whether colour reads at all (next table) and, once it reads, the noise costs nothing here. The bench does not sweep noise, blur or tilt, which would cost reads.
+
+### Where the correction matters
+
+One v20 tile (three codes of 300 characters) through the harsh camera at several cross-talk strengths, four noise draws each. "Raw" splits the camera channels with no correction; "corrected" fits the model from a beacon patch first. Counts are channel codes that decoded to the right text.
+
+| Cross-talk      | Raw channels | Corrected channels |
+| --------------- | ------------ | ------------------ |
+| 80% own channel | 12 of 12     | 12 of 12           |
+| 65% own channel | 12 of 12     | 12 of 12           |
+| 60% own channel | 12 of 12     | 12 of 12           |
+| 55% own channel | 1 of 12      | 12 of 12           |
+| 50% own channel | 0 of 12      | 12 of 12           |
+| 45% own channel | 0 of 12      | 12 of 12           |
+
+### What this proves and what it does not (#1147)
+
+| Criterion                                                                                              | Bench result                                                                                                                    | Status                                                                                           |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Colour at least 200 KB/s at 1080p/30 fps with simulated cross-talk, white balance shift and JPEG noise | 220.6 KB/s on the harsh camera                                                                                                  | Met in the simulation only. The simulated camera captures every frame and the decoder keeps up.  |
+| At least 1.8x the matching monochrome profile                                                          | 2.41x (220.6 against 91.7 KB/s, harsh camera)                                                                                   | Met in the simulation only.                                                                      |
+| At least 200 KB/s on a recent iPhone and a recent Android                                              | Not measured. No phone was used.                                                                                                | Not met. Open: the items are in the device checklist, and the profile stays off until they pass. |
+| If colour fails to decode, the transfer still completes from the mono beacons                          | Tested twice in `tests/colourTransfer.test.ts`: a decoder that reads no colour, and a camera that cannot separate the channels. | Met, tested.                                                                                     |
+
+Decode cost. A tile costs three plane decodes, so Colour needs 328 plane decodes per second at 30 fps here (a 4-tile frame is 12 decodes; the issue's 360 to 720 per second is the same figure at 30 and 60 fps), against 120 for monochrome. The time column is real jsQR plus the channel correction on this machine, single thread, loaded: 550.1 ms per camera frame is about 16.5 cores' worth at 30 fps. Goodput above assumes the decoder keeps up with the camera; on a device that cannot, the rate falls by the same factor and the receiver should report its tier. The shipped reader is zxing-wasm (328 crop decodes per second on one thread of this machine, measured above), not jsQR.
+
+Not measured at all: a real phone camera (its true cross-talk, gamma, auto white balance and auto exposure, which are not linear and not constant), real JPEG or video compression, glare, focus and rolling shutter on colour, how often a camera holds 4 px modules on a colour channel, decoding in browser workers, heat, and the sender screen (an OLED or a laptop panel has its own primaries and gamut). The model is linear in the coded values and not gamma-aware. The 200 KB/s device criterion is therefore **not measured**. See [the device checklist](TRANSFER_DEVICE_CHECKLIST.md#colour-layer-1147).
+
+<!-- colour-bench:end -->
+
 ## Reading these numbers
 
 - The coding overhead is the part a better code can improve. It is the "Frames needed" column, and it is the number to compare when a new code lands (#1141).

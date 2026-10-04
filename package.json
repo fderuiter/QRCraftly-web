@@ -47,6 +47,7 @@
     "bench:scanner": "tsx scripts/bench_scanner.ts",
     "bench:transfer": "tsx scripts/bench_transfer.ts",
     "bench:outer-code": "tsx scripts/bench_outer_code.ts",
+    "bench:colour": "tsx scripts/bench_colour.ts",
     "bench:optical": "tsx scripts/bench_optical.ts",
     "bench:feedback": "tsx scripts/bench_feedback.ts",
     "bench:optical-ladder": "tsx scripts/bench_optical_ladder.ts",

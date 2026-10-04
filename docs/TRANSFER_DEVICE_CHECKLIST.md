@@ -55,6 +55,18 @@ The simulation (`docs/FEEDBACK_BENCHMARK.md`) fixes how a receiver's reads are m
 - Two receivers at once: that the sender follows the weaker one and does not stop until both show "done".
 - Mixed sessions: the three profiles share one symbol size in the simulation (350 bytes) so a switch keeps one session. The shipped table uses different sizes, so a device run must confirm the shared size does not cost goodput on Steady.
 
+## Colour layer (#1147)
+
+The bench simulates the screen and the camera, so none of the colour numbers has seen a phone. The Colour profile stays off, and out of every screen, until these pass:
+
+- Goodput of Colour (Fast with three codes per tile) against monochrome Fast on the same pair of devices, 1080p sender at 30 fps and at 60 fps. The criterion is at least 200 KB/s on at least one recent iPhone and one recent Android, and at least 1.8 times monochrome. The bench's figure is a simulation and is not a prediction.
+- The real cross-talk matrix: log the fitted matrix and the patch residual (`CrossTalkModel.matrix`, `residual`) on each phone and each sender screen (an OLED, an LCD, a laptop panel). Check that `fitCrossTalk` accepts the patch at normal brightness and note the screens where it rejects it.
+- Auto white balance and auto exposure: do they move during a transfer, how often does a new beacon patch refit (`driftRefits`) and how often does the quiet-zone white rescale the model (`rescales`)? Does the camera's exposure lock help or hurt?
+- Gamma and clipping: the model is linear in the coded values. Record whether a white that clips in one channel breaks the fit.
+- Decodes per second: Colour needs three decodes per tile, so 360 per second at 30 fps and 720 at 60 fps for a 2x2 layout. Record what the phone sustains, whether the preview keeps its rate, heat after two minutes, and what tier the receiver reports.
+- Real compression: record whether the camera pipeline compresses (JPEG or video) and how it treats a colour channel at 4 px modules.
+- Fallback: with the receiver far enough away that colour does not read, confirm the transfer finishes from the beacons and the receiver shows the "only the black and white codes are getting through" message.
+
 ## Tiers
 
 | Tier | Target                    |
