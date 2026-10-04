@@ -18,6 +18,7 @@ You only need Rust to change something in `crates/`. The built modules are commi
 | `cargo test` (in `crates/`)                                                      | Runs the Rust unit tests on your machine.                                                                                         |
 | `cargo fmt --all` and `cargo clippy --all-targets -- -D warnings` (in `crates/`) | Format and lint, as CI does.                                                                                                      |
 | `node scripts/rust_no_deps_check.js`                                             | Part of `pnpm run lint`. Fails on any crate from outside the workspace, or a committed `.wasm` that does not match its `.sha256`. |
+| `pnpm run bench:wasm`                                                            | Reports each module's size, cold start and per-call time. Add `--json <file>` to save it.                                         |
 
 ## Layout
 
@@ -31,6 +32,7 @@ crates/
 src/wasm/               committed builds and their SHA-256 sidecars
 src/packages/wasm-runtime/
                         the TypeScript loader
+tests/foundry/          the differential harness, the self-test battery and bench:wasm
 ```
 
 ## Adding a module
@@ -40,7 +42,9 @@ src/packages/wasm-runtime/
 3. Export `#[no_mangle] pub extern "C"` functions that take pointers and lengths and return a status code from `qrcraftly_core::abi`. Use integer maths and never import anything from JavaScript.
 4. Add the crate to `members` in `crates/Cargo.toml`, write its unit tests, and run `pnpm run wasm:build`.
 5. Load it with `compileWasmUrl` and `instantiateWasm` from `src/packages/wasm-runtime`, and use the instance's `withBytes`, `withOutput` and `fn` helpers.
-6. Commit the crate, `crates/Cargo.lock` and both files in `src/wasm/`.
+6. Give the module a gzipped budget in `WASM_MODULE_BUDGETS_KB` in `scripts/check-bundle-size.js`, and list the calls worth timing in `tests/foundry/wasmBench.ts`.
+7. If it replaces existing code, add a differential test with `tests/foundry/differential.ts`, a battery for the cross-engine test, its `__FOUNDRY_<MODULE>__` constant in `src/vite-env.d.ts` and a row in the [Foundry scorecard](./FOUNDRY.md).
+8. Commit the crate, `crates/Cargo.lock` and both files in `src/wasm/`.
 
 ## Updating a committed module
 

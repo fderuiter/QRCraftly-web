@@ -9,7 +9,7 @@ import {
   parseLockPackages,
 } from '../scripts/rust_no_deps_check.js';
 import { compareWithCommitted, reproducibleRustFlags } from '../scripts/build_wasm.js';
-import { hashLine, parseMembers, readCrates } from '../scripts/utils/rustWorkspace.js';
+import { committedModuleNames, foundryDefines, foundrySwitchName, hashLine, parseMembers, readCrates } from '../scripts/utils/rustWorkspace.js';
 
 const temps: string[] = [];
 
@@ -154,6 +154,30 @@ describe('scripts/build_wasm.js', () => {
     expect(problems).toContain('src/wasm/mod-a.wasm.sha256 does not match a fresh build.');
     expect(problems).toContain('src/wasm/mod-b.wasm is missing.');
     expect(problems).toContain('src/wasm/gone.wasm has no crate in crates/.');
+  });
+});
+
+describe('Foundry canary switches', () => {
+  it('names one switch per module', () => {
+    expect(foundrySwitchName('selftest')).toBe('FOUNDRY_SELFTEST');
+    expect(foundrySwitchName('qr-decode')).toBe('FOUNDRY_QR_DECODE');
+    expect(committedModuleNames()).toContain('selftest');
+  });
+
+  it('defines every module as "js" unless its switch says "wasm"', () => {
+    expect(foundryDefines({}, ['selftest', 'qr-decode'])).toEqual({
+      __FOUNDRY_SELFTEST__: '"js"',
+      __FOUNDRY_QR_DECODE__: '"js"',
+    });
+    expect(foundryDefines({ FOUNDRY_QR_DECODE: 'wasm', FOUNDRY_SELFTEST: 'js' }, ['selftest', 'qr-decode'])).toEqual({
+      __FOUNDRY_SELFTEST__: '"js"',
+      __FOUNDRY_QR_DECODE__: '"wasm"',
+    });
+  });
+
+  it('fails the build on a misspelt switch or value', () => {
+    expect(() => foundryDefines({ FOUNDRY_SELFTSET: 'wasm' }, ['selftest'])).toThrow('FOUNDRY_SELFTSET names no module');
+    expect(() => foundryDefines({ FOUNDRY_SELFTEST: 'rust' }, ['selftest'])).toThrow('must be "wasm" or "js"');
   });
 });
 

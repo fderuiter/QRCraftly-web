@@ -47,6 +47,7 @@
     "format:check": "prettier --check .",
     "check-bundle-size": "node scripts/check-bundle-size.js",
     "bench:scanner": "tsx scripts/bench_scanner.ts",
+    "bench:wasm": "tsx scripts/bench_wasm.ts",
     "bench:transfer": "tsx scripts/bench_transfer.ts",
     "bench:outer-code": "tsx scripts/bench_outer_code.ts",
     "bench:colour": "tsx scripts/bench_colour.ts",
