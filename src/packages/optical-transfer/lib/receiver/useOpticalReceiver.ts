@@ -32,6 +32,7 @@ import {
   parseLegacyHandshake,
 } from './legacyFrames';
 import { MAX_VIDEO_UPLOAD_BYTES, formatLimit } from '../limits';
+import { analyseReceivedFile } from '@/utils/fileNames';
 import { detachVideoSource, isVideoFile, playQuietly, spawnReassemblyWorker } from './media';
 
 type ReceiverToast = {
@@ -165,11 +166,13 @@ export function useOpticalReceiver({
   /** Saves a verified file under its announced name and tells the user. */
   const deliverFile = useCallback((data: Uint8Array, hs: HandshakeInfo | null, fallbackPrefix: string) => {
     setDownloadTriggered(true);
-    saveFileRef.current(
-      data,
+    // The name and type are chosen by whoever is showing the stream: save the sanitised name and a
+    // MIME type that agrees with it.
+    const analysis = analyseReceivedFile(
       hs?.fileName || `${fallbackPrefix}_${Date.now()}.bin`,
       hs?.mimeType || 'application/octet-stream'
     );
+    saveFileRef.current(data, analysis.safeName, analysis.mimeType);
     addToastRef.current?.({ type: 'success', message: FILE_RECEIVED_MESSAGE, duration: 5000 });
   }, []);
 
@@ -218,7 +221,10 @@ export function useOpticalReceiver({
 
       setReceiverSuccess(true);
       setReceiverError(null);
-      if (autoDownloadRef.current) {
+      // Risky types (executables, scripts, active documents) are never saved without the person
+      // confirming on the completion panel, so auto-download skips them.
+      const risky = analyseReceivedFile(activeHandshake?.fileName ?? '', activeHandshake?.mimeType ?? '').risky;
+      if (autoDownloadRef.current && !risky) {
         deliverFile(reassembled, activeHandshake, 'received_file');
       }
     } catch (err) {
@@ -581,7 +587,7 @@ export function useOpticalReceiver({
   useEffect(() => {
     if (totalChunks !== null && chunks.size === totalChunks && !downloadTriggered) {
       revokeVideoUrl();
-      if (autoDownload) {
+      if (autoDownload && !analyseReceivedFile((handshake || handshakeRef.current)?.fileName ?? '', (handshake || handshakeRef.current)?.mimeType ?? '').risky) {
         setDownloadTriggered(true);
         stopCameraSession();
         reconstructAndValidateFile(chunks, totalChunks, handshake || handshakeRef.current || undefined);

@@ -108,3 +108,104 @@ export function sanitizeFileName(raw: string, options: SanitizeFileNameOptions =
 
   return name || fallback;
 }
+
+/** Extensions that can run programs or active content on the device that opens them. */
+const RISKY_EXTENSIONS: ReadonlySet<string> = new Set([
+  'exe', 'msi', 'bat', 'cmd', 'com', 'scr', 'ps1', 'vbs', 'js', 'jse', 'wsf', 'hta', 'lnk', 'apk', 'appx',
+  'dmg', 'pkg', 'app', 'jar', 'html', 'htm', 'svg', 'xhtml', 'docm', 'xlsm', 'pptm', 'iso', 'img',
+]);
+
+/** MIME types that are active content whatever the extension says. */
+const RISKY_MIME_TYPES: ReadonlySet<string> = new Set([
+  'text/html',
+  'application/xhtml+xml',
+  'image/svg+xml',
+  'application/javascript',
+  'text/javascript',
+  'application/x-msdownload',
+  'application/x-msdos-program',
+  'application/vnd.microsoft.portable-executable',
+  'application/x-sh',
+  'application/java-archive',
+  'application/vnd.android.package-archive',
+]);
+
+/** Extensions whose MIME type is well known, used to spot a name and type that disagree. */
+const EXTENSION_MIME: Readonly<Record<string, string>> = {
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  json: 'application/json',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  mp3: 'audio/mpeg',
+  mp4: 'video/mp4',
+  zip: 'application/zip',
+  html: 'text/html',
+  htm: 'text/html',
+  svg: 'image/svg+xml',
+};
+
+/** Extensions that look harmless, so a risky one right after them (`.pdf.exe`) is a disguise. */
+const DISGUISE_EXTENSIONS: ReadonlySet<string> = new Set([
+  'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'mp4', 'csv', 'zip',
+]);
+
+export interface ReceivedFileAnalysis {
+  /** The name the file will be saved under: sanitised, capped, never empty. */
+  safeName: string;
+  /** True when sanitising changed the name the sender announced. */
+  nameChanged: boolean;
+  /** Last extension without the dot, lowercase; empty when there is none. */
+  extension: string;
+  /** MIME type to save with: the announced one, or `application/octet-stream` when it disagrees. */
+  mimeType: string;
+  /** True when the announced MIME type disagreed with the extension and was replaced. */
+  mimeMismatch: boolean;
+  /** True when the type can run programs or active content; saving needs a second confirmation. */
+  risky: boolean;
+  /** True for a harmless-looking extension followed by a risky one, e.g. `photo.jpg.exe`. */
+  doubleExtension: boolean;
+  /** Short plain-language notes for the person saving the file. */
+  notices: string[];
+}
+
+/**
+ * Looks at the name and MIME type a sender announced for a received file. Nothing is blocked: the
+ * result says what the file will be saved as and whether the person should confirm first.
+ * @param fileName - The announced name, untrusted.
+ * @param mimeType - The announced MIME type, untrusted.
+ */
+export function analyseReceivedFile(fileName: string, mimeType: string): ReceivedFileAnalysis {
+  const safeName = sanitizeFileName(fileName, { fallback: 'received_file' });
+  const parts = safeName.toLowerCase().split('.');
+  const extensions = parts.length > 1 ? parts.slice(1) : [];
+  const extension = extensions[extensions.length - 1] ?? '';
+  const previous = extensions.length > 1 ? extensions[extensions.length - 2] : '';
+
+  const claimed = mimeType.split(';')[0].trim().toLowerCase();
+  const expected = EXTENSION_MIME[extension];
+  const mimeMismatch = Boolean(expected && claimed && claimed !== 'application/octet-stream' && claimed !== expected);
+
+  const doubleExtension = RISKY_EXTENSIONS.has(extension) && DISGUISE_EXTENSIONS.has(previous);
+  const risky = RISKY_EXTENSIONS.has(extension) || RISKY_MIME_TYPES.has(claimed);
+
+  const notices: string[] = [];
+  if (safeName !== fileName) notices.push('The file name was cleaned: hidden characters, path parts or unsafe symbols were removed.');
+  if (doubleExtension) notices.push(`The name ends in ".${previous}.${extension}". The real type is .${extension}.`);
+  if (mimeMismatch) notices.push('The file name and its announced type disagree, so it will be saved as a generic binary file.');
+
+  return {
+    safeName,
+    nameChanged: safeName !== fileName,
+    extension,
+    mimeType: mimeMismatch ? 'application/octet-stream' : mimeType || 'application/octet-stream',
+    mimeMismatch,
+    risky,
+    doubleExtension,
+    notices,
+  };
+}

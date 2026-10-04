@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { sanitizeFileName } from './fileNames';
+
 /**
  * Shared file download manager that triggers browser file saving
  * while safely destroying temporary data object URLs immediately afterward.
@@ -32,7 +34,8 @@ export function triggerFileDownload(
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = fileName;
+  // Names can come from a stream a stranger is showing: never hand the browser an unsafe one.
+  a.download = sanitizeFileName(fileName);
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

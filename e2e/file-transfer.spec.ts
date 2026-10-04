@@ -177,6 +177,44 @@ test.describe('Optical file transfer', () => {
       await expect(receiver.getByTestId('fountain-rank')).toHaveCount(0);
     });
 
+    test('asks before saving risky file types and shows the real extension', async ({ page: receiver, context }) => {
+      await installSyntheticCamera(context);
+      const sender = await context.newPage();
+      // The name hides an executable behind a document extension.
+      const exe = { name: 'invoice.pdf.exe', mimeType: 'application/x-msdownload', buffer: randomBytes(1024) };
+      const html = { name: 'page.html', mimeType: 'text/html', buffer: Buffer.from('<p>hello</p>'.repeat(40)) };
+
+      await openSender(sender, exe);
+      await openReceiver(receiver);
+      await relayUntilComplete(sender, receiver);
+
+      // The whole name wraps in view, with the type called out on its own line.
+      await expect(receiver.getByTestId('received-file-name')).toHaveText('invoice.pdf.exe');
+      await expect(receiver.getByTestId('received-file-type')).toContainText('.exe, application/x-msdownload');
+      await expect(receiver.getByTestId('received-file-notices')).toContainText('The real type is .exe');
+
+      // First click opens the confirmation; nothing is saved yet.
+      await receiver.getByRole('button', { name: 'Save', exact: true }).click();
+      const confirmation = receiver.getByTestId('risky-file-confirmation');
+      await expect(confirmation).toContainText('can run programs on your device');
+      await receiver.getByRole('button', { name: 'Cancel' }).click();
+      await expect(confirmation).not.toBeVisible();
+
+      await receiver.getByRole('button', { name: 'Save', exact: true }).click();
+      const downloadPromise = receiver.waitForEvent('download');
+      await receiver.getByRole('button', { name: 'Save anyway' }).click();
+      expect((await downloadPromise).suggestedFilename()).toBe(exe.name);
+
+      // An .html file is active content too.
+      await sender.getByRole('button', { name: 'Stop file transfer' }).click();
+      await sender.getByLabel('Choose a file to send').setInputFiles(html);
+      await sender.getByRole('button', { name: 'Start file transfer' }).click();
+      await receiver.getByRole('button', { name: 'Receive another file' }).click();
+      await relayUntilComplete(sender, receiver);
+      await receiver.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(receiver.getByTestId('risky-file-confirmation')).toBeVisible();
+    });
+
     test('works between two phone-sized screens', async ({ browser }) => {
       const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
       try {

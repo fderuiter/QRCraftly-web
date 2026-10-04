@@ -175,6 +175,12 @@ describe('File Transfer Receive Page & Pipeline', () => {
     expect(screen.getByTestId('inline-complete-panel')).toBeInTheDocument();
     expect(screen.getByText('Transfer Complete')).toBeInTheDocument();
 
+    // The legacy panel shows the same name, type, size and hash as the fountain panel.
+    const legacySummary = screen.getByTestId('received-file-summary');
+    expect(legacySummary).toHaveTextContent('simulated_file.txt');
+    expect(screen.getByTestId('received-file-type')).toHaveTextContent('.txt, text/plain');
+    expect(legacySummary).toHaveTextContent('SHA-256');
+
     // Verify no download is automatically initiated before user confirmation
     expect(global.URL.createObjectURL).not.toHaveBeenCalled();
 
@@ -502,6 +508,70 @@ describe('File Transfer Receive Page & Pipeline', () => {
         fireEvent.click(downloadBtn);
       });
       await waitFor(() => expect(global.URL.createObjectURL).toHaveBeenCalled());
+    });
+
+    async function receiveFile(fileName: string, mimeType: string) {
+      installFountainWorker();
+      const { encoder } = await createFountainSession(new TextEncoder().encode('Risky type check. '.repeat(30)), { fileName, mimeType });
+      render(
+        <ToastProvider>
+          <Page />
+        </ToastProvider>
+      );
+      for (let index = 0; index < encoder.k * 4; index++) {
+        await act(async () => {
+          scanSuccessCallback!(encoder.dropletStringForIndex(index));
+          await new Promise(resolve => setTimeout(resolve, 0));
+        });
+        if (screen.queryByTestId('inline-complete-panel')) break;
+      }
+      await waitFor(() => expect(screen.getByTestId('inline-complete-panel')).toBeInTheDocument());
+    }
+
+    it.each([
+      ['notes.txt', 'text/plain'],
+      ['scan.pdf', 'application/pdf'],
+      ['photo.jpg', 'image/jpeg'],
+    ])('saves %s with a single click and no risk confirmation (#1155)', async (fileName, mimeType) => {
+      await receiveFile(fileName, mimeType);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /download file/i }));
+      });
+      expect(screen.queryByTestId('risky-file-confirmation')).not.toBeInTheDocument();
+      await waitFor(() => expect(global.URL.createObjectURL).toHaveBeenCalled());
+    });
+
+    it.each([
+      ['setup.exe', 'application/x-msdownload'],
+      ['page.html', 'text/html'],
+      ['invoice.pdf.exe', 'application/pdf'],
+    ])('asks for a second click before saving %s (#1155)', async (fileName, mimeType) => {
+      await receiveFile(fileName, mimeType);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /download file/i }));
+      });
+      expect(screen.getByTestId('risky-file-confirmation')).toHaveTextContent('can run programs on your device');
+      expect(global.URL.createObjectURL).not.toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      });
+      expect(screen.queryByTestId('risky-file-confirmation')).not.toBeInTheDocument();
+      expect(global.URL.createObjectURL).not.toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /download file/i }));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Save anyway' }));
+      });
+      await waitFor(() => expect(global.URL.createObjectURL).toHaveBeenCalled());
+    });
+
+    it('shows the full name and cleans hidden characters from it (#1155)', async () => {
+      await receiveFile(`report${String.fromCharCode(0x202e)}fdp.exe`, 'application/pdf');
+      expect(screen.getByTestId('received-file-name')).toHaveTextContent('reportfdp.exe');
+      expect(screen.getByTestId('received-file-notices')).toHaveTextContent('file name was cleaned');
     });
 
     it('clears a completed transfer and scans again with Receive another file', async () => {

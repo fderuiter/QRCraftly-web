@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { sanitizeFileName, stripInvisibleCharacters, hasInvisibleCharacters } from './fileNames';
+import { sanitizeFileName, stripInvisibleCharacters, hasInvisibleCharacters, analyseReceivedFile } from './fileNames';
 import { sanitizeFileStem } from '@/packages/bulk-csv';
 
 // Built from code points so no bidirectional character appears in this source file.
@@ -111,5 +111,62 @@ describe('sanitizeFileStem (bulk CSV) covers the extra character classes', () =>
 
   it('keeps the 100 character cap', () => {
     expect(sanitizeFileStem('x'.repeat(300))).toHaveLength(100);
+  });
+});
+
+describe('analyseReceivedFile (#1155)', () => {
+  it.each(['report.pdf', 'photo.jpg', 'notes.txt', 'data.csv', 'archive.zip', 'README'])('does not flag %s', (name) => {
+    const result = analyseReceivedFile(name, 'application/octet-stream');
+    expect(result.risky).toBe(false);
+    expect(result.doubleExtension).toBe(false);
+    expect(result.notices).toEqual([]);
+  });
+
+  it.each([
+    'setup.exe', 'a.msi', 'a.bat', 'a.cmd', 'a.com', 'a.scr', 'a.ps1', 'a.vbs', 'a.js', 'a.jse', 'a.wsf', 'a.hta', 'a.lnk',
+    'a.apk', 'a.appx', 'a.dmg', 'a.pkg', 'a.app', 'a.jar', 'a.html', 'a.htm', 'a.svg', 'a.xhtml', 'a.docm', 'a.xlsm',
+    'a.pptm', 'a.iso', 'a.img', 'SETUP.EXE',
+  ])('flags %s as risky', (name) => {
+    expect(analyseReceivedFile(name, 'application/octet-stream').risky).toBe(true);
+  });
+
+  it('flags active MIME types whatever the extension says', () => {
+    expect(analyseReceivedFile('notes.dat', 'text/html').risky).toBe(true);
+    expect(analyseReceivedFile('notes.dat', 'image/svg+xml; charset=utf-8').risky).toBe(true);
+  });
+
+  it('calls out a risky extension hiding behind a harmless one', () => {
+    const result = analyseReceivedFile('photo.jpg.exe', 'image/jpeg');
+    expect(result.risky).toBe(true);
+    expect(result.doubleExtension).toBe(true);
+    expect(result.extension).toBe('exe');
+    expect(result.notices.join(' ')).toContain('The real type is .exe');
+  });
+
+  it('does not call .tar.gz or .min.js a disguise', () => {
+    expect(analyseReceivedFile('backup.tar.gz', '').doubleExtension).toBe(false);
+    expect(analyseReceivedFile('app.min.js', '').doubleExtension).toBe(false);
+  });
+
+  it('saves as a generic binary when the announced type disagrees with the extension', () => {
+    const result = analyseReceivedFile('holiday.jpg', 'application/pdf');
+    expect(result.mimeMismatch).toBe(true);
+    expect(result.mimeType).toBe('application/octet-stream');
+    expect(result.notices.join(' ')).toContain('disagree');
+    expect(analyseReceivedFile('holiday.jpg', 'image/jpeg').mimeMismatch).toBe(false);
+    expect(analyseReceivedFile('holiday.jpg', 'application/octet-stream').mimeMismatch).toBe(false);
+    expect(analyseReceivedFile('holiday.jpg', '').mimeType).toBe('application/octet-stream');
+  });
+
+  it('sanitises the name and says so', () => {
+    const result = analyseReceivedFile(`../a${RLO}b.pdf`, 'application/pdf');
+    expect(result.safeName).toBe('_ab.pdf');
+    expect(result.nameChanged).toBe(true);
+    expect(result.notices[0]).toContain('cleaned');
+    expect(analyseReceivedFile('clean.pdf', 'application/pdf').nameChanged).toBe(false);
+  });
+
+  it('falls back to a name when none is given', () => {
+    expect(analyseReceivedFile('', '').safeName).toBe('received_file');
   });
 });

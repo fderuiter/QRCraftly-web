@@ -16,11 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, File as FileIcon, FileArchive, FileImage, FileText, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { formatFileSize } from '@/utils/transferSpeed';
+import { analyseReceivedFile } from '@/utils/fileNames';
 
 /** Image types shown as a thumbnail. SVG is left out so no received markup is ever rendered. */
 const THUMBNAIL_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
@@ -74,7 +75,13 @@ function fileTypeIcon(mimeType: string) {
  * @param props.onReceiveAnother - Clears and starts over.
  * @returns The completion panel.
  */
-export function TransferComplete({ fileName, fileSize, mimeType, sha256, verified, data, saved, onSave, onReceiveAnother }: TransferCompleteProps) {
+export function TransferComplete({ fileName, fileSize, mimeType: announcedType, sha256, verified, data, saved, onSave, onReceiveAnother }: TransferCompleteProps) {
+  // The name and type come from whoever is showing the stream: show and save what is safe.
+  const received = useMemo(() => analyseReceivedFile(fileName, announcedType), [fileName, announcedType]);
+  const mimeType = received.mimeType;
+  // Risky types need a second click: the first only opens the confirmation.
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => setConfirming(false), [fileName, announcedType]);
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const showThumbnail = !!data && THUMBNAIL_TYPES.has(mimeType);
   const canOpen = !!data && OPENABLE_TYPES.has(mimeType);
@@ -88,6 +95,15 @@ export function TransferComplete({ fileName, fileSize, mimeType, sha256, verifie
     setThumbnail(url);
     return () => URL.revokeObjectURL(url);
   }, [showThumbnail, data, mimeType]);
+
+  const save = () => {
+    if (received.risky && !confirming) {
+      setConfirming(true);
+      return;
+    }
+    setConfirming(false);
+    onSave();
+  };
 
   const open = () => {
     if (!data) return;
@@ -123,13 +139,17 @@ export function TransferComplete({ fileName, fileSize, mimeType, sha256, verifie
         <dl className="min-w-0 flex-1 space-y-0.5 text-xs">
           <div className="flex gap-2">
             <dt className="sr-only">File</dt>
-            <dd className="min-w-0 truncate text-sm font-semibold text-fg">{fileName}</dd>
+            <dd className="min-w-0 text-sm font-semibold break-all text-fg" data-testid="received-file-name">{received.safeName}</dd>
           </div>
           <div className="flex gap-2 text-fg-muted">
-            <dt className="sr-only">Size and type</dt>
-            <dd className="font-mono">
-              {formatFileSize(fileSize)} · {mimeType || 'unknown type'}
+            <dt className="sr-only">Type</dt>
+            <dd className="font-mono" data-testid="received-file-type">
+              {received.extension ? `.${received.extension}` : 'no extension'}, {mimeType || 'unknown type'}
             </dd>
+          </div>
+          <div className="flex gap-2 text-fg-muted">
+            <dt className="sr-only">Size</dt>
+            <dd className="font-mono">{formatFileSize(fileSize)}</dd>
           </div>
           {sha256 && (
             <div className="flex gap-2 text-fg-muted">
@@ -139,6 +159,19 @@ export function TransferComplete({ fileName, fileSize, mimeType, sha256, verifie
           )}
         </dl>
       </div>
+      {received.notices.length > 0 && (
+        <ul className="max-w-xs space-y-1 text-left text-xs text-fg-muted" data-testid="received-file-notices">
+          {received.notices.map((notice) => (
+            <li key={notice}>{notice}</li>
+          ))}
+        </ul>
+      )}
+      {confirming && (
+        <div role="alert" className="max-w-xs rounded-lg border border-line-strong bg-surface p-3 text-left text-xs text-fg" data-testid="risky-file-confirmation">
+          <p className="font-semibold">Save this {received.extension ? `.${received.extension}` : ''} file?</p>
+          <p className="mt-1 text-fg-muted">This kind of file can run programs on your device. Only save it if you trust the sender.</p>
+        </div>
+      )}
       {verified && (
         <Badge tone="success">
           <ShieldCheck className="size-3.5" aria-hidden="true" />
@@ -151,9 +184,14 @@ export function TransferComplete({ fileName, fileSize, mimeType, sha256, verifie
             Open
           </Button>
         )}
-        <Button variant={saved ? 'outline' : 'primary'} onClick={onSave}>
-          {saved ? 'Save again' : 'Save'}
+        <Button variant={saved && !confirming ? 'outline' : 'primary'} onClick={save}>
+          {confirming ? 'Save anyway' : saved ? 'Save again' : 'Save'}
         </Button>
+        {confirming && (
+          <Button variant="outline" onClick={() => setConfirming(false)}>
+            Cancel
+          </Button>
+        )}
         <Button variant="outline" onClick={onReceiveAnother}>
           Receive another file
         </Button>
