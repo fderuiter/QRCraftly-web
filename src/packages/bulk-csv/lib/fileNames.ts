@@ -16,22 +16,19 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { sanitizeFileName } from '@/utils/fileNames';
+
 const MAX_STEM_LENGTH = 100;
 
 /**
- * Turns a CSV cell into a file name stem that is safe on Windows, macOS and Linux:
- * path separators, reserved characters and control characters become `_`, leading
- * dots are dropped (no hidden files or `..`), and the result is capped at 100
- * characters. Falls back to `fallback` when nothing usable is left.
+ * Turns a CSV cell into a file name stem that is safe on Windows, macOS and Linux: path
+ * separators, reserved, control, zero-width and bidirectional characters are removed or become
+ * `_`, leading dots and trailing dots or spaces are dropped, Windows device names (`CON`, `NUL`,
+ * `COM1` ...) are prefixed, and the result is capped at 100 characters. Falls back to `fallback`
+ * when nothing usable is left.
  */
 export function sanitizeFileStem(raw: string, fallback = 'qr_code'): string {
-  const cleaned = Array.from(raw, (ch) => (ch.charCodeAt(0) < 0x20 || '\\/?:*"<>|'.includes(ch) ? '_' : ch))
-    .join('')
-    .trim()
-    .replace(/^\.+/, '')
-    .slice(0, MAX_STEM_LENGTH)
-    .trim();
-  return cleaned.length > 0 ? cleaned : fallback;
+  return sanitizeFileName(raw, { fallback, maxLength: MAX_STEM_LENGTH, stem: true });
 }
 
 /**
