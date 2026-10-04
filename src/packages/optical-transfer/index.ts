@@ -198,3 +198,15 @@ export {
   type PoolSizeOptions,
 } from './lib/multicode/pool';
 export { planMultiCode, type MultiCodeOptions, type MultiCodePlan } from './lib/multicode/plan';
+export {
+  MULTI_RATE_PROFILES,
+  isBeaconFrame,
+  classifyFrameText,
+  createMultiRateSender,
+  type MultiRateProfile,
+  type MultiRateProfileName,
+  type MultiRateFrame,
+  type MultiRateSender,
+  type MultiRateSenderOptions,
+} from './lib/multicode/multirate';
+export { layerHint, ROBUST_LAYER_HINT, STALL_HINT, type LayerObservation } from './lib/multicode/layerHint';
