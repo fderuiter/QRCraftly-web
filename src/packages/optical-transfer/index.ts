@@ -214,3 +214,18 @@ export {
   type MultiRateSenderOptions,
 } from './lib/multicode/multirate';
 export { layerHint, ROBUST_LAYER_HINT, STALL_HINT, type LayerObservation } from './lib/multicode/layerHint';
+
+// Webcam back channel (#1146). Off unless a caller opts in through `createFeedbackLink().enable()`; nothing in the app imports these yet.
+export {
+  SPEED_LADDER,
+  SWITCHABLE_SYMBOL_SIZE,
+  MAX_RECEIVERS,
+  RECEIVER_EXPIRY_MS,
+  SETTLE_MS,
+  RISE_AFTER_MS,
+  switchableProfile,
+  createSpeedController,
+  type ControllerDecision,
+  type SpeedController,
+  type SpeedControllerOptions,
+} from './lib/feedback/controller';
