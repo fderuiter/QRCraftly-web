@@ -34,6 +34,8 @@ const COMPANY_LINKS = [
   ['Security Policy', '/security#security'],
   ['Privacy Architecture', '/security#compliance'],
   ['Open-Source Licenses', '/acknowledgements'],
+  ['iPhone & Mac App Privacy', '/privacy'],
+  ['iPhone & Mac App Support', '/support'],
 ] as const;
 
 /**

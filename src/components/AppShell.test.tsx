@@ -58,6 +58,8 @@ describe('AppShell', () => {
     const company = within(footer).getByRole('navigation', { name: 'Company' });
     expect(within(company).getByRole('link', { name: 'Security Policy' })).toHaveAttribute('href', '/security#security');
     expect(within(company).getByRole('link', { name: 'Privacy Architecture' })).toHaveAttribute('href', '/security#compliance');
+    expect(within(company).getByRole('link', { name: 'iPhone & Mac App Privacy' })).toHaveAttribute('href', '/privacy');
+    expect(within(company).getByRole('link', { name: 'iPhone & Mac App Support' })).toHaveAttribute('href', '/support');
     expect(footer).toHaveTextContent(/Open Source/);
   });
 
