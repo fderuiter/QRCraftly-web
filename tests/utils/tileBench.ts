@@ -191,7 +191,7 @@ export class TileSender {
 }
 
 /** Grey plane to the RGBA jsQR reads. */
-function toRgba(grey: Uint8ClampedArray): Uint8ClampedArray {
+export function toRgba(grey: Uint8ClampedArray): Uint8ClampedArray {
   const rgba = new Uint8ClampedArray(grey.length * 4);
   for (let i = 0; i < grey.length; i++) {
     const value = grey[i];
@@ -208,7 +208,7 @@ export interface Decoded {
   rect: Rect;
 }
 
-function boundingBox(location: NonNullable<ReturnType<typeof jsQR>>['location'], offsetX: number, offsetY: number): Rect {
+export function boundingBox(location: NonNullable<ReturnType<typeof jsQR>>['location'], offsetX: number, offsetY: number): Rect {
   const xs = [location.topLeftCorner.x, location.topRightCorner.x, location.bottomLeftCorner.x, location.bottomRightCorner.x];
   const ys = [location.topLeftCorner.y, location.topRightCorner.y, location.bottomLeftCorner.y, location.bottomRightCorner.y];
   const x = Math.min(...xs);
