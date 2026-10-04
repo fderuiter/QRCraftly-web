@@ -1,0 +1,74 @@
+{
+  "clean/10": {
+    "overheadMedian": 1,
+    "overheadP95": 1
+  },
+  "join/10": {
+    "overheadMedian": 1.1,
+    "overheadP95": 1.4
+  },
+  "loss-10/10": {
+    "overheadMedian": 1.1,
+    "overheadP95": 1.5
+  },
+  "loss-30/10": {
+    "overheadMedian": 1.3,
+    "overheadP95": 1.4
+  },
+  "burst/10": {
+    "overheadMedian": 1.1,
+    "overheadP95": 1.4
+  },
+  "duplicates/10": {
+    "overheadMedian": 1.1,
+    "overheadP95": 1.5
+  },
+  "clean/100": {
+    "overheadMedian": 1,
+    "overheadP95": 1
+  },
+  "join/100": {
+    "overheadMedian": 1.05,
+    "overheadP95": 1.36
+  },
+  "loss-10/100": {
+    "overheadMedian": 1.05,
+    "overheadP95": 1.4
+  },
+  "loss-30/100": {
+    "overheadMedian": 1.04,
+    "overheadP95": 1.37
+  },
+  "burst/100": {
+    "overheadMedian": 1.07,
+    "overheadP95": 1.21
+  },
+  "duplicates/100": {
+    "overheadMedian": 1.05,
+    "overheadP95": 1.4
+  },
+  "clean/1000": {
+    "overheadMedian": 1,
+    "overheadP95": 1
+  },
+  "join/1000": {
+    "overheadMedian": 1.255,
+    "overheadP95": 1.37
+  },
+  "loss-10/1000": {
+    "overheadMedian": 1.226,
+    "overheadP95": 1.23
+  },
+  "loss-30/1000": {
+    "overheadMedian": 1.106,
+    "overheadP95": 1.109
+  },
+  "burst/1000": {
+    "overheadMedian": 1.138,
+    "overheadP95": 1.218
+  },
+  "duplicates/1000": {
+    "overheadMedian": 1.226,
+    "overheadP95": 1.23
+  }
+}

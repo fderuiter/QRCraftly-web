@@ -45,6 +45,7 @@
     "format:check": "prettier --check .",
     "check-bundle-size": "node scripts/check-bundle-size.js",
     "bench:scanner": "tsx scripts/bench_scanner.ts",
+    "bench:transfer": "tsx scripts/bench_transfer.ts",
     "resource-quota-report": "node scripts/resource-quota-report.js",
     "secret-scanner": "node scripts/secret-scanner.js",
     "typecheck": "tsc --noEmit",

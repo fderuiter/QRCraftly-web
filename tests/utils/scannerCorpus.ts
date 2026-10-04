@@ -55,6 +55,12 @@ export interface CorpusSpec {
   noise?: number;
   /** Peak brightness added by a soft glare spot over the top-left of the code. */
   glare?: number;
+  /** Contrast between light and dark modules, 0-1 (default 1): a washed-out screen has less. */
+  contrast?: number;
+  /** Grey levels added to every pixel (negative darkens): a dim or over-bright screen. */
+  brightness?: number;
+  /** Rolling-shutter tear: from this fraction of the frame height down, rows shift sideways. */
+  tear?: { at: number; shiftPx: number };
   /** Frame size (default 1280x720). */
   width?: number;
   height?: number;
@@ -80,7 +86,7 @@ const BACKGROUND = 128;
 const QUIET_ZONE = 4;
 
 /** Deterministic PRNG (mulberry32) so noisy fixtures are identical between runs. */
-function createRandom(seed: number): () => number {
+export function createRandom(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
     state = (state + 0x6d2b79f5) >>> 0;
@@ -180,6 +186,21 @@ export function renderCorpusFrame(spec: CorpusSpec): { data: Uint8ClampedArray; 
   }
 
   boxBlur(grey, width, height, spec.blurPx ?? 0);
+
+  const contrast = spec.contrast ?? 1;
+  const brightness = spec.brightness ?? 0;
+  if (contrast !== 1 || brightness !== 0) {
+    for (let i = 0; i < grey.length; i++) grey[i] = BACKGROUND + (grey[i] - BACKGROUND) * contrast + brightness;
+  }
+  if (spec.tear && spec.tear.shiftPx !== 0) {
+    const first = Math.floor(spec.tear.at * height);
+    for (let y = first; y < height; y++) {
+      const row = grey.slice(y * width, (y + 1) * width);
+      for (let x = 0; x < width; x++) {
+        grey[y * width + x] = row[Math.min(width - 1, Math.max(0, x - spec.tear.shiftPx))];
+      }
+    }
+  }
 
   const random = createRandom(spec.seed ?? 1);
   const noise = spec.noise ?? 0;
