@@ -103,3 +103,10 @@ Boundary checks run automatically during `pnpm run lint` and CI.
 - **Purpose**: Offline, synchronous reading of a web address for the signs people use to disguise where a link goes (#1156). It makes no request and never says a site is safe: it reports findings, each `info` or `caution`, and an ordinary address has none.
 - **Entry Points**:
   - `index.ts`: `analyseLink(url)` returning `LinkFinding[]` (cautions first) with `LinkFindingCode`, `LinkFindingSeverity`. Findings: credentials before an `@`, an IP host in any notation, a non-default port, a shortener or redirector, mixed alphabets, a lookalike of about a hundred brands (UTS #39 confusables for Latin, Cyrillic, Greek and Armenian plus digit swaps), a brand named in a subdomain or sign-in path of another registrable domain, four or more subdomain levels, and `http`. Used by the scanner and checker result sheet and the generator's link hints. See the package [README](./link-safety/README.md).
+
+### `optical-modem` (`@/packages/optical-modem`)
+
+- **Purpose**: QRCraftly Optical (#1161), the colour modem that follows animated QR codes. Experimental and off by default: nothing in the shipped app calls it unless the build sets `VITE_OPTICAL_MODEM=true`. It holds the modem frame (corner fiducials, a calibration strip, a Reed-Solomon protected header, a colour grid), a deterministic phone-camera channel simulator, and the capacity probe analysis ([ADR 0027](../../docs/adr/0027-optical-channel-probe.md)). Arithmetic that decides what a receiver reads uses only `+ - * /` on integers or 32-bit floats, so every JavaScript engine gives the same bits.
+- **Entry Points**:
+  - `index.ts`: constellations (`getConstellation`, `constellationId`), the probe sequence and its frames (`probeSequence`, `probeGeometries`, `drawProbeFrame`), the probe receiver analysis (`ProbeRun`, `formatProbeReport`) and the simulator (`simulateCapture`).
+  - `flag.ts`: `isOpticalModemEnabled()`, the build flag. Kept tiny on purpose: pages import it statically and it must not pull the modem into a first load.

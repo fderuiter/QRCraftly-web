@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'node:crypto';
-import { getFiles, measurePageLoads, verifyBundleSize } from '../scripts/check-bundle-size.js';
+import { OPTICAL_PROBE_MARKER, getFiles, measurePageLoads, verifyBundleSize } from '../scripts/check-bundle-size.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,6 +65,17 @@ describe('Bundle Size Verification Script Tests', () => {
     expect(result.exceeds).toBe(false);
     expect(result.reports).toHaveLength(2);
     expect(verifyBundleSize(TEMP_TEST_DIR, 1).totalRawSize).toBe('console.log(1);'.length);
+  });
+
+  it('leaves the experimental optical probe chunk out of the site total (#1162)', () => {
+    fs.mkdirSync(path.join(TEMP_TEST_DIR, 'assets'));
+    fs.writeFileSync(path.join(TEMP_TEST_DIR, 'app.js'), 'console.log(1);');
+    fs.writeFileSync(path.join(TEMP_TEST_DIR, 'assets', 'chunk-AbC123.js'), `const marker = '${OPTICAL_PROBE_MARKER}';${'P'.repeat(9000)}`);
+
+    const result = verifyBundleSize(TEMP_TEST_DIR, 1);
+    expect(result.exceeds).toBe(false);
+    expect(result.totalRawSize).toBe('console.log(1);'.length);
+    expect(result.reports).toHaveLength(2);
   });
 
   it('budgets the lazily loaded wasm reader separately from the site total (ADR 0023)', () => {
