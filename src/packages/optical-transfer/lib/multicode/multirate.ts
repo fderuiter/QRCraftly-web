@@ -72,7 +72,7 @@ const BEACON_MANIFEST_INTERVAL = 4;
 
 /** What one display frame shows. */
 export type MultiRateFrame =
-  | { kind: 'dense'; /** One text per tile. */ texts: string[] }
+  | { kind: 'dense'; /** One text per tile and channel: tile 0's channels first. A single-channel stream has one per tile. */ texts: string[] }
   | { kind: 'beacon'; texts: [string] };
 
 /**
@@ -109,6 +109,8 @@ export interface MultiRateSenderOptions {
   /** The manifest; its symbol size is replaced by the layout's so beacons and tiles agree. */
   manifest: PrismManifest;
   profile: MultiRateProfile;
+  /** Independent Prism frames each tile carries (default 1; the Colour profile of #1147 uses 3, one per colour channel). Beacons stay single. */
+  channels?: number;
 }
 
 /** The sender's frame source for one multi-rate transfer. */
@@ -136,6 +138,7 @@ export interface MultiRateSender {
  */
 export function createMultiRateSender(options: MultiRateSenderOptions): MultiRateSender {
   const { profile } = options;
+  const channels = Math.max(1, Math.floor(options.channels ?? 1));
   const layout = TILE_LAYOUTS[profile.layoutId];
   const symbolSize = profile.symbolSize ?? layout.symbolSize;
   const manifest: PrismManifest = { ...options.manifest, symbolSize };
@@ -160,7 +163,8 @@ export function createMultiRateSender(options: MultiRateSenderOptions): MultiRat
         return { kind: 'beacon', texts: [beacon.frameText(beaconBase + beaconsSoFar - 1)] };
       }
       const denseIndex = frameIndex - beaconsSoFar;
-      const texts = Array.from({ length: layout.tiles }, (_, tile) => dense.frameText(denseIndex * layout.tiles + tile));
+      const perFrame = layout.tiles * channels;
+      const texts = Array.from({ length: perFrame }, (_, slot) => dense.frameText(denseIndex * perFrame + slot));
       return { kind: 'dense', texts };
     },
   };

@@ -236,3 +236,39 @@ export {
   type FeedbackLinkOptions,
   type FeedbackLinkState,
 } from './lib/feedback/link';
+
+// Colour layer (#1147). Off: `createColourSender` returns null unless a caller passes `enabled: true`, and nothing in the app imports these.
+export {
+  CALIBRATION_SWATCHES,
+  ColourCalibrator,
+  fitCrossTalk,
+  splitChannels,
+  type CalibrationEvent,
+  type CrossTalkModel,
+  type GreyPlane,
+  type Matrix3,
+  type Rgb,
+  type RgbaImage,
+} from './lib/colour/crosstalk';
+export { beaconPatchRects, meanColour, samplePatch, tileRectsFromBeacon } from './lib/colour/geometry';
+export { EMIT_DARK, EMIT_LIGHT, composeBeacon, composeColourTile, type ComposeOptions, type ModuleGrid } from './lib/colour/compose';
+export {
+  COLOUR_FALLBACK_BEACONS,
+  COLOUR_FALLBACK_HINT,
+  COLOUR_PROFILE,
+  createColourSender,
+  shouldFallBackToMono,
+  type ColourFrame,
+  type ColourLinkReport,
+  type ColourProfile,
+  type ColourSender,
+  type ColourSenderOptions,
+} from './lib/colour/profile';
+export {
+  ColourReceiver,
+  type ColourFallbackReason,
+  type ColourReceiverOptions,
+  type ColourState,
+  type ColourStats,
+  type DecodedCode,
+} from './lib/colour/receiver';
