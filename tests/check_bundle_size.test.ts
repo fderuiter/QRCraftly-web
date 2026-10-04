@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'node:crypto';
-import { OPTICAL_PROBE_MARKER, getFiles, measurePageLoads, verifyBundleSize } from '../scripts/check-bundle-size.js';
+import { OPTICAL_PROBE_MARKER, WASM_MODULE_BUDGETS_KB, checkWasmModuleBudgets, getFiles, isOwnWasmModule, measurePageLoads, verifyBundleSize } from '../scripts/check-bundle-size.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,6 +89,33 @@ describe('Bundle Size Verification Script Tests', () => {
     expect(result.reports).toHaveLength(2);
 
     expect(verifyBundleSize(TEMP_TEST_DIR, 1, 0.01).wasmExceeds).toBe(true);
+  });
+
+  it('gives each Rust module its own line, outside the reader budget (#1182)', () => {
+    fs.writeFileSync(path.join(TEMP_TEST_DIR, 'selftest.Bb9Mx2Pu.wasm'), randomBytes(20_000));
+    const result = verifyBundleSize(TEMP_TEST_DIR, 1, 1);
+    expect(result.wasmGzipSize).toBe(0);
+    expect(isOwnWasmModule('assets/static/selftest.Bb9Mx2Pu.wasm')).toBe(true);
+    expect(isOwnWasmModule('selftest.wasm')).toBe(true);
+    expect(isOwnWasmModule('assets/static/zxing_reader.Bb9Mx2Pu.wasm')).toBe(false);
+    expect(isOwnWasmModule('selftester.wasm')).toBe(false);
+  });
+
+  it('measures committed Rust modules against their budgets and flags any without one (#1182)', () => {
+    fs.writeFileSync(path.join(TEMP_TEST_DIR, 'small.wasm'), 'A'.repeat(100));
+    fs.writeFileSync(path.join(TEMP_TEST_DIR, 'big.wasm'), randomBytes(5000));
+    fs.writeFileSync(path.join(TEMP_TEST_DIR, 'stray.wasm'), 'C');
+    fs.writeFileSync(path.join(TEMP_TEST_DIR, 'small.wasm.sha256'), 'not a module');
+    const result = checkWasmModuleBudgets(TEMP_TEST_DIR, { small: 1, big: 1 });
+    expect(result.modules.map((m) => [m.name, m.exceeds])).toEqual([['big', true], ['small', false]]);
+    expect(result.unbudgeted).toEqual(['stray']);
+  });
+
+  it('keeps every committed Rust module within its budget', () => {
+    const result = checkWasmModuleBudgets();
+    expect(result.unbudgeted).toEqual([]);
+    expect(result.modules.map((m) => m.name).sort()).toEqual(Object.keys(WASM_MODULE_BUDGETS_KB).sort());
+    expect(result.modules.filter((m) => m.exceeds)).toEqual([]);
   });
 
   it('leaves generated share images and example pictures out of the site total (#1030)', () => {

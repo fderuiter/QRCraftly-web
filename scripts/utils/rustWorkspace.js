@@ -84,3 +84,52 @@ export function sha256(bytes) {
 export function hashLine(moduleName, bytes) {
   return `${sha256(bytes)}  ${moduleName}.wasm\n`;
 }
+
+/**
+ * Every committed module in `src/wasm/`, by name.
+ * @param {string} [wasmDir]
+ * @returns {string[]}
+ */
+export function committedModuleNames(wasmDir = WASM_DIR) {
+  if (!fs.existsSync(wasmDir)) return [];
+  return fs
+    .readdirSync(wasmDir)
+    .filter(file => file.endsWith('.wasm'))
+    .map(file => file.slice(0, -'.wasm'.length))
+    .sort();
+}
+
+/**
+ * The build-time Foundry canary switch of a module: `selftest` is `FOUNDRY_SELFTEST` in the
+ * environment and `__FOUNDRY_SELFTEST__` in code.
+ * @param {string} moduleName
+ * @returns {string}
+ */
+export function foundrySwitchName(moduleName) {
+  return `FOUNDRY_${moduleName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+}
+
+/**
+ * Vite `define` entries for the Foundry canary switches (ADR 0033): one `__FOUNDRY_<MODULE>__`
+ * constant per committed module, `"wasm"` when the build sets `FOUNDRY_<MODULE>=wasm` and `"js"`
+ * otherwise. Code picks an implementation with it, so the bundler drops the other one. A switch
+ * with any other value, or one naming no module, fails the build.
+ * @param {Record<string, string | undefined>} [env]
+ * @param {string[]} [modules]
+ * @returns {Record<string, string>}
+ */
+export function foundryDefines(env = process.env, modules = committedModuleNames()) {
+  const switches = new Map(modules.map(name => [foundrySwitchName(name), name]));
+  for (const [key, value] of Object.entries(env)) {
+    if (!key.startsWith('FOUNDRY_') || value === undefined) continue;
+    if (!switches.has(key)) {
+      throw new Error(`${key} names no module in src/wasm/. Known switches: ${[...switches.keys()].join(', ') || 'none'}.`);
+    }
+    if (value !== 'wasm' && value !== 'js') {
+      throw new Error(`${key} must be "wasm" or "js", not "${value}".`);
+    }
+  }
+  return Object.fromEntries(
+    [...switches.keys()].map(key => [`__${key}__`, JSON.stringify(env[key] === 'wasm' ? 'wasm' : 'js')])
+  );
+}

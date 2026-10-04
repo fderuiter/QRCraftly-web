@@ -12,6 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DIST_DIR = path.resolve(__dirname, '../dist/client');
+const WASM_DIR = path.resolve(__dirname, '../src/wasm');
 // What one visitor downloads to open one page (#1106): its HTML, the CSS and the scripts it loads
 // at startup (static imports, not lazy chunks, workers or the wasm reader). The worst page is the
 // number that matters for load time, so this is the budget that catches JavaScript bloat.
@@ -25,12 +26,59 @@ export const MAX_GZIPPED_SIZE_KB = 650;
 export const MAX_LAZY_WASM_GZIPPED_SIZE_KB = 450;
 
 /**
- * Whether a file is the lazily loaded WebAssembly reader, budgeted separately.
+ * Gzipped budget in KB for each of our own Rust modules in `src/wasm/` (#1182, ADR 0033). Each
+ * module's issue sets its line; a module without one fails the check.
+ */
+export const WASM_MODULE_BUDGETS_KB = {
+  selftest: 4,
+};
+
+/**
+ * Whether a file is one of our own Rust modules, as committed (`selftest.wasm`) or as emitted with
+ * a content hash (`selftest.Bb9Mx2Pu.wasm`).
+ * @param {string} relativePath
+ * @param {string[]} [modules]
+ * @returns {boolean}
+ */
+export function isOwnWasmModule(relativePath, modules = Object.keys(WASM_MODULE_BUDGETS_KB)) {
+  const base = relativePath.split('/').pop() ?? '';
+  return modules.some((name) => base === `${name}.wasm` || (base.startsWith(`${name}.`) && /^[\w-]+\.wasm$/.test(base.slice(name.length + 1))));
+}
+
+/**
+ * Whether a file is the lazily loaded WebAssembly reader, budgeted separately. Our own modules
+ * have their own lines instead.
  * @param {string} relativePath
  * @returns {boolean}
  */
 export function isLazyWasm(relativePath) {
-  return relativePath.endsWith('.wasm');
+  return relativePath.endsWith('.wasm') && !isOwnWasmModule(relativePath);
+}
+
+/**
+ * Measures each committed Rust module against its own budget. These are the exact bytes the site
+ * ships, so the check needs no build.
+ * @param {string} [wasmDir]
+ * @param {Record<string, number>} [budgets]
+ * @returns {{ modules: Array<{name: string, rawSize: number, gzipSize: number, limitBytes: number, exceeds: boolean}>, unbudgeted: string[] }}
+ */
+export function checkWasmModuleBudgets(wasmDir = WASM_DIR, budgets = WASM_MODULE_BUDGETS_KB) {
+  const modules = [];
+  const unbudgeted = [];
+  const files = fs.existsSync(wasmDir) ? fs.readdirSync(wasmDir).filter((file) => file.endsWith('.wasm')).sort() : [];
+  for (const file of files) {
+    const name = file.slice(0, -'.wasm'.length);
+    const budget = budgets[name];
+    if (budget === undefined) {
+      unbudgeted.push(name);
+      continue;
+    }
+    const content = fs.readFileSync(path.join(wasmDir, file));
+    const gzipSize = zlib.gzipSync(content).length;
+    const limitBytes = budget * 1024;
+    modules.push({ name, rawSize: content.length, gzipSize, limitBytes, exceeds: gzipSize > limitBytes });
+  }
+  return { modules, unbudgeted };
 }
 
 // The experimental optical channel probe (#1162) carries this string, so its chunk can be told apart
@@ -224,6 +272,24 @@ export function runCheck() {
     if (result.wasmExceeds) {
       console.error(
         `\n❌ ERROR: The lazily loaded WebAssembly (${(result.wasmGzipSize / 1024).toFixed(2)} KB gzipped) exceeds its ${MAX_LAZY_WASM_GZIPPED_SIZE_KB} KB budget!`
+      );
+      process.exit(1);
+    }
+
+    const own = checkWasmModuleBudgets();
+    for (const module of own.modules) {
+      console.log(
+        `Rust module ${module.name}: ${(module.gzipSize / 1024).toFixed(2)} KB gzipped (budget ${(module.limitBytes / 1024).toFixed(2)} KB, not in the total)`
+      );
+    }
+    if (own.unbudgeted.length > 0) {
+      console.error(`\n❌ ERROR: src/wasm/ has modules without a budget: ${own.unbudgeted.join(', ')}. Fix: add a line to WASM_MODULE_BUDGETS_KB in scripts/check-bundle-size.js.`);
+      process.exit(1);
+    }
+    const over = own.modules.find((module) => module.exceeds);
+    if (over) {
+      console.error(
+        `\n❌ ERROR: The Rust module ${over.name} (${(over.gzipSize / 1024).toFixed(2)} KB gzipped) exceeds its ${(over.limitBytes / 1024).toFixed(2)} KB budget!`
       );
       process.exit(1);
     }

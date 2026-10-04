@@ -25,6 +25,7 @@ import type { Plugin } from 'vite';
 import type { Connect } from 'vite';
 import { zxingNoNetwork } from './scripts/vite/zxingNoNetwork';
 import { shippedPackages } from './scripts/vite/thirdPartyLicenses';
+import { foundryDefines } from './scripts/utils/rustWorkspace.js';
 
 /**
  * Applies the static rules in `public/_redirects` (the file Cloudflare serves them from) in
@@ -72,6 +73,8 @@ export default defineConfig(() => {
       define: {
         // Released package version, used as softwareVersion in structured data.
         __APP_VERSION__: JSON.stringify(version),
+        // Foundry canary switches, one per Rust module: FOUNDRY_<MODULE>=wasm (ADR 0033).
+        ...foundryDefines(),
       },
       server: {
         port: 3000,
