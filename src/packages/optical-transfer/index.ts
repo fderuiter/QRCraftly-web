@@ -137,3 +137,64 @@ export {
   type PrivateKeys,
 } from './lib/prism/crypto';
 export { bytesToWords, wordsToBytes, fingerprintWords, formatKeyCode, parseKeyCode, keyQrText, parseKeyQr, KEY_CODE_WORDS, KEY_SECRET_BYTES } from './lib/prism/words';
+
+export { PrismReceiver } from './lib/prism/receiver';
+
+// Multi-code transfer (#1142). Off unless a caller opts in through `planMultiCode`; nothing in the app imports these yet.
+export {
+  MIN_MODULE_CSS_PX,
+  TILE_QUIET_MODULES,
+  TILE_LAYOUTS,
+  alphanumericCapacityL,
+  qrModuleCount,
+  tileFrameCapacity,
+  tileSymbolPlan,
+  layoutFootprint,
+  modulePxFor,
+  selectLayout,
+  type TileLayout,
+  type TileLayoutId,
+  type TileSymbolPlan,
+  type ScreenSize,
+  type LayoutChoice,
+  type LayoutOptions,
+} from './lib/multicode/layout';
+export {
+  tileGroup,
+  tileSlot,
+  tileFrameIndex,
+  tilesChangingAt,
+  tilesIntactAcross,
+  worstIntactFraction,
+} from './lib/multicode/stagger';
+export {
+  measureRefreshInterval,
+  refreshRateFromInterval,
+  holdForTargetFps,
+  effectiveFps,
+  createVsyncPacer,
+  type PacerTick,
+  type FrameClock,
+  type VsyncPacer,
+  type VsyncPacerOptions,
+} from './lib/multicode/pacing';
+export {
+  TileTracker,
+  predictTileRects,
+  createSymbolDedup,
+  type Rect,
+  type TileCrop,
+  type TrackPlan,
+  type CropResult,
+  type SymbolDedup,
+  type TileTrackerOptions,
+} from './lib/multicode/tracker';
+export {
+  decoderPoolSize,
+  createDecoderPool,
+  type DecoderPool,
+  type DecoderPoolOptions,
+  type DecoderPoolStats,
+  type PoolSizeOptions,
+} from './lib/multicode/pool';
+export { planMultiCode, type MultiCodeOptions, type MultiCodePlan } from './lib/multicode/plan';
