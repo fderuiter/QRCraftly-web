@@ -30,7 +30,7 @@ The GPU output is the reference output, byte for byte: symbol, confidence and me
 ### Fallback
 
 - WebGL 2 is the one path built. WebGPU compute is **not** built: the kernel is a per-cell map with no shared memory or reductions, so WebGL 2 fragment shaders do the same work, and WebGL 2 reaches more browsers today. WebGPU is the choice to revisit if a GPU fiducial search needs compute.
-- With no WebGL 2, a shader that fails to compile, a lost context or a failed self-test, the receiver keeps the QR profiles of the ladder (#1165) and shows one of four fixed messages (`GPU_FALLBACK_MESSAGES`), each ending in "QR profiles still work".
+- With no WebGL 2, a shader that fails to compile, a lost context or a failed self-test, the receiver keeps the QR profiles of the ladder ([ADR 0030](0030-optical-profile-ladder.md)) and shows one of four fixed messages (`GPU_FALLBACK_MESSAGES`), each ending in "QR profiles still work".
 - A JavaScript worker running the reference kernel is also a valid CPU path. It is not wired in here.
 
 ### Frame source

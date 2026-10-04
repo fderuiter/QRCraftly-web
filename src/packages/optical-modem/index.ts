@@ -38,3 +38,20 @@ export {
 export type { SampledGrid } from './lib/sample';
 export { FRAGMENT_SHADER, VERTEX_SHADER } from './lib/shader';
 export { grantedSettings, watchFrames, FrameRateMeter, type StreamGrant, type FrameTick, type FrameWatcher } from './lib/frameSource';
+export {
+  LADDER,
+  DEFAULT_LADDER_WEIGHTS,
+  LINK_ADVICE_TEXT,
+  LinkTracker,
+  SIMULATED_RECEIVERS,
+  ladderSchedule,
+  lockedSchedule,
+  observeDecode,
+  linkLabel,
+  lockLevelText,
+  type LadderRung,
+  type FrameObservation,
+  type LinkAdvice,
+  type LinkState,
+  type SimulatedReceiver,
+} from './lib/ladder';

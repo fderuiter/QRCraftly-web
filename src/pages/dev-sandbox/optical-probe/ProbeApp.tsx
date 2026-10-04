@@ -16,6 +16,7 @@ import {
   type ProbePattern,
 } from '@/packages/optical-modem';
 import { PHOTOSENSITIVITY_NOTICE } from '@/utils/photosensitivity';
+import LadderPreview from './LadderPreview';
 
 /**
  * Marks this tool's chunk for `scripts/check-bundle-size.js`, which leaves it out of the site-total
@@ -294,6 +295,7 @@ export default function ProbeApp() {
       </section>
       <Sender />
       <Receiver meta={{ device, direction, mode }} />
+      <LadderPreview />
     </main>
   );
 }
