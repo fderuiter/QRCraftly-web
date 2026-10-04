@@ -36,6 +36,7 @@ Not measured yet. The probe has not been run on a phone. This table is filled in
 
 ## Consequences
 
+- The frame format and codec that these measurements tune are in [ADR 0028](0028-optical-modem-frame-format.md).
 - The recommended constellation and cell size for each profile (P2 to P4) are set from this table, and the provisional geometries in the modem profile table are replaced then.
 - The simulator already shows one thing worth checking on a device: in its model, colours placed for the largest OKLab gap beat the RGB cube corners on gap but not on symbol errors, because the model's cross-talk and white-balance drift act per RGB channel. A real camera decides which wins.
 - The probe finds its fiducials with a luma threshold and needs cells of about 2.5 camera pixels or more. Below that it reports the frame as unreadable, which is itself a result: the cell is too small for this receiver.

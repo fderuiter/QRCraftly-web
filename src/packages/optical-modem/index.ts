@@ -18,3 +18,13 @@ export {
   type EdgeResult,
 } from './lib/probeAnalysis';
 export type { RgbaImage } from './lib/layout';
+export {
+  encodeModemFrame,
+  decodeModemFrame,
+  frameCapacity,
+  DEFAULT_ERASURE_THRESHOLD,
+  type DecodeOptions,
+  type DecodedFrame,
+  type FrameCapacity,
+} from './lib/codec';
+export { MODEM_PROFILES, type ModemProfile } from './lib/profile';

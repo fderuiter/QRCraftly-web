@@ -19,79 +19,179 @@ The same analysis the probe page runs, on simulated captures. The probe frame (1
 | Channel | Constellation          | Camera px per cell | Clean frames | Symbol errors | Bits per cell | SNR dB | Capacity KB/s |
 | ------- | ---------------------- | ------------------ | ------------ | ------------- | ------------- | ------ | ------------- |
 | studio  | monochrome             | 6.0                | 3/3          | 0.0%          | 1.00 of 1     | 28.8   | 22            |
-| studio  | monochrome             | 5.0                | 3/3          | 0.0%          | 1.00 of 1     | 24.8   | 22            |
+| studio  | monochrome             | 5.0                | 3/3          | 0.0%          | 1.00 of 1     | 24.7   | 22            |
 | studio  | monochrome             | 4.0                | 3/3          | 0.0%          | 1.00 of 1     | 19.0   | 22            |
 | studio  | monochrome             | 3.5                | 3/3          | 0.0%          | 1.00 of 1     | 15.9   | 22            |
-| studio  | monochrome             | 3.2                | 3/3          | 0.0%          | 1.00 of 1     | 15.5   | 22            |
-| studio  | 4 colours, OKLab       | 6.0                | 3/3          | 0.0%          | 2.00 of 2     | 21.9   | 44            |
+| studio  | monochrome             | 3.2                | 3/3          | 0.0%          | 1.00 of 1     | 15.4   | 22            |
+| studio  | 4 colours, OKLab       | 6.0                | 3/3          | 0.0%          | 2.00 of 2     | 21.8   | 44            |
 | studio  | 4 colours, OKLab       | 5.0                | 3/3          | 0.0%          | 2.00 of 2     | 18.5   | 44            |
-| studio  | 4 colours, OKLab       | 4.0                | 3/3          | 0.0%          | 2.00 of 2     | 13.2   | 44            |
+| studio  | 4 colours, OKLab       | 4.0                | 3/3          | 0.0%          | 2.00 of 2     | 13.3   | 44            |
 | studio  | 4 colours, OKLab       | 3.5                | 3/3          | 0.3%          | 1.98 of 2     | 10.5   | 44            |
-| studio  | 4 colours, OKLab       | 3.2                | 3/3          | 1.6%          | 1.91 of 2     | 9.1    | 42            |
-| studio  | 8 colours, RGB corners | 6.0                | 3/3          | 0.0%          | 3.00 of 3     | 15.4   | 66            |
+| studio  | 4 colours, OKLab       | 3.2                | 3/3          | 1.7%          | 1.90 of 2     | 9.2    | 42            |
+| studio  | 8 colours, RGB corners | 6.0                | 3/3          | 0.0%          | 3.00 of 3     | 15.5   | 66            |
 | studio  | 8 colours, RGB corners | 5.0                | 3/3          | 0.0%          | 3.00 of 3     | 11.5   | 66            |
 | studio  | 8 colours, RGB corners | 4.0                | 3/3          | 0.0%          | 3.00 of 3     | 7.7    | 66            |
 | studio  | 8 colours, RGB corners | 3.5                | 3/3          | 0.2%          | 2.98 of 3     | 5.4    | 66            |
 | studio  | 8 colours, RGB corners | 3.2                | 3/3          | 0.6%          | 2.95 of 3     | 4.6    | 65            |
 | studio  | 8 colours, OKLab       | 6.0                | 3/3          | 0.0%          | 3.00 of 3     | 20.3   | 66            |
-| studio  | 8 colours, OKLab       | 5.0                | 3/3          | 0.0%          | 3.00 of 3     | 15.1   | 66            |
+| studio  | 8 colours, OKLab       | 5.0                | 3/3          | 0.0%          | 3.00 of 3     | 15.0   | 66            |
 | studio  | 8 colours, OKLab       | 4.0                | 3/3          | 0.5%          | 2.97 of 3     | 10.6   | 65            |
-| studio  | 8 colours, OKLab       | 3.5                | 3/3          | 2.9%          | 2.84 of 3     | 7.3    | 63            |
-| studio  | 8 colours, OKLab       | 3.2                | 3/3          | 5.4%          | 2.72 of 3     | 5.3    | 60            |
+| studio  | 8 colours, OKLab       | 3.5                | 3/3          | 2.8%          | 2.85 of 3     | 7.3    | 63            |
+| studio  | 8 colours, OKLab       | 3.2                | 3/3          | 5.6%          | 2.71 of 3     | 5.2    | 60            |
 | studio  | 16 colours, OKLab      | 6.0                | 3/3          | 0.1%          | 3.99 of 4     | 14.5   | 88            |
-| studio  | 16 colours, OKLab      | 5.0                | 3/3          | 1.8%          | 3.90 of 4     | 10.9   | 86            |
-| studio  | 16 colours, OKLab      | 4.0                | 3/3          | 11.9%         | 3.51 of 4     | 5.9    | 77            |
-| studio  | 16 colours, OKLab      | 3.5                | 3/3          | 22.8%         | 3.13 of 4     | 3.9    | 69            |
-| studio  | 16 colours, OKLab      | 3.2                | 3/3          | 34.5%         | 2.75 of 4     | 1.7    | 61            |
-| typical | monochrome             | 6.0                | 3/3          | 0.0%          | 1.00 of 1     | 25.2   | 22            |
+| studio  | 16 colours, OKLab      | 5.0                | 3/3          | 1.7%          | 3.90 of 4     | 10.9   | 86            |
+| studio  | 16 colours, OKLab      | 4.0                | 3/3          | 11.6%         | 3.52 of 4     | 6.0    | 78            |
+| studio  | 16 colours, OKLab      | 3.5                | 3/3          | 22.4%         | 3.14 of 4     | 3.8    | 69            |
+| studio  | 16 colours, OKLab      | 3.2                | 3/3          | 33.9%         | 2.76 of 4     | 1.7    | 61            |
+| typical | monochrome             | 6.0                | 3/3          | 0.0%          | 1.00 of 1     | 25.1   | 22            |
 | typical | monochrome             | 5.0                | 3/3          | 0.0%          | 1.00 of 1     | 21.1   | 22            |
 | typical | monochrome             | 4.0                | 3/3          | 0.0%          | 1.00 of 1     | 16.6   | 22            |
-| typical | monochrome             | 3.5                | 3/3          | 0.0%          | 1.00 of 1     | 14.0   | 22            |
-| typical | monochrome             | 3.2                | 3/3          | 0.9%          | 0.93 of 1     | 12.5   | 21            |
+| typical | monochrome             | 3.5                | 3/3          | 0.0%          | 1.00 of 1     | 13.9   | 22            |
+| typical | monochrome             | 3.2                | 3/3          | 0.9%          | 0.94 of 1     | 12.5   | 21            |
 | typical | 4 colours, OKLab       | 6.0                | 3/3          | 0.0%          | 2.00 of 2     | 18.4   | 44            |
 | typical | 4 colours, OKLab       | 5.0                | 3/3          | 0.0%          | 2.00 of 2     | 14.8   | 44            |
-| typical | 4 colours, OKLab       | 4.0                | 3/3          | 0.3%          | 1.97 of 2     | 9.8    | 44            |
-| typical | 4 colours, OKLab       | 3.5                | 3/3          | 4.9%          | 1.75 of 2     | 7.0    | 38            |
-| typical | 4 colours, OKLab       | 3.2                | 3/3          | 12.6%         | 1.45 of 2     | 5.2    | 32            |
+| typical | 4 colours, OKLab       | 4.0                | 3/3          | 0.4%          | 1.97 of 2     | 9.8    | 44            |
+| typical | 4 colours, OKLab       | 3.5                | 3/3          | 4.7%          | 1.75 of 2     | 7.0    | 39            |
+| typical | 4 colours, OKLab       | 3.2                | 3/3          | 12.7%         | 1.44 of 2     | 5.2    | 32            |
 | typical | 8 colours, RGB corners | 6.0                | 3/3          | 0.0%          | 3.00 of 3     | 12.1   | 66            |
 | typical | 8 colours, RGB corners | 5.0                | 3/3          | 0.0%          | 3.00 of 3     | 9.2    | 66            |
 | typical | 8 colours, RGB corners | 4.0                | 3/3          | 0.9%          | 2.94 of 3     | 4.9    | 65            |
-| typical | 8 colours, RGB corners | 3.5                | 3/3          | 4.6%          | 2.71 of 3     | 2.5    | 60            |
+| typical | 8 colours, RGB corners | 3.5                | 3/3          | 4.6%          | 2.71 of 3     | 2.6    | 60            |
 | typical | 8 colours, RGB corners | 3.2                | 3/3          | 12.9%         | 2.29 of 3     | 0.9    | 51            |
 | typical | 8 colours, OKLab       | 6.0                | 3/3          | 0.0%          | 3.00 of 3     | 15.6   | 66            |
 | typical | 8 colours, OKLab       | 5.0                | 3/3          | 0.2%          | 2.98 of 3     | 11.5   | 66            |
-| typical | 8 colours, OKLab       | 4.0                | 3/3          | 3.8%          | 2.79 of 3     | 6.5    | 61            |
-| typical | 8 colours, OKLab       | 3.5                | 3/3          | 11.3%         | 2.40 of 3     | 3.5    | 53            |
-| typical | 8 colours, OKLab       | 3.2                | 3/3          | 23.2%         | 1.92 of 3     | 1.6    | 42            |
-| typical | 16 colours, OKLab      | 6.0                | 3/3          | 1.1%          | 3.94 of 4     | 10.5   | 87            |
-| typical | 16 colours, OKLab      | 5.0                | 3/3          | 7.5%          | 3.69 of 4     | 6.8    | 81            |
-| typical | 16 colours, OKLab      | 4.0                | 3/3          | 30.8%         | 2.90 of 4     | 1.8    | 64            |
-| typical | 16 colours, OKLab      | 3.5                | 3/3          | 48.4%         | 2.26 of 4     | -1.0   | 50            |
-| typical | 16 colours, OKLab      | 3.2                | 3/3          | 58.0%         | 1.85 of 4     | -2.7   | 41            |
+| typical | 8 colours, OKLab       | 4.0                | 3/3          | 3.8%          | 2.79 of 3     | 6.4    | 61            |
+| typical | 8 colours, OKLab       | 3.5                | 3/3          | 11.7%         | 2.39 of 3     | 3.4    | 53            |
+| typical | 8 colours, OKLab       | 3.2                | 3/3          | 22.8%         | 1.93 of 3     | 1.4    | 43            |
+| typical | 16 colours, OKLab      | 6.0                | 3/3          | 1.0%          | 3.94 of 4     | 10.5   | 87            |
+| typical | 16 colours, OKLab      | 5.0                | 3/3          | 7.0%          | 3.70 of 4     | 6.9    | 82            |
+| typical | 16 colours, OKLab      | 4.0                | 3/3          | 30.5%         | 2.90 of 4     | 1.8    | 64            |
+| typical | 16 colours, OKLab      | 3.5                | 3/3          | 48.1%         | 2.25 of 4     | -0.9   | 50            |
+| typical | 16 colours, OKLab      | 3.2                | 3/3          | 57.7%         | 1.86 of 4     | -2.7   | 41            |
 | poor    | monochrome             | 6.0                | 3/3          | 0.0%          | 1.00 of 1     | 21.3   | 22            |
 | poor    | monochrome             | 5.0                | 3/3          | 0.0%          | 1.00 of 1     | 18.0   | 22            |
 | poor    | monochrome             | 4.0                | 3/3          | 0.5%          | 0.96 of 1     | 13.8   | 21            |
-| poor    | monochrome             | 3.5                | 3/3          | 2.4%          | 0.86 of 1     | 11.6   | 19            |
+| poor    | monochrome             | 3.5                | 3/3          | 2.4%          | 0.86 of 1     | 11.5   | 19            |
 | poor    | monochrome             | 3.2                | 3/3          | 5.6%          | 0.72 of 1     | 9.9    | 16            |
 | poor    | 4 colours, OKLab       | 6.0                | 3/3          | 0.0%          | 2.00 of 2     | 13.4   | 44            |
 | poor    | 4 colours, OKLab       | 5.0                | 3/3          | 0.9%          | 1.94 of 2     | 9.8    | 43            |
-| poor    | 4 colours, OKLab       | 4.0                | 3/3          | 12.1%         | 1.47 of 2     | 5.2    | 32            |
-| poor    | 4 colours, OKLab       | 3.5                | 3/3          | 25.7%         | 1.03 of 2     | 2.5    | 23            |
+| poor    | 4 colours, OKLab       | 4.0                | 3/3          | 12.0%         | 1.47 of 2     | 5.2    | 33            |
+| poor    | 4 colours, OKLab       | 3.5                | 3/3          | 25.8%         | 1.03 of 2     | 2.5    | 23            |
 | poor    | 4 colours, OKLab       | 3.2                | 0/0          | 100.0%        | 0.00 of 2     | 0.0    | 0             |
 | poor    | 8 colours, RGB corners | 6.0                | 3/3          | 0.1%          | 2.99 of 3     | 7.8    | 66            |
 | poor    | 8 colours, RGB corners | 5.0                | 3/3          | 1.6%          | 2.90 of 3     | 5.0    | 64            |
-| poor    | 8 colours, RGB corners | 4.0                | 3/3          | 12.5%         | 2.35 of 3     | 1.2    | 52            |
-| poor    | 8 colours, RGB corners | 3.5                | 3/3          | 26.5%         | 1.74 of 3     | -0.9   | 38            |
-| poor    | 8 colours, RGB corners | 3.2                | 2/2          | 39.9%         | 1.30 of 3     | -2.9   | 29            |
+| poor    | 8 colours, RGB corners | 4.0                | 3/3          | 12.4%         | 2.35 of 3     | 1.2    | 52            |
+| poor    | 8 colours, RGB corners | 3.5                | 3/3          | 26.6%         | 1.73 of 3     | -0.9   | 38            |
+| poor    | 8 colours, RGB corners | 3.2                | 0/0          | 100.0%        | 0.00 of 3     | 0.0    | 0             |
 | poor    | 8 colours, OKLab       | 6.0                | 3/3          | 0.4%          | 2.97 of 3     | 9.7    | 65            |
-| poor    | 8 colours, OKLab       | 5.0                | 3/3          | 4.5%          | 2.73 of 3     | 6.1    | 60            |
-| poor    | 8 colours, OKLab       | 4.0                | 3/3          | 21.9%         | 1.99 of 3     | 1.7    | 44            |
-| poor    | 8 colours, OKLab       | 3.5                | 3/3          | 36.6%         | 1.45 of 3     | -0.8   | 32            |
-| poor    | 8 colours, OKLab       | 3.2                | 3/3          | 49.2%         | 1.10 of 3     | -2.2   | 24            |
-| poor    | 16 colours, OKLab      | 6.0                | 3/3          | 12.3%         | 3.52 of 4     | 3.7    | 78            |
-| poor    | 16 colours, OKLab      | 5.0                | 3/3          | 29.6%         | 2.90 of 4     | 0.0    | 64            |
-| poor    | 16 colours, OKLab      | 4.0                | 3/3          | 55.1%         | 1.96 of 4     | -3.3   | 43            |
-| poor    | 16 colours, OKLab      | 3.5                | 3/3          | 67.7%         | 1.40 of 4     | -7.1   | 31            |
-| poor    | 16 colours, OKLab      | 3.2                | 2/2          | 74.8%         | 1.07 of 4     | -8.6   | 24            |
+| poor    | 8 colours, OKLab       | 5.0                | 3/3          | 4.5%          | 2.73 of 3     | 6.0    | 60            |
+| poor    | 8 colours, OKLab       | 4.0                | 3/3          | 22.1%         | 1.99 of 3     | 1.6    | 44            |
+| poor    | 8 colours, OKLab       | 3.5                | 3/3          | 36.7%         | 1.45 of 3     | -0.9   | 32            |
+| poor    | 8 colours, OKLab       | 3.2                | 1/1          | 50.1%         | 1.07 of 3     | -2.3   | 24            |
+| poor    | 16 colours, OKLab      | 6.0                | 3/3          | 12.0%         | 3.52 of 4     | 3.7    | 78            |
+| poor    | 16 colours, OKLab      | 5.0                | 3/3          | 29.3%         | 2.91 of 4     | -0.0   | 64            |
+| poor    | 16 colours, OKLab      | 4.0                | 3/3          | 54.7%         | 1.96 of 4     | -3.4   | 43            |
+| poor    | 16 colours, OKLab      | 3.5                | 3/3          | 67.5%         | 1.40 of 4     | -7.0   | 31            |
+| poor    | 16 colours, OKLab      | 3.2                | 2/2          | 74.4%         | 1.09 of 4     | -7.9   | 24            |
 
 A row with no clean frames was not readable in this channel: the fiducials or the header were lost, or the cells were too ambiguous to tell frames apart. The capacity column counts a full 8 px cell grid of 120 x 67 cells; the profile geometries of the modem are larger.
+
+## Codec: blocks repaired and goodput
+
+Each row encodes frames of one profile (Reed-Solomon blocks, interleaved and whitened), captures them through the simulated channel and decodes them. "Readable" is how many frames had their fiducials and header read. "Hard" has the code find every wrong byte; "soft" marks bytes carried by a cell with confidence under 32 (of 255) as erasures. Goodput is the data bytes in repaired blocks times 30 frames per second, in kilobytes (1000 bytes) per second, and assumes every camera frame is a fresh, untorn frame (the probe measures how many really are). It counts data only, before the outer code's overhead.
+
+| Profile   | Channel | Camera px per cell | Readable | Blocks repaired, hard | Blocks repaired, soft | Goodput KB/s (of full frame) |
+| --------- | ------- | ------------------ | -------- | --------------------- | --------------------- | ---------------------------- |
+| P2 Steady | studio  | 6.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
+| P2 Steady | studio  | 5.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
+| P2 Steady | studio  | 4.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
+| P2 Steady | studio  | 3.5                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
+| P2 Steady | studio  | 3.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
+| P2 Steady | typical | 6.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
+| P2 Steady | typical | 5.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
+| P2 Steady | typical | 4.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
+| P2 Steady | typical | 3.5                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
+| P2 Steady | typical | 3.0                | 3/3      | 0%                    | 0%                    | 0.0 of 14.4                  |
+| P2 Steady | poor    | 6.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
+| P2 Steady | poor    | 5.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
+| P2 Steady | poor    | 4.0                | 3/3      | 0%                    | 0%                    | 0.0 of 14.4                  |
+| P2 Steady | poor    | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 14.4                  |
+| P2 Steady | poor    | 3.0                | 0/3      | 0%                    | 0%                    | 0.0 of 14.4                  |
+| P3 Fast   | studio  | 6.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
+| P3 Fast   | studio  | 5.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
+| P3 Fast   | studio  | 4.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
+| P3 Fast   | studio  | 3.5                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
+| P3 Fast   | studio  | 3.0                | 3/3      | 8%                    | 10%                   | 3.8 of 37.4                  |
+| P3 Fast   | typical | 6.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
+| P3 Fast   | typical | 5.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
+| P3 Fast   | typical | 4.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
+| P3 Fast   | typical | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  |
+| P3 Fast   | typical | 3.0                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  |
+| P3 Fast   | poor    | 6.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
+| P3 Fast   | poor    | 5.0                | 3/3      | 95%                   | 100%                  | 37.4 of 37.4                 |
+| P3 Fast   | poor    | 4.0                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  |
+| P3 Fast   | poor    | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  |
+| P3 Fast   | poor    | 3.0                | 0/3      | 0%                    | 0%                    | 0.0 of 37.4                  |
+| P4 Rapid  | studio  | 6.0                | 3/3      | 100%                  | 100%                  | 86.4 of 86.4                 |
+| P4 Rapid  | studio  | 5.0                | 3/3      | 100%                  | 100%                  | 86.4 of 86.4                 |
+| P4 Rapid  | studio  | 4.0                | 3/3      | 84%                   | 94%                   | 81.6 of 86.4                 |
+| P4 Rapid  | studio  | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
+| P4 Rapid  | studio  | 3.0                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
+| P4 Rapid  | typical | 6.0                | 3/3      | 100%                  | 100%                  | 86.4 of 86.4                 |
+| P4 Rapid  | typical | 5.0                | 3/3      | 100%                  | 100%                  | 86.4 of 86.4                 |
+| P4 Rapid  | typical | 4.0                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
+| P4 Rapid  | typical | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
+| P4 Rapid  | typical | 3.0                | 2/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
+| P4 Rapid  | poor    | 6.0                | 3/3      | 31%                   | 42%                   | 36.0 of 86.4                 |
+| P4 Rapid  | poor    | 5.0                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
+| P4 Rapid  | poor    | 4.0                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
+| P4 Rapid  | poor    | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
+| P4 Rapid  | poor    | 3.0                | 0/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
+
+### Soft versus hard decoding
+
+Share of blocks repaired in the typical channel at the stated pixels per cell, for each erasure threshold (0 is hard decoding), over 5 frames. Each profile is run with its own code and with 16 check bytes fewer; the data bytes grow to keep blocks at 160 bytes. Erasures help where the code is near its limit and do nothing where it has a wide margin.
+
+| Profile   | Check bytes | Camera px per cell | hard | soft < 16 | soft < 32 | soft < 40 | soft < 64 | soft < 96 | soft < 128 |
+| --------- | ----------- | ------------------ | ---- | --------- | --------- | --------- | --------- | --------- | ---------- |
+| P2 Steady | 80          | 3.5                | 100% | 100%      | 100%      | 100%      | 67%       | 17%       | 17%        |
+| P2 Steady | 64          | 3.5                | 63%  | 67%       | 67%       | 67%       | 10%       | 7%        | 7%         |
+| P3 Fast   | 64          | 4.0                | 100% | 100%      | 100%      | 100%      | 72%       | 2%        | 2%         |
+| P3 Fast   | 48          | 4.0                | 89%  | 91%       | 91%       | 86%       | 2%        | 2%        | 2%         |
+| P4 Rapid  | 80          | 5.0                | 99%  | 100%      | 100%      | 100%      | 100%      | 100%      | 13%        |
+| P4 Rapid  | 64          | 5.0                | 72%  | 78%       | 78%       | 77%       | 78%       | 48%       | 0%         |
+
+### Check bytes per block
+
+Blocks of 160 bytes with a varying split between data and check bytes, soft decoding, typical channel at the same pixels per cell. More check bytes repair more damage but carry less data.
+
+| Profile   | Check bytes | Data bytes | Blocks repaired | Goodput KB/s |
+| --------- | ----------- | ---------- | --------------- | ------------ |
+| P2 Steady | 16          | 144        | 0%              | 0.0          |
+| P2 Steady | 32          | 128        | 0%              | 0.0          |
+| P2 Steady | 48          | 112        | 22%             | 4.5          |
+| P2 Steady | 64          | 96         | 61%             | 10.6         |
+| P2 Steady | 80          | 80         | 100%            | 14.4         |
+| P2 Steady | 96          | 64         | 100%            | 11.5         |
+| P3 Fast   | 16          | 144        | 0%              | 0.0          |
+| P3 Fast   | 32          | 128        | 13%             | 6.4          |
+| P3 Fast   | 48          | 112        | 90%             | 39.2         |
+| P3 Fast   | 64          | 96         | 100%            | 37.4         |
+| P3 Fast   | 80          | 80         | 100%            | 31.2         |
+| P3 Fast   | 96          | 64         | 100%            | 25.0         |
+| P4 Rapid  | 16          | 144        | 0%              | 0.0          |
+| P4 Rapid  | 32          | 128        | 0%              | 0.0          |
+| P4 Rapid  | 48          | 112        | 17%             | 20.2         |
+| P4 Rapid  | 64          | 96         | 75%             | 77.8         |
+| P4 Rapid  | 80          | 80         | 100%            | 86.4         |
+| P4 Rapid  | 96          | 64         | 100%            | 69.1         |
+
+## End to end: a file through the outer code
+
+A 48 KB file, split into droplets by the rateless outer code (the same one the QR transfer uses), one droplet per inner block, through the typical channel. Frames are counted until the file is complete and its checksum matches; the time assumes one frame per camera frame at 30 fps. The file goodput includes the outer code's overhead.
+
+| Profile   | Camera px per cell | File complete | Frames | Seconds | File goodput KB/s |
+| --------- | ------------------ | ------------- | ------ | ------- | ----------------- |
+| P2 Steady | 3.5                | yes           | 127    | 4.2     | 11.3              |
+| P3 Fast   | 4.0                | yes           | 39     | 1.3     | 36.9              |
+| P4 Rapid  | 5.0                | yes           | 20     | 0.7     | 72.0              |
