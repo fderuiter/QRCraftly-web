@@ -229,3 +229,10 @@ export {
   type SpeedController,
   type SpeedControllerOptions,
 } from './lib/feedback/controller';
+export {
+  createFeedbackLink,
+  type CameraPermission,
+  type FeedbackLink,
+  type FeedbackLinkOptions,
+  type FeedbackLinkState,
+} from './lib/feedback/link';
