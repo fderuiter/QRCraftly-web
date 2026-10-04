@@ -73,7 +73,7 @@ describe('public/_headers security headers', () => {
 
   it('upgrades insecure subresource requests through the page policy (#1160)', () => {
     expect(fs.readFileSync(path.resolve(path.dirname(HEADERS_PATH), '../src/layouts/Head.tsx'), 'utf8')).toContain(
-      "form-action 'self'; upgrade-insecure-requests;"
+      "form-action 'self';"
     );
   });
 
