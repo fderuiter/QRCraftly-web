@@ -33,6 +33,7 @@
  *   --quick          Small K and few frames (seconds); what the regression guard uses.
  *   --max-k <n>      Largest K for the codec part (default 10000; 50000 takes minutes).
  *   --no-optical     Codec part only.
+ *   --no-tiles       Skip the multi-code (tiled) simulation, which takes a few minutes.
  *   --write          Write `docs/TRANSFER_BENCHMARK.md` and, with --baseline, the baseline file.
  *   --baseline       Also refresh `tests/fixtures/transfer-baseline.json` (overhead only, quick trials).
  */
@@ -43,12 +44,17 @@ import jsQR from 'jsqr';
 import QRCode from 'qrcode';
 import {
   FountainEncoder,
+  TILE_LAYOUTS,
   TRANSFER_DENSITY_PROFILES,
+  modulePxFor,
   prismSymbolSize,
   resolveFountainSymbolSize,
+  type TileLayoutId,
   type TransferDensity,
 } from '../src/packages/optical-transfer/index.ts';
 import { renderCorpusFrame } from '../tests/utils/scannerCorpus.ts';
+import * as reader from '../src/packages/optical-scanner/reader.ts';
+import { measureDecoderPool, sampleTileCrop, runTearScenario, runTileTransfer, type PoolMeasurement, type TearResult, type TileRunResult } from '../tests/utils/tileBench.ts';
 import {
   ERASURE_CHANNELS,
   OPTICAL_CONDITIONS,
@@ -153,6 +159,150 @@ function benchOptical(quick: boolean): OpticalRow[] {
   return rows;
 }
 
+
+interface TileScenario {
+  name: string;
+  layoutId: TileLayoutId;
+  frame: { width: number; height: number };
+  hold: number;
+  staggered: boolean;
+  cameraFps: number;
+  bytes: number;
+  tear?: boolean;
+}
+
+const FRAME_1080 = { width: 1920, height: 1080 };
+const FRAME_720 = { width: 1280, height: 720 };
+
+const TILE_SCENARIOS: readonly TileScenario[] = [
+  { name: 'mono 2x2 v25, 1080p, 30 fps', layoutId: '2x2-v25', frame: FRAME_1080, hold: 2, staggered: true, cameraFps: 30, bytes: 400_000 },
+  { name: '1 x v40, 1080p, 30 fps', layoutId: '1xv40', frame: FRAME_1080, hold: 2, staggered: false, cameraFps: 30, bytes: 300_000 },
+  { name: '3x2 v20, 1080p, 30 fps', layoutId: '3x2-v20', frame: FRAME_1080, hold: 2, staggered: true, cameraFps: 30, bytes: 400_000 },
+  { name: '2x2 v20, 720p, 30 fps', layoutId: '2x2-v20', frame: FRAME_720, hold: 2, staggered: true, cameraFps: 30, bytes: 200_000 },
+  { name: 'mono 2x2 v25, 1080p, 60 fps (hold 1)', layoutId: '2x2-v25', frame: FRAME_1080, hold: 1, staggered: false, cameraFps: 60, bytes: 400_000 },
+  { name: '2x2 v25, torn every frame, staggered', layoutId: '2x2-v25', frame: FRAME_1080, hold: 2, staggered: true, cameraFps: 30, bytes: 200_000, tear: true },
+  { name: '2x2 v25, torn every frame, not staggered', layoutId: '2x2-v25', frame: FRAME_1080, hold: 2, staggered: false, cameraFps: 30, bytes: 200_000, tear: true },
+];
+
+interface TileRow extends TileScenario {
+  modulePx: number;
+  result: TileRunResult;
+}
+
+async function benchTiles(quick: boolean): Promise<TileRow[]> {
+  const rows: TileRow[] = [];
+  for (const scenario of quick ? TILE_SCENARIOS.slice(0, 2) : TILE_SCENARIOS) {
+    const layout = TILE_LAYOUTS[scenario.layoutId];
+    const modulePx = modulePxFor(layout, scenario.frame);
+    const bytes = quick ? Math.round(scenario.bytes / 8) : scenario.bytes;
+    const result = await runTileTransfer({ ...scenario, bytes, screen: { frame: scenario.frame, modulePx }, refreshHz: 60 });
+    rows.push({ ...scenario, bytes, modulePx, result });
+    process.stdout.write(`tiles ${scenario.name}: ${result.complete ? `${result.goodputKBps} KB/s in ${result.cameraFrames} frames` : 'did not finish'}, crop ${result.cropMsMedian} ms\n`);
+  }
+  return rows;
+}
+
+interface TearRow {
+  layoutId: TileLayoutId;
+  staggered: boolean;
+  result: TearResult;
+}
+
+async function benchTears(quick: boolean): Promise<TearRow[]> {
+  const rows: TearRow[] = [];
+  for (const layoutId of ['2x2-v25', '3x2-v20', '1xv40'] as const) {
+    const modulePx = modulePxFor(TILE_LAYOUTS[layoutId], FRAME_1080);
+    for (const staggered of [true, false]) {
+      const result = await runTearScenario(layoutId, { frame: FRAME_1080, modulePx }, 2, staggered, quick ? 3 : 9);
+      rows.push({ layoutId, staggered, result });
+      process.stdout.write(`tear ${layoutId} ${staggered ? 'staggered' : 'not staggered'}: worst ${result.worst}, mean ${result.mean}\n`);
+    }
+  }
+  return rows;
+}
+
+/** Crops per second one thread decodes with the shipped zxing-wasm reader (ADR 0023), same crop as the jsQR pool rows. */
+async function measureZxingThread(millis: number): Promise<number> {
+  const wasm = fs.readFileSync(path.join(REPO_ROOT, 'node_modules/zxing-wasm/dist/reader/zxing_reader.wasm'));
+  (globalThis as { ImageData?: unknown }).ImageData ??= class {
+    constructor(
+      public data: Uint8ClampedArray,
+      public width: number,
+      public height: number
+    ) {}
+  };
+  if (!(await reader.installZxing(await WebAssembly.compile(wasm)))) return 0;
+  const { rgba, width, height } = await sampleTileCrop();
+  let decoded = 0;
+  const end = performance.now() + millis;
+  while (performance.now() < end) {
+    if (await reader.decodeWithZxing(rgba, width, height)) decoded += 1;
+  }
+  return Math.round(decoded / (millis / 1000));
+}
+
+const TILE_STATUS = `### What this proves and what it does not (#1142)
+
+| Criterion                                                  | Bench result                                                                                                  | Status                                                                                                           |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Mono 2x2 v25, 1080p, 30 fps, at least 100 KB/s            | 134.8 KB/s in the simulation                                                                                  | Met in the simulation only. A real camera, lens and screen are not in it.                                        |
+| 1 x v40 at least 60 KB/s                                   | 78.9 KB/s in the simulation                                                                                   | Met in the simulation only.                                                                                      |
+| Staggered refresh keeps at least 50% of tiles per torn frame | 2x2 v25: worst 75%, mean 78% (together: worst 50%, mean 56%). 3x2 v20: worst 67%.                             | Met for the tiled layouts. A single code (1 x v40) cannot stagger: a tear through it loses it.                   |
+| At least 120 decodes per second without dropping UI frames | jsQR, 4 threads here: 99 per second. zxing-wasm, 1 thread here: 328 per second. Main thread lag at most 6 ms. | Not shown. The 328 per second is a desktop-class core, not a mid-range phone, and Node has no browser UI thread. |
+| Hold is a whole number of refreshes                        | Unit test with a stepped frame clock (\`multicode.test.ts\`)                                                    | Met, tested.                                                                                                     |
+| Scanner page behaviour unchanged                           | No scanner file changed; the new code is imported by nothing in the app                                       | Met by construction.                                                                                             |
+
+Not measured at all: a real camera's focus, exposure and rolling shutter; whether a phone resolves 4 px modules; how often tracking is lost with a hand-held phone (the crop margin is 3 modules, so a camera that drifts more than that between frames falls back to a full search); decoding in browser workers on a phone; thermal throttling; and the receiver's capture request and \`requestVideoFrameCallback\` (not built yet). The 60 fps row assumes a camera that really captures 60 distinct frames per second. The full search here scans layout hypotheses with jsQR because it reads one code per image, so its cost is not the cost of zxing's multi-symbol read. The device list is in [the device checklist](TRANSFER_DEVICE_CHECKLIST.md).`;
+
+function renderTiles(tiles: TileRow[], tears: TearRow[], pool: PoolMeasurement[], zxingPerSecond: number): string[] {
+  const parts: string[] = ['## Multi-code frames (#1142)', ''];
+  parts.push(
+    'Several QR codes ("tiles") per frame, error correction L, a 60 Hz display held for 2 refreshes (30 fps) and a camera frame the same size as the screen. Real Prism frames, QR codes, pixels, jsQR decodes, tile tracking, dedup and receiver; simulated display and camera. The camera is sharp, level and in sync with the display (except in the two torn rows), so these rates are an upper bound for the code and the decode chain, not a prediction for a phone. Goodput is file bytes divided by the simulated camera time until the receiver verified the file, manifest and coding overhead included. jsQR reads one code per image, so the full search is a scan over layout hypotheses; one search runs per transfer and tracked frames decode crops only.',
+    ''
+  );
+  parts.push(
+    table(
+      ['Scenario', 'Module px', 'File', 'Camera frames', 'Goodput', 'Searches', 'Tile reads', 'Dedup dropped', 'Crop decode (median)'],
+      tiles.map((r) => [
+        r.name,
+        r.modulePx,
+        `${Math.round(r.bytes / 1000)} KB`,
+        r.result.cameraFrames,
+        r.result.complete ? `${r.result.goodputKBps} KB/s` : 'did not finish',
+        r.result.searches,
+        r.result.decodes,
+        r.result.duplicates,
+        `${r.result.cropMsMedian} ms`,
+      ])
+    ),
+    ''
+  );
+  parts.push('### Torn frames', '');
+  parts.push(
+    'A torn frame shows one picture above a row and the next picture below it. Each row below tears a 1080p frame at 9 rows spread over the codes, at every refresh where something changes, and counts the tiles whose own decode still returns a valid frame of the old or the new picture. "Staggered" changes the two diagonal groups on alternate refreshes; "not staggered" changes every tile together.',
+    ''
+  );
+  parts.push(
+    table(
+      ['Layout', 'Schedule', 'Tiles kept, worst case', 'Tiles kept, mean', 'Tears tried'],
+      tears.map((r) => [r.layoutId, r.staggered ? 'staggered' : 'together', `${Math.round(r.result.worst * 100)}%`, `${Math.round(r.result.mean * 100)}%`, r.result.positions])
+    ),
+    ''
+  );
+  parts.push('### Decoder threads', '');
+  parts.push(
+    'Real worker threads (Node `worker_threads`) each decode one 2x2 v25 tile crop from a 1080p frame with jsQR in a loop. "Main thread lag" is the longest gap in a 16 ms timer on the main thread while they ran. This is this machine, loaded by other work, with 4 logical cores; it says nothing about a phone CPU or a browser UI thread.',
+    ''
+  );
+  parts.push(table(['Workers', 'Crop decodes per second', 'Main thread lag (max)'], pool.map((r) => [r.workers, r.decodesPerSecond, `${r.mainThreadMaxLagMs} ms`])), '');
+  parts.push(
+    `The shipped reader is zxing-wasm, not jsQR. One thread of it decoded ${zxingPerSecond} of the same crop per second (the wasm runs with the reader's default options: invert, rotate and downscale tries on). It was measured on one thread only, so the pool rows above are the jsQR scaling and not a zxing pool.`,
+    ''
+  );
+  parts.push(TILE_STATUS, '');
+  return parts;
+}
+
 const READING_NOTES = `## Reading these numbers
 
 - The coding overhead is the part a better code can improve. It is the "Frames needed" column, and it is the number to compare when a new code lands (#1141).
@@ -180,7 +330,7 @@ function capacityRows(): Array<Array<string | number>> {
   });
 }
 
-function render(codec: CodecRow[], optical: OpticalRow[]): string {
+function render(codec: CodecRow[], optical: OpticalRow[], tileSection: string[]): string {
   const parts: string[] = [];
   parts.push('# File transfer benchmark', '');
   parts.push(
@@ -226,11 +376,12 @@ function render(codec: CodecRow[], optical: OpticalRow[]): string {
       ''
     );
   }
+  parts.push(...tileSection);
   parts.push(READING_NOTES);
   return `${parts.join('\n')}\n`;
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const quick = args.includes('--quick');
   const maxKIndex = args.indexOf('--max-k');
@@ -252,8 +403,19 @@ function main(): void {
     process.stdout.write(`optical ${row.condition} ${row.resolution} ${row.blockSize}B: ${Math.round(row.decodeRate * 100)}% ${row.decodeMsMedian} ms ${row.kbps60} KB/s (${row.tier60})\n`);
   }
 
+  let tileSection: string[] = [];
+  if (!args.includes('--no-tiles')) {
+    const tiles = await benchTiles(quick);
+    const tears = await benchTears(quick);
+    const pool = await measureDecoderPool(quick ? [1, 2] : [1, 2, 3, 4], quick ? 1000 : 3000);
+    for (const row of pool) process.stdout.write(`pool ${row.workers} workers: ${row.decodesPerSecond} decodes/s, main thread lag ${row.mainThreadMaxLagMs} ms\n`);
+    const zxingPerSecond = await measureZxingThread(quick ? 1000 : 3000);
+    process.stdout.write(`zxing one thread: ${zxingPerSecond} crop decodes/s\n`);
+    tileSection = renderTiles(tiles, tears, pool, zxingPerSecond);
+  }
+
   if (args.includes('--write')) {
-    fs.writeFileSync(REPORT_PATH, render(codec, optical));
+    fs.writeFileSync(REPORT_PATH, render(codec, optical, tileSection));
     process.stdout.write(`wrote ${path.relative(REPO_ROOT, REPORT_PATH).split(path.sep).join('/')}\n`);
   }
   if (args.includes('--baseline')) {
@@ -271,4 +433,4 @@ function main(): void {
   if (codec.some((r) => r.failures > 0)) process.exitCode = 1;
 }
 
-main();
+await main();

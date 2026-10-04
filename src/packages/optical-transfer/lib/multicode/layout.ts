@@ -123,12 +123,12 @@ function makeLayout(id: TileLayoutId, columns: number, rows: number, version: nu
 }
 
 export const TILE_LAYOUTS: Readonly<Record<TileLayoutId, TileLayout>> = {
-  '1xv40': makeLayout('1xv40', 1, 1, 40),
-  '1xv30': makeLayout('1xv30', 1, 1, 30),
-  '2x2-v25': makeLayout('2x2-v25', 2, 2, 25),
-  '2x2-v22': makeLayout('2x2-v22', 2, 2, 22),
-  '2x2-v20': makeLayout('2x2-v20', 2, 2, 20),
-  '3x2-v20': makeLayout('3x2-v20', 3, 2, 20),
+  '1xv40': /* @__PURE__ */ makeLayout('1xv40', 1, 1, 40),
+  '1xv30': /* @__PURE__ */ makeLayout('1xv30', 1, 1, 30),
+  '2x2-v25': /* @__PURE__ */ makeLayout('2x2-v25', 2, 2, 25),
+  '2x2-v22': /* @__PURE__ */ makeLayout('2x2-v22', 2, 2, 22),
+  '2x2-v20': /* @__PURE__ */ makeLayout('2x2-v20', 2, 2, 20),
+  '3x2-v20': /* @__PURE__ */ makeLayout('3x2-v20', 3, 2, 20),
 };
 
 /**
