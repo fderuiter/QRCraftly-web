@@ -26,6 +26,9 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Card } from '@/components/ui/Card';
 import { RangeInput } from '@/components/ui/RangeInput';
 import { Alert } from '@/components/ui/Alert';
+import { AccordionItem } from '@/components/ui/Accordion';
+import { PairingGuide } from '@/components/transfer/PairingGuide';
+import { TRANSFER_SPEEDS, formatFileSize, formatShortDuration, matchTransferSpeed } from '@/utils/transferSpeed';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { BetaNotice } from '@/components/BetaNotice';
 import { QrIllustration } from '@/components/QrIllustration';
@@ -127,6 +130,9 @@ function FileTransferToolInner() {
     : progress;
   const hasFile = selectedFile !== null || isTransferring;
   const activeDensityHint = DENSITY_OPTIONS.find(option => option.value === density)?.hint ?? '';
+  const activeSpeed = matchTransferSpeed(density, fps);
+  // Seconds the stream takes: the exact need once a fountain session exists, an upper bound before.
+  const estimatedSeconds = fountainInfo ? (fountainInfo.k * 1.15) / fps : estimate ? estimate.frames / fps : null;
 
   const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -243,37 +249,65 @@ function FileTransferToolInner() {
             <section className="space-y-6">
               <SectionHeading icon={<Sliders className="size-4 text-accent" aria-hidden="true" />} eyebrow="2. Transfer Settings" />
 
-              <RangeInput
-                id="fps-slider"
-                label="Transfer speed"
-                min={1}
-                max={60}
-                step={1}
-                value={fps}
-                onChange={setFps}
-                formatValue={(v) => `${v} frames/sec`}
-              />
-
               <div className="space-y-2">
-                <span id="density-label" className="block text-sm font-medium text-fg-soft">
-                  QR density
+                <span id="speed-label" className="block text-sm font-medium text-fg-soft">
+                  Speed
                 </span>
-                <SegmentedControl<TransferDensity>
-                  labelledBy="density-label"
-                  value={density}
-                  onChange={setDensity}
+                <SegmentedControl<string>
+                  labelledBy="speed-label"
+                  value={activeSpeed?.id ?? ''}
+                  onChange={(id) => {
+                    const speed = TRANSFER_SPEEDS.find((candidate) => candidate.id === id);
+                    if (!speed) return;
+                    setDensity(speed.density);
+                    setFps(speed.fps);
+                  }}
                   disabled={isTransferring}
-                  options={DENSITY_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+                  options={TRANSFER_SPEEDS.map((speed) => ({ value: speed.id, label: speed.label }))}
                 />
-                <p className="text-xs text-fg-muted">{activeDensityHint}</p>
+                <p className="text-xs text-fg-muted">{activeSpeed?.hint ?? 'Custom values set under Advanced.'}</p>
+                <p className="text-sm font-semibold text-fg" data-testid="speed-estimate" aria-live="polite">
+                  {estimatedSeconds !== null && selectedFile
+                    ? `~${formatShortDuration(estimatedSeconds)} for this ${formatFileSize(selectedFile.size)} file`
+                    : 'Choose a file to see how long it will take.'}
+                </p>
               </div>
-              <p className="text-xs text-fg-muted" data-testid="fountain-symbol-info">
-                {fountainInfo
-                  ? `Each QR carries ${fountainInfo.symbolSize} bytes (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). The receiver needs about ${Math.ceil(fountainInfo.k * 1.15)} frames, ${formatDuration((fountainInfo.k * 1.15) / fps)} at ${fps} frames/sec.`
-                  : estimate
-                    ? `Estimated transfer time: up to ${formatDuration(estimate.frames / fps)} at ${fps} frames/sec (${estimate.symbolSize} bytes per QR). Text and other compressible files go faster.`
-                    : 'Choose a file to see how long the transfer will take.'}
-              </p>
+
+              <AccordionItem title="Advanced" headingLevel={3}>
+                <div className="space-y-6">
+                  <RangeInput
+                    id="fps-slider"
+                    label="Transfer speed"
+                    min={1}
+                    max={60}
+                    step={1}
+                    value={fps}
+                    onChange={setFps}
+                    formatValue={(v) => `${v} frames/sec`}
+                  />
+
+                  <div className="space-y-2">
+                    <span id="density-label" className="block text-sm font-medium text-fg-soft">
+                      QR density
+                    </span>
+                    <SegmentedControl<TransferDensity>
+                      labelledBy="density-label"
+                      value={density}
+                      onChange={setDensity}
+                      disabled={isTransferring}
+                      options={DENSITY_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+                    />
+                    <p className="text-xs text-fg-muted">{activeDensityHint}</p>
+                  </div>
+                  <p className="text-xs text-fg-muted" data-testid="fountain-symbol-info">
+                    {fountainInfo
+                      ? `Each QR carries ${fountainInfo.symbolSize} bytes (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). The receiver needs about ${Math.ceil(fountainInfo.k * 1.15)} frames, ${formatDuration((fountainInfo.k * 1.15) / fps)} at ${fps} frames/sec.`
+                      : estimate
+                        ? `Estimated transfer time: up to ${formatDuration(estimate.frames / fps)} at ${fps} frames/sec (${estimate.symbolSize} bytes per QR). Text and other compressible files go faster.`
+                        : 'Choose a file to see how long the transfer will take.'}
+                  </p>
+                </div>
+              </AccordionItem>
             </section>
 
             {/* Beta notice after the primary actions so they stay in the first mobile viewport. */}
@@ -351,6 +385,8 @@ function FileTransferToolInner() {
                 )}
               </div>
 
+              {selectedFile && !isTransferring && !handshakeError && <PairingGuide />}
+
               {/* Handshake scannability failure alert */}
               {handshakeError && (
                 <div className="mb-4">
@@ -401,14 +437,22 @@ function FileTransferToolInner() {
 
               {/* Recycled UI Canvas Container */}
               <div className={`mb-4 flex items-center justify-center rounded-2xl border border-line-subtle bg-surface-sunken p-4 sm:p-6 ${hasFile ? '' : 'hidden'}`}>
-                <canvas
-                  ref={canvasRef}
-                  className="aspect-square max-h-[60vh] w-full rounded-lg bg-surface object-contain shadow-sm"
-                  role="img"
-                  aria-label="Transfer QR code"
-                  width={512}
-                  height={512}
-                />
+                <div className="relative w-full overflow-hidden rounded-lg">
+                  <canvas
+                    ref={canvasRef}
+                    className="aspect-square max-h-[60vh] w-full rounded-lg bg-surface object-contain shadow-sm"
+                    role="img"
+                    aria-label="Transfer QR code"
+                    width={512}
+                    height={512}
+                  />
+                  {/* A soft band sweeps the sending QR while it plays (motion-safe only). */}
+                  {isTransferring && (
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden motion-reduce:hidden">
+                      <div className="h-1/3 w-full bg-linear-to-b from-transparent via-accent/20 to-transparent motion-safe:animate-scan-sweep" />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Shown once there is a stream to style: transfer frames drop decoration so every frame scans. */}

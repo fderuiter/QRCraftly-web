@@ -127,6 +127,9 @@
   --animate-rise-out: rise-out var(--duration-fast) var(--ease-standard) both;
   --animate-slide-in: slide-in var(--duration-base) var(--ease-emphasized) both;
   --animate-slide-out: slide-out var(--duration-base) var(--ease-standard) both;
+  /* File transfer: a light band sweeping the sending QR, and the ring that bursts from the finish check. */
+  --animate-scan-sweep: scan-sweep 2.4s linear infinite;
+  --animate-burst: burst 700ms var(--ease-standard) both;
 
   @keyframes fade-in {
     from {
@@ -166,6 +169,24 @@
     from {
       opacity: 0;
       translate: 0 0.75rem;
+    }
+  }
+  @keyframes scan-sweep {
+    from {
+      translate: 0 -100%;
+    }
+    to {
+      translate: 0 300%;
+    }
+  }
+  @keyframes burst {
+    from {
+      opacity: 0.8;
+      scale: 0.4;
+    }
+    to {
+      opacity: 0;
+      scale: 2.2;
     }
   }
   @keyframes slide-out {

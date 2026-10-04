@@ -126,7 +126,10 @@ describe('File Transfer Page & Pipeline', () => {
 
     expect(screen.getByText('Send a File by QR Code')).toBeInTheDocument();
     
-    // Sliders exist
+    // One Speed control up front; the raw values wait under Advanced.
+    const speed = screen.getByRole('radiogroup', { name: 'Speed' });
+    expect(within(speed).getByRole('radio', { name: 'Balanced' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
     expect(screen.getByLabelText('Transfer speed')).toBeInTheDocument();
     const density = screen.getByRole('radiogroup', { name: 'QR density' });
     expect(within(density).getByRole('radio', { name: 'Balanced' })).toHaveAttribute('aria-checked', 'true');
@@ -141,6 +144,42 @@ describe('File Transfer Page & Pipeline', () => {
     render(<Page />);
 
     expect(screen.queryByRole('button', { name: /simulate 50mb/i })).not.toBeInTheDocument();
+  });
+
+  it('sets density and frame rate from the Speed control and shows the time for the chosen file', async () => {
+    render(<Page />);
+    const estimate = screen.getByTestId('speed-estimate');
+    expect(estimate).toHaveTextContent('Choose a file to see how long it will take.');
+
+    const file = new File([new Uint8Array(48 * 1024)], 'report.pdf', { type: 'application/pdf' });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Choose a file to send'), { target: { files: [file] } });
+    });
+    expect(estimate).toHaveTextContent(/^~\d+ (s|min) for this 48 KB file$/);
+
+    const speed = screen.getByRole('radiogroup', { name: 'Speed' });
+    await act(async () => {
+      fireEvent.click(within(speed).getByRole('radio', { name: 'Fast' }));
+    });
+    expect(within(speed).getByRole('radio', { name: 'Fast' })).toHaveAttribute('aria-checked', 'true');
+    expect((screen.getByLabelText('Transfer speed') as HTMLInputElement).value).toBe('24');
+
+    // Setting the frame rate by hand leaves no preset selected and says so.
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Transfer speed'), { target: { value: '19' } });
+    });
+    expect(within(speed).queryByRole('radio', { checked: true })).not.toBeInTheDocument();
+    expect(screen.getByText('Custom values set under Advanced.')).toBeInTheDocument();
+  });
+
+  it('shows the pairing guide once a file is chosen', async () => {
+    render(<Page />);
+    expect(screen.queryByTestId('pairing-guide')).not.toBeInTheDocument();
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Choose a file to send'), { target: { files: [file] } });
+    });
+    expect(screen.getByTestId('pairing-guide')).toHaveTextContent('Point your other phone here');
   });
 
   it('allows adjusting stream swap rate (FPS) slider controls', async () => {
@@ -284,6 +323,7 @@ describe('File Transfer Page & Pipeline', () => {
   it('estimates the transfer time from the file size and the chosen QR density', async () => {
     render(<Page />);
 
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
     const info = screen.getByTestId('fountain-symbol-info');
     expect(info).toHaveTextContent('Choose a file to see how long the transfer will take.');
 
@@ -297,13 +337,13 @@ describe('File Transfer Page & Pipeline', () => {
     const balanced = bytesPerQr();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('radio', { name: 'Reliable' }));
+      fireEvent.click(within(screen.getByRole('radiogroup', { name: 'QR density' })).getByRole('radio', { name: 'Reliable' }));
     });
-    expect(screen.getByRole('radio', { name: 'Reliable' })).toHaveAttribute('aria-checked', 'true');
+    expect(within(screen.getByRole('radiogroup', { name: 'QR density' })).getByRole('radio', { name: 'Reliable' })).toHaveAttribute('aria-checked', 'true');
     expect(bytesPerQr()).toBeLessThan(balanced);
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('radio', { name: 'Fast' }));
+      fireEvent.click(within(screen.getByRole('radiogroup', { name: 'QR density' })).getByRole('radio', { name: 'Fast' }));
     });
     expect(bytesPerQr()).toBeGreaterThan(balanced);
   });

@@ -103,6 +103,23 @@ describe('QRTool Component', () => {
     expect(screen.queryByText('Active')).not.toBeInTheDocument();
   });
 
+  it('shows the live code in a scene below the export row only after a view other than Flat is chosen', async () => {
+    render(<ToastProvider><QRTool initialConfig={{ value: 'https://example.com' }} /></ToastProvider>);
+    const views = within(screen.getByRole('radiogroup', { name: 'In the wild' }));
+    expect(views.getAllByRole('radio').map((radio) => radio.getAttribute('aria-label') ?? radio.textContent)).toEqual(['Flat', 'Poster', 'Card', 'Table tent', 'Screen', 'Sticker']);
+    expect(views.getByRole('radio', { name: 'Flat' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByTestId('mockup-view')).not.toBeInTheDocument();
+
+    fireEvent.click(views.getByRole('radio', { name: 'Table tent' }));
+    expect(await screen.findByTestId('mockup-view')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /table tent/i })).toBeInTheDocument();
+    // The flat preview stays on screen above: the scene copies from it and the exports read it.
+    expect(screen.getByTestId('qr-stage')).toBeVisible();
+
+    fireEvent.click(views.getByRole('radio', { name: 'Flat' }));
+    expect(screen.queryByTestId('mockup-view')).not.toBeInTheDocument();
+  });
+
   it('leaves site navigation, the theme toggle and the footer to the app shell', () => {
     render(<ToastProvider><QRTool /></ToastProvider>);
     expect(screen.queryByRole('navigation', { name: 'Primary navigation' })).not.toBeInTheDocument();
@@ -201,8 +218,10 @@ describe('QRTool Component', () => {
       return el;
     });
     fireEvent.click(screen.getByRole('button', { name: 'Download options' }));
-    fireEvent.click(screen.getByRole('radio', { name: 'PNG' }));
-    fireEvent.click(screen.getByRole('radio', { name: 'Poster' }));
+    const options = within(screen.getByRole('group', { name: 'Download options' }));
+    fireEvent.click(options.getByRole('radio', { name: 'PNG' }));
+    // "Poster" is also a preview view, so pick the size preset from inside the options.
+    fireEvent.click(options.getByRole('radio', { name: 'Poster' }));
     fireEvent.change(screen.getByLabelText('File name'), { target: { value: 'my code' } });
     fireEvent.click(downloadButton());
 

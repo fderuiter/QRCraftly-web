@@ -178,8 +178,8 @@ describe('File Transfer Receive Page & Pipeline', () => {
     // Verify no download is automatically initiated before user confirmation
     expect(global.URL.createObjectURL).not.toHaveBeenCalled();
 
-    // Click the manual Download File button inside the complete panel
-    const downloadBtn = screen.getByRole('button', { name: /download file/i });
+    // Click the Save button inside the complete panel
+    const downloadBtn = screen.getByRole('button', { name: /^save$/i });
     expect(downloadBtn).toBeInTheDocument();
     
     await act(async () => {
@@ -476,7 +476,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
       expect(screen.getByTestId('fountain-rank')).toHaveTextContent(new RegExp(`^[01] / ${encoder.k}$`));
       expect(screen.getByTestId('fountain-fps')).toHaveTextContent(/fps/);
       expect(screen.getByTestId('fountain-eta')).toBeInTheDocument();
-      expect(screen.getByRole('progressbar', { name: /decoding rank/i })).toBeInTheDocument();
+      expect(screen.getByRole('progressbar', { name: /blocks decoded/i })).toBeInTheDocument();
       expect(screen.queryByTestId('progress-grid')).not.toBeInTheDocument();
       expect(screen.queryByTestId('receiver-error')).not.toBeInTheDocument();
 
@@ -497,7 +497,7 @@ describe('File Transfer Receive Page & Pipeline', () => {
       expect(screen.getByTestId('fountain-rank')).toHaveTextContent(`${encoder.k} / ${encoder.k}`);
       expect(global.URL.createObjectURL).not.toHaveBeenCalled();
 
-      const downloadBtn = screen.getByRole('button', { name: /download file/i });
+      const downloadBtn = screen.getByRole('button', { name: /^save$/i });
       await act(async () => {
         fireEvent.click(downloadBtn);
       });
