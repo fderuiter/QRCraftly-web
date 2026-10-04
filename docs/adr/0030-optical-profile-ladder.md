@@ -14,14 +14,14 @@ Everything below was run on the channel simulator only ([OPTICAL_LADDER_BENCHMAR
 
 ### The ladder
 
-| Profile | Content                              | In this repository                       |
-| ------- | ------------------------------------ | ---------------------------------------- |
-| P0      | Monochrome QR beacons, huge cells    | Prism Stage A; not drawn by this package |
-| P1      | Dense monochrome multi-QR            | Prism Stage A; not drawn by this package |
-| P2      | 4-colour modem grid, 104 x 58 cells  | `MODEM_PROFILES`                         |
-| P3      | 8-colour modem grid, 120 x 67 cells  | `MODEM_PROFILES`                         |
-| P4      | 16-colour modem grid, 160 x 90 cells | `MODEM_PROFILES`                         |
-| P5      | Temporal modulation                  | Research only, not built (#1166)         |
+| Profile | Content                              | In this repository                                                  |
+| ------- | ------------------------------------ | ------------------------------------------------------------------- |
+| P0      | Monochrome QR beacons, huge cells    | Prism Stage A; not drawn by this package                            |
+| P1      | Dense monochrome multi-QR            | Prism Stage A; not drawn by this package                            |
+| P2      | 4-colour modem grid, 104 x 58 cells  | `MODEM_PROFILES`                                                    |
+| P3      | 8-colour modem grid, 120 x 67 cells  | `MODEM_PROFILES`                                                    |
+| P4      | 16-colour modem grid, 160 x 90 cells | `MODEM_PROFILES`                                                    |
+| P5      | Temporal modulation                  | Research only, not built ([research notes](../OPTICAL_RESEARCH.md)) |
 
 P2 to P4 are the provisional geometries of [ADR 0028](0028-optical-modem-frame-format.md). The issue calls P4 "8-colour, densest"; the profile in the codec has 16 colours, and the ladder follows the codec.
 
