@@ -73,3 +73,6 @@ export { constructLocationString, hydrateLocationData } from './lib/generators/l
 export { MeetingContract, constructMeetingString, hydrateMeetingData } from './lib/generators/meeting';
 export { constructSocialString, hydrateSocialData } from './lib/generators/social';
 export { BulkCsvContract, constructBulkCsvString, hydrateBulkCsvData } from './lib/generators/bulkCsv';
+
+// Wallet address checksums (Base58Check, bech32/bech32m, EIP-55)
+export { checkCryptoAddress, type AddressCheck } from './lib/cryptoAddress';

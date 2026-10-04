@@ -16,18 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRType, WifiEncryption } from '@/types';
-import { QR_GENERATORS, identifyProtocol } from '@/packages/qr-payload';
+import { QRType } from '@/types';
+import { identifyProtocol } from '@/packages/qr-payload';
 import { getQRTypeLabel } from '@/data/qrTypeLabels';
 import { isDangerousUrl } from '@/utils/security';
 import { analyseLink, type LinkFinding } from '@/packages/link-safety';
 import { hasMixedScripts, toUnicodeHostname } from '@/utils/hostname';
+import { revealInvisibleCharacters } from '@/utils/fileNames';
+import { describeContent, type ScanSummaryRow } from './contentNotes';
 
-/** One line of the readable summary, for example "Network: Cafe guest". */
-export interface ScanSummaryRow {
-  label: string;
-  value: string;
-}
+export type { ScanSummaryRow } from './contentNotes';
 
 /** What a scanned web address really points at. */
 export interface ScanLink {
@@ -57,6 +55,16 @@ export interface ScanDescription {
   typeLabel: string;
   /** A few readable facts about the content. */
   summary: ScanSummaryRow[];
+  /** Things to read before acting on the code, for example a hidden Bcc recipient. */
+  cautions: string[];
+  /** The text with a password or key replaced by bullets, and hidden characters spelled out. */
+  displayText: string;
+  /** Like `displayText`, with the secret shown. */
+  revealedText: string;
+  /** The text with a password or key hidden: what Share sends unless the reader includes it. */
+  shareText: string;
+  /** True when the code holds a password or key that is hidden until the reader asks. */
+  hasSecret: boolean;
   /** The web address, for `http:` and `https:` content that is safe to offer. */
   link: ScanLink | null;
   /**
@@ -64,92 +72,6 @@ export interface ScanDescription {
    * including obfuscated forms). Only Copy is offered then.
    */
   blocked: boolean;
-}
-
-const WIFI_SECURITY: Record<WifiEncryption, string> = {
-  [WifiEncryption.WPA]: 'WPA/WPA2/WPA3',
-  [WifiEncryption.WEP]: 'WEP (outdated)',
-  [WifiEncryption.NOPASS]: 'None (open network)',
-  [WifiEncryption.WPA2_EAP]: 'WPA2 Enterprise',
-};
-
-/** Keeps only the rows that have a value. */
-function rows(entries: readonly (readonly [label: string, value: string | undefined])[]): ScanSummaryRow[] {
-  return entries
-    .filter((entry): entry is readonly [string, string] => typeof entry[1] === 'string' && entry[1].trim() !== '')
-    .map(([label, value]) => ({ label, value: value.trim() }));
-}
-
-/** A calendar date as the reader's locale writes it, or the raw value when it does not parse. */
-function readableDate(value: string): string {
-  if (!value) return value;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-}
-
-function summarize(type: QRType, text: string): ScanSummaryRow[] {
-  try {
-    switch (type) {
-      case QRType.WIFI: {
-        const wifi = QR_GENERATORS[QRType.WIFI].hydrate(text);
-        return rows([
-          ['Network', wifi.ssid],
-          ['Security', WIFI_SECURITY[wifi.encryption]],
-          ['Hidden network', wifi.hidden ? 'Yes' : undefined],
-        ]);
-      }
-      case QRType.VCARD: {
-        const card = QR_GENERATORS[QRType.VCARD].hydrate(text);
-        return rows([
-          ['Name', `${card.firstName} ${card.lastName}`],
-          ['Organization', card.organization],
-          ['Phone', card.phone],
-          ['Email', card.email],
-        ]);
-      }
-      case QRType.EVENT: {
-        const event = QR_GENERATORS[QRType.EVENT].hydrate(text);
-        return rows([
-          ['Event', event.title],
-          ['Starts', readableDate(event.startDate)],
-          ['Ends', readableDate(event.endDate)],
-          ['Location', event.location],
-        ]);
-      }
-      case QRType.EMAIL: {
-        const message = QR_GENERATORS[QRType.EMAIL].hydrate(text);
-        return rows([
-          ['To', message.email],
-          ['Subject', message.subject],
-        ]);
-      }
-      case QRType.SMS: {
-        const sms = QR_GENERATORS[QRType.SMS].hydrate(text);
-        return rows([
-          ['To', sms.number],
-          ['Message', sms.message],
-        ]);
-      }
-      case QRType.PHONE:
-        return rows([['Number', QR_GENERATORS[QRType.PHONE].hydrate(text).number]]);
-      case QRType.LOCATION: {
-        const place = QR_GENERATORS[QRType.LOCATION].hydrate(text);
-        return rows([['Coordinates', place.latitude && place.longitude ? `${place.latitude}, ${place.longitude}` : undefined]]);
-      }
-      case QRType.PAYMENT: {
-        const payment = QR_GENERATORS[QRType.PAYMENT].hydrate(text);
-        return rows([
-          ['Network', payment.network],
-          ['Address', payment.address],
-          ['Amount', payment.amount],
-        ]);
-      }
-      default:
-        return [];
-    }
-  } catch {
-    return [];
-  }
 }
 
 /**
@@ -185,13 +107,19 @@ function readLink(text: string): ScanLink | null {
  * @returns The description.
  */
 export function describeScan(text: string): ScanDescription {
-  const type = identifyProtocol(text) ?? QRType.TEXT;
+  const detected = identifyProtocol(text) ?? QRType.TEXT;
   const blocked = isDangerousUrl(text);
+  const notes = blocked ? { rows: [], cautions: [], secret: null, redacted: text } : describeContent(detected, text);
   return {
     text,
-    type,
-    typeLabel: getQRTypeLabel(type),
-    summary: blocked ? [] : summarize(type, text),
+    type: detected,
+    typeLabel: notes.typeLabel ?? getQRTypeLabel(detected),
+    summary: notes.rows,
+    cautions: notes.cautions,
+    shareText: notes.redacted,
+    displayText: revealInvisibleCharacters(notes.redacted),
+    revealedText: revealInvisibleCharacters(text),
+    hasSecret: notes.secret !== null,
     link: blocked ? null : readLink(text),
     blocked,
   };

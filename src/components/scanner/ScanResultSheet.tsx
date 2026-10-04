@@ -23,6 +23,8 @@ import {
   Calendar,
   Check,
   Copy,
+  Eye,
+  EyeOff,
   CreditCard,
   FileSpreadsheet,
   Info,
@@ -89,6 +91,8 @@ function canShare(): boolean {
 export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, editLabel = 'Edit in generator', onScanAnother }) => {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [revealed, setRevealed] = useState(false);
+  const [shareSecret, setShareSecret] = useState(false);
   const Icon = scan.blocked ? Ban : TYPE_ICONS[scan.type];
   const { link } = scan;
   const cautions = link?.findings.filter((finding) => finding.severity === 'caution') ?? [];
@@ -97,6 +101,8 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
   // Move focus to the result so keyboard and screen reader users land on it.
   useEffect(() => {
     headingRef.current?.focus();
+    setRevealed(false);
+    setShareSecret(false);
   }, [scan]);
 
   const copy = async () => {
@@ -109,7 +115,7 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
   };
 
   const share = () => {
-    navigator.share({ text: scan.text }).catch(() => undefined);
+    navigator.share({ text: shareSecret ? scan.text : scan.shareText }).catch(() => undefined);
   };
 
   return (
@@ -138,6 +144,17 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
             edited here. You can still copy the text to inspect it.
           </p>
         </div>
+      )}
+
+      {scan.cautions.length > 0 && (
+        <ul className="space-y-1 rounded-lg border border-warning-line bg-warning-soft p-3 text-sm text-warning" aria-label="Cautions about this code">
+          {scan.cautions.map((caution) => (
+            <li key={caution} className="flex gap-1.5">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              {caution}
+            </li>
+          ))}
+        </ul>
       )}
 
       {link && (
@@ -179,10 +196,27 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
           {scan.summary.map((row) => (
             <React.Fragment key={row.label}>
               <dt className="font-medium text-fg-muted">{row.label}</dt>
-              <dd className="break-all text-fg">{row.value}</dd>
+              <dd className="break-all text-fg">
+                <bdi>{row.secret && !revealed ? '\u2022'.repeat(8) : row.value}</bdi>
+              </dd>
             </React.Fragment>
           ))}
         </dl>
+      )}
+
+      {scan.hasSecret && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="secondary" size="sm" aria-pressed={revealed} onClick={() => setRevealed((value) => !value)}>
+            {revealed ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+            {revealed ? 'Hide the secret' : 'Show the secret'}
+          </Button>
+          {canShare() && !scan.blocked && (
+            <label className="flex items-center gap-2 text-sm text-fg">
+              <input type="checkbox" checked={shareSecret} onChange={(event) => setShareSecret(event.target.checked)} />
+              Include the secret when sharing
+            </label>
+          )}
+        </div>
       )}
 
       <div>
@@ -190,10 +224,11 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
           Content
         </p>
         <pre
+          dir="auto"
           className="rounded-lg border border-line bg-surface p-3 font-mono text-sm break-all whitespace-pre-wrap text-fg"
           aria-labelledby="scan-result-text-label"
         >
-          {scan.text}
+          {revealed ? scan.revealedText : scan.displayText}
         </pre>
       </div>
 

@@ -74,6 +74,22 @@ export function hasInvisibleCharacters(value: string): boolean {
 }
 
 /**
+ * Makes hidden characters visible as `[U+202E]` markers, so a reader can see that text which
+ * looks ordinary holds direction overrides or zero-width characters. Tab and line breaks stay.
+ * @param value - Untrusted text.
+ * @returns The text with every control, zero-width and bidirectional character spelled out.
+ */
+export function revealInvisibleCharacters(value: string): string {
+  return Array.from(value)
+    .map((ch) => {
+      const code = ch.codePointAt(0) ?? 0;
+      if (code === 0x09 || code === 0x0a || code === 0x0d) return ch;
+      return isControl(code) || isInvisible(code) ? `[U+${code.toString(16).toUpperCase().padStart(4, '0')}]` : ch;
+    })
+    .join('');
+}
+
+/**
  * Turns an untrusted name into a safe one:
  * - control characters become `_`, zero-width and bidirectional characters are removed,
  * - `/ \ : * ? " < > |` become `_`, so `../` can never survive,
