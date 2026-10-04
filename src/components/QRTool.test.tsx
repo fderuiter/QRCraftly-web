@@ -19,7 +19,7 @@ import React, { useEffect } from 'react';
 import { ToastProvider } from './ui/Toast';
 import { render, screen, fireEvent, waitFor, cleanup, within, act } from '@testing-library/react';
 import QRTool from './QRTool';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import jsQR from 'jsqr';
 import { renderToString } from 'react-dom/server';
 import { contentRegistry } from '@/data/contentRegistry';
@@ -65,6 +65,11 @@ function downloadAs(label: 'PNG' | 'JPEG' | 'WebP' | 'SVG') {
 const exportStatus = () => within(screen.getByTestId('export-actions')).getByRole('status').textContent;
 
 describe('QRTool Component', () => {
+  // The scene view is lazy. Load it up front so a busy CI machine does not outlast findByTestId's wait.
+  beforeAll(async () => {
+    await import('./mockups/MockupView');
+  }, 30_000);
+
   // Store original globals
   const originalShowSaveFilePicker = (global as any).showSaveFilePicker;
 
@@ -111,7 +116,7 @@ describe('QRTool Component', () => {
     expect(screen.queryByTestId('mockup-view')).not.toBeInTheDocument();
 
     fireEvent.click(views.getByRole('radio', { name: 'Table tent' }));
-    expect(await screen.findByTestId('mockup-view')).toBeInTheDocument();
+    expect(await screen.findByTestId('mockup-view', {}, { timeout: 5_000 })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /table tent/i })).toBeInTheDocument();
     // The flat preview stays on screen above: the scene copies from it and the exports read it.
     expect(screen.getByTestId('qr-stage')).toBeVisible();

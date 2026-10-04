@@ -1,0 +1,11 @@
+[package]
+name = "qrcraftly-core"
+description = "Shared maths for QRCraftly's WebAssembly modules: GF(256), CRC32 and the module allocator."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "qrcraftly_core"
+path = "src/lib.rs"

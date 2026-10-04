@@ -1,0 +1,7 @@
+# Pinned so every machine and CI builds byte-identical .wasm files (#1182).
+# Bump it in its own PR and run `pnpm run wasm:build` to refresh the committed files.
+[toolchain]
+channel = "1.97.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]

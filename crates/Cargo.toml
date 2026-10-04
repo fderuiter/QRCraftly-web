@@ -1,0 +1,21 @@
+# QRCraftly's Rust workspace (#1182). Plain Rust only: every dependency must be
+# a crate in this workspace (checked by scripts/rust_no_deps_check.js).
+# See docs/RUST.md and ADR 0033.
+[workspace]
+resolver = "2"
+members = ["core", "selftest"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false
+incremental = false
