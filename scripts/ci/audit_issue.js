@@ -37,6 +37,7 @@ const SEVERITY_ORDER = ['critical', 'high', 'moderate', 'low', 'info'];
 function cell(value) {
   return String(value ?? '')
     .replace(/\r?\n/g, ' ')
+    .replace(/\\/g, '\\\\')
     .replace(/\|/g, '\\|')
     .trim();
 }

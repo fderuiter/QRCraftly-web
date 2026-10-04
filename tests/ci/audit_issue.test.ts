@@ -45,6 +45,11 @@ describe('summarizeAudit', () => {
     expect(summary).toContain('| bad\\|pkg | critical | [Remote code execution](https://example.com/2) | <2.0.0 | >=2.0.0 |');
   });
 
+  it('escapes backslashes before pipes so a cell cannot break out of the table', () => {
+    const report = JSON.stringify({ advisories: { '1': { module_name: 'a\\|b', severity: 'high', title: 't' } } });
+    expect(summarizeAudit(report)).toContain('| a\\\\\\|b | high |');
+  });
+
   it('caps the table at 50 rows', () => {
     const advisories = Object.fromEntries(
       Array.from({ length: 60 }, (_, i) => [String(i), { module_name: `pkg-${i}`, severity: 'moderate', title: 't' }])
