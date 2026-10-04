@@ -136,13 +136,18 @@ describe('setup composite action', () => {
   });
 });
 
-describe('scheduled dependency audit email', () => {
+describe('scheduled dependency audit alert', () => {
   const workflow = read('.github/workflows/audit-moderate.yml');
 
-  it('only sends mail when the SMTP secrets and a valid sender are configured', () => {
-    expect(workflow).toContain('id: mail-config');
-    expect(workflow).toContain("if: failure() && steps.mail-config.outputs.configured == 'true'");
-    expect(workflow).toMatch(/from: "Security Audit Bot <\$\{\{ secrets\.MAIL_FROM \|\| secrets\.SMTP_USERNAME \}\}>"/);
+  it('reports through a GitHub issue, not SMTP email', () => {
+    expect(workflow).toContain('run: node scripts/ci/audit_issue.js');
+    expect(workflow).toContain('issues: write');
+    expect(workflow).not.toMatch(/action-send-mail|SMTP_|MAIL_TO|MAIL_FROM/);
+  });
+
+  it('still fails the job when the audit fails', () => {
+    expect(workflow).toContain("if: steps.audit.outcome == 'failure'");
+    expect(workflow).toContain('exit 1');
   });
 });
 

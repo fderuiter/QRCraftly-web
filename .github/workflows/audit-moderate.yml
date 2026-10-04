@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 # Cancel previous runs if a new commit is pushed to the same branch/ref
 concurrency:
@@ -25,47 +26,25 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
 
+      # continue-on-error lets the alert step see the result; the last step
+      # still fails the job when the audit failed.
       - name: Run Moderate Dependency Audit
+        id: audit
+        continue-on-error: true
         run: pnpm audit --audit-level=moderate
 
-      # The failure email needs SMTP_USERNAME, SMTP_PASSWORD, MAIL_TO and a sender
-      # address (MAIL_FROM, or SMTP_USERNAME when that is an email address). Without
-      # them action-send-mail fails with "'from' address is invalid" and buries the
-      # audit result, so check first and skip the email with a warning.
-      - name: Check Failure Email Configuration
-        id: mail-config
-        if: failure()
+      # One GitHub issue instead of an SMTP email (#1184): opened or commented on
+      # when the audit fails, closed when it passes again.
+      - name: Sync Dependency Audit Issue
+        if: always() && steps.audit.outcome != 'skipped'
         env:
-          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          MAIL_TO: ${{ secrets.MAIL_TO }}
-          MAIL_FROM: ${{ secrets.MAIL_FROM || secrets.SMTP_USERNAME }}
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/audit_issue.js
+
+      - name: Fail When The Audit Failed
+        if: steps.audit.outcome == 'failure'
         run: |
-          case "$MAIL_FROM" in
-            *@*) SENDER_OK=true ;;
-            *) SENDER_OK=false ;;
-          esac
-          if [ -n "$SMTP_USERNAME" ] && [ -n "$SMTP_PASSWORD" ] && [ -n "$MAIL_TO" ] && [ "$SENDER_OK" = true ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::Failure email skipped: set the SMTP_USERNAME, SMTP_PASSWORD and MAIL_TO secrets, plus MAIL_FROM when SMTP_USERNAME is not an email address."
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Send Email on Failure
-        if: failure() && steps.mail-config.outputs.configured == 'true'
-        uses: dawidd6/action-send-mail@67ce3558d613188179559c61d3565140cf389968 # v22
-        with:
-          server_address: ${{ secrets.SMTP_SERVER || 'smtp.gmail.com' }}
-          server_port: ${{ secrets.SMTP_PORT || 465 }}
-          username: ${{ secrets.SMTP_USERNAME }}
-          password: ${{ secrets.SMTP_PASSWORD }}
-          subject: "Security Alert: Moderate-severity or higher vulnerability detected in ${{ github.repository }}"
-          to: ${{ secrets.MAIL_TO }}
-          from: "Security Audit Bot <${{ secrets.MAIL_FROM || secrets.SMTP_USERNAME }}>"
-          body: |
-            A moderate-severity or higher dependency vulnerability was detected on the ${{ github.ref_name }} branch of ${{ github.repository }}.
-
-            Workflow Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-            Please review the audit logs and update the affected dependencies as soon as possible.
+          echo "::error::pnpm audit found a moderate or higher vulnerability."
+          exit 1
