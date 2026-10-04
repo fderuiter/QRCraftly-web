@@ -20,6 +20,7 @@ import { QRType, WifiEncryption } from '@/types';
 import { QR_GENERATORS, identifyProtocol } from '@/packages/qr-payload';
 import { getQRTypeLabel } from '@/data/qrTypeLabels';
 import { isDangerousUrl } from '@/utils/security';
+import { analyseLink, type LinkFinding } from '@/packages/link-safety';
 import { hasMixedScripts, toUnicodeHostname } from '@/utils/hostname';
 
 /** One line of the readable summary, for example "Network: Cafe guest". */
@@ -42,6 +43,8 @@ export interface ScanLink {
   international: boolean;
   /** True when a label mixes scripts, the usual sign of a lookalike address. */
   mixedScripts: boolean;
+  /** Signs the address may not be what it seems, cautions first. Empty for an ordinary address. */
+  findings: LinkFinding[];
 }
 
 /** A decoded QR code, described for the result sheet. */
@@ -171,6 +174,7 @@ function readLink(text: string): ScanLink | null {
     secure: url.protocol === 'https:',
     international: host !== url.hostname,
     mixedScripts: hasMixedScripts(host),
+    findings: analyseLink(trimmed),
   };
 }
 

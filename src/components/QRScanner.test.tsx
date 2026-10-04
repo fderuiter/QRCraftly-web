@@ -654,7 +654,7 @@ describe('QRScanner Component', () => {
       await decode('https://example.com/menu');
 
       expect(screen.getByTestId('scan-result-host')).toHaveTextContent('example.com');
-      expect(screen.getByText(/Encrypted link with a plain address/)).toBeInTheDocument();
+      expect(screen.getByText(/No warning signs found in the address/)).toBeInTheDocument();
       const open = screen.getByRole('link', { name: 'Open link' });
       expect(open).toHaveAttribute('href', 'https://example.com/menu');
       expect(open).toHaveAttribute('target', '_blank');
@@ -691,6 +691,18 @@ describe('QRScanner Component', () => {
       expect(screen.getByText(/mixes letters from different alphabets/)).toBeInTheDocument();
       expect(screen.getByText(/not encrypted/)).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Edit in generator' })).not.toBeInTheDocument();
+    });
+
+    it('lists cautions and notes for a disguised link, never calling it safe', async () => {
+      const { container } = render(<QRScanner />);
+      await settle();
+      await decode('https://paypal.com@bit.ly:8443/x');
+
+      expect(screen.getByRole('list', { name: 'Cautions' })).toHaveTextContent(/Everything before the @/);
+      expect(screen.getByRole('list', { name: 'Notes' })).toHaveTextContent(/shortened link/);
+      expect(screen.queryByText(/No warning signs/)).not.toBeInTheDocument();
+      expect(screen.getByTestId('scan-result').textContent?.toLowerCase()).not.toMatch(/\bsafe\b/);
+      expect(await axe(container)).toHaveNoViolations();
     });
 
     it('summarises a WiFi code and copies its text', async () => {

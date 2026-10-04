@@ -25,6 +25,7 @@ import {
   Copy,
   CreditCard,
   FileSpreadsheet,
+  Info,
   Link,
   Mail,
   MapPin,
@@ -33,7 +34,6 @@ import {
   QrCode,
   RefreshCw,
   Share2,
-  ShieldCheck,
   Type,
   UserSquare2,
   Video,
@@ -91,14 +91,8 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const Icon = scan.blocked ? Ban : TYPE_ICONS[scan.type];
   const { link } = scan;
-  const warnings = link
-    ? [
-        !link.secure && 'This link is not encrypted (http). Anything you send on the page can be read on the way.',
-        link.mixedScripts &&
-          'The address mixes letters from different alphabets, a common trick to imitate a well-known site.',
-        link.international && !link.mixedScripts && `The address uses international characters. Its plain form is ${link.asciiHost}.`,
-      ].filter((warning): warning is string => typeof warning === 'string')
-    : [];
+  const cautions = link?.findings.filter((finding) => finding.severity === 'caution') ?? [];
+  const notes = link?.findings.filter((finding) => finding.severity === 'info') ?? [];
 
   // Move focus to the result so keyboard and screen reader users land on it.
   useEffect(() => {
@@ -152,17 +146,27 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
           <p className="text-xl font-bold break-all text-fg" data-testid="scan-result-host">
             {link.host}
           </p>
-          {warnings.length === 0 ? (
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-success">
-              <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
-              Encrypted link with a plain address. Check it is the site you expect before opening it.
+          {link.findings.length === 0 && (
+            <p className="mt-1 text-sm text-fg-muted">
+              No warning signs found in the address. That is not a guarantee: check it is the site you expect before opening it.
             </p>
-          ) : (
-            <ul className="mt-2 space-y-1 text-sm text-warning">
-              {warnings.map((warning) => (
-                <li key={warning} className="flex gap-1.5">
+          )}
+          {cautions.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm text-warning" aria-label="Cautions">
+              {cautions.map((finding) => (
+                <li key={finding.code} className="flex gap-1.5">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                  {warning}
+                  {finding.message}
+                </li>
+              ))}
+            </ul>
+          )}
+          {notes.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm text-fg-muted" aria-label="Notes">
+              {notes.map((finding) => (
+                <li key={finding.code} className="flex gap-1.5">
+                  <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  {finding.message}
                 </li>
               ))}
             </ul>

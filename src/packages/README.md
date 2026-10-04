@@ -97,3 +97,9 @@ Boundary checks run automatically during `pnpm run lint` and CI.
 - **Purpose**: Dependency-free building blocks for the Bulk CSV Batch generator (`/bulk-csv-qr-code`). Everything runs in memory with no network access; the app loads this package only in the code-split Bulk CSV chunk.
 - **Entry Points**:
   - `index.ts`: RFC 4180 CSV parser with a header row (`parseCsv`, `CsvParseError`, `MAX_BULK_CSV_ROWS`, `MAX_BULK_CSV_CHARS`: quoted fields, `""` escapes, CRLF/LF/CR, embedded line breaks, BOM stripping, bounded row count), a minimal ZIP writer (`createZip`: stored entries, CRC-32 from `@/packages/optical-transfer`, central directory, UTF-8 names via general purpose bit 11) and file name helpers (`sanitizeFileStem`, `allocateFileName`).
+
+### `link-safety` (`@/packages/link-safety`)
+
+- **Purpose**: Offline, synchronous reading of a web address for the signs people use to disguise where a link goes (#1156). It makes no request and never says a site is safe: it reports findings, each `info` or `caution`, and an ordinary address has none.
+- **Entry Points**:
+  - `index.ts`: `analyseLink(url)` returning `LinkFinding[]` (cautions first) with `LinkFindingCode`, `LinkFindingSeverity`. Findings: credentials before an `@`, an IP host in any notation, a non-default port, a shortener or redirector, mixed alphabets, a lookalike of about a hundred brands (UTS #39 confusables for Latin, Cyrillic, Greek and Armenian plus digit swaps), a brand named in a subdomain or sign-in path of another registrable domain, four or more subdomain levels, and `http`. Used by the scanner and checker result sheet and the generator's link hints. See the package [README](./link-safety/README.md).
