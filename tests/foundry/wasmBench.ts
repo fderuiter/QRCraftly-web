@@ -27,6 +27,8 @@ import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { compileWasmBytes, instantiateWasm, type WasmInstance } from '../../src/packages/wasm-runtime/index';
 import { committedModuleNames } from '../../scripts/utils/rustWorkspace.js';
+import { qrEncoder } from '../fixtures/qrEncoder';
+import { decodeRequest, prepareDecode, renderGrid } from './qrDecodeModule';
 
 const WASM_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../src/wasm');
 
@@ -35,6 +37,9 @@ export interface WasmBenchCall {
   /** Sets up inputs once and returns the call to time. */
   prepare(instance: WasmInstance): () => void;
 }
+
+/** Seeded grey noise: the frame a camera sees between codes. */
+const NOISE_1080P = new Uint8Array(1920 * 1080).map((_, i) => (Math.imul(i, 2654435761) >>> 24) & 0xff);
 
 const FOUR_KB = new Uint8Array(4096).map((_, i) => (i * 31 + 7) & 0xff);
 
@@ -76,6 +81,24 @@ export const BENCH_CALLS: Record<string, WasmBenchCall[]> = {
     {
       name: 'encode v40 (L)',
       prepare: (instance) => prepareEncode(instance, 0, 'abcdefghijklmnopqrstuvwxyz'.repeat(114).slice(0, 2953)),
+    },
+  ],
+  'qr-decode': [
+    {
+      name: 'blank 1080p frame',
+      prepare: (instance) => prepareDecode(instance, decodeRequest(new Uint8Array(1920 * 1080).fill(200), 1920, 1080, 1)),
+    },
+    {
+      name: 'noisy 1080p frame',
+      prepare: (instance) => prepareDecode(instance, decodeRequest(NOISE_1080P, 1920, 1080, 1)),
+    },
+    {
+      name: 'noisy 1080p, all passes',
+      prepare: (instance) => prepareDecode(instance, decodeRequest(NOISE_1080P, 1920, 1080, 1, 0b1110)),
+    },
+    {
+      name: 'URL code in 640x480',
+      prepare: (instance) => prepareDecode(instance, decodeRequest(renderGrid(qrEncoder.create('https://qrcraftly.com/menu?table=12').modules, 6, 640, 480), 640, 480, 1)),
     },
   ],
 };
