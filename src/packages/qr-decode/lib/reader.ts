@@ -87,6 +87,18 @@ export interface QrRead {
   fnc1: 'gs1' | 'aim' | null;
 }
 
+/** A tile whose place and shape are already known, as Prism's tracker knows them. */
+export interface QrTile {
+  /** The symbol's top-left, top-right, bottom-right and bottom-left corners (its modules' outer edges), in frame pixels. */
+  corners: [QrPoint, QrPoint, QrPoint, QrPoint];
+  /** 1 to 40. */
+  version: number;
+  /** Omit to accept any level. */
+  level?: QrReadLevel;
+  /** Also try the tile as light on dark. */
+  inverted?: boolean;
+}
+
 /** Reads QR codes from pixels, synchronously. */
 export interface QrReader {
   /**
@@ -94,10 +106,18 @@ export interface QrReader {
    * @returns The codes found, best first; empty when there are none.
    */
   read(pixels: Uint8ClampedArray | Uint8Array, width: number, height: number, options?: QrReadOptions): QrRead[];
+  /**
+   * The Prism fast path: reads up to 8 tiles from their known corners, versions
+   * and levels without searching the frame, copying the frame in once.
+   * @returns One entry per tile, in order: its code, or null when it does not read as that version and level there.
+   */
+  readTracked(pixels: Uint8ClampedArray | Uint8Array, width: number, height: number, tiles: readonly QrTile[]): Array<QrRead | null>;
 }
 
 const LEVELS: readonly QrReadLevel[] = ['L', 'M', 'Q', 'H'];
 const REQUEST_HEADER = 12;
+const TILE_RECORD = 4 + 8 * 4;
+const ANY_LEVEL = 255;
 const CODE_HEADER = 8 + 16 * 4 + 8;
 const SEGMENT_RECORD = 16;
 const MAX_CODES = 8;
@@ -124,12 +144,21 @@ function point(view: DataView, at: number): QrPoint {
   return { x: view.getFloat32(at, true), y: view.getFloat32(at + 4, true) };
 }
 
-/** Reads the codes out of a `qr_decode` result (layout in `crates/qr-decode/src/lib.rs`). */
-function parseResult(out: Uint8Array): QrRead[] {
+/**
+ * Reads the records out of a `qr_decode` or `qr_decode_tracked` result (layout in
+ * `crates/qr-decode/src/lib.rs`). A tracked tile that did not read is a record of
+ * zeros, returned as null.
+ */
+function parseResult(out: Uint8Array): Array<QrRead | null> {
   const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
-  const reads: QrRead[] = [];
+  const reads: Array<QrRead | null> = [];
   let at = 4;
   for (let i = 0; i < out[0]; i++) {
+    if (out[at] === 0) {
+      reads.push(null);
+      at += CODE_HEADER;
+      continue;
+    }
     const flags = out[at + 3];
     const points = Array.from({ length: 8 }, (_, k) => point(view, at + 8 + k * 8));
     const alignment = points[7];
@@ -165,38 +194,79 @@ function parseResult(out: Uint8Array): QrRead[] {
   return reads;
 }
 
+/** Checks the frame and returns its channels per pixel. */
+function channelsOf(pixels: Uint8ClampedArray | Uint8Array, width: number, height: number): number {
+  const channels = pixels.length === width * height ? 1 : 4;
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || pixels.length !== width * height * channels) {
+    throw new WasmModuleError('status', `Expected ${width} x ${height} grey or RGBA pixels, got ${pixels.length} bytes.`);
+  }
+  return channels;
+}
+
+/** The first 12 bytes of either request: width, height, channels and four more bytes. */
+function headerOf(length: number, width: number, height: number, tail: [number, number, number, number]): Uint8Array {
+  const header = new Uint8Array(length);
+  const view = new DataView(header.buffer);
+  view.setUint32(0, width, true);
+  view.setUint32(4, height, true);
+  header.set(tail, 8);
+  return header;
+}
+
 /** Wraps an instance of the module. The returned reader is synchronous. */
 export function createQrReader(instance: WasmInstance): QrReader {
   const decode = instance.fn('qr_decode');
+  const decodeTracked = instance.fn('qr_decode_tracked');
   const capacityFor = instance.fn('qr_decode_capacity');
+
+  /** Copies the header and pixels in, runs `exported` and parses what it wrote. */
+  function call(exported: typeof decode, name: string, header: Uint8Array, pixels: Uint8ClampedArray | Uint8Array, maxCodes: number): Array<QrRead | null> {
+    const capacity = capacityFor(maxCodes) >>> 0;
+    const requestLength = header.length + pixels.length;
+    const request = instance.alloc(requestLength);
+    try {
+      instance.write(request, header);
+      instance.write(request + header.length, pixels instanceof Uint8Array ? pixels : new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.length));
+      const out = instance.alloc(capacity);
+      try {
+        const status = exported(request, requestLength, out, capacity);
+        if (status !== WASM_STATUS.OK) throw new WasmModuleError('status', `${name} failed with status ${status}.`);
+        // Parsed in place: the result is a few hundred bytes of a buffer sized for the worst case.
+        return parseResult(new Uint8Array(instance.memory.buffer, out, capacity));
+      } finally {
+        instance.free(out, capacity);
+      }
+    } finally {
+      instance.free(request, requestLength);
+    }
+  }
 
   return {
     read(pixels, width, height, options = {}) {
-      const channels = pixels.length === width * height ? 1 : 4;
-      if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || pixels.length !== width * height * channels) {
-        throw new WasmModuleError('status', `Expected ${width} x ${height} grey or RGBA pixels, got ${pixels.length} bytes.`);
-      }
+      const channels = channelsOf(pixels, width, height);
       const maxCodes = Math.min(MAX_CODES, Math.max(1, Math.floor(options.maxCodes ?? 1)));
-      const capacity = capacityFor(maxCodes) >>> 0;
-      const requestLength = REQUEST_HEADER + pixels.length;
-      const request = instance.alloc(requestLength);
-      try {
-        const header = new Uint8Array(REQUEST_HEADER);
-        const headerView = new DataView(header.buffer);
-        headerView.setUint32(0, width, true);
-        headerView.setUint32(4, height, true);
-        header.set([channels, flagsOf(options), maxCodes, 0], 8);
-        instance.write(request, header);
-        instance.write(request + REQUEST_HEADER, pixels instanceof Uint8Array ? pixels : new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.length));
-        let status: number = WASM_STATUS.OK;
-        const out = instance.withOutput(capacity, (outPtr) => {
-          status = decode(request, requestLength, outPtr, capacity);
-        });
-        if (status !== WASM_STATUS.OK) throw new WasmModuleError('status', `qr_decode failed with status ${status}.`);
-        return parseResult(out);
-      } finally {
-        instance.free(request, requestLength);
+      const reads = call(decode, 'qr_decode', headerOf(REQUEST_HEADER, width, height, [channels, flagsOf(options), maxCodes, 0]), pixels, maxCodes);
+      return reads.filter((read): read is QrRead => read !== null);
+    },
+    readTracked(pixels, width, height, tiles) {
+      const channels = channelsOf(pixels, width, height);
+      if (tiles.length < 1 || tiles.length > MAX_CODES) {
+        throw new WasmModuleError('status', `Expected 1 to ${MAX_CODES} tiles, got ${tiles.length}.`);
       }
+      const header = headerOf(REQUEST_HEADER + tiles.length * TILE_RECORD, width, height, [channels, 0, tiles.length, 0]);
+      const view = new DataView(header.buffer);
+      tiles.forEach((tile, t) => {
+        if (!Number.isInteger(tile.version) || tile.version < 1 || tile.version > 40) {
+          throw new WasmModuleError('status', `Expected a version from 1 to 40, got ${tile.version}.`);
+        }
+        const at = REQUEST_HEADER + t * TILE_RECORD;
+        header.set([tile.version, tile.level === undefined ? ANY_LEVEL : LEVELS.indexOf(tile.level), tile.inverted ? FLAG_INVERTED : 0, 0], at);
+        tile.corners.forEach((corner, k) => {
+          view.setFloat32(at + 4 + k * 8, corner.x, true);
+          view.setFloat32(at + 8 + k * 8, corner.y, true);
+        });
+      });
+      return call(decodeTracked, 'qr_decode_tracked', header, pixels, tiles.length);
     },
   };
 }

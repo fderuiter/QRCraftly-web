@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { qrEncoder } from '../../../../tests/fixtures/qrEncoder';
-import { loadQrReader, type QrReader } from '../index';
+import { loadQrReader, type QrPoint, type QrReader } from '../index';
 import type { QrSegmentInput, QrEncodeOptions } from '@/packages/qr-matrix';
 
 const SCALE = 4;
@@ -103,6 +103,43 @@ describe('qr-decode reader (#1178)', () => {
     const grey = new Uint8Array(240 * 240);
     for (let i = 0; i < grey.length; i++) grey[i] = dark.data[i * 4];
     expect(reader.read(grey, 240, 240, { inverted: true })[0].text).toBe('inverted');
+  });
+
+  it('reads tracked tiles from their corners, versions and levels (the Prism fast path)', async () => {
+    const reader = await loadQrReader();
+    const frame = frameOf(480, 240);
+    const side = draw(frame, 'tile one', 40, 40, { errorCorrectionLevel: 'M' });
+    draw(frame, 'tile two', 280, 40, { errorCorrectionLevel: 'M' });
+    const [found] = reader.read(frame.data, frame.width, frame.height);
+    const corners = (x: number): [QrPoint, QrPoint, QrPoint, QrPoint] => [
+      { x, y: 40 },
+      { x: x + side, y: 40 },
+      { x: x + side, y: 40 + side },
+      { x, y: 40 + side },
+    ];
+    const version = found.version;
+
+    const [one, two, wrongLevel, wrongVersion] = reader.readTracked(frame.data, frame.width, frame.height, [
+      { corners: corners(40), version, level: 'M' },
+      { corners: corners(280), version },
+      { corners: corners(40), version, level: 'H' },
+      { corners: corners(40), version: version + 1 },
+    ]);
+    expect(one).toMatchObject({ text: 'tile one', version, level: 'M', mirrored: false, inverted: false, alignment: null });
+    expect(one?.corners).toEqual(corners(40));
+    expect(two?.text).toBe('tile two');
+    expect(wrongLevel).toBeNull();
+    expect(wrongVersion).toBeNull();
+
+    const dark = frameOf(240, 240);
+    draw(dark, 'tile one', 40, 40, { errorCorrectionLevel: 'M' }, 255, 0);
+    expect(reader.readTracked(dark.data, 240, 240, [{ corners: corners(40), version }])).toEqual([null]);
+    expect(reader.readTracked(dark.data, 240, 240, [{ corners: corners(40), version, inverted: true }])[0]).toMatchObject({ text: 'tile one', inverted: true });
+
+    expect(() => reader.readTracked(frame.data, frame.width, frame.height, [])).toThrow(/tiles/);
+    expect(() => reader.readTracked(frame.data, frame.width, frame.height, [{ corners: corners(40), version: 41 }])).toThrow(/version/);
+    const nan: [QrPoint, QrPoint, QrPoint, QrPoint] = [{ x: Number.NaN, y: 0 }, ...corners(40).slice(1)] as [QrPoint, QrPoint, QrPoint, QrPoint];
+    expect(() => reader.readTracked(frame.data, frame.width, frame.height, [{ corners: nan, version }])).toThrow(/status/);
   });
 
   it('rejects pixels that do not match the size', async () => {

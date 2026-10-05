@@ -211,8 +211,16 @@ pub fn decode(block: &mut [u8], check: usize, erasures: &[usize]) -> Option<usiz
     };
     let mut clean = true;
     for j in 0..check {
-        let root = gf256::exp2(j as u32);
-        let s = block.iter().fold(0, |acc, &c| gf256::mul(acc, root) ^ c);
+        // Horner's rule at 2^j, multiplying in the log domain: j < 255 and
+        // log < 255, so the index stays inside the doubled table.
+        let s = block.iter().fold(0u8, |acc, &c| {
+            let product = if acc == 0 {
+                0
+            } else {
+                gf256::EXP[gf256::LOG[acc as usize] as usize + j]
+            };
+            product ^ c
+        });
         syndromes.c[j] = s;
         clean &= s == 0;
     }

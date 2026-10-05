@@ -426,7 +426,7 @@ pub fn timing_score(img: &Binary, p: &Placement) -> (usize, usize) {
 }
 
 /// How close to its threshold a module's brightness may be before it counts as weak.
-const WEAK_MARGIN: i32 = 12;
+pub(crate) const WEAK_MARGIN: i32 = 12;
 
 /// Samples every module centre. `None` when the grid runs off the frame.
 pub fn sample(img: &Binary, luma: &Luma, p: &Placement) -> Option<Grid> {

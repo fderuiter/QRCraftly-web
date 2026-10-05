@@ -440,17 +440,63 @@ while (Date.now() < end) {
 parentPort.postMessage(decoded);
 `;
 
-/** One 2x2 v25 tile of a 1080p frame as grey pixels: the crop a tracked frame decodes. */
-export async function sampleTileCrop(): Promise<{ grey: Uint8ClampedArray; width: number; height: number }> {
+/** A 2x2 v25 frame at 1080p as grey pixels, and the cell each tile is cropped from. */
+async function sampleTileFrame() {
   const layout = TILE_LAYOUTS['2x2-v25'];
   const screen: SimScreen = { frame: { width: 1920, height: 1080 }, modulePx: 4 };
   const stream = await createTileStream(new Uint8Array(layout.symbolSize * 8).map((_, i) => (i * 40503) >>> 7), layout);
   const sender = new TileSender(stream, layout, screen, 2, true);
-  const frame = sender.capture(4);
-  const cell = sender.placement.cell[0];
+  return { frame: sender.capture(4), cells: sender.placement.cell };
+}
+
+/** One 2x2 v25 tile of a 1080p frame as grey pixels: the crop a tracked frame decodes. */
+export async function sampleTileCrop(): Promise<{ grey: Uint8ClampedArray; width: number; height: number }> {
+  const { frame, cells } = await sampleTileFrame();
+  const cell = cells[0];
   const crop = new Uint8ClampedArray(cell.width * cell.height);
   for (let row = 0; row < cell.height; row++) crop.set(frame.grey.subarray((cell.y + row) * frame.width + cell.x, (cell.y + row) * frame.width + cell.x + cell.width), row * cell.width);
   return { grey: crop, width: cell.width, height: cell.height };
+}
+
+export interface TrackedMeasurement {
+  /** Full reads (search and decode) of one 2x2 v25 tile crop per second. */
+  fullPerSecond: number;
+  /** Fast-path reads of the same crop per second, from the tile's known corners, version and level. */
+  trackedPerSecond: number;
+  /** Tiles per second the fast path reads from the whole 1080p frame, all four in one call. */
+  frameTilesPerSecond: number;
+}
+
+/** Calls `read` in a loop for `millis` and returns how many calls per second it made. */
+function perSecond(millis: number, read: () => void): number {
+  let calls = 0;
+  const end = performance.now() + millis;
+  while (performance.now() < end) {
+    read();
+    calls += 1;
+  }
+  return Math.round(calls / (millis / 1000));
+}
+
+/**
+ * Measures the Prism fast path (#1178) on one thread: reading a tile from its known corners, version and level
+ * against a full read of the same crop, and all four tiles of the 1080p frame in one call.
+ * @param millis - How long each measurement runs.
+ */
+export async function measureTrackedReads(millis = 2000): Promise<TrackedMeasurement> {
+  const { frame, cells } = await sampleTileFrame();
+  const crop = await sampleTileCrop();
+  const [found] = qrReader.read(crop.grey, crop.width, crop.height);
+  if (!found) throw new Error('The sample tile did not read.');
+  const tile = { corners: found.corners, version: found.version, level: found.level };
+  const tiles = cells.map((cell) => ({ ...tile, corners: tile.corners.map((p) => ({ x: p.x + cell.x, y: p.y + cell.y })) as typeof tile.corners }));
+  const fromFrame = qrReader.readTracked(frame.grey, frame.width, frame.height, tiles);
+  if (fromFrame.some((read) => read === null)) throw new Error('A tile of the sample frame did not read on the fast path.');
+  return {
+    fullPerSecond: perSecond(millis, () => qrReader.read(crop.grey, crop.width, crop.height)),
+    trackedPerSecond: perSecond(millis, () => qrReader.readTracked(crop.grey, crop.width, crop.height, [tile])),
+    frameTilesPerSecond: perSecond(millis, () => qrReader.readTracked(frame.grey, frame.width, frame.height, tiles)) * tiles.length,
+  };
 }
 
 /**
