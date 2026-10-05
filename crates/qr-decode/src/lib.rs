@@ -94,6 +94,9 @@ const CODE_HEADER: usize = 8 + 16 * 4 + 8;
 const SEGMENT_RECORD: usize = 16;
 /// Triples tried per pass, so a frame full of finder-like noise stays cheap.
 const MAX_ATTEMPTS: usize = 64;
+/// Share of timing-pattern modules a placement must read correctly before the
+/// whole grid is sampled. Noise scores about 50.
+const TIMING_MIN_PERCENT: usize = 70;
 
 /// How hard to look.
 #[derive(Clone, Copy, Debug)]
@@ -172,6 +175,10 @@ fn decode_placement(
 ) -> Option<Decoded> {
     let size = placement.size;
     {
+        let (matches, total) = detect::timing_score(binary, placement);
+        if matches * 100 < total * TIMING_MIN_PERCENT {
+            return None;
+        }
         let grid = detect::sample(binary, luma, placement)?;
         // A mirrored code samples as the transpose of itself; its format bits can
         // still pass as some other word, so any failure but a size hint tries it.

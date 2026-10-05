@@ -407,6 +407,24 @@ pub fn place(img: &Binary, t: &Triple, module: f32, size: usize, use_alignment: 
     }
 }
 
+/// How many timing-pattern modules (row and column 6 between the finders)
+/// read as they should, out of how many: a cheap test before sampling the
+/// whole grid. Noise matches about half; a real code nearly all. The pattern
+/// is symmetric, so a mirrored code scores the same.
+pub fn timing_score(img: &Binary, p: &Placement) -> (usize, usize) {
+    let n = p.size;
+    let (mut matches, mut total) = (0, 0);
+    for i in 8..n.saturating_sub(8) {
+        for (r, c) in [(6, i), (i, 6)] {
+            let (x, y) = p.transform.apply(c as f32 + 0.5, r as f32 + 0.5);
+            let dark = img.get_i(floor(x) as i32, floor(y) as i32);
+            total += 1;
+            matches += usize::from(dark == i.is_multiple_of(2));
+        }
+    }
+    (matches, total)
+}
+
 /// How close to its threshold a module's brightness may be before it counts as weak.
 const WEAK_MARGIN: i32 = 12;
 
