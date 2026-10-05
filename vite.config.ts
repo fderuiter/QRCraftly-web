@@ -105,7 +105,14 @@ export default defineConfig(() => {
       },
       build: {
         target: "es2022",
-        rollupOptions: {}
+        rollupOptions: {
+          output: {
+            manualChunks(id: string) {
+              if (/[\\/]node_modules[\\/].*[\\/]node_modules[\\/](react|react-dom|scheduler|vike|vike-react)[\\/]/.test(id)) return 'vendor';
+              return undefined;
+            },
+          },
+        }
       },
       test: {
         globals: true,
