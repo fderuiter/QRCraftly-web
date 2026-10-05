@@ -119,9 +119,9 @@ Boundary checks run automatically during `pnpm run lint` and CI.
 
 ### `qr-decode` (`@/packages/qr-decode`)
 
-- **Purpose**: Our QR decoder ([#1178](https://github.com/fderuiter/QRCraftly-web/issues/1178)), the Rust module `crates/qr-decode` compiled to `src/wasm/qr-decode.wasm`. It reads RGBA or grey frames, up to eight codes at a time, light-on-dark and mirrored codes included, and turns each code's segments into text by mode and ECI. It replaced jsQR everywhere: the scanner's fallback, the scannability check and the transfer handshake.
+- **Purpose**: Our QR decoder ([#1178](https://github.com/fderuiter/QRCraftly-web/issues/1178)), the Rust module `crates/qr-decode` compiled to `src/wasm/qr-decode.wasm`. It reads RGBA or grey frames, up to eight codes at a time, light-on-dark and mirrored codes included, and turns each code's segments into text by mode and ECI. It replaced jsQR everywhere: the scanner's fallback, the scannability check and the transfer handshake. `readTracked` is the Prism fast path: it reads up to eight tiles whose corners, version and level are already known, sampling their grids without a search, from one copy of the frame.
 - **Entry Points**:
-  - `index.ts`: `loadQrReader` (fetches and instantiates the module once; under Node it reads the file), `createQrReader` (a synchronous reader over an instance) and the `QrReader`, `QrRead`, `QrReadOptions`, `QrReadSegment`, `QrReadMode`, `QrReadLevel` and `QrPoint` types.
+  - `index.ts`: `loadQrReader` (fetches and instantiates the module once; under Node it reads the file), `createQrReader` (a synchronous reader over an instance, with `read` and `readTracked`) and the `QrReader`, `QrRead`, `QrReadOptions`, `QrTile`, `QrReadSegment`, `QrReadMode`, `QrReadLevel` and `QrPoint` types.
 
 ### `wasm-runtime` (`@/packages/wasm-runtime`)
 

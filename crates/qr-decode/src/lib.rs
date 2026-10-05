@@ -50,6 +50,21 @@
 //!   (0xFFFFFFFF for none), start u32 and length u32 in this code's bytes.
 //! - The bytes.
 //!
+//! A second export, `qr_decode_tracked`, is the Prism fast path ([`tracked`]):
+//! it reads tiles whose corners, version and level are already known,
+//! without searching, from one copy of the frame. Its request:
+//! - bytes 0 to 3: width as u32; bytes 4 to 7: height as u32.
+//! - byte 8: channels per pixel, 1 or 4; byte 9: 0; byte 10: the number of
+//!   tiles (1 to 8); byte 11: 0.
+//! - Per tile, 36 bytes: version (1 to 40), level (0 L, 1 M, 2 Q, 3 H, 255
+//!   any) and flags (2 also try light on dark) as u8, then 0; then the
+//!   symbol's top-left, top-right, bottom-right and bottom-left corners as
+//!   8 f32, x, y pairs in frame pixels.
+//! - Then the pixels, as above.
+//!
+//! Its result has the layout above with one record per tile, in order; a tile
+//! that did not read is a record of zeros (version 0, no segments, no bytes).
+//!
 //! Every input is untrusted: sizes are checked before anything is allocated,
 //! candidate counts are capped, and nothing indexes outside a buffer.
 
@@ -66,6 +81,7 @@ pub mod finder;
 pub mod image;
 pub mod math;
 pub mod symbol;
+pub mod tracked;
 pub mod transform;
 
 use alloc::vec::Vec;
@@ -90,6 +106,10 @@ pub const RESULT_FNC1_SECOND: u8 = 16;
 pub const MAX_SIDE: usize = 8192;
 pub const MAX_CODES: usize = 8;
 const REQUEST_HEADER: usize = 12;
+/// Bytes per tile in a tracked request.
+const TILE_RECORD: usize = 4 + 8 * 4;
+/// Level byte meaning any level, in a tracked request.
+pub const ANY_LEVEL: u8 = 255;
 const CODE_HEADER: usize = 8 + 16 * 4 + 8;
 const SEGMENT_RECORD: usize = 16;
 /// Triples tried per pass, so a frame full of finder-like noise stays cheap.
@@ -370,17 +390,32 @@ fn record_len(d: &Decoded) -> usize {
 
 /// Writes the result layout, or returns the bytes needed as an error.
 pub fn write_result(codes: &[Decoded], out: &mut [u8]) -> Result<usize, usize> {
-    let len = 4 + codes.iter().map(record_len).sum::<usize>();
+    let slots: Vec<Option<&Decoded>> = codes.iter().map(Some).collect();
+    write_slots(&slots, out)
+}
+
+/// `write_result` with gaps: an empty slot is written as a record of zeros
+/// (version 0, no segments, no bytes), so a tracked result keeps one record
+/// per tile.
+pub fn write_slots(slots: &[Option<&Decoded>], out: &mut [u8]) -> Result<usize, usize> {
+    let len = 4 + slots
+        .iter()
+        .map(|s| s.map_or(CODE_HEADER, record_len))
+        .sum::<usize>();
     if out.len() < len {
         return Err(len);
     }
-    out[..4].copy_from_slice(&[codes.len() as u8, 0, 0, 0]);
+    out[..4].copy_from_slice(&[slots.len() as u8, 0, 0, 0]);
     let mut at = 4;
     let mut put = |out: &mut [u8], bytes: &[u8]| {
         out[at..at + bytes.len()].copy_from_slice(bytes);
         at += bytes.len();
     };
-    for d in codes {
+    for slot in slots {
+        let Some(d) = slot else {
+            put(out, &[0; CODE_HEADER]);
+            continue;
+        };
         let c = &d.content;
         let mut flags = 0u8;
         if d.mirrored {
@@ -470,6 +505,101 @@ pub unsafe extern "C" fn qr_decode(
     };
     let codes = decode(&luma, &options);
     match write_result(&codes, out) {
+        Ok(_) => STATUS_OK,
+        Err(_) => STATUS_BUFFER_TOO_SMALL,
+    }
+}
+
+/// Validates a tracked request; the pixels stay in the request.
+pub fn parse_tracked_request(bytes: &[u8]) -> Option<(tracked::Pixels<'_>, Vec<tracked::Tile>)> {
+    let width = read_u32(bytes, 0)? as usize;
+    let height = read_u32(bytes, 4)? as usize;
+    let channels = *bytes.get(8)? as usize;
+    let count = *bytes.get(10)? as usize;
+    if width == 0 || height == 0 || width > MAX_SIDE || height > MAX_SIDE {
+        return None;
+    }
+    if !(channels == 1 || channels == 4) || *bytes.get(9)? != 0 || *bytes.get(11)? != 0 {
+        return None;
+    }
+    if !(1..=MAX_CODES).contains(&count) {
+        return None;
+    }
+    // Corners may sit a little off the frame, but not so far that the maths overflows.
+    let limit = (2 * MAX_SIDE) as f32;
+    let mut tiles = Vec::with_capacity(count);
+    for t in 0..count {
+        let at = REQUEST_HEADER + t * TILE_RECORD;
+        let record = bytes.get(at..at + TILE_RECORD)?;
+        let (version, level, flags) = (record[0], record[1], record[2]);
+        if !(1..=40).contains(&version) || flags & !FLAG_INVERTED != 0 || record[3] != 0 {
+            return None;
+        }
+        let ecc = match level {
+            ANY_LEVEL => None,
+            _ => Some(Ecc::from_index(level)?),
+        };
+        let mut corners = [(0.0f32, 0.0f32); 4];
+        for (k, corner) in corners.iter_mut().enumerate() {
+            let x = f32::from_bits(read_u32(record, 4 + 8 * k)?);
+            let y = f32::from_bits(read_u32(record, 8 + 8 * k)?);
+            if !(x.abs() <= limit && y.abs() <= limit) {
+                return None;
+            }
+            *corner = (x, y);
+        }
+        tiles.push(tracked::Tile {
+            corners,
+            version,
+            ecc,
+            inverted: flags & FLAG_INVERTED != 0,
+        });
+    }
+    let pixels = bytes.get(REQUEST_HEADER + count * TILE_RECORD..)?;
+    if pixels.len() != width * height * channels {
+        return None;
+    }
+    Some((
+        tracked::Pixels {
+            width,
+            height,
+            channels,
+            data: pixels,
+        },
+        tiles,
+    ))
+}
+
+/// Reads the tiles a tracked request describes into `out_ptr`, one record
+/// per tile in order. Returns a status code as `qr_decode` does; `out_len`
+/// must be at least `qr_decode_capacity` of the tile count. A tile that does
+/// not decode is a success with a record of zeros.
+///
+/// # Safety
+/// `req_ptr..req_ptr + req_len` must be readable and `out_ptr..out_ptr + out_len` writable.
+#[no_mangle]
+pub unsafe extern "C" fn qr_decode_tracked(
+    req_ptr: *const u8,
+    req_len: usize,
+    out_ptr: *mut u8,
+    out_len: usize,
+) -> i32 {
+    if req_ptr.is_null() || out_ptr.is_null() {
+        return STATUS_BAD_INPUT;
+    }
+    // SAFETY: guaranteed by the caller.
+    let request = unsafe { core::slice::from_raw_parts(req_ptr, req_len) };
+    // SAFETY: guaranteed by the caller.
+    let out = unsafe { core::slice::from_raw_parts_mut(out_ptr, out_len) };
+    let Some((pixels, tiles)) = parse_tracked_request(request) else {
+        return STATUS_BAD_INPUT;
+    };
+    let codes: Vec<Option<Decoded>> = tiles
+        .iter()
+        .map(|tile| tracked::decode_tracked(&pixels, tile))
+        .collect();
+    let slots: Vec<Option<&Decoded>> = codes.iter().map(Option::as_ref).collect();
+    match write_slots(&slots, out) {
         Ok(_) => STATUS_OK,
         Err(_) => STATUS_BUFFER_TOO_SMALL,
     }

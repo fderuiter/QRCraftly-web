@@ -29,5 +29,6 @@ export {
   type QrReadOptions,
   type QrReadLevel,
   type QrPoint,
+  type QrTile,
 } from './lib/reader';
 export type { QrReadSegment, QrReadMode } from './lib/text';

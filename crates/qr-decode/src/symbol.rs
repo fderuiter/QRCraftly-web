@@ -167,6 +167,11 @@ fn read_codewords(grid: &Grid, version: u8, mask: u8) -> (Vec<u8>, Vec<bool>) {
     let total = total_codewords(version);
     let mut words = vec![0u8; total];
     let mut weak = vec![false; total];
+    // Every mask repeats every 12 rows and 12 columns, so one tile of it serves the grid.
+    let mut pattern = [false; 144];
+    for (k, p) in pattern.iter_mut().enumerate() {
+        *p = mask_bit(mask, k / 12, k % 12);
+    }
     let mut bit = 0usize;
     let mut col = n - 1;
     let mut upward = true;
@@ -185,7 +190,7 @@ fn read_codewords(grid: &Grid, version: u8, mask: u8) -> (Vec<u8>, Vec<bool>) {
                 if bit / 8 >= total {
                     break 'outer;
                 }
-                let dark = (grid.bits[i] != 0) ^ mask_bit(mask, row, c);
+                let dark = (grid.bits[i] != 0) ^ pattern[(row % 12) * 12 + c % 12];
                 if dark {
                     words[bit / 8] |= 0x80 >> (bit % 8);
                 }

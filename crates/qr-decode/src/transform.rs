@@ -111,6 +111,22 @@ impl Projective {
             .then(&Projective::square_to_quad(to))
     }
 
+    /// Maps `count` points along a row, (x0, y), (x0 + 1, y) and so on, passing
+    /// each to `f` with its index. Cheaper than `apply` on each: the
+    /// numerators step by a constant and each point takes one division.
+    pub fn for_row(&self, x0: f32, y: f32, count: usize, mut f: impl FnMut(usize, f32, f32)) {
+        let mut nx = self.a11 * x0 + self.a21 * y + self.a31;
+        let mut ny = self.a12 * x0 + self.a22 * y + self.a32;
+        let mut d = self.a13 * x0 + self.a23 * y + self.a33;
+        for k in 0..count {
+            let inverse = 1.0 / d;
+            f(k, nx * inverse, ny * inverse);
+            nx += self.a11;
+            ny += self.a12;
+            d += self.a13;
+        }
+    }
+
     pub fn apply(&self, x: f32, y: f32) -> (f32, f32) {
         let d = self.a13 * x + self.a23 * y + self.a33;
         (

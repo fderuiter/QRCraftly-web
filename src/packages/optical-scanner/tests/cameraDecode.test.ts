@@ -15,6 +15,7 @@ const countingReader: QrReader = {
     readerCalls.count += 1;
     return qrReader.read(...args);
   },
+  readTracked: (...args) => qrReader.readTracked(...args),
 };
 
 const decodeCameraFrame = (data: Uint8ClampedArray, width: number, height: number, strategy: CameraDecodeStrategy) =>
