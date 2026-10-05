@@ -26,8 +26,10 @@
 
 use crate::segment::{BitBuffer, Segment, StructuredAppend};
 use crate::tables::{
-    alignment_coords, data_codewords, ec_blocks, ec_codewords, symbol_size, total_codewords, Ecc,
+    alignment_coords, data_codewords, ec_blocks, ec_codewords, mask_bit, symbol_size,
+    total_codewords, Ecc,
 };
+pub use crate::tables::{format_bits, version_bits};
 use alloc::vec;
 use alloc::vec::Vec;
 use qrcraftly_core::reed_solomon;
@@ -109,43 +111,6 @@ pub struct Matrix {
     pub size: usize,
     pub modules: Vec<u8>,
     reserved: Vec<u8>,
-}
-
-/// Format information: level and mask with their BCH(15,5) code, masked with 0x5412.
-pub fn format_bits(ecc: Ecc, mask: u8) -> u32 {
-    let data = (ecc.format_bits() << 3) | mask as u32;
-    let mut rem = data << 10;
-    for i in (10..15).rev() {
-        if rem & (1 << i) != 0 {
-            rem ^= 0x537 << (i - 10);
-        }
-    }
-    ((data << 10) | rem) ^ 0x5412
-}
-
-/// Version information: the version with its BCH(18,6) code.
-pub fn version_bits(version: u8) -> u32 {
-    let data = version as u32;
-    let mut rem = data << 12;
-    for i in (12..18).rev() {
-        if rem & (1 << i) != 0 {
-            rem ^= 0x1F25 << (i - 12);
-        }
-    }
-    (data << 12) | rem
-}
-
-fn mask_bit(mask: u8, row: usize, col: usize) -> bool {
-    match mask {
-        0 => (row + col).is_multiple_of(2),
-        1 => row.is_multiple_of(2),
-        2 => col.is_multiple_of(3),
-        3 => (row + col).is_multiple_of(3),
-        4 => (row / 2 + col / 3).is_multiple_of(2),
-        5 => (row * col) % 2 + (row * col) % 3 == 0,
-        6 => ((row * col) % 2 + (row * col) % 3).is_multiple_of(2),
-        _ => ((row * col) % 3 + (row + col) % 2).is_multiple_of(2),
-    }
 }
 
 impl Matrix {
@@ -413,22 +378,6 @@ pub fn build(version: u8, ecc: Ecc, mask: Option<u8>, codewords: &[u8]) -> (Matr
 mod tests {
     use super::*;
     use crate::segment::Mode;
-
-    #[test]
-    fn format_bits_match_the_specification_table() {
-        assert_eq!(format_bits(Ecc::M, 0), 0x5412);
-        assert_eq!(format_bits(Ecc::L, 0), 0x77C4);
-        assert_eq!(format_bits(Ecc::H, 7), 0x083B);
-        assert_eq!(format_bits(Ecc::Q, 5), 0x2183);
-        assert_eq!(format_bits(Ecc::Q, 7), 0x2BED);
-    }
-
-    #[test]
-    fn version_bits_match_the_specification_table() {
-        assert_eq!(version_bits(7), 0x07C94);
-        assert_eq!(version_bits(21), 0x15683);
-        assert_eq!(version_bits(40), 0x28C69);
-    }
 
     #[test]
     fn specification_example_codewords() {

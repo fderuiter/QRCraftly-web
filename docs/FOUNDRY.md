@@ -33,7 +33,7 @@ Each replacement moves through these stages in order. The scorecard below record
 | `selftest` ([#1182](https://github.com/fderuiter/QRCraftly-web/issues/1182))  | nothing; proves the build and the loader   | Shipped as a test fixture only      | 4 KB         |
 | `qr-encode` ([#1177](https://github.com/fderuiter/QRCraftly-web/issues/1177)) | `qrcode` and its 28 packages               | Removed: `qrcode` is gone           | 20 KB        |
 | Prism FEC ([#1176](https://github.com/fderuiter/QRCraftly-web/issues/1176))   | the LT fountain code (in-house TypeScript) | Contract, waits on the patent check | set in #1176 |
-| QR decoder ([#1178](https://github.com/fderuiter/QRCraftly-web/issues/1178))  | `jsqr`, then `zxing-wasm`                  | Contract                            | set in #1178 |
+| `qr-decode` ([#1178](https://github.com/fderuiter/QRCraftly-web/issues/1178)) | `jsqr`, then `zxing-wasm`                  | Bench                               | 32 KB        |
 
 ### Other replacements
 

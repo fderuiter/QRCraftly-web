@@ -3,6 +3,14 @@
 version = 4
 
 [[package]]
+name = "qr-decode"
+version = "0.0.0"
+dependencies = [
+ "qr-encode",
+ "qrcraftly-core",
+]
+
+[[package]]
 name = "qr-encode"
 version = "0.0.0"
 dependencies = [
