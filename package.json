@@ -26,7 +26,7 @@
     "dev": "vite",
     "prebuild": "node scripts/storage_privacy_ast_auditor.js",
     "build": "node scripts/compile_docs_manifest.js --check && vite build && pnpm run postbuild",
-    "postbuild": "node scripts/generate_sw.cjs && node scripts/write_build_info.js && node scripts/bundle_ast_audit.js && tsx scripts/generate_sitemap.ts && tsx scripts/generate_social_images.ts && node scripts/csp_hash_injector.js && node scripts/generate_lhci_manifest.js",
+    "postbuild": "node scripts/generate_sw.cjs && node scripts/write_build_info.js && node scripts/bundle_ast_audit.js && tsx scripts/generate_sitemap.ts && tsx scripts/generate_social_images.ts && node scripts/defer_page_scripts.js && node scripts/csp_hash_injector.js && node scripts/generate_lhci_manifest.js",
     "preview": "vite preview",
     "test": "vitest",
     "test:e2e": "playwright test",
