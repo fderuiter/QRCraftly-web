@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { QRConfig, SocialFormat, TemplateStyle, QRModules } from '../types';
 import { drawQR, drawQRInternal } from '../utils/qrRenderer';
 import { drawWithTemplate, SOCIAL_DIMENSIONS } from '@/packages/qr-export';
@@ -39,31 +39,35 @@ import { motionAllowed } from '../hooks/usePresence';
 
 /** Length of the preview crossfade in ms (#1054). */
 const CROSSFADE_MS = 150;
-/** The ghost canvas of the frame currently fading out, per preview canvas. */
-const fadingGhosts = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+/** The ghost canvas that fades a preview's previous frame out, kept for reuse: allocating a new
+ * backing store for every change costs more than the copy into it. */
+const ghosts = new WeakMap<HTMLCanvasElement, { canvas: HTMLCanvasElement; animation: Animation | null }>();
 
 /**
  * Crossfades the preview when the QR or its design changes: copies the current frame into a
  * ghost canvas laid over the preview and fades the ghost out, while the caller draws the new
  * frame on the real canvas straight away (the correct frame is never delayed). Skipped under
  * reduced motion, for the first frame, when the frame size changes and without the Web
- * Animations API. The ghost removes itself when the fade ends, leaving today's render.
+ * Animations API. The ghost leaves the page when the fade ends, leaving today's render.
  * @param canvas - The preview canvas, before it is redrawn.
  * @returns Call it after drawing: it drops the fade when the frame size changed.
  */
 function crossfadeFrom(canvas: HTMLCanvasElement): () => void {
-  fadingGhosts.get(canvas)?.remove();
-  fadingGhosts.delete(canvas);
+  const previous = ghosts.get(canvas);
+  previous?.animation?.cancel();
+  previous?.canvas.remove();
   const container = canvas.parentElement;
   const none = () => {};
   if (!container || canvas.width === 0 || canvas.height === 0 || !motionAllowed()) return none;
-  const ghost = document.createElement('canvas');
+  const ghost = previous?.canvas ?? document.createElement('canvas');
   if (typeof ghost.animate !== 'function') return none;
-  ghost.width = canvas.width;
-  ghost.height = canvas.height;
+  // Setting a size reallocates the canvas even when it is unchanged, so only a new size is set.
+  if (ghost.width !== canvas.width) ghost.width = canvas.width;
+  if (ghost.height !== canvas.height) ghost.height = canvas.height;
   const ctx = ghost.getContext('2d');
   if (!ctx) return none;
   try {
+    ctx.clearRect(0, 0, ghost.width, ghost.height);
     ctx.drawImage(canvas, 0, 0);
   } catch {
     return none;
@@ -71,20 +75,23 @@ function crossfadeFrom(canvas: HTMLCanvasElement): () => void {
   ghost.setAttribute('aria-hidden', 'true');
   ghost.className = 'pointer-events-none absolute inset-0 size-full';
   container.appendChild(ghost);
-  fadingGhosts.set(canvas, ghost);
+  const entry: { canvas: HTMLCanvasElement; animation: Animation | null } = { canvas: ghost, animation: null };
+  ghosts.set(canvas, entry);
   const animation = ghost.animate([{ opacity: 1 }, { opacity: 0 }], {
     duration: CROSSFADE_MS,
     easing: 'cubic-bezier(0.2, 0, 0, 1)',
     fill: 'forwards',
   });
-  const cleanUp = () => {
+  entry.animation = animation;
+  animation.onfinish = () => {
     ghost.remove();
-    if (fadingGhosts.get(canvas) === ghost) fadingGhosts.delete(canvas);
+    entry.animation = null;
   };
-  animation.onfinish = cleanUp;
-  animation.oncancel = cleanUp;
   return () => {
-    if (canvas.width !== ghost.width || canvas.height !== ghost.height) animation.cancel();
+    if (canvas.width !== ghost.width || canvas.height !== ghost.height) {
+      animation.cancel();
+      ghost.remove();
+    }
   };
 }
 
@@ -150,8 +157,10 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
   // The QR store is the single owner of the scannability fallback flag.
   const fallbackActive = useOptionalQRStoreSelector(state => state.isScannabilityFallbackActive) ?? false;
 
+  // Only a maze has bridges to drop, so the config keeps its identity otherwise: the flag flips
+  // around every edit and would repaint the old matrix for nothing.
   const activeConfig = useMemo(() => {
-    if (fallbackActive) {
+    if (fallbackActive && config.isMazeEnabled) {
       return { ...config, isMazeBridgesEnabled: false };
     }
     return config;
@@ -199,7 +208,9 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     };
   }, []);
 
-  useEffect(() => {
+  // The refs, the matrix worker and the paint effects below are layout effects so a change is
+  // drawn before the browser paints, not one frame later; the refs update first.
+  useLayoutEffect(() => {
     configRef.current = activeConfig;
     logoImgRef.current = logoImg;
     borderLogoImgRef.current = borderLogoImg;
@@ -361,7 +372,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
   const [computedMazeData, setComputedMazeData] = useState<MazeData | null>(null);
   const computedMazeDataRef = useRef<MazeData | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     computedMazeDataRef.current = computedMazeData;
   }, [computedMazeData]);
 
@@ -422,7 +433,10 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     };
   }, [initMazeWorker]);
 
+  // Reads the config from its ref so this callback, and everything built on it, stays stable:
+  // otherwise every config change would recreate the matrix worker and re-request the matrix.
   const requestMazeCalculation = useCallback((modules: QRModules) => {
+    const activeConfig = configRef.current;
     if (!activeConfig.isMazeEnabled) {
       setComputedMazeData(null);
       return;
@@ -472,7 +486,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
         setTimeout(runner, 0);
       }
     }
-  }, [activeConfig]);
+  }, []);
 
   const clearCanvasAndResize = useCallback(() => {
     const canvas = localCanvasRef.current;
@@ -690,7 +704,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
   }, [paintMatrix, clearCanvasAndResize]);
 
   // Web Worker lifecycle management
-  useEffect(() => {
+  useLayoutEffect(() => {
     let worker: Worker | null = null;
     try {
       worker = getQrCanvasRuntime().createMatrixWorker();
@@ -732,13 +746,13 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
   }, [paintMatrix, clearCanvasAndResize]);
 
   // Monitor value and error correction level to request calculations
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (activeIsAnimating) return;
     requestMatrixCalculation();
   }, [config.value, config.errorCorrectionLevel, activeIsAnimating, requestMatrixCalculation]);
 
   // Repaint canvas when computed background maze data updates without triggering a new calculation
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (activeIsAnimating) return;
     if (computedMazeData && lastModulesRef.current) {
       repaintCanvasOnly(lastModulesRef.current);
@@ -746,7 +760,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
   }, [computedMazeData, activeIsAnimating, repaintCanvasOnly]);
 
   // Monitor structural and aesthetic changes to repaint immediately
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (activeIsAnimating) return;
     if (lastModulesRef.current) {
       paintMatrix(lastModulesRef.current);

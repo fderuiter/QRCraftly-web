@@ -23,6 +23,9 @@ import { isDangerousUrl } from "../../utils/security";
 import { CONTAINMENT_PROFILES } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
 
+/** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
+const COMMIT_DELAY_MS = 100;
+
 // `type` selects which member of the data union `data` is, so the casts below follow it.
 const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => {
   if (type === QRType.WIFI) {
@@ -111,6 +114,8 @@ export function useInputLogic(
   // The debounced write waiting in timeoutRef, so flush() can apply it immediately.
   const pendingCommitRef = useRef<(() => void) | null>(null);
   const prevTypeRef = useRef<QRType | null>(null);
+  // When the last edit was written, so an edit after a quiet spell is written at once.
+  const lastEditAtRef = useRef(Number.NEGATIVE_INFINITY);
 
   // Synchronize input states reactively when config changes externally (e.g., undo/redo or preset loaded)
   useEffect(() => {
@@ -213,8 +218,17 @@ export function useInputLogic(
         }
       }
     };
+    // A first edit after a quiet spell goes straight to the preview, in the same render as the
+    // field; only a burst of typing is held back until it pauses.
+    const now = performance.now();
+    const quiet = now - lastEditAtRef.current >= COMMIT_DELAY_MS;
+    lastEditAtRef.current = now;
+    if (quiet) {
+      commit();
+      return;
+    }
     pendingCommitRef.current = commit;
-    timeoutRef.current = setTimeout(commit, 100);
+    timeoutRef.current = setTimeout(commit, COMMIT_DELAY_MS);
   };
 
   // Applies a pending debounced edit now, so an action taken right after typing (for example

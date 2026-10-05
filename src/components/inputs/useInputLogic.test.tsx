@@ -85,7 +85,12 @@ describe("useInputLogic", () => {
       { initialProps: { cfg: config } }
     );
 
-    // User types something
+    // User types: the first edit after a quiet spell is written at once, the next one in the
+    // same burst waits for the burst to pause
+    act(() => {
+      result.current.inputProps.onChange({ text: "User Typed" });
+    });
+    expect(onChange).toHaveBeenCalledTimes(1);
     act(() => {
       result.current.inputProps.onChange({ text: "User Typed Something" });
     });
@@ -103,7 +108,7 @@ describe("useInputLogic", () => {
     });
 
     // Stale typed value must not overwrite the restored/external state
-    expect(onChange).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenCalledTimes(1);
     expect(result.current.inputProps.data).toEqual({ text: "Original State Restored" });
   });
 
@@ -278,22 +283,26 @@ describe("useInputLogic flush", () => {
     const onChange = vi.fn();
     const { result } = renderHook(() => useInputLogic(createMockConfig(QRType.TEXT, ""), onChange));
 
-    act(() => {
-      (result.current.inputProps as { onChange: (u: { text: string }) => void }).onChange({ text: "typed" });
-    });
-    expect(onChange).not.toHaveBeenCalled();
+    const type = (text: string) =>
+      act(() => {
+        (result.current.inputProps as { onChange: (u: { text: string }) => void }).onChange({ text });
+      });
+    type("t");
+    expect(onChange).toHaveBeenCalledTimes(1);
+    type("typed");
+    expect(onChange).toHaveBeenCalledTimes(1);
 
     act(() => {
       result.current.flush();
     });
-    expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange).toHaveBeenCalledWith({ value: "typed" });
+    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange).toHaveBeenLastCalledWith({ value: "typed" });
 
     act(() => {
       vi.advanceTimersByTime(200);
       result.current.flush();
     });
-    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledTimes(2);
   });
 
   it("does nothing when no edit is pending", () => {
