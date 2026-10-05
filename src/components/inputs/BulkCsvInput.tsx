@@ -17,6 +17,7 @@
 */
 
 import { Progress } from '../ui/Progress';
+import { BulkCsvDropZone } from './BulkCsvDropZone';
 import React, { useState, useEffect, useMemo, ChangeEvent } from 'react';
 import {
   parseCsv,
@@ -304,15 +305,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   return (
     <div className="space-y-6">
       {!data.csvContent ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center dark:border-slate-700 dark:bg-slate-800/50">
-          <FileSpreadsheet className="size-12 text-teal-600 dark:text-teal-400" />
-          <h3 className="mt-3 text-base font-semibold text-slate-900 dark:text-white">
-            Upload CSV or TXT File
-          </h3>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Upload a `.csv` or `.txt` file with a header row. Up to {MAX_BULK_CSV_ROWS} rows are
-            processed, entirely in your browser.
-          </p>
+        <BulkCsvDropZone>
           <label className="mt-4 cursor-pointer">
             <span className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-800 focus:ring-2 focus:ring-teal-500 focus:outline-hidden">
               <Upload className="size-4" />
@@ -320,7 +313,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
             </span>
             {fileInput('Upload CSV or TXT file')}
           </label>
-        </div>
+        </BulkCsvDropZone>
       ) : (
         <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-800">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-700">

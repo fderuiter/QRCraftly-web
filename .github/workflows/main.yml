@@ -292,6 +292,23 @@ jobs:
               console.error("Warning: Failed to post Resource Quota comment due to a GitHub API error:", error);
             }
 
+  # Audits the exact `dist` the Build job produced. Each page runs three times and the
+  # median run is asserted, so one noisy run on a shared runner cannot fail CI.
+  lighthouse:
+    name: Lighthouse
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      pull-requests: write # Required for posting comments
+    steps:
+      - name: Download Build Output
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist
+          path: dist/
+
       - name: Run Lighthouse CI
         id: lighthouse_audit
         uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # v12
@@ -387,7 +404,7 @@ jobs:
   # no longer reports. It is also what auto-merge waits on (see RELEASING.md).
   ci:
     name: CI
-    needs: [setup, dependency-audit, static-validation, test, wasm-reproducible, e2e, build]
+    needs: [setup, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

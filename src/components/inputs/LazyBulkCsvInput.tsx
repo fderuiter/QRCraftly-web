@@ -19,6 +19,7 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import type { BulkCsvInputProps } from './BulkCsvInput';
 import { Skeleton } from '../ui/Skeleton';
+import { BulkCsvDropZone } from './BulkCsvDropZone';
 
 // Code-split: the CSV parser, ZIP writer and batch UI load only when the Bulk CSV
 // type is opened, so every other page keeps its JavaScript budget.
@@ -26,7 +27,15 @@ const BulkCsvInput = React.lazy(() =>
   import('./BulkCsvInput').then((module) => ({ default: module.BulkCsvInput }))
 );
 
-const Placeholder = () => <Skeleton className="h-48" />;
+// The drop zone itself, with a stand-in the size of its file picker: its text is the page's
+// largest paint, so it is pre-rendered rather than drawn when the chunk arrives.
+const Placeholder = () => (
+  <div className="space-y-6">
+    <BulkCsvDropZone>
+      <Skeleton className="mt-4 h-9 w-32 rounded-lg" />
+    </BulkCsvDropZone>
+  </div>
+);
 
 /**
  * Registry entry for the Bulk CSV Batch type. Renders a placeholder during
