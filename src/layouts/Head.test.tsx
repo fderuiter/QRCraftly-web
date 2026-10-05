@@ -240,6 +240,20 @@ describe('HeadDefault', () => {
     expect(data.itemListElement[2].item).toBe(`${expectedDomain}/products/special-offer`);
   });
 
+  it('percent-encodes characters in the canonical URL so they cannot break out of the href', () => {
+    mockUsePageContext.mockReturnValue({
+      urlPathname: '/about"><script>x</script>',
+      is404: false,
+      config: {}
+    });
+
+    const { container } = render(<HeadDefault />, { container: document.head });
+
+    const href = container.querySelector('link[rel="canonical"]')?.getAttribute('href');
+    expect(href).toBe('https://qrcraftly.com/about%22%3E%3Cscript%3Ex%3C/script%3E');
+    expect(container.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(href);
+  });
+
   it('handles 404 pages correctly (noindex, no canonical, no og:url)', () => {
     mockUsePageContext.mockReturnValue({
       urlPathname: '/some-garbage-url',
