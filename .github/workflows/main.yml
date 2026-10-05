@@ -129,7 +129,8 @@ jobs:
           cache-dependency-path: 'requirements.txt'
 
       - name: Install Semgrep
-        run: pip install -r requirements.txt
+        # requirements.txt is a pip-compile lock with hashes (source: requirements.in).
+        run: pip install --require-hashes -r requirements.txt
 
       - name: Run Semgrep
         run: semgrep ci --config=semgrep.yml --metrics=off --disable-version-check

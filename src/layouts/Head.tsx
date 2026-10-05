@@ -61,7 +61,9 @@ export default function HeadDefault() {
 
   const resolvedDomain = resolveDomainForPath(pageContext.urlPathname);
   // Retired routes redirect elsewhere; their canonical link points at the replacement.
-  const canonicalUrl = resolvePublicUrl(getLegacyRedirect(pageContext.urlPathname)?.canonicalPath ?? pageContext.urlPathname);
+  // encodeURI escapes any character that could break out of the href (CodeQL js/stored-xss);
+  // prerendered route paths are plain ASCII slugs, so it leaves real URLs unchanged.
+  const canonicalUrl = encodeURI(resolvePublicUrl(getLegacyRedirect(pageContext.urlPathname)?.canonicalPath ?? pageContext.urlPathname));
 
   // Resolve Open Graph Image
   // Allows pages to override the default OG image via config.image
