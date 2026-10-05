@@ -1,8 +1,11 @@
 ---
-status: proposed
+status: superseded
+superseded_by: 0037
 ---
 
 # Outer Code Selection for Prism: RaptorQ
+
+> Superseded by [ADR 0037](./0037-prism-outer-code-lt-over-ldpc-precode.md): RaptorQ was ruled out (IETF IPR 2554 excludes devices with cellular radios) and an exact RFC 5053 R10 by a patent active until 2028 (#1174). Prism's outer code is our own LT code over an LDPC precode, decoded by Gaussian elimination. This record is kept for its measurements.
 
 ## Context
 

@@ -36,6 +36,16 @@ export { type HandshakeInfo, type TransferStats } from './lib/contracts';
 
 export { FountainEncoder } from './lib/fountain/encoder';
 export { FountainDecoder } from './lib/fountain/decoder';
+export {
+  FecEncoder,
+  FecDecoder,
+  loadFecModule,
+  planBlocks,
+  isValidFecLayout,
+  type FecLayout,
+  type FecSymbol,
+  type FecEncoderOptions,
+} from './lib/fec/codec';
 export { solveGF2, type GF2Equation, type GF2Solution } from './lib/fountain/gf2';
 export {
   buildRobustSolitonCdf,
@@ -81,6 +91,8 @@ export {
   MAX_BUNDLE_ENTRIES,
   MAX_RECEIVE_BYTES,
   MAX_RECEIVE_MESSAGE_BYTES,
+  MAX_FEC_SOURCE_SYMBOLS,
+  MAX_FEC_SYMBOL_BYTES,
 } from './lib/limits';
 export {
   FountainReassembler,
