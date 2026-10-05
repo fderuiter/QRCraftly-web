@@ -13,7 +13,7 @@ let compiled: Promise<WebAssembly.Module | null> | null = null;
 
 /**
  * Compiles the reader once per page. Resolves null when WebAssembly is unavailable (or blocked by a
- * stricter CSP) or the file cannot be loaded; the worker then keeps using jsQR.
+ * stricter CSP) or the file cannot be loaded; the worker then keeps using our reader (#1178).
  */
 export function compileZxingModule(): Promise<WebAssembly.Module | null> {
   compiled ??= (async (): Promise<WebAssembly.Module | null> => {
@@ -32,7 +32,7 @@ export function compileZxingModule(): Promise<WebAssembly.Module | null> {
       if (!answer.ok) throw new Error(`HTTP ${answer.status}`);
       return await WebAssembly.compile(await answer.arrayBuffer());
     } catch (err) {
-      console.warn('zxing-reader-wasm unavailable, scanning with jsQR:', err);
+      console.warn('zxing-reader-wasm unavailable, scanning with qr-decode:', err);
       return null;
     }
   })();

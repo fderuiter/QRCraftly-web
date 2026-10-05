@@ -14,9 +14,9 @@ export type ScanCorners = readonly [ScanPoint, ScanPoint, ScanPoint, ScanPoint];
 
 /**
  * Which decoder read a code: the platform's `BarcodeDetector`, the zxing-cpp WebAssembly reader
- * (ADR 0023) or the pure-JavaScript jsQR fallback.
+ * (ADR 0023) or our own Rust reader, `qr-decode` (#1178).
  */
-export type ScanDecoder = 'native' | 'zxing' | 'jsqr';
+export type ScanDecoder = 'native' | 'zxing' | 'qr-decode';
 
 /** One decoded code, byte-exact (#1099). */
 export interface DecodedCode {
@@ -112,7 +112,7 @@ export function mapCorners(
   return [map(corners[0]), map(corners[1]), map(corners[2]), map(corners[3])];
 }
 
-const DECODERS: readonly ScanDecoder[] = ['native', 'zxing', 'jsqr'];
+const DECODERS: readonly ScanDecoder[] = ['native', 'zxing', 'qr-decode'];
 
 /** Checks the optional rich-result fields of a worker response. */
 function richFieldsError(d: Record<string, unknown>): string | null {
@@ -127,7 +127,7 @@ function richFieldsError(d: Record<string, unknown>): string | null {
     return 'Scanner response corners must be eight numbers or null';
   }
   if (d.decoder !== undefined && !DECODERS.includes(d.decoder as ScanDecoder)) {
-    return 'Scanner response decoder must be native, zxing or jsqr';
+    return 'Scanner response decoder must be native, zxing or qr-decode';
   }
   return null;
 }

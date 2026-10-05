@@ -18,6 +18,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { calculateScannabilityHealth, getExportRiskPolicy } from '../index';
+import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { evaluateScannability, performScannabilityCheck } from '../checker';
 import { QRConfig, QRType, QRErrorCorrectionLevel, QRStyle, SocialFormat, TemplateStyle } from '@/types';
 import { DEFAULT_CONFIG } from '@/constants';
@@ -125,7 +126,7 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       data.fill(255);
 
       const config = getBaseConfig();
-      const assessment = evaluateScannability({ data, width, height }, config, { isTest: true });
+      const assessment = evaluateScannability(qrReader, { data, width, height }, config, { isTest: true });
 
       expect(assessment).toHaveProperty('status');
       expect(assessment).toHaveProperty('health');

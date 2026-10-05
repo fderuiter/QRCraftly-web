@@ -6,7 +6,7 @@
  * through Emscripten's `instantiateWasm` hook. The build strips every network loader from the
  * zxing-wasm glue (`scripts/vite/zxingNoNetwork.ts`), so this code cannot fetch anything.
  *
- * Until a module is installed, or when instantiating it fails, the worker keeps decoding with jsQR.
+ * Until a module is installed, or when instantiating it fails, the worker keeps decoding with our reader (#1178).
  */
 import { prepareZXingModule, readBarcodes, type ReaderOptions, type ReadResult } from 'zxing-wasm/reader';
 import type { DecodedCode, ScanCorners } from './contracts';
@@ -30,7 +30,7 @@ export type ZxingState = 'absent' | 'loading' | 'ready' | 'failed';
 let state: ZxingState = 'absent';
 let installing: Promise<boolean> | null = null;
 
-/** Where the reader stands: not offered yet, being instantiated, usable, or failed (jsQR only). */
+/** Where the reader stands: not offered yet, being instantiated, usable, or failed (our reader only). */
 export function zxingState(): ZxingState {
   return state;
 }

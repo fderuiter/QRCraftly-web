@@ -1,20 +1,24 @@
 /**
- * Camera-frame decoding (#1096): one bounded jsQR pass per frame, rotating strategies.
+ * Camera-frame decoding (#1096): one bounded reader pass per frame, rotating strategies.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import type { QrReader } from '@/packages/qr-decode';
+import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { renderCorpusFrame } from '../../../../tests/utils/scannerCorpus';
-import { cameraStrategyFor, decodeCameraFrame, estimateNoise, type CameraDecodeStrategy } from '../index';
+import { cameraStrategyFor, decodeCameraFrame as decodeWith, estimateNoise, type CameraDecodeStrategy } from '../index';
 
-const jsQRCalls = vi.hoisted(() => ({ count: 0 }));
+const readerCalls = { count: 0 };
 
-vi.mock('jsqr', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('jsqr')>();
-  const counted = (...args: Parameters<typeof actual.default>) => {
-    jsQRCalls.count += 1;
-    return actual.default(...args);
-  };
-  return { default: counted };
-});
+/** The test reader, counting its passes. */
+const countingReader: QrReader = {
+  read: (...args) => {
+    readerCalls.count += 1;
+    return qrReader.read(...args);
+  },
+};
+
+const decodeCameraFrame = (data: Uint8ClampedArray, width: number, height: number, strategy: CameraDecodeStrategy) =>
+  decodeWith(countingReader, data, width, height, strategy);
 
 const TEXT = 'https://qrcraftly.com/camera-decode';
 const STRATEGIES: CameraDecodeStrategy[] = ['centre', 'frame', 'inverted'];
@@ -30,22 +34,22 @@ function decodeWithin(frame: { data: Uint8ClampedArray; width: number; height: n
 
 describe('camera-frame decoding', () => {
   beforeEach(() => {
-    jsQRCalls.count = 0;
+    readerCalls.count = 0;
   });
 
-  it('runs at most one jsQR pass on a frame with no code, whatever the strategy', () => {
+  it('runs at most one reader pass on a frame with no code, whatever the strategy', () => {
     const empty = renderCorpusFrame({ text: null });
     for (const pass of STRATEGIES) {
-      jsQRCalls.count = 0;
+      readerCalls.count = 0;
       expect(decodeCameraFrame(empty.data, empty.width, empty.height, pass)).toBeNull();
-      expect(jsQRCalls.count).toBe(1);
+      expect(readerCalls.count).toBe(1);
     }
   });
 
   it('runs one pass on a grainy low-light frame too', () => {
     const grainy = renderCorpusFrame({ text: null, noise: 20 });
     expect(decodeCameraFrame(grainy.data, grainy.width, grainy.height, 'centre')).toBeNull();
-    expect(jsQRCalls.count).toBe(1);
+    expect(readerCalls.count).toBe(1);
   });
 
   it('rotates centre crop, whole frame and an inverted pass across frames', () => {

@@ -1,5 +1,5 @@
 import zlib from 'node:zlib';
-import jsQR from 'jsqr';
+import { qrReader } from './fixtures/qrReader';
 import { describe, expect, it } from 'vitest';
 import { buildMatrix, loadQrEncoder } from '@/packages/qr-matrix';
 import { QRErrorCorrectionLevel, QRType } from '@/types';
@@ -53,7 +53,7 @@ describe('share images (#1030)', () => {
   it('carries a QR code that scans back to the page address', async () => {
     const png = renderShareImage('WiFi QR Code Generator', 'qrcraftly.com', await gridFor(address));
     const { width, height, rgba } = decodeIndexedPng(png);
-    expect(jsQR(rgba, width, height)?.data).toBe(address);
+    expect(qrReader.read(rgba, width, height, { inverted: true })[0]?.text).toBe(address);
   });
 
   it('is byte-for-byte reproducible and survives long headings', async () => {
@@ -85,7 +85,7 @@ describe('example SVG', () => {
         }
       }
     }
-    expect(jsQR(rgba, side, side)?.data).toBe(payload);
+    expect(qrReader.read(rgba, side, side, { inverted: true })[0]?.text).toBe(payload);
   });
 });
 
@@ -126,7 +126,7 @@ describe('mosaic examples (#1035)', () => {
     const { width, height, rgba } = decodeRgbPng(png);
     expect(width).toBe((grid.size + 8) * 12);
     expect(height).toBe(width);
-    expect(jsQR(rgba, width, height)?.data).toBe(address);
+    expect(qrReader.read(rgba, width, height, { inverted: true })[0]?.text).toBe(address);
     // It is a picture, not a black and white code: many distinct colours.
     const colours = new Set<number>();
     for (let i = 0; i < rgba.length; i += 4) colours.add((rgba[i] << 16) | (rgba[i + 1] << 8) | rgba[i + 2]);

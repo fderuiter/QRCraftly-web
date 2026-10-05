@@ -39,7 +39,7 @@ Boundary checks run automatically during `pnpm run lint` and CI.
 - **Entry Points**:
   - `index.ts`: Public API: the headless Scannability Health Evaluator (`createScannabilityEvaluator`, one `ScannabilityAssessment` answer with status, health, export risk and recovery state), `createScannabilityWorker()`, worker contracts, and optical blur/contrast math.
   - `client.ts`: Thin React adapter hook (`useScannability`) over the evaluator. App capabilities (failure reporting, module count) are injected; the package never imports app layers.
-  - `checker.ts`: The pure `performScannabilityCheck`/`evaluateScannability` runners. They bundle the jsQR decoder, so pages load this entry with `import()` when they need it (exports, the evaluator's main-thread fallback) and the root entry stays free of it (#1041).
+  - `checker.ts`: The pure `performScannabilityCheck`/`evaluateScannability` runners. Callers pass in the QR reader from `qr-decode`. Pages load this entry and the reader with `import()` when they need them (exports, the evaluator's main-thread fallback), so the root entry stays free of both (#1041).
   - `worker.ts`: Dedicated background Web Worker performing real-time contrast auditing and optical decoding.
 
 ### `qr-matrix` (`@/packages/qr-matrix`)
@@ -75,7 +75,7 @@ Boundary checks run automatically during `pnpm run lint` and CI.
   - `index.ts`: Public API, polymorphic `scan(source, options)` for files/images, the headless Camera Scanner Engine (`createCameraScannerEngine`), scanner contracts, and downscaling math.
   - `client.ts`: Thin React adapter hook (`useQrScanner`) over the Camera Session (`state`, `start`, `stop`, `videoRef`: the one owner of the camera stream) and the Camera Scanner Engine, plus file drag-and-drop scanning.
   - `scheduler.ts`: Secondary entry point exposing `AdaptiveFrameScheduler`, `DoubleBufferPool`, and `terminateScannerWorker` (shared file-scan worker teardown). Worker spawning is private to the package.
-  - `worker.ts`: Dedicated background Web Worker that decodes camera frames (one bounded jsQR pass each) and image files (`createImageBitmap` with EXIF orientation, then jsQR at 2048 px and 1024 px).
+  - `worker.ts`: Dedicated background Web Worker that decodes camera frames (one bounded pass of the `qr-decode` reader each, or zxing-wasm once loaded) and image files (`createImageBitmap` with EXIF orientation, then decoded at 2048 px and 1024 px).
 
 ### `qr-payload` (`@/packages/qr-payload`)
 
@@ -92,7 +92,7 @@ Boundary checks run automatically during `pnpm run lint` and CI.
   - Multi-rate stream (#1143, [ADR 0031](../../docs/adr/0031-multi-rate-stream-and-speed-profiles.md)), also exported from `index.ts` and called by nothing in the app yet: the Steady, Balanced and Fast profiles (`MULTI_RATE_PROFILES`), the sender that interleaves dense frames with beacons (`createMultiRateSender`, `isBeaconFrame`, `classifyFrameText`) and the receiver's layer hint (`layerHint`).
   - Colour layer (#1147), also exported from `index.ts`, off and called by nothing in the app: three Prism frames per tile, one per colour channel (`composeColourTile`), black and white beacons with a calibration patch (`composeBeacon`, `samplePatch`), the cross-talk fit (`fitCrossTalk`, `ColourCalibrator`: closed-form least squares from the eight corners of the colour cube, only `+ - * /`), the channel split (`splitChannels`) and the receiver that decodes each plane on the tracked tile crops and falls back to the beacons when colour does not read (`ColourReceiver`). The Colour profile (`COLOUR_PROFILE`) is Fast with three channels and is not offered; `createColourSender` returns null unless `enabled: true`. The package carries no QR reader: the receiver is handed `decodePlane` and `decodeImage`. The benchmark section is in the [benchmark report](../../docs/TRANSFER_BENCHMARK.md).
   - `client.ts`: Headless React hooks. `useOpticalSender` broadcasts fountain droplets by default, with no handshake frame and every QR at version 7 or lower; the caller injects `renderFrame` and the scannability fallback flag. `useOpticalReceiver` provides stateless entry and exposes `fountainStats` telemetry (droplets vs K, rank, FPS, ETA); the caller injects `saveFile`; the camera comes from `useQrScanner`'s Camera Session and its error is exposed as `cameraError`. Also exports UI state types.
-  - `checksum.ts`: `crc32` alone, for callers such as the Bulk CSV zip writer that must not pull in the handshake gate and its jsQR decoder.
+  - `checksum.ts`: `crc32` alone, for callers such as the Bulk CSV zip writer that must not pull in the handshake gate and its scannability check.
   - `worker-slice.ts`: Background Web Worker: hashing, `deflate-raw` compression (skipped when it saves less than 5%), density-bounded symbol sizing, and QR matrix generation for Prism frames.
   - `worker-reassembly.ts`: Background Web Worker: fountain reassembly (peeling + GF(2) elimination), manifest checks, decompression and SHA-256 verification.
 
@@ -119,7 +119,7 @@ Boundary checks run automatically during `pnpm run lint` and CI.
 
 ### `qr-decode` (`@/packages/qr-decode`)
 
-- **Purpose**: Our QR decoder ([#1178](https://github.com/fderuiter/QRCraftly-web/issues/1178)), the Rust module `crates/qr-decode` compiled to `src/wasm/qr-decode.wasm`. It reads RGBA or grey frames, up to eight codes at a time, light-on-dark and mirrored codes included, and turns each code's segments into text by mode and ECI. It runs beside jsQR in shadow tests until it replaces it.
+- **Purpose**: Our QR decoder ([#1178](https://github.com/fderuiter/QRCraftly-web/issues/1178)), the Rust module `crates/qr-decode` compiled to `src/wasm/qr-decode.wasm`. It reads RGBA or grey frames, up to eight codes at a time, light-on-dark and mirrored codes included, and turns each code's segments into text by mode and ECI. It replaced jsQR everywhere: the scanner's fallback, the scannability check and the transfer handshake.
 - **Entry Points**:
   - `index.ts`: `loadQrReader` (fetches and instantiates the module once; under Node it reads the file), `createQrReader` (a synchronous reader over an instance) and the `QrReader`, `QrRead`, `QrReadOptions`, `QrReadSegment`, `QrReadMode`, `QrReadLevel` and `QrPoint` types.
 

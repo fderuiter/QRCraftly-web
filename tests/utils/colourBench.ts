@@ -21,15 +21,15 @@
  * sent through the same simulated screen and camera, one frame of the sender per camera frame (a 60 Hz
  * display held for two refreshes, 30 fps).
  *
- * What is real: the Prism frames, the fountain code, QR encoding, every pixel, the jsQR decodes of
- * every tile and beacon, the cross-talk fit and correction, the tile tracker, the dedup and the
+ * What is real: the Prism frames, the fountain code, QR encoding, every pixel, the decodes (our reader,
+ * #1178) of every tile and beacon, the cross-talk fit and correction, the tile tracker, the dedup and the
  * receiver. What is simulated: the screen and the camera. The camera mixes the emitted channels
  * through a 3x3 matrix, scales them with a white balance that can shift mid-transfer, subsamples
  * colour over 2x2 pixels, and adds per-pixel and per-8x8-block noise as a JPEG-like stand-in (it is not
  * a JPEG codec). It is sharp, level and in sync with the display. Decode times are this machine's, one
  * thread; goodput is on the simulated camera clock and so assumes the decoder keeps up with the camera.
  */
-import jsQR from 'jsqr';
+import { qrReader } from '../fixtures/qrReader';
 import { qrEncoder as QRCode } from '../fixtures/qrEncoder';
 import {
   COLOUR_PROFILE,
@@ -56,7 +56,7 @@ import {
   type TileLayout,
 } from '../../src/packages/optical-transfer/index';
 import { createRandom } from './scannerCorpus';
-import { boundingBox, toRgba } from './tileBench';
+import { boundingBox } from './tileBench';
 
 const BACKGROUND = 128;
 
@@ -98,7 +98,7 @@ export const CLEAN_CHANNEL: CameraChannel = {
 };
 
 /**
- * A mild phone: each channel sees 12 to 22% of the others. jsQR reads such a channel with no
+ * A mild phone: each channel sees 12 to 22% of the others. Such a channel reads with no
  * correction at all (see the benchmark report), so this is where colour needs the fit least.
  */
 export const MILD_CHANNEL: CameraChannel = {
@@ -270,16 +270,16 @@ export function renderScreen(frame: ScreenFrame, layout: TileLayout, beaconVersi
   return image;
 }
 
-/** jsQR on RGBA pixels, as a decoded code. */
-export function jsqrCode(rgba: Uint8ClampedArray, width: number, height: number): DecodedCode | null {
-  const result = jsQR(rgba, width, height, { inversionAttempts: 'dontInvert' });
-  return result ? { text: result.data, rect: boundingBox(result.location, 0, 0) } : null;
+/** Our reader on grey or RGBA pixels, as a decoded code. */
+function readCode(pixels: Uint8ClampedArray, width: number, height: number): DecodedCode | null {
+  const [result] = qrReader.read(pixels, width, height);
+  return result ? { text: result.text, rect: boundingBox(result.corners, 0, 0), version: result.version } : null;
 }
 
-/** The decoders the Colour receiver is given: jsQR on a channel plane, and on a whole frame. */
-export const jsqrDecoders = {
-  decodePlane: (plane: GreyPlane): DecodedCode | null => jsqrCode(toRgba(plane.data), plane.width, plane.height),
-  decodeImage: (image: RgbaImage): DecodedCode | null => jsqrCode(image.data, image.width, image.height),
+/** The decoders the Colour receiver is given: our reader on a channel plane, and on a whole frame. */
+export const qrDecoders = {
+  decodePlane: (plane: GreyPlane): DecodedCode | null => readCode(plane.data, plane.width, plane.height),
+  decodeImage: (image: RgbaImage): DecodedCode | null => readCode(image.data, image.width, image.height),
 };
 
 /** The monochrome Fast receiver the Colour profile is measured against: tracked crops, then the beacon. */
@@ -309,7 +309,7 @@ class MonoReceiver {
       const data = new Uint8ClampedArray(width * height * 4);
       for (let row = 0; row < height; row++) data.set(image.data.subarray(((y + row) * image.width + x) * 4, ((y + row) * image.width + x + width) * 4), row * width * 4);
       this.decodes += 1;
-      const hit = jsqrCode(data, width, height);
+      const hit = readCode(data, width, height);
       if (hit) {
         any = true;
         this.take(hit.text);
@@ -318,7 +318,7 @@ class MonoReceiver {
     });
     this.tracker.reportCrops(results);
     if (any) return;
-    const beacon = jsqrCode(image.data, image.width, image.height);
+    const beacon = readCode(image.data, image.width, image.height);
     if (beacon) this.take(beacon.text);
   }
 
@@ -364,7 +364,7 @@ export interface ColourRunResult {
   tileDecodes: number;
   /** Individual code decodes tried on tiles and beacons. */
   decodes: number;
-  /** Real jsQR and correction time per simulated camera frame, in milliseconds, on this machine. */
+  /** Real decode and correction time per simulated camera frame, in milliseconds, on this machine. */
   decodeMsPerFrame: number;
   /** Decodes per second the receiver needs to keep up with the camera at its frame rate. */
   decodesPerSecond: number;
@@ -397,7 +397,7 @@ export async function runColourTransfer(options: ColourRunOptions): Promise<Colo
   if (!layout) throw new Error('No sender.');
   const beaconVersion = COLOUR_PROFILE.base.beaconVersion;
   const colour = colourSender
-    ? new ColourReceiver({ layout, beaconVersion, decodeImage: jsqrDecoders.decodeImage, decodePlane: options.decodePlane ?? jsqrDecoders.decodePlane, fallbackBeacons: options.fallbackBeacons })
+    ? new ColourReceiver({ layout, beaconVersion, decodeImage: qrDecoders.decodeImage, decodePlane: options.decodePlane ?? qrDecoders.decodePlane, fallbackBeacons: options.fallbackBeacons })
     : null;
   const mono = monoSender ? new MonoReceiver(layout, screen) : null;
   const receiver = colour ?? mono;

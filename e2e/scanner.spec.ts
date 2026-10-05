@@ -20,7 +20,7 @@
  * The generator's camera scanner against a scripted fake camera (#1103).
  *
  * The fake camera (`tests/utils/fakeCamera.ts`) feeds a canvas stream into the real
- * scanner (engine, worker, jsQR), so these tests measure what a user waits for: the
+ * scanner (engine, worker, decoder), so these tests measure what a user waits for: the
  * time from opening the scanner (or a code appearing) to the decoded code landing in
  * the generator. Budgets are generous so they do not flake on a CI runner; the
  * numbers are attached to each test as `time-to-decode` annotations.

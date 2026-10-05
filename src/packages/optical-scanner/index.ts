@@ -44,7 +44,7 @@ export {
   type CameraFrameLoop,
 } from './lib/cameraSession';
 
-/** The camera-frame decoder: one bounded jsQR pass per frame, rotating strategies (#1096). */
+/** The camera-frame decoder: one bounded pass of our reader per frame, rotating strategies (#1096). */
 export {
   decodeCameraFrame,
   decodeCameraCode,

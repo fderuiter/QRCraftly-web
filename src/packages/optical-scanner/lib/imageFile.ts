@@ -2,12 +2,11 @@
  * Image-file decoding shared by the scanner worker and its main-thread fallback (#1098).
  *
  * A photo or screenshot is decoded at its native size capped at {@link FILE_SCAN_SIZES}[0] first,
- * where small codes in large photos still have enough pixels, then downscaled, where jsQR copes
- * better with large, blurry or noisy codes. Each size gets the zxing reader when the worker has it
- * (ADR 0023), otherwise jsQR's multi-pass decoder.
+ * where small codes in large photos still have enough pixels, then downscaled, where large, blurry
+ * or noisy codes read better. Each size gets the zxing reader when the worker has it (ADR 0023),
+ * otherwise our reader's multi-pass decode (#1178).
  */
 import { getDownscaledDimensions, mapCorners, type DecodedCode } from './contracts';
-import { decodeRgbaCode } from './decodeSync';
 
 /** The sizes (longest side, px) an image file is decoded at, in order. */
 export const FILE_SCAN_SIZES = [2048, 1024] as const;
@@ -34,7 +33,7 @@ export interface PixelContext {
   getImageData(sx: number, sy: number, sw: number, sh: number): ImageData;
 }
 
-/** Decodes RGBA pixels: jsQR's multi-pass decoder, or the zxing reader in the worker. */
+/** Decodes RGBA pixels: our reader's multi-pass decode, or the zxing reader in the worker. */
 export type RgbaDecoder = (
   data: Uint8ClampedArray,
   width: number,
@@ -47,7 +46,7 @@ export type RgbaDecoder = (
  * @param width Its width.
  * @param height Its height.
  * @param createContext Returns a 2D context of the given size (an `OffscreenCanvas` in the worker).
- * @param decode The pixel decoder (jsQR's multi-pass decoder by default).
+ * @param decode The pixel decoder.
  * @returns The decoded code, its corners in the image's own pixels, or null.
  */
 export async function decodeImageAtSizes(
@@ -55,7 +54,7 @@ export async function decodeImageAtSizes(
   width: number,
   height: number,
   createContext: (width: number, height: number) => PixelContext | null,
-  decode: RgbaDecoder = decodeRgbaCode
+  decode: RgbaDecoder
 ): Promise<DecodedCode | null> {
   let previous = '';
   for (const maxDimension of FILE_SCAN_SIZES) {

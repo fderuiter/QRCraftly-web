@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import jsQR from 'jsqr';
+import { qrReader } from '../tests/fixtures/qrReader';
 
 test.describe('QR Code Scannability via Headless Browser', () => {
   test('generates scannable QR codes for various styles', async ({ page }) => {
@@ -43,8 +43,8 @@ test.describe('QR Code Scannability via Headless Browser', () => {
         }
 
         const uint8Data = new Uint8ClampedArray(result.data.buffer);
-        const code = jsQR(uint8Data, result.width, result.height, { inversionAttempts: "attemptBoth" });
-        return code ? code.data : undefined;
+        const [code] = qrReader.read(uint8Data, result.width, result.height, { inverted: true });
+        return code ? code.text : undefined;
     };
 
     await expect.poll(async () => {

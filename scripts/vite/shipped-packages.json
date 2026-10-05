@@ -2,7 +2,6 @@
   "@brillout/json-serializer",
   "@brillout/picocolors",
   "@rollup/plugin-commonjs",
-  "jsqr",
   "lucide-react",
   "react",
   "react-dom",

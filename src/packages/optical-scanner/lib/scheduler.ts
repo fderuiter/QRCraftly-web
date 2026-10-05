@@ -17,7 +17,7 @@ export interface SchedulerOptions<TDetail = unknown> {
 
 const WATCHDOG_POLL_MS = 100;
 /**
- * Default hang budget: how long the worker may stay silent with a frame in flight. One jsQR pass
+ * Default hang budget: how long the worker may stay silent with a frame in flight. One reader pass
  * on a slow phone can take a second or two, so only a far longer silence counts as a hang (#1096).
  */
 export const DEFAULT_WATCHDOG_TIMEOUT_MS = 5000;

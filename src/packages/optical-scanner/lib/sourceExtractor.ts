@@ -1,3 +1,4 @@
+import { loadQrReader } from '@/packages/qr-decode';
 import {
   getDownscaledDimensions,
   mapCorners,
@@ -8,7 +9,7 @@ import {
   type ScanSource,
 } from './contracts';
 import { dispatchWorkerRequest, whenReaderOffered } from './workerRunner';
-import { decodeImageDataSync } from './decodeSync';
+import { decodeImageDataSync, decodeRgbaCode } from './decodeSync';
 import { decodeImageAtSizes, FILE_SCAN_MESSAGE, type FileScanRequest } from './imageFile';
 import { getNativeQrDetector, type NativeQrDetector } from './nativeDetector';
 import { assertImageWithinLimits } from './imageLimits';
@@ -69,14 +70,21 @@ async function decodeImageFileHere(file: Blob): Promise<DecodedCode | null> {
   if (typeof document === 'undefined') {
     throw new Error('File decoding requires DOM environment');
   }
+  const reader = await loadQrReader();
   const loaded = await loadImage(file);
   try {
-    return decodeImageAtSizes(loaded.image, loaded.width, loaded.height, (width, height) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      return canvas.getContext('2d', { willReadFrequently: true });
-    });
+    return await decodeImageAtSizes(
+      loaded.image,
+      loaded.width,
+      loaded.height,
+      (width, height) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        return canvas.getContext('2d', { willReadFrequently: true });
+      },
+      (data, width, height) => decodeRgbaCode(reader, data, width, height)
+    );
   } finally {
     loaded.close();
   }
@@ -105,7 +113,7 @@ async function detectInImageFile(detector: NativeQrDetector, file: Blob): Promis
 
 /**
  * Decodes an image file: with the platform's detector when it reads QR codes (#1099), otherwise in
- * the scanner worker (zxing, then jsQR), or here when the worker cannot. Concurrent calls are
+ * the scanner worker (zxing, else our reader), or here when the worker cannot. Concurrent calls are
  * independent: a newer file does not fail because an older one is still being decoded.
  */
 async function scanImageFile(file: Blob, signal?: AbortSignal): Promise<Decoded> {
@@ -121,10 +129,10 @@ async function scanImageFile(file: Blob, signal?: AbortSignal): Promise<Decoded>
     before: whenReaderOffered,
   });
   const result = await worker;
-  if (result.code || signal?.aborted) return { code: result.code ?? null, source: result.decoder ?? 'jsqr' };
+  if (result.code || signal?.aborted) return { code: result.code ?? null, source: result.decoder ?? 'qr-decode' };
   // No error: the worker read the image and found no code. Otherwise it could not decode it.
-  if (!result.error) return { code: null, source: result.decoder ?? 'jsqr' };
-  return { code: await decodeImageFileHere(file), source: 'jsqr' };
+  if (!result.error) return { code: null, source: result.decoder ?? 'qr-decode' };
+  return { code: await decodeImageFileHere(file), source: 'qr-decode' };
 }
 
 /** Builds a scan result from a decode. */
@@ -165,7 +173,7 @@ export async function scanSource(source: ScanSource, options: ScanOptions = {}):
   }
 
   try {
-    // 1-3. Pixels already in memory: the platform's detector when it reads QR codes, else jsQR here.
+    // 1-3. Pixels already in memory: the platform's detector when it reads QR codes, else our reader here.
     const inMemory =
       (typeof ImageData !== 'undefined' && source instanceof ImageData) ||
       (typeof HTMLCanvasElement !== 'undefined' && source instanceof HTMLCanvasElement) ||
@@ -177,8 +185,8 @@ export async function scanSource(source: ScanSource, options: ScanOptions = {}):
 
     // 1. Direct ImageData
     if (typeof ImageData !== 'undefined' && source instanceof ImageData) {
-      const code = decodeImageDataSync(source, source.width, source.height);
-      return toScanResult({ code, source: 'jsqr' }, start, 'NO_QR_DETECTED');
+      const code = decodeImageDataSync(await loadQrReader(), source, source.width, source.height);
+      return toScanResult({ code, source: 'qr-decode' }, start, 'NO_QR_DETECTED');
     }
 
     // 2. HTMLCanvasElement
@@ -188,8 +196,8 @@ export async function scanSource(source: ScanSource, options: ScanOptions = {}):
         throw new Error('Failed to acquire canvas 2D rendering context');
       }
       const imgData = ctx.getImageData(0, 0, source.width, source.height);
-      const code = decodeImageDataSync(imgData, source.width, source.height);
-      return toScanResult({ code, source: 'jsqr' }, start, 'NO_QR_DETECTED');
+      const code = decodeImageDataSync(await loadQrReader(), imgData, source.width, source.height);
+      return toScanResult({ code, source: 'qr-decode' }, start, 'NO_QR_DETECTED');
     }
 
     // 3. ImageBitmap
@@ -222,10 +230,10 @@ export async function scanSource(source: ScanSource, options: ScanOptions = {}):
         throw new Error('Failed to extract pixels from ImageBitmap');
       }
 
-      const found = decodeImageDataSync(imgData, dWidth, dHeight);
+      const found = decodeImageDataSync(await loadQrReader(), imgData, dWidth, dHeight);
       // Corners back in the bitmap's own pixels.
       const code = found && { ...found, corners: mapCorners(found.corners, source.width / dWidth, source.height / dHeight) };
-      return toScanResult({ code, source: 'jsqr' }, start, 'NO_QR_DETECTED');
+      return toScanResult({ code, source: 'qr-decode' }, start, 'NO_QR_DETECTED');
     }
 
     // 4. Image File or Blob

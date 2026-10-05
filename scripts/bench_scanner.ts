@@ -25,21 +25,21 @@
  * Options:
  *   --ref <git-ref>   Benchmark the decoder (`src/packages/optical-scanner/lib/decodeSync.ts`)
  *                     at a git ref instead of the working tree. Repeat to compare refs
- *                     side by side; `--ref WORKTREE` names the working tree explicitly.
+ *                     side by side; `--ref WORKTREE` names the working tree explicitly. Refs from
+ *                     before #1178 imported jsQR, which is no longer installed, so they do not load.
  *   --filter <text>   Only fixtures whose id contains the text (e.g. `noise`, `no-code`).
  *   --by-category     Also print one row per corpus category.
  *   --budget <ms>     Exit non-zero when any camera frame takes longer (default: report only).
  *   --no-zxing        Skip the zxing-wasm rows (they always use the working tree's reader).
- *   --no-qr-decode    Skip the rows for our Rust decoder (#1178, always the working tree's module).
  *
  * Timing depends on the machine, so this is not a CI gate: run it on demand or from the
- * manual / nightly "Scanner benchmark" workflow. `decodeSync.ts` must keep importing only
- * `jsqr`, so an older copy can be loaded from a ref.
+ * manual / nightly "Scanner benchmark" workflow. `decodeSync.ts` must keep importing nothing at
+ * runtime (the reader is passed in), so an older copy can be loaded from a ref. Every ref runs with
+ * the working tree's `src/wasm/qr-decode.wasm`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import jsQR from 'jsqr';
 import { execBinary } from './utils/execHelper.js';
 import { generateCorpus, type CorpusFrame } from '../tests/utils/scannerCorpus.ts';
 import * as reader from '../src/packages/optical-scanner/reader.ts';
@@ -52,11 +52,12 @@ const WORKTREE = 'WORKTREE';
 /** Camera frames a rotating decoder may use before a fixture counts as missed. */
 const CAMERA_FRAMES = 4;
 
-/** The decoder exports a strategy may use; older refs have only some of them. */
+type Reader = typeof qrReader;
+
+/** The decoder exports a strategy may use. */
 interface DecoderModule {
-  decodeRgbaFrame?: (data: Uint8ClampedArray, width: number, height: number) => string | null;
-  decodeRgbaCode?: (data: Uint8ClampedArray, width: number, height: number) => { text: string } | null;
-  decodeCameraFrame?: (data: Uint8ClampedArray, width: number, height: number, pass: string) => string | null;
+  decodeRgbaCode?: (reader: Reader, data: Uint8ClampedArray, width: number, height: number) => { text: string } | null;
+  decodeCameraFrame?: (reader: Reader, data: Uint8ClampedArray, width: number, height: number, pass: string) => string | null;
   cameraStrategyFor?: (sequenceId: number) => string;
 }
 
@@ -77,11 +78,10 @@ interface Options {
   byCategory: boolean;
   budget?: number;
   zxing: boolean;
-  qrDecode: boolean;
 }
 
 function parseArgs(argv: string[]): Options {
-  const options: Options = { refs: [], byCategory: false, zxing: true, qrDecode: true };
+  const options: Options = { refs: [], byCategory: false, zxing: true };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--ref') options.refs.push(argv[++i]);
@@ -89,7 +89,6 @@ function parseArgs(argv: string[]): Options {
     else if (arg === '--by-category') options.byCategory = true;
     else if (arg === '--budget') options.budget = Number(argv[++i]);
     else if (arg === '--no-zxing') options.zxing = false;
-    else if (arg === '--no-qr-decode') options.qrDecode = false;
     else if (arg === '--') continue;
     else throw new Error(`Unknown option: ${arg}`);
   }
@@ -187,39 +186,23 @@ async function zxingStrategies(): Promise<Strategy[]> {
   ];
 }
 
-/** Our Rust decoder (#1178), shadowing jsQR: its default pass, and every pass in one call. */
-function qrDecodeStrategies(): Strategy[] {
-  const row = (name: string, options: Parameters<typeof qrReader.read>[3]): Strategy => ({
-    name,
-    run: (frame) => {
-      const { value, ms } = timed(() => qrReader.read(frame.data, frame.width, frame.height, options));
-      return { times: [ms], decoded: value[0]?.text ?? null };
-    },
-  });
-  return [row('qr-decode (default pass)', {}), row('qr-decode (inverted, global and half passes)', { inverted: true, global: true, half: true })];
-}
-
 function strategiesFor(decoder: DecoderModule): Strategy[] {
   const strategies: Strategy[] = [
     {
-      name: 'one jsQR pass (full frame, dontInvert)',
+      name: 'one qr-decode pass (full frame, dark on light)',
       run: (frame) => {
-        const { value, ms } = timed(() => jsQR(frame.data, frame.width, frame.height, { inversionAttempts: 'dontInvert' }));
-        return { times: [ms], decoded: value?.data ?? null };
+        const { value, ms } = timed(() => qrReader.read(frame.data, frame.width, frame.height));
+        return { times: [ms], decoded: value[0]?.text ?? null };
       },
     },
   ];
   const { decodeCameraFrame, cameraStrategyFor, decodeRgbaCode } = decoder;
-  // Newer refs return the rich `decodeRgbaCode` result only.
-  const decodeRgbaFrame =
-    decoder.decodeRgbaFrame ??
-    (decodeRgbaCode && ((data: Uint8ClampedArray, width: number, height: number) => decodeRgbaCode(data, width, height)?.text ?? null));
-  if (decodeRgbaFrame) {
+  if (decodeRgbaCode) {
     strategies.push({
-      name: 'multi-pass (decodeRgbaFrame)',
+      name: 'multi-pass (decodeRgbaCode)',
       run: (frame) => {
-        const { value, ms } = timed(() => decodeRgbaFrame(frame.data, frame.width, frame.height));
-        return { times: [ms], decoded: value };
+        const { value, ms } = timed(() => decodeRgbaCode(qrReader, frame.data, frame.width, frame.height));
+        return { times: [ms], decoded: value?.text ?? null };
       },
     });
   }
@@ -229,7 +212,7 @@ function strategiesFor(decoder: DecoderModule): Strategy[] {
       run: (frame) => {
         const times: number[] = [];
         for (let sequenceId = 1; sequenceId <= CAMERA_FRAMES; sequenceId++) {
-          const { value, ms } = timed(() => decodeCameraFrame(frame.data, frame.width, frame.height, cameraStrategyFor(sequenceId)));
+          const { value, ms } = timed(() => decodeCameraFrame(qrReader, frame.data, frame.width, frame.height, cameraStrategyFor(sequenceId)));
           times.push(ms);
           if (value) return { times, decoded: value };
         }
@@ -288,7 +271,6 @@ async function main(): Promise<void> {
     const categoryRows: Row[] = [];
     const strategies = strategiesFor(decoder);
     if (options.zxing && ref === options.refs[0]) strategies.push(...(await zxingStrategies()));
-    if (options.qrDecode && ref === options.refs[0]) strategies.push(...qrDecodeStrategies());
     for (const strategy of strategies) {
       const row: Row = { label: strategy.name, decoded: 0, total: withCode, times: [], framesToDecode: [] };
       const byCategory = new Map<string, Row>();

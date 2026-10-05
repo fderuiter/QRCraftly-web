@@ -39,7 +39,7 @@ describe('lock-on corners (#1062)', () => {
     const { result } = renderHook(() => useOpticalReceiver(receiverOptions()));
     expect(result.current.lockOn).toBeNull();
 
-    act(() => scanOptions?.onScanSuccess?.('not a transfer frame', { text: 'x', bytes: null, corners, source: 'jsqr', durationMs: 1 }));
+    act(() => scanOptions?.onScanSuccess?.('not a transfer frame', { text: 'x', bytes: null, corners, source: 'qr-decode', durationMs: 1 }));
     expect(result.current.lockOn).toEqual(corners);
 
     act(() => {

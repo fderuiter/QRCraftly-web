@@ -64,7 +64,7 @@ describe('/qr-code-scanner page (#1034)', () => {
     render(withPageContent('/qr-code-scanner', <Page />));
     const options: UseQrScannerOptions | undefined = vi.mocked(useQrScanner).mock.lastCall?.[0];
     await act(async () => {
-      options?.onScanSuccess?.('WIFI:T:WPA;S:Home;P:secret;;', { text: 'x', bytes: null, corners: null, source: 'jsqr', durationMs: 0 });
+      options?.onScanSuccess?.('WIFI:T:WPA;S:Home;P:secret;;', { text: 'x', bytes: null, corners: null, source: 'qr-decode', durationMs: 0 });
     });
     act(() => {
       screen.getByRole('button', { name: 'Open in generator' }).click();

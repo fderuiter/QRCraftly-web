@@ -24,7 +24,7 @@
  *      frames, joining mid-stream). Reports frames needed divided by K and the decode time.
  *   2. Optical: real QR frames of a droplet, degraded the way a phone camera degrades them
  *      (blur, noise, dim screen, tilt, rolling-shutter tear) at 720p and 1080p, decoded with
- *      jsQR. Reports the decode rate and an estimated throughput with its spec tier.
+ *      our reader (qr-decode, #1178). Reports the decode rate and an estimated throughput with its spec tier.
  *
  * The optical part is a Node-side estimate. It cannot see a real screen, lens or shutter, so
  * `docs/TRANSFER_DEVICE_CHECKLIST.md` lists what to measure on phones.
@@ -40,8 +40,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import jsQR from 'jsqr';
 import { qrEncoder as QRCode } from '../tests/fixtures/qrEncoder';
+import { qrReader } from '../tests/fixtures/qrReader';
 import {
   FountainEncoder,
   TILE_LAYOUTS,
@@ -130,9 +130,9 @@ function benchOptical(quick: boolean): OpticalRow[] {
             tear: condition.tear,
           });
           const started = performance.now();
-          const result = jsQR(frame.data, frame.width, frame.height, { inversionAttempts: 'dontInvert' });
+          const [result] = qrReader.read(frame.data, frame.width, frame.height);
           times.push(performance.now() - started);
-          if (result?.data === text) decoded += 1;
+          if (result?.text === text) decoded += 1;
           modules = Math.max(modules, count);
         }
         times.sort((a, b) => a - b);
@@ -221,7 +221,7 @@ async function benchTears(quick: boolean): Promise<TearRow[]> {
   return rows;
 }
 
-/** Crops per second one thread decodes with the shipped zxing-wasm reader (ADR 0023), same crop as the jsQR pool rows. */
+/** Crops per second one thread decodes with the shipped zxing-wasm reader (ADR 0023), same crop as the pool rows. */
 async function measureZxingThread(millis: number): Promise<number> {
   const wasm = fs.readFileSync(path.join(REPO_ROOT, 'node_modules/zxing-wasm/dist/reader/zxing_reader.wasm'));
   (globalThis as { ImageData?: unknown }).ImageData ??= class {
@@ -252,12 +252,12 @@ const TILE_STATUS = `### What this proves and what it does not (#1142)
 | Hold is a whole number of refreshes                        | Unit test with a stepped frame clock (\`multicode.test.ts\`)                                                    | Met, tested.                                                                                                     |
 | Scanner page behaviour unchanged                           | No scanner file changed; the new code is imported by nothing in the app                                       | Met by construction.                                                                                             |
 
-Not measured at all: a real camera's focus, exposure and rolling shutter; whether a phone resolves 4 px modules; how often tracking is lost with a hand-held phone (the crop margin is 3 modules, so a camera that drifts more than that between frames falls back to a full search); decoding in browser workers on a phone; thermal throttling; and the receiver's capture request and \`requestVideoFrameCallback\` (not built yet). The 60 fps row assumes a camera that really captures 60 distinct frames per second. The full search here scans layout hypotheses with jsQR because it reads one code per image, so its cost is not the cost of zxing's multi-symbol read. The device list is in [the device checklist](TRANSFER_DEVICE_CHECKLIST.md).`;
+Not measured at all: a real camera's focus, exposure and rolling shutter; whether a phone resolves 4 px modules; how often tracking is lost with a hand-held phone (the crop margin is 3 modules, so a camera that drifts more than that between frames falls back to a full search); decoding in browser workers on a phone; thermal throttling; and the receiver's capture request and \`requestVideoFrameCallback\` (not built yet). The 60 fps row assumes a camera that really captures 60 distinct frames per second. The full search here scans layout hypotheses, reading one code per crop, so its cost is not the cost of zxing's multi-symbol read. The device list is in [the device checklist](TRANSFER_DEVICE_CHECKLIST.md).`;
 
 function renderTiles(tiles: TileRow[], tears: TearRow[], pool: PoolMeasurement[], zxingPerSecond: number): string[] {
   const parts: string[] = ['## Multi-code frames (#1142)', ''];
   parts.push(
-    'Several QR codes ("tiles") per frame, error correction L, a 60 Hz display held for 2 refreshes (30 fps) and a camera frame the same size as the screen. Real Prism frames, QR codes, pixels, jsQR decodes, tile tracking, dedup and receiver; simulated display and camera. The camera is sharp, level and in sync with the display (except in the two torn rows), so these rates are an upper bound for the code and the decode chain, not a prediction for a phone. Goodput is file bytes divided by the simulated camera time until the receiver verified the file, manifest and coding overhead included. jsQR reads one code per image, so the full search is a scan over layout hypotheses; one search runs per transfer and tracked frames decode crops only.',
+    'Several QR codes ("tiles") per frame, error correction L, a 60 Hz display held for 2 refreshes (30 fps) and a camera frame the same size as the screen. Real Prism frames, QR codes, pixels, decodes with our reader (qr-decode), tile tracking, dedup and receiver; simulated display and camera. The camera is sharp, level and in sync with the display (except in the two torn rows), so these rates are an upper bound for the code and the decode chain, not a prediction for a phone. Goodput is file bytes divided by the simulated camera time until the receiver verified the file, manifest and coding overhead included. The bench reads one code per crop, so the full search is a scan over layout hypotheses; one search runs per transfer and tracked frames decode crops only.',
     ''
   );
   parts.push(
@@ -291,12 +291,12 @@ function renderTiles(tiles: TileRow[], tears: TearRow[], pool: PoolMeasurement[]
   );
   parts.push('### Decoder threads', '');
   parts.push(
-    'Real worker threads (Node `worker_threads`) each decode one 2x2 v25 tile crop from a 1080p frame with jsQR in a loop. "Main thread lag" is the longest gap in a 16 ms timer on the main thread while they ran. This is this machine, loaded by other work, with 4 logical cores; it says nothing about a phone CPU or a browser UI thread.',
+    'Real worker threads (Node `worker_threads`) each decode one 2x2 v25 tile crop from a 1080p frame with our reader (qr-decode) in a loop. "Main thread lag" is the longest gap in a 16 ms timer on the main thread while they ran. This is this machine, loaded by other work, with 4 logical cores; it says nothing about a phone CPU or a browser UI thread.',
     ''
   );
   parts.push(table(['Workers', 'Crop decodes per second', 'Main thread lag (max)'], pool.map((r) => [r.workers, r.decodesPerSecond, `${r.mainThreadMaxLagMs} ms`])), '');
   parts.push(
-    `The shipped reader is zxing-wasm, not jsQR. One thread of it decoded ${zxingPerSecond} of the same crop per second (the wasm runs with the reader's default options: invert, rotate and downscale tries on). It was measured on one thread only, so the pool rows above are the jsQR scaling and not a zxing pool.`,
+    `The camera scanner prefers zxing-wasm when it has loaded (ADR 0023). One thread of it decoded ${zxingPerSecond} of the same crop per second (the wasm runs with the reader's default options: invert, rotate and downscale tries on). It was measured on one thread only, so the pool rows above are our reader's scaling and not a zxing pool.`,
     ''
   );
   parts.push(TILE_STATUS, '');
@@ -355,7 +355,7 @@ function render(codec: CodecRow[], optical: OpticalRow[], tileSection: string[])
   if (optical.length > 0) {
     parts.push('## Optical channel simulator', '');
     parts.push(
-      'Real QR frames of one droplet each (error correction L), degraded and decoded with jsQR. The estimate is `min(fps, decode rate) × success rate × block size ÷ 1.1` (the 1.1 is the coding overhead). It ignores display tearing between refreshes beyond the rolling-shutter row, and a real camera adds exposure, focus hunting and dropped frames.',
+      'Real QR frames of one droplet each (error correction L), degraded and decoded with our reader (qr-decode), one pass. The estimate is `min(fps, decode rate) × success rate × block size ÷ 1.1` (the 1.1 is the coding overhead). It ignores display tearing between refreshes beyond the rolling-shutter row, and a real camera adds exposure, focus hunting and dropped frames.',
       ''
     );
     parts.push(

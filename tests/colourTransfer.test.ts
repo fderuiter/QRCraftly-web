@@ -19,7 +19,7 @@
 import { qrEncoder as QRCode } from './fixtures/qrEncoder';
 import { describe, expect, it } from 'vitest';
 import { COLOUR_FALLBACK_HINT, composeBeacon, composeColourTile, fitCrossTalk, qrModuleCount, samplePatch, splitChannels } from '../src/packages/optical-transfer/index';
-import { CLEAN_CHANNEL, COLOUR_BLIND_CHANNEL, REFERENCE_CHANNEL, capture, jsqrDecoders, runColourTransfer } from './utils/colourBench';
+import { CLEAN_CHANNEL, COLOUR_BLIND_CHANNEL, REFERENCE_CHANNEL, capture, qrDecoders, runColourTransfer } from './utils/colourBench';
 import { createRandom } from './utils/scannerCorpus';
 
 // A smaller screen makes every full-frame decode cheaper; the beacons (3 px modules) still read.
@@ -51,7 +51,7 @@ describe('Colour layer simulation (#1147)', () => {
     const patch = samplePatch(seenBeacon, { x: 16, y: 16, width: modules * 4, height: modules * 4 }, modules);
     const model = patch ? fitCrossTalk(patch) : null;
     expect(model).not.toBeNull();
-    const read = (planes: ReturnType<typeof splitChannels>) => planes.map((plane) => jsqrDecoders.decodePlane(plane)?.text);
+    const read = (planes: ReturnType<typeof splitChannels>) => planes.map((plane) => qrDecoders.decodePlane(plane)?.text);
     expect(read(splitChannels(seen, null, null))).not.toEqual(texts);
     expect(read(splitChannels(seen, null, model))).toEqual(texts);
   });

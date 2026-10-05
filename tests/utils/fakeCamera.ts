@@ -32,7 +32,7 @@
  *   check that the camera is released.
  * - `constraints()` returns what each `getUserMedia` call asked for.
  *
- * The real scanner (engine, worker, jsQR) reads these pixels exactly as it would read
+ * The real scanner (engine, worker, decoder) reads these pixels exactly as it would read
  * a camera, headless, without `.y4m` files. Used by the scanner spec and, through
  * `e2e/utils/opticalLink.ts`, by the file-transfer receiver spec.
  */

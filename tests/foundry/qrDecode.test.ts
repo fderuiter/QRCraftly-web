@@ -17,7 +17,6 @@
 */
 
 import { createHash } from 'node:crypto';
-import jsQR from 'jsqr';
 import { describe, expect, it } from 'vitest';
 import type { QrEccLetter } from '@/packages/qr-matrix';
 import { qrEncoder } from '../fixtures/qrEncoder';
@@ -55,10 +54,10 @@ function hex(bytes: Uint8Array | number[]): string {
 }
 
 describe('Rust QR decoder (#1178)', () => {
-  it('reads the same bytes as jsQR from every rendered code', async () => {
+  it('reads back the encoded bytes from every rendered code', async () => {
     const module = await loadCommittedModule('qr-decode');
     const report = runDifferential({
-      name: 'qr_decode vs jsQR',
+      name: 'qr_decode vs the encoder',
       inputs: cases(60),
       candidate: ({ text, level }) => {
         const grid = qrEncoder.create(text, { errorCorrectionLevel: level }).modules;
@@ -66,12 +65,7 @@ describe('Rust QR decoder (#1178)', () => {
         const codes = prepareDecode(module, decodeRequest(renderGrid(grid, SCALE), side, side, 1))();
         return codes.map((code) => hex(code.bytes)).join(',');
       },
-      reference: ({ text, level }) => {
-        const grid = qrEncoder.create(text, { errorCorrectionLevel: level }).modules;
-        const side = (grid.size + 8) * SCALE;
-        const found = jsQR(toRgba(renderGrid(grid, SCALE)), side, side);
-        return found ? hex(found.binaryData) : '';
-      },
+      reference: ({ text }) => hex(new TextEncoder().encode(text)),
     });
     expect(report).toMatchObject({ checked: 60, mismatchCount: 0 });
   });

@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import jsQR from 'jsqr';
+import type { QrReader } from '@/packages/qr-decode';
 import { isDangerousUrl } from '@/utils/security';
 import { applyOpticalSimulationMath } from './opticalSimulation';
 import { auditModuleContrast } from './contrastAudit';
@@ -45,23 +45,14 @@ export interface OpticalScratchBuffers {
   temp?: Uint8ClampedArray;
 }
 
-type Decoder = typeof jsQR;
-
-// Some bundlers hand the CommonJS jsQR build back as `{ default: fn }`.
-const decodeQR: Decoder =
-  typeof jsQR === 'function' ? jsQR : (jsQR as unknown as { default: Decoder }).default;
-
 /**
- * Attempts one jsQR pass. Decoder exceptions are treated as "no code found" so a crash in one
- * polarity pass never prevents the next pass from running.
+ * Attempts one read with our reader (#1178): dark-on-light only, or both polarities. Reader
+ * exceptions are treated as "no code found" so a failure in one pass never prevents the next.
  */
-function tryDecode(
-  frame: PixelFrame,
-  inversionAttempts: 'dontInvert' | 'attemptBoth'
-): string | null {
+function tryDecode(reader: QrReader, frame: PixelFrame, inverted: boolean): string | null {
   try {
-    const code = decodeQR(frame.data, frame.width, frame.height, { inversionAttempts });
-    return code ? code.data : null;
+    const [code] = reader.read(frame.data, frame.width, frame.height, { inverted });
+    return code ? code.text : null;
   } catch {
     return null;
   }
@@ -76,6 +67,7 @@ function tryDecode(
  * Stages: localized module contrast audit, two-pass (normal, then inverted) digital decode, the
  * dangerous-URL security check, optical print simulation, then a two-pass physical decode.
  *
+ * @param reader - The QR reader, from `loadQrReader`.
  * @param frame - Pixels to evaluate.
  * @param isTest - Skips the randomized optical simulation (deterministic automation runs).
  * @param moduleCount - QR modules per side; enables the localized contrast audit.
@@ -83,6 +75,7 @@ function tryDecode(
  * @returns A generator whose return value is the check result.
  */
 export function* scannabilitySteps(
+  reader: QrReader,
   frame: PixelFrame,
   isTest: boolean,
   moduleCount?: number,
@@ -101,10 +94,10 @@ export function* scannabilitySteps(
   const metrics = { localContrastViolations, minLocalContrast };
 
   // 1. Digital check (pass 1: normal polarity, pass 2: inverted polarity)
-  let decoded = tryDecode(frame, 'dontInvert');
+  let decoded = tryDecode(reader, frame, false);
   if (decoded === null) {
     yield;
-    decoded = tryDecode(frame, 'attemptBoth');
+    decoded = tryDecode(reader, frame, true);
   }
 
   if (decoded === null) {
@@ -133,10 +126,10 @@ export function* scannabilitySteps(
   yield;
 
   // 3. Physical check (pass 1: normal polarity, pass 2: inverted polarity)
-  let physicalReady = tryDecode(simulated, 'dontInvert') !== null;
+  let physicalReady = tryDecode(reader, simulated, false) !== null;
   if (!physicalReady) {
     yield;
-    physicalReady = tryDecode(simulated, 'attemptBoth') !== null;
+    physicalReady = tryDecode(reader, simulated, true) !== null;
   }
 
   return { success: true, physicalReady, ...metrics };
@@ -146,15 +139,17 @@ export function* scannabilitySteps(
  * Runs the Scannability Health check synchronously on the calling thread. This is the same
  * step sequence the Scannability Worker runs (see `scannabilitySteps`), so worker and
  * main-thread fallback results match by construction rather than by copied code.
+ * @param reader - The QR reader, from `loadQrReader`.
  */
 export function performScannabilityCheck(
+  reader: QrReader,
   imageData: PixelFrame,
   width: number,
   height: number,
   isTest: boolean,
   moduleCount?: number
 ): ScannabilityResult {
-  const steps = scannabilitySteps({ data: imageData.data, width, height }, isTest, moduleCount);
+  const steps = scannabilitySteps(reader, { data: imageData.data, width, height }, isTest, moduleCount);
   let step = steps.next();
   while (!step.done) step = steps.next();
   return step.value;

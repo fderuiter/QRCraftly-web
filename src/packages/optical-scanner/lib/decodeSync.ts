@@ -1,12 +1,10 @@
-import jsQR, { type QRCode } from 'jsqr';
-// Types only: `scripts/bench_scanner.ts` loads this file from older git refs, so it imports nothing
-// but jsQR at runtime.
+// Types only: `scripts/bench_scanner.ts` loads this file from other git refs, so it imports nothing
+// at runtime. Callers pass in the reader (#1178).
+import type { QrRead, QrReader } from '@/packages/qr-decode';
 import type { DecodedCode, ScanCorners } from './contracts';
 
-/** Scale of the retry pass for frames the full-resolution pass could not read. */
-const RETRY_SCALE = 0.6;
-/** Frames smaller than this on either side skip the downscaled retry. */
-const MIN_RETRY_DIMENSION = 160;
+/** Frames smaller than this on either side skip the noise downscale. */
+const MIN_DOWNSCALE_DIMENSION = 160;
 
 /**
  * Box-filters RGBA pixels down to `scale` of their size.
@@ -65,46 +63,30 @@ interface Transform {
 
 const IDENTITY: Transform = { offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1 };
 
-/** Converts a jsQR result into a {@link DecodedCode}, its corners mapped through `transform`. */
-function toDecodedCode(code: QRCode, transform: Transform = IDENTITY): DecodedCode {
-  const { topLeftCorner, topRightCorner, bottomRightCorner, bottomLeftCorner } = code.location;
+/** Converts a read into a {@link DecodedCode}, its corners mapped through `transform`. */
+function toDecodedCode(code: QrRead, transform: Transform = IDENTITY): DecodedCode {
   const map = ({ x, y }: { x: number; y: number }) => ({
     x: transform.offsetX + x * transform.scaleX,
     y: transform.offsetY + y * transform.scaleY,
   });
-  const corners: ScanCorners = [map(topLeftCorner), map(topRightCorner), map(bottomRightCorner), map(bottomLeftCorner)];
-  return { text: code.data, bytes: Uint8Array.from(code.binaryData), corners };
+  const [topLeft, topRight, bottomRight, bottomLeft] = code.corners;
+  const corners: ScanCorners = [map(topLeft), map(topRight), map(bottomRight), map(bottomLeft)];
+  return { text: code.text, bytes: code.bytes, corners };
 }
 
 /**
- * Decodes one frame with jsQR in up to three passes: dark-on-light at full
- * resolution, dark-on-light at {@link RETRY_SCALE}, then both polarities at full
- * resolution. jsQR's sampling grid misses dense codes (QR version 8 and up) at
- * some module sizes that decode fine a little smaller, so the downscaled pass
- * rescues most of those frames for about a third of the cost of a full pass.
+ * Decodes one image with every pass of our reader: local thresholds, then one threshold for the
+ * whole image, then half size, each in both polarities. For one-shot images, not camera frames.
+ * @param reader The QR reader, from `loadQrReader`.
  * @param data RGBA pixels.
  * @param width Frame width.
  * @param height Frame height.
  * @returns The decoded code (text, bytes and corners in the frame's pixels), or null.
  */
-export function decodeRgbaCode(data: Uint8ClampedArray, width: number, height: number): DecodedCode | null {
+export function decodeRgbaCode(reader: QrReader, data: Uint8ClampedArray, width: number, height: number): DecodedCode | null {
   try {
-    const direct = jsQR(data, width, height, { inversionAttempts: 'dontInvert' });
-    if (direct) return toDecodedCode(direct);
-    if (width >= MIN_RETRY_DIMENSION && height >= MIN_RETRY_DIMENSION) {
-      const small = downscaleRgba(data, width, height, RETRY_SCALE);
-      const retried = jsQR(small.data, small.width, small.height, { inversionAttempts: 'dontInvert' });
-      if (retried) {
-        return toDecodedCode(retried, {
-          offsetX: 0,
-          offsetY: 0,
-          scaleX: width / small.width,
-          scaleY: height / small.height,
-        });
-      }
-    }
-    const both = jsQR(data, width, height, { inversionAttempts: 'attemptBoth' });
-    return both ? toDecodedCode(both) : null;
+    const [code] = reader.read(data, width, height, { inverted: true, global: true, half: true });
+    return code ? toDecodedCode(code) : null;
   } catch {
     return null;
   }
@@ -112,7 +94,7 @@ export function decodeRgbaCode(data: Uint8ClampedArray, width: number, height: n
 
 /**
  * One camera-frame decode strategy. The camera loop sees a new frame every few tens of
- * milliseconds, so each frame gets exactly one jsQR pass and consecutive frames rotate
+ * milliseconds, so each frame gets exactly one reader pass and consecutive frames rotate
  * through the strategies (#1096):
  * - `centre`: the centre square of the frame (where the viewfinder reticle is) at native
  *   resolution, for small or distant codes;
@@ -127,9 +109,8 @@ const CAMERA_STRATEGIES: readonly CameraDecodeStrategy[] = ['centre', 'frame', '
 const FRAME_PASS_MAX_DIMENSION = 800;
 /**
  * Sensor-noise levels (median grey difference between neighbouring pixels) above which a pass
- * decodes a box-downscaled copy instead. jsQR's binarizer turns grain into thousands of finder
- * pattern candidates: on a 1280x720 frame with +/-14 grey levels of noise one pass takes seconds.
- * Averaging 2x2 (or 3x3) pixels cuts the noise enough to keep a pass in the tens of milliseconds.
+ * decodes a box-downscaled copy instead. Averaging 2x2 (or 3x3) pixels cuts the grain, so the
+ * binarizer finds the code's edges rather than the sensor's, and the pass gets cheaper.
  */
 const NOISY_LEVEL = 6;
 const VERY_NOISY_LEVEL = 11;
@@ -189,8 +170,9 @@ export function estimateNoise(data: Uint8ClampedArray, width: number, height: nu
 }
 
 /**
- * Decodes one camera frame with a single jsQR pass (see {@link CameraDecodeStrategy}). Noisy frames
- * are box-downscaled first so a grainy low-light frame cannot stall the worker for seconds.
+ * Decodes one camera frame with a single reader pass (see {@link CameraDecodeStrategy}). Noisy frames
+ * are box-downscaled first.
+ * @param reader The QR reader, from `loadQrReader`.
  * @param data RGBA pixels.
  * @param width Frame width.
  * @param height Frame height.
@@ -198,6 +180,7 @@ export function estimateNoise(data: Uint8ClampedArray, width: number, height: nu
  * @returns The decoded code (corners in the frame's pixels), or null.
  */
 export function decodeCameraCode(
+  reader: QrReader,
   data: Uint8ClampedArray,
   width: number,
   height: number,
@@ -211,11 +194,11 @@ export function decodeCameraCode(
       image = downscaleRgba(image.data, image.width, image.height, FRAME_PASS_MAX_DIMENSION / longest);
     }
     const noise = estimateNoise(image.data, image.width, image.height);
-    if (noise >= NOISY_LEVEL && Math.min(image.width, image.height) >= MIN_RETRY_DIMENSION) {
+    if (noise >= NOISY_LEVEL && Math.min(image.width, image.height) >= MIN_DOWNSCALE_DIMENSION) {
       image = downscaleRgba(image.data, image.width, image.height, noise >= VERY_NOISY_LEVEL ? 1 / 3 : 0.5);
     }
     if (strategy === 'inverted') {
-      // jsQR 1.4's `onlyInvert` never builds the inverted image, so invert the pixels here.
+      // Invert the pixels so this pass looks for light-on-dark codes only, at the cost of one pass.
       const inverted = image.data === data ? new Uint8ClampedArray(image.data) : image.data;
       for (let i = 0; i < inverted.length; i += 4) {
         inverted[i] = 255 - inverted[i];
@@ -224,7 +207,7 @@ export function decodeCameraCode(
       }
       image = { ...image, data: inverted };
     }
-    const code = jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
+    const [code] = reader.read(image.data, image.width, image.height);
     if (!code) return null;
     return toDecodedCode(code, {
       offsetX: cut.left,
@@ -242,21 +225,23 @@ export function decodeCameraCode(
  * @returns The decoded text, or null.
  */
 export function decodeCameraFrame(
+  reader: QrReader,
   data: Uint8ClampedArray,
   width: number,
   height: number,
   strategy: CameraDecodeStrategy
 ): string | null {
-  return decodeCameraCode(data, width, height, strategy)?.text ?? null;
+  return decodeCameraCode(reader, data, width, height, strategy)?.text ?? null;
 }
 
 /**
  * Decodes raw RGBA pixel data on the calling thread (see {@link decodeRgbaCode}).
  */
 export function decodeImageDataSync(
+  reader: QrReader,
   imageData: ImageData | { data: Uint8ClampedArray },
   width: number,
   height: number
 ): DecodedCode | null {
-  return decodeRgbaCode(imageData.data, width, height);
+  return decodeRgbaCode(reader, imageData.data, width, height);
 }

@@ -1,12 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import jsQR from 'jsqr';
+import { fakeQrRead } from './utils/fakeQrRead';
 
-vi.mock('jsqr', () => {
-  return {
-    default: vi.fn(),
-  };
-});
+const qrRead = vi.hoisted(() => vi.fn());
+vi.mock('@/packages/qr-decode', () => ({ loadQrReader: () => Promise.resolve({ read: qrRead }) }));
 
 const liveWorkers: Worker[] = [];
 
@@ -31,7 +28,7 @@ describe('High-Fidelity Worker Concurrency & Serialization Tests', () => {
   });
 
   afterEach(() => {
-    // Stop every worker so no in-flight decode from one test leaks jsQR calls into the next.
+    // Stop every worker so no in-flight decode from one test leaks reader calls into the next.
     liveWorkers.splice(0).forEach(worker => worker.terminate());
     vi.clearAllMocks();
     if (globalThis.mockWorkerControl) {
@@ -87,12 +84,7 @@ describe('High-Fidelity Worker Concurrency & Serialization Tests', () => {
     };
 
     // Use mockImplementation to isolate mock data specifically to this test's parameters
-    vi.mocked(jsQR).mockImplementation((data: any) => {
-      if (data && data.length === 400) {
-        return { data: 'javascript:alert(1)' } as any;
-      }
-      return null;
-    });
+    qrRead.mockImplementation((data: Uint8ClampedArray) => (data?.length === 400 ? [fakeQrRead('javascript:alert(1)')] : []));
 
     worker.postMessage({
       imageData: {
@@ -119,12 +111,7 @@ describe('High-Fidelity Worker Concurrency & Serialization Tests', () => {
     });
 
     // 2. Let's test a safe payload
-    vi.mocked(jsQR).mockImplementation((data: any) => {
-      if (data && data.length === 400) {
-        return { data: 'https://safe.com' } as any;
-      }
-      return null;
-    });
+    qrRead.mockImplementation((data: Uint8ClampedArray) => (data?.length === 400 ? [fakeQrRead('https://safe.com')] : []));
 
     worker.postMessage({
       imageData: {
@@ -163,7 +150,7 @@ describe('High-Fidelity Worker Concurrency & Serialization Tests', () => {
       finishedAt.push(performance.now());
     };
 
-    vi.mocked(jsQR).mockReturnValue({ data: 'https://safe.com' } as any);
+    qrRead.mockReturnValue([fakeQrRead('https://safe.com')]);
 
     // Send three requests rapidly.
     // Due to concurrency limit = 1 and delay = 30ms, they should queue up and finish in order at t=30ms, t=60ms, t=90ms
@@ -199,22 +186,19 @@ describe('High-Fidelity Worker Concurrency & Serialization Tests', () => {
     expect(finishedAt[2] - finishedAt[1]).toBeGreaterThanOrEqual(25);
   });
 
-  // Requirement 1, 2, 4 & Acceptance Criteria 1, 2: Two-pass sequence of dontInvert followed by an
-  // attemptBoth fallback, in both the digital and the physical check (see scannabilitySteps).
-  it('should execute standard decoding (dontInvert) followed by an inverted fallback pass (attemptBoth)', async () => {
+  // Requirement 1, 2, 4 & Acceptance Criteria 1, 2: Two-pass sequence of a dark-on-light pass followed
+  // by a both-polarities fallback, in both the digital and the physical check (see scannabilitySteps).
+  it('should execute standard decoding followed by an inverted fallback pass', async () => {
     const worker = await createScannabilityWorker();
     let receivedResponse: any = null;
     worker.onmessage = (e: any) => {
       receivedResponse = e.data;
     };
 
-    const optionsPassed: any[] = [];
-    vi.mocked(jsQR).mockImplementation((data: any, width: number, height: number, options?: any) => {
-      optionsPassed.push(options?.inversionAttempts);
-      if (options?.inversionAttempts === 'attemptBoth') {
-        return { data: 'https://inverted-qr.com' } as any;
-      }
-      return null;
+    const optionsPassed: unknown[] = [];
+    qrRead.mockImplementation((_data: Uint8ClampedArray, _width: number, _height: number, options?: { inverted?: boolean }) => {
+      optionsPassed.push(options?.inverted);
+      return options?.inverted ? [fakeQrRead('https://inverted-qr.com')] : [];
     });
 
     worker.postMessage({
@@ -231,9 +215,8 @@ describe('High-Fidelity Worker Concurrency & Serialization Tests', () => {
 
     await vi.waitFor(() => expect(receivedResponse?.configId).toBe('inverted-test'), WAIT);
 
-    // Verify two-pass sequence (digital check followed by physical check) was followed with onlyInvert fallback
-    expect(optionsPassed).toEqual(['dontInvert', 'attemptBoth', 'dontInvert', 'attemptBoth']);
-    expect(optionsPassed).not.toContain('onlyInvert');
+    // Two passes each for the digital check and the physical check, the second in both polarities
+    expect(optionsPassed).toEqual([false, true, false, true]);
     expect(receivedResponse).toEqual({
       success: true,
       physicalReady: true,

@@ -72,7 +72,7 @@ describe('useQrScanner adapter', () => {
       });
     });
     await flushFrames(20);
-    expect(onScanSuccess).toHaveBeenCalledWith('HELLO', expect.objectContaining({ text: 'HELLO', source: 'jsqr' }));
+    expect(onScanSuccess).toHaveBeenCalledWith('HELLO', expect.objectContaining({ text: 'HELLO', source: 'qr-decode' }));
 
     await flushFrames(250);
     expect(result.current.latencyHistory.length).toBeGreaterThan(0);

@@ -92,14 +92,14 @@ describe('renderLicenseFile', () => {
 
 describe('checkShipped', () => {
   it('reports packages that ship unlisted, listed packages that no longer ship, and unknown virtual modules', () => {
-    const seen = new Map<string, Set<string | undefined>>(list.filter((name) => name !== 'jsqr').map((name) => [name, new Set([undefined])]));
+    const seen = new Map<string, Set<string | undefined>>(list.filter((name) => name !== 'lucide-react').map((name) => [name, new Set([undefined])]));
     seen.set('left-pad', new Set([undefined]));
     const problems = checkShipped(seen, new Set(['mystery']), root);
     expect(problems).toEqual(
       expect.arrayContaining([
         expect.stringContaining('mystery'),
         'left-pad ships to the browser but is not in shipped-packages.json.',
-        'jsqr is in shipped-packages.json but no longer ships to the browser.',
+        'lucide-react is in shipped-packages.json but no longer ships to the browser.',
       ]),
     );
   });
