@@ -24,6 +24,7 @@ import {
   analyzeDamage,
   applyBlast,
   BARRAGE_STRIKES,
+  blankTargetMatrix,
   buildTargetMatrix,
   finderAt,
   isDarkModule,
@@ -60,8 +61,8 @@ interface Ring {
 export interface ModeProps {
   /** Target under test. */
   target: ArcadeTarget;
-  /** The QR encoder that builds the target's matrix. */
-  encoder: QrEncoder;
+  /** The QR encoder that builds the target's matrix, or null while it loads (the board is blank). */
+  encoder: QrEncoder | null;
   /** Target settings panel. */
   settings: React.ReactNode;
   /** Screen-reader announcements. */
@@ -122,7 +123,10 @@ function drawBoard(
  * @returns The simulator.
  */
 export function SimulatorMode({ target, encoder, settings, announce }: ModeProps) {
-  const matrix = useMemo(() => buildTargetMatrix(target.payload, target.ecc, encoder), [target.payload, target.ecc, encoder]);
+  const matrix = useMemo(
+    () => (encoder ? buildTargetMatrix(target.payload, target.ecc, encoder) : blankTargetMatrix(target.payload, target.ecc)),
+    [target.payload, target.ecc, encoder]
+  );
   const [damage, setDamage] = useState<ReadonlySet<number>>(() => new Set());
   const [weaponId, setWeaponId] = useState<SimulatorWeaponId>('pinpoint');
   const [latency, setLatency] = useState(0);
@@ -153,7 +157,7 @@ export function SimulatorMode({ target, encoder, settings, announce }: ModeProps
     captureFrame: capture,
     expectedPayload: () => matrix.payload,
     isInputActive: () => drawingRef.current,
-    boardKey: `${matrix.payload}|${matrix.ecc}|${target.fgColor}|${target.bgColor}|${rebuilds}`,
+    boardKey: `${matrix.payload}|${matrix.ecc}|${target.fgColor}|${target.bgColor}|${rebuilds}|${encoder ? 'ready' : 'blank'}`,
   });
   const { defeatOpen, closeDefeat } = useArcadeStatus(analysis, scan.state, announce);
   const requestScan = scan.request;

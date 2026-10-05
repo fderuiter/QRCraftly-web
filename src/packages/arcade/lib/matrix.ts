@@ -90,6 +90,20 @@ export function buildTargetMatrix(payload: string, ecc: EccLevel, encoder: QrEnc
   return { ...encode(FALLBACK_PAYLOAD, ecc, encoder), usedFallback: true };
 }
 
+/** Modules along one side of {@link blankTargetMatrix}: a version 2 symbol. */
+const BLANK_SIZE = 25;
+
+/**
+ * An all-light matrix that stands in for a target while the encoder loads, so the game keeps its
+ * layout before the first real encode.
+ * @param payload - The payload the real matrix will encode.
+ * @param ecc - Error correction tier.
+ * @returns A blank matrix.
+ */
+export function blankTargetMatrix(payload: string, ecc: EccLevel): TargetMatrix {
+  return { size: BLANK_SIZE, modules: new Uint8Array(BLANK_SIZE * BLANK_SIZE), payload, ecc, usedFallback: false };
+}
+
 /**
  * Whether a module is dark.
  * @param matrix - The matrix.

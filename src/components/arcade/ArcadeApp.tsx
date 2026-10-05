@@ -55,6 +55,8 @@ function useModeParam(): [ArcadeMode, (mode: ArcadeMode) => void] {
   return [mode, setMode];
 }
 
+const ignore = () => {};
+
 /**
  * The QR Arcade & Durability Lab: mode switcher, shared target state and the active mode.
  * @returns The arcade.
@@ -114,15 +116,15 @@ export function ArcadeApp() {
 
       <div id={PANEL_ID} role="tabpanel" aria-labelledby={tabId(mode)}>
         <p className="sr-only">{activeMode.description}</p>
-        {!encoder ? (
-          <p className="py-16 text-center text-sm text-fg-muted" data-testid="arcade-loading">
-            Loading the target…
-          </p>
-        ) : mode === 'blaster' ? (
-          <BlasterMode target={target} encoder={encoder} settings={settings} announce={announce} />
-        ) : (
-          <SimulatorMode target={target} encoder={encoder} settings={settings} announce={announce} />
-        )}
+        {/* Until the encoder loads, the mode shows a blank board so the page keeps its layout; it is
+            inert and silent until the real target is built, which re-scans it. */}
+        <div inert={!encoder} aria-busy={!encoder} data-testid={encoder ? undefined : 'arcade-loading'}>
+          {mode === 'blaster' ? (
+            <BlasterMode target={target} encoder={encoder} settings={settings} announce={encoder ? announce : ignore} />
+          ) : (
+            <SimulatorMode target={target} encoder={encoder} settings={settings} announce={encoder ? announce : ignore} />
+          )}
+        </div>
       </div>
 
       <div role="status" aria-live="polite" className="sr-only" data-testid="arcade-announcer">

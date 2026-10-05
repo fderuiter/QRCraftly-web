@@ -335,10 +335,10 @@ describe('QRTool Component', () => {
       expect(screen.queryByText('Scan Safety Warning')).not.toBeInTheDocument();
     });
 
-    expect(appendSpy).toHaveBeenCalled();
-    expect(clickSpy).toHaveBeenCalled();
-
+    // The SVG is built asynchronously (the encoder may still be loading), so wait for the download.
     await waitFor(() => {
+      expect(appendSpy).toHaveBeenCalled();
+      expect(clickSpy).toHaveBeenCalled();
       expect(screen.queryByText(/SCAN_VALIDATION_FAILED/i)).not.toBeInTheDocument();
       const statuses = screen.getAllByRole('status');
       expect(statuses.some(s => s.textContent === 'SVG downloaded')).toBe(true);

@@ -27,6 +27,7 @@
  */
 
 export {
+  blankTargetMatrix,
   buildTargetMatrix,
   isDarkModule,
   finderAt,
