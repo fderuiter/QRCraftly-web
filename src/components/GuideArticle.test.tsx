@@ -34,7 +34,7 @@ describe('guides data', () => {
 describe('GuideArticle', () => {
   it('renders the title, byline, sections and sources without axe violations', async () => {
     const guide = guides[0];
-    const { container } = render(<GuideArticle guide={guide} urlPathname={`/guides/${guide.slug}`} />);
+    const { container } = render(<GuideArticle guide={guide} />);
     expect(screen.getByRole('heading', { level: 1, name: guide.title })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Sources' })).toBeInTheDocument();
     expect(screen.getByText(/min read/)).toBeInTheDocument();

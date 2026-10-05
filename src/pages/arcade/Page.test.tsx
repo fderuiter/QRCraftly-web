@@ -23,6 +23,8 @@ import LayoutDefault from '@/layouts/LayoutDefault';
 import Page from './+Page';
 import config from './+config';
 import { getMetadataForPath } from '@/data/contentRegistry';
+import { getPageSchema } from '@/data/pageContent';
+import { withPageContent } from '../../../tests/utils/pageContent';
 
 vi.mock('vike/client/router', () => ({ navigate: vi.fn(() => Promise.resolve()) }));
 
@@ -30,9 +32,7 @@ describe('/arcade page', () => {
   it('renders inside the default layout with the skip link, primary navigation and theme toggle', () => {
     window.history.replaceState(null, '', '/arcade');
     render(
-      <LayoutDefault>
-        <Page />
-      </LayoutDefault>
+      <LayoutDefault>{withPageContent('/arcade', <Page />)}</LayoutDefault>
     );
     expect(screen.getByRole('link', { name: 'Skip to main content' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'QR Arcade & Durability Lab' })).toBeInTheDocument();
@@ -44,10 +44,10 @@ describe('/arcade page', () => {
   });
 
   it('renders the how-to and FAQ content and structured data', () => {
-    render(<Page />);
+    render(withPageContent('/arcade', <Page />));
     expect(screen.getByRole('heading', { name: 'How to Stress-Test a QR Code in the QR Arcade' })).toBeInTheDocument();
     expect(screen.getByText('Frequently Asked Questions')).toBeInTheDocument();
-    const jsonLd = Array.from(document.querySelectorAll('script[type="application/ld+json"]')).map((s) => s.textContent).join('');
+    const jsonLd = JSON.stringify(getPageSchema('/arcade'));
     expect(jsonLd).toContain('WebApplication');
     expect(jsonLd).toContain('HowTo');
     expect(jsonLd).toContain('FAQPage');

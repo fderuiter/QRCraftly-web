@@ -19,10 +19,7 @@
 import type { ReactNode } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { ArticleHeading, ArticleLayout } from '@/components/ArticleLayout';
-import { JsonLdScript } from '@/components/ui/JsonLdScript';
 import { GUIDE_AUTHOR, getGuide, readingMinutes, type Guide, type GuideBlock } from '@/data/guides';
-import { generateGuideSchema } from '@/utils/schemaGenerator';
-import { resolveDomainForPath } from '@/utils/metadataEngine';
 import { isDangerousUrl } from '@/utils/security';
 
 const LINK_PATTERN = /\[([^\]]+)\]\(([^)\s]+)\)/g;
@@ -129,14 +126,13 @@ export function formatGuideDate(date: string): string {
 
 /**
  * A guide from the `/guides` hub (#1038): heading, a visible byline with its dates, a table of
- * contents, the body, the sources it rests on and links to related guides, with `Article` data.
+ * contents, the body, the sources it rests on and links to related guides. Head renders its
+ * `Article` data.
  * @param props - Component properties.
  * @param props.guide - The guide to show.
- * @param props.urlPathname - The page's path, for the structured data.
  * @returns The article.
  */
-export function GuideArticle({ guide, urlPathname }: { guide: Guide; urlPathname: string }) {
-  const schema = generateGuideSchema(guide, resolveDomainForPath(urlPathname));
+export function GuideArticle({ guide }: { guide: Guide }) {
   const sections = [...guide.sections.map(({ id, heading }) => ({ id, label: heading })), { id: 'sources', label: 'Sources' }];
   const related = guide.related.flatMap((slug) => {
     const other = getGuide(slug);
@@ -146,7 +142,6 @@ export function GuideArticle({ guide, urlPathname }: { guide: Guide; urlPathname
 
   return (
     <>
-      <JsonLdScript data={schema} />
       <ArticleLayout
         title={guide.title}
         lead={

@@ -16,15 +16,19 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { GuideArticle } from '@/components/GuideArticle';
-import { getGuide } from '@/data/guides';
-
-const guide = getGuide('qr-code-scams-quishing');
+import { createContext, useContext } from 'react';
+import type { PageContent } from './pageContent';
 
 /**
- * The guide at /guides/qr-code-scams-quishing.
- * @returns The page.
+ * The content of the page being rendered, from the global `+data` hook (see `pageContent.ts`).
+ * LayoutDefault provides it; null outside a page, for example in a component test.
  */
-export default function Page() {
-  return guide ? <GuideArticle guide={guide} /> : null;
+export const PageContentContext = createContext<PageContent | null>(null);
+
+/**
+ * Reads the content of the page being rendered.
+ * @returns The page's content, or null when no page provides it.
+ */
+export function usePageContent(): PageContent | null {
+  return useContext(PageContentContext);
 }

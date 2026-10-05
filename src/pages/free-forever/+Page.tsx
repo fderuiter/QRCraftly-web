@@ -20,9 +20,6 @@
 import { Eyebrow } from '@/components/ui/SectionHeading';
 import { Ban, EyeOff, Laptop, Gift } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { JsonLdScript } from '@/components/ui/JsonLdScript';
-import { contentRegistry } from '@/data/contentRegistry';
-import { copy } from '@/data/copy/free-forever';
 import {
   PLEDGE_AFFORDABLE,
   PLEDGE_COLLECTED,
@@ -37,9 +34,6 @@ import {
   PLEDGE_WHY,
   TRIAL_EXPIRY_LINK_LABEL,
 } from '@/data/pledge';
-import { generateSchema } from '@/utils/schemaGenerator';
-import { resolveDomainForPath } from '@/utils/metadataEngine';
-import { usePageContext } from 'vike-react/usePageContext';
 
 const PROMISE_ICONS: readonly LucideIcon[] = [Ban, EyeOff, Laptop, Gift];
 
@@ -49,15 +43,10 @@ const PROMISE_ICONS: readonly LucideIcon[] = [Ban, EyeOff, Laptop, Gift];
  * @returns The pledge page layout.
  */
 export default function Page() {
-  const pageContext = usePageContext();
-  const urlPathname = pageContext?.urlPathname ?? '/free-forever';
-  const resolvedDomain = resolveDomainForPath(urlPathname);
-  const schemaData = generateSchema({ ...contentRegistry['free-forever'], ...copy }, resolvedDomain, urlPathname);
 
   return (
     <>
       <div className="mx-auto max-w-4xl px-4 py-12">
-        <JsonLdScript data={schemaData} />
 
         <header className="mb-12 text-center">
           <Eyebrow tone="accent" className="mb-3 justify-center">The QRCraftly Pledge</Eyebrow>

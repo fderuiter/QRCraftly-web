@@ -23,6 +23,9 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ThemeProvider } from '../context/ThemeContext';
 import { ServiceWorkerUpdatePrompt } from '../components/ServiceWorkerUpdatePrompt';
 import { AppShell } from '../components/AppShell';
+import { PageContentContext } from '../data/PageContentContext';
+import type { PageContent } from '../data/pageContent';
+import { usePageContext } from 'vike-react/usePageContext';
 
 /**
  * LayoutDefault Component
@@ -35,11 +38,14 @@ import { AppShell } from '../components/AppShell';
  */
 export default function LayoutDefault({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
+  // The page's own content from the global `+data` hook (#1058).
+  const content = (usePageContext()?.data as PageContent | undefined) ?? null;
   useEffect(() => {
     setHydrated(true);
   }, []);
 
   return (
+    <PageContentContext.Provider value={content}>
     <ThemeProvider>
     <ToastProvider>
       <ServiceWorkerUpdatePrompt enabled={!import.meta.env.DEV} />
@@ -48,5 +54,6 @@ export default function LayoutDefault({ children }: { children: React.ReactNode 
       </AppShell>
     </ToastProvider>
     </ThemeProvider>
+    </PageContentContext.Provider>
   );
 }

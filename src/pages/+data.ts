@@ -16,15 +16,15 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { GuideArticle } from '@/components/GuideArticle';
-import { getGuide } from '@/data/guides';
-
-const guide = getGuide('qr-code-scams-quishing');
+import type { PageContextServer } from 'vike/types';
+import { buildPageContent, type PageContent } from '@/data/pageContent';
 
 /**
- * The guide at /guides/qr-code-scams-quishing.
- * @returns The page.
+ * Hands each page its own content at prerender time, so the shared content modules stay on the
+ * server (#1058). Vike serializes the result into the page's HTML.
+ * @param pageContext - The page being rendered.
+ * @returns The page's content.
  */
-export default function Page() {
-  return guide ? <GuideArticle guide={guide} /> : null;
+export default function data(pageContext: PageContextServer): PageContent {
+  return buildPageContent(pageContext);
 }

@@ -18,19 +18,11 @@
 
 import { QRTypePage } from '@/components/QRTypePage';
 import { QRType } from '@/types';
-import { contentRegistry } from '@/data/contentRegistry';
 import { copy } from '@/data/copy/email-qr-code';
-import { generateSchema } from '@/utils/schemaGenerator';
-import { resolveDomainForPath } from '@/utils/metadataEngine';
-import { usePageContext } from 'vike-react/usePageContext';
 
 /**
  * Email QR Code Page Component
  */
 export default function Page() {
-  const pageContext = usePageContext();
-  const resolvedDomain = resolveDomainForPath(pageContext.urlPathname);
-  const schemaData = generateSchema({ ...contentRegistry['email-qr-code'], ...copy }, resolvedDomain, pageContext.urlPathname);
-
-  return <QRTypePage type={QRType.EMAIL} title="Email QR Code" schemaData={schemaData}  toolId="email-qr-code" copy={copy} />;
+  return <QRTypePage type={QRType.EMAIL} title="Email QR Code" toolId="email-qr-code" copy={copy} />;
 }

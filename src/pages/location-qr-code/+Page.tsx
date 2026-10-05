@@ -18,20 +18,11 @@
 
 import { QRTypePage } from '@/components/QRTypePage';
 import { QRType } from '@/types';
-import { contentRegistry } from '@/data/contentRegistry';
 import { copy } from '@/data/copy/location-qr-code';
-import { generateSchema } from '@/utils/schemaGenerator';
-import { resolveDomainForPath } from '@/utils/metadataEngine';
-import { usePageContext } from 'vike-react/usePageContext';
 
 /**
  * Location QR Code Page Component
  */
 export default function Page() {
-  const pageContext = usePageContext();
-  const urlPathname = pageContext?.urlPathname ?? '/location-qr-code';
-  const resolvedDomain = resolveDomainForPath(urlPathname);
-  const schemaData = generateSchema({ ...contentRegistry['location-qr-code'], ...copy }, resolvedDomain, urlPathname);
-
-  return <QRTypePage type={QRType.LOCATION} title="Location QR Code" schemaData={schemaData} toolId="location-qr-code" copy={copy} />;
+  return <QRTypePage type={QRType.LOCATION} title="Location QR Code" toolId="location-qr-code" copy={copy} />;
 }

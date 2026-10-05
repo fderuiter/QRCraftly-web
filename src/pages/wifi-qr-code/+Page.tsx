@@ -18,11 +18,7 @@
 
 import { QRTypePage } from '@/components/QRTypePage';
 import { QRType } from '@/types';
-import { contentRegistry } from '@/data/contentRegistry';
 import { copy } from '@/data/copy/wifi-qr-code';
-import { generateSchema } from '@/utils/schemaGenerator';
-import { resolveDomainForPath } from '@/utils/metadataEngine';
-import { usePageContext } from 'vike-react/usePageContext';
 
 /**
  * WiFi QR Code Page Component
@@ -32,10 +28,5 @@ import { usePageContext } from 'vike-react/usePageContext';
  * @returns The WiFi QR code page layout.
  */
 export default function Page() {
-  const pageContext = usePageContext();
-  const urlPathname = pageContext?.urlPathname ?? '/wifi-qr-code';
-  const resolvedDomain = resolveDomainForPath(urlPathname);
-  const schemaData = generateSchema({ ...contentRegistry['wifi-qr-code'], ...copy }, resolvedDomain, urlPathname);
-
-  return <QRTypePage type={QRType.WIFI} title="WiFi QR Code" schemaData={schemaData} toolId="wifi-qr-code" copy={copy} />;
+  return <QRTypePage type={QRType.WIFI} title="WiFi QR Code" toolId="wifi-qr-code" copy={copy} />;
 }

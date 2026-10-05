@@ -1,10 +1,7 @@
 import { useContext } from 'react';
-import { contentRegistry } from '@/data/contentRegistry';
 import { copy as indexCopy } from '@/data/copy/index';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
-import { LANDING_GALLERIES } from '@/data/landingPages';
-import { getExampleImage, getRelatedTypePages } from '@/data/relatedPages';
-import { typeGuides } from '@/data/typeGuides';
+import { usePageContent } from '@/data/PageContentContext';
 import { isDangerousUrl } from '@/utils/security';
 import { Breadcrumbs } from './Breadcrumbs';
 import { SectionHeading } from './ui/SectionHeading';
@@ -56,19 +53,17 @@ function GuideList({ heading, items }: { heading: string; items: readonly string
  * @returns The content sections, or null for unknown ids.
  */
 export function SidebarContent({ toolId }: SidebarContentProps) {
-  const content = contentRegistry[toolId];
+  const page = usePageContent();
   const copy = useContext(PageCopyContext);
+  const content = page?.tool;
 
-  if (!content) return null;
+  if (!page || !content) return null;
 
   const displayFaqs = (copy.faqs && copy.faqs.length > 0) 
     ? copy.faqs 
     : indexCopy.faqs;
 
-  const example = getExampleImage(toolId);
-  const related = getRelatedTypePages(toolId);
-  const gallery = LANDING_GALLERIES[toolId];
-  const guide = typeGuides[toolId];
+  const { example, related, gallery, guide } = page;
   const intro = content.intro ?? guide?.intro;
 
   return (

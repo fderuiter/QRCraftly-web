@@ -18,7 +18,6 @@
 
 import { GuideArticle } from '@/components/GuideArticle';
 import { getGuide } from '@/data/guides';
-import { usePageContext } from 'vike-react/usePageContext';
 
 const guide = getGuide('how-to-print-a-qr-code-that-scans');
 
@@ -27,6 +26,5 @@ const guide = getGuide('how-to-print-a-qr-code-that-scans');
  * @returns The page.
  */
 export default function Page() {
-  const urlPathname = usePageContext()?.urlPathname ?? '/guides/how-to-print-a-qr-code-that-scans';
-  return guide ? <GuideArticle guide={guide} urlPathname={urlPathname} /> : null;
+  return guide ? <GuideArticle guide={guide} /> : null;
 }

@@ -26,6 +26,7 @@ import { contentRegistry } from '@/data/contentRegistry';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { pageCopy } from '../../tests/utils/pageCopy';
 import { axe } from 'vitest-axe';
+import { withPageContent } from '../../tests/utils/pageContent';
 
 vi.mock('jsqr', () => ({
   default: vi.fn(),
@@ -102,7 +103,7 @@ describe('QRTool Component', () => {
   });
 
   it('renders without crashing', () => {
-    render(<ToastProvider><QRTool /></ToastProvider>);
+    render(withPageContent('/', <ToastProvider><QRTool /></ToastProvider>));
     expect(screen.getByRole('heading', { level: 1, name: 'Free QR Code Generator' })).toBeInTheDocument();
     expect(screen.getByText('No sign-up, no ads, never expires.')).toBeInTheDocument();
     expect(screen.queryByText('Active')).not.toBeInTheDocument();
@@ -897,7 +898,7 @@ describe('Generator workspace structure (#795, #802)', { timeout: 20000 }, () =>
   });
 
   it('renders how-to/FAQ outside the tool column at article width', () => {
-    render(<ToastProvider><QRTool toolId="wifi-qr-code" /></ToastProvider>);
+    render(withPageContent('/wifi-qr-code', <ToastProvider><QRTool toolId="wifi-qr-code" /></ToastProvider>));
     const settings = screen.getByRole('complementary', { name: 'QR Code Settings' });
     const educational = document.getElementById('content-section');
     expect(educational).not.toBeNull();
@@ -944,7 +945,7 @@ describe('Generator workspace structure (#795, #802)', { timeout: 20000 }, () =>
   });
 
   it('server-renders the instructions and FAQ', () => {
-    const html = renderToString(<PageCopyContext.Provider value={pageCopy('wifi-qr-code')}><ToastProvider><QRTool toolId="wifi-qr-code" /></ToastProvider></PageCopyContext.Provider>);
+    const html = renderToString(withPageContent('/wifi-qr-code', <PageCopyContext.Provider value={pageCopy('wifi-qr-code')}><ToastProvider><QRTool toolId="wifi-qr-code" /></ToastProvider></PageCopyContext.Provider>));
     const content = pageCopy('wifi-qr-code');
     expect(html).toContain('Frequently Asked Questions');
     expect(html).toContain(content.howTo?.name ?? 'How to');

@@ -94,6 +94,21 @@ module.exports = {
       },
     },
 
+    {
+      name: "page-content-stays-on-server",
+      comment:
+        "The content registry, type guides, landing copy and schema builder describe every page. Browser code reads its own page's share through usePageContent() (filled by src/pages/+data.ts), and Head renders the structured data, so these modules never ship to the browser (#1058). Type-only imports are fine.",
+      severity: "error",
+      from: {
+        path: "^src/(components|hooks|context|layouts|pages)/",
+        pathNot: "^src/layouts/Head\\.tsx$|^src/pages/\\+(data|description)\\.ts$|\\.test\\.tsx?$",
+      },
+      to: {
+        path: "^src/(data/(contentRegistry|typeGuides|landingPageContent|relatedPages|pageContent)|utils/schemaGenerator)\\.ts$",
+        dependencyTypesNot: ["type-only"],
+      },
+    },
+
     // Layering controls WHICH packages may depend on which; add repo-specific
     // rules here when that concern has a concrete seam.
   ],

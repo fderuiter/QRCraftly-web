@@ -25,13 +25,12 @@ import { clearRetainedAppearance } from '@/context/QRContext';
 import { getMetadataForPath } from '@/data/contentRegistry';
 import { LANDING_PRESETS } from '@/data/landingPages';
 import { QRErrorCorrectionLevel } from '@/types';
+import { withPageContent } from '../../tests/utils/pageContent';
 
 function renderLanding(id: string) {
   window.history.replaceState(null, '', `/${id}`);
   return render(
-    <LayoutDefault>
-      <LandingPage id={id} />
-    </LayoutDefault>
+    <LayoutDefault>{withPageContent(`/${id}`, <LandingPage id={id} />)}</LayoutDefault>
   );
 }
 

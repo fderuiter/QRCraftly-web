@@ -17,33 +17,25 @@
 */
 
 import { QRTypePage } from '@/components/QRTypePage';
-import { contentRegistry } from '@/data/contentRegistry';
 import { LANDING_PRESETS } from '@/data/landingPages';
-import { landingPageContent } from '@/data/landingPageContent';
-import { generateSchema } from '@/utils/schemaGenerator';
-import { resolveDomainForPath } from '@/utils/metadataEngine';
-import { usePageContext } from 'vike-react/usePageContext';
+import { usePageContent } from '@/data/PageContentContext';
 
 /**
  * A landing page that opens the generator with presets for one job (#1035, #1037), such as the
- * logo panel open with high error correction. Its copy, share image and schema come from the
- * page's registry entry.
+ * logo panel open with high error correction. Its copy comes from the page's content (`+data`),
+ * and Head renders its share image and schema.
  * @param props - The component props.
  * @param props.id - Registry id and route of the page (a key of `LANDING_PRESETS`).
  * @returns The generator page.
  */
 export function LandingPage({ id }: { id: string }) {
-  const pageContext = usePageContext();
-  const urlPathname = pageContext?.urlPathname ?? `/${id}`;
   const preset = LANDING_PRESETS[id];
-  const copy = landingPageContent[id];
-  const schemaData = generateSchema({ ...contentRegistry[id], howTo: copy.howTo, faqs: copy.faqs }, resolveDomainForPath(urlPathname), urlPathname);
+  const copy = usePageContent()?.landing;
 
   return (
     <QRTypePage
       type={preset.type}
       title={preset.title}
-      schemaData={schemaData}
       toolId={id}
       copy={copy}
       presetConfig={preset.presetConfig}

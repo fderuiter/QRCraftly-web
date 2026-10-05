@@ -26,6 +26,8 @@ import Page from './+Page';
 import config from './+config';
 import { getMetadataForPath } from '@/data/contentRegistry';
 import { useQrScanner, type UseQrScannerOptions } from '@/packages/optical-scanner/client';
+import { getPageSchema } from '@/data/pageContent';
+import { withPageContent } from '../../../tests/utils/pageContent';
 
 vi.mock('vike/client/router', () => ({ navigate: vi.fn(() => Promise.resolve()) }));
 vi.mock('@/packages/optical-scanner/client', async (importOriginal) => {
@@ -39,9 +41,7 @@ describe('/qr-code-scanner page (#1034)', () => {
     Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia }, configurable: true, writable: true });
     window.history.replaceState(null, '', '/qr-code-scanner');
     const { container } = render(
-      <LayoutDefault>
-        <Page />
-      </LayoutDefault>
+      <LayoutDefault>{withPageContent('/qr-code-scanner', <Page />)}</LayoutDefault>
     );
     expect(screen.getByRole('heading', { level: 1, name: 'QR Code Scanner' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start camera' })).toBeInTheDocument();
@@ -50,18 +50,18 @@ describe('/qr-code-scanner page (#1034)', () => {
   });
 
   it('renders the how-to, privacy, FAQ and related links with structured data', () => {
-    render(<Page />);
+    render(withPageContent('/qr-code-scanner', <Page />));
     expect(screen.getByRole('heading', { name: 'How to Scan a QR Code Online' })).toBeInTheDocument();
     expect(screen.getByText('Nothing uploaded')).toBeInTheDocument();
     expect(screen.getByText('Frequently Asked Questions')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Make your own QR code' })).toHaveAttribute('href', '/');
-    const jsonLd = Array.from(document.querySelectorAll('script[type="application/ld+json"]')).map((s) => s.textContent).join('');
+    const jsonLd = JSON.stringify(getPageSchema('/qr-code-scanner'));
     expect(jsonLd).toContain('WebApplication');
     expect(jsonLd).toContain('FAQPage');
   });
 
   it('opens a scanned code in the generator for its type without putting it in the URL', async () => {
-    render(<Page />);
+    render(withPageContent('/qr-code-scanner', <Page />));
     const options: UseQrScannerOptions | undefined = vi.mocked(useQrScanner).mock.lastCall?.[0];
     await act(async () => {
       options?.onScanSuccess?.('WIFI:T:WPA;S:Home;P:secret;;', { text: 'x', bytes: null, corners: null, source: 'jsqr', durationMs: 0 });

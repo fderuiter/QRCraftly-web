@@ -21,7 +21,6 @@ import QRTool from '@/components/QRTool';
 import { DEFAULT_CONFIG } from '@/constants';
 import { QRType, type QRConfig } from '@/types';
 import { PresetOpenSections } from '@/components/StyleControls';
-import { JsonLdScript } from '@/components/ui/JsonLdScript';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import type { ToolCopy } from '@/data/copy/types';
 
@@ -30,8 +29,6 @@ interface QRTypePageProps {
   type: QRType;
   /** The title to display in the QRTool header. */
   title: string;
-  /** The structured data (JSON-LD) object to inject. */
-  schemaData: unknown;
   /** The tool ID for loading content. */
   toolId: string;
   /** The page's how-to steps and FAQs, which its content section shows. */
@@ -50,23 +47,20 @@ const NO_SECTIONS: readonly string[] = [];
 
 /**
  * A reusable page component for specific QR code type landing pages.
- * It sets up the QRTool with the correct type and injects the provided schema.org data.
+ * It sets up the QRTool with the correct type. Head renders the page's structured data.
  */
-export const QRTypePage: React.FC<QRTypePageProps> = ({ type, title, schemaData, toolId, copy, presetConfig, openSections = NO_SECTIONS }) => {
+export const QRTypePage: React.FC<QRTypePageProps> = ({ type, title, toolId, copy, presetConfig, openSections = NO_SECTIONS }) => {
   const config = {
     ...DEFAULT_CONFIG,
     type,
   };
 
   return (
-    <>
-      <JsonLdScript data={schemaData} />
-      <PageCopyContext.Provider value={copy ?? NO_COPY}>
-        <PresetOpenSections.Provider value={openSections}>
-          <QRTool initialConfig={config} presetConfig={presetConfig} title={title} toolId={toolId} />
-        </PresetOpenSections.Provider>
-      </PageCopyContext.Provider>
-    </>
+    <PageCopyContext.Provider value={copy ?? NO_COPY}>
+      <PresetOpenSections.Provider value={openSections}>
+        <QRTool initialConfig={config} presetConfig={presetConfig} title={title} toolId={toolId} />
+      </PresetOpenSections.Provider>
+    </PageCopyContext.Provider>
   );
 };
 

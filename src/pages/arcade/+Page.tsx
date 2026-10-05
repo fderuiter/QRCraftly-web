@@ -17,15 +17,10 @@
 */
 
 import React from 'react';
-import { usePageContext } from 'vike-react/usePageContext';
 import { ArcadeApp } from '@/components/arcade/ArcadeApp';
 import { SidebarContent } from '@/components/SidebarContent';
-import { JsonLdScript } from '@/components/ui/JsonLdScript';
-import { contentRegistry } from '@/data/contentRegistry';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { copy } from '@/data/copy/arcade';
-import { resolveDomainForPath } from '@/utils/metadataEngine';
-import { generateSchema } from '@/utils/schemaGenerator';
 
 /**
  * QR Arcade & Durability Lab page (/arcade): the Arcade Blaster and Damage Simulator modes
@@ -33,13 +28,9 @@ import { generateSchema } from '@/utils/schemaGenerator';
  * @returns The page.
  */
 export default function Page() {
-  const pageContext = usePageContext();
-  const urlPathname = pageContext?.urlPathname ?? '/arcade';
-  const schemaData = generateSchema({ ...contentRegistry['arcade'], ...copy }, resolveDomainForPath(urlPathname), urlPathname);
 
   return (
     <>
-      <JsonLdScript data={schemaData} />
       <ArcadeApp />
       <div className="mx-auto max-w-3xl px-4 pb-12">
         <PageCopyContext.Provider value={copy}>
