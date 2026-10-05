@@ -30,6 +30,7 @@
  *   --by-category     Also print one row per corpus category.
  *   --budget <ms>     Exit non-zero when any camera frame takes longer (default: report only).
  *   --no-zxing        Skip the zxing-wasm rows (they always use the working tree's reader).
+ *   --no-qr-decode    Skip the rows for our Rust decoder (#1178, always the working tree's module).
  *
  * Timing depends on the machine, so this is not a CI gate: run it on demand or from the
  * manual / nightly "Scanner benchmark" workflow. `decodeSync.ts` must keep importing only
@@ -42,6 +43,7 @@ import jsQR from 'jsqr';
 import { execBinary } from './utils/execHelper.js';
 import { generateCorpus, type CorpusFrame } from '../tests/utils/scannerCorpus.ts';
 import * as reader from '../src/packages/optical-scanner/reader.ts';
+import { qrReader } from '../tests/fixtures/qrReader.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DECODER_PATH = 'src/packages/optical-scanner/lib/decodeSync.ts';
@@ -75,10 +77,11 @@ interface Options {
   byCategory: boolean;
   budget?: number;
   zxing: boolean;
+  qrDecode: boolean;
 }
 
 function parseArgs(argv: string[]): Options {
-  const options: Options = { refs: [], byCategory: false, zxing: true };
+  const options: Options = { refs: [], byCategory: false, zxing: true, qrDecode: true };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--ref') options.refs.push(argv[++i]);
@@ -86,6 +89,7 @@ function parseArgs(argv: string[]): Options {
     else if (arg === '--by-category') options.byCategory = true;
     else if (arg === '--budget') options.budget = Number(argv[++i]);
     else if (arg === '--no-zxing') options.zxing = false;
+    else if (arg === '--no-qr-decode') options.qrDecode = false;
     else if (arg === '--') continue;
     else throw new Error(`Unknown option: ${arg}`);
   }
@@ -183,6 +187,18 @@ async function zxingStrategies(): Promise<Strategy[]> {
   ];
 }
 
+/** Our Rust decoder (#1178), shadowing jsQR: its default pass, and every pass in one call. */
+function qrDecodeStrategies(): Strategy[] {
+  const row = (name: string, options: Parameters<typeof qrReader.read>[3]): Strategy => ({
+    name,
+    run: (frame) => {
+      const { value, ms } = timed(() => qrReader.read(frame.data, frame.width, frame.height, options));
+      return { times: [ms], decoded: value[0]?.text ?? null };
+    },
+  });
+  return [row('qr-decode (default pass)', {}), row('qr-decode (inverted, global and half passes)', { inverted: true, global: true, half: true })];
+}
+
 function strategiesFor(decoder: DecoderModule): Strategy[] {
   const strategies: Strategy[] = [
     {
@@ -272,6 +288,7 @@ async function main(): Promise<void> {
     const categoryRows: Row[] = [];
     const strategies = strategiesFor(decoder);
     if (options.zxing && ref === options.refs[0]) strategies.push(...(await zxingStrategies()));
+    if (options.qrDecode && ref === options.refs[0]) strategies.push(...qrDecodeStrategies());
     for (const strategy of strategies) {
       const row: Row = { label: strategy.name, decoded: 0, total: withCode, times: [], framesToDecode: [] };
       const byCategory = new Map<string, Row>();

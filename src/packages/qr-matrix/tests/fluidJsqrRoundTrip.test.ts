@@ -28,6 +28,7 @@
 import { describe, it, expect } from 'vitest';
 import jsQR from 'jsqr';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
+import { qrReader } from '../../../../tests/fixtures/qrReader';
 import {
   QRConfig,
   QRStyle,
@@ -363,6 +364,8 @@ describe('Fluid Ink jsQR round-trip (real pixels)', { timeout: 60_000 }, () => {
           const code = jsQR(raster.data, size, size, { inversionAttempts: 'dontInvert' });
           expect(code, `jsQR could not decode ${name} at EC ${ec}, ${px}px/module`).not.toBeNull();
           expect(code?.data).toBe(value);
+          // Shadow run of our decoder (#1178), which replaces jsQR.
+          expect(qrReader.read(raster.data, size, size)[0]?.text, `qr-decode could not decode ${name} at EC ${ec}, ${px}px/module`).toBe(value);
         }
       });
     }

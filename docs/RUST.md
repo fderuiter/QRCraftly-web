@@ -29,7 +29,7 @@ crates/
   Cargo.lock            committed; lists workspace crates only
   rust-toolchain.toml   the pinned Rust version
   core/                 qrcraftly-core: GF(256), Reed-Solomon, CRC-32, the QR tables, the ABI and the module allocator
-  qr-decode/            the QR decoder (#1178); replaces jsQR, then zxing-wasm
+  qr-decode/            the QR decoder (#1178), loaded by src/packages/qr-decode
   qr-encode/            the QR encoder (#1177), loaded by src/packages/qr-matrix
   selftest/             a tiny module that proves the build and the loader work
 src/wasm/               committed builds and their SHA-256 sidecars

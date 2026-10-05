@@ -42,6 +42,7 @@ import { getLuminanceFromRgb } from '@/utils/colorUtils';
 import { DEFAULT_CONFIG } from '@/constants';
 import { SvgContext } from '@/packages/qr-export';
 import jsQR from 'jsqr';
+import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import type { QRConfig, QRModules, QRErrorCorrectionLevel } from '@/types';
 
@@ -374,6 +375,8 @@ const PAYLOADS = [
 ];
 
 const decode = (img: MosaicSource) => jsQR(new Uint8ClampedArray(img.data), img.width, img.height)?.data ?? null;
+/** Our decoder (#1178), run beside jsQR until it replaces it. */
+const decodeOurs = (img: MosaicSource) => qrReader.read(new Uint8ClampedArray(img.data), img.width, img.height)[0]?.text ?? null;
 
 describe('Mosaic QR decodes with jsQR', () => {
   const modes: MosaicMode[] = ['tiles', 'halftone'];
@@ -390,7 +393,10 @@ describe('Mosaic QR decodes with jsQR', () => {
               const plan = planMosaic(modules, makeImage(kind), { mode, contrast });
               const raster = rasterizeMosaic(plan, 6);
               if (decode(raster) !== payload) failures.push(`clean ${kind} ${ecl} v${(modules.size - 17) / 4}`);
-              if (decode(boxBlur(raster, 1)) !== payload) failures.push(`blurred ${kind} ${ecl} v${(modules.size - 17) / 4}`);
+              const blurred = boxBlur(raster, 1);
+              if (decode(blurred) !== payload) failures.push(`blurred ${kind} ${ecl} v${(modules.size - 17) / 4}`);
+              if (decodeOurs(raster) !== payload) failures.push(`qr-decode clean ${kind} ${ecl} v${(modules.size - 17) / 4}`);
+              if (decodeOurs(blurred) !== payload) failures.push(`qr-decode blurred ${kind} ${ecl} v${(modules.size - 17) / 4}`);
             }
           }
         }
@@ -403,7 +409,9 @@ describe('Mosaic QR decodes with jsQR', () => {
     const payload = PAYLOADS[0];
     for (const kind of FIXTURE_IMAGES) {
       const plan = planMosaic(encode(payload), makeImage(kind), DEFAULT_MOSAIC_OPTIONS);
-      expect(decode(rasterizeMosaic(plan, 3))).toBe(payload);
+      const raster = rasterizeMosaic(plan, 3);
+      expect(decode(raster)).toBe(payload);
+      expect(decodeOurs(raster)).toBe(payload);
     }
   });
 });
