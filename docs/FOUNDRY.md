@@ -28,12 +28,12 @@ Each replacement moves through these stages in order. The scorecard below record
 
 ### Rust modules
 
-| Module                                                                        | Replaces                                   | Stage                                                                                                         | Gzip budget  |
-| ----------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------ |
-| `selftest` ([#1182](https://github.com/fderuiter/QRCraftly-web/issues/1182))  | nothing; proves the build and the loader   | Shipped as a test fixture only                                                                                | 4 KB         |
-| `qr-encode` ([#1177](https://github.com/fderuiter/QRCraftly-web/issues/1177)) | `qrcode` and its 28 packages               | Removed: `qrcode` is gone                                                                                     | 20 KB        |
-| Prism FEC ([#1176](https://github.com/fderuiter/QRCraftly-web/issues/1176))   | the LT fountain code (in-house TypeScript) | Contract, waits on the patent check                                                                           | set in #1176 |
-| `qr-decode` ([#1178](https://github.com/fderuiter/QRCraftly-web/issues/1178)) | `jsqr`, then `zxing-wasm`                  | Removed: `jsqr` and `zxing-wasm` are gone ([ADR 0036](./adr/0036-in-house-qr-decoder-replaces-zxing-wasm.md)) | 32 KB        |
+| Module                                                                        | Replaces                                   | Stage                                                                                                                      | Gzip budget |
+| ----------------------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `selftest` ([#1182](https://github.com/fderuiter/QRCraftly-web/issues/1182))  | nothing; proves the build and the loader   | Shipped as a test fixture only                                                                                             | 4 KB        |
+| `qr-encode` ([#1177](https://github.com/fderuiter/QRCraftly-web/issues/1177)) | `qrcode` and its 28 packages               | Removed: `qrcode` is gone                                                                                                  | 20 KB       |
+| `prism-fec` ([#1176](https://github.com/fderuiter/QRCraftly-web/issues/1176)) | the LT fountain code (in-house TypeScript) | Module and wrapper built ([ADR 0037](./adr/0037-prism-outer-code-lt-over-ldpc-precode.md)); the transfer switches in #1141 | 10 KB       |
+| `qr-decode` ([#1178](https://github.com/fderuiter/QRCraftly-web/issues/1178)) | `jsqr`, then `zxing-wasm`                  | Removed: `jsqr` and `zxing-wasm` are gone ([ADR 0036](./adr/0036-in-house-qr-decoder-replaces-zxing-wasm.md))              | 32 KB       |
 
 ### Other replacements
 

@@ -3,7 +3,7 @@
 # See docs/RUST.md and ADR 0033.
 [workspace]
 resolver = "2"
-members = ["core", "qr-decode", "qr-encode", "selftest"]
+members = ["core", "prism-fec", "qr-decode", "qr-encode", "selftest"]
 
 [workspace.package]
 version = "0.0.0"

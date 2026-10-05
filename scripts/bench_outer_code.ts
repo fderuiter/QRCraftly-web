@@ -19,12 +19,14 @@
 /**
  * Outer code spike (#1141): `pnpm run bench:outer-code [options]`.
  *
- * Compares the candidate outer codes for Prism (RaptorQ, Wirehair) with today's LT code through
- * the same seeded erasure channels as `pnpm run bench:transfer`. Reports the size of each
+ * Compares the outer codes for Prism with today's LT code through the same seeded erasure channels
+ * as `pnpm run bench:transfer`: our own code (`fec`, crates/prism-fec, #1176, in blocks of up to
+ * 8192 symbols; `fec-2048` is the same code in blocks of at most 2048) and, when installed, the
+ * RaptorQ and Wirehair packages the spike compared. Reports the size of each
  * candidate's WebAssembly and glue, encode and decode time per K, and the reception overhead in
  * symbols beyond K (median, p99, worst). Everything except the times is seeded and repeatable.
  *
- * The candidates are NOT dependencies of this repository. Install them in a scratch directory:
+ * RaptorQ and Wirehair are NOT dependencies of this repository. Install them in a scratch directory:
  *
  *   mkdir /some/scratch && cd /some/scratch && echo '{"type":"module"}' > package.json
  *   pnpm add raptorq wirehair-wasm
@@ -32,9 +34,11 @@
  *
  * Options:
  *   --modules <dir>      Directory whose node_modules holds the candidates (or OUTER_CODE_MODULES).
- *   --candidates <list>  Comma list of lt, raptorq, wirehair (default: lt plus whichever are installed).
- *   --ks <list>          Comma list of K values (default 10,100,1000,10000).
- *   --trials <n>         Trials per cell for every K (default: 1000, 1000, 200, 5 by K).
+ *   --candidates <list>  Comma list of lt, fec, fec-2048, raptorq, wirehair (default: lt, fec, fec-2048
+ *                        plus whichever are installed).
+ *   --ks <list>          Comma list of K values (default 10,100,1000,8192).
+ *   --trials <n>         Trials per cell for every K (default: 1000, 1000, 200, then 5 for LT,
+ *                        30 for fec and 100 for fec-2048).
  *   --channels <list>    Comma list of channel names (default clean,join,loss-30,burst).
  *   --determinism        Print the SHA-256 of a seeded symbol stream per candidate (twice).
  *   --chromium <path>    Also run the determinism hash in that Chromium build and compare it with Node.
@@ -45,7 +49,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
-import { FountainDecoder, FountainEncoder } from '../src/packages/optical-transfer/index.ts';
+import { FecDecoder, FecEncoder, FountainDecoder, FountainEncoder, loadFecModule } from '../src/packages/optical-transfer/index.ts';
 import { createRandom } from '../tests/utils/scannerCorpus.ts';
 import { ERASURE_CHANNELS, type ErasureChannel } from '../tests/utils/transferBench.ts';
 
@@ -94,7 +98,7 @@ function parseArgs(argv: string[]): Args {
   return {
     modules: read('--modules') ?? process.env.OUTER_CODE_MODULES,
     candidates: list('--candidates'),
-    ks: (list('--ks') ?? ['10', '100', '1000', '10000']).map(Number),
+    ks: (list('--ks') ?? ['10', '100', '1000', '8192']).map(Number),
     trials: trials === undefined ? undefined : Number(trials),
     channels: list('--channels') ?? ['clean', 'join', 'loss-30', 'burst'],
     determinism: argv.includes('--determinism') || read('--chromium') !== undefined,
@@ -102,9 +106,11 @@ function parseArgs(argv: string[]): Args {
   };
 }
 
-function defaultTrials(k: number): number {
+function defaultTrials(candidate: string, k: number): number {
   if (k <= 100) return 1000;
   if (k <= 1000) return 200;
+  if (candidate === 'fec') return 30;
+  if (candidate === 'fec-2048') return 100;
   return 5;
 }
 
@@ -234,7 +240,48 @@ const loadLt: Loader = async () => ({
   },
 });
 
-const LOADERS: Record<string, Loader> = { lt: loadLt, raptorq: loadRaptorq, wirehair: loadWirehair };
+/**
+ * Our outer code (#1176, ADR 0037): the prism-fec module through its TypeScript wrapper.
+ * @param name - The candidate's name.
+ * @param maxBlockSymbols - Most source symbols per block.
+ * @returns The loader.
+ */
+function fecLoader(name: string, maxBlockSymbols: number): Loader {
+  return async () => {
+    const module = await loadFecModule();
+    return {
+      name,
+      files: [new URL('../src/wasm/prism-fec.wasm', import.meta.url).pathname],
+      async open(message, symbolSize) {
+        const encoder = new FecEncoder(module, message, { symbolSize, maxBlockSymbols });
+        const decoder = new FecDecoder(module, encoder.layout);
+        return {
+          wire: (index) => encoder.symbol(index).data,
+          send: (index) => {
+            const symbol = encoder.symbol(index);
+            return () => {
+              decoder.add(symbol);
+              return decoder.isComplete;
+            };
+          },
+          recover: () => decoder.finalize(),
+          dispose: () => undefined,
+        };
+      },
+    };
+  };
+}
+
+const LOADERS: Record<string, Loader> = {
+  lt: loadLt,
+  fec: fecLoader('fec', 8192),
+  'fec-2048': fecLoader('fec-2048', 2048),
+  raptorq: loadRaptorq,
+  wirehair: loadWirehair,
+};
+
+/** Candidates that live in the scratch directory rather than this repository. */
+const INSTALLED = new Set(['raptorq', 'wirehair']);
 
 function makeMessage(k: number, symbolSize: number, random: () => number): Uint8Array {
   const message = new Uint8Array(k * symbolSize - Math.floor(random() * Math.min(symbolSize, 16)));
@@ -339,7 +386,7 @@ async function overheadRows(candidates: Candidate[], args: Args): Promise<Array<
   for (const candidate of candidates) {
     for (const k of args.ks) {
       for (const channel of channels) {
-        const trials = args.trials ?? defaultTrials(k);
+        const trials = args.trials ?? defaultTrials(candidate.name, k);
         const extra: number[] = [];
         const times: number[] = [];
         let failed = 0;
@@ -462,12 +509,12 @@ async function chromiumHashes(executablePath: string, modules: string, kinds: st
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  const wanted = args.candidates ?? ['lt', 'raptorq', 'wirehair'];
+  const wanted = args.candidates ?? ['lt', 'fec', 'fec-2048', 'raptorq', 'wirehair'];
   const candidates: Candidate[] = [];
   for (const name of wanted) {
     const loader = LOADERS[name];
-    if (!loader) throw new Error(`Unknown candidate "${name}". Use lt, raptorq or wirehair.`);
-    if (name !== 'lt' && !args.modules) {
+    if (!loader) throw new Error(`Unknown candidate "${name}". Use lt, fec, fec-2048, raptorq or wirehair.`);
+    if (INSTALLED.has(name) && !args.modules) {
       if (args.candidates) throw new Error('Pass --modules <dir> (or OUTER_CODE_MODULES) for raptorq and wirehair; see the header of this script.');
       continue;
     }
@@ -497,9 +544,11 @@ async function main(): Promise<void> {
       console.log(`${candidate.name}: node run 1 ${first}\n${candidate.name}: node run 2 ${second} (${first === second ? 'identical' : 'DIFFERENT'})`);
     }
     if (args.chromium && args.modules) {
-      const browser = await chromiumHashes(args.chromium, args.modules, coded.map((c) => c.name));
+      // Our own module's cross-engine check is e2e/foundry-wasm.spec.ts.
+      const installed = coded.filter((c) => INSTALLED.has(c.name));
+      const browser = await chromiumHashes(args.chromium, args.modules, installed.map((c) => c.name));
       console.log(`browser: ${browser.userAgent}`);
-      for (const candidate of coded) {
+      for (const candidate of installed) {
         console.log(`${candidate.name}: chromium ${browser[candidate.name]} (${browser[candidate.name] === node[candidate.name] ? 'same as Node' : 'DIFFERENT from Node'})`);
       }
     }

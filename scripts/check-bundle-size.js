@@ -30,6 +30,7 @@ export const WASM_MODULE_BUDGETS_KB = {
   selftest: 4,
   'qr-encode': 20,
   'qr-decode': 32,
+  'prism-fec': 10,
 };
 
 /**
