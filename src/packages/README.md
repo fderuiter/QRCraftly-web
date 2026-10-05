@@ -75,7 +75,7 @@ Boundary checks run automatically during `pnpm run lint` and CI.
   - `index.ts`: Public API, polymorphic `scan(source, options)` for files/images, the headless Camera Scanner Engine (`createCameraScannerEngine`), scanner contracts, and downscaling math.
   - `client.ts`: Thin React adapter hook (`useQrScanner`) over the Camera Session (`state`, `start`, `stop`, `videoRef`: the one owner of the camera stream) and the Camera Scanner Engine, plus file drag-and-drop scanning.
   - `scheduler.ts`: Secondary entry point exposing `AdaptiveFrameScheduler`, `DoubleBufferPool`, and `terminateScannerWorker` (shared file-scan worker teardown). Worker spawning is private to the package.
-  - `worker.ts`: Dedicated background Web Worker that decodes camera frames (one bounded pass of the `qr-decode` reader each, or zxing-wasm once loaded) and image files (`createImageBitmap` with EXIF orientation, then decoded at 2048 px and 1024 px).
+  - `worker.ts`: Dedicated background Web Worker that decodes camera frames (one bounded pass of the `qr-decode` reader each, ADR 0036) and image files (`createImageBitmap` with EXIF orientation, then decoded at 2048 px and 1024 px).
 
 ### `qr-payload` (`@/packages/qr-payload`)
 

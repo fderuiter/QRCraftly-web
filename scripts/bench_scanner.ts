@@ -30,9 +30,8 @@
  *   --filter <text>   Only fixtures whose id contains the text (e.g. `noise`, `no-code`).
  *   --by-category     Also print one row per corpus category.
  *   --budget <ms>     Exit non-zero when any camera frame takes longer (default: report only).
- *   --no-zxing        Skip the zxing-wasm rows (they always use the working tree's reader).
- *   --corpus hard     Use the hard corpus from #1104 (`tests/utils/hardCorpus.ts`) instead, and
- *                     print #1178's parity gate: our multi-pass read against zxing-wasm per subset.
+ *   --corpus hard     Use the hard corpus from #1104 (`tests/utils/hardCorpus.ts`) instead. The
+ *                     last zxing-wasm comparison on it is recorded in ADR 0036.
  *   --count <n>       Frames per subset of the hard corpus (default 60).
  *
  * Timing depends on the machine, so this is not a CI gate: run it on demand or from the
@@ -45,8 +44,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execBinary } from './utils/execHelper.js';
 import { generateCorpus, type CorpusFrame } from '../tests/utils/scannerCorpus.ts';
-import { GATE_SUBSETS, generateHardCorpus } from '../tests/utils/hardCorpus.ts';
-import * as reader from '../src/packages/optical-scanner/reader.ts';
+import { generateHardCorpus } from '../tests/utils/hardCorpus.ts';
 import { qrReader } from '../tests/fixtures/qrReader.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -73,7 +71,7 @@ interface FrameRun {
 
 interface Strategy {
   name: string;
-  run(frame: CorpusFrame): FrameRun | Promise<FrameRun>;
+  run(frame: CorpusFrame): FrameRun;
 }
 
 interface Options {
@@ -81,20 +79,18 @@ interface Options {
   filter?: string;
   byCategory: boolean;
   budget?: number;
-  zxing: boolean;
   hard: boolean;
   count: number;
 }
 
 function parseArgs(argv: string[]): Options {
-  const options: Options = { refs: [], byCategory: false, zxing: true, hard: false, count: 60 };
+  const options: Options = { refs: [], byCategory: false, hard: false, count: 60 };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--ref') options.refs.push(argv[++i]);
     else if (arg === '--filter') options.filter = argv[++i];
     else if (arg === '--by-category') options.byCategory = true;
     else if (arg === '--budget') options.budget = Number(argv[++i]);
-    else if (arg === '--no-zxing') options.zxing = false;
     else if (arg === '--corpus') {
       const corpus = argv[++i];
       if (corpus !== 'hard' && corpus !== 'generated') throw new Error(`Unknown corpus: ${corpus}`);
@@ -123,78 +119,6 @@ async function loadDecoder(ref: string): Promise<DecoderModule> {
   const file = path.join(dir, 'decodeSync.ts');
   fs.writeFileSync(file, source);
   return import(`${pathToFileURL(file).href}?ref=${encodeURIComponent(ref)}`);
-}
-
-async function timedAsync<T>(fn: () => Promise<T>): Promise<{ value: T; ms: number }> {
-  const start = performance.now();
-  const value = await fn();
-  return { value, ms: performance.now() - start };
-}
-
-/** Copies a region of an RGBA frame, downscaled (nearest pixel) so its longest side is at most `max`. */
-function cutRegion(
-  frame: CorpusFrame,
-  region: { x: number; y: number; width: number; height: number },
-  max: number
-): { data: Uint8ClampedArray; width: number; height: number } {
-  const scale = Math.min(1, max / Math.max(region.width, region.height));
-  const width = Math.round(region.width * scale);
-  const height = Math.round(region.height * scale);
-  const data = new Uint8ClampedArray(width * height * 4);
-  for (let y = 0; y < height; y++) {
-    const sy = region.y + Math.floor(y / scale);
-    for (let x = 0; x < width; x++) {
-      const from = (sy * frame.width + region.x + Math.floor(x / scale)) * 4;
-      data.set(frame.data.subarray(from, from + 4), (y * width + x) * 4);
-    }
-  }
-  return { data, width, height };
-}
-
-/**
- * The zxing-wasm reader rows (ADR 0023), using the working tree's reader seam. The camera row
- * mirrors the engine: odd frames cut the centre square at native resolution (up to 1280 px), even
- * frames take the whole frame downscaled to 1280 px.
- */
-async function zxingStrategies(): Promise<Strategy[]> {
-  const wasm = fs.readFileSync(path.join(REPO_ROOT, 'node_modules/zxing-wasm/dist/reader/zxing_reader.wasm'));
-  (globalThis as { ImageData?: unknown }).ImageData ??= class {
-    constructor(
-      public data: Uint8ClampedArray,
-      public width: number,
-      public height: number
-    ) {}
-  };
-  if (!(await reader.installZxing(await WebAssembly.compile(wasm)))) throw new Error('zxing-wasm failed to instantiate');
-  const decode = (image: { data: Uint8ClampedArray; width: number; height: number }) =>
-    reader.decodeWithZxing(image.data, image.width, image.height) as Promise<{ text: string } | null>;
-  return [
-    {
-      name: 'zxing-wasm (whole frame)',
-      run: async (frame) => {
-        const { value, ms } = await timedAsync(() => decode(frame));
-        return { times: [ms], decoded: value?.text ?? null };
-      },
-    },
-    {
-      name: 'zxing-wasm camera rotation (region, whole frame)',
-      run: async (frame) => {
-        const times: number[] = [];
-        const side = Math.min(frame.width, frame.height);
-        const regions = [
-          { x: Math.floor((frame.width - side) / 2), y: Math.floor((frame.height - side) / 2), width: side, height: side },
-          { x: 0, y: 0, width: frame.width, height: frame.height },
-        ];
-        for (const region of regions) {
-          const image = cutRegion(frame, region, 1280);
-          const { value, ms } = await timedAsync(() => decode(image));
-          times.push(ms);
-          if (value) return { times, decoded: value.text };
-        }
-        return { times, decoded: null };
-      },
-    },
-  ];
 }
 
 function strategiesFor(decoder: DecoderModule): Strategy[] {
@@ -269,37 +193,6 @@ function formatTable(rows: Row[]): string {
   return [line(header), `|${widths.map((w) => '-'.repeat(w + 2)).join('|')}|`, ...body.map(line)].join('\n');
 }
 
-const OURS = 'multi-pass (decodeRgbaCode)';
-const ZXING = 'zxing-wasm (whole frame)';
-
-/**
- * #1178's parity gate: on every hard subset, our multi-pass read must reach at least 95% of
- * zxing-wasm's read rate with a p95 time per frame no worse than twice zxing's.
- */
-function printParityGate(categoriesByStrategy: Map<string, Map<string, Row>>): void {
-  const ours = categoriesByStrategy.get(OURS);
-  const zxing = categoriesByStrategy.get(ZXING);
-  if (!ours || !zxing) return;
-  const p95 = (row: Row) => percentile([...row.times].sort((a, b) => a - b), 95);
-  console.log('\n### Parity gate (#1178): ours (multi-pass) against zxing-wasm\n');
-  console.log('| subset | ours | zxing | share of zxing | ours p95 ms | zxing p95 ms | p95 ratio | gate |');
-  console.log('|---|---|---|---|---|---|---|---|');
-  let failed = 0;
-  for (const subset of GATE_SUBSETS) {
-    const a = ours.get(subset);
-    const b = zxing.get(subset);
-    if (!a || !b || b.total === 0) continue;
-    const share = b.decoded ? a.decoded / b.decoded : 1;
-    const ratio = p95(b) ? p95(a) / p95(b) : 0;
-    const met = share >= 0.95 && ratio <= 2;
-    if (!met) failed += 1;
-    console.log(
-      `| ${subset} | ${a.decoded}/${a.total} | ${b.decoded}/${b.total} | ${(share * 100).toFixed(0)}% | ${p95(a).toFixed(1)} | ${p95(b).toFixed(1)} | ${ratio.toFixed(2)} | ${met ? 'met' : 'not met'} |`
-    );
-  }
-  console.log(`\nGate: ${failed === 0 ? 'met on every subset' : `not met on ${failed} subset(s)`} (needs at least 95% of zxing's reads and p95 at most 2x).`);
-}
-
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   const corpus = options.hard ? [...generateHardCorpus(options.count, options.filter)] : [...generateCorpus(options.filter)];
@@ -307,20 +200,16 @@ async function main(): Promise<void> {
   console.log(`Scanner benchmark: ${corpus.length} fixtures (${withCode} with a code, ${corpus.length - withCode} without)\n`);
 
   let overBudget = 0;
-  /** Per strategy (first ref only), its rows by category: what the parity gate compares. */
-  const categoriesByStrategy = new Map<string, Map<string, Row>>();
   for (const ref of options.refs) {
     const decoder = await loadDecoder(ref);
     const rows: Row[] = [];
     const categoryRows: Row[] = [];
-    const strategies = strategiesFor(decoder);
-    if (options.zxing && ref === options.refs[0]) strategies.push(...(await zxingStrategies()));
-    for (const strategy of strategies) {
+    for (const strategy of strategiesFor(decoder)) {
       const row: Row = { label: strategy.name, decoded: 0, total: withCode, times: [], framesToDecode: [] };
       const byCategory = new Map<string, Row>();
       const slowest: Array<{ id: string; ms: number }> = [];
       for (const frame of corpus) {
-        const result = await strategy.run(frame);
+        const result = strategy.run(frame);
         row.times.push(...result.times);
         const max = Math.max(...result.times);
         slowest.push({ id: frame.id, ms: max });
@@ -342,7 +231,6 @@ async function main(): Promise<void> {
         }
       }
       rows.push(row);
-      if (ref === options.refs[0]) categoriesByStrategy.set(strategy.name, byCategory);
       if (options.byCategory) {
         categoryRows.push({ ...row, label: strategy.name }, ...byCategory.values());
       }
@@ -359,7 +247,6 @@ async function main(): Promise<void> {
     console.log('');
   }
   console.log('"frames" is the mean number of camera frames (decode calls) a decoded fixture needed.');
-  if (options.hard) printParityGate(categoriesByStrategy);
   if (options.budget !== undefined) {
     console.log(`Camera frames over the ${options.budget} ms budget: ${overBudget}`);
     if (overBudget > 0) process.exitCode = 1;

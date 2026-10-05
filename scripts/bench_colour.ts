@@ -158,7 +158,7 @@ function render(rows: Row[], correction: Array<Array<string | number>>, bytes: n
     ''
   );
   parts.push(
-    `Decode cost. A tile costs three plane decodes, so Colour needs ${colour.decodesPerSecond} plane decodes per second at 30 fps here (a 4-tile frame is 12 decodes; the issue's 360 to 720 per second is the same figure at 30 and 60 fps), against ${mono.decodesPerSecond} for monochrome. The time column is our reader plus the channel correction on this machine, single thread, loaded: ${colour.decodeMsPerFrame} ms per camera frame is about ${coresNeeded} cores' worth at 30 fps. Goodput above assumes the decoder keeps up with the camera; on a device that cannot, the rate falls by the same factor and the receiver should report its tier. The camera scanner prefers zxing-wasm when it has loaded (ADR 0023).`,
+    `Decode cost. A tile costs three plane decodes, so Colour needs ${colour.decodesPerSecond} plane decodes per second at 30 fps here (a 4-tile frame is 12 decodes; the issue's 360 to 720 per second is the same figure at 30 and 60 fps), against ${mono.decodesPerSecond} for monochrome. The time column is our reader plus the channel correction on this machine, single thread, loaded: ${colour.decodeMsPerFrame} ms per camera frame is about ${coresNeeded} cores' worth at 30 fps. Goodput above assumes the decoder keeps up with the camera; on a device that cannot, the rate falls by the same factor and the receiver should report its tier.`,
     ''
   );
   parts.push(

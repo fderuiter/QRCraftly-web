@@ -229,22 +229,22 @@ describe('generated service worker runtime', () => {
     expect(await sw.fetchEvent('/index.pageContext.json')).toBe('network:/index.pageContext.json');
   });
 
-  it('caches the scanner wasm on first use and serves it from the cache afterwards (ADR 0023)', async () => {
+  it('caches a wasm module on first use and serves it from the cache afterwards (ADR 0033)', async () => {
     const response = { ok: true, body: 'wasm', clone: () => 'cached-wasm' };
     const fetchImpl = vi.fn(async () => response);
     const sw = loadWorker({ caches, fetchImpl, hash: 'new' });
     await sw.dispatch('install');
 
-    expect(await sw.fetchEvent('/assets/zxing_reader-abc.wasm')).toBe(response);
-    expect(await sw.fetchEvent('/assets/zxing_reader-abc.wasm')).toBe('cached-wasm');
+    expect(await sw.fetchEvent('/assets/qr-decode.abc.wasm')).toBe(response);
+    expect(await sw.fetchEvent('/assets/qr-decode.abc.wasm')).toBe('cached-wasm');
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it('does not cache a failed wasm response', async () => {
     const fetchImpl = vi.fn(async () => ({ ok: false, clone: () => 'broken' }));
     const sw = loadWorker({ caches, fetchImpl });
-    await sw.fetchEvent('/assets/zxing_reader-abc.wasm');
-    await sw.fetchEvent('/assets/zxing_reader-abc.wasm');
+    await sw.fetchEvent('/assets/qr-decode.abc.wasm');
+    await sw.fetchEvent('/assets/qr-decode.abc.wasm');
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
@@ -315,8 +315,8 @@ describe('service worker precache manifest', () => {
     expect(toPrecacheUrl('assets/chunks/a.js')).toBe('/assets/chunks/a.js');
   });
 
-  it('leaves the lazily loaded wasm reader out of the precache', () => {
-    expect(isRuntimeCached('assets/zxing_reader-abc.wasm')).toBe(true);
+  it('leaves the lazily loaded wasm modules out of the precache', () => {
+    expect(isRuntimeCached('assets/qr-decode.abc.wasm')).toBe(true);
     expect(isRuntimeCached('assets/chunks/a.js')).toBe(false);
   });
 

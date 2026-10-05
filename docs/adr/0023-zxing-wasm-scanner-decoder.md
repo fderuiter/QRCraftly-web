@@ -1,8 +1,11 @@
 ---
-status: accepted
+status: superseded
+superseded_by: 0036
 ---
 
 # zxing-wasm Decoder Chain for the Optical Scanner
+
+> Superseded by [ADR 0036](./0036-in-house-qr-decoder-replaces-zxing-wasm.md): our own decoder (`qr-decode`, #1178) reached parity with zxing-wasm on the hard corpus and replaced it. The chain is now the platform `BarcodeDetector`, then our reader. This record is kept for history.
 
 ## Context
 

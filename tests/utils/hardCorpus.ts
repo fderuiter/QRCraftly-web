@@ -17,8 +17,9 @@
 */
 
 /**
- * The hard decode corpus from the decoder comparison in #1104, kept in the repo so the
- * zxing parity gate of #1178 can be measured again: `pnpm run bench:scanner --corpus hard`.
+ * The hard decode corpus from the decoder comparison in #1104, kept in the repo so our reader can
+ * be measured on it again: `pnpm run bench:scanner --corpus hard`. The zxing-wasm parity it
+ * reached (#1178) is recorded in ADR 0036.
  *
  * Each subset holds seeded synthetic camera frames (640x480 and 1280x720) of a real QR
  * code on a cluttered background, drawn through a pinhole projection with 3x3
@@ -38,9 +39,6 @@ export type HardSubset = (typeof HARD_SUBSETS)[number];
 export interface HardFrame extends CorpusFrame {
   symbol: { corners: Point[]; version: number } | null;
 }
-
-/** The subsets #1178's parity gate is measured on: every one with a code in it. */
-export const GATE_SUBSETS: readonly HardSubset[] = HARD_SUBSETS.filter((subset) => subset !== 'negatives');
 
 interface Random {
   u: () => number;

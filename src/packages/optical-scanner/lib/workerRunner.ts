@@ -1,54 +1,26 @@
 import {
   isValidScannerResponse,
-  ZXING_MODULE_MESSAGE,
   type DecodedCode,
   type ScanDecoder,
   type ScannerRequest,
   cornersFromArray,
 } from './contracts';
-import { compileZxingModule } from './zxingModule';
 
 let sharedWorker: Worker | null = null;
 let consecutiveRestarts = 0;
 const MAX_CONSECUTIVE_RESTARTS = 3;
-/** Settles once the current worker has been offered the zxing reader (or it could not be). */
-let readerOffered: Promise<void> = Promise.resolve();
-
-/**
- * Offers the compiled zxing reader to a new worker (ADR 0023). The worker scans with our reader (#1178) until
- * the module arrives, and keeps doing so if it never does.
- */
-function offerZxingReader(worker: Worker): Promise<void> {
-  return compileZxingModule().then(
-    (module) => {
-      if (module && sharedWorker === worker) {
-        worker.postMessage({ type: ZXING_MODULE_MESSAGE, module });
-      }
-    },
-    () => undefined
-  );
-}
 
 /**
  * Retrieves or lazily instantiates the shared background Web Worker for optical scanning. Only
- * scans the platform's own detector cannot handle reach it, so creating it is also when the zxing
- * reader is loaded.
+ * scans the platform's own detector cannot handle reach it; the worker decodes them with our
+ * reader, `qr-decode` (#1178, ADR 0036).
  */
 export function getScannerWorker(): Worker {
   if (typeof window === 'undefined') {
     throw new Error('Web Worker can only be instantiated in browser environment');
   }
-  if (!sharedWorker) {
-    const worker = new Worker(new URL('../worker.ts', import.meta.url), { type: 'module' });
-    sharedWorker = worker;
-    readerOffered = offerZxingReader(worker);
-  }
+  sharedWorker ??= new Worker(new URL('../worker.ts', import.meta.url), { type: 'module' });
   return sharedWorker;
-}
-
-/** Resolves once the shared worker has been offered the zxing reader (never rejects). */
-export function whenReaderOffered(): Promise<void> {
-  return readerOffered;
 }
 
 function disposeSharedWorker(): void {
@@ -108,8 +80,6 @@ function markWorkerHealthy(): void {
 export interface DispatchWorkerRequestOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
-  /** Awaited after the worker is created and before the request is posted (never delays the timeout). */
-  before?: () => Promise<void>;
 }
 
 export interface DispatchWorkerRequestResult {
@@ -131,7 +101,7 @@ export function dispatchWorkerRequest(
   transfer: Transferable[],
   options: DispatchWorkerRequestOptions = {}
 ): Promise<DispatchWorkerRequestResult> {
-  const { timeoutMs = 1500, signal, before } = options;
+  const { timeoutMs = 1500, signal } = options;
   const { sequenceId } = message;
 
   return new Promise((resolve) => {
@@ -202,22 +172,13 @@ export function dispatchWorkerRequest(
 
     signal?.addEventListener('abort', onAbort);
 
-    const target = worker;
-    const post = () => {
-      if (isDone) return;
-      try {
-        target.addEventListener('message', handleMessage);
-        target.addEventListener('error', handleError);
-        target.postMessage(message, transfer);
-      } catch (postErr) {
-        console.error('Failed to postMessage to scanner worker:', postErr);
-        finish({ decoded: null, error: 'DISPATCH_ERROR' });
-      }
-    };
-    if (before) {
-      before().then(post, post);
-    } else {
-      post();
+    try {
+      worker.addEventListener('message', handleMessage);
+      worker.addEventListener('error', handleError);
+      worker.postMessage(message, transfer);
+    } catch (postErr) {
+      console.error('Failed to postMessage to scanner worker:', postErr);
+      finish({ decoded: null, error: 'DISPATCH_ERROR' });
     }
   });
 }

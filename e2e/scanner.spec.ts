@@ -93,7 +93,7 @@ async function decodeTime(page: Page, timeout = 15_000): Promise<number> {
  * Resources the page fetched between the timer's start and the decode (resource timing), other
  * than the app's own code: applying the decoded content starts the generator's matrix worker,
  * whose script is a same-origin `/assets/` file, exactly as typing the same content would, and the
- * scanner may load its own zxing-wasm reader from `/assets/` (ADR 0023).
+ * scanner may load its own qr-decode reader from `/assets/` (ADR 0036).
  */
 async function requestsDuringScan(page: Page): Promise<string[]> {
   return page.evaluate(() => {
