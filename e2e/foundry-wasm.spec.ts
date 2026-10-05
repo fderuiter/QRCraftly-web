@@ -25,12 +25,14 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { test, expect } from './fixtures';
+import { runQrDecodeBattery, QR_DECODE_BATTERY_SHA256 } from '../tests/foundry/qrDecodeBattery';
 import { runQrEncodeBattery, QR_ENCODE_BATTERY_SHA256 } from '../tests/foundry/qrEncodeBattery';
 import { runSelftestBattery, SELFTEST_BATTERY_SHA256 } from '../tests/foundry/selftestBattery';
 
 const BATTERIES = [
   { module: 'selftest', battery: runSelftestBattery, sha256: SELFTEST_BATTERY_SHA256 },
   { module: 'qr-encode', battery: runQrEncodeBattery, sha256: QR_ENCODE_BATTERY_SHA256 },
+  { module: 'qr-decode', battery: runQrDecodeBattery, sha256: QR_DECODE_BATTERY_SHA256 },
 ];
 
 for (const { module: name, battery, sha256 } of BATTERIES) {

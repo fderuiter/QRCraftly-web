@@ -16,12 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { createHash } from 'node:crypto';
 import jsQR from 'jsqr';
 import { describe, expect, it } from 'vitest';
 import type { QrEccLetter } from '@/packages/qr-matrix';
 import { qrEncoder } from '../fixtures/qrEncoder';
 import { createRandom } from '../utils/scannerCorpus';
-import { loadCommittedModule, runDifferential } from './differential';
+import { committedModuleBytes, loadCommittedModule, runDifferential } from './differential';
+import { QR_DECODE_BATTERY_SHA256, runQrDecodeBattery } from './qrDecodeBattery';
 import { decodeRequest, prepareDecode, renderGrid } from './qrDecodeModule';
 
 const LEVELS: readonly QrEccLetter[] = ['L', 'M', 'Q', 'H'];
@@ -91,5 +93,17 @@ describe('Rust QR decoder (#1178)', () => {
     expect(prepareDecode(module, decodeRequest(new Uint8Array(320 * 240).fill(128), 320, 240, 1))()).toEqual([]);
     const request = decodeRequest(new Uint8Array(16), 4, 4, 1);
     expect(() => prepareDecode(module, request.subarray(0, request.length - 1))()).toThrow(/status/);
+  });
+
+  it('gives the battery output the browser engines are compared against', async () => {
+    const { instance } = await WebAssembly.instantiate(committedModuleBytes('qr-decode'), {});
+    const counts: number[] = [];
+    const digest = createHash('sha256').update(runQrDecodeBattery(instance.exports, counts)).digest('hex');
+    // One code per frame, none in the light-on-dark frame without the inverted pass, two in the
+    // shared frame, none in the blank and random frames, and four refused requests.
+    expect(counts).toEqual([1, 1, 1, 1, 1, 1, 0, 1, 1, 2, 0, 0, -1, -1, -1, -1]);
+    // A change to the module that alters this hash changes its output. If that is intended,
+    // update QR_DECODE_BATTERY_SHA256 in tests/foundry/qrDecodeBattery.ts.
+    expect(digest).toBe(QR_DECODE_BATTERY_SHA256);
   });
 });

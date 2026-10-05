@@ -117,6 +117,12 @@ Boundary checks run automatically during `pnpm run lint` and CI.
   - `gpu.ts`: the WebGL 2 decode kernel (`createGpuKernel`, `createVerifiedGpuKernel`, `selfTestGpuKernel`, `GPU_FALLBACK_MESSAGES`). Separate so that importing the root never pulls the GL code in.
   - `flag.ts`: `isOpticalModemEnabled()`, the build flag. Kept tiny on purpose: pages import it statically and it must not pull the modem into a first load.
 
+### `qr-decode` (`@/packages/qr-decode`)
+
+- **Purpose**: Our QR decoder ([#1178](https://github.com/fderuiter/QRCraftly-web/issues/1178)), the Rust module `crates/qr-decode` compiled to `src/wasm/qr-decode.wasm`. It reads RGBA or grey frames, up to eight codes at a time, light-on-dark and mirrored codes included, and turns each code's segments into text by mode and ECI. It runs beside jsQR in shadow tests until it replaces it.
+- **Entry Points**:
+  - `index.ts`: `loadQrReader` (fetches and instantiates the module once; under Node it reads the file), `createQrReader` (a synchronous reader over an instance) and the `QrReader`, `QrRead`, `QrReadOptions`, `QrReadSegment`, `QrReadMode`, `QrReadLevel` and `QrPoint` types.
+
 ### `wasm-runtime` (`@/packages/wasm-runtime`)
 
 - **Purpose**: Loads QRCraftly's own Rust WebAssembly modules ([ADR 0033](../../docs/adr/0033-rust-webassembly-modules.md), [RUST.md](../../docs/RUST.md)): same-origin compile with a per-URL cache, import-free instantiation, and typed helpers for copying bytes in and out, freeing on every path and turning traps and status codes into a `WasmModuleError`.
