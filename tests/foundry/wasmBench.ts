@@ -154,14 +154,21 @@ function round(value: number, digits = 3): number {
   return Math.round(value * scale) / scale;
 }
 
+/**
+ * Warms up with up to 100 calls, then times batches that double up to 100 calls until `callMs`
+ * has passed, so a call of tens of milliseconds (a whole camera frame) is not run hundreds of times.
+ */
 function timeCall(call: () => void, callMs: number): Omit<WasmCallResult, 'name'> {
-  for (let i = 0; i < 100; i++) call();
+  const warmStart = performance.now();
+  for (let i = 0; i < 100 && (i === 0 || performance.now() - warmStart < callMs); i++) call();
   let iterations = 0;
+  let batch = 1;
   const start = performance.now();
   let elapsed = 0;
   while (elapsed < callMs) {
-    for (let i = 0; i < 100; i++) call();
-    iterations += 100;
+    for (let i = 0; i < batch; i++) call();
+    iterations += batch;
+    batch = Math.min(batch * 2, 100);
     elapsed = performance.now() - start;
   }
   return { iterations, microsPerCall: round((elapsed * 1000) / iterations) };
