@@ -36,11 +36,17 @@ interface TransferFile {
   buffer: Buffer;
 }
 
-async function openSender(sender: Page, file: TransferFile, speed?: 'Steady' | 'Balanced' | 'Fast') {
+async function openSender(sender: Page, file: TransferFile, speed?: 'Steady' | 'Balanced' | 'Fast', options: { outerCode?: boolean } = {}) {
   await sender.goto('/file-transfer');
   await sender.waitForSelector('main[data-hydrated="true"]');
   await sender.getByLabel('Choose a file to send').setInputFiles(file);
   if (speed) await sender.getByRole('radio', { name: speed, exact: true }).click();
+  if (options.outerCode) {
+    await sender.getByRole('button', { name: 'Advanced', exact: true }).click();
+    // The switch's visible track covers its input, so click the label, as a person would.
+    await sender.getByText('New transfer format (preview)', { exact: true }).click();
+    await expect(sender.getByLabel('New transfer format (preview)')).toBeChecked();
+  }
   await sender.getByRole('button', { name: 'Start file transfer' }).click();
   await expect(sender.getByRole('button', { name: 'Stop file transfer' })).toBeVisible({ timeout: 20_000 });
 }
@@ -114,6 +120,17 @@ test.describe('Optical file transfer', () => {
 
       await relayUntilComplete(sender, receiver, { drop: n => n % 4 === 0 });
 
+      await expectDownloadedCopy(receiver, file);
+    });
+
+    test('sends with the new outer code when it is chosen under Advanced (#1141)', async ({ page: receiver, context }) => {
+      await installSyntheticCamera(context);
+      const sender = await context.newPage();
+      const file = { name: 'outer.bin', mimeType: 'application/octet-stream', buffer: randomBytes(5 * 1024) };
+      await openSender(sender, file, undefined, { outerCode: true });
+      await expect(sender.getByTestId('outer-code-hint')).not.toContainText('standard format:');
+      await openReceiver(receiver);
+      await relayUntilComplete(sender, receiver, { drop: n => n % 3 === 0 });
       await expectDownloadedCopy(receiver, file);
     });
 

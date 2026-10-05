@@ -67,9 +67,9 @@ The bench simulates the screen and the camera, so none of the colour numbers has
 - Real compression: record whether the camera pipeline compresses (JPEG or video) and how it treats a colour channel at 4 px modules.
 - Fallback: with the receiver far enough away that colour does not read, confirm the transfer finishes from the beacons and the receiver shows the "only the black and white codes are getting through" message.
 
-## Outer code (#1176)
+## Outer code (#1176, #1141)
 
-The new outer code ([ADR 0037](./adr/0037-prism-outer-code-lt-over-ldpc-precode.md)) decodes by Gaussian elimination as symbols arrive. On a shared x86-64 machine, in WebAssembly under Node, a full 8192-symbol block (512 KB at 64-byte symbols) is about 1.1 s of work in total, with about 80 ms left after the last symbol. Once #1141 puts it in the receiver, record on a mid-range Android:
+The new outer code ([ADR 0037](./adr/0037-prism-outer-code-lt-over-ldpc-precode.md)) decodes by Gaussian elimination as symbols arrive. On a shared x86-64 machine, in WebAssembly under Node, a full 8192-symbol block (512 KB at 64-byte symbols) is about 1.1 s of work in total, with about 80 ms left after the last symbol. Turn on "New transfer format (preview)" under Advanced on the sender ([ADR 0038](./adr/0038-prism-manifest-v2-outer-code-opt-in.md)) and record on a mid-range Android, with a file of about 4 MB at the balanced density (four blocks):
 
 - The reassembly worker's total time for one 8192-symbol block, and the time from the last frame to "Transfer Complete".
 - Whether the camera preview keeps its frame rate while blocks decode.

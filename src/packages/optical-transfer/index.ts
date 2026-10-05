@@ -105,6 +105,7 @@ export { encodeBase45, decodeBase45, base45Length } from './lib/prism/base45';
 export {
   PRISM_VERSION,
   FLAG_ENCRYPTED,
+  FLAG_OUTER_CODE,
   FRAME_OVERHEAD,
   encodeDataFrame,
   encodeManifestFrame,
@@ -120,6 +121,8 @@ export {
 } from './lib/prism/frame';
 export {
   MAX_MANIFEST_NAME_BYTES,
+  MANIFEST_VERSION_FEC,
+  MAX_FEC_BLOCKS,
   encodeManifest,
   decodeManifest,
   sessionIdOf,
@@ -138,6 +141,8 @@ export {
   prismFrameCapacity,
   prismSymbolSize,
   estimateTransferFrames,
+  neededSymbols,
+  type OuterCode,
   type PrismStreamOptions,
   type PrismSessionOptions,
 } from './lib/prism/session';
@@ -154,7 +159,7 @@ export {
 } from './lib/prism/crypto';
 export { bytesToWords, wordsToBytes, fingerprintWords, formatKeyCode, parseKeyCode, keyQrText, parseKeyQr, KEY_CODE_WORDS, KEY_SECRET_BYTES } from './lib/prism/words';
 
-export { PrismReceiver } from './lib/prism/receiver';
+export { PrismReceiver, OUTER_CODE_UNAVAILABLE } from './lib/prism/receiver';
 
 // Multi-code transfer (#1142). Off unless a caller opts in through `planMultiCode`; nothing in the app imports these yet.
 export {

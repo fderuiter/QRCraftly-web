@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { loadFecModule } from '@/packages/optical-transfer';
 import baseline from './fixtures/transfer-baseline.json';
 import { BASELINE_MAX_K, CODEC_BLOCK_SIZE, ERASURE_CHANNELS, benchCodec, codecTrials, runCodecTrial } from './utils/transferBench';
 
@@ -33,6 +34,22 @@ describe('transfer benchmark regression guard (#1139)', () => {
     expect(row.failures).toBe(0);
     expect(row.overheadMedian).toBeLessThanOrEqual(recorded.overheadMedian * TOLERANCE);
     expect(row.overheadP95).toBeLessThanOrEqual(recorded.overheadP95 * TOLERANCE);
+  });
+
+  describe('the outer code (#1141)', () => {
+    let module: WebAssembly.Module;
+    beforeAll(async () => {
+      module = await loadFecModule();
+    });
+
+    it.each(cells)('$channel.name at K=$k stays within its baseline', ({ k, channel }) => {
+      const recorded = (baseline as Record<string, { overheadMedian: number; overheadP95: number }>)[`fec/${channel.name}/${k}`];
+      expect(recorded, 'run `pnpm run bench:transfer -- --quick --baseline` to record it').toBeDefined();
+      const row = benchCodec(k, CODEC_BLOCK_SIZE, channel, codecTrials(k, true), module);
+      expect(row.failures).toBe(0);
+      expect(row.overheadMedian).toBeLessThanOrEqual(recorded.overheadMedian * TOLERANCE);
+      expect(row.overheadP95).toBeLessThanOrEqual(recorded.overheadP95 * TOLERANCE);
+    });
   });
 
   it('is repeatable: the same seed gives the same trial', () => {

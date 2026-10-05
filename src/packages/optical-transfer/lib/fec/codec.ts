@@ -114,6 +114,11 @@ export function isValidFecLayout(layout: FecLayout): boolean {
   return symbols === Math.max(1, Math.ceil(messageLength / symbolSize));
 }
 
+/** Where symbol `index` of a round-robin stream over `blocks` blocks belongs. */
+function streamPosition(index: number, blocks: number): { block: number; esi: number } {
+  return { block: index % blocks, esi: Math.floor(index / blocks) >>> 0 };
+}
+
 /** Encodes one source block in its own module instance. */
 export class FecBlockEncoder {
   private readonly instance: WasmInstance;
@@ -232,9 +237,7 @@ export class FecEncoder {
 
   /** Encoding symbol `index` (0, 1, 2, …) of the round-robin stream. */
   symbol(index: number): FecSymbol {
-    const count = this.encoders.length;
-    const block = index % count;
-    const esi = Math.floor(index / count) >>> 0;
+    const { block, esi } = streamPosition(index, this.encoders.length);
     return { block, esi, data: this.encoders[block].symbol(esi) };
   }
 }
@@ -290,6 +293,15 @@ export class FecDecoder {
     return added;
   }
 
+  /**
+   * Adds symbol `index` of the round-robin stream {@link FecEncoder.symbol} hands out.
+   * @returns Whether it was new information.
+   */
+  addAt(index: number, data: Uint8Array): boolean {
+    if (!Number.isSafeInteger(index) || index < 0) return false;
+    return this.add({ ...streamPosition(index, this.layout.blocks.length), data });
+  }
+
   /** Symbols handed to {@link add}, counted whether or not they helped. */
   get symbolsReceived(): number {
     return this.received;
@@ -305,9 +317,32 @@ export class FecDecoder {
     return this.blockNeeded.reduce((sum, n) => sum + n, 0);
   }
 
+  /** Source symbols in the message, K, summed over the blocks. */
+  get k(): number {
+    return this.layout.blocks.reduce((sum, k) => sum + k, 0);
+  }
+
+  /**
+   * Received symbols that raised the rank, at most K. Unlike {@link rank} it leaves out the
+   * precode checks a block's decoder starts with, so it counts from 0 to K like the LT decoder's.
+   */
+  get symbolRank(): number {
+    let total = 0;
+    for (let i = 0; i < this.ranks.length; i++) {
+      const k = this.layout.blocks[i];
+      total += this.solved[i] ? k : Math.max(0, Math.min(k, this.ranks[i] - (this.blockNeeded[i] - k)));
+    }
+    return total;
+  }
+
+  /** Source symbols in the blocks solved so far. */
+  get resolved(): number {
+    return this.layout.blocks.reduce((sum, k, i) => sum + (this.solved[i] ? k : 0), 0);
+  }
+
   /** Progress from 0 to 1. */
   get progress(): number {
-    return this.isComplete ? 1 : Math.min(1, this.rank / Math.max(1, this.needed));
+    return this.isComplete ? 1 : Math.min(1, this.symbolRank / Math.max(1, this.k));
   }
 
   get isComplete(): boolean {

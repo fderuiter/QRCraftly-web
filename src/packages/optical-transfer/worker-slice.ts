@@ -17,6 +17,7 @@
 */
 
 import { loadQrEncoder, type QrEccLetter, type QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
+import { loadFecModule } from './lib/fec/codec';
 import { TRANSFER_DENSITY_PROFILES, resolveTransferDensity, sha256Hex } from './lib/fountain/session';
 import { createPrismBundleSession, createPrismSession, type PrismSession, type PrismStream } from './lib/prism/session';
 import { keyQrText, parseKeyCode } from './lib/prism/words';
@@ -44,6 +45,14 @@ let keyQr: string | null = null;
 
 // Start loading the encoder with the worker; a failed load is retried by the next START.
 loadQrEncoder().catch(() => undefined);
+
+/** The outer code's module, loaded on the first transfer that asks for it; null if it cannot load. */
+let fecModule: Promise<WebAssembly.Module | null> | null = null;
+
+function outerCodeModule(): Promise<WebAssembly.Module | null> {
+  fecModule ??= loadFecModule().catch(() => null);
+  return fecModule;
+}
 
 // Keyed by the Blob/File instance so a cached hash can never be reused for different content.
 const hashCache = new WeakMap<Blob, string>();
@@ -136,12 +145,16 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
     const profile = TRANSFER_DENSITY_PROFILES[density];
     // Frames use the density's ECC, not the page's appearance ECC.
     errorCorrectionLevel = profile.errorCorrectionLevel;
+    // Without the module (an old browser) the transfer goes out with the LT code, which every receiver reads.
+    const module = payload?.outerCode === 'fec' ? await outerCodeModule() : null;
+    if (sessionId !== currentSessionId) return;
     const sessionOptions = {
       fileName: fileNameOf(source),
       mimeType: source.type,
       errorCorrectionLevel,
       maxVersion: profile.maxVersion,
       private: payload?.private === true,
+      fecModule: module ?? undefined,
     };
 
     let session: PrismSession;
@@ -177,6 +190,7 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
       fingerprint: session.stream.fingerprint,
       fileCount: sources.length,
       keyCode: session.keyCode,
+      outerCode: session.outerCode,
     };
   } catch (err: unknown) {
     if (sessionId !== currentSessionId) return;

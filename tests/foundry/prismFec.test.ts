@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MAX_FEC_SOURCE_SYMBOLS, MAX_FEC_SYMBOL_BYTES } from '@/packages/optical-transfer';
 import { committedModuleBytes } from './differential';
-import { PRISM_FEC_BATTERY_SHA256, runPrismFecBattery } from './prismFecBattery';
+import { PRISM_FEC_BATTERY_SHA256, decodePrismFecJob, makePrismFecJob, runPrismFecBattery } from './prismFecBattery';
 
 describe('prism-fec module (#1176)', () => {
   it('gives the battery output the browser engines are compared against', async () => {
@@ -30,6 +30,19 @@ describe('prism-fec module (#1176)', () => {
     // A change to the module that alters this hash changes the symbols on the wire. If that is
     // intended, update PRISM_FEC_BATTERY_SHA256 in tests/foundry/prismFecBattery.ts.
     expect(digest).toBe(PRISM_FEC_BATTERY_SHA256);
+  });
+
+  it('decodes, in a fresh instance, the lossy symbols another instance encoded', async () => {
+    const bytes = committedModuleBytes('prism-fec');
+    const { job, sources } = makePrismFecJob((await WebAssembly.instantiate(bytes, {})).instance.exports);
+    const decoded = decodePrismFecJob((await WebAssembly.instantiate(bytes, {})).instance.exports, job);
+    const expected = new Uint8Array(sources.reduce((sum, source) => sum + source.length, 0));
+    let offset = 0;
+    for (const source of sources) {
+      expected.set(source, offset);
+      offset += source.length;
+    }
+    expect(decoded).toEqual(expected);
   });
 
   it('refuses the same sizes as the receive limits', () => {

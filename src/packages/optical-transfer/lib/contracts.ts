@@ -17,6 +17,7 @@
 */
 
 import type { TransferCompression, TransferDensity } from './fountain/session';
+import type { OuterCode } from './prism/session';
 
 /**
  * What a finished transfer announced about its file: name, size, type and SHA-256.
@@ -50,6 +51,8 @@ export interface SliceStartPayload {
   fps?: number;
   /** QR version ceiling and error correction of the frames. */
   density?: TransferDensity;
+  /** Send with the outer code (ADR 0037) instead of the LT code; falls back to LT when it cannot. */
+  outerCode?: OuterCode;
 }
 
 /** Messages the slice worker accepts. */
@@ -75,6 +78,8 @@ export interface FountainInitInfo {
   fileCount: number;
   /** The words of a private transfer's key code, to read out or type; absent for a plain transfer. */
   keyCode?: string;
+  /** The code the stream is sent with. */
+  outerCode: OuterCode;
 }
 
 /** Messages the slice worker emits. */
