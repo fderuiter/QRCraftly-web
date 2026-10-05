@@ -37,17 +37,15 @@ function renderLanding(id: string) {
 const logoButton = () => screen.getByRole('button', { name: 'Logo' });
 
 describe('landing pages that preset the generator (#1035, #1037)', () => {
-  it('opens the Logo section for the picture-in-code pages and leaves it closed elsewhere', () => {
-    for (const [id, expanded] of [
-      ['mosaic-qr-code', 'true'],
-      ['qr-code-with-logo', 'true'],
-      ['menu-qr-code', 'false'],
-    ] as const) {
-      clearRetainedAppearance();
-      const { unmount } = renderLanding(id);
-      expect(logoButton()).toHaveAttribute('aria-expanded', expanded);
-      unmount();
-    }
+  // One test per page: three full generator renders in one test can pass 15 s on a busy runner.
+  it.each([
+    ['mosaic-qr-code', 'true'],
+    ['qr-code-with-logo', 'true'],
+    ['menu-qr-code', 'false'],
+  ] as const)('sets the Logo section of %s to aria-expanded=%s', (id, expanded) => {
+    clearRetainedAppearance();
+    renderLanding(id);
+    expect(logoButton()).toHaveAttribute('aria-expanded', expanded);
   });
 
   it('sets high error correction on the logo and mosaic pages, even after another route changed it', () => {
