@@ -7,10 +7,9 @@ on:
     types: [closed]
   workflow_dispatch:
 
+# Read-only by default; each job asks only for the write scope it needs.
 permissions:
-  contents: write
-  actions: write
-  pull-requests: read
+  contents: read
 
 jobs:
   cleanup_branches:
@@ -18,6 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    permissions:
+      contents: write # delete merged branch refs
+      pull-requests: read
     steps:
       - name: Delete merged branches
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
@@ -80,6 +82,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions:
+      actions: write # delete stale artifacts
     steps:
       - name: Delete old artifacts
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
