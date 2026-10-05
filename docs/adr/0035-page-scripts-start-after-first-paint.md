@@ -16,7 +16,7 @@ Every page is pre-rendered, so its HTML and CSS are enough to paint it. Vike sti
 
 ## Consequences
 
-- Local Lighthouse on generator pages rose from about 0.85 to 0.91–0.99. First contentful paint is about 1 s; time to interactive is unchanged.
+- Local Lighthouse on generator pages rose from about 0.85 to 0.91–0.99. First contentful paint is about 1 s; time to interactive is unchanged. CI medians on every page were 0.92 or more, so the Lighthouse floor in `lighthouserc.json` rose from 0.85 to 0.9.
 - The page is visible a moment before React hydrates it. The markup is identical, and the theme script in `<head>` still runs first, so nothing shifts.
 - Client-side navigation is unaffected: it only applies to the HTML that the server sends.
 - If Vike changes how it writes startup tags, the rewrite finds none and leaves the page as it was; `tests/defer_page_scripts.test.ts` and the e2e suite catch that.

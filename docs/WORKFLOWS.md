@@ -78,7 +78,7 @@ GitHub Actions triggers the consolidated CI pipeline on the PR:
 2. `static-validation`: Storage privacy AST audit, UI catalog checks, markdown audit, TypeScript compiler (`tsc --noEmit`), depcruise module boundaries, ESLint, Knip, contrast checks, Prettier, code duplication check, ShellCheck, secret scanner, and Semgrep.
 3. `test`: Vitest unit tests with strict coverage thresholds.
 4. `build`: Production build verification and bundle size budgets. Uploads `dist` as a short-lived artifact.
-5. `lighthouse`: Lighthouse CI audits of every pre-rendered page in that `dist`, three runs per page with the median run asserted (performance at least 0.85).
+5. `lighthouse`: Lighthouse CI audits of every pre-rendered page in that `dist`, three runs per page with the median run asserted (performance at least 0.9).
 6. `e2e`: Downloads the `build` job's `dist` and runs Playwright cross-browser tests across Chromium, Firefox, and WebKit against `vite preview` (no second build), then `pnpm run test:e2e:dev` checks that the Vite development server hydrates without runtime errors.
 7. `dependency-audit`: `pnpm audit --audit-level=high`, reported as its own check. No other job depends on it, so a newly published upstream advisory never skips the checks above, but it does block the merge through `CI`.
 8. `ci`: the aggregate **`CI`** check. It passes only when jobs 1 to 7 all succeed, and it is the check the `main` ruleset requires.
