@@ -83,6 +83,21 @@ export const BENCH_CALLS: Record<string, WasmBenchCall[]> = {
       prepare: (instance) => prepareEncode(instance, 0, 'abcdefghijklmnopqrstuvwxyz'.repeat(114).slice(0, 2953)),
     },
   ],
+  'prism-fec': [
+    {
+      name: 'encode symbol (K 2048, T 64)',
+      prepare(instance) {
+        const { encoder } = prepareFecEncoder(instance, 2048);
+        const symbol = instance.fn('fec_encoder_symbol');
+        let esi = 0;
+        return () => symbol(encoder, esi++);
+      },
+    },
+    {
+      name: 'decode block after a join (K 2048, T 64)',
+      prepare: (instance) => prepareFecDecode(instance, 2048),
+    },
+  ],
   'qr-decode': [
     {
       name: 'blank 1080p frame',
@@ -102,6 +117,47 @@ export const BENCH_CALLS: Record<string, WasmBenchCall[]> = {
     },
   ],
 };
+
+const FEC_SYMBOL = 64;
+const FEC_SEED = 1176;
+
+/** An encoder over a seeded block of `k` symbols (crates/prism-fec). */
+function prepareFecEncoder(instance: WasmInstance, k: number): { encoder: number; source: number } {
+  const bytes = new Uint8Array(k * FEC_SYMBOL).map((_, i) => (Math.imul(i, 2654435761) >>> 24) & 0xff);
+  const source = instance.alloc(bytes.length);
+  instance.write(source, bytes);
+  const encoder = instance.fn('fec_encoder_new')(k, FEC_SYMBOL, FEC_SEED, source, bytes.length) >>> 0;
+  return { encoder, source };
+}
+
+/**
+ * A whole block decode: a new decoder, symbols from a mid-stream join until it completes, then
+ * back-substitution. The symbols are made once, and the encoder is freed so each decode starts
+ * from an empty heap.
+ */
+function prepareFecDecode(instance: WasmInstance, k: number): () => void {
+  const { encoder, source } = prepareFecEncoder(instance, k);
+  const symbolAt = instance.fn('fec_encoder_symbol');
+  const join = 1_000_000;
+  const symbols = Array.from({ length: k + 40 }, (_, i) => instance.read(symbolAt(encoder, join + i) >>> 0, FEC_SYMBOL));
+  instance.fn('fec_encoder_free')(encoder);
+  instance.free(source, k * FEC_SYMBOL);
+  const create = instance.fn('fec_decoder_new');
+  const inboxOf = instance.fn('fec_decoder_inbox');
+  const add = instance.fn('fec_decoder_add');
+  const solve = instance.fn('fec_decoder_solve');
+  const free = instance.fn('fec_decoder_free');
+  return () => {
+    const decoder = create(k, FEC_SYMBOL, FEC_SEED) >>> 0;
+    const inbox = inboxOf(decoder) >>> 0;
+    for (let i = 0; i < symbols.length; i++) {
+      instance.write(inbox, symbols[i]);
+      if (add(decoder, join + i) === 2) break;
+    }
+    if (solve(decoder) === 0) throw new Error('the bench block did not decode');
+    free(decoder);
+  };
+}
 
 /** A raw `qr_encode` call with the best mask: level, smallest version, then UTF-8 text (crates/qr-encode). */
 function prepareEncode(instance: WasmInstance, level: number, text: string): () => void {

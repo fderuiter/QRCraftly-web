@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "prism-fec"
+version = "0.0.0"
+dependencies = [
+ "qrcraftly-core",
+]
+
+[[package]]
 name = "qr-decode"
 version = "0.0.0"
 dependencies = [

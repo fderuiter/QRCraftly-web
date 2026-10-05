@@ -39,6 +39,16 @@ export const MAX_INDEX_BYTES = 1024 * 1024;
 /** Source block count above which a new stream must repeat 8 times before decoder tables are built. */
 export const LARGE_BLOCK_COUNT = 1 << 16;
 
+/**
+ * Most source symbols in one block of the outer code (#1176). Matches `MAX_SOURCE_SYMBOLS` in
+ * `crates/prism-fec/src/code.rs`. A block's decoder holds about L x L bits (L = K plus 3% and 8),
+ * 8.9 MB at this cap.
+ */
+export const MAX_FEC_SOURCE_SYMBOLS = 8192;
+
+/** Largest outer-code symbol in bytes. Matches `MAX_SYMBOL_BYTES` in `crates/prism-fec/src/code.rs`. */
+export const MAX_FEC_SYMBOL_BYTES = 1024;
+
 /** Largest video a person may upload to be scanned for a transfer, in bytes (500 MB). */
 export const MAX_VIDEO_UPLOAD_BYTES = 500 * 1024 * 1024;
 
