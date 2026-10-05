@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { QrReader } from '@/packages/qr-decode';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { renderCorpusFrame } from '../../../../tests/utils/scannerCorpus';
-import { cameraStrategyFor, decodeCameraFrame as decodeWith, estimateNoise, type CameraDecodeStrategy } from '../index';
+import { cameraStrategyFor, decodeCameraFrame as decodeWith, type CameraDecodeStrategy } from '../index';
 
 const readerCalls = { count: 0 };
 
@@ -82,12 +82,5 @@ describe('camera-frame decoding', () => {
     }
     expect(decodeCameraFrame(shifted, frame.width, frame.height, 'centre')).toBeNull();
     expect(decodeCameraFrame(shifted, frame.width, frame.height, 'frame')).toBe(TEXT);
-  });
-
-  it('estimates sensor noise from neighbouring pixels', () => {
-    const clean = renderCorpusFrame({ text: TEXT });
-    const grainy = renderCorpusFrame({ text: TEXT, noise: 14 });
-    expect(estimateNoise(clean.data, clean.width, clean.height)).toBe(0);
-    expect(estimateNoise(grainy.data, grainy.width, grainy.height)).toBeGreaterThanOrEqual(6);
   });
 });

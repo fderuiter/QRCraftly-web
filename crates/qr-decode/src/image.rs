@@ -134,6 +134,7 @@ impl Binary {
         let columns = w.div_ceil(BLOCK);
         let rows = h.div_ceil(BLOCK);
         let mut black = vec![0u8; columns * rows];
+        let mut flat = vec![false; columns * rows];
         for by in 0..rows {
             let y0 = (by * BLOCK).min(h - BLOCK);
             for bx in 0..columns {
@@ -148,6 +149,7 @@ impl Binary {
                 }
                 let mut level = (sum >> (2 * BLOCK_SHIFT)) as u8;
                 if max - min <= MIN_CONTRAST {
+                    flat[by * columns + bx] = true;
                     // A flat block: assume it is background, unless its neighbours
                     // say the code continues through it.
                     level = min / 2;
@@ -164,20 +166,32 @@ impl Binary {
                 black[by * columns + bx] = level;
             }
         }
-        // Each block's threshold is the average level of the 5 x 5 blocks around it.
+        // Each block's threshold is the average level of the 5 x 5 blocks
+        // around it, counting only blocks with contrast when there are any: a
+        // flat block's guessed level would drag a faint code's edge below its
+        // dark modules.
         let mut levels = vec![0u8; columns * rows];
         let mut bits = vec![0u8; w * h];
         for by in 0..rows {
             let cy = by.clamp(2, rows.saturating_sub(3).max(2));
             for bx in 0..columns {
                 let cx = bx.clamp(2, columns.saturating_sub(3).max(2));
-                let mut sum = 0u32;
+                let (mut sum, mut count, mut flat_sum, mut flat_count) = (0u32, 0u32, 0u32, 0u32);
                 for ny in cy - 2..=(cy + 2).min(rows - 1) {
                     for nx in cx - 2..=(cx + 2).min(columns - 1) {
-                        sum += black[ny * columns + nx] as u32;
+                        let i = ny * columns + nx;
+                        if flat[i] {
+                            flat_sum += black[i] as u32;
+                            flat_count += 1;
+                        } else {
+                            sum += black[i] as u32;
+                            count += 1;
+                        }
                     }
                 }
-                let t = (sum / 25) as u8;
+                let t = sum
+                    .checked_div(count)
+                    .unwrap_or(flat_sum / flat_count.max(1)) as u8;
                 levels[by * columns + bx] = t;
                 let y0 = by * BLOCK;
                 let x0 = bx * BLOCK;

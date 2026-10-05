@@ -23,7 +23,7 @@
  */
 
 /** SHA-256 of {@link runQrDecodeBattery}'s output for the committed `src/wasm/qr-decode.wasm`. */
-export const QR_DECODE_BATTERY_SHA256 = 'd06eaa0dc3873d7eeb370b3af32fa45ffb3b59f982e9dc4949ef00c6fadb6a11';
+export const QR_DECODE_BATTERY_SHA256 = '5b597a7a4a37dfff4a0d65e8c35354a93dde51a8c610f6f993676ffac340955f';
 
 /**
  * Draws two fixed symbols (version 2 and version 7) into frames: plain, RGBA in colour, sheared,

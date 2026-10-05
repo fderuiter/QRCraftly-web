@@ -49,7 +49,6 @@ export {
   decodeCameraFrame,
   decodeCameraCode,
   cameraStrategyFor,
-  estimateNoise,
   type CameraDecodeStrategy,
 } from './lib/decodeSync';
 

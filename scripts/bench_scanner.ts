@@ -31,6 +31,9 @@
  *   --by-category     Also print one row per corpus category.
  *   --budget <ms>     Exit non-zero when any camera frame takes longer (default: report only).
  *   --no-zxing        Skip the zxing-wasm rows (they always use the working tree's reader).
+ *   --corpus hard     Use the hard corpus from #1104 (`tests/utils/hardCorpus.ts`) instead, and
+ *                     print #1178's parity gate: our multi-pass read against zxing-wasm per subset.
+ *   --count <n>       Frames per subset of the hard corpus (default 60).
  *
  * Timing depends on the machine, so this is not a CI gate: run it on demand or from the
  * manual / nightly "Scanner benchmark" workflow. `decodeSync.ts` must keep importing nothing at
@@ -42,6 +45,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execBinary } from './utils/execHelper.js';
 import { generateCorpus, type CorpusFrame } from '../tests/utils/scannerCorpus.ts';
+import { GATE_SUBSETS, generateHardCorpus } from '../tests/utils/hardCorpus.ts';
 import * as reader from '../src/packages/optical-scanner/reader.ts';
 import { qrReader } from '../tests/fixtures/qrReader.ts';
 
@@ -78,10 +82,12 @@ interface Options {
   byCategory: boolean;
   budget?: number;
   zxing: boolean;
+  hard: boolean;
+  count: number;
 }
 
 function parseArgs(argv: string[]): Options {
-  const options: Options = { refs: [], byCategory: false, zxing: true };
+  const options: Options = { refs: [], byCategory: false, zxing: true, hard: false, count: 60 };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--ref') options.refs.push(argv[++i]);
@@ -89,6 +95,11 @@ function parseArgs(argv: string[]): Options {
     else if (arg === '--by-category') options.byCategory = true;
     else if (arg === '--budget') options.budget = Number(argv[++i]);
     else if (arg === '--no-zxing') options.zxing = false;
+    else if (arg === '--corpus') {
+      const corpus = argv[++i];
+      if (corpus !== 'hard' && corpus !== 'generated') throw new Error(`Unknown corpus: ${corpus}`);
+      options.hard = corpus === 'hard';
+    } else if (arg === '--count') options.count = Number(argv[++i]);
     else if (arg === '--') continue;
     else throw new Error(`Unknown option: ${arg}`);
   }
@@ -258,13 +269,46 @@ function formatTable(rows: Row[]): string {
   return [line(header), `|${widths.map((w) => '-'.repeat(w + 2)).join('|')}|`, ...body.map(line)].join('\n');
 }
 
+const OURS = 'multi-pass (decodeRgbaCode)';
+const ZXING = 'zxing-wasm (whole frame)';
+
+/**
+ * #1178's parity gate: on every hard subset, our multi-pass read must reach at least 95% of
+ * zxing-wasm's read rate with a p95 time per frame no worse than twice zxing's.
+ */
+function printParityGate(categoriesByStrategy: Map<string, Map<string, Row>>): void {
+  const ours = categoriesByStrategy.get(OURS);
+  const zxing = categoriesByStrategy.get(ZXING);
+  if (!ours || !zxing) return;
+  const p95 = (row: Row) => percentile([...row.times].sort((a, b) => a - b), 95);
+  console.log('\n### Parity gate (#1178): ours (multi-pass) against zxing-wasm\n');
+  console.log('| subset | ours | zxing | share of zxing | ours p95 ms | zxing p95 ms | p95 ratio | gate |');
+  console.log('|---|---|---|---|---|---|---|---|');
+  let failed = 0;
+  for (const subset of GATE_SUBSETS) {
+    const a = ours.get(subset);
+    const b = zxing.get(subset);
+    if (!a || !b || b.total === 0) continue;
+    const share = b.decoded ? a.decoded / b.decoded : 1;
+    const ratio = p95(b) ? p95(a) / p95(b) : 0;
+    const met = share >= 0.95 && ratio <= 2;
+    if (!met) failed += 1;
+    console.log(
+      `| ${subset} | ${a.decoded}/${a.total} | ${b.decoded}/${b.total} | ${(share * 100).toFixed(0)}% | ${p95(a).toFixed(1)} | ${p95(b).toFixed(1)} | ${ratio.toFixed(2)} | ${met ? 'met' : 'not met'} |`
+    );
+  }
+  console.log(`\nGate: ${failed === 0 ? 'met on every subset' : `not met on ${failed} subset(s)`} (needs at least 95% of zxing's reads and p95 at most 2x).`);
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
-  const corpus = [...generateCorpus(options.filter)];
+  const corpus = options.hard ? [...generateHardCorpus(options.count, options.filter)] : [...generateCorpus(options.filter)];
   const withCode = corpus.filter((f) => f.expected !== null).length;
   console.log(`Scanner benchmark: ${corpus.length} fixtures (${withCode} with a code, ${corpus.length - withCode} without)\n`);
 
   let overBudget = 0;
+  /** Per strategy (first ref only), its rows by category: what the parity gate compares. */
+  const categoriesByStrategy = new Map<string, Map<string, Row>>();
   for (const ref of options.refs) {
     const decoder = await loadDecoder(ref);
     const rows: Row[] = [];
@@ -298,6 +342,7 @@ async function main(): Promise<void> {
         }
       }
       rows.push(row);
+      if (ref === options.refs[0]) categoriesByStrategy.set(strategy.name, byCategory);
       if (options.byCategory) {
         categoryRows.push({ ...row, label: strategy.name }, ...byCategory.values());
       }
@@ -314,6 +359,7 @@ async function main(): Promise<void> {
     console.log('');
   }
   console.log('"frames" is the mean number of camera frames (decode calls) a decoded fixture needed.');
+  if (options.hard) printParityGate(categoriesByStrategy);
   if (options.budget !== undefined) {
     console.log(`Camera frames over the ${options.budget} ms budget: ${overBudget}`);
     if (overBudget > 0) process.exitCode = 1;
