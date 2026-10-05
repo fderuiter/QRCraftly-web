@@ -97,7 +97,7 @@ describe('useLeadingDebounce', () => {
     vi.useRealTimers();
   });
 
-  it('applies a change that follows a quiet spell on the next task, without the delay', () => {
+  it('applies a change that follows a quiet spell in the same render', () => {
     const { result, rerender } = renderHook(({ value }) => useLeadingDebounce(value, 100), {
       initialProps: { value: 'a' },
     });
@@ -106,10 +106,6 @@ describe('useLeadingDebounce', () => {
     });
 
     rerender({ value: 'b' });
-    expect(result.current).toBe('a');
-    act(() => {
-      vi.advanceTimersByTime(0);
-    });
     expect(result.current).toBe('b');
   });
 
@@ -122,9 +118,6 @@ describe('useLeadingDebounce', () => {
     });
 
     rerender({ value: 1 });
-    act(() => {
-      vi.advanceTimersByTime(0);
-    });
     expect(result.current).toBe(1);
 
     // Two quick changes in a row: only the last one lands, after the delay.

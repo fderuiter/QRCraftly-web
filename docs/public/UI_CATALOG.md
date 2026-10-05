@@ -52,7 +52,7 @@ They style themselves only with the semantic design tokens from `src/layouts/ind
 
 ## 2. QR Input Form Panel Components (`src/components/inputs/`)
 
-These components capture specialized data structures required to construct distinct QR code types. They rely entirely on primitive UI inputs and check free-text fields against the `CONTAINMENT_PROFILES` exported by `@/packages/qr-payload`.
+These components capture specialized data structures required to construct distinct QR code types. They rely entirely on primitive UI inputs and check free-text fields against the `CONTAINMENT_PROFILES` exported by `@/packages/qr-payload`. Their shared state lives in `useInputLogic.ts`: the first edit after a quiet spell reaches the preview in the same render, later edits in a burst of typing are written once it pauses for 100 ms, `flush()` writes a pending edit at once, and an external change (undo, a loaded preset) cancels a pending edit.
 
 - **BulkCsvInput** (`BulkCsvInput.tsx` / `BulkCsvInput.test.tsx`): Bulk CSV Batch form, code-split behind `LazyBulkCsvInput.tsx` so it loads only on that type. Parses the CSV and writes the ZIP with `@/packages/bulk-csv` in memory (at most 500 rows). The live preview encodes only the first row with a payload and says which row it shows (`previewRow` from `@/packages/bulk-csv`). Supports column mapping, PNG/SVG format selection, accessible file upload inputs, malformed CSV and missing-payload handling, progress tracking, and zero network calls.
 - **EmailInput** (`EmailInput.tsx`): Standard email layout supporting recipient, subject, and body message fields.

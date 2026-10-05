@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 /**
  * A hook that returns a debounced value.
@@ -46,27 +46,35 @@ export function useDebounce<T>(value: T, delay: number): T {
 
 /**
  * Like {@link useDebounce}, but a change that follows a quiet spell of at least `delay` ms is
- * applied at once (on the next task), and only a burst of changes (a slider drag, fast typing) is
- * held back until it pauses. A single click shows its result without waiting a debounce period.
+ * applied in the same render, and only a burst of changes (a slider drag, fast typing) is held
+ * back until it pauses. A single click shows its result without waiting a debounce period or a
+ * task.
  * @param value The value to debounce.
  * @param delay The quiet time in milliseconds that ends a burst.
  * @returns The debounced value.
  */
 export function useLeadingDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-  const lastChangeRef = useRef<number>(Number.NEGATIVE_INFINITY);
+  // `holding` is set by a change and cleared once `delay` ms pass without another one.
+  const [state, setState] = useState({ value, applied: value, holding: false });
+  let current = state;
+  if (!Object.is(value, state.value)) {
+    // Adjusting state while rendering: React re-runs this render with the new state at once.
+    current = { value, applied: state.holding ? state.applied : value, holding: true };
+    setState(current);
+  }
 
   useEffect(() => {
-    const now = performance.now();
-    const quiet = now - lastChangeRef.current >= delay;
-    lastChangeRef.current = now;
     const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, quiet ? 0 : delay);
+      setState((latest) =>
+        latest.holding || !Object.is(latest.applied, latest.value)
+          ? { value: latest.value, applied: latest.value, holding: false }
+          : latest
+      );
+    }, delay);
     return () => {
       clearTimeout(handler);
     };
   }, [value, delay]);
 
-  return debouncedValue;
+  return current.applied;
 }

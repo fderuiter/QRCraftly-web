@@ -140,8 +140,10 @@ test.describe('Throttled Interactive Performance Testing', () => {
     const canvas = page.locator('canvas[role="img"]').first();
     await canvas.waitFor();
 
-    // Compares the preview as a 48 px thumbnail each frame, so the check stays cheap, and reports
-    // how long the preview takes to change after `act` runs.
+    // Watches the preview from inside the page, comparing it as a 48 px thumbnail at each frame so
+    // the check stays cheap, and reports the time from the input event (the keydown, or the click
+    // that selects a pattern) to the first frame that shows the new preview. The time the
+    // automation takes to deliver the input, or to report back, is not counted.
     const measure = async (act: () => Promise<void>) => {
       await page.evaluate(() => {
         const thumb = document.createElement('canvas');
@@ -156,24 +158,33 @@ test.describe('Throttled Interactive Performance Testing', () => {
           ctx.drawImage(preview, 0, 0, 48, 48);
           return ctx.getImageData(0, 0, 48, 48).data.join(',');
         };
-        const w = window as unknown as { __read: () => string; __before: string; __start: number };
-        w.__read = read;
-        w.__before = read();
-        w.__start = performance.now();
+        const before = read();
+        let start = Number.NaN;
+        const onInput = (event: Event) => {
+          start = event.timeStamp;
+          document.removeEventListener('keydown', onInput, true);
+          document.removeEventListener('click', onInput, true);
+        };
+        document.addEventListener('keydown', onInput, true);
+        document.addEventListener('click', onInput, true);
+        const waitingSince = performance.now();
+        (window as unknown as { __latency: Promise<number> }).__latency = new Promise<number>((resolve, reject) => {
+          // performance.now(), not the frame's own timestamp: that is when the frame began, which
+          // can be before the input's task ran.
+          const frame = () => {
+            const now = performance.now();
+            if (Number.isNaN(start)) {
+              if (now - waitingSince > 5000) reject(new Error('no input event arrived'));
+              else requestAnimationFrame(frame);
+            } else if (read() !== before) resolve(now - start);
+            else if (now - start > 3000) reject(new Error('the preview never changed'));
+            else requestAnimationFrame(frame);
+          };
+          requestAnimationFrame(frame);
+        });
       });
       await act();
-      return page.evaluate(
-        () =>
-          new Promise<number>((resolve, reject) => {
-            const w = window as unknown as { __read: () => string; __before: string; __start: number };
-            const tick = () => {
-              if (w.__read() !== w.__before) resolve(performance.now() - w.__start);
-              else if (performance.now() - w.__start > 3000) reject(new Error('the preview never changed'));
-              else requestAnimationFrame(tick);
-            };
-            tick();
-          })
-      );
+      return page.evaluate(() => (window as unknown as { __latency: Promise<number> }).__latency);
     };
 
     await client.send('Emulation.setCPUThrottlingRate', { rate: 4 });
@@ -191,11 +202,11 @@ test.describe('Throttled Interactive Performance Testing', () => {
       const pattern = await measure(() => page.getByLabel('Select Starburst pattern').click({ force: true }));
       console.log(`[4x] typing -> new preview ${typing.toFixed(0)} ms, pattern switch -> new preview ${pattern.toFixed(0)} ms`);
 
-      // Measured locally at 4x: typing 500-900 ms, a pattern switch 220-540 ms (the goals in #1058
-      // are 100 and 120 ms). These ceilings are a regression guard with room for a busy CI runner,
-      // not the goal: they catch the preview becoming slower, for example a debounce put back.
-      expect(typing).toBeLessThan(1500);
-      expect(pattern).toBeLessThan(1200);
+      // Measured locally at 4x: typing 100-190 ms, a pattern switch 90-150 ms (the goals in #1058
+      // are 100 and 120 ms). The ceilings leave room for a busy CI runner and still catch a
+      // regression such as a debounce or an extra frame put back in the path.
+      expect(typing).toBeLessThan(400);
+      expect(pattern).toBeLessThan(400);
     } finally {
       await client.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     }
