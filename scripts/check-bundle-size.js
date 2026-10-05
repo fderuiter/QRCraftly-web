@@ -14,16 +14,13 @@ const __dirname = path.dirname(__filename);
 const DIST_DIR = path.resolve(__dirname, '../dist/client');
 const WASM_DIR = path.resolve(__dirname, '../src/wasm');
 // What one visitor downloads to open one page (#1106): its HTML, the CSS and the scripts it loads
-// at startup (static imports, not lazy chunks, workers or the wasm reader). The worst page is the
+// at startup (static imports, not lazy chunks, workers or WebAssembly modules). The worst page is the
 // number that matters for load time, so this is the budget that catches JavaScript bloat.
 export const MAX_PAGE_FIRST_LOAD_KB = 260;
 // A loose backstop on the JavaScript and CSS in dist/client, so shipped code cannot grow unseen.
 // Pre-rendered HTML is left out: every new page adds some, and the per-page budget already
 // bounds each page's own HTML. Measured at 563 KB on 2026-10-03.
 export const MAX_GZIPPED_SIZE_KB = 650;
-// The scanner's zxing-wasm reader (ADR 0023) is fetched only when someone scans and is never
-// precached, so it has its own budget instead of counting against the site's.
-export const MAX_LAZY_WASM_GZIPPED_SIZE_KB = 450;
 
 /**
  * Gzipped budget in KB for each of our own Rust modules in `src/wasm/` (#1182, ADR 0033). Each
@@ -37,24 +34,14 @@ export const WASM_MODULE_BUDGETS_KB = {
 
 /**
  * Whether a file is one of our own Rust modules, as committed (`selftest.wasm`) or as emitted with
- * a content hash (`selftest.Bb9Mx2Pu.wasm`).
+ * a content hash (`selftest.Bb9Mx2Pu.wasm` by pages, `selftest-Bb9Mx2Pu.wasm` by worker bundles).
  * @param {string} relativePath
  * @param {string[]} [modules]
  * @returns {boolean}
  */
 export function isOwnWasmModule(relativePath, modules = Object.keys(WASM_MODULE_BUDGETS_KB)) {
   const base = relativePath.split('/').pop() ?? '';
-  return modules.some((name) => base === `${name}.wasm` || (base.startsWith(`${name}.`) && /^[\w-]+\.wasm$/.test(base.slice(name.length + 1))));
-}
-
-/**
- * Whether a file is the lazily loaded WebAssembly reader, budgeted separately. Our own modules
- * have their own lines instead.
- * @param {string} relativePath
- * @returns {boolean}
- */
-export function isLazyWasm(relativePath) {
-  return relativePath.endsWith('.wasm') && !isOwnWasmModule(relativePath);
+  return modules.some((name) => base === `${name}.wasm` || ((base.startsWith(`${name}.`) || base.startsWith(`${name}-`)) && /^[\w-]+\.wasm$/.test(base.slice(name.length + 1))));
 }
 
 /**
@@ -170,20 +157,19 @@ export function getFiles(dir) {
 
 /**
  * Calculates raw and gzipped sizes of all files in a directory.
- * Only JavaScript and CSS count toward the limit; the lazily loaded `.wasm` reader has its own
- * budget, and every file is still listed in `reports`.
+ * Only JavaScript and CSS count toward the limit; our own `.wasm` modules have their own lines
+ * ({@link WASM_MODULE_BUDGETS_KB}), any other `.wasm` is listed in `unbudgetedWasm`, and every file
+ * is still listed in `reports`.
  * @param {string} distDir 
  * @param {number} limitKb 
- * @param {number} [wasmLimitKb]
- * @returns {{totalRawSize: number, totalGzipSize: number, limitBytes: number, wasmGzipSize: number, wasmLimitBytes: number, reports: Array<{path: string, rawSize: number, gzipSize: number}>, exceeds: boolean, wasmExceeds: boolean}}
+ * @returns {{totalRawSize: number, totalGzipSize: number, limitBytes: number, unbudgetedWasm: string[], reports: Array<{path: string, rawSize: number, gzipSize: number}>, exceeds: boolean}}
  */
-export function verifyBundleSize(distDir, limitKb, wasmLimitKb = MAX_LAZY_WASM_GZIPPED_SIZE_KB) {
+export function verifyBundleSize(distDir, limitKb) {
   const limitBytes = limitKb * 1024;
-  const wasmLimitBytes = wasmLimitKb * 1024;
   const files = getFiles(distDir);
   let totalGzipSize = 0;
   let totalRawSize = 0;
-  let wasmGzipSize = 0;
+  const unbudgetedWasm = [];
   const reports = [];
 
   for (const file of files) {
@@ -196,8 +182,8 @@ export function verifyBundleSize(distDir, limitKb, wasmLimitKb = MAX_LAZY_WASM_G
       gzipSize: gzipped.length
     });
     const posixPath = relativePath.split(path.sep).join('/');
-    if (isLazyWasm(posixPath)) {
-      wasmGzipSize += gzipped.length;
+    if (posixPath.endsWith('.wasm') && !isOwnWasmModule(posixPath)) {
+      unbudgetedWasm.push(posixPath);
       continue;
     }
     if (isGeneratedMedia(posixPath) || isOpticalProbe(posixPath, content) || !isShippedCode(posixPath)) continue;
@@ -209,11 +195,9 @@ export function verifyBundleSize(distDir, limitKb, wasmLimitKb = MAX_LAZY_WASM_G
     totalRawSize,
     totalGzipSize,
     limitBytes,
-    wasmGzipSize,
-    wasmLimitBytes,
+    unbudgetedWasm,
     reports,
-    exceeds: totalGzipSize > limitBytes,
-    wasmExceeds: wasmGzipSize > wasmLimitBytes
+    exceeds: totalGzipSize > limitBytes
   };
 }
 
@@ -268,12 +252,9 @@ export function runCheck() {
       process.exit(1);
     }
 
-    console.log(
-      `Lazy WebAssembly Gzipped: ${(result.wasmGzipSize / 1024).toFixed(2)} KB (budget ${MAX_LAZY_WASM_GZIPPED_SIZE_KB}.00 KB, not in the total)`
-    );
-    if (result.wasmExceeds) {
+    if (result.unbudgetedWasm.length > 0) {
       console.error(
-        `\n❌ ERROR: The lazily loaded WebAssembly (${(result.wasmGzipSize / 1024).toFixed(2)} KB gzipped) exceeds its ${MAX_LAZY_WASM_GZIPPED_SIZE_KB} KB budget!`
+        `\n❌ ERROR: dist/client ships WebAssembly that is not one of our Rust modules: ${result.unbudgetedWasm.join(', ')}. Fix: build it from crates/ into src/wasm/ and add a line to WASM_MODULE_BUDGETS_KB in scripts/check-bundle-size.js.`
       );
       process.exit(1);
     }

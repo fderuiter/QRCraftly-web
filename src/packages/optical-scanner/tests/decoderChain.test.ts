@@ -1,16 +1,11 @@
 /**
- * The decoder chain (#1099, ADR 0023): the platform detector first, the zxing-wasm reader in the
- * worker, our reader (#1178) last; multi-frame confirmation; byte-exact results.
+ * The decoder chain (#1099, ADR 0036): the platform detector first, then our reader (#1178) in the
+ * worker; multi-frame confirmation; byte-exact results.
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createNativeQrDetector, createResultGate, cameraStrategyFor, decodeCameraCode } from '../index';
-import { decodeWithZxing, installZxing, zxingState } from '../reader';
 import { renderCorpusFrame } from '../../../../tests/utils/scannerCorpus';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
-
-const WASM = path.resolve('node_modules/zxing-wasm/dist/reader/zxing_reader.wasm');
 
 /** Cuts the centre square of a frame at native resolution, as the engine's region of interest does. */
 function centreRegion(frame: { data: Uint8ClampedArray; width: number; height: number }) {
@@ -29,8 +24,8 @@ describe('result gate', () => {
   it('drops a single spurious decode and accepts two that agree within the window', () => {
     const gate = createResultGate();
     expect(gate.offer('MISREAD', 'qr-decode', 0)).toBe(false);
-    expect(gate.offer('REAL', 'zxing', 100)).toBe(false);
-    expect(gate.offer('REAL', 'zxing', 300)).toBe(true);
+    expect(gate.offer('REAL', 'qr-decode', 100)).toBe(false);
+    expect(gate.offer('REAL', 'qr-decode', 300)).toBe(true);
   });
 
   it('does not count agreeing decodes further apart than the window', () => {
@@ -46,12 +41,12 @@ describe('result gate', () => {
 
   it('emits each distinct payload once per hold period', () => {
     const gate = createResultGate({ confirmations: 1, holdMs: 3000 });
-    expect(gate.offer('A', 'zxing', 0)).toBe(true);
-    expect(gate.offer('A', 'zxing', 100)).toBe(false);
-    expect(gate.offer('B', 'zxing', 200)).toBe(true);
-    expect(gate.offer('A', 'zxing', 2900)).toBe(false);
-    expect(gate.offer('A', 'zxing', 3000)).toBe(true);
-    expect(gate.offer('B', 'zxing', 3100)).toBe(false);
+    expect(gate.offer('A', 'qr-decode', 0)).toBe(true);
+    expect(gate.offer('A', 'qr-decode', 100)).toBe(false);
+    expect(gate.offer('B', 'qr-decode', 200)).toBe(true);
+    expect(gate.offer('A', 'qr-decode', 2900)).toBe(false);
+    expect(gate.offer('A', 'qr-decode', 3000)).toBe(true);
+    expect(gate.offer('B', 'qr-decode', 3100)).toBe(false);
   });
 
   it('emits every decode for streams (one confirmation, no hold) and forgets everything on reset', () => {
@@ -97,49 +92,34 @@ describe('native detector', () => {
   });
 });
 
-describe('zxing-wasm reader (ADR 0023)', () => {
-  beforeAll(async () => {
-    // Node has no ImageData; the reader only reads its data, width and height.
-    if (typeof globalThis.ImageData === 'undefined') {
-      vi.stubGlobal(
-        'ImageData',
-        class {
-          constructor(
-            public data: Uint8ClampedArray,
-            public width: number,
-            public height: number
-          ) {}
-        }
-      );
+describe('our reader in the worker (ADR 0036)', () => {
+  /** Decodes a frame the way the worker decodes camera frames, trying each rotating strategy. */
+  const decodeLikeCamera = (frame: { data: Uint8ClampedArray; width: number; height: number }) => {
+    for (let sequenceId = 1; sequenceId <= 4; sequenceId++) {
+      const code = decodeCameraCode(qrReader, frame.data, frame.width, frame.height, cameraStrategyFor(sequenceId));
+      if (code) return code;
     }
-    expect(zxingState()).toBe('absent');
-    expect(await installZxing(await WebAssembly.compile(fs.readFileSync(WASM)))).toBe(true);
-    expect(zxingState()).toBe('ready');
-  });
+    return null;
+  };
 
-  it('decodes a 2 px-module code in a 1080p frame from the native-resolution region (#1099)', async () => {
+  it('decodes a 2 px-module code in a 1080p frame from the native-resolution region (#1099)', () => {
     const frame = renderCorpusFrame({ text: 'https://qrcraftly.com/scan', modulePx: 2, width: 1920, height: 1080 });
     const region = centreRegion(frame);
 
-    const zxing = await decodeWithZxing(region.data, region.width, region.height);
-    expect(zxing?.text).toBe('https://qrcraftly.com/scan');
-    expect(zxing?.corners).not.toBeNull();
-
-    const ours = decodeCameraCode(qrReader, region.data, region.width, region.height, cameraStrategyFor(1));
-    expect(ours?.text).toBe('https://qrcraftly.com/scan');
+    const code = decodeCameraCode(qrReader, region.data, region.width, region.height, cameraStrategyFor(1));
+    expect(code?.text).toBe('https://qrcraftly.com/scan');
+    expect(code?.corners).not.toBeNull();
   });
 
-  it('returns the exact payload bytes, not just text', async () => {
+  it('returns the exact payload bytes, not just text', () => {
     const text = 'Grüße';
-    const frame = renderCorpusFrame({ text, modulePx: 4, width: 640, height: 480 });
-    const code = await decodeWithZxing(frame.data, frame.width, frame.height);
+    const code = decodeLikeCamera(renderCorpusFrame({ text, modulePx: 4, width: 640, height: 480 }));
     expect(code?.text).toBe(text);
     expect(Array.from(code?.bytes ?? [])).toEqual(Array.from(new TextEncoder().encode(text)));
   });
 
-  it('finds nothing in a frame with no code', async () => {
-    const frame = renderCorpusFrame({ text: null, noise: 20, width: 640, height: 480 });
-    expect(await decodeWithZxing(frame.data, frame.width, frame.height)).toBeNull();
+  it('finds nothing in a frame with no code', () => {
+    expect(decodeLikeCamera(renderCorpusFrame({ text: null, noise: 20, width: 640, height: 480 }))).toBeNull();
   });
 });
 

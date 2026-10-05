@@ -1,5 +1,6 @@
 ---
 status: accepted
+superseded_in_part_by: 0036
 ---
 
 # Consolidated Optical Detection Engine
@@ -79,11 +80,11 @@ The camera stream used to be acquired by the app's `useCamera` hook and attached
 
 ### 7. Decoder Chain and Result Confirmation (amendment, issues #1099 and #1104)
 
-- **Three decoders, best first** ([ADR 0023](./0023-zxing-wasm-scanner-decoder.md)): the platform `BarcodeDetector` when it reads QR codes (`lib/nativeDetector.ts`; camera frames then never reach the worker), zxing-wasm in the worker (`lib/zxingReader.ts`, compiled on the main thread by `lib/zxingModule.ts` and exposed to the worker through the `reader` entry point), and jsQR as the fallback.
+- **Three decoders, best first** ([ADR 0023](./0023-zxing-wasm-scanner-decoder.md)): the platform `BarcodeDetector` when it reads QR codes (`lib/nativeDetector.ts`; camera frames then never reach the worker), zxing-wasm in the worker (`lib/zxingReader.ts`, compiled on the main thread by `lib/zxingModule.ts` and exposed to the worker through the `reader` entry point), and jsQR as the fallback. _Superseded in part by [ADR 0036](./0036-in-house-qr-decoder-replaces-zxing-wasm.md): two decoders now, the platform detector and then our reader (`qr-decode`); the zxing files and the `reader` entry point are gone._
 - **Region of interest.** Odd frames send the centre square at native resolution (up to 1280px) with `createImageBitmap(video, sx, sy, sw, sh)`; even frames send the whole frame downscaled to 1280px. The worker maps corners back to frame coordinates.
 - **Confirmation** (`lib/resultGate.ts`): two agreeing decodes within 500 ms, one for the platform detector, and a 3 s hold before the same payload is emitted again. `useOpticalReceiver` passes `confirmations: 1, repeatHoldMs: 0`.
 - **Rich results.** `ScanResult` and the camera callback carry `bytes`, `corners` and `source`; the worker response adds `decodedBytes`, `corners` and `decoder`.
-- **Tests**: [`src/packages/optical-scanner/tests/decoderChain.test.ts`](../../src/packages/optical-scanner/tests/decoderChain.test.ts) runs the real zxing reader in Node over the corpus, the gate and the native path.
+- **Tests**: [`src/packages/optical-scanner/tests/decoderChain.test.ts`](../../src/packages/optical-scanner/tests/decoderChain.test.ts) runs the real zxing reader in Node over the corpus, the gate and the native path. _Since [ADR 0036](./0036-in-house-qr-decoder-replaces-zxing-wasm.md) it runs our reader instead._
 
 ### 8. Camera Controls (amendment, issue #1100)
 

@@ -364,8 +364,8 @@ describe('Camera Scanner Engine (headless)', () => {
       await h.step(4);
       expect(h.workers).toHaveLength(1);
 
-      await h.answerNextFrame(10, { status: 'pass', decodedData: 'FROM-WORKER', decoder: 'zxing' });
-      expect(h.events.onScanSuccess).toHaveBeenCalledWith('FROM-WORKER', expect.objectContaining({ source: 'zxing' }));
+      await h.answerNextFrame(10, { status: 'pass', decodedData: 'FROM-WORKER', decoder: 'qr-decode' });
+      expect(h.events.onScanSuccess).toHaveBeenCalledWith('FROM-WORKER', expect.objectContaining({ source: 'qr-decode' }));
       expect(detect).toHaveBeenCalledTimes(1);
     });
 
@@ -377,13 +377,13 @@ describe('Camera Scanner Engine (headless)', () => {
         decodedData: 'AB',
         decodedBytes: new Uint8Array([65, 66]),
         corners: [10, 10, 50, 10, 50, 50, 10, 50],
-        decoder: 'zxing',
+        decoder: 'qr-decode',
       });
 
       const [, result] = h.events.onScanSuccess.mock.calls[0] as unknown as [string, CameraScanResult];
       expect(Array.from(result.bytes ?? [])).toEqual([65, 66]);
       expect(result.corners?.[2]).toEqual({ x: 50, y: 50 });
-      expect(result.source).toBe('zxing');
+      expect(result.source).toBe('qr-decode');
       expect(result.durationMs).toBe(12);
     });
   });

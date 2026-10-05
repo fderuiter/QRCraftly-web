@@ -225,9 +225,9 @@ export function decodeCrop(frame: GreyFrame, crop: Rect): Decoded | null {
  * A multi-code search with one code read per crop (jsQR, the decoder before #1178, read one code
  * per image and missed one of four tiles in a 1080p frame), so the bench tries every layout as a
  * hypothesis: it cuts the frame into that layout's cells, assuming the screen
- * fills the frame, and keeps the hypothesis that decodes the most. The shipped scanner would use
- * zxing's multi-symbol read here. Search cost in the bench is therefore a stand-in, not a measurement
- * of that read.
+ * fills the frame, and keeps the hypothesis that decodes the most. A shipped receiver would use our
+ * reader's multi-code read here (up to eight codes per frame). Search cost in the bench is therefore
+ * a stand-in, not a measurement of that read.
  * @param frame - The camera frame.
  * @returns Every code found by the best hypothesis.
  */

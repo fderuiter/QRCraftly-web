@@ -8,7 +8,7 @@ import {
   type ScanResult,
   type ScanSource,
 } from './contracts';
-import { dispatchWorkerRequest, whenReaderOffered } from './workerRunner';
+import { dispatchWorkerRequest } from './workerRunner';
 import { decodeImageDataSync, decodeRgbaCode } from './decodeSync';
 import { decodeImageAtSizes, FILE_SCAN_MESSAGE, type FileScanRequest } from './imageFile';
 import { getNativeQrDetector, type NativeQrDetector } from './nativeDetector';
@@ -113,7 +113,7 @@ async function detectInImageFile(detector: NativeQrDetector, file: Blob): Promis
 
 /**
  * Decodes an image file: with the platform's detector when it reads QR codes (#1099), otherwise in
- * the scanner worker (zxing, else our reader), or here when the worker cannot. Concurrent calls are
+ * the scanner worker with our reader, or here when the worker cannot. Concurrent calls are
  * independent: a newer file does not fail because an older one is still being decoded.
  */
 async function scanImageFile(file: Blob, signal?: AbortSignal): Promise<Decoded> {
@@ -125,8 +125,6 @@ async function scanImageFile(file: Blob, signal?: AbortSignal): Promise<Decoded>
   const worker = dispatchWorkerRequest(request, [], {
     signal,
     timeoutMs: FILE_SCAN_TIMEOUT_MS,
-    // Post the file after the zxing reader, so the worker knows to wait for it.
-    before: whenReaderOffered,
   });
   const result = await worker;
   if (result.code || signal?.aborted) return { code: result.code ?? null, source: result.decoder ?? 'qr-decode' };

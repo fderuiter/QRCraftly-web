@@ -78,26 +78,25 @@ describe('Bundle Size Verification Script Tests', () => {
     expect(result.reports).toHaveLength(2);
   });
 
-  it('budgets the lazily loaded wasm reader separately from the site total (ADR 0023)', () => {
+  it('flags WebAssembly that is not one of our Rust modules, outside the site total (ADR 0036)', () => {
     fs.writeFileSync(path.join(TEMP_TEST_DIR, 'app.js'), 'console.log(1);');
     fs.writeFileSync(path.join(TEMP_TEST_DIR, 'reader.wasm'), 'B'.repeat(5000));
 
-    const result = verifyBundleSize(TEMP_TEST_DIR, 1, 10);
+    const result = verifyBundleSize(TEMP_TEST_DIR, 1);
     expect(result.exceeds).toBe(false);
-    expect(result.wasmGzipSize).toBeGreaterThan(0);
-    expect(result.wasmExceeds).toBe(false);
+    expect(result.unbudgetedWasm).toEqual(['reader.wasm']);
     expect(result.reports).toHaveLength(2);
-
-    expect(verifyBundleSize(TEMP_TEST_DIR, 1, 0.01).wasmExceeds).toBe(true);
   });
 
-  it('gives each Rust module its own line, outside the reader budget (#1182)', () => {
+  it('gives each Rust module its own line, outside the site total (#1182)', () => {
     fs.writeFileSync(path.join(TEMP_TEST_DIR, 'selftest.Bb9Mx2Pu.wasm'), randomBytes(20_000));
-    const result = verifyBundleSize(TEMP_TEST_DIR, 1, 1);
-    expect(result.wasmGzipSize).toBe(0);
+    const result = verifyBundleSize(TEMP_TEST_DIR, 1);
+    expect(result.exceeds).toBe(false);
+    expect(result.unbudgetedWasm).toEqual([]);
     expect(isOwnWasmModule('assets/static/selftest.Bb9Mx2Pu.wasm')).toBe(true);
     expect(isOwnWasmModule('selftest.wasm')).toBe(true);
-    expect(isOwnWasmModule('assets/static/zxing_reader.Bb9Mx2Pu.wasm')).toBe(false);
+    expect(isOwnWasmModule('assets/qr-decode-CADHaSzS.wasm')).toBe(true);
+    expect(isOwnWasmModule('assets/static/reader.Bb9Mx2Pu.wasm')).toBe(false);
     expect(isOwnWasmModule('selftester.wasm')).toBe(false);
   });
 

@@ -53,11 +53,9 @@ import {
   type TransferDensity,
 } from '../src/packages/optical-transfer/index.ts';
 import { renderCorpusFrame } from '../tests/utils/scannerCorpus.ts';
-import * as reader from '../src/packages/optical-scanner/reader.ts';
 import {
   measureDecoderPool,
   measureTrackedReads,
-  sampleTileCrop,
   runTearScenario,
   runTileTransfer,
   type PoolMeasurement,
@@ -231,28 +229,6 @@ async function benchTears(quick: boolean): Promise<TearRow[]> {
   return rows;
 }
 
-/** Crops per second one thread decodes with the shipped zxing-wasm reader (ADR 0023), same crop as the pool rows. */
-async function measureZxingThread(millis: number): Promise<number> {
-  const wasm = fs.readFileSync(path.join(REPO_ROOT, 'node_modules/zxing-wasm/dist/reader/zxing_reader.wasm'));
-  (globalThis as { ImageData?: unknown }).ImageData ??= class {
-    constructor(
-      public data: Uint8ClampedArray,
-      public width: number,
-      public height: number
-    ) {}
-  };
-  if (!(await reader.installZxing(await WebAssembly.compile(wasm)))) return 0;
-  const { grey, width, height } = await sampleTileCrop();
-  const rgba = new Uint8ClampedArray(grey.length * 4);
-  grey.forEach((v, i) => rgba.fill(v, i * 4, i * 4 + 3).fill(255, i * 4 + 3, i * 4 + 4));
-  let decoded = 0;
-  const end = performance.now() + millis;
-  while (performance.now() < end) {
-    if (await reader.decodeWithZxing(rgba, width, height)) decoded += 1;
-  }
-  return Math.round(decoded / (millis / 1000));
-}
-
 const TILE_STATUS = `### What this proves and what it does not (#1142)
 
 | Criterion                                                  | Bench result                                                                                                  | Status                                                                                                           |
@@ -260,13 +236,13 @@ const TILE_STATUS = `### What this proves and what it does not (#1142)
 | Mono 2x2 v25, 1080p, 30 fps, at least 100 KB/s            | 134.8 KB/s in the simulation                                                                                  | Met in the simulation only. A real camera, lens and screen are not in it.                                        |
 | 1 x v40 at least 60 KB/s                                   | 78.9 KB/s in the simulation                                                                                   | Met in the simulation only.                                                                                      |
 | Staggered refresh keeps at least 50% of tiles per torn frame | 2x2 v25: worst 75%, mean 78% (together: worst 50%, mean 56%). 3x2 v20: worst 67%.                             | Met for the tiled layouts. A single code (1 x v40) cannot stagger: a tear through it loses it.                   |
-| At least 120 decodes per second without dropping UI frames | jsQR, 4 threads here: 99 per second. zxing-wasm, 1 thread here: 328 per second. Main thread lag at most 6 ms. | Not shown. The 328 per second is a desktop-class core, not a mid-range phone, and Node has no browser UI thread. |
+| At least 120 decodes per second without dropping UI frames | Our reader: see the decoder threads table above. Main thread lag at most 6 ms. | Not shown. This is a desktop-class core, not a mid-range phone, and Node has no browser UI thread. |
 | Hold is a whole number of refreshes                        | Unit test with a stepped frame clock (\`multicode.test.ts\`)                                                    | Met, tested.                                                                                                     |
 | Scanner page behaviour unchanged                           | No scanner file changed; the new code is imported by nothing in the app                                       | Met by construction.                                                                                             |
 
-Not measured at all: a real camera's focus, exposure and rolling shutter; whether a phone resolves 4 px modules; how often tracking is lost with a hand-held phone (the crop margin is 3 modules, so a camera that drifts more than that between frames falls back to a full search); decoding in browser workers on a phone; thermal throttling; and the receiver's capture request and \`requestVideoFrameCallback\` (not built yet). The 60 fps row assumes a camera that really captures 60 distinct frames per second. The full search here scans layout hypotheses, reading one code per crop, so its cost is not the cost of zxing's multi-symbol read. The device list is in [the device checklist](TRANSFER_DEVICE_CHECKLIST.md).`;
+Not measured at all: a real camera's focus, exposure and rolling shutter; whether a phone resolves 4 px modules; how often tracking is lost with a hand-held phone (the crop margin is 3 modules, so a camera that drifts more than that between frames falls back to a full search); decoding in browser workers on a phone; thermal throttling; and the receiver's capture request and \`requestVideoFrameCallback\` (not built yet). The 60 fps row assumes a camera that really captures 60 distinct frames per second. The full search here scans layout hypotheses, reading one code per crop, so its cost is not the cost of our reader's multi-code read. The device list is in [the device checklist](TRANSFER_DEVICE_CHECKLIST.md).`;
 
-function renderTiles(tiles: TileRow[], tears: TearRow[], pool: PoolMeasurement[], zxingPerSecond: number, tracked: TrackedMeasurement): string[] {
+function renderTiles(tiles: TileRow[], tears: TearRow[], pool: PoolMeasurement[], tracked: TrackedMeasurement): string[] {
   const parts: string[] = ['## Multi-code frames (#1142)', ''];
   parts.push(
     'Several QR codes ("tiles") per frame, error correction L, a 60 Hz display held for 2 refreshes (30 fps) and a camera frame the same size as the screen. Real Prism frames, QR codes, pixels, decodes with our reader (qr-decode), tile tracking, dedup and receiver; simulated display and camera. The camera is sharp, level and in sync with the display (except in the two torn rows), so these rates are an upper bound for the code and the decode chain, not a prediction for a phone. Goodput is file bytes divided by the simulated camera time until the receiver verified the file, manifest and coding overhead included. The bench reads one code per crop, so the full search is a scan over layout hypotheses; one search runs per transfer and tracked frames decode crops only.',
@@ -307,10 +283,6 @@ function renderTiles(tiles: TileRow[], tears: TearRow[], pool: PoolMeasurement[]
     ''
   );
   parts.push(table(['Workers', 'Crop decodes per second', 'Main thread lag (max)'], pool.map((r) => [r.workers, r.decodesPerSecond, `${r.mainThreadMaxLagMs} ms`])), '');
-  parts.push(
-    `The camera scanner prefers zxing-wasm when it has loaded (ADR 0023). One thread of it decoded ${zxingPerSecond} of the same crop per second (the wasm runs with the reader's default options: invert, rotate and downscale tries on). It was measured on one thread only, so the pool rows above are our reader's scaling and not a zxing pool.`,
-    ''
-  );
   parts.push('### Fast path for tracked tiles (#1178)', '');
   parts.push(
     'Once a tile has been found, the receiver knows its corners, version and level, so our reader can sample its grid directly instead of searching (`readTracked`). One thread, the same 2x2 v25 crop as above, and the whole 1080p frame with all four tiles read in one call (the frame is copied into the module once per call).',
@@ -439,11 +411,9 @@ async function main(): Promise<void> {
     const tears = await benchTears(quick);
     const pool = await measureDecoderPool(quick ? [1, 2] : [1, 2, 3, 4], quick ? 1000 : 3000);
     for (const row of pool) process.stdout.write(`pool ${row.workers} workers: ${row.decodesPerSecond} decodes/s, main thread lag ${row.mainThreadMaxLagMs} ms\n`);
-    const zxingPerSecond = await measureZxingThread(quick ? 1000 : 3000);
-    process.stdout.write(`zxing one thread: ${zxingPerSecond} crop decodes/s\n`);
     const tracked = await measureTrackedReads(quick ? 1000 : 3000);
     process.stdout.write(`fast path: ${tracked.trackedPerSecond} reads/s vs ${tracked.fullPerSecond} full reads/s of the crop; ${tracked.frameTilesPerSecond} tiles/s from the whole frame\n`);
-    tileSection = renderTiles(tiles, tears, pool, zxingPerSecond, tracked);
+    tileSection = renderTiles(tiles, tears, pool, tracked);
   }
 
   if (args.includes('--write')) {

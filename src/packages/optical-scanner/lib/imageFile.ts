@@ -3,8 +3,7 @@
  *
  * A photo or screenshot is decoded at its native size capped at {@link FILE_SCAN_SIZES}[0] first,
  * where small codes in large photos still have enough pixels, then downscaled, where large, blurry
- * or noisy codes read better. Each size gets the zxing reader when the worker has it (ADR 0023),
- * otherwise our reader's multi-pass decode (#1178).
+ * or noisy codes read better. Each size gets our reader's multi-pass decode (#1178).
  */
 import { getDownscaledDimensions, mapCorners, type DecodedCode } from './contracts';
 
@@ -33,7 +32,7 @@ export interface PixelContext {
   getImageData(sx: number, sy: number, sw: number, sh: number): ImageData;
 }
 
-/** Decodes RGBA pixels: our reader's multi-pass decode, or the zxing reader in the worker. */
+/** Decodes RGBA pixels: our reader's multi-pass decode. */
 export type RgbaDecoder = (
   data: Uint8ClampedArray,
   width: number,

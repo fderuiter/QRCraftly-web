@@ -92,5 +92,13 @@ describe('Scanner Contract Payload Validation', () => {
 
       expect(() => assertScannerResponse(missingStatus)).toThrow();
     });
+
+    it('accepts only the decoders in the chain: native and qr-decode (ADR 0036)', () => {
+      const answer = (decoder: string) => ({ status: 'pass', sequenceId: 4, decodedData: 'A', decoder });
+
+      expect(isValidScannerResponse(answer('native'))).toBe(true);
+      expect(isValidScannerResponse(answer('qr-decode'))).toBe(true);
+      expect(isValidScannerResponse(answer('zxing'))).toBe(false);
+    });
   });
 });

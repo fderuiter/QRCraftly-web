@@ -72,8 +72,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "vike": "^0.4.247",
-    "vike-react": "^0.6.13",
-    "zxing-wasm": "3.1.4"
+    "vike-react": "^0.6.13"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

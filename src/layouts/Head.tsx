@@ -128,8 +128,9 @@ export default function HeadDefault() {
         script-src 'unsafe-inline' with per-page SHA-256 hashes).
         - script-src 'unsafe-inline': Required for JSON-LD scripts and Vike hydration in SSG;
           removed by the build-time hash injector.
-        - script-src 'wasm-unsafe-eval': Lets the scanner compile its self-hosted zxing-wasm
-          reader (ADR 0023). It allows WebAssembly compilation only, never JavaScript eval.
+        - script-src 'wasm-unsafe-eval': Lets the app compile its own self-hosted WebAssembly
+          modules, such as the qr-decode reader (ADR 0033, ADR 0036). It allows WebAssembly
+          compilation only, never JavaScript eval.
         - style-src 'unsafe-inline': Still required for React inline style attributes
           (dynamic preview styles). No third-party style hosts.
         - font-src 'self': No web-font CDN; the app renders with the system font stack.

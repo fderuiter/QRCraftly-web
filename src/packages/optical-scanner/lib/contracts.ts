@@ -13,10 +13,10 @@ export interface ScanPoint {
 export type ScanCorners = readonly [ScanPoint, ScanPoint, ScanPoint, ScanPoint];
 
 /**
- * Which decoder read a code: the platform's `BarcodeDetector`, the zxing-cpp WebAssembly reader
- * (ADR 0023) or our own Rust reader, `qr-decode` (#1178).
+ * Which decoder read a code: the platform's `BarcodeDetector` or our own Rust reader, `qr-decode`
+ * (#1178, ADR 0036).
  */
-export type ScanDecoder = 'native' | 'zxing' | 'qr-decode';
+export type ScanDecoder = 'native' | 'qr-decode';
 
 /** One decoded code, byte-exact (#1099). */
 export interface DecodedCode {
@@ -27,9 +27,6 @@ export interface DecodedCode {
   /** Where the code is, in the coordinates of the frame or image that was scanned, when known. */
   corners: ScanCorners | null;
 }
-
-/** Message type of the compiled zxing reader posted to the scanner worker (ADR 0023). */
-export const ZXING_MODULE_MESSAGE = 'zxing-module';
 
 /** Where a camera frame posted to the worker was cut from, in the camera's own pixels. */
 export interface ScanRegion {
@@ -112,7 +109,7 @@ export function mapCorners(
   return [map(corners[0]), map(corners[1]), map(corners[2]), map(corners[3])];
 }
 
-const DECODERS: readonly ScanDecoder[] = ['native', 'zxing', 'qr-decode'];
+const DECODERS: readonly ScanDecoder[] = ['native', 'qr-decode'];
 
 /** Checks the optional rich-result fields of a worker response. */
 function richFieldsError(d: Record<string, unknown>): string | null {
@@ -127,7 +124,7 @@ function richFieldsError(d: Record<string, unknown>): string | null {
     return 'Scanner response corners must be eight numbers or null';
   }
   if (d.decoder !== undefined && !DECODERS.includes(d.decoder as ScanDecoder)) {
-    return 'Scanner response decoder must be native, zxing or qr-decode';
+    return 'Scanner response decoder must be native or qr-decode';
   }
   return null;
 }

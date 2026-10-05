@@ -105,12 +105,14 @@ test.describe('Content Security Policy enforced', () => {
     expect(blobViolations).toEqual([]);
   });
 
-  test('the scanner compiles its self-hosted zxing reader under the CSP (ADR 0023)', async ({ page, context }) => {
+  test('the scanner compiles its self-hosted qr-decode reader under the CSP (ADR 0036)', async ({ page, context }) => {
     const warnings: string[] = [];
-    page.on('console', (message) => {
-      if (/zxing-reader-wasm unavailable/.test(message.text())) warnings.push(message.text());
-    });
-    const wasm = page.waitForResponse((response) => /\/assets\/.*zxing_reader[\w.-]*\.wasm$/.test(response.url()));
+    const record = (text: string) => {
+      if (/WasmModuleError|did not compile|wasm-runtime|WebAssembly/.test(text)) warnings.push(text);
+    };
+    page.on('console', (message) => record(message.text()));
+    page.on('pageerror', (error) => record(String(error)));
+    const wasm = page.waitForResponse((response) => /\/assets\/.*qr-decode[\w.-]*\.wasm$/.test(response.url()));
     await installFakeCamera(context);
     await page.reload();
     await page.waitForSelector('main[data-hydrated="true"]');

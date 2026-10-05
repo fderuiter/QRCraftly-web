@@ -27,14 +27,14 @@ function computeHash(filePath) {
   return hashSum.digest('hex').substring(0, 8);
 }
 
-// Files cached on first use instead of precached: the scanner's zxing-wasm
-// reader (about 400 KB gzipped, ADR 0023) is only needed by visitors who scan.
+// Files cached on first use instead of precached: our WebAssembly modules (ADR 0033), such as
+// the scanner's qr-decode reader, are only needed by visitors who use the tool that loads them.
 const RUNTIME_CACHED_EXTENSION = '.wasm';
 
 /**
  * Whether a dist/client file is cached on first use rather than precached.
  * @param {string} relativePath POSIX path relative to dist/client.
- * @returns {boolean} True for the lazily loaded WebAssembly reader.
+ * @returns {boolean} True for the lazily loaded WebAssembly modules.
  */
 function isRuntimeCached(relativePath) {
   return relativePath.endsWith(RUNTIME_CACHED_EXTENSION);
