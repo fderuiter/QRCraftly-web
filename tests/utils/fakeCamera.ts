@@ -37,7 +37,7 @@
  * `e2e/utils/opticalLink.ts`, by the file-transfer receiver spec.
  */
 import type { BrowserContext, Page } from '@playwright/test';
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from '../fixtures/qrEncoder';
 
 /** What the fake camera shows. All fields are optional; an empty scene is a plain grey view. */
 export interface FakeCameraScene {

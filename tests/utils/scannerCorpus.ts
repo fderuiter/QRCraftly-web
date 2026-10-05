@@ -30,7 +30,7 @@
  * results are comparable between runs and between git refs. The corpus has no real
  * phone photos yet; add them under `tests/fixtures/scanner/` with their licence noted.
  */
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from '../fixtures/qrEncoder';
 
 export type ErrorCorrection = 'L' | 'M' | 'Q' | 'H';
 
@@ -168,7 +168,7 @@ export function renderCorpusFrame(spec: CorpusSpec): { data: Uint8ClampedArray; 
         const mx = Math.floor(sx / modulePx) - QUIET_ZONE;
         const my = Math.floor(sy / modulePx) - QUIET_ZONE;
         const inside = mx >= 0 && my >= 0 && mx < count && my < count;
-        grey[y * width + x] = inside && qr.modules.get(my, mx) === 1 ? dark : light;
+        grey[y * width + x] = inside && qr.modules.get(my, mx) ? dark : light;
       }
     }
 

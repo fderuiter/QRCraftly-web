@@ -16,8 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import QRCode from 'qrcode';
-import { buildMatrix, fromQrcodePackage, isFinderPattern } from '@/packages/qr-matrix';
+import { buildMatrix, isFinderPattern, type QrEncoder } from '@/packages/qr-matrix';
 import { QRErrorCorrectionLevel, QRType } from '@/types';
 
 /** Reed-Solomon error correction tier. */
@@ -31,7 +30,7 @@ export const FALLBACK_PAYLOAD = 'https://qrcraftly.com';
 
 /**
  * A QR module matrix built once for an arcade target. Both game modes and the scannability
- * frame painter read the same matrix, so there is exactly one `QRCode.create` call per target.
+ * frame painter read the same matrix, so there is exactly one encode per target.
  */
 export interface TargetMatrix {
   /** Modules along one side. */
@@ -46,8 +45,6 @@ export interface TargetMatrix {
   usedFallback: boolean;
 }
 
-const encoder = fromQrcodePackage(QRCode);
-
 function toErrorCorrectionLevel(ecc: EccLevel): QRErrorCorrectionLevel {
   switch (ecc) {
     case 'L':
@@ -61,7 +58,7 @@ function toErrorCorrectionLevel(ecc: EccLevel): QRErrorCorrectionLevel {
   }
 }
 
-function encode(payload: string, ecc: EccLevel): TargetMatrix {
+function encode(payload: string, ecc: EccLevel, encoder: QrEncoder): TargetMatrix {
   // The payload is already the exact string the generator encodes (see `targetFromConfig`,
   // which applies `resolveEncodedValue`), so it is encoded verbatim here.
   const matrix = buildMatrix({ type: QRType.TEXT, value: payload, errorCorrectionLevel: toErrorCorrectionLevel(ecc) }, encoder);
@@ -79,17 +76,32 @@ function encode(payload: string, ecc: EccLevel): TargetMatrix {
  * Builds the module matrix for an arcade target.
  * @param payload - Text to encode. Empty or unencodable payloads fall back to {@link FALLBACK_PAYLOAD}.
  * @param ecc - Error correction tier.
+ * @param encoder - The QR encoder (`loadQrEncoder` from `@/packages/qr-matrix`).
  * @returns The matrix.
  */
-export function buildTargetMatrix(payload: string, ecc: EccLevel): TargetMatrix {
+export function buildTargetMatrix(payload: string, ecc: EccLevel, encoder: QrEncoder): TargetMatrix {
   if (payload.length > 0) {
     try {
-      return encode(payload, ecc);
+      return encode(payload, ecc, encoder);
     } catch {
       // Too long for any QR version: fall through to the fallback payload.
     }
   }
-  return { ...encode(FALLBACK_PAYLOAD, ecc), usedFallback: true };
+  return { ...encode(FALLBACK_PAYLOAD, ecc, encoder), usedFallback: true };
+}
+
+/** Modules along one side of {@link blankTargetMatrix}: a version 2 symbol. */
+const BLANK_SIZE = 25;
+
+/**
+ * An all-light matrix that stands in for a target while the encoder loads, so the game keeps its
+ * layout before the first real encode.
+ * @param payload - The payload the real matrix will encode.
+ * @param ecc - Error correction tier.
+ * @returns A blank matrix.
+ */
+export function blankTargetMatrix(payload: string, ecc: EccLevel): TargetMatrix {
+  return { size: BLANK_SIZE, modules: new Uint8Array(BLANK_SIZE * BLANK_SIZE), payload, ecc, usedFallback: false };
 }
 
 /**

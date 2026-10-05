@@ -17,11 +17,12 @@
 */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { isFinderPattern } from '@/packages/qr-matrix';
 import {
   analyzeDamage,
   applyBlast,
+  blankTargetMatrix,
   buildTargetMatrix,
   finderAt,
   FALLBACK_PAYLOAD,
@@ -43,9 +44,9 @@ afterEach(() => {
 });
 
 describe('target matrix', () => {
-  it('builds the matrix with a single QRCode.create call', () => {
+  it('builds the matrix with a single encode', () => {
     const create = vi.spyOn(QRCode, 'create');
-    const matrix = buildTargetMatrix('https://qrcraftly.com', 'H');
+    const matrix = buildTargetMatrix('https://qrcraftly.com', 'H', QRCode);
     expect(create).toHaveBeenCalledTimes(1);
     expect(matrix.size).toBeGreaterThanOrEqual(21);
     expect(matrix.modules).toHaveLength(matrix.size * matrix.size);
@@ -58,15 +59,21 @@ describe('target matrix', () => {
 
   it('encodes the payload verbatim, without re-normalizing it', () => {
     const create = vi.spyOn(QRCode, 'create');
-    const matrix = buildTargetMatrix('example.com', 'Q');
+    const matrix = buildTargetMatrix('example.com', 'Q', QRCode);
     expect(create).toHaveBeenCalledWith('example.com', { errorCorrectionLevel: 'Q' });
     expect(matrix.payload).toBe('example.com');
     expect(matrix.ecc).toBe('Q');
   });
 
   it('falls back when the payload is empty or too long', () => {
-    expect(buildTargetMatrix('', 'L')).toMatchObject({ payload: FALLBACK_PAYLOAD, usedFallback: true });
-    expect(buildTargetMatrix('x'.repeat(5000), 'H')).toMatchObject({ payload: FALLBACK_PAYLOAD, usedFallback: true });
+    expect(buildTargetMatrix('', 'L', QRCode)).toMatchObject({ payload: FALLBACK_PAYLOAD, usedFallback: true });
+    expect(buildTargetMatrix('x'.repeat(5000), 'H', QRCode)).toMatchObject({ payload: FALLBACK_PAYLOAD, usedFallback: true });
+  });
+
+  it('stands in with a blank board while the encoder loads', () => {
+    const blank = blankTargetMatrix('example.com', 'M');
+    expect(blank).toMatchObject({ size: 25, payload: 'example.com', ecc: 'M', usedFallback: false });
+    expect(blank.modules.every((m) => m === 0)).toBe(true);
   });
 
   it('shares finder geometry with the renderer', () => {

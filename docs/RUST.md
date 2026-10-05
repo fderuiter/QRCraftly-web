@@ -19,6 +19,7 @@ You only need Rust to change something in `crates/`. The built modules are commi
 | `cargo fmt --all` and `cargo clippy --all-targets -- -D warnings` (in `crates/`) | Format and lint, as CI does.                                                                                                      |
 | `node scripts/rust_no_deps_check.js`                                             | Part of `pnpm run lint`. Fails on any crate from outside the workspace, or a committed `.wasm` that does not match its `.sha256`. |
 | `pnpm run bench:wasm`                                                            | Reports each module's size, cold start and per-call time. Add `--json <file>` to save it.                                         |
+| `pnpm run bench:qr-encode`                                                       | Times the QR encoder per encode (p50 and p95) through its TypeScript wrapper. Add `--json <file>` to save it.                     |
 
 ## Layout
 
@@ -27,12 +28,14 @@ crates/
   Cargo.toml            workspace and release profile
   Cargo.lock            committed; lists workspace crates only
   rust-toolchain.toml   the pinned Rust version
-  core/                 qrcraftly-core: GF(256), CRC-32, the ABI and the module allocator
+  core/                 qrcraftly-core: GF(256), Reed-Solomon, CRC-32, the ABI and the module allocator
+  qr-encode/            the QR encoder (#1177), loaded by src/packages/qr-matrix
   selftest/             a tiny module that proves the build and the loader work
 src/wasm/               committed builds and their SHA-256 sidecars
 src/packages/wasm-runtime/
                         the TypeScript loader
-tests/foundry/          the differential harness, the self-test battery and bench:wasm
+tests/foundry/          the differential harness, the cross-engine batteries, the QR encoder
+                        golden test and the benchmarks
 ```
 
 ## Adding a module

@@ -229,7 +229,7 @@ To maintain security and reduce repository noise, QRCraftly uses **Dependabot** 
 - **Vite 6**: Fast build tool and development server.
 - **Vike**: Routing and build-time pre-rendering (every page is pre-rendered to static HTML).
 - **Tailwind CSS v4**: Utility-first CSS framework for styling.
-- **qrcode**: Library for generating QR code module data.
+- **Rust and WebAssembly**: QRCraftly's own QR encoder (`crates/qr-encode`), built to `src/wasm/` (see [docs/RUST.md](docs/RUST.md)).
 - **Lucide React**: Icon set.
 - **Vitest**: Testing framework.
 

@@ -24,6 +24,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { SimulatorMode } from './SimulatorMode';
 import { TargetSettings } from './TargetSettings';
 import { useArcadeTarget } from './useArcadeTarget';
+import { useQrEncoder } from '@/hooks/useQrEncoder';
 
 const PANEL_ID = 'arcade-mode-panel';
 const tabId = (mode: ArcadeMode) => `arcade-tab-${mode}`;
@@ -54,6 +55,8 @@ function useModeParam(): [ArcadeMode, (mode: ArcadeMode) => void] {
   return [mode, setMode];
 }
 
+const ignore = () => {};
+
 /**
  * The QR Arcade & Durability Lab: mode switcher, shared target state and the active mode.
  * @returns The arcade.
@@ -61,6 +64,7 @@ function useModeParam(): [ArcadeMode, (mode: ArcadeMode) => void] {
 export function ArcadeApp() {
   const [mode, setMode] = useModeParam();
   const { target, updateTarget, resetToGenerator, hasGeneratorDesign } = useArcadeTarget();
+  const encoder = useQrEncoder();
   const [announcement, setAnnouncement] = useState('');
   const announce = useCallback((message: string) => setAnnouncement(message), []);
 
@@ -112,11 +116,15 @@ export function ArcadeApp() {
 
       <div id={PANEL_ID} role="tabpanel" aria-labelledby={tabId(mode)}>
         <p className="sr-only">{activeMode.description}</p>
-        {mode === 'blaster' ? (
-          <BlasterMode target={target} settings={settings} announce={announce} />
-        ) : (
-          <SimulatorMode target={target} settings={settings} announce={announce} />
-        )}
+        {/* Until the encoder loads, the mode shows a blank board so the page keeps its layout; it is
+            inert and silent until the real target is built, which re-scans it. */}
+        <div inert={!encoder} aria-busy={!encoder} data-testid={encoder ? undefined : 'arcade-loading'}>
+          {mode === 'blaster' ? (
+            <BlasterMode target={target} encoder={encoder} settings={settings} announce={encoder ? announce : ignore} />
+          ) : (
+            <SimulatorMode target={target} encoder={encoder} settings={settings} announce={encoder ? announce : ignore} />
+          )}
+        </div>
       </div>
 
       <div role="status" aria-live="polite" className="sr-only" data-testid="arcade-announcer">

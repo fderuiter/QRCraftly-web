@@ -1,9 +1,11 @@
-import QRCode from 'qrcode';
 import { validateConfig } from '@/packages/qr-payload';
 import type { QRConfig } from '@/types';
-import { buildMatrix, fromQrcodePackage } from './lib/buildMatrix';
+import { buildMatrix } from './lib/buildMatrix';
+import { loadQrEncoder } from './lib/encoder';
 
-const encoder = fromQrcodePackage(QRCode);
+// Start loading the encoder with the worker, so the first code does not wait on it.
+// A failed load is retried by the next request.
+loadQrEncoder().catch(() => undefined);
 
 let latestSequenceId = -1;
 
@@ -40,6 +42,10 @@ self.onmessage = async (e: MessageEvent<{ config: QRConfig; sequenceId: number }
     }
 
     // 2. Perform QR calculations (Reed-Solomon & module layout)
+    const encoder = await loadQrEncoder();
+    if (sequenceId < latestSequenceId) {
+      return;
+    }
     const modules = buildMatrix(config, encoder);
 
     const size = modules.size;

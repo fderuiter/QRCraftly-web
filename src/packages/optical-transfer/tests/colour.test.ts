@@ -1,5 +1,5 @@
 import jsQR from 'jsqr';
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { describe, it, expect } from 'vitest';
 import {
   CALIBRATION_SWATCHES,

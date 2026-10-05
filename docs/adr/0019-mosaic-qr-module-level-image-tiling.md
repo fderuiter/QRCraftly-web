@@ -20,7 +20,7 @@ Mosaic QR is a style option (not a separate page) implemented with technique 3 i
 
 ### Engine (`src/packages/qr-matrix/lib/mosaic.ts`)
 
-- **No flipped modules.** The QR matrix from `qrcode` is used unchanged. Every module keeps its polarity, so error correction is not spent on the picture; it stays available for a centre logo and for print or camera damage. Uploading a mosaic sets error correction to H by default.
+- **No flipped modules.** The QR matrix from the encoder is used unchanged. Every module keeps its polarity, so error correction is not spent on the picture; it stays available for a centre logo and for print or camera damage. Uploading a mosaic sets error correction to H by default.
 - **Sampling.** The image is centre-cropped to a square ("cover" fit), composited over white, and area-averaged into one cell per module (`tiles`) or 3x3 sub-cells per module (`halftone`).
 - **Luminance clamping.** Colours are adjusted in linear light so hue is kept: dark modules are scaled down until their WCAG relative luminance is at most `darkMax`; light modules are mixed towards white until it is at least `lightMin`. In `halftone` mode only the centre sub-cell (the **Mosaic Core**) gets the strict limits; the eight outer sub-cells get looser ones and carry the image detail.
 - **Contrast setting.** One 0..1 value maps to the limits. At 0 the core contrast ratio is about 5:1; at 1 about 13:1. The default is 0.5. The linear-light helpers live in `src/utils/colorUtils.ts` (`srgbToLinear`, `linearToSrgb`, `getLuminanceFromLinearRgb`).

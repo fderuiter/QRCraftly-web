@@ -41,7 +41,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import jsQR from 'jsqr';
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from '../tests/fixtures/qrEncoder';
 import {
   FountainEncoder,
   TILE_LAYOUTS,

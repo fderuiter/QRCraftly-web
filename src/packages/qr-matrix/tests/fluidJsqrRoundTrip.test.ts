@@ -22,12 +22,12 @@
  * The production renderer draws into a tiny software canvas defined below, which
  * flattens the recorded paths (lines, quadratic curves, arcs) and fills them with
  * the canvas default non-zero winding rule into an RGBA buffer. That buffer is then
- * decoded with the real jsQR decoder. `qrcode` is globally mocked in vitest.setup.ts,
- * so the real encoder is loaded with `vi.importActual`.
+ * decoded with the real jsQR decoder.
  */
 
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import jsQR from 'jsqr';
+import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import {
   QRConfig,
   QRStyle,
@@ -37,8 +37,6 @@ import {
   TemplateStyle,
 } from '@/types';
 import { drawQRInternal, calculateLayout, clearFluidCache, isFinderSeparatorZone } from '../index';
-
-vi.unmock('qrcode');
 
 interface Point {
   x: number;
@@ -316,13 +314,6 @@ interface QRModulesLike {
   size: number;
   get: (row: number, col: number) => number | boolean;
 }
-
-type QRCodeModule = typeof import('qrcode');
-let QRCode: QRCodeModule;
-
-beforeAll(async () => {
-  QRCode = await vi.importActual<QRCodeModule>('qrcode');
-});
 
 const QUIET_MODULES = 4;
 

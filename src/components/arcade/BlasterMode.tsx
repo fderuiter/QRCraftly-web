@@ -30,6 +30,7 @@ import {
   BLASTER_WEAPONS,
   BlasterWeaponId,
   blasterWeaponForKey,
+  blankTargetMatrix,
   buildTargetMatrix,
   burnLaser,
   burst,
@@ -213,8 +214,11 @@ function drawScene(ctx: CanvasRenderingContext2D, s: Scene) {
  * @param props - Mode properties.
  * @returns The blaster.
  */
-export function BlasterMode({ target, settings, announce }: ModeProps) {
-  const matrix = useMemo(() => buildTargetMatrix(target.payload, target.ecc), [target.payload, target.ecc]);
+export function BlasterMode({ target, encoder, settings, announce }: ModeProps) {
+  const matrix = useMemo(
+    () => (encoder ? buildTargetMatrix(target.payload, target.ecc, encoder) : blankTargetMatrix(target.payload, target.ecc)),
+    [target.payload, target.ecc, encoder]
+  );
   const grid = useMemo(() => new MicroGrid(matrix), [matrix]);
   const [weapon, setWeapon] = useState<BlasterWeaponId>('plasma');
   const [autoFire, setAutoFire] = useState(false);
@@ -245,7 +249,7 @@ export function BlasterMode({ target, settings, announce }: ModeProps) {
     captureFrame: capture,
     expectedPayload: () => matrix.payload,
     isInputActive: () => pointerDownRef.current || spaceHeldRef.current || live.current.autoFire,
-    boardKey: `${matrix.payload}|${matrix.ecc}|${target.fgColor}|${target.bgColor}|${heals}`,
+    boardKey: `${matrix.payload}|${matrix.ecc}|${target.fgColor}|${target.bgColor}|${heals}|${encoder ? 'ready' : 'blank'}`,
   });
   const { defeatOpen, closeDefeat } = useArcadeStatus(analysis, scan.state, announce);
   const scanRef = useLatestRef(scan);

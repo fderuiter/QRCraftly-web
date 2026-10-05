@@ -33,7 +33,7 @@ describe('Acknowledgements page', () => {
       expect(within(row).getByText(pkg.version)).toBeInTheDocument();
       expect(within(row).getByText(pkg.license)).toBeInTheDocument();
     }
-    for (const pkg of ['react', 'qrcode', 'jsqr', 'vike']) {
+    for (const pkg of ['react', 'zxing-wasm', 'jsqr', 'vike']) {
       expect(shippedPackages.some((candidate) => candidate.name === pkg)).toBe(true);
     }
   });

@@ -27,6 +27,8 @@
  *
  * Compile once per URL (cached), then instantiate inside the worker that uses
  * the module. A compiled `WebAssembly.Module` can also be posted to a worker.
+ * Under Node (tests, scripts, pre-rendering) a `file:` URL is read from disk, so
+ * `new URL('…/x.wasm', import.meta.url)` works in both places.
  */
 
 /** The shared calling convention, matching `crates/core/src/abi.rs`. */
@@ -38,9 +40,10 @@ export const WASM_STATUS = {
   BAD_INPUT: 1,
   OUT_OF_MEMORY: 2,
   BUFFER_TOO_SMALL: 3,
+  DATA_TOO_LONG: 4,
 } as const;
 
-export type WasmErrorKind = 'origin' | 'fetch' | 'compile' | 'abi' | 'trap' | 'status' | 'memory';
+export type WasmErrorKind = 'origin' | 'load' | 'compile' | 'abi' | 'trap' | 'status' | 'memory';
 
 export class WasmModuleError extends Error {
   readonly kind: WasmErrorKind;
@@ -59,6 +62,7 @@ const STATUS_NAMES: Record<number, string> = {
   [WASM_STATUS.BAD_INPUT]: 'bad input',
   [WASM_STATUS.OUT_OF_MEMORY]: 'out of memory',
   [WASM_STATUS.BUFFER_TOO_SMALL]: 'output buffer too small',
+  [WASM_STATUS.DATA_TOO_LONG]: 'data too long',
 };
 
 /** Throws a typed error unless `status` is {@link WASM_STATUS.OK}. */
@@ -92,11 +96,39 @@ export async function compileWasmBytes(bytes: BufferSource): Promise<WebAssembly
 
 const compiled = new Map<string, Promise<WebAssembly.Module>>();
 
-async function fetchAndCompile(url: URL, fetchImpl: typeof fetch): Promise<WebAssembly.Module> {
-  const response = await fetchImpl(url, { credentials: 'same-origin' });
+/**
+ * Node's `fs.readFileSync`, when running under Node (`process.getBuiltinModule`,
+ * Node 22.3 and later). Browsers have no `process`, so this is null there.
+ */
+function nodeReadFile(): ((url: URL) => Uint8Array) | null {
+  const proc: unknown = Reflect.get(globalThis, 'process');
+  if (typeof proc !== 'object' || proc === null) return null;
+  const getBuiltinModule: unknown = Reflect.get(proc, 'getBuiltinModule');
+  if (typeof getBuiltinModule !== 'function') return null;
+  const fs: unknown = Reflect.apply(getBuiltinModule, proc, ['node:fs']);
+  if (typeof fs !== 'object' || fs === null) return null;
+  const readFileSync: unknown = Reflect.get(fs, 'readFileSync');
+  if (typeof readFileSync !== 'function') return null;
+  return (url) => {
+    const bytes: unknown = Reflect.apply(readFileSync, fs, [url]);
+    // A Node Buffer; under jsdom it comes from another realm, so check the view, not the class.
+    if (!ArrayBuffer.isView(bytes)) throw new WasmModuleError('load', `Could not read ${url.pathname}.`);
+    return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  };
+}
+
+/** A `file:` URL to read from disk under Node, or null for anything to fetch. */
+function nodeFileUrl(url: string | URL): URL | null {
+  if (typeof url === 'string' && !url.startsWith('file:')) return null;
+  const parsed = new URL(url);
+  return parsed.protocol === 'file:' ? parsed : null;
+}
+
+async function fetchAndCompile(url: URL, fetchImpl: typeof fetch | undefined): Promise<WebAssembly.Module> {
+  const response = await (fetchImpl ?? fetch)(url, { credentials: 'same-origin' });
   if (!response.ok) {
     // This literal also authorizes the fetch above in scripts/bundle_ast_audit.js.
-    throw new WasmModuleError('fetch', 'wasm-runtime: same-origin module fetch failed with HTTP ' + String(response.status));
+    throw new WasmModuleError('load', 'wasm-runtime: same-origin module fetch failed with HTTP ' + String(response.status));
   }
   // Streaming compile needs the application/wasm type; fall back to bytes otherwise.
   if (typeof WebAssembly.compileStreaming === 'function' && response.headers.get('content-type') === 'application/wasm') {
@@ -117,11 +149,26 @@ export function compileWasmUrl(
   url: string | URL,
   options: { base?: string; fetchImpl?: typeof fetch } = {},
 ): Promise<WebAssembly.Module> {
+  const file = nodeFileUrl(url);
+  const readFile = file ? nodeReadFile() : null;
+  if (file && readFile) {
+    const key = file.href;
+    const cached = compiled.get(key);
+    if (cached) return cached;
+    const pending = Promise.resolve()
+      .then(() => compileWasmBytes(readFile(file)))
+      .catch((error: unknown) => {
+        compiled.delete(key);
+        throw error;
+      });
+    compiled.set(key, pending);
+    return pending;
+  }
   const resolved = resolveSameOrigin(url, options.base ?? globalThis.location?.href);
   const key = resolved.href;
   const cached = compiled.get(key);
   if (cached) return cached;
-  const pending = fetchAndCompile(resolved, options.fetchImpl ?? fetch).catch((error: unknown) => {
+  const pending = fetchAndCompile(resolved, options.fetchImpl).catch((error: unknown) => {
     compiled.delete(key);
     throw error;
   });
@@ -232,11 +279,25 @@ export class WasmInstance {
   }
 }
 
-/** Instantiates a compiled module. Modules take no imports. */
-export async function instantiateWasm(module: WebAssembly.Module): Promise<WasmInstance> {
+function assertNoImports(module: WebAssembly.Module): void {
   if (WebAssembly.Module.imports(module).length > 0) {
     throw new WasmModuleError('abi', 'QRCraftly modules must not import anything.');
   }
+}
+
+/** Instantiates a compiled module. Modules take no imports. */
+export async function instantiateWasm(module: WebAssembly.Module): Promise<WasmInstance> {
+  assertNoImports(module);
   const instance = await WebAssembly.instantiate(module, {});
   return new WasmInstance(instance);
+}
+
+/**
+ * Instantiates a compiled module synchronously, for workers and Node. Chromium
+ * refuses synchronous instantiation of modules over 4 KB on the main thread, so
+ * pages use {@link instantiateWasm}.
+ */
+export function instantiateWasmSync(module: WebAssembly.Module): WasmInstance {
+  assertNoImports(module);
+  return new WasmInstance(new WebAssembly.Instance(module, {}));
 }

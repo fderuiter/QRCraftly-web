@@ -68,7 +68,28 @@ export const BENCH_CALLS: Record<string, WasmBenchCall[]> = {
       },
     },
   ],
+  'qr-encode': [
+    {
+      name: 'encode URL (M)',
+      prepare: (instance) => prepareEncode(instance, 1, 'https://qrcraftly.com/menu?table=12'),
+    },
+    {
+      name: 'encode v40 (L)',
+      prepare: (instance) => prepareEncode(instance, 0, 'abcdefghijklmnopqrstuvwxyz'.repeat(114).slice(0, 2953)),
+    },
+  ],
 };
+
+/** A raw `qr_encode` call with the best mask: level, smallest version, then UTF-8 text (crates/qr-encode). */
+function prepareEncode(instance: WasmInstance, level: number, text: string): () => void {
+  const encode = instance.fn('qr_encode');
+  const request = new Uint8Array([level, 0, 8, 0, ...new TextEncoder().encode(text)]);
+  const capacity = instance.fn('qr_output_capacity')(request.length);
+  const input = instance.alloc(request.length);
+  const output = instance.alloc(capacity);
+  instance.write(input, request);
+  return () => encode(input, request.length, output, capacity);
+}
 
 export interface WasmBenchOptions {
   /** Compiles and instantiations measured for the cold start; the median is reported. */

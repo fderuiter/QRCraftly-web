@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import {
   FountainEncoder,
   FountainDecoder,

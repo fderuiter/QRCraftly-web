@@ -31,6 +31,7 @@ export const MAX_LAZY_WASM_GZIPPED_SIZE_KB = 450;
  */
 export const WASM_MODULE_BUDGETS_KB = {
   selftest: 4,
+  'qr-encode': 20,
 };
 
 /**

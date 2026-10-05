@@ -34,3 +34,5 @@ pub const STATUS_BAD_INPUT: i32 = 1;
 pub const STATUS_OUT_OF_MEMORY: i32 = 2;
 /// An output buffer was too small.
 pub const STATUS_BUFFER_TOO_SMALL: i32 = 3;
+/// The data does not fit the requested symbol (for example a QR code longer than version 40 holds).
+pub const STATUS_DATA_TOO_LONG: i32 = 4;

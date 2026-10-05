@@ -24,6 +24,7 @@ import {
   analyzeDamage,
   applyBlast,
   BARRAGE_STRIKES,
+  blankTargetMatrix,
   buildTargetMatrix,
   finderAt,
   isDarkModule,
@@ -36,6 +37,7 @@ import {
 } from '@/packages/arcade';
 import { useEmpiricalScan, useLatestRef, useReducedMotion } from '@/packages/arcade/client';
 import type { ArcadeTarget } from '@/packages/arcade/handoff';
+import type { QrEncoder } from '@/packages/qr-matrix';
 import { ArcadeCockpit } from './ArcadeCockpit';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { DefeatModal } from './DefeatModal';
@@ -59,6 +61,8 @@ interface Ring {
 export interface ModeProps {
   /** Target under test. */
   target: ArcadeTarget;
+  /** The QR encoder that builds the target's matrix, or null while it loads (the board is blank). */
+  encoder: QrEncoder | null;
   /** Target settings panel. */
   settings: React.ReactNode;
   /** Screen-reader announcements. */
@@ -118,8 +122,11 @@ function drawBoard(
  * @param props - Mode properties.
  * @returns The simulator.
  */
-export function SimulatorMode({ target, settings, announce }: ModeProps) {
-  const matrix = useMemo(() => buildTargetMatrix(target.payload, target.ecc), [target.payload, target.ecc]);
+export function SimulatorMode({ target, encoder, settings, announce }: ModeProps) {
+  const matrix = useMemo(
+    () => (encoder ? buildTargetMatrix(target.payload, target.ecc, encoder) : blankTargetMatrix(target.payload, target.ecc)),
+    [target.payload, target.ecc, encoder]
+  );
   const [damage, setDamage] = useState<ReadonlySet<number>>(() => new Set());
   const [weaponId, setWeaponId] = useState<SimulatorWeaponId>('pinpoint');
   const [latency, setLatency] = useState(0);
@@ -150,7 +157,7 @@ export function SimulatorMode({ target, settings, announce }: ModeProps) {
     captureFrame: capture,
     expectedPayload: () => matrix.payload,
     isInputActive: () => drawingRef.current,
-    boardKey: `${matrix.payload}|${matrix.ecc}|${target.fgColor}|${target.bgColor}|${rebuilds}`,
+    boardKey: `${matrix.payload}|${matrix.ecc}|${target.fgColor}|${target.bgColor}|${rebuilds}|${encoder ? 'ready' : 'blank'}`,
   });
   const { defeatOpen, closeDefeat } = useArcadeStatus(analysis, scan.state, announce);
   const requestScan = scan.request;

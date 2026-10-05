@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import QRCode from 'qrcode';
+import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { scan } from '../index';
 
 // Node has no ImageData; scan() only needs its shape.
@@ -25,7 +25,7 @@ function renderQr(text: string, moduleSize: number, invert = false) {
       const mx = Math.floor(x / moduleSize) - 4;
       const my = Math.floor(y / moduleSize) - 4;
       const inside = mx >= 0 && my >= 0 && mx < qr.modules.size && my < qr.modules.size;
-      const dark = inside && qr.modules.get(my, mx) === 1;
+      const dark = inside && qr.modules.get(my, mx);
       const value = dark !== invert ? 0 : 255;
       const i = (y * size + x) * 4;
       data[i] = value;

@@ -17,14 +17,22 @@
 */
 
 export { drawQR, drawQRInternal } from './lib/renderer';
+export { buildMatrix, resolveEncodedValue, type QrEncoder, type MatrixSource } from './lib/buildMatrix';
 export {
-  buildMatrix,
-  resolveEncodedValue,
   loadQrEncoder,
-  fromQrcodePackage,
-  type QrEncoder,
-  type MatrixSource,
-} from './lib/buildMatrix';
+  createQrEncoder,
+  QrEncodeError,
+  QR_ENCODE_WASM_URL,
+  type QrSymbolEncoder,
+  type QrSymbol,
+  type QrModuleGrid,
+  type QrEncodeOptions,
+  type QrEncodeErrorKind,
+  type QrEncodedSegment,
+  type QrSegmentInput,
+  type QrSegmentMode,
+  type QrEccLetter,
+} from './lib/encoder';
 export { createMatrixWorker, createMazeWorker } from './lib/workerFactory';
 export {
   calculateLayout,

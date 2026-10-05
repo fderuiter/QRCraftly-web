@@ -10,7 +10,6 @@ const repoRoot = path.join(__dirname, '..');
 export const ALLOWED_DEPENDENCIES = new Set([
   'jsqr',
   'lucide-react',
-  'qrcode',
   'react',
   'react-dom',
   'vike',
