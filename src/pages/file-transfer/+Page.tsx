@@ -41,12 +41,6 @@ import { TransferModeSwitcher } from '@/components/TransferModeSwitcher';
 import { useOpticalSender } from '@/packages/optical-transfer/client';
 import { estimateTransferFrames, type TransferDensity } from '@/packages/optical-transfer';
 import { paintTransferFrame } from './paintTransferFrame';
-import { JsonLdScript } from '@/components/ui/JsonLdScript';
-import { generateSchema } from '@/utils/schemaGenerator';
-import { resolveDomainForPath } from '@/utils/metadataEngine';
-import { usePageContext } from 'vike-react/usePageContext';
-import { contentRegistry } from '@/data/contentRegistry';
-import { copy } from '@/data/copy/file-transfer';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import {
   PAUSED_ANNOUNCEMENT,
@@ -662,14 +656,9 @@ function FileTransferToolInner() {
  * @returns The rendered Page component wrapped in a QRProvider.
  */
 export default function Page() {
-  const pageContext = usePageContext();
-  const urlPathname = pageContext?.urlPathname ?? '/file-transfer';
-  const resolvedDomain = resolveDomainForPath(urlPathname);
-  const schemaData = generateSchema({ ...contentRegistry['file-transfer'], ...copy }, resolvedDomain, urlPathname);
 
   return (
     <QRProvider>
-      <JsonLdScript data={schemaData} />
       <FileTransferToolInner />
     </QRProvider>
   );

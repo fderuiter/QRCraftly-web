@@ -18,24 +18,16 @@
 
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { formatGuideDate } from '@/components/GuideArticle';
-import { JsonLdScript } from '@/components/ui/JsonLdScript';
-import { auxiliaryRegistry } from '@/data/contentRegistry';
 import { guides, readingMinutes } from '@/data/guides';
-import { generateGuideIndexSchema } from '@/utils/schemaGenerator';
-import { resolveDomainForPath } from '@/utils/metadataEngine';
 import { isDangerousUrl } from '@/utils/security';
-import { usePageContext } from 'vike-react/usePageContext';
 
 /**
  * The `/guides` index (#1038): every guide with its summary, date and reading time.
  * @returns The page.
  */
 export default function Page() {
-  const urlPathname = usePageContext()?.urlPathname ?? '/guides';
-  const content = auxiliaryRegistry['guides'];
   return (
     <>
-      <JsonLdScript data={generateGuideIndexSchema(content.description, resolveDomainForPath(urlPathname))} />
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <Breadcrumbs pageId="guides" />
         <h1 className="mb-3 text-3xl font-bold text-fg sm:text-4xl">QR code guides</h1>

@@ -20,6 +20,7 @@ import { render, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import HeadDefault from './Head';
 import { THEME_INIT_SCRIPT } from '@/utils/theme';
+import { getPageSchema } from '@/data/pageContent';
 
 // Hoist the mock functions so they can be used inside vi.mock
 const { mockUsePageContext, mockGetPublicDomain } = vi.hoisted(() => {
@@ -158,7 +159,7 @@ describe('HeadDefault', () => {
     render(<HeadDefault />, { container: document.head });
 
     const scripts = document.head.querySelectorAll('script[type="application/ld+json"]');
-    expect(scripts).toHaveLength(1);
+    expect(scripts).toHaveLength(2);
 
     const rootData = JSON.parse(scripts[0].textContent!);
     const breadcrumbNode = rootData['@graph'].find((item: any) => item['@type'] === 'BreadcrumbList');
@@ -287,7 +288,7 @@ describe('HeadDefault', () => {
     render(<HeadDefault />, { container: document.head });
 
     const scripts = document.head.querySelectorAll('script[type="application/ld+json"]');
-    expect(scripts).toHaveLength(1);
+    expect(scripts).toHaveLength(2);
 
     const rootData = JSON.parse(scripts[0].textContent!);
     const websiteNode = rootData['@graph'].find((item: any) => item['@type'] === 'WebSite');
@@ -306,7 +307,7 @@ describe('HeadDefault', () => {
     render(<HeadDefault />, { container: document.head });
 
     const scripts = document.head.querySelectorAll('script[type="application/ld+json"]');
-    expect(scripts).toHaveLength(1);
+    expect(scripts).toHaveLength(2);
 
     const rootData = JSON.parse(scripts[0].textContent!);
     const orgNode = rootData['@graph'].find((item: any) => item['@type'] === 'Organization');
@@ -415,5 +416,19 @@ describe('HeadDefault', () => {
     expect(data.itemListElement[0].item).toBe(expectedDomain);
     expect(data.itemListElement[1].name).toBe('About');
     expect(data.itemListElement[1].item).toBe(`${expectedDomain}/about`);
+  });
+
+  it("renders the page's own structured data after the site graph (#1058)", () => {
+    mockUsePageContext.mockReturnValue({ urlPathname: '/wifi-qr-code', config: {} });
+    render(<HeadDefault />, { container: document.head });
+    const scripts = document.head.querySelectorAll('script[type="application/ld+json"]');
+    expect(scripts).toHaveLength(2);
+    expect(JSON.parse(scripts[1].textContent!)).toEqual(getPageSchema('/wifi-qr-code'));
+  });
+
+  it('renders only the site graph for a page without its own structured data', () => {
+    mockUsePageContext.mockReturnValue({ urlPathname: '/privacy', config: {} });
+    render(<HeadDefault />, { container: document.head });
+    expect(document.head.querySelectorAll('script[type="application/ld+json"]')).toHaveLength(1);
   });
 });

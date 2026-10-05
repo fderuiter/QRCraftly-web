@@ -5,12 +5,16 @@ import { contentRegistry } from '@/data/contentRegistry';
 import { typeGuides } from '@/data/typeGuides';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { pageCopy } from '../../tests/utils/pageCopy';
+import { pathOf, withPageContent } from '../../tests/utils/pageContent';
 
 const renderSidebar = (toolId: string) =>
   render(
-    <PageCopyContext.Provider value={pageCopy(toolId)}>
-      <SidebarContent toolId={toolId} />
-    </PageCopyContext.Provider>
+    withPageContent(
+      pathOf(toolId),
+      <PageCopyContext.Provider value={pageCopy(toolId)}>
+        <SidebarContent toolId={toolId} />
+      </PageCopyContext.Provider>,
+    )
   );
 
 describe('getAboutHeading', () => {

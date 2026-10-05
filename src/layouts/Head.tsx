@@ -21,6 +21,7 @@ import type { PageContextServer } from 'vike/types';
 import { JsonLdScript } from '@/components/ui/JsonLdScript';
 import { resolveDomainForPath, resolvePublicUrl, resolveImageUrl, compileBreadcrumbSchema, getSanitizedPath, type JsonLdObject } from '@/utils/metadataEngine';
 import { getLegacyRedirect, getMetadataForPath } from '@/data/contentRegistry';
+import { getPageSchema } from '@/data/pageContent';
 import { THEME_INIT_SCRIPT } from '@/utils/theme';
 
 /**
@@ -110,6 +111,10 @@ export default function HeadDefault() {
     }
   }
 
+  // The page's own structured data (application, how-to, FAQ or article). It is built here, on
+  // the server, so the content modules it reads never ship to the browser (#1058).
+  const pageSchema = is404 ? undefined : getPageSchema(pageContext.urlPathname);
+
   const consolidatedSchema = {
     "@context": "https://schema.org",
     "@graph": schemaGraph
@@ -151,6 +156,7 @@ export default function HeadDefault() {
 
       {/* Global Structured Data */}
       <JsonLdScript data={consolidatedSchema} />
+      {pageSchema && <JsonLdScript data={pageSchema} />}
 
       {/* Canonical URL - Do not render for 404 pages to avoid indexing errors */}
       {!is404 && <link rel="canonical" href={canonicalUrl} />}

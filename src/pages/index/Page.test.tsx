@@ -20,6 +20,7 @@
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Page from './+Page';
+import { getPageSchema } from '@/data/pageContent';
 
 // Mock QRTool to avoid rendering complex children
 vi.mock('../../components/QRTool', () => ({
@@ -28,11 +29,8 @@ vi.mock('../../components/QRTool', () => ({
 
 describe('Home Page', () => {
   it('renders structured data with required SEO properties', () => {
-    const { container } = render(<Page />);
-    const script = container.querySelector('script[type="application/ld+json"]');
-    expect(script).toBeInTheDocument();
-
-    const json = JSON.parse(script?.textContent || '{}');
+    // Head renders the page's structured data at prerender time (#1058).
+    const json = JSON.parse(JSON.stringify(getPageSchema('/')));
     expect(json['@context']).toBe('https://schema.org');
     expect(json['@graph']).toBeDefined();
 

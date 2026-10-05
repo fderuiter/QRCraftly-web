@@ -42,7 +42,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { sidebarControls } from '@/registry';
 import { StressTestButton } from './arcade/StressTestButton';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from './ToolWorkspaceLayout';
-import { contentRegistry } from '@/data/contentRegistry';
+import { usePageContent } from '@/data/PageContentContext';
 import { MiniPreview } from './MiniPreview';
 import { getScanVerdict, type ScanFix, type ScanVerdict } from '@/packages/scannability';
 import { GeneratorCommands } from './command/GeneratorCommands';
@@ -122,7 +122,7 @@ const belowControls = sidebarControls.filter((c) => c.placement === 'below');
 function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: string }) {
   // Keyword-led H1 from the content registry (e.g. "Free WiFi QR Code Generator"); the brand
   // stays in the header link and the <title>.
-  const heading = contentRegistry[toolId]?.heading ?? title ?? 'QRCraftly';
+  const heading = usePageContent()?.tool?.heading ?? title ?? 'QRCraftly';
   const config = useQRStoreSelector(s => s.config);
   const store = useQRStore();
   const setModuleCount = store.setModuleCount;

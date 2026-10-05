@@ -16,20 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { usePageContext } from 'vike-react/usePageContext';
 import { navigate } from 'vike/client/router';
 import { CloudUpload, Gamepad2, ShieldCheck } from 'lucide-react';
 import { QRChecker } from '@/components/QRChecker';
 import type { ScanDescription } from '@/components/scanner/describeScan';
 import { SidebarContent } from '@/components/SidebarContent';
-import { JsonLdScript } from '@/components/ui/JsonLdScript';
-import { contentRegistry } from '@/data/contentRegistry';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
-import { landingPageContent } from '@/data/landingPageContent';
+import { usePageContent } from '@/data/PageContentContext';
+import type { ToolCopy } from '@/data/copy/types';
 import { QR_TYPE_ROUTES } from '@/data/navigation';
 import { stageGeneratorContent } from '@/context/QRContext';
-import { resolveDomainForPath } from '@/utils/metadataEngine';
-import { generateSchema } from '@/utils/schemaGenerator';
 
 /** The plain promises under the checker, each backed by how it works. */
 const PROMISES = [
@@ -51,23 +47,22 @@ function openInGenerator(scan: ScanDescription) {
   void navigate(QR_TYPE_ROUTES[scan.type]);
 }
 
+/** Copy used before the page's content is available. */
+const NO_COPY: ToolCopy = {};
+
 /**
  * Standalone QR code checker (/qr-code-checker, #1036): upload, drop or paste a picture of any
  * QR code and get a scannability report plus what it holds.
  * @returns The page.
  */
 export default function Page() {
-  const pageContext = usePageContext();
-  const urlPathname = pageContext?.urlPathname ?? '/qr-code-checker';
-  const content = contentRegistry['qr-code-checker'];
-  const copy = landingPageContent['qr-code-checker'];
-  const schemaData = generateSchema({ ...content, howTo: copy.howTo, faqs: copy.faqs }, resolveDomainForPath(urlPathname), urlPathname);
+  const page = usePageContent();
+  const copy = page?.landing ?? NO_COPY;
 
   return (
     <>
-      <JsonLdScript data={schemaData} />
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="mb-2 text-3xl font-bold text-fg sm:text-4xl">{content.heading}</h1>
+        <h1 className="mb-2 text-3xl font-bold text-fg sm:text-4xl">{page?.tool?.heading}</h1>
         <p className="mb-6 text-fg-soft">
           Find out what a QR code holds and whether it will scan, even after print blur. No sign-up, and nothing leaves your browser.
         </p>

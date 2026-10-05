@@ -5,15 +5,10 @@ import docsManifest from '../../data/docs_manifest.json';
 import { AccordionItem } from '@/components/ui/Accordion';
 import { ButtonLink } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { JsonLdScript } from '@/components/ui/JsonLdScript';
 import { ArticleHeading, ArticleLayout, type ArticleSection } from '@/components/ArticleLayout';
-import { contentRegistry } from '@/data/contentRegistry';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { copy } from '@/data/copy/security';
-import { generateSchema } from '@/utils/schemaGenerator';
-import { resolveDomainForPath } from '@/utils/metadataEngine';
 import { SidebarContent } from '@/components/SidebarContent';
-import { usePageContext } from 'vike-react/usePageContext';
 
 /**
  * Typography for compiled Markdown. The project does not ship `@tailwindcss/typography`, so
@@ -160,14 +155,9 @@ const SECTIONS: readonly ArticleSection[] = [
  * @returns The security page.
  */
 export default function Page() {
-  const pageContext = usePageContext();
-  const urlPathname = pageContext?.urlPathname ?? '/security';
-  const resolvedDomain = resolveDomainForPath(urlPathname);
-  const schemaData = generateSchema({ ...contentRegistry['security'], ...copy }, resolvedDomain, urlPathname);
 
   return (
     <>
-      <JsonLdScript data={schemaData} />
       <ArticleLayout
         title="Security & Privacy Transparency Hub"
         lead="What QRCraftly does with your data, in plain words, and the full policies behind it."

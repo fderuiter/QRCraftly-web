@@ -18,7 +18,6 @@
 
 import { GuideArticle } from '@/components/GuideArticle';
 import { getGuide } from '@/data/guides';
-import { usePageContext } from 'vike-react/usePageContext';
 
 const guide = getGuide('static-vs-dynamic-qr-codes');
 
@@ -27,6 +26,5 @@ const guide = getGuide('static-vs-dynamic-qr-codes');
  * @returns The page.
  */
 export default function Page() {
-  const urlPathname = usePageContext()?.urlPathname ?? '/guides/static-vs-dynamic-qr-codes';
-  return guide ? <GuideArticle guide={guide} urlPathname={urlPathname} /> : null;
+  return guide ? <GuideArticle guide={guide} /> : null;
 }

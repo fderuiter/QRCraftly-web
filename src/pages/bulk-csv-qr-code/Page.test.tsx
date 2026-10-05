@@ -19,6 +19,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Page from './+Page';
+import { getPageSchema } from '@/data/pageContent';
 
 interface SchemaNode {
   '@type'?: string | string[];
@@ -49,10 +50,8 @@ describe('Bulk CSV QR Code Page', () => {
   });
 
   it('renders structured data schema', () => {
-    const { container } = render(<Page />);
-    const script = container.querySelector('script[type="application/ld+json"]');
-    expect(script).toBeInTheDocument();
-    const json: unknown = JSON.parse(script?.textContent || '{}');
+    // Head renders the page's structured data at prerender time (#1058).
+    const json: unknown = JSON.parse(JSON.stringify(getPageSchema('/bulk-csv-qr-code')));
     if (!isSchemaGraph(json)) throw new Error('Expected a JSON-LD @graph');
     expect(json['@context']).toBe('https://schema.org');
     expect(json['@graph']).toBeDefined();

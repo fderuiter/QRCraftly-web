@@ -637,7 +637,12 @@ export const legacyRouteRegistry: Record<string, LegacyRouteContent> = {
   }
 };
 
-const getRegistryKeyForPath = (path: string): string => {
+/**
+ * Maps a pathname to its registry key: `/` is `index`, and `/wifi-qr-code/` is `wifi-qr-code`.
+ * @param path - A pathname.
+ * @returns The registry key.
+ */
+export const getRegistryKeyForPath = (path: string): string => {
   let cleanPath = getSanitizedPath(path);
   if (cleanPath !== "/" && cleanPath.endsWith("/")) {
     cleanPath = cleanPath.slice(0, -1);

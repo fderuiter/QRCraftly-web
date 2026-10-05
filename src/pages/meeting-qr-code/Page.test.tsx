@@ -19,6 +19,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Page from './+Page';
+import { getPageSchema } from '@/data/pageContent';
 
 vi.mock('../../components/QRTool', () => ({
   default: ({ initialConfig }: any) => (
@@ -38,10 +39,8 @@ describe('Meeting QR Code Page', () => {
   });
 
   it('does NOT render structured data schema with Virtual Meeting details but renders WebApplication', () => {
-    const { container } = render(<Page />);
-    const script = container.querySelector('script[type="application/ld+json"]');
-    expect(script).toBeInTheDocument();
-    const json = JSON.parse(script?.textContent || '{}');
+    // Head renders the page's structured data at prerender time (#1058).
+    const json = JSON.parse(JSON.stringify(getPageSchema('/meeting-qr-code')));
     expect(json['@context']).toBe('https://schema.org');
     
     const eventObj = json['@graph'].find((item: any) => item['@type'] === 'Event');

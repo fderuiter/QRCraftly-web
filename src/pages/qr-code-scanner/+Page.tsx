@@ -16,20 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { usePageContext } from 'vike-react/usePageContext';
 import { navigate } from 'vike/client/router';
 import { Camera, CloudUpload, ShieldCheck } from 'lucide-react';
 import { QRScanner } from '@/components/QRScanner';
 import type { ScanDescription } from '@/components/scanner/describeScan';
 import { SidebarContent } from '@/components/SidebarContent';
-import { JsonLdScript } from '@/components/ui/JsonLdScript';
-import { contentRegistry } from '@/data/contentRegistry';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
+import { usePageContent } from '@/data/PageContentContext';
 import { copy } from '@/data/copy/qr-code-scanner';
 import { QR_TYPE_ROUTES } from '@/data/navigation';
 import { stageGeneratorContent } from '@/context/QRContext';
-import { resolveDomainForPath } from '@/utils/metadataEngine';
-import { generateSchema } from '@/utils/schemaGenerator';
 
 /** The plain promises under the scanner, each backed by how the scanner works. */
 const PROMISES = [
@@ -58,16 +54,12 @@ function openInGenerator(scan: ScanDescription) {
  * @returns The page.
  */
 export default function Page() {
-  const pageContext = usePageContext();
-  const urlPathname = pageContext?.urlPathname ?? '/qr-code-scanner';
-  const content = contentRegistry['qr-code-scanner'];
-  const schemaData = generateSchema({ ...content, ...copy }, resolveDomainForPath(urlPathname), urlPathname);
+  const page = usePageContent();
 
   return (
     <>
-      <JsonLdScript data={schemaData} />
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="mb-2 text-3xl font-bold text-fg sm:text-4xl">{content.heading}</h1>
+        <h1 className="mb-2 text-3xl font-bold text-fg sm:text-4xl">{page?.tool?.heading}</h1>
         <p className="mb-6 text-fg-soft">
           Scan a QR code with your camera, or from a photo or screenshot. No app and no sign-up, and nothing leaves your
           browser.

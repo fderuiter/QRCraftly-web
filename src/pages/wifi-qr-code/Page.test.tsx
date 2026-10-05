@@ -20,6 +20,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Page from './+Page';
+import { getPageSchema } from '@/data/pageContent';
 
 // Mock QRTool component since we only want to test if it's passed correct props
 vi.mock('../../components/QRTool', () => ({
@@ -40,10 +41,8 @@ describe('WiFi QR Code Page', () => {
   });
 
   it('renders structured data schema', () => {
-    const { container } = render(<Page />);
-    const script = container.querySelector('script[type="application/ld+json"]');
-    expect(script).toBeInTheDocument();
-    const json = JSON.parse(script?.textContent || '{}');
+    // Head renders the page's structured data at prerender time (#1058).
+    const json = JSON.parse(JSON.stringify(getPageSchema('/wifi-qr-code')));
     expect(json['@context']).toBe('https://schema.org');
     expect(json['@graph']).toBeDefined();
     expect(json['@graph']).toHaveLength(3); // WebApplication, HowTo and FAQPage
