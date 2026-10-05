@@ -117,6 +117,8 @@ const MAX_ATTEMPTS: usize = 64;
 /// Share of timing-pattern modules a placement must read correctly before the
 /// whole grid is sampled. Noise scores about 50.
 const TIMING_MIN_PERCENT: usize = 70;
+/// Share a placement must read before the alignment pattern is searched for.
+const SEARCH_MIN_PERCENT: usize = 55;
 
 /// How hard to look.
 #[derive(Clone, Copy, Debug)]
@@ -159,7 +161,7 @@ pub struct Decoded {
 
 /// Tries every size a triple suggests until one decodes.
 fn decode_triple(binary: &Binary, luma: &Luma, t: &detect::Triple) -> Option<Decoded> {
-    let (module, sizes) = detect::dimensions(binary, t);
+    let (module, sizes, widths) = detect::dimensions(binary, t);
     let mut queue = sizes;
     let mut tried: Vec<usize> = Vec::new();
     while let Some(size) = (!queue.is_empty()).then(|| queue.remove(0)) {
@@ -167,17 +169,19 @@ fn decode_triple(binary: &Binary, luma: &Luma, t: &detect::Triple) -> Option<Dec
             continue;
         }
         tried.push(size);
-        for use_alignment in [true, false] {
-            let placement = detect::place(binary, t, module, size, use_alignment);
-            if !use_alignment && size == 21 {
-                break;
-            }
+        let map = detect::perspective(t, &widths, size);
+        // The timing patterns run beside the finders, so even without the
+        // alignment pattern a real code reads most of them; noise reads about
+        // half, and is not worth the search.
+        let bare = detect::place(t, size, None, map.as_ref());
+        if !detect::timing_passes(binary, &bare, SEARCH_MIN_PERCENT) {
+            continue;
+        }
+        let alignments = detect::alignments(binary, t, module, size, map.as_ref());
+        for alignment in alignments.into_iter().map(Some).chain([None]) {
+            let placement = detect::place(t, size, alignment, map.as_ref());
             if let Some(found) = decode_placement(binary, luma, t, &placement, &mut queue) {
                 return Some(found);
-            }
-            if placement.alignment.is_none() {
-                // Nothing different to try without it.
-                break;
             }
         }
     }
@@ -195,8 +199,7 @@ fn decode_placement(
 ) -> Option<Decoded> {
     let size = placement.size;
     {
-        let (matches, total) = detect::timing_score(binary, placement);
-        if matches * 100 < total * TIMING_MIN_PERCENT {
+        if !detect::timing_passes(binary, placement, TIMING_MIN_PERCENT) {
             return None;
         }
         let grid = detect::sample(binary, luma, placement)?;
@@ -264,7 +267,7 @@ fn scan(binary: &Binary, luma: &Luma, dense: bool, max: usize, out: &mut Vec<Dec
         return;
     }
     let mut used = [false; finder::MAX_CANDIDATES];
-    for t in detect::triples(&finders).iter().take(MAX_ATTEMPTS) {
+    for t in &detect::triples(&finders, MAX_ATTEMPTS) {
         if out.len() >= max {
             return;
         }

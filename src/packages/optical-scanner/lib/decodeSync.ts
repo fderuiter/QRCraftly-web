@@ -3,9 +3,6 @@
 import type { QrRead, QrReader } from '@/packages/qr-decode';
 import type { DecodedCode, ScanCorners } from './contracts';
 
-/** Frames smaller than this on either side skip the noise downscale. */
-const MIN_DOWNSCALE_DIMENSION = 160;
-
 /**
  * Box-filters RGBA pixels down to `scale` of their size.
  * @param data RGBA pixels.
@@ -108,14 +105,6 @@ const CAMERA_STRATEGIES: readonly CameraDecodeStrategy[] = ['centre', 'frame', '
 /** Longest edge of the whole-frame passes. */
 const FRAME_PASS_MAX_DIMENSION = 800;
 /**
- * Sensor-noise levels (median grey difference between neighbouring pixels) above which a pass
- * decodes a box-downscaled copy instead. Averaging 2x2 (or 3x3) pixels cuts the grain, so the
- * binarizer finds the code's edges rather than the sensor's, and the pass gets cheaper.
- */
-const NOISY_LEVEL = 6;
-const VERY_NOISY_LEVEL = 11;
-
-/**
  * Picks the strategy for a camera frame.
  * @param sequenceId The frame's sequence number within its scan session (1, 2, ...).
  * @returns The pass to run on that frame.
@@ -144,34 +133,9 @@ function cropCentre(
 }
 
 /**
- * Estimates sensor noise as the median absolute green-channel difference between horizontal
- * neighbours on a sample of rows. Codes and edges are a small share of neighbour pairs, so the
- * median tracks the grain of flat areas.
- * @returns The noise level in grey levels (0 for a clean frame).
- */
-export function estimateNoise(data: Uint8ClampedArray, width: number, height: number): number {
-  const histogram = new Uint32Array(256);
-  const rowStep = Math.max(1, Math.floor(height / 48));
-  let count = 0;
-  for (let y = rowStep >> 1; y < height; y += rowStep) {
-    let i = y * width * 4 + 1;
-    const end = i + (width - 1) * 4;
-    for (; i < end; i += 8) {
-      histogram[Math.abs(data[i] - data[i + 4])] += 1;
-      count += 1;
-    }
-  }
-  let seen = 0;
-  for (let level = 0; level < 256; level++) {
-    seen += histogram[level];
-    if (seen * 2 >= count) return level;
-  }
-  return 0;
-}
-
-/**
- * Decodes one camera frame with a single reader pass (see {@link CameraDecodeStrategy}). Noisy frames
- * are box-downscaled first.
+ * Decodes one camera frame with a single reader pass (see {@link CameraDecodeStrategy}). Grainy
+ * frames go in at full resolution: the reader's local thresholding copes with sensor noise, and
+ * box-downscaling them (which jsQR needed) halves its read rate on noisy frames.
  * @param reader The QR reader, from `loadQrReader`.
  * @param data RGBA pixels.
  * @param width Frame width.
@@ -192,10 +156,6 @@ export function decodeCameraCode(
     const longest = Math.max(image.width, image.height);
     if (strategy === 'frame' && longest > FRAME_PASS_MAX_DIMENSION) {
       image = downscaleRgba(image.data, image.width, image.height, FRAME_PASS_MAX_DIMENSION / longest);
-    }
-    const noise = estimateNoise(image.data, image.width, image.height);
-    if (noise >= NOISY_LEVEL && Math.min(image.width, image.height) >= MIN_DOWNSCALE_DIMENSION) {
-      image = downscaleRgba(image.data, image.width, image.height, noise >= VERY_NOISY_LEVEL ? 1 / 3 : 0.5);
     }
     if (strategy === 'inverted') {
       // Invert the pixels so this pass looks for light-on-dark codes only, at the cost of one pass.

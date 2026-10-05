@@ -34,8 +34,13 @@ import type { CorpusFrame } from './scannerCorpus';
 export const HARD_SUBSETS = ['clean', 'small_modules', 'noise', 'blur', 'perspective', 'low_contrast', 'inverted', 'combined_hard', 'negatives'] as const;
 export type HardSubset = (typeof HARD_SUBSETS)[number];
 
-/** The subsets #1178's parity gate is measured on. */
-export const GATE_SUBSETS: readonly HardSubset[] = ['small_modules', 'noise', 'blur', 'perspective', 'combined_hard'];
+/** A hard corpus frame, with where its symbol was drawn (for diagnosing a miss). */
+export interface HardFrame extends CorpusFrame {
+  symbol: { corners: Point[]; version: number } | null;
+}
+
+/** The subsets #1178's parity gate is measured on: every one with a code in it. */
+export const GATE_SUBSETS: readonly HardSubset[] = HARD_SUBSETS.filter((subset) => subset !== 'negatives');
 
 interface Random {
   u: () => number;
@@ -94,7 +99,7 @@ function payload(kind: 'url' | 'wifi' | 'vcard', r: Random): string {
   return `BEGIN:VCARD\nVERSION:3.0\nN:Doe;Jane\nFN:Jane Doe\nORG:Example Corp\nTEL;TYPE=CELL:+1 555 01${r.int(10, 99)}\nEMAIL;TYPE=INTERNET:jane.${token(r, 4)}@example.com\nADR:;;1 Main St;Springfield;IL;62701;USA\nURL:https://example.com\nEND:VCARD`;
 }
 
-type Point = [number, number];
+export type Point = [number, number];
 type Matrix3 = [number, number, number, number, number, number, number, number, number];
 
 /** The homography mapping each `src` point to its `dst` point. */
@@ -196,23 +201,25 @@ interface Drawing {
   cy: number;
 }
 
-/** Draws the symbol with a four-module quiet zone, each pixel the mean of 3 x 3 samples. */
-function drawCode(g: Float32Array, width: number, height: number, modules: { size: number; data: ArrayLike<number> }, d: Drawing): void {
+/**
+ * Draws the symbol with a four-module quiet zone, each pixel the mean of 3 x 3 samples.
+ * @returns The symbol's top-left, top-right, bottom-right and bottom-left corners in the frame.
+ */
+function drawCode(g: Float32Array, width: number, height: number, modules: { size: number; data: ArrayLike<number> }, d: Drawing): Point[] {
   const n = modules.size;
   const q = 4;
   const side = n + 2 * q;
   const corners = projectedCorners(width, height, side * d.modulePx, d.tilt, d.axis, d.rot, d.cx, d.cy);
-  const toModule = invert3(
-    solveHomography(
-      [
-        [0, 0],
-        [side, 0],
-        [side, side],
-        [0, side],
-      ],
-      corners
-    )
+  const toFrame = solveHomography(
+    [
+      [0, 0],
+      [side, 0],
+      [side, side],
+      [0, side],
+    ],
+    corners
   );
+  const toModule = invert3(toFrame);
   const xs = corners.map((c) => c[0]);
   const ys = corners.map((c) => c[1]);
   const x0 = Math.max(0, Math.floor(Math.min(...xs)));
@@ -246,6 +253,12 @@ function drawCode(g: Float32Array, width: number, height: number, modules: { siz
       }
     }
   }
+  const [a0, a1, a2, a3, a4, a5, a6, a7, a8] = toFrame;
+  const project = ([u, v]: Point): Point => {
+    const w = a6 * u + a7 * v + a8;
+    return [(a0 * u + a1 * v + a2) / w, (a3 * u + a4 * v + a5) / w];
+  };
+  return [project([q, q]), project([q + n, q]), project([q + n, q + n]), project([q, q + n])];
 }
 
 function boxBlur(g: Float32Array, width: number, height: number, radius: number): Float32Array {
@@ -305,11 +318,12 @@ const KINDS = ['url', 'wifi', 'vcard'] as const;
 const LEVELS = ['L', 'M', 'H'] as const;
 
 /** Fixture `i` of a subset with a code. */
-function sample(subset: Exclude<HardSubset, 'negatives'>, i: number): CorpusFrame {
+function sample(subset: Exclude<HardSubset, 'negatives'>, i: number): HardFrame {
   const r = makeRandom(hashString(`${subset}:${i}`));
   const [width, height] = SIZES[i % 2];
   const text = payload(KINDS[Math.floor(i / 2) % 3], r);
-  const modules = qrEncoder.create(text, { errorCorrectionLevel: LEVELS[Math.floor(i / 6) % 3] }).modules;
+  const symbol = qrEncoder.create(text, { errorCorrectionLevel: LEVELS[Math.floor(i / 6) % 3] });
+  const modules = symbol.modules;
   const fitMax = (Math.min(width, height) * 0.85) / (modules.size + 8);
   const pickModule = (lo: number, hi: number) => Math.min(fitMax, r.range(lo, hi));
   let dark = r.range(20, 45);
@@ -374,7 +388,7 @@ function sample(subset: Exclude<HardSubset, 'negatives'>, i: number): CorpusFram
   const cx = width / 2 + r.range(-0.1, 0.1) * width;
   const cy = height / 2 + r.range(-0.08, 0.08) * height;
   const drawing: Drawing = { modulePx, tilt, axis, rot, dark: invert ? light : dark, light: invert ? dark : light, cx, cy };
-  drawCode(g, width, height, modules, drawing);
+  const corners = drawCode(g, width, height, modules, drawing);
   if (invert) {
     // A light-on-dark code on a dark surface: invert the surroundings, then redraw the code.
     for (let k = 0; k < g.length; k++) g[k] = 255 - g[k];
@@ -395,24 +409,24 @@ function sample(subset: Exclude<HardSubset, 'negatives'>, i: number): CorpusFram
     for (let k = 0; k < g.length; k++) g[k] = g[k] * s + 5;
   }
   if (blur) g = blur.type === 'box' ? boxBlur(g, width, height, blur.radius) : gaussBlur(g, width, height, blur.sigma);
-  return { id: `${subset}/${i}`, category: subset, expected: text, data: toRgba(g, r, noise), width, height };
+  return { id: `${subset}/${i}`, category: subset, expected: text, data: toRgba(g, r, noise), width, height, symbol: { corners, version: symbol.version } };
 }
 
 /** Fixture `i` of the negatives: pure noise or a blurred scene, with no code. */
-function negative(i: number): CorpusFrame {
+function negative(i: number): HardFrame {
   const r = makeRandom(hashString(`negatives:${i}`));
   const [width, height] = SIZES[i % 2];
   const mode = Math.floor(i / 2) % 2 === 0 ? 'pure_noise' : 'scene';
   const sigma = [10, 14, 20, 30][Math.floor(i / 4) % 4];
   const g = mode === 'pure_noise' ? new Float32Array(width * height).fill(128) : gaussBlur(background(width, height, r), width, height, 1);
-  return { id: `negatives/${mode}/${i}`, category: 'negatives', expected: null, data: toRgba(g, r, sigma), width, height };
+  return { id: `negatives/${mode}/${i}`, category: 'negatives', expected: null, data: toRgba(g, r, sigma), width, height, symbol: null };
 }
 
 /**
  * Generates `count` frames per subset, subset by subset.
  * @param filter - Only fixtures whose id contains this text.
  */
-export function* generateHardCorpus(count = 60, filter?: string): Generator<CorpusFrame> {
+export function* generateHardCorpus(count = 60, filter?: string): Generator<HardFrame> {
   for (const subset of HARD_SUBSETS) {
     for (let i = 0; i < count; i++) {
       if (filter && !`${subset}/${i}`.includes(filter) && !subset.includes(filter)) continue;

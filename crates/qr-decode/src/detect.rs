@@ -22,7 +22,7 @@
 
 use crate::finder::Finder;
 use crate::image::{Binary, Luma};
-use crate::math::{abs, distance, floor, round};
+use crate::math::{abs, distance, floor, round, sqrt};
 use crate::symbol::Grid;
 use crate::transform::Projective;
 use alloc::vec;
@@ -38,30 +38,46 @@ pub struct Triple {
     score: f32,
 }
 
-/// Plausible finder triples, best first. A triple is plausible when its
-/// module sizes agree, its two legs are of similar length and meet at
-/// roughly a right angle.
-pub fn triples(finders: &[Finder]) -> Vec<Triple> {
+/// The `limit` best plausible finder triples, best first. A triple is
+/// plausible when its module sizes agree, its two legs are of similar length
+/// and meet at roughly a right angle.
+pub fn triples(finders: &[Finder], limit: usize) -> Vec<Triple> {
     let mut out = Vec::new();
     let n = finders.len();
+    // Every pair's distance once: there are far more triples than pairs.
+    let mut distances = vec![0.0f32; n * n];
+    for i in 0..n {
+        for j in i + 1..n {
+            let d = finders[i].distance(&finders[j]);
+            distances[i * n + j] = d;
+            distances[j * n + i] = d;
+        }
+    }
+    let distance = |a: usize, b: usize| distances[a * n + b];
+    // Kept sorted and cut to `limit` as it fills: a noisy frame can make
+    // thousands, and only the best are ever tried. Ties keep scan order.
     for i in 0..n {
         for j in i + 1..n {
             for k in j + 1..n {
-                if let Some(t) = triple(finders, [i, j, k]) {
-                    out.push(t);
+                let Some(t) = triple(finders, [i, j, k], &distance) else {
+                    continue;
+                };
+                let at = out.partition_point(|o: &Triple| o.score <= t.score);
+                if at < limit {
+                    out.insert(at, t);
+                    out.truncate(limit);
                 }
             }
         }
     }
-    out.sort_by(|a, b| {
-        a.score
-            .partial_cmp(&b.score)
-            .unwrap_or(core::cmp::Ordering::Equal)
-    });
     out
 }
 
-fn triple(finders: &[Finder], idx: [usize; 3]) -> Option<Triple> {
+fn triple(
+    finders: &[Finder],
+    idx: [usize; 3],
+    distance: &impl Fn(usize, usize) -> f32,
+) -> Option<Triple> {
     let p = [finders[idx[0]], finders[idx[1]], finders[idx[2]]];
     let sizes = [p[0].module, p[1].module, p[2].module];
     let (min, max) = (
@@ -72,9 +88,8 @@ fn triple(finders: &[Finder], idx: [usize; 3]) -> Option<Triple> {
         return None;
     }
     // The corner opposite the longest side is the top-left.
-    let d01 = p[0].distance(&p[1]);
-    let d12 = p[1].distance(&p[2]);
-    let d02 = p[0].distance(&p[2]);
+    let d = |a: usize, b: usize| distance(idx[a], idx[b]);
+    let (d01, d12, d02) = (d(0, 1), d(1, 2), d(0, 2));
     let (tl, a, b, hyp) = if d12 >= d01 && d12 >= d02 {
         (0, 1, 2, d12)
     } else if d02 >= d01 && d02 >= d12 {
@@ -83,8 +98,7 @@ fn triple(finders: &[Finder], idx: [usize; 3]) -> Option<Triple> {
         (2, 0, 1, d01)
     };
     let (mut tr, mut bl) = (a, b);
-    let leg_a = p[tl].distance(&p[tr]);
-    let leg_b = p[tl].distance(&p[bl]);
+    let (leg_a, leg_b) = (d(tl, tr), d(tl, bl));
     if leg_a < 1.0 || leg_b < 1.0 {
         return None;
     }
@@ -198,11 +212,32 @@ fn finder_width(img: &Binary, from: &Finder, to_x: f32, to_y: f32) -> Option<f32
     Some(forward + back - 1.0)
 }
 
+/// Each finder's full width measured along the triple's two legs: the
+/// top-left and top-right toward each other, the top-left and bottom-left
+/// toward each other.
+#[derive(Clone, Copy, Debug)]
+pub struct Widths {
+    tl_tr: Option<f32>,
+    tr_tl: Option<f32>,
+    tl_bl: Option<f32>,
+    bl_tl: Option<f32>,
+}
+
+impl Widths {
+    fn measure(img: &Binary, t: &Triple) -> Widths {
+        let (tl, tr, bl) = (&t.top_left, &t.top_right, &t.bottom_left);
+        Widths {
+            tl_tr: finder_width(img, tl, tr.x, tr.y),
+            tr_tl: finder_width(img, tr, tl.x, tl.y),
+            tl_bl: finder_width(img, tl, bl.x, bl.y),
+            bl_tl: finder_width(img, bl, tl.x, tl.y),
+        }
+    }
+}
+
 /// Module size from the finders' widths measured toward each other.
-fn module_size(img: &Binary, t: &Triple) -> f32 {
-    let one_way = |a: &Finder, b: &Finder| -> Option<f32> {
-        let ab = finder_width(img, a, b.x, b.y);
-        let ba = finder_width(img, b, a.x, a.y);
+fn module_size(t: &Triple, widths: &Widths) -> f32 {
+    let one_way = |ab: Option<f32>, ba: Option<f32>| -> Option<f32> {
         match (ab, ba) {
             (Some(x), Some(y)) => Some((x + y) / 14.0),
             (Some(x), None) | (None, Some(x)) => Some(x / 7.0),
@@ -210,8 +245,8 @@ fn module_size(img: &Binary, t: &Triple) -> f32 {
         }
     };
     let estimates = [
-        one_way(&t.top_left, &t.top_right),
-        one_way(&t.top_left, &t.bottom_left),
+        one_way(widths.tl_tr, widths.tr_tl),
+        one_way(widths.tl_bl, widths.bl_tl),
     ];
     match estimates {
         [Some(a), Some(b)] => (a + b) / 2.0,
@@ -220,9 +255,11 @@ fn module_size(img: &Binary, t: &Triple) -> f32 {
     }
 }
 
-/// Candidate symbol sizes for a triple, the likeliest first.
-pub fn dimensions(img: &Binary, t: &Triple) -> (f32, Vec<usize>) {
-    let module = module_size(img, t);
+/// The module size, candidate symbol sizes (the likeliest first) and the
+/// finder widths they came from.
+pub fn dimensions(img: &Binary, t: &Triple) -> (f32, Vec<usize>, Widths) {
+    let widths = Widths::measure(img, t);
+    let module = module_size(t, &widths);
     let across = (t.top_left.distance(&t.top_right) + t.top_left.distance(&t.bottom_left)) / 2.0;
     let d = round(across / module) as i32 + 7;
     let candidates: &[i32] = match d.rem_euclid(4) {
@@ -237,24 +274,26 @@ pub fn dimensions(img: &Binary, t: &Triple) -> (f32, Vec<usize>) {
         .filter(|s| (21..=177).contains(s))
         .map(|s| s as usize)
         .collect();
-    (module, sizes)
+    (module, sizes, widths)
 }
 
-/// Whether three runs read light-dark-light... as 1:1:1 at `module` pixels each.
+/// Whether three runs read light-dark-light... as 1:1:1 at about `module` pixels each.
+/// Perspective can make the pattern's own modules differ from the finders'
+/// estimate, so the runs are measured against their own mean, which must be
+/// near `module`, with half a pixel of slack for whole-pixel runs.
 fn alignment_ratio(c: &[u32; 3], module: f32) -> bool {
-    let max = module / 2.0;
-    c.iter().all(|&n| abs(module - n as f32) < max)
+    let local = (c[0] + c[1] + c[2]) as f32 / 3.0;
+    if local < 0.6 * module || local > 1.6 * module {
+        return false;
+    }
+    let max = local / 2.0 + 0.5;
+    c.iter().all(|&n| abs(local - n as f32) < max)
 }
 
-/// The centre of the bottom-right alignment pattern near (ex, ey), searching
-/// `allowance` modules around it.
-fn find_alignment(
-    img: &Binary,
-    module: f32,
-    ex: f32,
-    ey: f32,
-    allowance: f32,
-) -> Option<(f32, f32)> {
+/// Alignment pattern centres within `allowance` modules of (ex, ey), nearest
+/// first, with hits from neighbouring rows of one pattern merged.
+fn find_alignments(img: &Binary, module: f32, ex: f32, ey: f32, allowance: f32) -> Vec<(f32, f32)> {
+    let mut found: Vec<(f32, f32)> = Vec::new();
     let reach = allowance * module;
     let (w, h) = (img.width as f32, img.height as f32);
     let left = (ex - reach).max(0.0) as usize;
@@ -266,22 +305,9 @@ fn find_alignment(
         || (right - left) as f32 <= module * 3.0
         || (bottom - top) as f32 <= module * 3.0
     {
-        return None;
+        return found;
     }
-    let mut best: Option<(f32, f32, f32)> = None;
-    let middle = (top + bottom) / 2;
-    let rows = bottom - top;
-    for i in 0..rows {
-        // Rows nearest the estimate first.
-        let offset = i.div_ceil(2);
-        let y = if i % 2 == 0 {
-            middle + offset
-        } else {
-            middle.wrapping_sub(offset)
-        };
-        if y < top || y > bottom {
-            continue;
-        }
+    for y in top..=bottom {
         // Runs of one colour along the row, as (start, length, dark).
         let mut runs: [(usize, u32, bool); 3] = [(0, 0, false); 3];
         let mut x = left;
@@ -297,21 +323,17 @@ fn find_alignment(
                 let c = [runs[0].1, runs[1].1, runs[2].1];
                 if alignment_ratio(&c, module) {
                     if let Some(p) = check_alignment(img, module, &c, x, y) {
-                        let d = distance(p.0, p.1, ex, ey);
-                        if best.is_none_or(|b| d < b.2) {
-                            best = Some((p.0, p.1, d));
+                        if !found.iter().any(|f| distance(f.0, f.1, p.0, p.1) < module) {
+                            let d = distance(p.0, p.1, ex, ey);
+                            let at = found.partition_point(|f| distance(f.0, f.1, ex, ey) <= d);
+                            found.insert(at, p);
                         }
                     }
                 }
             }
         }
-        if let Some(b) = best {
-            if b.2 < module {
-                break;
-            }
-        }
     }
-    best.map(|b| (b.0, b.1))
+    found
 }
 
 /// Confirms an alignment hit down its column; returns the centre.
@@ -371,26 +393,132 @@ pub struct Placement {
     pub alignment: Option<(f32, f32)>,
 }
 
-/// Fixes the module-to-frame map for a triple at `size` modules a side. With
-/// `use_alignment`, the bottom-right alignment pattern anchors the fourth
-/// corner when one is found; otherwise the map is the parallelogram the three
-/// finders span.
-pub fn place(img: &Binary, t: &Triple, module: f32, size: usize, use_alignment: bool) -> Placement {
+type Homogeneous = (f32, f32, f32);
+
+fn cross(a: Homogeneous, b: Homogeneous) -> Homogeneous {
+    (
+        a.1 * b.2 - a.2 * b.1,
+        a.2 * b.0 - a.0 * b.2,
+        a.0 * b.1 - a.1 * b.0,
+    )
+}
+
+/// The vanishing point of the line from finder `a` to finder `b`, `span`
+/// modules apart, in homogeneous coordinates (at infinity when the code is
+/// seen square on). Along one line a projective map is fixed by the two
+/// centres and how wide each finder reads: the farther finder reads narrower.
+fn vanishing(
+    a: &Finder,
+    b: &Finder,
+    near: Option<f32>,
+    far: Option<f32>,
+    span: f32,
+) -> Option<Homogeneous> {
+    let (near, far) = (near?, far?);
+    let length = a.distance(b);
+    if length < 1.0 {
+        return None;
+    }
+    // With t(m) = k m / (r m + 1) from a (m = 0) to b (m = span), the slopes
+    // at the ends are k and k / (r span + 1)^2.
+    let g = sqrt(near / far).clamp(0.5, 2.0);
+    let r = (g - 1.0) / span;
+    let k = length * g / span;
+    let (ux, uy) = ((b.x - a.x) / length, (b.y - a.y) / length);
+    Some((a.x * r + ux * k, a.y * r + uy * k, r))
+}
+
+/// The map from module to frame coordinates that the three finders alone
+/// imply, perspective included: the fourth centre is where the line from
+/// the top-right toward the columns' vanishing point meets the line from the
+/// bottom-left toward the rows'. `None` when a finder cannot be measured.
+pub fn perspective(t: &Triple, widths: &Widths, size: usize) -> Option<Projective> {
+    let d = size as f32;
+    let span = d - 7.0;
+    let (tl, tr, bl) = (&t.top_left, &t.top_right, &t.bottom_left);
+    let rows = vanishing(tl, tr, widths.tl_tr, widths.tr_tl, span)?;
+    let columns = vanishing(tl, bl, widths.tl_bl, widths.bl_tl, span)?;
+    let corner = cross(
+        cross((tr.x, tr.y, 1.0), columns),
+        cross((bl.x, bl.y, 1.0), rows),
+    );
+    if abs(corner.2) < 1e-6 {
+        return None;
+    }
+    let br = (corner.0 / corner.2, corner.1 / corner.2);
+    // A corner past twice the finders' span is a bad measurement, not perspective.
+    let (px, py) = (tr.x - tl.x + bl.x, tr.y - tl.y + bl.y);
+    if distance(br.0, br.1, px, py) > tl.distance(tr).max(tl.distance(bl)) {
+        return None;
+    }
+    Some(Projective::quad_to_quad(
+        [
+            (3.5, 3.5),
+            (d - 3.5, 3.5),
+            (d - 3.5, d - 3.5),
+            (3.5, d - 3.5),
+        ],
+        [(tl.x, tl.y), (tr.x, tr.y), br, (bl.x, bl.y)],
+    ))
+}
+
+/// The most alignment pattern candidates tried for one placement.
+pub const MAX_ALIGNMENTS: usize = 3;
+
+/// Where the bottom-right alignment pattern of a triple at `size` modules a
+/// side may be, likeliest first. A data pattern can sit nearer the estimate
+/// than the real one, so several are kept.
+pub fn alignments(
+    img: &Binary,
+    t: &Triple,
+    module: f32,
+    size: usize,
+    map: Option<&Projective>,
+) -> Vec<(f32, f32)> {
+    if size <= 21 {
+        return Vec::new();
+    }
+    let d = size as f32;
+    let (ex, ey) = match map {
+        Some(map) => map.apply(d - 6.5, d - 6.5),
+        None => {
+            let (tl, tr, bl) = (&t.top_left, &t.top_right, &t.bottom_left);
+            let bx = tr.x - tl.x + bl.x;
+            let by = tr.y - tl.y + bl.y;
+            let correction = 1.0 - 3.0 / (d - 7.0);
+            (
+                tl.x + correction * (bx - tl.x),
+                tl.y + correction * (by - tl.y),
+            )
+        }
+    };
+    for allowance in [4.0, 8.0, 16.0] {
+        let mut found = find_alignments(img, module, ex, ey, allowance);
+        if !found.is_empty() {
+            found.truncate(MAX_ALIGNMENTS);
+            return found;
+        }
+    }
+    Vec::new()
+}
+
+/// Fixes the module-to-frame map for a triple at `size` modules a side. An
+/// alignment pattern anchors the fourth corner when given; otherwise the map
+/// is the parallelogram the three finders span.
+pub fn place(
+    t: &Triple,
+    size: usize,
+    alignment: Option<(f32, f32)>,
+    map: Option<&Projective>,
+) -> Placement {
     let d = size as f32;
     let (tl, tr, bl) = (&t.top_left, &t.top_right, &t.bottom_left);
-    let mut alignment = None;
-    if size > 21 && use_alignment {
-        let bx = tr.x - tl.x + bl.x;
-        let by = tr.y - tl.y + bl.y;
-        let correction = 1.0 - 3.0 / (d - 7.0);
-        let ex = tl.x + correction * (bx - tl.x);
-        let ey = tl.y + correction * (by - tl.y);
-        for allowance in [4.0, 8.0, 16.0] {
-            if let Some(p) = find_alignment(img, module, ex, ey, allowance) {
-                alignment = Some(p);
-                break;
-            }
-        }
+    if let (None, Some(map)) = (alignment, map) {
+        return Placement {
+            size,
+            transform: *map,
+            alignment,
+        };
     }
     let (corner, image_corner) = match alignment {
         Some(p) => ((d - 6.5, d - 6.5), p),
@@ -407,22 +535,30 @@ pub fn place(img: &Binary, t: &Triple, module: f32, size: usize, use_alignment: 
     }
 }
 
-/// How many timing-pattern modules (row and column 6 between the finders)
-/// read as they should, out of how many: a cheap test before sampling the
-/// whole grid. Noise matches about half; a real code nearly all. The pattern
-/// is symmetric, so a mirrored code scores the same.
-pub fn timing_score(img: &Binary, p: &Placement) -> (usize, usize) {
+/// Whether at least `percent` of the timing-pattern modules (row and column
+/// 6 between the finders) read as they should: a cheap test before sampling
+/// the whole grid. Noise matches about half; a real code nearly all. The
+/// pattern is symmetric, so a mirrored code scores the same. Stops as soon as
+/// the misses settle it.
+pub fn timing_passes(img: &Binary, p: &Placement, percent: usize) -> bool {
     let n = p.size;
-    let (mut matches, mut total) = (0, 0);
+    let total = 2 * n.saturating_sub(16);
+    // Fewer than `percent` match exactly when more than this many miss.
+    let allowed = total - (total * percent).div_ceil(100);
+    let mut misses = 0;
     for i in 8..n.saturating_sub(8) {
         for (r, c) in [(6, i), (i, 6)] {
             let (x, y) = p.transform.apply(c as f32 + 0.5, r as f32 + 0.5);
             let dark = img.get_i(floor(x) as i32, floor(y) as i32);
-            total += 1;
-            matches += usize::from(dark == i.is_multiple_of(2));
+            if dark != i.is_multiple_of(2) {
+                misses += 1;
+                if misses > allowed {
+                    return false;
+                }
+            }
         }
     }
-    (matches, total)
+    true
 }
 
 /// How close to its threshold a module's brightness may be before it counts as weak.

@@ -27,14 +27,16 @@ use crate::image::Binary;
 use crate::math::{abs as fabs, distance};
 use alloc::vec::Vec;
 
-/// A finder pattern centre, its estimated module size in pixels and how many
-/// scan lines confirmed it.
+/// A finder pattern centre, its estimated module size in pixels, how many
+/// scan lines confirmed it and how many of those fit the ratio without the
+/// half pixel of slack.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Finder {
     pub x: f32,
     pub y: f32,
     pub module: f32,
     pub count: u32,
+    pub tight: u32,
 }
 
 impl Finder {
@@ -50,7 +52,7 @@ impl Finder {
         false
     }
 
-    fn merge(&self, x: f32, y: f32, module: f32) -> Finder {
+    fn merge(&self, x: f32, y: f32, module: f32, tight: bool) -> Finder {
         let n = self.count as f32;
         let total = n + 1.0;
         Finder {
@@ -58,6 +60,7 @@ impl Finder {
             y: (n * self.y + y) / total,
             module: (n * self.module + module) / total,
             count: self.count + 1,
+            tight: self.tight + u32::from(tight),
         }
     }
 }
@@ -65,9 +68,12 @@ impl Finder {
 /// The most candidates kept, so a noisy frame cannot make detection quadratic in its noise.
 pub const MAX_CANDIDATES: usize = 48;
 
-/// Whether five run lengths are close enough to 1:1:3:1:1. `slack` is the
-/// allowed deviation as a fraction of a module.
-fn is_finder_ratio(counts: &[u32; 5], slack: f32) -> bool {
+/// Whether five run lengths are close enough to 1:1:3:1:1. Each run may be
+/// off by `slack_quarters` quarters of a module, plus half a pixel when
+/// `half_pixel`: runs are whole pixels while module edges are not, which
+/// matters for small modules. Integer arithmetic throughout, as this runs at
+/// every run boundary.
+fn is_finder_ratio(counts: &[u32; 5], slack_quarters: u32, half_pixel: bool) -> bool {
     if counts.contains(&0) {
         return false;
     }
@@ -75,13 +81,15 @@ fn is_finder_ratio(counts: &[u32; 5], slack: f32) -> bool {
     if total < 7 {
         return false;
     }
-    let module = total as f32 / 7.0;
-    let max = module * slack;
-    fabs(module - counts[0] as f32) < max
-        && fabs(module - counts[1] as f32) < max
-        && fabs(3.0 * module - counts[2] as f32) < 3.0 * max
-        && fabs(module - counts[3] as f32) < max
-        && fabs(module - counts[4] as f32) < max
+    // |module - run| < module * slack + 0.5, with module = total / 7, times 28.
+    let off = |run: u32, modules: u32| (modules * total).abs_diff(7 * run) * 4;
+    let pixel = if half_pixel { 14 } else { 0 };
+    let allowed = |modules: u32| modules * slack_quarters * total + pixel;
+    off(counts[0], 1) < allowed(1)
+        && off(counts[1], 1) < allowed(1)
+        && off(counts[2], 3) < allowed(3)
+        && off(counts[3], 1) < allowed(1)
+        && off(counts[4], 1) < allowed(1)
 }
 
 fn centre_from_end(counts: &[u32; 5], end: usize) -> f32 {
@@ -94,8 +102,9 @@ struct Scanner<'a> {
 }
 
 impl Scanner<'_> {
-    /// Re-measures the pattern down column `x` from row `y`; returns the centre row.
-    fn check_vertical(&self, x: usize, y: usize, max: u32, original: u32) -> Option<f32> {
+    /// Re-measures the pattern down column `x` from row `y`; returns the
+    /// centre row and whether it fits without the half pixel.
+    fn check_vertical(&self, x: usize, y: usize, max: u32, original: u32) -> Option<(f32, bool)> {
         let img = self.image;
         let h = img.height;
         let mut c = [0u32; 5];
@@ -145,14 +154,21 @@ impl Scanner<'_> {
         }
         let total: u32 = c.iter().sum();
         // A tilted code stretches one axis; allow the column to differ from the row by 60%.
-        if 5 * total.abs_diff(original) >= 3 * original || !is_finder_ratio(&c, 0.5) {
+        if 5 * total.abs_diff(original) >= 3 * original || !is_finder_ratio(&c, 2, true) {
             return None;
         }
-        Some(centre_from_end(&c, j))
+        Some((centre_from_end(&c, j), is_finder_ratio(&c, 2, false)))
     }
 
-    /// Re-measures along row `y` from column `x`; returns the centre column and the run total.
-    fn check_horizontal(&self, x: usize, y: usize, max: u32, original: u32) -> Option<(f32, u32)> {
+    /// Re-measures along row `y` from column `x`; returns the centre column,
+    /// the run total and whether it fits without the half pixel.
+    fn check_horizontal(
+        &self,
+        x: usize,
+        y: usize,
+        max: u32,
+        original: u32,
+    ) -> Option<(f32, u32, bool)> {
         let img = self.image;
         let w = img.width;
         let mut c = [0u32; 5];
@@ -201,14 +217,15 @@ impl Scanner<'_> {
             return None;
         }
         let total: u32 = c.iter().sum();
-        if 5 * total.abs_diff(original) >= original || !is_finder_ratio(&c, 0.5) {
+        if 5 * total.abs_diff(original) >= original || !is_finder_ratio(&c, 2, true) {
             return None;
         }
-        Some((centre_from_end(&c, j), total))
+        Some((centre_from_end(&c, j), total, is_finder_ratio(&c, 2, false)))
     }
 
-    /// The same ratio along the down-right diagonal through the centre.
-    fn check_diagonal(&self, x: usize, y: usize) -> bool {
+    /// The same ratio along the down-right diagonal through the centre:
+    /// `None` when it fails, else whether it fits without the half pixel.
+    fn check_diagonal(&self, x: usize, y: usize) -> Option<bool> {
         let img = self.image;
         let (x, y) = (x as i32, y as i32);
         let mut c = [0u32; 5];
@@ -217,7 +234,7 @@ impl Scanner<'_> {
             c[2] += 1;
             i += 1;
             if x < i || y < i {
-                return false;
+                return None;
             }
         }
         while x >= i && y >= i && !img.get_i(x - i, y - i) {
@@ -225,7 +242,7 @@ impl Scanner<'_> {
             i += 1;
         }
         if x < i || y < i {
-            return false;
+            return None;
         }
         while x >= i && y >= i && img.get_i(x - i, y - i) {
             c[0] += 1;
@@ -245,34 +262,36 @@ impl Scanner<'_> {
             c[4] += 1;
             i += 1;
         }
-        is_finder_ratio(&c, 0.75)
+        is_finder_ratio(&c, 3, true).then(|| is_finder_ratio(&c, 3, false))
     }
 
     /// Confirms a row hit and records it; true when it was a finder.
     fn handle(&mut self, counts: &[u32; 5], row: usize, end: usize) -> bool {
         let total: u32 = counts.iter().sum();
         let mut cx = centre_from_end(counts, end);
-        let Some(cy) = self.check_vertical(cx as usize, row, counts[2], total) else {
+        let Some((cy, tight_v)) = self.check_vertical(cx as usize, row, counts[2], total) else {
             return false;
         };
-        let Some((x, horizontal)) =
+        let Some((x, horizontal, tight_h)) =
             self.check_horizontal(cx as usize, cy as usize, counts[2], total)
         else {
             return false;
         };
         cx = x;
-        if !self.check_diagonal(cx as usize, cy as usize) {
+        let Some(tight_d) = self.check_diagonal(cx as usize, cy as usize) else {
             return false;
-        }
+        };
+        let tight = is_finder_ratio(counts, 2, false) && tight_v && tight_h && tight_d;
         let module = horizontal as f32 / 7.0;
         if let Some(existing) = self.found.iter_mut().find(|f| f.near(module, cx, cy)) {
-            *existing = existing.merge(cx, cy, module);
+            *existing = existing.merge(cx, cy, module, tight);
         } else if self.found.len() < 4 * MAX_CANDIDATES {
             self.found.push(Finder {
                 x: cx,
                 y: cy,
                 module,
                 count: 1,
+                tight: u32::from(tight),
             });
         }
         true
@@ -301,7 +320,7 @@ pub fn find(image: &Binary, dense: bool) -> Vec<Finder> {
                 c[state] += 1;
             } else if state & 1 == 0 {
                 if state == 4 {
-                    if is_finder_ratio(&c, 0.5) && scanner.handle(&c, y, x) {
+                    if is_finder_ratio(&c, 2, true) && scanner.handle(&c, y, x) {
                         c = [0; 5];
                         state = 0;
                         continue;
@@ -316,14 +335,15 @@ pub fn find(image: &Binary, dense: bool) -> Vec<Finder> {
                 c[state] += 1;
             }
         }
-        if state == 4 && is_finder_ratio(&c, 0.5) {
+        if state == 4 && is_finder_ratio(&c, 2, true) {
             scanner.handle(&c, y, w);
         }
         y += step;
     }
     let mut found = scanner.found;
-    // Most confirmed first; ties keep scan order.
-    found.sort_by_key(|f| core::cmp::Reverse(f.count));
+    found.retain(|f| f.count > 1 || f.module >= 1.5);
+    // Most confirmed first, then the closest fits; ties keep scan order.
+    found.sort_by_key(|f| core::cmp::Reverse((f.count, f.tight)));
     found.truncate(MAX_CANDIDATES);
     found
 }
