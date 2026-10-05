@@ -20,7 +20,7 @@ import { ToastProvider } from './ui/Toast';
 import { render, screen, fireEvent, waitFor, cleanup, within, act } from '@testing-library/react';
 import QRTool from './QRTool';
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
-import jsQR from 'jsqr';
+import { fakeQrRead } from '../../tests/utils/fakeQrRead';
 import { renderToString } from 'react-dom/server';
 import { contentRegistry } from '@/data/contentRegistry';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
@@ -28,9 +28,8 @@ import { pageCopy } from '../../tests/utils/pageCopy';
 import { axe } from 'vitest-axe';
 import { withPageContent } from '../../tests/utils/pageContent';
 
-vi.mock('jsqr', () => ({
-  default: vi.fn(),
-}));
+const qrRead = vi.hoisted(() => vi.fn());
+vi.mock('@/packages/qr-decode', () => ({ loadQrReader: () => Promise.resolve({ read: qrRead }) }));
 
 // Mock QRCanvas because it uses canvas which is hard to test in jsdom,
 // and we want to test App logic not the library
@@ -75,7 +74,7 @@ describe('QRTool Component', () => {
   const originalShowSaveFilePicker = (global as any).showSaveFilePicker;
 
   beforeEach(() => {
-    vi.mocked(jsQR).mockReturnValue({ data: 'https://qrcraftly.com' } as any);
+    qrRead.mockReturnValue([fakeQrRead('https://qrcraftly.com')]);
 
     // Mock URL.createObjectURL and URL.revokeObjectURL
     global.URL.createObjectURL = vi.fn(() => 'mock-url');
@@ -275,7 +274,7 @@ describe('QRTool Component', () => {
   });
 
   it('when scannability is unsafe and user clicks "Export Anyway" from the dropdown menu, download succeeds with allowUnsafe bypass', async () => {
-    vi.mocked(jsQR).mockReturnValue(null);
+    qrRead.mockReturnValue([]);
     const appendSpy = vi.spyOn(document.body, 'appendChild');
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click');
 
@@ -311,7 +310,7 @@ describe('QRTool Component', () => {
   });
 
   it('when scannability is unsafe and user clicks "Export Anyway" for SVG, vector export succeeds', async () => {
-    vi.mocked(jsQR).mockReturnValue(null);
+    qrRead.mockReturnValue([]);
     const appendSpy = vi.spyOn(document.body, 'appendChild');
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click');
 
@@ -347,7 +346,7 @@ describe('QRTool Component', () => {
   });
 
   it('when scannability is unsafe and user clicks "Export Anyway" for Copy, clipboard copy succeeds', async () => {
-    vi.mocked(jsQR).mockReturnValue(null);
+    qrRead.mockReturnValue([]);
     const mockWrite = vi.fn().mockResolvedValue(undefined);
     const originalClipboard = global.navigator.clipboard;
     const originalClipboardItem = (global as any).ClipboardItem;
@@ -397,7 +396,7 @@ describe('QRTool Component', () => {
   });
 
   it('when scannability is unsafe and user clicks "Export Anyway" for Share, Web Share succeeds', async () => {
-    vi.mocked(jsQR).mockReturnValue(null);
+    qrRead.mockReturnValue([]);
     const mockShare = vi.fn().mockResolvedValue(undefined);
     const mockCanShare = vi.fn().mockReturnValue(true);
     const originalShare = global.navigator.share;
@@ -822,7 +821,7 @@ describe('QRTool Component', () => {
     const SCANNABILITY_FAIL_TIMEOUT_MS = 5000;
 
     it('updates configuration when user applies the suggested contrast fix', async () => {
-      vi.mocked(jsQR).mockReturnValue(null); // Force scan verification failure
+      qrRead.mockReturnValue([]); // Force scan verification failure
 
       render(
         <ToastProvider>
@@ -849,7 +848,7 @@ describe('QRTool Component', () => {
     });
 
     it('updates configuration when user resets the colours', async () => {
-      vi.mocked(jsQR).mockReturnValue(null); // Force scan verification failure
+      qrRead.mockReturnValue([]); // Force scan verification failure
 
       render(
         <ToastProvider>

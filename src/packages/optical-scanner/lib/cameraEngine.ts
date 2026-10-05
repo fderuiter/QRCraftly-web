@@ -1,3 +1,4 @@
+import { loadQrReader, type QrReader } from '@/packages/qr-decode';
 import {
   cornersFromArray,
   getDownscaledDimensions,
@@ -22,7 +23,7 @@ import {
 
 /**
  * Hang budget: how long the worker may stay silent with a frame in flight before it is replaced.
- * Each frame costs one bounded jsQR pass, so a slow but healthy worker answers well within it;
+ * Each frame costs one bounded decoder pass, so a slow but healthy worker answers well within it;
  * only a real hang or crash restarts the worker (#1096).
  */
 const WATCHDOG_TIMEOUT_MS = DEFAULT_WATCHDOG_TIMEOUT_MS;
@@ -124,8 +125,9 @@ export interface CameraScannerEngineConfig extends CameraScannerEngineOptions {
   /** Frame grabber; defaults to `createImageBitmap` and a 2D canvas. */
   grabber?: CameraFrameGrabber;
   /**
-   * Main-thread decoder used after worker fallback; defaults to one jsQR pass per frame, rotating
-   * strategies by `sequenceId` like the worker does.
+   * Main-thread decoder used after worker fallback; defaults to one pass of our reader per frame,
+   * rotating strategies by `sequenceId` like the worker does. Frames before the reader has loaded
+   * count as misses.
    */
   decodeSync?: (
     pixels: CameraFramePixels,
@@ -199,6 +201,30 @@ function asDecodedCode(value: DecodedCode | string): DecodedCode {
 }
 
 /**
+ * The default main-thread decoder: our reader (#1178), loaded on the first frame. Until it has
+ * loaded, frames are misses; a failed load is retried on a later frame.
+ */
+function createDefaultDecodeSync(): NonNullable<CameraScannerEngineConfig['decodeSync']> {
+  let reader: QrReader | null = null;
+  let loading: Promise<void> | null = null;
+  return (pixels, width, height, sequenceId) => {
+    if (!reader) {
+      loading ??= loadQrReader().then(
+        (loaded) => {
+          reader = loaded;
+        },
+        (err: unknown) => {
+          console.error('The QR reader did not load for main-thread decoding:', err);
+          loading = null;
+        }
+      );
+      return null;
+    }
+    return decodeCameraCode(reader, pixels.data, width, height, cameraStrategyFor(sequenceId));
+  };
+}
+
+/**
  * Default grabber backed by `createImageBitmap` and a reusable 2D canvas.
  */
 function createDefaultGrabber(): CameraFrameGrabber {
@@ -239,10 +265,7 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
   const clock = config.clock ?? systemClock;
   const createWorker = config.createWorker ?? connectSharedScannerWorker;
   const grabber = config.grabber ?? createDefaultGrabber();
-  const decodeSync =
-    config.decodeSync ??
-    ((pixels: CameraFramePixels, width: number, height: number, sequenceId: number) =>
-      decodeCameraCode(pixels.data, width, height, cameraStrategyFor(sequenceId)));
+  const decodeSync = config.decodeSync ?? createDefaultDecodeSync();
   const { getSource } = config;
   const gate = createResultGate({
     confirmations: config.confirmations ?? 2,
@@ -276,7 +299,7 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
     onDelayChange: () => emit((e) => e.onMetricsChange?.(getMetrics())),
     onLatencyHistoryChange: () => emit((e) => e.onMetricsChange?.(getMetrics())),
     onScanSuccess: (data, result) => {
-      const scan = result ?? { text: data, bytes: null, corners: null, source: 'jsqr', durationMs: 0 };
+      const scan = result ?? { text: data, bytes: null, corners: null, source: 'qr-decode', durationMs: 0 };
       if (!gate.offer(data, scan.source, clock.now())) return;
       emit((e) => e.onScanSuccess?.(data, scan));
     },
@@ -318,7 +341,7 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
             text: payload.decodedData,
             bytes: payload.decodedBytes ?? null,
             corners,
-            source: payload.decoder ?? 'jsqr',
+            source: payload.decoder ?? 'qr-decode',
             durationMs: frameDuration(payload.sequenceId),
           }
         : undefined;
@@ -409,7 +432,7 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
           scheduler.endFrame(seqId, 'pass', code.text, null, undefined, {
             ...code,
             corners: mapCorners(code.corners, width / dims.width, height / dims.height),
-            source: 'jsqr',
+            source: 'qr-decode',
             durationMs: frameDuration(seqId),
           });
         } else {

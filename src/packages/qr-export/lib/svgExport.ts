@@ -340,8 +340,11 @@ export async function validateSvgScannability(
   if (!ctx) return false;
 
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const { performScannabilityCheck } = await import('@/packages/scannability/checker');
-  const result = performScannabilityCheck(imageData, canvas.width, canvas.height, true);
+  const [{ performScannabilityCheck }, { loadQrReader }] = await Promise.all([
+    import('@/packages/scannability/checker'),
+    import('@/packages/qr-decode'),
+  ]);
+  const result = performScannabilityCheck(await loadQrReader(), imageData, canvas.width, canvas.height, true);
   return result.success;
 }
 

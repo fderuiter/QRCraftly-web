@@ -20,6 +20,7 @@ import { QRConfig, QRStyle, SocialFormat, TemplateStyle } from '@/types';
 import { drawQRInternal } from '@/packages/qr-matrix';
 import { createScannabilityWorker, isWorkerResponse } from '@/packages/scannability';
 import { performScannabilityCheck } from '@/packages/scannability/checker';
+import { loadQrReader } from '@/packages/qr-decode';
 
 /** Side length, in CSS pixels, of the canvas the handshake frame is rendered onto for checking. */
 const DISPLAY_SIZE = 512;
@@ -45,7 +46,7 @@ export interface HandshakeVerifierDeps {
   /** Spawns a Scannability Worker, or returns null where workers are unavailable. */
   createWorker: () => Worker | null;
   /** Main-thread check used when the worker is unavailable, fails, or misses the watchdog. */
-  checkOnMainThread: (request: HandshakeCheckRequest) => boolean;
+  checkOnMainThread: (request: HandshakeCheckRequest) => boolean | Promise<boolean>;
   /** Creates the canvas the frame is rendered onto. */
   createCanvas: () => HTMLCanvasElement;
   /** Watchdog in milliseconds before the main-thread check takes over. */
@@ -55,8 +56,8 @@ export interface HandshakeVerifierDeps {
 /** Production capabilities: the real Scannability Worker and checker from `@/packages/scannability`. */
 const defaultHandshakeVerifierDeps: HandshakeVerifierDeps = {
   createWorker: createScannabilityWorker,
-  checkOnMainThread: ({ imageData, width, height, isTest, moduleCount }) =>
-    performScannabilityCheck(imageData, width, height, isTest, moduleCount).success,
+  checkOnMainThread: async ({ imageData, width, height, isTest, moduleCount }) =>
+    performScannabilityCheck(await loadQrReader(), imageData, width, height, isTest, moduleCount).success,
   createCanvas: () => document.createElement('canvas'),
   watchdogMs: HANDSHAKE_WATCHDOG_MS,
 };
@@ -148,9 +149,9 @@ export async function verifyHandshakeFrame(
   const request = renderHandshakeFrame(frame, config, logoImg, borderLogoImg, deps.createCanvas);
   if (!request) return true;
 
-  const fallback = (): boolean => {
+  const fallback = async (): Promise<boolean> => {
     try {
-      return deps.checkOnMainThread(request);
+      return await deps.checkOnMainThread(request);
     } catch {
       return false;
     }
@@ -167,7 +168,7 @@ export async function verifyHandshakeFrame(
 
   return new Promise<boolean>((resolve) => {
     let settled = false;
-    const settle = (decide: () => boolean) => {
+    const settle = (decide: () => boolean | Promise<boolean>) => {
       if (settled) return;
       settled = true;
       clearTimeout(watchdog);

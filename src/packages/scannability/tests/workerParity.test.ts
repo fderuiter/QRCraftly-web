@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
+import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { performScannabilityCheck, type PixelFrame } from '../checker';
 
 /** Rasterizes a QR code into RGBA pixels (black on white, 4-module quiet zone). */
@@ -86,7 +87,7 @@ describe('Scannability Worker parity with the main-thread check', () => {
     ['a frame without a code', blankFrame, 'BLANK'],
   ])('matches for %s', async (_label, makeFrame, configId) => {
     const frame = makeFrame();
-    const mainThread = performScannabilityCheck(frame, frame.width, frame.height, true, 25);
+    const mainThread = performScannabilityCheck(qrReader, frame, frame.width, frame.height, true, 25);
     const worker = await runInWorker(frame, configId, 25);
 
     expect(worker).toEqual({ ...mainThread, configId, sequenceId: undefined, buffer: undefined });
@@ -94,7 +95,7 @@ describe('Scannability Worker parity with the main-thread check', () => {
 
   it('flags a dangerous payload as a security violation on both paths', async () => {
     const frame = renderQr('javascript:alert(1)');
-    expect(performScannabilityCheck(frame, frame.width, frame.height, true)).toMatchObject({
+    expect(performScannabilityCheck(qrReader, frame, frame.width, frame.height, true)).toMatchObject({
       success: false,
       error: 'SECURITY_VIOLATION',
     });
@@ -106,7 +107,7 @@ describe('Scannability Worker parity with the main-thread check', () => {
 
   it('passes a clean code on both paths', async () => {
     const frame = renderQr('https://qrcraftly.com');
-    expect(performScannabilityCheck(frame, frame.width, frame.height, true)).toMatchObject({
+    expect(performScannabilityCheck(qrReader, frame, frame.width, frame.height, true)).toMatchObject({
       success: true,
       physicalReady: true,
     });

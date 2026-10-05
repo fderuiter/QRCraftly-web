@@ -1,3 +1,4 @@
+import { loadQrReader } from '@/packages/qr-decode';
 import { cameraStrategyFor, decodeCameraCode, decodeRgbaCode } from './decodeSync';
 import {
   isValidScannerRequest,
@@ -85,16 +86,17 @@ async function scanImageFile(file: unknown, sequenceId: number): Promise<void> {
     let bitmap: ImageBitmap | null = null;
     try {
       bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-      // A reader still being instantiated is worth the wait: it reads far more photos than jsQR.
+      // A zxing reader still being instantiated is worth the wait: it reads more photos than ours.
       const useZxing = await whenZxingSettled();
+      const reader = useZxing ? null : await loadQrReader();
       const code = await decodeImageAtSizes(
         bitmap,
         bitmap.width,
         bitmap.height,
         (width, height) => new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true }),
-        useZxing ? decodeWithZxing : decodeRgbaCode
+        reader ? (data, width, height) => decodeRgbaCode(reader, data, width, height) : decodeWithZxing
       );
-      response = { status: code ? 'pass' : 'fail', sequenceId, ...codeFields(code, useZxing ? 'zxing' : 'jsqr') };
+      response = { status: code ? 'pass' : 'fail', sequenceId, ...codeFields(code, useZxing ? 'zxing' : 'qr-decode') };
     } catch {
       response = { status: 'fail', sequenceId, error: FILE_SCAN_UNREADABLE };
     } finally {
@@ -140,12 +142,17 @@ self.onmessage = async (e: MessageEvent<ScannerWorkerMessage | null>) => {
       return;
     }
 
-    const code = decodeRgbaCode(data, requestWidth, requestHeight);
+    let code: DecodedCode | null = null;
+    try {
+      code = decodeRgbaCode(await loadQrReader(), data, requestWidth, requestHeight);
+    } catch {
+      // Our reader (#1178) did not load: answer with a miss so the buffer goes back to the pool.
+    }
 
     const response = {
       status: code ? ('pass' as const) : ('fail' as const),
       sequenceId,
-      ...codeFields(code, 'jsqr'),
+      ...codeFields(code, 'qr-decode'),
       buffer: requestBuffer ?? undefined,
       epochId,
     };
@@ -243,13 +250,13 @@ self.onmessage = async (e: MessageEvent<ScannerWorkerMessage | null>) => {
       console.error('Failed to close image after drawing:', err);
     }
 
-    // The zxing reader when it is ready (ADR 0023); otherwise one bounded jsQR pass per frame,
+    // The zxing reader when it is ready (ADR 0023); otherwise one bounded pass of ours per frame,
     // consecutive frames rotating strategies (#1096). The engine already cut the frame to match.
-    const decoder: ScanDecoder = zxingState() === 'ready' ? 'zxing' : 'jsqr';
+    const decoder: ScanDecoder = zxingState() === 'ready' ? 'zxing' : 'qr-decode';
     const found =
       decoder === 'zxing'
         ? await decodeWithZxing(imageData.data, width, height)
-        : decodeCameraCode(imageData.data, width, height, cameraStrategyFor(sequenceId));
+        : decodeCameraCode(await loadQrReader(), imageData.data, width, height, cameraStrategyFor(sequenceId));
     const code = toCameraFrame(found, width, height, region);
 
     const response = {

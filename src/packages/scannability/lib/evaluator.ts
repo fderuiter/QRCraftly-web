@@ -211,14 +211,21 @@ type RunCheck = (frame: PixelFrame, isTest: boolean, moduleCount?: number) => Sc
 let defaultRunCheck: Promise<RunCheck> | null = null;
 
 /**
- * The main-thread check, loaded on first use: it bundles the jsQR decoder, which the worker
- * already carries, so pages only download it when a check has to run on the main thread.
+ * The main-thread check, loaded on first use with the QR reader (#1178), so pages only download
+ * the reader's WebAssembly module when a check has to run on the main thread. A failed load is
+ * not kept, so a later check retries.
  */
 function loadDefaultRunCheck(): Promise<RunCheck> {
-  defaultRunCheck ??= import('./checker').then(
-    ({ performScannabilityCheck }): RunCheck =>
-      (frame, isTest, moduleCount) => performScannabilityCheck(frame, frame.width, frame.height, isTest, moduleCount)
-  );
+  defaultRunCheck ??= Promise.all([import('./checker'), import('@/packages/qr-decode')])
+    .then(([{ performScannabilityCheck }, { loadQrReader }]) => loadQrReader().then((reader) => ({ performScannabilityCheck, reader })))
+    .then(
+      ({ performScannabilityCheck, reader }): RunCheck =>
+        (frame, isTest, moduleCount) => performScannabilityCheck(reader, frame, frame.width, frame.height, isTest, moduleCount)
+    )
+    .catch((error: unknown) => {
+      defaultRunCheck = null;
+      throw error;
+    });
   return defaultRunCheck;
 }
 

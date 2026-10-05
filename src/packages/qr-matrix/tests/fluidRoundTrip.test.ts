@@ -22,11 +22,10 @@
  * The production renderer draws into a tiny software canvas defined below, which
  * flattens the recorded paths (lines, quadratic curves, arcs) and fills them with
  * the canvas default non-zero winding rule into an RGBA buffer. That buffer is then
- * decoded with the real jsQR decoder.
+ * decoded with our real decoder (#1178).
  */
 
 import { describe, it, expect } from 'vitest';
-import jsQR from 'jsqr';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import {
@@ -353,19 +352,15 @@ function renderFluidUncached(value: string, ecLevel: QRErrorCorrectionLevel, pxP
 
 const isDark = (rgb: [number, number, number]): boolean => rgb[0] + rgb[1] + rgb[2] < 384;
 
-describe('Fluid Ink jsQR round-trip (real pixels)', { timeout: 60_000 }, () => {
+describe('Fluid Ink round-trip (real pixels)', { timeout: 60_000 }, () => {
   // Two module sizes: before the fluid eyeball became a squircle, a round eyeball made
-  // jsQR miss the finder patterns at 8 and 16 px per module for some payloads.
+  // jsQR (the decoder before #1178) miss the finder patterns at 8 and 16 px per module for some payloads.
   for (const { name, value } of payloads) {
     for (const ec of ecLevels) {
       it(`decodes ${name} at EC ${ec}`, () => {
         for (const px of [8, 16]) {
           const { raster, size } = renderFluid(value, ec, px);
-          const code = jsQR(raster.data, size, size, { inversionAttempts: 'dontInvert' });
-          expect(code, `jsQR could not decode ${name} at EC ${ec}, ${px}px/module`).not.toBeNull();
-          expect(code?.data).toBe(value);
-          // Shadow run of our decoder (#1178), which replaces jsQR.
-          expect(qrReader.read(raster.data, size, size)[0]?.text, `qr-decode could not decode ${name} at EC ${ec}, ${px}px/module`).toBe(value);
+          expect(qrReader.read(raster.data, size, size)[0]?.text, `could not decode ${name} at EC ${ec}, ${px}px/module`).toBe(value);
         }
       });
     }

@@ -17,10 +17,12 @@
 */
 
 /*
- * The full pixel check (jsQR decode, optical print simulation, module contrast audit) has its own
- * entry point so callers can load it with `import()` when they need it. It bundles the jsQR
- * decoder, which generator pages should not download up front; the root entry stays free of it.
+ * The full pixel check (QR decode, optical print simulation, module contrast audit) has its own
+ * entry point so callers can load it with `import()` when they need it. Callers pass in the QR
+ * reader (`loadQrReader` from `@/packages/qr-decode`, #1178), which fetches its WebAssembly module
+ * on first use, so generator pages download neither up front.
  */
+import type { QrReader } from '@/packages/qr-decode';
 import type { QRConfig } from '@/types';
 import { performScannabilityCheck, type ScannabilityResult } from './lib/checker';
 import { calculateScannabilityHealth, type HealthScore } from './lib/scoring';
@@ -45,18 +47,21 @@ export interface EvaluateScannabilityOptions {
  * Headless evaluator that runs the unified Scannability Health pipeline against
  * pixel data or canvas images and produces an aggregated scannability evaluation report.
  *
+ * @param reader - The QR reader, from `loadQrReader`.
  * @param source - Image pixel data with dimensions.
  * @param config - Current QR code configuration profile.
  * @param options - Optional evaluation parameters (e.g. test flags, module count).
  * @returns Complete scannability evaluation outcome.
  */
 export function evaluateScannability(
+  reader: QrReader,
   source: ImageData | { data: Uint8ClampedArray; width: number; height: number },
   config: QRConfig,
   options: EvaluateScannabilityOptions = {}
 ): ScannabilityEvaluation {
   const isTest = options.isTest ?? (typeof navigator !== 'undefined' ? !!navigator.webdriver : false);
   const result = performScannabilityCheck(
+    reader,
     source,
     source.width,
     source.height,

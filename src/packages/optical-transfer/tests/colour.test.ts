@@ -1,4 +1,4 @@
-import jsQR from 'jsqr';
+import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { describe, it, expect } from 'vitest';
 import {
@@ -179,7 +179,7 @@ describe('colour frames (#1147)', () => {
       const rgba = new Uint8ClampedArray(plane.data.length * 4);
       plane.data.forEach((value, i) => rgba.fill(value, i * 4, i * 4 + 3));
       for (let i = 3; i < rgba.length; i += 4) rgba[i] = 255;
-      expect(jsQR(rgba, plane.width, plane.height)?.data).toBe(texts[channel]);
+      expect(qrReader.read(rgba, plane.width, plane.height, { inverted: true })[0]?.text).toBe(texts[channel]);
     });
   });
 

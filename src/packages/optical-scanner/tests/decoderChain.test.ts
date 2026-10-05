@@ -1,6 +1,6 @@
 /**
  * The decoder chain (#1099, ADR 0023): the platform detector first, the zxing-wasm reader in the
- * worker, jsQR last; multi-frame confirmation; byte-exact results.
+ * worker, our reader (#1178) last; multi-frame confirmation; byte-exact results.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,6 +8,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createNativeQrDetector, createResultGate, cameraStrategyFor, decodeCameraCode } from '../index';
 import { decodeWithZxing, installZxing, zxingState } from '../reader';
 import { renderCorpusFrame } from '../../../../tests/utils/scannerCorpus';
+import { qrReader } from '../../../../tests/fixtures/qrReader';
 
 const WASM = path.resolve('node_modules/zxing-wasm/dist/reader/zxing_reader.wasm');
 
@@ -27,16 +28,16 @@ function centreRegion(frame: { data: Uint8ClampedArray; width: number; height: n
 describe('result gate', () => {
   it('drops a single spurious decode and accepts two that agree within the window', () => {
     const gate = createResultGate();
-    expect(gate.offer('MISREAD', 'jsqr', 0)).toBe(false);
+    expect(gate.offer('MISREAD', 'qr-decode', 0)).toBe(false);
     expect(gate.offer('REAL', 'zxing', 100)).toBe(false);
     expect(gate.offer('REAL', 'zxing', 300)).toBe(true);
   });
 
   it('does not count agreeing decodes further apart than the window', () => {
     const gate = createResultGate({ windowMs: 500 });
-    expect(gate.offer('SLOW', 'jsqr', 0)).toBe(false);
-    expect(gate.offer('SLOW', 'jsqr', 800)).toBe(false);
-    expect(gate.offer('SLOW', 'jsqr', 1000)).toBe(true);
+    expect(gate.offer('SLOW', 'qr-decode', 0)).toBe(false);
+    expect(gate.offer('SLOW', 'qr-decode', 800)).toBe(false);
+    expect(gate.offer('SLOW', 'qr-decode', 1000)).toBe(true);
   });
 
   it('trusts the platform detector on one frame', () => {
@@ -55,12 +56,12 @@ describe('result gate', () => {
 
   it('emits every decode for streams (one confirmation, no hold) and forgets everything on reset', () => {
     const stream = createResultGate({ confirmations: 1, holdMs: 0 });
-    expect([stream.offer('F|0', 'jsqr', 0), stream.offer('F|0', 'jsqr', 10)]).toEqual([true, true]);
+    expect([stream.offer('F|0', 'qr-decode', 0), stream.offer('F|0', 'qr-decode', 10)]).toEqual([true, true]);
 
     const gate = createResultGate();
-    gate.offer('X', 'jsqr', 0);
+    gate.offer('X', 'qr-decode', 0);
     gate.reset();
-    expect(gate.offer('X', 'jsqr', 10)).toBe(false);
+    expect(gate.offer('X', 'qr-decode', 10)).toBe(false);
   });
 });
 
@@ -124,8 +125,8 @@ describe('zxing-wasm reader (ADR 0023)', () => {
     expect(zxing?.text).toBe('https://qrcraftly.com/scan');
     expect(zxing?.corners).not.toBeNull();
 
-    const jsqr = decodeCameraCode(region.data, region.width, region.height, cameraStrategyFor(1));
-    expect(jsqr?.text).toBe('https://qrcraftly.com/scan');
+    const ours = decodeCameraCode(qrReader, region.data, region.width, region.height, cameraStrategyFor(1));
+    expect(ours?.text).toBe('https://qrcraftly.com/scan');
   });
 
   it('returns the exact payload bytes, not just text', async () => {

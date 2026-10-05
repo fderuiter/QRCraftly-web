@@ -32,7 +32,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { qrEncoder as QRCode } from '../tests/fixtures/qrEncoder';
 import { composeBeacon, composeColourTile, fitCrossTalk, qrModuleCount, samplePatch, splitChannels } from '../src/packages/optical-transfer/index.ts';
-import { CLEAN_CHANNEL, COLOUR_BLIND_CHANNEL, MILD_CHANNEL, REFERENCE_CHANNEL, capture, jsqrDecoders, runColourTransfer, type CameraChannel, type ColourRunMode, type ColourRunResult } from '../tests/utils/colourBench.ts';
+import { CLEAN_CHANNEL, COLOUR_BLIND_CHANNEL, MILD_CHANNEL, REFERENCE_CHANNEL, capture, qrDecoders, runColourTransfer, type CameraChannel, type ColourRunMode, type ColourRunResult } from '../tests/utils/colourBench.ts';
 import { createRandom } from '../tests/utils/scannerCorpus.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -86,7 +86,7 @@ async function benchCorrection(): Promise<Array<Array<string | number>>> {
       const seen = capture(tile, channel, 0, createRandom(seed));
       const patch = samplePatch(capture(beacon, channel, 0, createRandom(seed + 100)), code, modules);
       const model = patch ? fitCrossTalk(patch) : null;
-      const read = (planes: ReturnType<typeof splitChannels>) => planes.filter((plane, i) => jsqrDecoders.decodePlane(plane)?.text === texts[i]).length;
+      const read = (planes: ReturnType<typeof splitChannels>) => planes.filter((plane, i) => qrDecoders.decodePlane(plane)?.text === texts[i]).length;
       raw += read(splitChannels(seen, null, null));
       corrected += read(splitChannels(seen, null, model));
     }
@@ -108,7 +108,7 @@ function render(rows: Row[], correction: Array<Array<string | number>>, bytes: n
   const coresNeeded = (colour.decodeMsPerFrame / (1000 / FPS)).toFixed(1);
   const parts: string[] = [COLOUR_BLOCK_START, '', '## Colour layer (#1147)', ''];
   parts.push(
-    `Written by \`pnpm run bench:colour --write\` (minutes; \`bench:transfer --write\` keeps this block). The Colour profile (Fast with three Prism frames in every tile, one per colour channel, and the same beacons) against the monochrome Fast profile, 2x2 v25 tiles, error correction L, 1080p, 30 fps (a 60 Hz display held for 2 refreshes, one sender frame per camera frame), a ${(bytes / 1000).toFixed(0)} KB random file. Real Prism frames, QR codes, pixels, jsQR decodes, cross-talk fit and correction, tile tracking, dedup and receiver; simulated screen and camera. The camera mixes the three channels through a 3x3 matrix, scales them with a white balance that shifts mid-transfer (red up 12%, blue down 14% over 10 frames from frame 24), shares colour over 2x2 pixels and adds per-pixel and per-8x8-block noise as a JPEG-like stand-in (it is not a JPEG codec). The camera is sharp, level and in sync with the display, so these rates are an upper bound for the code and decode chain, not a prediction for a phone. Goodput is file bytes divided by simulated camera time until the receiver verified the file, start-up included: Colour waits for its first beacon (one in 12 frames), the monochrome receiver is told where its tiles are and pays no wait.`,
+    `Written by \`pnpm run bench:colour --write\` (minutes; \`bench:transfer --write\` keeps this block). The Colour profile (Fast with three Prism frames in every tile, one per colour channel, and the same beacons) against the monochrome Fast profile, 2x2 v25 tiles, error correction L, 1080p, 30 fps (a 60 Hz display held for 2 refreshes, one sender frame per camera frame), a ${(bytes / 1000).toFixed(0)} KB random file. Real Prism frames, QR codes, pixels, decodes with our reader (qr-decode), cross-talk fit and correction, tile tracking, dedup and receiver; simulated screen and camera. The camera mixes the three channels through a 3x3 matrix, scales them with a white balance that shifts mid-transfer (red up 12%, blue down 14% over 10 frames from frame 24), shares colour over 2x2 pixels and adds per-pixel and per-8x8-block noise as a JPEG-like stand-in (it is not a JPEG codec). The camera is sharp, level and in sync with the display, so these rates are an upper bound for the code and decode chain, not a prediction for a phone. Goodput is file bytes divided by simulated camera time until the receiver verified the file, start-up included: Colour waits for its first beacon (one in 12 frames), the monochrome receiver is told where its tiles are and pays no wait.`,
     ''
   );
   parts.push(
@@ -158,7 +158,7 @@ function render(rows: Row[], correction: Array<Array<string | number>>, bytes: n
     ''
   );
   parts.push(
-    `Decode cost. A tile costs three plane decodes, so Colour needs ${colour.decodesPerSecond} plane decodes per second at 30 fps here (a 4-tile frame is 12 decodes; the issue's 360 to 720 per second is the same figure at 30 and 60 fps), against ${mono.decodesPerSecond} for monochrome. The time column is real jsQR plus the channel correction on this machine, single thread, loaded: ${colour.decodeMsPerFrame} ms per camera frame is about ${coresNeeded} cores' worth at 30 fps. Goodput above assumes the decoder keeps up with the camera; on a device that cannot, the rate falls by the same factor and the receiver should report its tier. The shipped reader is zxing-wasm (328 crop decodes per second on one thread of this machine, measured above), not jsQR.`,
+    `Decode cost. A tile costs three plane decodes, so Colour needs ${colour.decodesPerSecond} plane decodes per second at 30 fps here (a 4-tile frame is 12 decodes; the issue's 360 to 720 per second is the same figure at 30 and 60 fps), against ${mono.decodesPerSecond} for monochrome. The time column is our reader plus the channel correction on this machine, single thread, loaded: ${colour.decodeMsPerFrame} ms per camera frame is about ${coresNeeded} cores' worth at 30 fps. Goodput above assumes the decoder keeps up with the camera; on a device that cannot, the rate falls by the same factor and the receiver should report its tier. The camera scanner prefers zxing-wasm when it has loaded (ADR 0023).`,
     ''
   );
   parts.push(

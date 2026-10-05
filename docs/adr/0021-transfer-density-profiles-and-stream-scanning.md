@@ -29,6 +29,9 @@ The fountain code already absorbs lost frames, so per-frame error correction onl
   `resolveFountainSymbolSize` accepts ECC L, M, Q or H and QR versions up to 20. `MAX_SYMBOL_SIZE` rises to 400 bytes. `estimateTransferFrames` gives the page a frame and time estimate before the transfer starts. The legacy `F|` carousel keeps its own chunk size and the appearance ECC raised to Q.
 
 - **Multi-scale decode** (`decodeRgbaFrame` in `optical-scanner/lib/decodeSync.ts`): every decode path in the scanner worker tries jsQR dark-on-light at full size, then dark-on-light on a 0.6 box-filtered copy, then both polarities at full size.
+
+  > **Amendment (#1178):** jsQR was replaced by QRCraftly's own decoder (`src/packages/qr-decode`), so the 0.6 copy, a jsQR workaround, is gone; `decodeRgbaCode` makes one call with local thresholds, one global threshold and a half-size pass, each in both polarities.
+
 - **Scheduler recovery** (`AdaptiveFrameScheduler`): when the median decode latency is below the current sampling delay, the delay moves halfway towards it, so a stream that settles at 40 to 100 ms per decode speeds up again. The transfer receiver also caps its sampling delay at 150 ms.
 - **Receiver recovery**: fountain droplets are accepted after an error, and the next fountain progress clears it. The camera engine skips a video element until it has a frame (`readyState` 2 or more).
 - **Receiver UX**: a blocked, missing or busy camera gets a plain explanation and a "Use a video file instead" action. The completion panel shows the file name, size and SHA-256, and a "Receive another file" action.

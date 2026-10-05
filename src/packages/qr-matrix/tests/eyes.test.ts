@@ -83,7 +83,7 @@ describe('renderEyes', () => {
     expect(ctx.fill).toHaveBeenCalled();
   });
 
-  it('renders fluid eyes with a squircle eyeball (no circle, so jsQR finds the finder)', () => {
+  it('renders fluid eyes with a squircle eyeball (no circle, so decoders find the finder)', () => {
     const ctx = createMockCtx();
     renderEyes(ctx, { ...baseConfig, style: QRStyle.FLUID }, 0, 0, 10, 21);
 

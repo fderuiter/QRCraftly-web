@@ -1,6 +1,7 @@
 import { AdaptiveFrameScheduler } from '@/packages/optical-scanner/scheduler';
 import { applyOpticalSimulationMath } from '@/packages/scannability';
-import jsQR from 'jsqr';
+import type { QrReader } from '@/packages/qr-decode';
+import { qrReader } from '../fixtures/qrReader';
 
 /**
  * Optical degradation profile options for simulated scannability checks.
@@ -50,6 +51,8 @@ export interface WorkerQueueConfig {
  * Configuration options for the OpticalScannerHarness.
  */
 export interface HarnessConfig {
+  /** The QR reader; defaults to the real one (#1178). */
+  reader?: QrReader;
   /**
    * Minimum frame sampling capture interval in milliseconds.
    */
@@ -221,6 +224,7 @@ export class OpticalScannerHarness {
   private opticalProfile: OpticalProfile;
   private workerConfig: WorkerQueueConfig;
   private config: HarnessConfig;
+  private readonly reader: QrReader;
 
   private totalFramesPushed = 0;
   private framesAccepted = 0;
@@ -251,6 +255,7 @@ export class OpticalScannerHarness {
    */
   constructor(config: HarnessConfig = {}) {
     this.config = config;
+    this.reader = config.reader ?? qrReader;
     this.opticalProfile = {
       noiseLevel: 10,
       enabled: true,
@@ -335,19 +340,19 @@ export class OpticalScannerHarness {
     scannabilityClassification: ScannabilityClassification;
     decodedData: string | null;
   } {
-    // Ensure Uint8ClampedArray for jsQR decoding
+    // Ensure Uint8ClampedArray for decoding
     const clampedPixels =
       pixels instanceof Uint8ClampedArray
         ? pixels
         : new Uint8ClampedArray(pixels.buffer, pixels.byteOffset, pixels.byteLength);
 
     // 1. Digital Check
-    let digitalCode = jsQR(clampedPixels, width, height, { inversionAttempts: 'dontInvert' });
+    let [digitalCode] = this.reader.read(clampedPixels, width, height);
     if (!digitalCode) {
-      digitalCode = jsQR(clampedPixels, width, height, { inversionAttempts: 'attemptBoth' });
+      [digitalCode] = this.reader.read(clampedPixels, width, height, { inverted: true });
     }
     const digitalScannable = !!digitalCode;
-    const decodedData = digitalCode ? digitalCode.data : null;
+    const decodedData = digitalCode ? digitalCode.text : null;
 
     if (!digitalScannable) {
       return {
@@ -371,9 +376,9 @@ export class OpticalScannerHarness {
     const noiseLevel = this.opticalProfile.noiseLevel ?? 10;
     const degradedPixels = applyOpticalSimulationMath(pixels, width, height, noiseLevel);
 
-    let opticalCode = jsQR(degradedPixels, width, height, { inversionAttempts: 'dontInvert' });
+    let [opticalCode] = this.reader.read(degradedPixels, width, height);
     if (!opticalCode) {
-      opticalCode = jsQR(degradedPixels, width, height, { inversionAttempts: 'attemptBoth' });
+      [opticalCode] = this.reader.read(degradedPixels, width, height, { inverted: true });
     }
     const opticalScannable = !!opticalCode;
 

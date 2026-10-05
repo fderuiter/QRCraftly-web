@@ -18,7 +18,7 @@
 
 /*
  * CRC-32 on its own entry point, for callers (the Bulk CSV zip writer) that need only the checksum.
- * The root entry also carries the handshake and its jsQR decoder, which generator pages should
- * not download (#1041).
+ * The root entry also carries the handshake and its scannability check, which generator pages
+ * should not download (#1041).
  */
 export { crc32 } from './lib/fountain/crc32';

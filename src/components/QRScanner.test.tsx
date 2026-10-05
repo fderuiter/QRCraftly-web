@@ -4,7 +4,7 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react';
 import { QRScanner, clearScanHistory } from './QRScanner';
 import { useQrScanner, type UseQrScannerOptions } from '@/packages/optical-scanner/client';
-import jsQR from 'jsqr';
+import { fakeQrRead } from '../../tests/utils/fakeQrRead';
 import { axe } from 'vitest-axe';
 
 // The real hook and Camera Session run against a fake camera; the spy only records the options
@@ -14,9 +14,8 @@ vi.mock('@/packages/optical-scanner/client', async (importOriginal) => {
   return { ...actual, useQrScanner: vi.fn(actual.useQrScanner) };
 });
 
-vi.mock('jsqr', () => ({
-  default: vi.fn(),
-}));
+const qrRead = vi.hoisted(() => vi.fn());
+vi.mock('@/packages/qr-decode', () => ({ loadQrReader: () => Promise.resolve({ read: qrRead }) }));
 
 /** A camera track that records whether it was stopped. */
 interface FakeTrack {
@@ -50,7 +49,7 @@ describe('QRScanner Component', () => {
   const decode = async (data: string) => {
     const options: UseQrScannerOptions | undefined = vi.mocked(useQrScanner).mock.lastCall?.[0];
     await act(async () => {
-      options?.onScanSuccess?.(data, { text: data, bytes: null, corners: null, source: 'jsqr', durationMs: 0 });
+      options?.onScanSuccess?.(data, { text: data, bytes: null, corners: null, source: 'qr-decode', durationMs: 0 });
     });
   };
 
@@ -392,8 +391,8 @@ describe('QRScanner Component', () => {
 
     expect(screen.getByRole('heading', { name: 'Scan from an image' })).toBeInTheDocument();
 
-    // Mock successful jsQR decoding
-    vi.mocked(jsQR).mockReturnValue({ data: 'https://qrcraftly.com' } as any);
+    // Mock a successful read
+    qrRead.mockReturnValue([fakeQrRead('https://qrcraftly.com')]);
 
     // Mock FileReader and Image loading
     const mockFile = new File(['dummy content'], 'test.png', { type: 'image/png' });
@@ -424,8 +423,8 @@ describe('QRScanner Component', () => {
     const fileTab = screen.getByRole('radio', { name: 'Image' });
     fireEvent.click(fileTab);
 
-    // Mock jsQR returning null (no QR code found)
-    vi.mocked(jsQR).mockReturnValue(null);
+    // Mock the reader finding no code
+    qrRead.mockReturnValue([]);
 
     const mockFile = new File(['dummy content'], 'test.png', { type: 'image/png' });
     const fileInput = screen.getByLabelText(/upload qr code image file/i);
@@ -473,16 +472,9 @@ describe('QRScanner Component', () => {
     const fileTab = screen.getByRole('radio', { name: 'Image' });
     fireEvent.click(fileTab);
 
-    // Mock first upload as successful, second as failure, and third as success
-    let callCount = 0;
-    vi.mocked(jsQR).mockImplementation((data, width, height, options) => {
-      if (!options || options.inversionAttempts === 'dontInvert') {
-        callCount++;
-      }
-      if (callCount === 1) return { data: 'scan 1' } as any;
-      if (callCount === 2 || callCount === 3) return null;
-      return { data: 'scan 2' } as any;
-    });
+    // The first upload reads, the second finds nothing and the third reads again.
+    let next: string | null = 'scan 1';
+    qrRead.mockImplementation(() => (next ? [fakeQrRead(next)] : []));
 
     const mockFile = new File(['dummy content'], 'test.png', { type: 'image/png' });
     let fileInput = screen.getByLabelText(/upload qr code image file/i) as HTMLInputElement;
@@ -504,6 +496,7 @@ describe('QRScanner Component', () => {
     fileInput = screen.getByLabelText(/upload qr code image file/i) as HTMLInputElement;
 
     // Second consecutive upload of the exact same file
+    next = null;
     fireEvent.change(fileInput, { target: { files: [mockFile] } });
 
     // 2. Clear native value immediately again
@@ -518,6 +511,7 @@ describe('QRScanner Component', () => {
     });
 
     // Third consecutive upload of the exact same file
+    next = 'scan 2';
     fireEvent.change(fileInput, { target: { files: [mockFile] } });
     expect(fileInput.value).toBe('');
     expect(screen.getByText(/processing file\.\.\./i)).toBeInTheDocument();
@@ -526,8 +520,8 @@ describe('QRScanner Component', () => {
       expect(mockOnScanSuccess).toHaveBeenCalledWith('scan 2');
     });
 
-    // Reset jsQR mock implementation
-    vi.mocked(jsQR).mockReset();
+    // Reset the reader mock
+    qrRead.mockReset();
   });
 
   describe('image files only (#1098)', () => {
@@ -599,7 +593,7 @@ describe('QRScanner Component', () => {
       const fileTab = screen.getByRole('radio', { name: 'Image' });
       fireEvent.click(fileTab);
 
-      vi.mocked(jsQR).mockReturnValue({ data: 'https://post-unmount-scan.com' } as any);
+      qrRead.mockReturnValue([fakeQrRead('https://post-unmount-scan.com')]);
       const mockFile = new File(['dummy content'], 'test.png', { type: 'image/png' });
       const fileInput = screen.getByLabelText(/upload qr code image file/i);
 
@@ -616,7 +610,7 @@ describe('QRScanner Component', () => {
       const fileTab = screen.getByRole('radio', { name: 'Image' });
       fireEvent.click(fileTab);
 
-      vi.mocked(jsQR).mockReturnValue({ data: 'stale result' } as any);
+      qrRead.mockReturnValue([fakeQrRead('stale result')]);
 
       const mockFile = new File(['dummy file'], 'test.png', { type: 'image/png' });
       const fileInput = screen.getByLabelText(/upload qr code image file/i);
@@ -644,7 +638,7 @@ describe('QRScanner Component', () => {
           worker.dispatchMessage({ status: 'pass', sequenceId: msg.sequenceId, decodedData: data, buffer: msg.buffer || new ArrayBuffer(0) });
         }, 0);
       });
-      vi.mocked(jsQR).mockReturnValue({ data } as any);
+      qrRead.mockReturnValue([fakeQrRead(data)]);
     };
 
     it('shows a link host, a safety verdict and the actions, and announces the result', async () => {

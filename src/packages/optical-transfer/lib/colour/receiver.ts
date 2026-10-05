@@ -44,6 +44,8 @@ import { meanColour, samplePatch, tileRectsFromBeacon } from './geometry';
 export interface DecodedCode {
   text: string;
   rect: Rect;
+  /** The code's QR version, when the decoder reports it. */
+  version?: number;
 }
 
 export interface ColourReceiverOptions {
@@ -182,12 +184,16 @@ export class ColourReceiver {
   private readBeacon(image: RgbaImage): void {
     const hit = this.options.decodeImage(image);
     if (!hit || !looksLikePrismFrame(hit.text)) return;
+    const { layout, beaconVersion } = this.options;
+    // A decoder can read one channel of a colour tile in grey (#1178): its frame counts, but it is no beacon.
+    // Only the version tells them apart, not the text: a beacon that carries the manifest is short.
+    if (hit.version !== undefined && hit.version !== beaconVersion) {
+      this.take(hit.text);
+      return;
+    }
     this.counters.beaconReads += 1;
     this.take(hit.text);
-    // A colour tile is not readable in grey, so whatever the whole-frame decoder reads is the beacon. It is
-    // not told apart by size: a beacon that carries the manifest is short.
     if (this.currentState === 'mono') return;
-    const { layout, beaconVersion } = this.options;
     const patch = samplePatch(image, hit.rect, qrModuleCount(beaconVersion));
     if (!patch || this.calibrator.update(patch) === 'rejected') {
       if (!this.calibrator.model) {

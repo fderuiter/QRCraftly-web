@@ -22,11 +22,10 @@ import { useQRDownload, BLOCKED_EXPORT_MESSAGE } from './useQRDownload';
 import { DEFAULT_CONFIG } from '../constants';
 import { QRConfig, QRType, TemplateStyle, SocialFormat } from '../types';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import jsQR from 'jsqr';
+import { fakeQrRead } from '../../tests/utils/fakeQrRead';
 
-vi.mock('jsqr', () => ({
-  default: vi.fn(),
-}));
+const qrRead = vi.hoisted(() => vi.fn());
+vi.mock('@/packages/qr-decode', () => ({ loadQrReader: () => Promise.resolve({ read: qrRead }) }));
 
 describe('useQRDownload', () => {
   let mockCanvas: HTMLCanvasElement;
@@ -34,7 +33,7 @@ describe('useQRDownload', () => {
   let originalShowSaveFilePicker: any;
 
   beforeEach(() => {
-    vi.mocked(jsQR).mockReturnValue({ data: 'https://qrcraftly.com' } as any);
+    qrRead.mockReturnValue([fakeQrRead('https://qrcraftly.com')]);
 
     // Setup mock canvas
     mockCanvas = document.createElement('canvas');
@@ -472,7 +471,7 @@ describe('useQRDownload', () => {
 
   describe('scannability validation before asset export', () => {
     it('blocks downloadToDevice if scannability validation fails', async () => {
-      vi.mocked(jsQR).mockReturnValue(null);
+      qrRead.mockReturnValue([]);
 
       const { result } = renderHook(() => useQRDownload(mockQrRef, DEFAULT_CONFIG as QRConfig), { wrapper: ToastProvider });
 
@@ -482,7 +481,7 @@ describe('useQRDownload', () => {
     });
 
     it('blocks handleSaveAs if scannability validation fails', async () => {
-      vi.mocked(jsQR).mockReturnValue(null);
+      qrRead.mockReturnValue([]);
 
       const { result } = renderHook(() => useQRDownload(mockQrRef, DEFAULT_CONFIG as QRConfig), { wrapper: ToastProvider });
 
@@ -492,7 +491,7 @@ describe('useQRDownload', () => {
     });
 
     it('blocks handleCopy if scannability validation fails', async () => {
-      vi.mocked(jsQR).mockReturnValue(null);
+      qrRead.mockReturnValue([]);
 
       const { result } = renderHook(() => useQRDownload(mockQrRef, DEFAULT_CONFIG as QRConfig), { wrapper: ToastProvider });
 
@@ -502,7 +501,7 @@ describe('useQRDownload', () => {
     });
 
     it('blocks handleShare if scannability validation fails', async () => {
-      vi.mocked(jsQR).mockReturnValue(null);
+      qrRead.mockReturnValue([]);
 
       const { result } = renderHook(() => useQRDownload(mockQrRef, DEFAULT_CONFIG as QRConfig), { wrapper: ToastProvider });
 
@@ -512,7 +511,7 @@ describe('useQRDownload', () => {
     });
 
     it('blocks handleSaveSvg if scannability validation fails', async () => {
-      vi.mocked(jsQR).mockReturnValue(null);
+      qrRead.mockReturnValue([]);
 
       const { result } = renderHook(() => useQRDownload(mockQrRef, DEFAULT_CONFIG as QRConfig), { wrapper: ToastProvider });
 
@@ -524,7 +523,7 @@ describe('useQRDownload', () => {
     it.each(['png', 'jpeg', 'webp', 'svg', 'clipboard', 'share'] as const)(
       'blocks exportAsset(%s) if scannability validation fails and allowUnsafe is not set',
       async (format) => {
-        vi.mocked(jsQR).mockReturnValue(null);
+        qrRead.mockReturnValue([]);
         const { result } = renderHook(() => useQRDownload(mockQrRef, DEFAULT_CONFIG as QRConfig), { wrapper: ToastProvider });
 
         const status = await result.current.exportAsset(format);
@@ -536,7 +535,7 @@ describe('useQRDownload', () => {
     it.each(['png', 'jpeg', 'webp', 'svg', 'clipboard', 'share'] as const)(
       'blocks exportAsset(%s) if allowUnsafe is explicitly false and validation fails',
       async (format) => {
-        vi.mocked(jsQR).mockReturnValue(null);
+        qrRead.mockReturnValue([]);
         const { result } = renderHook(() => useQRDownload(mockQrRef, DEFAULT_CONFIG as QRConfig), { wrapper: ToastProvider });
 
         const status = await result.current.exportAsset(format, { allowUnsafe: false });
@@ -553,7 +552,7 @@ describe('useQRDownload', () => {
     let originalCanShare: any;
 
     beforeEach(() => {
-      vi.mocked(jsQR).mockReturnValue(null); // Scan verification always fails
+      qrRead.mockReturnValue([]); // Scan verification always fails
 
       originalClipboardItem = (global as any).ClipboardItem;
       originalClipboard = global.navigator.clipboard;

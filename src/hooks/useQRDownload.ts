@@ -57,10 +57,13 @@ const blockedExport = (
   isDangerousUrl(config.value) ? { success: false, format, error: new Error(BLOCKED_EXPORT_MESSAGE) } : null;
 
 /**
- * The export check bundles the jsQR decoder, so it is loaded on demand rather than with the page.
- * The hook warms it up once the browser is idle, so a copy or share keeps its user gesture.
+ * The export check and our QR reader (#1178) are loaded on demand rather than with the page.
+ * The hook warms them up once the browser is idle, so a copy or share keeps its user gesture.
  */
-const loadScannabilityCheck = () => import('@/packages/scannability/checker');
+const loadScannabilityCheck = () =>
+  Promise.all([import('@/packages/scannability/checker'), import('@/packages/qr-decode').then(({ loadQrReader }) => loadQrReader())]).then(
+    ([{ performScannabilityCheck }, reader]) => ({ performScannabilityCheck, reader })
+  );
 
 /** Loads the export check once the main thread is idle after the page has loaded. */
 function warmScannabilityCheck(): () => void {
@@ -164,8 +167,8 @@ export function useQRDownload(
       const ctx = canvas.getContext('2d');
       if (!ctx) return false;
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const { performScannabilityCheck } = await loadScannabilityCheck();
-      const result = performScannabilityCheck(imageData, canvas.width, canvas.height, true);
+      const { performScannabilityCheck, reader } = await loadScannabilityCheck();
+      const result = performScannabilityCheck(reader, imageData, canvas.width, canvas.height, true);
       return result.success;
     } catch (err) {
       console.error('Scannability validation failed:', err);

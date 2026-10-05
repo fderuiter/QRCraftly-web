@@ -15,7 +15,7 @@ const MAX_CONSECUTIVE_RESTARTS = 3;
 let readerOffered: Promise<void> = Promise.resolve();
 
 /**
- * Offers the compiled zxing reader to a new worker (ADR 0023). The worker scans with jsQR until
+ * Offers the compiled zxing reader to a new worker (ADR 0023). The worker scans with our reader (#1178) until
  * the module arrives, and keeps doing so if it never does.
  */
 function offerZxingReader(worker: Worker): Promise<void> {

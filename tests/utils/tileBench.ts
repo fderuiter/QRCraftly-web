@@ -21,11 +21,13 @@
  * Prism frames and a receiver that finds them once, tracks them and decodes crops.
  *
  * What is real: the Prism frames, the fountain code, QR encoding at a fixed version, the pixels, the
- * jsQR decode of every tile, the tile tracker, the dedup and the receiver. What is simulated: the
+ * decode of every tile (our reader, #1178), the tile tracker, the dedup and the receiver. What is simulated: the
  * display and the camera. The camera sees the screen filling its frame, sharp, level and in sync with
  * the display, apart from the tear scenario. Decode times are this machine's, one thread.
  */
-import jsQR from 'jsqr';
+import fs from 'node:fs';
+import type { QrPoint } from '@/packages/qr-decode';
+import { qrReader } from '../fixtures/qrReader';
 import { qrEncoder as QRCode } from '../fixtures/qrEncoder';
 import {
   PrismReceiver,
@@ -190,34 +192,21 @@ export class TileSender {
   }
 }
 
-/** Grey plane to the RGBA jsQR reads. */
-export function toRgba(grey: Uint8ClampedArray): Uint8ClampedArray {
-  const rgba = new Uint8ClampedArray(grey.length * 4);
-  for (let i = 0; i < grey.length; i++) {
-    const value = grey[i];
-    rgba[i * 4] = value;
-    rgba[i * 4 + 1] = value;
-    rgba[i * 4 + 2] = value;
-    rgba[i * 4 + 3] = 255;
-  }
-  return rgba;
-}
-
 export interface Decoded {
   text: string;
   rect: Rect;
 }
 
-export function boundingBox(location: NonNullable<ReturnType<typeof jsQR>>['location'], offsetX: number, offsetY: number): Rect {
-  const xs = [location.topLeftCorner.x, location.topRightCorner.x, location.bottomLeftCorner.x, location.bottomRightCorner.x];
-  const ys = [location.topLeftCorner.y, location.topRightCorner.y, location.bottomLeftCorner.y, location.bottomRightCorner.y];
+export function boundingBox(corners: readonly QrPoint[], offsetX: number, offsetY: number): Rect {
+  const xs = corners.map((point) => point.x);
+  const ys = corners.map((point) => point.y);
   const x = Math.min(...xs);
   const y = Math.min(...ys);
   return { x: x + offsetX, y: y + offsetY, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
 }
 
 /**
- * Decodes the crop of a frame with jsQR.
+ * Decodes the crop of a frame with our reader.
  * @param frame - The camera frame.
  * @param crop - The region.
  * @returns The text and where the code sat in frame pixels, or null.
@@ -228,14 +217,14 @@ export function decodeCrop(frame: GreyFrame, crop: Rect): Decoded | null {
     const start = (crop.y + row) * frame.width + crop.x;
     grey.set(frame.grey.subarray(start, start + crop.width), row * crop.width);
   }
-  const result = jsQR(toRgba(grey), crop.width, crop.height, { inversionAttempts: 'dontInvert' });
-  return result ? { text: result.data, rect: boundingBox(result.location, crop.x, crop.y) } : null;
+  const [result] = qrReader.read(grey, crop.width, crop.height);
+  return result ? { text: result.text, rect: boundingBox(result.corners, crop.x, crop.y) } : null;
 }
 
 /**
- * A multi-code search with a single-code decoder. jsQR reads one code per image and fails when
- * several are in view (it did not decode one of four tiles in a 1080p frame), so the bench tries
- * every layout as a hypothesis: it cuts the frame into that layout's cells, assuming the screen
+ * A multi-code search with one code read per crop (jsQR, the decoder before #1178, read one code
+ * per image and missed one of four tiles in a 1080p frame), so the bench tries every layout as a
+ * hypothesis: it cuts the frame into that layout's cells, assuming the screen
  * fills the frame, and keeps the hypothesis that decodes the most. The shipped scanner would use
  * zxing's multi-symbol read here. Search cost in the bench is therefore a stand-in, not a measurement
  * of that read.
@@ -290,7 +279,7 @@ export interface TileRunResult {
   duplicates: number;
   cropMsMedian: number;
   searchMsMedian: number;
-  /** Real jsQR time spent decoding, per simulated camera frame, in milliseconds. */
+  /** Real time spent decoding, per simulated camera frame, in milliseconds. */
   decodeMsPerFrame: number;
 }
 
@@ -421,7 +410,7 @@ export async function runTearScenario(layoutId: TileLayoutId, screen: SimScreen,
 
 export interface PoolMeasurement {
   workers: number;
-  /** jsQR decodes of one tile crop per second, all workers together. */
+  /** Decodes of one tile crop per second, all workers together. */
   decodesPerSecond: number;
   /** Longest gap between ticks of a 16 ms timer on the main thread while the workers ran, in milliseconds. */
   mainThreadMaxLagMs: number;
@@ -429,18 +418,30 @@ export interface PoolMeasurement {
 
 const POOL_WORKER = `
 const { parentPort, workerData } = require('node:worker_threads');
-const jsQR = require('jsqr');
-const rgba = new Uint8ClampedArray(workerData.rgba);
+const x = new WebAssembly.Instance(new WebAssembly.Module(workerData.wasm), {}).exports;
+const pixels = new Uint8Array(workerData.grey);
+const length = 12 + pixels.length;
+const header = new Uint8Array(12);
+new DataView(header.buffer).setUint32(0, workerData.width, true);
+new DataView(header.buffer).setUint32(4, workerData.height, true);
+header.set([1, 0, 1, 0], 8);
+const capacity = x.qr_decode_capacity(1) >>> 0;
 let decoded = 0;
 const end = Date.now() + workerData.ms;
 while (Date.now() < end) {
-  if (jsQR(rgba, workerData.width, workerData.height, { inversionAttempts: 'dontInvert' })) decoded += 1;
+  const request = x.alloc(length);
+  const out = x.alloc(capacity);
+  new Uint8Array(x.memory.buffer, request, 12).set(header);
+  new Uint8Array(x.memory.buffer, request + 12, pixels.length).set(pixels);
+  if (x.qr_decode(request, length, out, capacity) === 0 && new Uint8Array(x.memory.buffer, out, 1)[0] > 0) decoded += 1;
+  x.free(out, capacity);
+  x.free(request, length);
 }
 parentPort.postMessage(decoded);
 `;
 
-/** One 2x2 v25 tile of a 1080p frame as the RGBA a decoder reads: the crop a tracked frame decodes. */
-export async function sampleTileCrop(): Promise<{ rgba: Uint8ClampedArray; width: number; height: number }> {
+/** One 2x2 v25 tile of a 1080p frame as grey pixels: the crop a tracked frame decodes. */
+export async function sampleTileCrop(): Promise<{ grey: Uint8ClampedArray; width: number; height: number }> {
   const layout = TILE_LAYOUTS['2x2-v25'];
   const screen: SimScreen = { frame: { width: 1920, height: 1080 }, modulePx: 4 };
   const stream = await createTileStream(new Uint8Array(layout.symbolSize * 8).map((_, i) => (i * 40503) >>> 7), layout);
@@ -449,11 +450,11 @@ export async function sampleTileCrop(): Promise<{ rgba: Uint8ClampedArray; width
   const cell = sender.placement.cell[0];
   const crop = new Uint8ClampedArray(cell.width * cell.height);
   for (let row = 0; row < cell.height; row++) crop.set(frame.grey.subarray((cell.y + row) * frame.width + cell.x, (cell.y + row) * frame.width + cell.x + cell.width), row * cell.width);
-  return { rgba: toRgba(crop), width: cell.width, height: cell.height };
+  return { grey: crop, width: cell.width, height: cell.height };
 }
 
 /**
- * Measures how many tile crops per second real threads decode with jsQR: one crop of a 2x2 v25 tile at
+ * Measures how many tile crops per second real threads decode with our reader: one crop of a 2x2 v25 tile at
  * 1080p, decoded in a loop on each worker thread.
  * @param workerCounts - Pool sizes to try.
  * @param millis - How long each size runs.
@@ -461,7 +462,8 @@ export async function sampleTileCrop(): Promise<{ rgba: Uint8ClampedArray; width
  */
 export async function measureDecoderPool(workerCounts: readonly number[], millis = 2000): Promise<PoolMeasurement[]> {
   const { Worker } = await import('node:worker_threads');
-  const { rgba, width, height } = await sampleTileCrop();
+  const { grey, width, height } = await sampleTileCrop();
+  const wasm = fs.readFileSync(new URL('../../src/wasm/qr-decode.wasm', import.meta.url));
 
   const results: PoolMeasurement[] = [];
   for (const workers of workerCounts) {
@@ -477,7 +479,7 @@ export async function measureDecoderPool(workerCounts: readonly number[], millis
         { length: workers },
         () =>
           new Promise<number>((resolve, reject) => {
-            const worker = new Worker(POOL_WORKER, { eval: true, workerData: { rgba: rgba.buffer.slice(0), width, height, ms: millis } });
+            const worker = new Worker(POOL_WORKER, { eval: true, workerData: { wasm, grey: grey.buffer.slice(0), width, height, ms: millis } });
             worker.once('message', (decoded: number) => resolve(decoded));
             worker.once('error', reject);
           })

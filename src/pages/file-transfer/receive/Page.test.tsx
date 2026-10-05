@@ -40,7 +40,7 @@ vi.mock('@/packages/optical-scanner/client', async (importOriginal) => {
     useQrScanner: (options: Parameters<typeof actual.useQrScanner>[0]) => {
       const onScanSuccess = options?.onScanSuccess;
       scanSuccessCallback = onScanSuccess
-        ? (data) => onScanSuccess(data, { text: data, bytes: null, corners: null, source: 'jsqr', durationMs: 0 })
+        ? (data) => onScanSuccess(data, { text: data, bytes: null, corners: null, source: 'qr-decode', durationMs: 0 })
         : undefined;
       return actual.useQrScanner(options);
     }

@@ -1,13 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import { loadWorkerModule, type InThreadWorkerScope, type WorkerModuleUnderTest } from './utils/inThreadWorker';
-import jsQR from 'jsqr';
+import { fakeQrRead } from './utils/fakeQrRead';
 import { getLuminanceFromRgb } from '@/utils/colorUtils';
 
-vi.mock('jsqr', () => {
-  return {
-    default: vi.fn(),
-  };
-});
+const qrRead = vi.hoisted(() => vi.fn());
+vi.mock('@/packages/qr-decode', () => ({ loadQrReader: () => Promise.resolve({ read: qrRead }) }));
 
 // Spy on the luminance helper the contrast audit uses, so a test can make processing crash.
 vi.mock('@/utils/colorUtils', async (importOriginal) => {
@@ -70,8 +67,8 @@ describe('scannabilityWorker', () => {
     scope.postMessage = postMessageSpy;
 
     // Control mocks
-    vi.mocked(jsQR).mockReturnValueOnce({ data: 'https://safe.com' } as any) // digital
-                  .mockReturnValueOnce({ data: 'https://safe.com' } as any); // physical
+    qrRead.mockReturnValueOnce([fakeQrRead('https://safe.com')]) // digital
+                  .mockReturnValueOnce([fakeQrRead('https://safe.com')]); // physical
 
     expect(workerHandler).toBeDefined();
 
@@ -91,9 +88,9 @@ describe('scannabilityWorker', () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
 
-    vi.mocked(jsQR).mockReturnValueOnce({ data: 'https://safe.com' } as any) // digital
-                  .mockReturnValueOnce(null); // physical fails (dontInvert)
-    vi.mocked(jsQR).mockReturnValueOnce(null); // physical fails (onlyInvert)
+    qrRead.mockReturnValueOnce([fakeQrRead('https://safe.com')]) // digital
+                  .mockReturnValueOnce([]); // physical fails (dontInvert)
+    qrRead.mockReturnValueOnce([]); // physical fails (onlyInvert)
 
     await workerHandler({ data: createDummyRequest() } as MessageEvent);
 
@@ -110,7 +107,7 @@ describe('scannabilityWorker', () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
 
-    vi.mocked(jsQR).mockReturnValueOnce({ data: 'javascript:alert(1)' } as any);
+    qrRead.mockReturnValueOnce([fakeQrRead('javascript:alert(1)')]);
 
     await workerHandler({ data: createDummyRequest() } as MessageEvent);
 
@@ -126,9 +123,9 @@ describe('scannabilityWorker', () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
 
-    vi.mocked(jsQR).mockReturnValueOnce(null) // digital 1 fails
-                  .mockReturnValueOnce({ data: 'https://safe.com' } as any) // digital 2 passes
-                  .mockReturnValueOnce({ data: 'https://safe.com' } as any); // physical passes
+    qrRead.mockReturnValueOnce([]) // digital 1 fails
+                  .mockReturnValueOnce([fakeQrRead('https://safe.com')]) // digital 2 passes
+                  .mockReturnValueOnce([fakeQrRead('https://safe.com')]); // physical passes
 
     await workerHandler({ data: createDummyRequest() } as MessageEvent);
 
@@ -143,8 +140,8 @@ describe('scannabilityWorker', () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
 
-    vi.mocked(jsQR).mockReturnValueOnce(null) // digital 1 fails
-                  .mockReturnValueOnce(null); // digital 2 fails
+    qrRead.mockReturnValueOnce([]) // digital 1 fails
+                  .mockReturnValueOnce([]); // digital 2 fails
 
     await workerHandler({ data: createDummyRequest() } as MessageEvent);
 
@@ -160,8 +157,8 @@ describe('scannabilityWorker', () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
 
-    vi.mocked(jsQR).mockReturnValueOnce({ data: 'https://safe.com' } as any) // digital
-                  .mockReturnValueOnce({ data: 'https://safe.com' } as any); // physical
+    qrRead.mockReturnValueOnce([fakeQrRead('https://safe.com')]) // digital
+                  .mockReturnValueOnce([fakeQrRead('https://safe.com')]); // physical
 
     await workerHandler({ data: createDummyRequest('123', false) } as MessageEvent);
 
@@ -191,7 +188,7 @@ describe('scannabilityWorker', () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
 
-    vi.mocked(jsQR).mockImplementation(() => {
+    qrRead.mockImplementation(() => {
       throw new Error('Simulation crash');
     });
 
@@ -203,7 +200,7 @@ describe('scannabilityWorker', () => {
       error: 'NOT_FOUND',
       configId: '123',
     }));
-    vi.mocked(jsQR).mockReset();
+    qrRead.mockReset();
   });
 
   it('catches crash error if global processing fails internally', async () => {
@@ -255,9 +252,9 @@ describe('scannabilityWorker', () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
 
-    vi.mocked(jsQR).mockReturnValueOnce({ data: 'https://safe.com' } as any) // digital passes
-                  .mockReturnValueOnce(null) // physical 1 fails
-                  .mockReturnValueOnce({ data: 'https://safe.com' } as any); // physical 2 passes
+    qrRead.mockReturnValueOnce([fakeQrRead('https://safe.com')]) // digital passes
+                  .mockReturnValueOnce([]) // physical 1 fails
+                  .mockReturnValueOnce([fakeQrRead('https://safe.com')]); // physical 2 passes
 
     await workerHandler({ data: createDummyRequest() } as MessageEvent);
 
@@ -273,7 +270,7 @@ describe('scannabilityWorker', () => {
     scope.postMessage = postMessageSpy;
 
     // Mock responses
-    vi.mocked(jsQR).mockReturnValue({ data: 'https://safe.com' } as any);
+    qrRead.mockReturnValue([fakeQrRead('https://safe.com')]);
 
     // Dispatch two requests: '101' and then '102'
     const firstPromise = workerHandler({ data: createDummyRequest('101') } as MessageEvent);
@@ -298,7 +295,7 @@ describe('scannabilityWorker', () => {
   it('releases transferred image handle immediately upon detecting cooperative cancellation', async () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
-    vi.mocked(jsQR).mockReturnValue({ data: 'https://safe.com' } as any);
+    qrRead.mockReturnValue([fakeQrRead('https://safe.com')]);
 
     const closeSpy1 = vi.fn();
     const closeSpy2 = vi.fn();
@@ -409,8 +406,8 @@ describe('scannabilityWorker', () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
 
-    vi.mocked(jsQR).mockReturnValueOnce({ data: 'https://safe.com' } as any)
-                  .mockReturnValueOnce({ data: 'https://safe.com' } as any);
+    qrRead.mockReturnValueOnce([fakeQrRead('https://safe.com')])
+                  .mockReturnValueOnce([fakeQrRead('https://safe.com')]);
 
     const buffer = new ArrayBuffer(400);
     const req = {
@@ -447,8 +444,8 @@ describe('scannabilityWorker', () => {
 
     const instantiateSpy = vi.spyOn(globalThis.WebAssembly, 'instantiate');
 
-    vi.mocked(jsQR).mockReturnValueOnce({ data: 'https://pure-js.com' } as any)
-                  .mockReturnValueOnce({ data: 'https://pure-js.com' } as any);
+    qrRead.mockReturnValueOnce([fakeQrRead('https://pure-js.com')])
+                  .mockReturnValueOnce([fakeQrRead('https://pure-js.com')]);
 
     await workerHandler({ data: createDummyRequest('pure-js-1') } as MessageEvent);
 

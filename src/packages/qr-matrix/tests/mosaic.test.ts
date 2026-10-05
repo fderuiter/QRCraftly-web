@@ -41,7 +41,6 @@ import { drawQRInternal } from '../index';
 import { getLuminanceFromRgb } from '@/utils/colorUtils';
 import { DEFAULT_CONFIG } from '@/constants';
 import { SvgContext } from '@/packages/qr-export';
-import jsQR from 'jsqr';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import type { QRConfig, QRModules, QRErrorCorrectionLevel } from '@/types';
@@ -366,7 +365,7 @@ describe('drawQRInternal with a mosaic', () => {
  * Scannability verification for Mosaic QR (issue #1017).
  *
  * Mosaics are planned with the production engine, rasterised without a canvas and
- * decoded with the real jsQR decoder, clean and after a blur that models camera defocus.
+ * decoded with our real decoder (#1178), clean and after a blur that models camera defocus.
  */
 const PAYLOADS = [
   'https://qrcraftly.com/',
@@ -374,11 +373,10 @@ const PAYLOADS = [
   'Mosaic QR keeps every module polarity. '.repeat(8),
 ];
 
-const decode = (img: MosaicSource) => jsQR(new Uint8ClampedArray(img.data), img.width, img.height)?.data ?? null;
-/** Our decoder (#1178), run beside jsQR until it replaces it. */
-const decodeOurs = (img: MosaicSource) => qrReader.read(new Uint8ClampedArray(img.data), img.width, img.height)[0]?.text ?? null;
+const decode = (img: MosaicSource) =>
+  qrReader.read(new Uint8ClampedArray(img.data), img.width, img.height, { inverted: true })[0]?.text ?? null;
 
-describe('Mosaic QR decodes with jsQR', () => {
+describe('Mosaic QR decodes', () => {
   const modes: MosaicMode[] = ['tiles', 'halftone'];
   const contrasts = [DEFAULT_MOSAIC_OPTIONS.contrast, 1];
 
@@ -395,8 +393,6 @@ describe('Mosaic QR decodes with jsQR', () => {
               if (decode(raster) !== payload) failures.push(`clean ${kind} ${ecl} v${(modules.size - 17) / 4}`);
               const blurred = boxBlur(raster, 1);
               if (decode(blurred) !== payload) failures.push(`blurred ${kind} ${ecl} v${(modules.size - 17) / 4}`);
-              if (decodeOurs(raster) !== payload) failures.push(`qr-decode clean ${kind} ${ecl} v${(modules.size - 17) / 4}`);
-              if (decodeOurs(blurred) !== payload) failures.push(`qr-decode blurred ${kind} ${ecl} v${(modules.size - 17) / 4}`);
             }
           }
         }
@@ -411,7 +407,6 @@ describe('Mosaic QR decodes with jsQR', () => {
       const plan = planMosaic(encode(payload), makeImage(kind), DEFAULT_MOSAIC_OPTIONS);
       const raster = rasterizeMosaic(plan, 3);
       expect(decode(raster)).toBe(payload);
-      expect(decodeOurs(raster)).toBe(payload);
     }
   });
 });

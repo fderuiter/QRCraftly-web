@@ -99,8 +99,11 @@ export async function checkQrImage(file: Blob): Promise<CheckOutcome> {
     const frame = framePixels(bitmap, scanned.corners);
     bitmap.close();
     if (frame) {
-      const { performScannabilityCheck } = await import('@/packages/scannability/checker');
-      const result = performScannabilityCheck(frame, frame.width, frame.height, false);
+      const [{ performScannabilityCheck }, { loadQrReader }] = await Promise.all([
+        import('@/packages/scannability/checker'),
+        import('@/packages/qr-decode'),
+      ]);
+      const result = performScannabilityCheck(await loadQrReader(), frame, frame.width, frame.height, false);
       if (result.success && result.physicalReady) status = 'physical-pass';
     }
   } catch {

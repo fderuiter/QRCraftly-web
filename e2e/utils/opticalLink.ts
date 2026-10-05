@@ -26,7 +26,7 @@ import { installFakeCamera, showOnCamera } from '../../tests/utils/fakeCamera';
  * The receiver page gets a synthetic camera. `getUserMedia` returns the
  * `captureStream()` of a hidden canvas, and the test paints the sender's
  * transfer canvas onto it frame by frame. The receiver's real scanner (worker,
- * jsQR, adaptive scheduler) reads those pixels exactly as it would read a
+ * decoder, adaptive scheduler) reads those pixels exactly as it would read a
  * camera, so a passing transfer proves the whole screen-to-camera pipeline.
  */
 
