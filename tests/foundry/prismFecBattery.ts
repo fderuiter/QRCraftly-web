@@ -55,6 +55,10 @@ export function runPrismFecBattery(exports: WebAssembly.Exports): Uint8Array {
   };
 
   const out: number[] = [];
+  // A loop, not a spread: spreading a whole block overflows the stack in Chromium.
+  const pushBytes = (bytes: Uint8Array): void => {
+    for (const byte of bytes) out.push(byte);
+  };
   const pushU32 = (value: number): void => {
     out.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff);
   };
@@ -83,7 +87,7 @@ export function runPrismFecBattery(exports: WebAssembly.Exports): Uint8Array {
     // A few symbols from the start of the stream and from near the top of the ESI range.
     for (const esi of [0, 1, 2, 3, 4294967295]) {
       const at = call('fec_encoder_symbol', encoder, esi) >>> 0;
-      out.push(...new Uint8Array(memory.buffer, at, t));
+      pushBytes(new Uint8Array(memory.buffer, at, t));
     }
 
     // Decode after a join, losing about a quarter of the symbols.
@@ -104,7 +108,7 @@ export function runPrismFecBattery(exports: WebAssembly.Exports): Uint8Array {
     if (solved === 0) throw new Error(`K = ${k} did not decode`);
     const bytes = new Uint8Array(memory.buffer, solved, k * t);
     if (!bytes.every((byte, i) => byte === source[i])) throw new Error(`K = ${k} decoded to different bytes`);
-    out.push(...bytes);
+    pushBytes(bytes);
 
     call('fec_decoder_free', decoder);
     call('fec_encoder_free', encoder);
