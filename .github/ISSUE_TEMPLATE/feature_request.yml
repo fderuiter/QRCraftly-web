@@ -1,6 +1,6 @@
 name: Feature request
 description: Suggest an improvement or a new QR code capability.
-labels: ['needs-triage']
+labels: ['enhancement', 'needs-triage']
 body:
   - type: textarea
     id: problem
