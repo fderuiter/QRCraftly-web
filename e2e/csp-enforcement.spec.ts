@@ -61,7 +61,7 @@ test.beforeEach(async ({ page }, testInfo) => {
   await page.waitForSelector('main[data-hydrated="true"]');
 });
 
-test.describe('Content Security Policy enforced', () => {
+test.describe('Content Security Policy enforced', { tag: '@prod' }, () => {
   test('ships a CSP that allows blob: images/media and no third-party origins', async ({ page }) => {
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
     expect(csp).toContain("img-src 'self' data: blob:");

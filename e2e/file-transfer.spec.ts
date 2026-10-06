@@ -96,7 +96,7 @@ test.describe('Optical file transfer', () => {
     test.skip(({ browserName }) => browserName !== 'chromium', 'synthetic camera relay is Chromium-only');
     test.setTimeout(150_000);
 
-    test('sends a binary file and downloads a byte-identical, SHA-256-verified copy', async ({ page: receiver, context }) => {
+    test('sends a binary file and downloads a byte-identical, SHA-256-verified copy', { tag: '@prod' }, async ({ page: receiver, context }) => {
       await installSyntheticCamera(context);
       const sender = await context.newPage();
       const file = { name: 'firmware.bin', mimeType: 'application/octet-stream', buffer: randomBytes(6 * 1024) };
@@ -123,7 +123,7 @@ test.describe('Optical file transfer', () => {
       await expectDownloadedCopy(receiver, file);
     });
 
-    test('sends with the new outer code when it is chosen under Advanced (#1141)', async ({ page: receiver, context }) => {
+    test('sends with the new outer code when it is chosen under Advanced (#1141)', { tag: '@prod' }, async ({ page: receiver, context }) => {
       await installSyntheticCamera(context);
       const sender = await context.newPage();
       const file = { name: 'outer.bin', mimeType: 'application/octet-stream', buffer: randomBytes(5 * 1024) };

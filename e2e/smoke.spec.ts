@@ -18,7 +18,7 @@
 
 import { test, expect } from '@playwright/test';
 
-test.describe('Live Host Smoke Verification', () => {
+test.describe('Live Host Smoke Verification', { tag: '@prod' }, () => {
   test('Page loads, JS executes, and Web Worker initializes without errors', async ({ page }) => {
     const consoleErrors: string[] = [];
 

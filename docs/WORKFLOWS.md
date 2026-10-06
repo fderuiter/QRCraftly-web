@@ -91,7 +91,7 @@ Reviewers and agents can verify changes live in an edge environment before appro
 
 ### Step 6: Merge into `main`
 
-Once `CI` passes and reviews are complete, merge with **Squash and merge**. Cloudflare deploys the merge to production, and the `Verify Production Deployment` job smoke tests production once it serves the new commit.
+Once `CI` passes and reviews are complete, merge with **Squash and merge**. Cloudflare deploys the merge to production, and the `Verify Production Deployment` job tests production once it serves the new commit. It runs the E2E tests tagged `@prod` against the deployed site: the page loads, the CSP holds, an SVG downloads, the scanner reads with its self-hosted decoder, and file transfers complete in both formats (#1228). Tag a test `@prod` only when it is read-only and needs nothing but the site itself.
 
 ---
 
