@@ -71,18 +71,20 @@ const VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20, 22, 25];
 const SIZES = [512, 768, 1024];
 
 describe('optical print simulation', () => {
-  it('passes every plain code, at every version, level and preview size (never "fragile")', () => {
-    const fragile: string[] = [];
-    VERSIONS.forEach((version, v) => {
+  // One test per version keeps each well inside the test timeout on a slow CI runner.
+  it.each(VERSIONS.map((version, v) => [version, v]))(
+    'passes every plain version %i code, at every level and preview size (never "fragile")',
+    (version, v) => {
+      const fragile: string[] = [];
       LEVELS.forEach((level, l) => {
         const size = SIZES[(v + l) % SIZES.length];
         const result = check(render(version, level, size));
         expect(result.success).toBe(true);
         if (!result.physicalReady) fragile.push(`v${version}-${level}@${size}`);
       });
-    });
-    expect(fragile).toEqual([]);
-  });
+      expect(fragile).toEqual([]);
+    },
+  );
 
   it('passes dark grey and coloured-on-light designs a phone reads from paper', () => {
     expect(check(render(4, 'M', 512, { ink: 110 }))).toMatchObject({ success: true, physicalReady: true });
