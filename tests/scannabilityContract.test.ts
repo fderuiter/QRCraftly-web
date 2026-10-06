@@ -16,7 +16,6 @@ describe('sharedContract runtime assertion logic', () => {
         width: 100,
         height: 100,
         configId: 'test-config',
-        isTest: true,
       };
       expect(isWorkerRequest(valid)).toBe(true);
       expect(() => assertWorkerRequest(valid)).not.toThrow();
@@ -28,7 +27,6 @@ describe('sharedContract runtime assertion logic', () => {
         width: 100,
         height: 100,
         configId: 'test-config',
-        isTest: true,
       };
       expect(isWorkerRequest(valid)).toBe(true);
       expect(() => assertWorkerRequest(valid)).not.toThrow();
@@ -149,17 +147,6 @@ describe('sharedContract runtime assertion logic', () => {
       };
       expect(isWorkerRequest(invalidConfigId)).toBe(false);
       expect(() => assertWorkerRequest(invalidConfigId)).toThrow('Worker request configId must be a string');
-    });
-
-    it('should reject invalid isTest', () => {
-      const invalidIsTest = {
-        imageData: { data: new Uint8ClampedArray(4) },
-        width: 100,
-        height: 100,
-        isTest: 'not-a-boolean',
-      };
-      expect(isWorkerRequest(invalidIsTest)).toBe(false);
-      expect(() => assertWorkerRequest(invalidIsTest)).toThrow('Worker request isTest must be a boolean');
     });
   });
 

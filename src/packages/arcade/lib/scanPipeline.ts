@@ -71,8 +71,6 @@ export interface EmpiricalScanOptions {
   detector?: DetectorLike | null;
   /** Spawns the fallback Scannability Worker (lazily, on first use). */
   createWorker?: () => WorkerLike | null;
-  /** Whether the frame comes from an automated test browser (skips optical blur in the worker). */
-  isTest?: boolean;
 }
 
 /**
@@ -179,7 +177,6 @@ export class EmpiricalScanPipeline {
       buffer,
       width: frame.width,
       height: frame.height,
-      isTest: this.options.isTest ?? false,
       configId: String(token),
     };
     assertWorkerRequest(request);

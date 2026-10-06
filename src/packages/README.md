@@ -37,7 +37,7 @@ Boundary checks run automatically during `pnpm run lint` and CI.
 
 - **Purpose**: Zero-copy off-thread Web Worker scannability audits, contrast checks, and optical simulation.
 - **Entry Points**:
-  - `index.ts`: Public API: the headless Scannability Health Evaluator (`createScannabilityEvaluator`, one `ScannabilityAssessment` answer with status, health, export risk and recovery state), `createScannabilityWorker()`, worker contracts, and optical blur/contrast math.
+  - `index.ts`: Public API: the headless Scannability Health Evaluator (`createScannabilityEvaluator`, one `ScannabilityAssessment` answer with status, health, export risk and recovery state), `createScannabilityWorker()`, worker contracts, the print simulation (`simulatePrint`, [ADR 0042](../../docs/adr/0042-print-simulation-in-module-units.md)) and contrast math.
   - `client.ts`: Thin React adapter hook (`useScannability`) over the evaluator. App capabilities (failure reporting, module count) are injected; the package never imports app layers.
   - `checker.ts`: The pure `performScannabilityCheck`/`evaluateScannability` runners. Callers pass in the QR reader from `qr-decode`. Pages load this entry and the reader with `import()` when they need them (exports, the evaluator's main-thread fallback), so the root entry stays free of both (#1041).
   - `worker.ts`: Dedicated background Web Worker performing real-time contrast auditing and optical decoding.

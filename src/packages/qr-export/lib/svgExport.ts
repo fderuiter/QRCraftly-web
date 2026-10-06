@@ -344,7 +344,7 @@ export async function validateSvgScannability(
     import('@/packages/scannability/checker'),
     import('@/packages/qr-decode'),
   ]);
-  const result = performScannabilityCheck(await loadQrReader(), imageData, canvas.width, canvas.height, true);
+  const result = performScannabilityCheck(await loadQrReader(), imageData, canvas.width, canvas.height);
   return result.success;
 }
 

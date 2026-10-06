@@ -211,7 +211,7 @@ export function renderCondition(source: HTMLCanvasElement, condition: ViewingCon
  * @returns One result per condition.
  */
 export async function testViewingConditions(source: HTMLCanvasElement, config: QRConfig, moduleCount: number, widthCm: number): Promise<ViewingResult[]> {
-  const evaluator = createScannabilityEvaluator({ config, isTest: () => false });
+  const evaluator = createScannabilityEvaluator({ config });
   try {
     return await runViewingTest(
       viewingConditions(widthCm),

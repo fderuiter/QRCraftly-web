@@ -47,7 +47,7 @@ describe('scannabilityWorker', () => {
     scope.postMessage = originalPostMessage;
   });
 
-  const createDummyRequest = (configId = '123', isTest = true, moduleCount?: number) => {
+  const createDummyRequest = (configId = '123', moduleCount?: number) => {
     return {
       imageData: {
         data: new Uint8ClampedArray(400),
@@ -57,7 +57,6 @@ describe('scannabilityWorker', () => {
       width: 10,
       height: 10,
       configId,
-      isTest,
       moduleCount,
     };
   };
@@ -153,18 +152,40 @@ describe('scannabilityWorker', () => {
     }));
   });
 
-  it('applies optical simulation math when isTest is false', async () => {
+  it('reads the simulated print of the found code, as the camera scanner reads (#1248)', async () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
 
     qrRead.mockReturnValueOnce([fakeQrRead('https://safe.com')]) // digital
                   .mockReturnValueOnce([fakeQrRead('https://safe.com')]); // physical
 
-    await workerHandler({ data: createDummyRequest('123', false) } as MessageEvent);
+    await workerHandler({ data: createDummyRequest('123') } as MessageEvent);
 
+    // A version 1 code is 21 modules plus a 4-module quiet zone each side, 6 pixels a module, in grey.
+    const side = (21 + 8) * 6;
+    const [printed, width, height, options] = qrRead.mock.calls[1];
+    expect(printed).toHaveLength(side * side);
+    expect([width, height]).toEqual([side, side]);
+    expect(options).toEqual({ inverted: true, global: true, half: true });
     expect(postMessageSpy).toHaveBeenCalledWith(expect.objectContaining({
       success: true,
       physicalReady: true,
+      configId: '123',
+    }));
+  });
+
+  it('does not count a different text in the simulated print as a pass', async () => {
+    const postMessageSpy = vi.fn();
+    scope.postMessage = postMessageSpy;
+
+    qrRead.mockReturnValueOnce([fakeQrRead('https://safe.com')]) // digital
+                  .mockReturnValueOnce([fakeQrRead('https://safe.co')]); // physical misread
+
+    await workerHandler({ data: createDummyRequest('123') } as MessageEvent);
+
+    expect(postMessageSpy).toHaveBeenCalledWith(expect.objectContaining({
+      success: true,
+      physicalReady: false,
       configId: '123',
     }));
   });
@@ -211,7 +232,7 @@ describe('scannabilityWorker', () => {
       throw new Error('Contrast audit crash');
     });
 
-    await workerHandler({ data: createDummyRequest('123', true, 5) } as MessageEvent);
+    await workerHandler({ data: createDummyRequest('123', 5) } as MessageEvent);
 
     expect(postMessageSpy).toHaveBeenCalledWith({
       success: false,
@@ -248,19 +269,19 @@ describe('scannabilityWorker', () => {
     });
   });
 
-  it('handles case where first physical scan fails but second physical scan passes', async () => {
+  it('reports a screen-only pass when the simulated print does not read', async () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
 
     qrRead.mockReturnValueOnce([fakeQrRead('https://safe.com')]) // digital passes
-                  .mockReturnValueOnce([]) // physical 1 fails
-                  .mockReturnValueOnce([fakeQrRead('https://safe.com')]); // physical 2 passes
+                  .mockReturnValueOnce([]); // the simulated print does not read
 
     await workerHandler({ data: createDummyRequest() } as MessageEvent);
 
+    expect(qrRead).toHaveBeenCalledTimes(2);
     expect(postMessageSpy).toHaveBeenCalledWith(expect.objectContaining({
       success: true,
-      physicalReady: true,
+      physicalReady: false,
       configId: '123',
     }));
   });
@@ -305,7 +326,6 @@ describe('scannabilityWorker', () => {
       width: 10,
       height: 10,
       configId: '201',
-      isTest: true,
     };
 
     const req2 = {
@@ -313,7 +333,6 @@ describe('scannabilityWorker', () => {
       width: 10,
       height: 10,
       configId: '202',
-      isTest: true,
     };
 
     const p1 = workerHandler({ data: req1 } as MessageEvent);
@@ -353,7 +372,6 @@ describe('scannabilityWorker', () => {
       width: 10,
       height: 10,
       configId: '301',
-      isTest: true,
       moduleCount: 5,
     };
 
@@ -390,8 +408,7 @@ describe('scannabilityWorker', () => {
         width: 10,
         height: 10,
         configId: 'needs-image-data',
-        isTest: true,
-      },
+        },
     } as MessageEvent);
 
     expect(closeSpy).toHaveBeenCalledTimes(1);
@@ -421,7 +438,6 @@ describe('scannabilityWorker', () => {
       height: 10,
       configId: 'buf-123',
       sequenceId: 1,
-      isTest: true,
     };
 
     await workerHandler({ data: req } as MessageEvent);

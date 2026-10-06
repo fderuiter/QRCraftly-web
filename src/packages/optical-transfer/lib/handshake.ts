@@ -37,8 +37,6 @@ export interface HandshakeCheckRequest {
   width: number;
   height: number;
   moduleCount: number;
-  /** Relaxed decoding for automated browsers (`navigator.webdriver`). */
-  isTest: boolean;
 }
 
 /** Capabilities the handshake gate runs on. Tests inject fakes; the app uses the defaults. */
@@ -56,8 +54,8 @@ export interface HandshakeVerifierDeps {
 /** Production capabilities: the real Scannability Worker and checker from `@/packages/scannability`. */
 const defaultHandshakeVerifierDeps: HandshakeVerifierDeps = {
   createWorker: createScannabilityWorker,
-  checkOnMainThread: async ({ imageData, width, height, isTest, moduleCount }) =>
-    performScannabilityCheck(await loadQrReader(), imageData, width, height, isTest, moduleCount).success,
+  checkOnMainThread: async ({ imageData, width, height, moduleCount }) =>
+    performScannabilityCheck(await loadQrReader(), imageData, width, height, moduleCount).success,
   createCanvas: () => document.createElement('canvas'),
   watchdogMs: HANDSHAKE_WATCHDOG_MS,
 };
@@ -120,7 +118,6 @@ function renderHandshakeFrame(
     width: DISPLAY_SIZE,
     height: DISPLAY_SIZE,
     moduleCount: modules.size,
-    isTest: typeof navigator !== 'undefined' ? !!navigator.webdriver : true,
   };
 }
 
@@ -199,7 +196,6 @@ export async function verifyHandshakeFrame(
         imageData: request.imageData,
         width: request.width,
         height: request.height,
-        isTest: request.isTest,
         moduleCount: request.moduleCount,
         configId: 'handshake-gate',
       });

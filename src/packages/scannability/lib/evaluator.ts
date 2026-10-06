@@ -115,10 +115,8 @@ export interface ScannabilityEvaluatorConfig {
   clock?: ScannabilityClock;
   /** Frame reader; defaults to `createImageBitmap` and 2D canvases. */
   frames?: ScannabilityFrameReader;
-  /** Whether the optical simulation should be skipped (automation); defaults to `navigator.webdriver`. */
-  isTest?: () => boolean;
   /** Main-thread check; defaults to the same step sequence the worker runs, loaded on first use. */
-  runCheck?: (frame: PixelFrame, isTest: boolean, moduleCount?: number) => ScannabilityResult;
+  runCheck?: (frame: PixelFrame, moduleCount?: number) => ScannabilityResult;
 }
 
 /**
@@ -204,9 +202,7 @@ const defaultFrameReader: ScannabilityFrameReader = {
   bitmapToPixels: drawBitmap,
 };
 
-const detectAutomation = () => typeof navigator !== 'undefined' && !!navigator.webdriver;
-
-type RunCheck = (frame: PixelFrame, isTest: boolean, moduleCount?: number) => ScannabilityResult;
+type RunCheck = (frame: PixelFrame, moduleCount?: number) => ScannabilityResult;
 
 let defaultRunCheck: Promise<RunCheck> | null = null;
 
@@ -220,7 +216,7 @@ function loadDefaultRunCheck(): Promise<RunCheck> {
     .then(([{ performScannabilityCheck }, { loadQrReader }]) => loadQrReader().then((reader) => ({ performScannabilityCheck, reader })))
     .then(
       ({ performScannabilityCheck, reader }): RunCheck =>
-        (frame, isTest, moduleCount) => performScannabilityCheck(reader, frame, frame.width, frame.height, isTest, moduleCount)
+        (frame, moduleCount) => performScannabilityCheck(reader, frame, frame.width, frame.height, moduleCount)
     )
     .catch((error: unknown) => {
       defaultRunCheck = null;
@@ -241,7 +237,6 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
   const clock = options.clock ?? systemScannabilityClock;
   const frames = options.frames ?? defaultFrameReader;
   const createWorker = options.createWorker ?? connectScannabilityWorker;
-  const isTest = options.isTest ?? detectAutomation;
   const injectedRunCheck = options.runCheck;
   const listeners = new Set<(assessment: ScannabilityAssessment) => void>();
   const pending = new Map<number, (assessment: ScannabilityAssessment | null) => void>();
@@ -408,7 +403,6 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
     const base = {
       width: size.width,
       height: size.height,
-      isTest: isTest(),
       configId: String(seq),
       moduleCount,
     };
@@ -556,11 +550,11 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
   function runOnMainThread(seq: number, pixels: PixelFrame, moduleCount: number | undefined, workerHealthy: boolean) {
     if (!isCurrent(seq)) return;
     if (injectedRunCheck) {
-      finishOnMainThread(seq, () => injectedRunCheck(pixels, isTest(), moduleCount), workerHealthy);
+      finishOnMainThread(seq, () => injectedRunCheck(pixels, moduleCount), workerHealthy);
       return;
     }
     loadDefaultRunCheck().then(
-      (runCheck) => finishOnMainThread(seq, () => runCheck(pixels, isTest(), moduleCount), workerHealthy),
+      (runCheck) => finishOnMainThread(seq, () => runCheck(pixels, moduleCount), workerHealthy),
       (err: unknown) =>
         finishOnMainThread(
           seq,

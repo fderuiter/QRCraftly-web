@@ -69,7 +69,6 @@ describe('High-Fidelity Worker Concurrency & Serialization Tests', () => {
         },
         width: 5,
         height: 5,
-        isTest: true,
         configId: '1',
       });
     }).not.toThrow();
@@ -94,7 +93,6 @@ describe('High-Fidelity Worker Concurrency & Serialization Tests', () => {
       },
       width: 10,
       height: 10,
-      isTest: true,
       configId: 'sec-check',
     });
 
@@ -111,7 +109,7 @@ describe('High-Fidelity Worker Concurrency & Serialization Tests', () => {
     });
 
     // 2. Let's test a safe payload
-    qrRead.mockImplementation((data: Uint8ClampedArray) => (data?.length === 400 ? [fakeQrRead('https://safe.com')] : []));
+    qrRead.mockImplementation(() => [fakeQrRead('https://safe.com')]);
 
     worker.postMessage({
       imageData: {
@@ -121,7 +119,6 @@ describe('High-Fidelity Worker Concurrency & Serialization Tests', () => {
       },
       width: 10,
       height: 10,
-      isTest: true,
       configId: 'safe-check',
     });
 
@@ -156,15 +153,15 @@ describe('High-Fidelity Worker Concurrency & Serialization Tests', () => {
     // Due to concurrency limit = 1 and delay = 30ms, they should queue up and finish in order at t=30ms, t=60ms, t=90ms
     worker.postMessage({
       imageData: { data: new Uint8ClampedArray(400), width: 10, height: 10 },
-      width: 10, height: 10, isTest: true, configId: 'task-1'
+      width: 10, height: 10, configId: 'task-1'
     });
     worker.postMessage({
       imageData: { data: new Uint8ClampedArray(400), width: 10, height: 10 },
-      width: 10, height: 10, isTest: true, configId: 'task-2'
+      width: 10, height: 10, configId: 'task-2'
     });
     worker.postMessage({
       imageData: { data: new Uint8ClampedArray(400), width: 10, height: 10 },
-      width: 10, height: 10, isTest: true, configId: 'task-3'
+      width: 10, height: 10, configId: 'task-3'
     });
 
     // With a 30ms delay nothing can finish within the first 15ms.
@@ -209,14 +206,14 @@ describe('High-Fidelity Worker Concurrency & Serialization Tests', () => {
       },
       width: 10,
       height: 10,
-      isTest: true,
       configId: 'inverted-test',
     });
 
     await vi.waitFor(() => expect(receivedResponse?.configId).toBe('inverted-test'), WAIT);
 
-    // Two passes each for the digital check and the physical check, the second in both polarities
-    expect(optionsPassed).toEqual([false, true, false, true]);
+    // Two passes for the digital check, the second in both polarities, then one camera-style read
+    // of the simulated print, which always looks for both polarities
+    expect(optionsPassed).toEqual([false, true, true]);
     expect(receivedResponse).toEqual({
       success: true,
       physicalReady: true,

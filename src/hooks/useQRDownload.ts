@@ -168,7 +168,7 @@ export function useQRDownload(
       if (!ctx) return false;
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const { performScannabilityCheck, reader } = await loadScannabilityCheck();
-      const result = performScannabilityCheck(reader, imageData, canvas.width, canvas.height, true);
+      const result = performScannabilityCheck(reader, imageData, canvas.width, canvas.height);
       return result.success;
     } catch (err) {
       console.error('Scannability validation failed:', err);
