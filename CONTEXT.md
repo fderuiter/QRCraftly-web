@@ -199,7 +199,7 @@ The division of responsibility in which GitHub Actions is the quality gate (the 
 _Avoid_: Build trigger, dual deploy, cloud build runner, auto-deployment app
 
 **Trunk-Based Delivery**:
-The lifecycle discipline where every feature and fix branch returns to `main` through a squash-merged pull request that passes the required `CI` and `PR Title` checks, and every merge to `main` deploys to production.
+The lifecycle discipline where every feature and fix branch returns to `main` through a squash-merged pull request that passes the required `CI`, `PR Title` and `Workers Builds: qrcraftly` checks, and every merge to `main` deploys to production.
 _Avoid_: Staged promotion, dev branch, integration branch, direct push release
 
 **Ephemeral Preview Environment**:

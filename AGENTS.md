@@ -47,7 +47,7 @@ See `docs/agents/docs-maintenance.md`.
 
 - **No Dynamic QR Codes**: QRCraftly makes static codes only and has no server code, API, database or bot check. Never add server-side redirects, D1, Turnstile or `/api/` calls. Read `docs/adr/0022-no-dynamic-qr-codes-client-side-only.md`.
 - **Worker Concurrency & Scannability**: Off-thread Web Workers (`src/packages/scannability/worker.ts`, `src/packages/optical-scanner/worker.ts`), zero-copy `ArrayBuffer` double-buffering, degradation state caching, immediate 1500ms watchdog fault-tolerance, non-blocking superseded dropped ACK backpressure handling, and client-side SVG generation via `SvgContext`. Read `docs/public/SCALING.md`.
-- **Security & Sanitization**: SVG element allowlists (`sanitizeSvg`), phone/SMS sanitization, anchor link sanitization (`sanitizeHref`), and inline-script CSP hashing. Read `docs/SECURITY.md`.
+- **Security & Sanitization**: SVG element allowlists (`sanitizeSvg`), phone/SMS sanitization, the link scheme check (`isDangerousUrl`), and inline-script CSP hashing. Read `docs/SECURITY.md`.
 - **HIPAA Compliance Guidelines**: Client-side volatile memory guarantees and what the host can see. Read `docs/public/COMPLIANCE.md`.
 - **No-Ads Pledge**: QRCraftly is never ad supported and has no analytics, telemetry or third-party requests. Never add ads, analytics, diagnostics reporting or third-party scripts. Read `docs/PLEDGE.md`; the site copy lives in `src/data/pledge.ts`.
 
@@ -64,7 +64,7 @@ See `docs/agents/docs-maintenance.md`.
 Before declaring any implementation task complete, verify your changes:
 
 1. **Standard Code Changes**: Run and ensure passing:
-   - `pnpm run lint` (runs dependency license compliance, the git lineage (code-to-doc pairing) audit, AST storage checks, the path invariance audit, UI catalog validation, markdown audits, static SVG path tracking, the docs manifest check, TypeScript type-checking, dependency-cruiser package boundaries, ESLint, Knip, contrast checks, Prettier, and duplication checks)
+   - `pnpm run lint` (runs dependency license compliance, the Rust no-dependency check, the git lineage (code-to-doc pairing) audit, AST storage checks, the path invariance audit, UI catalog validation, markdown audits, static SVG path tracking, the docs manifest check, TypeScript type-checking, dependency-cruiser package boundaries, ESLint, Knip, contrast checks, the design token audit, Prettier, and duplication checks)
    - `pnpm test` (Vitest test suite)
 2. **Build, Routing, or Core Generator Changes**: In addition to standard checks, run:
    - `pnpm build` (verifies SSG pre-rendering, the bundle AST audit, and postbuild security scripts; the gzipped bundle size budget is a separate CI step, `pnpm run check-bundle-size`)

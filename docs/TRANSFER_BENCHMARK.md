@@ -232,5 +232,5 @@ Not measured at all: a real phone camera (its true cross-talk, gamma, auto white
 
 - The coding overhead is the part a better code can improve. It is the "Frames needed" column, and it is the number to compare when a new code lands (#1141).
 - Decode time grows much faster than K. A decoder that peels most blocks and then falls back to Gaussian elimination is cheap at 1,000 blocks and slow at 50,000. A large file needs either bigger blocks (a smaller K) or a faster decoder.
-- The optical estimate is bounded by how many frames per second one JavaScript decode can handle, so a single code per frame cannot reach the upper tiers on its own. That is the case for multi-code frames (#1142) and a faster decoder.
-- jsQR alone fails on the tilted rows. The shipped scanner tries several strategies, so these rows measure the simulator's floor, not the app's.
+- The optical estimate is bounded by how many frames per second one decode can handle, so a single code per frame cannot reach the upper tiers on its own. That is the case for multi-code frames (#1142) and a faster decoder.
+- One pass of our reader (qr-decode) fails on the tilted rows. The shipped scanner tries several strategies, so these rows measure the simulator's floor, not the app's.

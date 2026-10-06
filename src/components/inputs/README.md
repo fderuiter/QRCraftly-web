@@ -8,7 +8,7 @@ Each input component follows a consistent pattern:
 
 1.  **Strict Props**: Takes a `data` object (specific to the type, e.g., `WifiData`) and an `onChange` handler.
 2.  **Stateless (Mostly)**: Typically delegates state management to the parent (`InputPanel`) via `useInputLogic` and the centralized registry, though some may handle purely UI-local state (like toggling password visibility or geolocation loading).
-3.  **Shared Styles**: Uses centralized style constants from `styles.ts` to ensure visual consistency.
+3.  **Shared Styles**: Uses the shared form fields (`src/components/ui/FormFields.tsx`, `FormBlock`) and style constants from `src/components/ui/styles.ts` to ensure visual consistency.
 
 ### Example Structure
 

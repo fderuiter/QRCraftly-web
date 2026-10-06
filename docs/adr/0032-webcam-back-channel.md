@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Webcam Back Channel: Feedback Frame, Speed Controller and Opt-In

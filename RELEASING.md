@@ -5,7 +5,7 @@ This is the single runbook for how code reaches production, how versions and tag
 ## The flow at a glance
 
 ```
-feat/*, fix/*, …  ──PR (squash, CI + PR Title required)──►  main ──► production (Cloudflare Workers Builds)
+feat/*, fix/*, …  ──PR (squash, required checks green)──►  main ──► production (Cloudflare Workers Builds)
                                                                      qrcraftly.com
                                                                      qrcraftly.fpderuiter.workers.dev
 

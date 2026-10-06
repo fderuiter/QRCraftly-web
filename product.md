@@ -1,6 +1,6 @@
 # QRCraftly — Product Specification
 
-> **Version**: aligned with `v0.8.0`
+> **Version**: aligned with `v0.11.0`
 > **Status**: Living document — update alongside every minor release.
 > **Audience**: Engineering team, stakeholders, and open-source contributors.
 
@@ -22,13 +22,13 @@ Make beautiful, accessible, privacy-safe QR codes trivially easy to produce — 
 
 ## 3. Positioning
 
-| Dimension           | QRCraftly                                                                  |
-| ------------------- | -------------------------------------------------------------------------- |
-| **Category**        | Client-side QR code studio                                                 |
-| **Differentiation** | Studio-grade visual customization + zero-knowledge privacy architecture    |
-| **License**         | AGPL-3.0 open-source; open-core with a paid self-hosted / white-label tier |
-| **Deployment**      | Progressive web app on Cloudflare's global edge network (`qrcraftly.com`)  |
-| **Maturity**        | Pre-release (`v0.x`); actively approaching `v1.0` stable                   |
+| Dimension           | QRCraftly                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| **Category**        | Client-side QR code studio                                                           |
+| **Differentiation** | Studio-grade visual customization + zero-knowledge privacy architecture              |
+| **License**         | AGPL-3.0 open-source; every feature free for everyone ([the Pledge](docs/PLEDGE.md)) |
+| **Deployment**      | Progressive web app on Cloudflare's global edge network (`qrcraftly.com`)            |
+| **Maturity**        | Pre-release (`v0.x`); actively approaching `v1.0` stable                             |
 
 ---
 
@@ -104,6 +104,7 @@ Features are tagged with a maturity tier:
 - **Live preview**: QR matrix re-renders in real time with every input change.
 - **Off-thread analysis**: Scannability auditing runs in the Scannability Worker (`src/packages/scannability/`) and camera or file decoding runs in the optical scanner worker (`src/packages/optical-scanner/`). Pixel data moves to the workers as transferable `ArrayBuffer`s, keeping the UI responsive.
 - **Scan to fill**: The input panel can scan an existing QR code from the webcam or an image file and load its content into the matching form.
+- **Bulk CSV**: At `/bulk-csv-qr-code`, upload a CSV (at most 500 rows) and download one QR code per row as a ZIP, all in the browser (`src/packages/bulk-csv/`).
 
 ### 6.2 Visual Customization `[STABLE]`
 
@@ -120,7 +121,7 @@ Features are tagged with a maturity tier:
 
 ### 6.4 Air-Gapped Optical Transfer `[BETA]`
 
-User-facing at `/file-transfer` (send) and `/file-transfer/receive` (receive), linked from the site footer with "Beta" labels.
+User-facing at `/file-transfer` (send) and `/file-transfer/receive` (receive), linked from the header navigation (tagged "Beta") and the site footer.
 
 - **Mechanism**: Transmits arbitrary binary files across physical air gaps as animated QR streams — no network, Bluetooth, or USB required.
 - **Reliability**: Each frame is protected by the QR code's own Reed-Solomon error correction. The received file is checked against a SHA-256 hash before it is offered for download.
@@ -169,11 +170,11 @@ HIPAA Technical Safeguard alignment is documented in [`docs/public/COMPLIANCE.md
 
 ### Next — Near-Term (next 1–3 minor releases)
 
-- **SEO & content marketing**: Targeted landing pages (e.g., `/wifi-qr-code`) to grow organic acquisition; Lighthouse CI scores must remain green.
+- **SEO & content marketing**: The generator pages (e.g., `/wifi-qr-code`), landing pages and guides are live; grow organic acquisition from them (see [`docs/SEO_MEASUREMENT.md`](docs/SEO_MEASUREMENT.md)). Lighthouse CI scores must remain green.
 
 ### Later — Medium-Term
 
-- **Open-core paid tier launch**: Self-hosted or white-label license offering for organizations. Gate advanced features (Air-Gapped Transfer, future team workspaces) behind this tier.
+- **Commercial self-hosting licence (undecided)**: A possible licence for organizations that want to self-host or white-label QRCraftly with commercial support. It would never gate a feature on `qrcraftly.com` ([the Pledge](docs/PLEDGE.md): no paid upgrades, every feature for everyone).
 - **Expand QR data types**: Additional social platforms, structured data types, and AR marker support as demand warrants.
 - **v1.0 stable release**: Graduate from `v0.x` pre-release when Air-Gapped Optical Transfer is out of Beta and the core studio feature set is considered complete.
 
@@ -192,8 +193,8 @@ The following are explicitly **out of scope** and should not be planned, specced
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Dynamic / trackable QR redirection                     | Any server-side redirection requires storing a destination URL server-side and logging scan events, which cannot be reconciled with the privacy-first invariant. Decided and removed in [ADR 0022](docs/adr/0022-no-dynamic-qr-codes-client-side-only.md). |
 | Server-side QR generation                              | Violates the privacy-first invariant; payloads must never leave the client                                                                                                                                                                                 |
-| Native mobile apps (iOS / Android)                     | Web-first strategy; responsive PWA is sufficient                                                                                                                                                                                                           |
-| Batch / bulk QR generation via API or CSV upload       | Adds infrastructure complexity without a clear user persona match today                                                                                                                                                                                    |
+| Native mobile apps in this repository                  | The web app is a responsive PWA. The App Store app for iPhone, iPad and Mac ("QRCraftly: QR Code Studio") is a separate project; this repository only hosts its `/privacy` and `/support` pages                                                            |
+| Batch / bulk QR generation via a server API            | Needs server code; bulk generation from a CSV upload runs in the browser instead (`/bulk-csv-qr-code`)                                                                                                                                                     |
 | Ads, analytics, telemetry or diagnostics reporting     | Violates [the QRCraftly Pledge](docs/PLEDGE.md): the project shuts down before it becomes ad supported                                                                                                                                                     |
 | Server-side storage of user QR codes or cloud accounts | Violates volatile memory guarantee                                                                                                                                                                                                                         |
 
@@ -207,21 +208,23 @@ QRCraftly is healthy and growing when all of the following trend in the right di
 
 | Metric                                             | Target                                                                                                            | Enforced in CI today                         |
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| Lighthouse Performance                             | >= 90                                                                                                             | >= 75 (`lighthouserc.json`)                  |
+| Lighthouse Performance                             | >= 90                                                                                                             | >= 90 (`lighthouserc.json`)                  |
 | Lighthouse Accessibility                           | >= 95                                                                                                             | >= 90 (`lighthouserc.json`)                  |
 | Lighthouse SEO                                     | >= 90                                                                                                             | >= 95 (`lighthouserc.json`)                  |
 | Lighthouse Best Practices                          | >= 90                                                                                                             | >= 90 (`lighthouserc.json`)                  |
 | Page first load                                    | <= 260 KB gzipped per page (HTML, CSS and startup scripts); <= 650 KB for the JavaScript and CSS in `dist/client` | Same limits (`scripts/check-bundle-size.js`) |
 | Scannability pass rate (Print Simulation Verified) | >= 95% across all pattern styles in CI visual regression                                                          | No CI check measures this rate               |
 
-### Product Engagement
+### Reach
 
-| Metric                         | Cadence |
-| ------------------------------ | ------- |
-| Unique weekly active users     | Weekly  |
-| QR codes generated per day     | Daily   |
-| Session duration on the studio | Weekly  |
-| Mobile vs. desktop split       | Monthly |
+QRCraftly has no analytics ([the Pledge](docs/PLEDGE.md)), so it cannot count users, sessions or codes generated. Reach is measured from search consoles and Cloudflare's aggregate request counts only; see [`docs/SEO_MEASUREMENT.md`](docs/SEO_MEASUREMENT.md).
+
+| Metric                                               | Cadence |
+| ---------------------------------------------------- | ------- |
+| Non-brand search clicks and impressions              | Monthly |
+| Indexed pages vs sitemap URLs                        | Monthly |
+| Mobile vs. desktop search clicks (Search Console)    | Monthly |
+| Page requests (Cloudflare zone totals, no page code) | Monthly |
 
 ### Community & Repository Health
 
@@ -238,12 +241,9 @@ QRCraftly is healthy and growing when all of the following trend in the right di
 
 QRCraftly is **open-source under AGPL-3.0**. The base product is free forever for individuals and non-commercial use.
 
-The planned commercial tier is **open-core**:
+Every feature on `qrcraftly.com` is free for everyone, with no account, no ads and no paid upgrades, now and later ([the Pledge](docs/PLEDGE.md)). That includes the full studio, every data type, every visual option and Air-Gapped Transfer.
 
-- **Free (open-source)**: Full QR generation studio, all data types, all visual customization, Air-Gapped Transfer — all features that run entirely in-browser.
-- **Paid (self-hosted / white-label license)**: Organizations that want to self-host QRCraftly, remove attribution, use a custom domain, and receive commercial support.
-
-> No SaaS subscription or per-code pricing is planned at this stage. Revisit at `v1.0`.
+> A commercial licence for organizations that want to self-host or white-label QRCraftly with support is undecided. If it ever exists, it covers only self-hosting, white-labelling and support, never a feature of the public site. No SaaS subscription or per-code pricing is planned.
 
 ---
 
@@ -252,6 +252,7 @@ The planned commercial tier is **open-core**:
 | Document                                                 | Purpose                                                                  |
 | -------------------------------------------------------- | ------------------------------------------------------------------------ |
 | [`CONTEXT.md`](CONTEXT.md)                               | Canonical domain glossary — use correct terminology                      |
+| [`docs/PLEDGE.md`](docs/PLEDGE.md)                       | The no-ads, no-tracking, free-forever pledge and how CI enforces it      |
 | [`AGENTS.md`](AGENTS.md)                                 | Engineering operating instructions and hard invariants for AI agents     |
 | [`docs/public/COMPLIANCE.md`](docs/public/COMPLIANCE.md) | HIPAA technical safeguard documentation                                  |
 | [`docs/public/SCALING.md`](docs/public/SCALING.md)       | Scannability Worker, Web Workers, and performance architecture           |
