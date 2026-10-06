@@ -269,11 +269,18 @@ describe('optical modem module against the TypeScript kernels it replaced (#1198
     }
   });
 
-  it('encodes, finds, samples and decodes the simulation corpus as codec.ts, locate.ts and sample.ts did', () => {
-    const specs = frameSpecs();
-    expect(golden.frames).toHaveLength(specs.length);
-    const changes: BlockChanges = { refused: 0, repaired: 0 };
-    specs.forEach((spec, i) => {
+  // One test per profile and per probe run: under CI's coverage instrumentation the simulated
+  // captures are slow, and a single test over the whole corpus ran past its timeout.
+  const frameChanges: BlockChanges = { refused: 0, repaired: 0 };
+  const frameCorpus = frameSpecs().map((spec, i) => ({ spec, i }));
+
+  it('has a recorded result for every frame of the simulation corpus', () => {
+    expect(golden.frames).toHaveLength(frameCorpus.length);
+  });
+
+  it.each([0, 1, 2])('encodes, finds, samples and decodes profile %i of the simulation corpus as codec.ts, locate.ts and sample.ts did', (profile) => {
+    const changes = frameChanges;
+    frameCorpus.filter(({ spec }) => spec.profile === profile).forEach(({ spec, i }) => {
       const want = golden.frames[i];
       const base = MODEM_PROFILES[spec.profile];
       const shape = { ...base, parity: base.parity - spec.parityShift, packetBytes: base.packetBytes + spec.parityShift };
@@ -300,31 +307,40 @@ describe('optical modem module against the TypeScript kernels it replaced (#1198
       ];
       for (const [label, decoded, recorded] of decodes) compareDecode(json(decoded) as DecodeSummary, recorded as DecodeSummary, payload, shape.packetBytes, `frame ${i} ${label}`, changes);
     });
-    expect(changes).toEqual(KNOWN_FRAME_BLOCK_CHANGES);
   }, 120_000);
 
-  it('gives the probe reports probeAnalysis.ts gave', () => {
+  it('changes only the pinned blocks where rs.ts returned wrong bytes', () => {
+    expect(frameChanges).toEqual(KNOWN_FRAME_BLOCK_CHANGES);
+  });
+
+  const probeCorpus = probeSpecs().map((spec, i) => ({ spec, i }));
+
+  it('has a recorded probe report for every probe run, plus a foreign frame', () => {
+    expect(golden.probe).toHaveLength(probeCorpus.length + 1);
+  });
+
+  it.each(probeCorpus)('gives the probe report probeAnalysis.ts gave for probe run $i', ({ spec, i }) => {
     const sequence = probeSequence();
     const blank: RgbaImage = { width: 320, height: 200, data: new Uint8ClampedArray(320 * 200 * 4).fill(200) };
-    const runs: unknown[] = [];
-    for (const spec of probeSpecs()) {
-      const pattern = sequence.filter((p) => p.kind === spec.kind && p.pitch === spec.pitch)[spec.nth];
-      const run = new ProbeRun({ device: 'corpus', mode: 'propped', direction: 'simulated', camera: { width: 1920, height: 1080, frameRate: 60, deliveredFps: 30 } });
-      const seen: Array<number | null> = [];
-      for (let c = 0; c < PROBE_RUN_FRAMES; c++) {
-        const counter = c * 2;
-        const next = c === PROBE_RUN_FRAMES - 1 ? drawProbeFrame(pattern, CORPUS_SESSION, counter + 1) : undefined;
-        const capture = simulateCapture(drawProbeFrame(pattern, CORPUS_SESSION, counter), spec.preset, { pixelsPerCell: spec.cameraPx, cellPitch: pattern.pitch, seed: c + 1, next });
-        seen.push(run.ingest(capture, (counter * 1000) / 60));
-      }
-      if (spec.blank) seen.push(run.ingest(blank, 999));
-      runs.push({ index: pattern.index, seen, report: reportOf(run.report()) });
+    const pattern = sequence.filter((p) => p.kind === spec.kind && p.pitch === spec.pitch)[spec.nth];
+    const run = new ProbeRun({ device: 'corpus', mode: 'propped', direction: 'simulated', camera: { width: 1920, height: 1080, frameRate: 60, deliveredFps: 30 } });
+    const seen: Array<number | null> = [];
+    for (let c = 0; c < PROBE_RUN_FRAMES; c++) {
+      const counter = c * 2;
+      const next = c === PROBE_RUN_FRAMES - 1 ? drawProbeFrame(pattern, CORPUS_SESSION, counter + 1) : undefined;
+      const capture = simulateCapture(drawProbeFrame(pattern, CORPUS_SESSION, counter), spec.preset, { pixelsPerCell: spec.cameraPx, cellPitch: pattern.pitch, seed: c + 1, next });
+      seen.push(run.ingest(capture, (counter * 1000) / 60));
     }
+    if (spec.blank) seen.push(run.ingest(blank, 999));
+    expect({ index: pattern.index, seen, report: reportOf(run.report()) }).toEqual(golden.probe[i]);
+  }, 120_000);
+
+  it('gives the probe report probeAnalysis.ts gave for a frame from another stream', () => {
     const foreign = new ProbeRun({ device: 'corpus', mode: 'handheld', direction: 'simulated' });
     const shape = { ...MODEM_PROFILES[0], cols: 120, rows: 67 };
     const capture = simulateCapture(encodeModemFrame(shape, new Uint8Array(4), 1, 1, 8), 'studio', { pixelsPerCell: 5, cellPitch: 8, seed: 1 });
-    runs.push({ index: -1, seen: [foreign.ingest(capture, 0)], report: reportOf(foreign.report()) });
-    expect(runs).toEqual(golden.probe);
+    const run = { index: -1, seen: [foreign.ingest(capture, 0)], report: reportOf(foreign.report()) };
+    expect(run).toEqual(golden.probe[probeCorpus.length]);
   }, 120_000);
 
   it('estimates mutual information as probeAnalysis.ts did', () => {
