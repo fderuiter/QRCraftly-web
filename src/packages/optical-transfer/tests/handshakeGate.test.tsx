@@ -23,7 +23,6 @@ import {
   HANDSHAKE_WATCHDOG_MS,
   type HandshakeVerifierDeps,
 } from '../index';
-import { transferTestConfig } from './fixtures';
 
 /** A Scannability Worker stand-in the test answers by hand. */
 class FakeWorker {
@@ -63,7 +62,7 @@ describe('verifyHandshakeFrame', () => {
     const worker = new FakeWorker();
     const { verifierDeps, checkOnMainThread } = deps(worker, false);
 
-    const verdict = verifyHandshakeFrame(frame, transferTestConfig, null, null, verifierDeps);
+    const verdict = verifyHandshakeFrame(frame, verifierDeps);
     await flush();
     expect(worker.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({ configId: 'handshake-gate', moduleCount: 21, width: 512, height: 512 })
@@ -81,7 +80,7 @@ describe('verifyHandshakeFrame', () => {
     const worker = new FakeWorker();
     const { verifierDeps, checkOnMainThread } = deps(worker, true);
 
-    const verdict = verifyHandshakeFrame(frame, transferTestConfig, null, null, verifierDeps);
+    const verdict = verifyHandshakeFrame(frame, verifierDeps);
     await flush();
     worker.reply({ success: false, physicalReady: false, configId: 'handshake-gate' });
 
@@ -94,7 +93,7 @@ describe('verifyHandshakeFrame', () => {
     const worker = new FakeWorker();
     const { verifierDeps, checkOnMainThread } = deps(worker, false);
 
-    const verdict = verifyHandshakeFrame(frame, transferTestConfig, null, null, verifierDeps);
+    const verdict = verifyHandshakeFrame(frame, verifierDeps);
     await flush();
     await vi.advanceTimersByTimeAsync(HANDSHAKE_WATCHDOG_MS);
     worker.reply({ success: true, physicalReady: true, configId: 'handshake-gate' });
@@ -107,14 +106,14 @@ describe('verifyHandshakeFrame', () => {
   it('runs the main-thread check when no worker can be spawned', async () => {
     const { verifierDeps, checkOnMainThread } = deps(null, true);
 
-    await expect(verifyHandshakeFrame(frame, transferTestConfig, null, null, verifierDeps)).resolves.toBe(true);
+    await expect(verifyHandshakeFrame(frame, verifierDeps)).resolves.toBe(true);
     expect(checkOnMainThread).toHaveBeenCalledWith(expect.objectContaining({ moduleCount: 21, width: 512, height: 512 }));
   });
 
   it('runs the main-thread check when the worker errors or drops the request', async () => {
     const erroring = new FakeWorker();
     const first = deps(erroring, true);
-    const erroredVerdict = verifyHandshakeFrame(frame, transferTestConfig, null, null, first.verifierDeps);
+    const erroredVerdict = verifyHandshakeFrame(frame, first.verifierDeps);
     await flush();
     erroring.onerror?.(new Event('error'));
     await expect(erroredVerdict).resolves.toBe(true);
@@ -122,7 +121,7 @@ describe('verifyHandshakeFrame', () => {
 
     const dropping = new FakeWorker();
     const second = deps(dropping, false);
-    const droppedVerdict = verifyHandshakeFrame(frame, transferTestConfig, null, null, second.verifierDeps);
+    const droppedVerdict = verifyHandshakeFrame(frame, second.verifierDeps);
     await flush();
     dropping.reply({ dropped: true, configId: 'handshake-gate' });
     await expect(droppedVerdict).resolves.toBe(false);
@@ -134,6 +133,6 @@ describe('verifyHandshakeFrame', () => {
     verifierDeps.checkOnMainThread = () => {
       throw new Error('decoder crashed');
     };
-    await expect(verifyHandshakeFrame(frame, transferTestConfig, null, null, verifierDeps)).resolves.toBe(false);
+    await expect(verifyHandshakeFrame(frame, verifierDeps)).resolves.toBe(false);
   });
 });

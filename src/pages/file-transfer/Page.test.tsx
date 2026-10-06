@@ -310,6 +310,82 @@ describe('File Transfer Page & Pipeline', () => {
     }
   });
 
+  it('locks every transfer setting from Start, while the first frame is still being checked', async () => {
+    render(<Page />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /simulate 50mb/i }));
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+    let start: any = null;
+    // No frame arrives, so the page stays on "Checking QR…".
+    globalThis.mockWorkerControl.setInterceptor((message: any) => {
+      if (message.type === 'START') start = message;
+    });
+    try {
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /start file transfer/i }));
+      });
+      expect(screen.getByRole('button', { name: /start file transfer/i })).toHaveTextContent('Checking QR…');
+
+      const privateSwitch = screen.getByRole('switch', { name: 'Private transfer' });
+      for (const name of ['Private transfer', 'Wallet-compatible (BC-UR)', 'New transfer format (preview)', 'Several codes per frame (preview)']) {
+        expect(screen.getByRole('switch', { name })).toBeDisabled();
+      }
+      expect(screen.getByLabelText('Choose a file to send')).toBeDisabled();
+      for (const group of ['Speed', 'QR density']) {
+        for (const radio of within(screen.getByRole('radiogroup', { name: group })).getAllByRole('radio')) expect(radio).toBeDisabled();
+      }
+
+      fireEvent.click(privateSwitch);
+      expect(privateSwitch).not.toBeChecked();
+      expect(start.payload.private).toBe(false);
+    } finally {
+      globalThis.mockWorkerControl.setInterceptor(null);
+    }
+  });
+
+  it('keeps a private transfer\'s key words hidden until their button is held', async () => {
+    render(<Page />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /simulate 50mb/i }));
+    });
+    fireEvent.click(screen.getByRole('switch', { name: 'Private transfer' }));
+    const keyCode = 'able baker charlie delta echo foxtrot golf hotel';
+    globalThis.mockWorkerControl.setInterceptor((message: any, worker: any) => {
+      if (message.type !== 'START') return;
+      expect(message.payload.private).toBe(true);
+      worker.dispatchMessage({ type: 'PROGRESS', index: 0, total: 10 });
+      worker.dispatchMessage({
+        type: 'INITIALIZED',
+        totalFrames: 10,
+        sha256: '',
+        fountain: { k: 10, symbolSize: 100, compression: 'none', density: 'balanced', fingerprint: 'abcd efgh ijkl mnop', fileCount: 1, keyCode, outerCode: 'lt', tiles: null, beacon: null, sessionId: '00', steerable: false },
+      });
+      worker.dispatchMessage({ type: 'FRAME', index: 0, total: 10, size: 21, data: new Uint8Array(21 * 21) });
+    });
+    try {
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /start file transfer/i }));
+      });
+      const panel = await screen.findByTestId('sender-key-panel');
+      expect(within(panel).queryByText(keyCode)).not.toBeInTheDocument();
+      expect(within(panel).getByTestId('sender-key-code-hidden')).toBeInTheDocument();
+
+      const hold = within(panel).getByRole('button', { name: 'Hold to show key code' });
+      fireEvent.pointerDown(hold);
+      expect(within(panel).getByTestId('sender-key-code')).toHaveTextContent(keyCode);
+      fireEvent.pointerUp(hold);
+      expect(within(panel).queryByText(keyCode)).not.toBeInTheDocument();
+
+      fireEvent.keyDown(hold, { key: 'Enter' });
+      expect(within(panel).getByTestId('sender-key-code')).toHaveTextContent(keyCode);
+      fireEvent.blur(hold);
+      expect(within(panel).queryByText(keyCode)).not.toBeInTheDocument();
+    } finally {
+      globalThis.mockWorkerControl.setInterceptor(null);
+    }
+  });
+
   it('unconditionally clears the file input value on change to allow consecutive re-selections of the same file', async () => {
     render(<Page />);
 

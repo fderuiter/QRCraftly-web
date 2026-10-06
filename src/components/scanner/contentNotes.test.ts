@@ -35,6 +35,20 @@ describe('scan summaries for codes that are not links (#1158)', () => {
     expect(scan.cautions.join(' ')).toMatch(/filled in for you/);
   });
 
+  it('reads mailto header names in any case and keeps every repeated recipient field', () => {
+    const upper = describeScan('mailto:boss@example.com?BCC=x@attacker.example&Subject=Hi&BODY=Hello');
+    expect(row(upper.text, 'Bcc')?.value).toBe('x@attacker.example');
+    expect(row(upper.text, 'Subject')?.value).toBe('Hi');
+    expect(upper.cautions.join(' ')).toMatch(/hidden recipients \(Bcc\)/);
+    expect(upper.cautions.join(' ')).toMatch(/addressed to 2 people/);
+    expect(upper.cautions.join(' ')).toMatch(/filled in for you/);
+
+    const repeated = describeScan('mailto:a@example.com?bcc=one@example.com&Bcc=two@example.com&cc=c@example.com&CC=d@example.com');
+    expect(row(repeated.text, 'Bcc')?.value).toBe('one@example.com, two@example.com');
+    expect(row(repeated.text, 'Cc')?.value).toBe('c@example.com, d@example.com');
+    expect(repeated.cautions.join(' ')).toMatch(/addressed to 5 people/);
+  });
+
   it('adds no caution to a plain mailto', () => {
     expect(describeScan('mailto:hello@example.com?subject=Hi').cautions).toEqual([]);
   });

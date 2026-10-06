@@ -76,6 +76,21 @@ describe('analyseLink', () => {
     }
   });
 
+  it('reads the address the browser opens, with tabs, line breaks and spaces after the host', () => {
+    expect(codes('https://paypa1.com/signin?ref= home')).toEqual(['lookalike']);
+    expect(codes('https://paypa1.com/sign\tin')).toEqual(['lookalike']);
+    expect(codes('https://pay\npa1.com/signin')).toEqual(['lookalike']);
+    expect(codes('paypa1.com/signin?ref= home')).toEqual(['lookalike']);
+    expect(codes('https://www.paypal.com@203.0.113.7/login?a= b')).toEqual(['userinfo', 'ip-host']);
+  });
+
+  it('reads a host with a trailing dot as the same site', () => {
+    expect(codes('https://paypa1.com./signin')).toEqual(['lookalike']);
+    expect(codes('https://203.0.113.7./')).toEqual(['ip-host']);
+    expect(analyseLink('https://www.paypal.com./')).toEqual([]);
+    expect(codes('https://paypal.com.account-verify.example./')).toEqual(['brand-in-subdomain']);
+  });
+
   it('never calls an address safe', () => {
     const wording = [...analyseLink('http://user@192.168.0.1:81/'), ...analyseLink('https://paypa1.com')].map((f) => f.message).join(' ');
     expect(wording.toLowerCase()).not.toContain('safe');

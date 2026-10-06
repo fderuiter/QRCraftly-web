@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRConfig, QRStyle, SocialFormat, TemplateStyle } from '@/types';
+import { QRConfig, QRErrorCorrectionLevel, QRStyle, QRType, SocialFormat, TemplateStyle } from '@/types';
 import { drawQRInternal } from '@/packages/qr-matrix';
 import { createScannabilityWorker, isWorkerResponse } from '@/packages/scannability';
 import { performScannabilityCheck } from '@/packages/scannability/checker';
@@ -61,63 +61,75 @@ const defaultHandshakeVerifierDeps: HandshakeVerifierDeps = {
 };
 
 /** Signature of the handshake gate, so hooks can take an injected verifier. */
-export type HandshakeFrameVerifier = (
-  frame: { size: number; data: Uint8Array },
-  config: QRConfig,
-  logoImg: HTMLImageElement | null,
-  borderLogoImg: HTMLImageElement | null
-) => Promise<boolean>;
+export type HandshakeFrameVerifier = (frame: { size: number; data: Uint8Array }) => Promise<boolean>;
 
 /**
- * Sanitizes visual configuration for high-density animated stream chunk frames.
- * Automatically strips center logos, border overlays, templates, and complex module geometries.
- * @param config The input QR code configuration.
- * @returns Streamlined QR code configuration.
+ * The one look of every transfer frame and key QR (#1307): square black modules on white with a
+ * four-module quiet zone, the same as the multi-code tiles. The page's appearance settings never
+ * reach a transfer frame, so no colour, logo, pattern or image can cost a read.
  */
-export function sanitizeStreamConfig(config: QRConfig): QRConfig {
-  return {
-    ...config,
-    style: QRStyle.STANDARD,
-    logoUrl: null,
-    logoSize: 0,
-    isBorderEnabled: false,
-    borderLogoUrl: null,
-    borderText: '',
-    socialFormat: SocialFormat.SQUARE_1_1,
-    templateStyle: TemplateStyle.NONE,
-    isMazeEnabled: false,
-    isMazeBridgesEnabled: false,
+const TRANSFER_FRAME_CONFIG: Readonly<QRConfig> = Object.freeze<QRConfig>({
+  value: '',
+  type: QRType.TEXT,
+  fgColor: '#000000',
+  bgColor: '#ffffff',
+  style: QRStyle.STANDARD,
+  logoUrl: null,
+  logoSize: 0,
+  logoPaddingStyle: 'none',
+  logoPadding: 0,
+  logoBackgroundColor: '#ffffff',
+  eyeColor: '#000000',
+  errorCorrectionLevel: QRErrorCorrectionLevel.M,
+  isBorderEnabled: false,
+  borderSize: 0,
+  borderColor: '#000000',
+  borderStyle: 'solid',
+  borderText: '',
+  borderTextPosition: 'bottom-center',
+  borderTextColor: '#000000',
+  borderLogoUrl: null,
+  borderLogoPosition: 'bottom-center',
+  socialFormat: SocialFormat.SQUARE_1_1,
+  templateStyle: TemplateStyle.NONE,
+  isMazeEnabled: false,
+  isMazeBridgesEnabled: false,
+  backgroundImageUrl: null,
+  isLuminanceMaskingEnabled: false,
+  mosaicImageUrl: null,
+});
+
+/**
+ * Draws a transfer frame or key QR in {@link TRANSFER_FRAME_CONFIG}, filling a square of `size`.
+ * @param ctx - The canvas context.
+ * @param frame - The module matrix, row by row, 1 for dark.
+ * @param size - Side of the square, in the context's units.
+ */
+export function drawTransferFrame(ctx: CanvasRenderingContext2D, frame: { size: number; data: Uint8Array }, size: number): void {
+  const modules = {
+    size: frame.size,
+    get: (r: number, c: number) => !!frame.data[r * frame.size + c],
   };
+  drawQRInternal(ctx, modules, TRANSFER_FRAME_CONFIG, null, null, size, modules.size);
 }
 
 /**
  * Renders the frame and captures its pixels.
  * @returns The check request, or null when no 2D context is available.
  */
-function renderHandshakeFrame(
-  frame: { size: number; data: Uint8Array },
-  config: QRConfig,
-  logoImg: HTMLImageElement | null,
-  borderLogoImg: HTMLImageElement | null,
-  createCanvas: () => HTMLCanvasElement
-): HandshakeCheckRequest | null {
+function renderHandshakeFrame(frame: { size: number; data: Uint8Array }, createCanvas: () => HTMLCanvasElement): HandshakeCheckRequest | null {
   const canvas = createCanvas();
   canvas.width = DISPLAY_SIZE;
   canvas.height = DISPLAY_SIZE;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
-
-  const modules = {
-    size: frame.size,
-    get: (r: number, c: number) => !!frame.data[r * frame.size + c],
-  };
-  drawQRInternal(ctx, modules, config, logoImg, borderLogoImg, DISPLAY_SIZE, modules.size);
+  drawTransferFrame(ctx, frame, DISPLAY_SIZE);
 
   return {
     imageData: ctx.getImageData(0, 0, DISPLAY_SIZE, DISPLAY_SIZE),
     width: DISPLAY_SIZE,
     height: DISPLAY_SIZE,
-    moduleCount: modules.size,
+    moduleCount: frame.size,
   };
 }
 
@@ -126,24 +138,18 @@ function renderHandshakeFrame(
  * The Scannability Worker's answer is used whenever it arrives within the watchdog; the
  * main-thread check runs only if the worker is unavailable, errors, drops the request, or
  * misses the watchdog.
- * @param frame The raw module matrix data of the frame.
- * @param config The QR configuration used to render the frame.
- * @param logoImg Optional logo image element.
- * @param borderLogoImg Optional border logo image element.
+ * @param frame The raw module matrix data of the frame, drawn as {@link drawTransferFrame} draws it.
  * @param deps Injected worker factory, checker and canvas factory.
  * @returns A promise resolving to true if the frame is scannable, false otherwise.
  */
 export async function verifyHandshakeFrame(
   frame: { size: number; data: Uint8Array },
-  config: QRConfig,
-  logoImg: HTMLImageElement | null = null,
-  borderLogoImg: HTMLImageElement | null = null,
   deps: HandshakeVerifierDeps = defaultHandshakeVerifierDeps
 ): Promise<boolean> {
   // Server-side rendering has no canvas; the browser re-runs the gate before playback.
   if (typeof document === 'undefined') return true;
 
-  const request = renderHandshakeFrame(frame, config, logoImg, borderLogoImg, deps.createCanvas);
+  const request = renderHandshakeFrame(frame, deps.createCanvas);
   if (!request) return true;
 
   const fallback = async (): Promise<boolean> => {

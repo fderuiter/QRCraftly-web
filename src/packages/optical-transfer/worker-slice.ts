@@ -25,6 +25,7 @@ import { FRAME_OVERHEAD } from './lib/prism/frame';
 import { BEACON_MANIFEST_INTERVAL, beaconStreamStart, beaconSymbolsFor } from './lib/prism/session';
 import { createPrismBundleSession, createPrismSession, type PrismSession, type PrismStream } from './lib/prism/session';
 import { keyQrText, parseKeyCode } from './lib/prism/words';
+import { encodeStreamFrame, streamVersionOf } from './lib/sender/streamSymbols';
 import type {
   BeaconPlan,
   FountainInitInfo,
@@ -53,6 +54,8 @@ let activeGeneratingSessionId = 0;
 let fileSHA256 = '';
 let lookaheadLimit = 3;
 let stream: PrismStream | null = null;
+/** The version every frame of a single-code stream is drawn at, so the code never changes size (#1306). */
+let streamVersion = 0;
 /** Text of the key QR of the running private transfer; null for a plain one. */
 let keyQr: string | null = null;
 
@@ -95,8 +98,11 @@ function generateFrame(index: number, sessionId: number): void {
   if (sessionId !== currentSessionId || !active || !encoder) return;
 
   try {
-    // Tiles share one fixed version, so a short manifest frame is the same size as a data frame.
-    const qr = encoder.create(active.frameText(index), { errorCorrectionLevel, version: tileLayout?.version });
+    // Every frame shares one version, so a short manifest frame is the same size as a data frame.
+    const text = active.frameText(index);
+    const qr = tileLayout
+      ? encoder.create(text, { errorCorrectionLevel, version: tileLayout.version })
+      : encodeStreamFrame(encoder, text, errorCorrectionLevel, streamVersion);
     const { size, data } = qr.modules;
     if (sessionId !== currentSessionId) return;
 
@@ -244,6 +250,7 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
     }
     if (sessionId !== currentSessionId) return;
     stream = session.stream;
+    streamVersion = tileLayout ? tileLayout.version : streamVersionOf(session.stream, errorCorrectionLevel);
     totalFrames = session.stream.k;
     if (beaconPlan && session.beacon) {
       beacons = { plan: beaconPlan, stream: session.beacon, start: beaconStreamStart(session.stream.k, session.beacon.symbolsPerFrame) };

@@ -67,12 +67,13 @@ describe('File transfer workspaces (#796, #978)', () => {
     const settings = screen.getByRole('heading', { name: /2\. Transfer Settings/ });
     const start = screen.getByRole('button', { name: 'Start file transfer' });
     const canvas = screen.getByRole('img', { name: 'Transfer QR code' });
-    const appearance = screen.getByRole('heading', { name: /3\. QR Appearance/ });
 
     expect(follows(choose, settings)).toBe(true);
     expect(follows(settings, start)).toBe(true);
     expect(follows(start, canvas)).toBe(true);
-    expect(follows(canvas, appearance)).toBe(true);
+    // Transfer codes have one fixed look, so the page offers no appearance controls (#1307).
+    expect(screen.queryByRole('heading', { name: /QR Appearance/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Pattern & Colors' })).not.toBeInTheDocument();
   });
 
   it('receiver: descriptive h1, and mobile order Activate Camera > viewport > progress', () => {

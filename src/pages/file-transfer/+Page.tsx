@@ -33,9 +33,6 @@ import { TRANSFER_SPEEDS, formatFileSize, formatShortDuration, matchTransferSpee
 import { EmptyState } from '@/components/ui/EmptyState';
 import { BetaNotice } from '@/components/BetaNotice';
 import { QrIllustration } from '@/components/QrIllustration';
-import StyleControls from '@/components/StyleControls';
-import { QRProvider, useQRStore, useQRStoreSelector } from '@/context/QRContext';
-import { useImage } from '@/hooks/useImage';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from '@/components/ToolWorkspaceLayout';
 import { TransferModeSwitcher } from '@/components/TransferModeSwitcher';
 import { useOpticalSender } from '@/packages/optical-transfer/client';
@@ -125,17 +122,34 @@ function steerMessage(state: FeedbackLinkState, profile: MultiRateProfileName | 
 }
 
 /**
+ * Button handlers that show something only while the button is held, by pointer or with Space or
+ * Enter, and hide it when the button is let go or loses focus.
+ * @param show - Shows it.
+ * @param hide - Hides it.
+ * @returns Props for a `Button`.
+ */
+function holdToShow(show: () => void, hide: () => void) {
+  return {
+    onPointerDown: show,
+    onPointerUp: hide,
+    onPointerLeave: hide,
+    onPointerCancel: hide,
+    onBlur: hide,
+    onKeyDown: (event: React.KeyboardEvent) => {
+      if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) show();
+    },
+    onKeyUp: hide,
+  };
+}
+
+/**
  * High-Performance Animated QR File Transfer Tool - Sender only view
  * @returns The FileTransferToolInner component.
  */
 function FileTransferToolInner() {
   const [isDraggingFile, setIsDraggingFile] = React.useState(false);
-  const config = useQRStoreSelector(s => s.config);
-  const store = useQRStore();
-
-  // Logo images
-  const logoImg = useImage(config.logoUrl);
-  const borderLogoImg = useImage(config.isBorderEnabled ? config.borderLogoUrl : null);
+  // The key words show only while their button is held, never beside the stream by default.
+  const [showingKeyCode, setShowingKeyCode] = React.useState(false);
 
   // Hook into the unified animated QR sender
   const {
@@ -151,6 +165,7 @@ function FileTransferToolInner() {
     isTransferring,
     isPaused,
     isVerifyingHandshake,
+    settingsLocked,
     handshakeError,
     progress,
     currentFrameIndex,
@@ -183,9 +198,6 @@ function FileTransferToolInner() {
     handleFileChange,
     simulate50MBFile,
   } = useOpticalSender({
-    config,
-    logoImg,
-    borderLogoImg,
     renderFrame: paintTransferFrame,
     requestWebcam: openSenderWebcam,
   });
@@ -266,7 +278,7 @@ function FileTransferToolInner() {
 
   const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
-    if (!isTransferring) {
+    if (!settingsLocked) {
       event.dataTransfer.dropEffect = 'copy';
       setIsDraggingFile(true);
     }
@@ -282,7 +294,7 @@ function FileTransferToolInner() {
     event.preventDefault();
     setIsDraggingFile(false);
 
-    if (isTransferring) return;
+    if (settingsLocked) return;
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -299,7 +311,7 @@ function FileTransferToolInner() {
     <div className="w-full">
       <ToolWorkspaceLayout
         previewFocusable
-        controlsLabel="Settings and Styling"
+        controlsLabel="Transfer settings"
         previewLabel="Transfer QR"
         previewId="transfer-preview"
         header={
@@ -325,7 +337,7 @@ function FileTransferToolInner() {
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                   className={`flex min-h-24 w-full min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-3 transition-colors ${
-                    isTransferring
+                    settingsLocked
                       ? 'cursor-not-allowed border-line bg-surface-sunken opacity-60'
                       : isDraggingFile
                         ? 'cursor-copy border-accent bg-accent-soft'
@@ -343,13 +355,13 @@ function FileTransferToolInner() {
                     aria-label="Choose a file to send"
                     multiple
                     onChange={handleFileChange}
-                    disabled={isTransferring}
+                    disabled={settingsLocked}
                   />
                 </label>
 
                 {folderSupported && (
                   <>
-                    <Button variant="outline" onClick={() => folderInputRef.current?.click()} disabled={isTransferring} fullWidth>
+                    <Button variant="outline" onClick={() => folderInputRef.current?.click()} disabled={settingsLocked} fullWidth>
                       <FolderUp className="size-4" aria-hidden="true" />
                       Send a folder
                     </Button>
@@ -359,7 +371,7 @@ function FileTransferToolInner() {
                       className="hidden"
                       aria-label="Choose a folder to send"
                       onChange={handleFileChange}
-                      disabled={isTransferring}
+                      disabled={settingsLocked}
                       {...FOLDER_INPUT_PROPS}
                     />
                   </>
@@ -369,7 +381,7 @@ function FileTransferToolInner() {
                   <Button
                     variant="outline"
                     onClick={simulate50MBFile}
-                    disabled={isTransferring}
+                    disabled={settingsLocked}
                     fullWidth
                   >
                     <Cpu className="size-4" />
@@ -411,7 +423,7 @@ function FileTransferToolInner() {
                     setDensity(speed.density);
                     setFps(speed.fps);
                   }}
-                  disabled={isTransferring}
+                  disabled={settingsLocked}
                   options={TRANSFER_SPEEDS.map((speed) => ({ value: speed.id, label: speed.label }))}
                 />
                 <p className="text-xs text-fg-muted">{activeSpeed?.hint ?? 'Custom values set under Advanced.'}</p>
@@ -423,7 +435,7 @@ function FileTransferToolInner() {
               </div>
 
               <div className="space-y-1">
-                <ToggleSwitch id="private-transfer" label="Private transfer" checked={isPrivate} onChange={setIsPrivate} disabled={isTransferring} />
+                <ToggleSwitch id="private-transfer" label="Private transfer" checked={isPrivate} onChange={setIsPrivate} disabled={settingsLocked} />
                 <p className="text-xs text-fg-muted">
                   Encrypts the file and its name. You read a key code to the receiver, who enters it before the file opens. Someone filming the stream cannot read the file without the code.
                 </p>
@@ -450,7 +462,7 @@ function FileTransferToolInner() {
                       labelledBy="density-label"
                       value={density}
                       onChange={setDensity}
-                      disabled={isTransferring}
+                      disabled={settingsLocked}
                       options={DENSITY_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
                     />
                     <p className="text-xs text-fg-muted">{activeDensityHint}</p>
@@ -462,7 +474,7 @@ function FileTransferToolInner() {
                       label="New transfer format (preview)"
                       checked={outerCode === 'fec'}
                       onChange={(checked) => setOuterCode(checked ? 'fec' : 'lt')}
-                      disabled={isTransferring}
+                      disabled={settingsLocked}
                     />
                     <p className="text-xs text-fg-muted" data-testid="outer-code-hint">
                       {fountainInfo && outerCode === 'fec' && fountainInfo.outerCode === 'lt'
@@ -477,7 +489,7 @@ function FileTransferToolInner() {
                       label="Several codes per frame (preview)"
                       checked={multiCode}
                       onChange={setMultiCode}
-                      disabled={isTransferring}
+                      disabled={settingsLocked}
                     />
                     <p className="text-xs text-fg-muted" data-testid="multi-code-hint">
                       {fountainInfo && multiCode && !fountainInfo.tiles
@@ -492,7 +504,7 @@ function FileTransferToolInner() {
                       label="Let the receiver steer (preview)"
                       checked={steer && multiCode}
                       onChange={setSteer}
-                      disabled={isTransferring || !multiCode}
+                      disabled={settingsLocked || !multiCode}
                     />
                     <p className="text-xs text-fg-muted" data-testid="steer-hint">
                       {multiCode
@@ -506,7 +518,7 @@ function FileTransferToolInner() {
                       label="Wallet-compatible (BC-UR)"
                       checked={walletCompat && !isPrivate}
                       onChange={setWalletCompat}
-                      disabled={isTransferring || isPrivate}
+                      disabled={settingsLocked || isPrivate}
                     />
                     <p className="text-xs text-fg-muted" data-testid="wallet-bcur-hint">
                       {isPrivate
@@ -532,13 +544,6 @@ function FileTransferToolInner() {
             {/* Beta notice after the primary actions so they stay in the first mobile viewport. */}
             <BetaNotice />
           </>
-        }
-        secondary={
-          /* Style Customization Section */
-          <section className="space-y-4">
-            <SectionHeading eyebrow="3. QR Appearance" />
-            <StyleControls config={config} onChange={store.updateConfig} />
-          </section>
         }
         preview={
             <Card>
@@ -706,24 +711,26 @@ function FileTransferToolInner() {
                   {fountainInfo?.keyCode && (
                     <div className="space-y-2 rounded-lg border border-line bg-surface p-3" data-testid="sender-key-panel">
                       <p className="font-semibold text-fg">Key code</p>
-                      <p className="font-mono text-sm font-semibold break-words text-fg-soft" data-testid="sender-key-code">
-                        {fountainInfo.keyCode}
+                      <p className="font-mono text-sm font-semibold break-words text-fg-soft" aria-live="polite">
+                        {showingKeyCode ? (
+                          <span data-testid="sender-key-code">{fountainInfo.keyCode}</span>
+                        ) : (
+                          <span className="font-sans font-normal text-fg-muted" data-testid="sender-key-code-hidden">
+                            Hidden while the stream plays.
+                          </span>
+                        )}
                       </p>
-                      <p className="text-fg-muted">Tell the receiver these words, or hold the button to show a QR code they can scan. Do not show the code on a screen the camera can see.</p>
-                      <Button
-                        variant="outline"
-                        onPointerDown={showKeyQr}
-                        onPointerUp={hideKeyQr}
-                        onPointerLeave={hideKeyQr}
-                        onPointerCancel={hideKeyQr}
-                        onBlur={hideKeyQr}
-                        onKeyDown={(event) => {
-                          if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) showKeyQr();
-                        }}
-                        onKeyUp={hideKeyQr}
-                      >
-                        Hold to show key QR
-                      </Button>
+                      <p className="text-fg-muted">
+                        Hold a button to show the eight words to read to the receiver, or a QR code they can scan. Anyone filming this screen while the key shows can read the file, so show it only out of view of other cameras.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" {...holdToShow(() => setShowingKeyCode(true), () => setShowingKeyCode(false))}>
+                          Hold to show key code
+                        </Button>
+                        <Button variant="outline" {...holdToShow(showKeyQr, hideKeyQr)}>
+                          Hold to show key QR
+                        </Button>
+                      </div>
                       <canvas
                         ref={keyCanvasRef}
                         className={`mx-auto aspect-square w-48 rounded-lg bg-surface ${keyFrame ? '' : 'hidden'}`}
@@ -772,10 +779,9 @@ function FileTransferToolInner() {
                 </div>
               </div>
 
-              {/* Shown once there is a stream to style: transfer frames drop decoration so every frame scans. */}
               {hasFile && (
                 <p className="text-xs text-fg-muted">
-                  Logos, borders and complex patterns are left off transfer frames so every frame scans.
+                  Transfer codes are always plain black on white, so every frame scans.
                 </p>
               )}
             </Card>
@@ -787,13 +793,8 @@ function FileTransferToolInner() {
 
 /**
  * High-Performance Animated QR File Transfer Page Component
- * @returns The rendered Page component wrapped in a QRProvider.
+ * @returns The rendered Page component.
  */
 export default function Page() {
-
-  return (
-    <QRProvider>
-      <FileTransferToolInner />
-    </QRProvider>
-  );
+  return <FileTransferToolInner />;
 }

@@ -18,10 +18,9 @@
 
 
 import type React from 'react';
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { QRConfig } from '@/types';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PreallocatedFramePool } from '../framePool';
-import { sanitizeStreamConfig, verifyHandshakeFrame, type HandshakeFrameVerifier } from '../handshake';
+import { verifyHandshakeFrame, type HandshakeFrameVerifier } from '../handshake';
 import type { BeaconPlan, SliceWorkerOutgoingMessage, TransferStats } from '../contracts';
 import { DEFAULT_TRANSFER_DENSITY, type TransferCompression, type TransferDensity } from '../fountain/session';
 import type { TileLayoutId } from '../multicode/layout';
@@ -46,21 +45,13 @@ export interface TransferFrame {
 }
 
 /**
- * Paints one frame onto the transfer canvas. Injected by the page so the package does not depend
- * on the app's template and export renderers.
+ * Paints one frame onto the transfer canvas in the fixed transfer look (`TRANSFER_FRAME_CONFIG`):
+ * a transfer frame carries no styling that could cost a read (#1307). Injected by the page so the
+ * package does not depend on the app's canvas renderer.
  */
-export type TransferFrameRenderer = (
-  canvas: HTMLCanvasElement,
-  frame: TransferFrame,
-  config: QRConfig,
-  logoImg: HTMLImageElement | null,
-  borderLogoImg: HTMLImageElement | null
-) => void;
+export type TransferFrameRenderer = (canvas: HTMLCanvasElement, frame: TransferFrame) => void;
 
 export interface UseOpticalSenderOptions {
-  config: QRConfig;
-  logoImg: HTMLImageElement | null;
-  borderLogoImg: HTMLImageElement | null;
   /** Paints each frame onto `canvasRef`. */
   renderFrame: TransferFrameRenderer;
   /** Scannability gate run on the first frame before playback. Defaults to `verifyHandshakeFrame`. */
@@ -122,24 +113,20 @@ const WALLET_ONE_FILE = 'Wallet-compatible mode sends one file at a time. Pick a
 
 const PROFILE_FOR_DENSITY: Readonly<Record<TransferDensity, MultiRateProfileName>> = { reliable: 'steady', balanced: 'balanced', fast: 'fast' };
 
-const HANDSHAKE_FAILURE_SUFFIX =
-  'failed scannability check. Transfer playback remains paused. Please increase contrast or reduce visual complexity.';
+const HANDSHAKE_FAILURE_SUFFIX = 'failed scannability check. Transfer playback remains paused. Try the Reliable density.';
 
 /**
  * Headless React hook to coordinate asynchronous file slicing, animation playback,
  * flow-control feedback, and pre-allocated frame memory pooling for the sender.
  */
 export function useOpticalSender({
-  config,
-  logoImg,
-  borderLogoImg,
   renderFrame,
   verifyFrame = verifyHandshakeFrame,
   requestWebcam,
 }: UseOpticalSenderOptions) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   /** Encrypt the next transfer under a key code (#1144). */
-  const [isPrivate, setIsPrivate] = useState(false);
+  const [isPrivate, setIsPrivateState] = useState(false);
   /** The key QR, while the person holds the button that shows it. */
   const [keyFrame, setKeyFrame] = useState<TransferFrame | null>(null);
   const selectedFile = selectedFiles[0] ?? null;
@@ -153,15 +140,15 @@ export function useOpticalSender({
   const [progress, setProgress] = useState(0);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [totalFrames, setTotalFrames] = useState(0);
-  const [density, setDensity] = useState<TransferDensity>(DEFAULT_TRANSFER_DENSITY);
+  const [density, setDensityState] = useState<TransferDensity>(DEFAULT_TRANSFER_DENSITY);
   /** The code to send with: the LT code by default, the outer code (#1141) when chosen under Advanced. */
-  const [outerCode, setOuterCode] = useState<OuterCode>('lt');
+  const [outerCode, setOuterCodeState] = useState<OuterCode>('lt');
   /** Several codes per frame (#1142), chosen under Advanced. Off by default. */
-  const [multiCode, setMultiCode] = useState(false);
+  const [multiCode, setMultiCodeState] = useState(false);
   /** The running multi-code stream's layout and pacing, or null. */
   const [tileInfo, setTileInfo] = useState<SenderTileInfo | null>(null);
   /** Let the receiver steer the speed through the webcam (#1146), chosen under Advanced. Off by default. */
-  const [steer, setSteer] = useState(false);
+  const [steer, setSteerSetting] = useState(false);
   /** The back channel: off, asking for the webcam, listening, or one-way after a refusal or loss. */
   const [steerState, setSteerState] = useState<FeedbackLinkState>({ status: 'off' });
   /** The profile a steered transfer shows now, or null. */
@@ -171,7 +158,7 @@ export function useOpticalSender({
   /** True when the sender stopped because every receiver it could see had the file. */
   const [autoStopped, setAutoStopped] = useState(false);
   /** Sends real BC-UR parts that wallets can read, in place of Prism (#1149). */
-  const [walletCompat, setWalletCompat] = useState(false);
+  const [walletCompat, setWalletCompatState] = useState(false);
   const [fountainInfo, setFountainInfo] = useState<SenderFountainInfo | null>(null);
   const [fps, setFps] = useState(15);
   const [currentPass, setCurrentPass] = useState(1);
@@ -190,9 +177,6 @@ export function useOpticalSender({
   const passCountRef = useRef<number>(1);
 
   // Refs for background loop
-  const configRef = useRef(config);
-  const logoImgRef = useRef(logoImg);
-  const borderLogoImgRef = useRef(borderLogoImg);
   const renderFrameRef = useRef(renderFrame);
   const verifyFrameRef = useRef(verifyFrame);
   const isTransferringRef = useRef(false);
@@ -241,9 +225,6 @@ export function useOpticalSender({
   const walletRunRef = useRef(0);
 
   useEffect(() => {
-    configRef.current = config;
-    logoImgRef.current = logoImg;
-    borderLogoImgRef.current = borderLogoImg;
     renderFrameRef.current = renderFrame;
     verifyFrameRef.current = verifyFrame;
     isTransferringRef.current = isTransferring;
@@ -251,7 +232,32 @@ export function useOpticalSender({
     fpsRef.current = fps;
     totalFramesRef.current = totalFrames;
     requestWebcamRef.current = requestWebcam;
-  }, [config, logoImg, borderLogoImg, renderFrame, verifyFrame, isTransferring, isVerifyingHandshake, fps, totalFrames, requestWebcam]);
+  }, [renderFrame, verifyFrame, isTransferring, isVerifyingHandshake, fps, totalFrames, requestWebcam]);
+
+  /**
+   * True from Start until the stream stops. A stream keeps the settings it was started with, so the
+   * switches below cannot change while it starts or runs and never show something it is not doing.
+   */
+  const settingsLocked = isTransferring || isVerifyingHandshake;
+  const settingsLockedRef = useRef(false);
+  useEffect(() => {
+    settingsLockedRef.current = settingsLocked;
+  }, [settingsLocked]);
+  const settingSetters = useMemo(() => {
+    const unlessLocked =
+      <T,>(set: (value: T) => void) =>
+      (value: T) => {
+        if (!settingsLockedRef.current) set(value);
+      };
+    return {
+      setIsPrivate: unlessLocked(setIsPrivateState),
+      setDensity: unlessLocked(setDensityState),
+      setOuterCode: unlessLocked(setOuterCodeState),
+      setMultiCode: unlessLocked(setMultiCodeState),
+      setSteer: unlessLocked(setSteerSetting),
+      setWalletCompat: unlessLocked(setWalletCompatState),
+    };
+  }, []);
 
   /** Turns the back channel off and lets the webcam go. */
   const endSteering = useCallback(() => {
@@ -280,16 +286,16 @@ export function useOpticalSender({
     };
   }, [endSteering]);
 
-  /** Paints a frame. Transfer frames are always sanitized: no logo, no decoration that could cost a read. */
+  /** Paints a frame in the fixed transfer look. */
   const paint = useCallback((frame: TransferFrame) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    renderFrameRef.current(canvas, frame, sanitizeStreamConfig(configRef.current), null, null);
+    renderFrameRef.current(canvas, frame);
   }, []);
 
   useEffect(() => {
     if (keyFrame && keyCanvasRef.current) {
-      renderFrameRef.current(keyCanvasRef.current, keyFrame, sanitizeStreamConfig(configRef.current), null, null);
+      renderFrameRef.current(keyCanvasRef.current, keyFrame);
     }
   }, [keyFrame]);
 
@@ -300,6 +306,7 @@ export function useOpticalSender({
     isPausedRef.current = false;
     setIsVerifyingHandshake(false);
     isVerifyingHandshakeRef.current = false;
+    settingsLockedRef.current = false;
     setHandshakeError(null);
     setHandshakeVerified(false);
     setKeyFrame(null);
@@ -445,7 +452,7 @@ export function useOpticalSender({
       .then(async (wallet) => {
         if (run !== walletRunRef.current) return;
         const first = wallet.nextFrame();
-        const isScannable = await verifyFrameRef.current(first, sanitizeStreamConfig(configRef.current), null, null);
+        const isScannable = await verifyFrameRef.current(first);
         if (run !== walletRunRef.current) return;
         if (!isScannable) {
           fail(`Transfer QR frame ${HANDSHAKE_FAILURE_SUFFIX}`);
@@ -589,9 +596,8 @@ export function useOpticalSender({
   const gateFirstFrame = useCallback(async (frame: TransferFrame) => {
     isVerifyingHandshakeRef.current = false;
 
-    // The first frame is checked as it will be shown: sanitized, without a logo. Tiles are always
-    // painted dark on light whatever the page's colours, so they skip the check.
-    const isScannable = tilePlanRef.current ? true : await verifyFrameRef.current(frame, sanitizeStreamConfig(configRef.current), null, null);
+    // The first frame is checked as it will be shown. Tiles are painted by the sender itself, so they skip the check.
+    const isScannable = tilePlanRef.current ? true : await verifyFrameRef.current(frame);
 
     setIsVerifyingHandshake(false);
 
@@ -827,6 +833,7 @@ export function useOpticalSender({
 
     setIsVerifyingHandshake(true);
     isVerifyingHandshakeRef.current = true;
+    settingsLockedRef.current = true;
     setHandshakeError(null);
     setHandshakeVerified(false);
 
@@ -955,7 +962,7 @@ export function useOpticalSender({
     setSelectedFile,
     setSelectedFiles,
     isPrivate,
-    setIsPrivate,
+    setIsPrivate: settingSetters.setIsPrivate,
     keyFrame,
     keyCanvasRef,
     showKeyQr,
@@ -963,26 +970,27 @@ export function useOpticalSender({
     isTransferring,
     isPaused,
     isVerifyingHandshake,
+    settingsLocked,
     handshakeVerified,
     handshakeError,
     progress,
     currentFrameIndex,
     totalFrames,
     density,
-    setDensity,
+    setDensity: settingSetters.setDensity,
     outerCode,
-    setOuterCode,
+    setOuterCode: settingSetters.setOuterCode,
     multiCode,
-    setMultiCode,
+    setMultiCode: settingSetters.setMultiCode,
     tileInfo,
     steer,
-    setSteer,
+    setSteer: settingSetters.setSteer,
     steerState,
     steeredProfile,
     steeringReceivers,
     autoStopped,
     walletCompat,
-    setWalletCompat,
+    setWalletCompat: settingSetters.setWalletCompat,
     fps,
     setFps,
     currentPass,

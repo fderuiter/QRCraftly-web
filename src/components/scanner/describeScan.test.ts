@@ -16,6 +16,15 @@ describe('describeScan', () => {
     expect(scan.link).toMatchObject({ host: 'аpple.com', asciiHost: 'xn--pple-43d.com', secure: false, international: true, mixedScripts: true });
   });
 
+  it('offers and checks the address the browser will open', () => {
+    const spaced = describeScan('https://paypa1.com/signin?ref= home');
+    expect(spaced.link?.href).toBe('https://paypa1.com/signin?ref=%20home');
+    expect(spaced.link?.findings.map((finding) => finding.code)).toEqual(['lookalike']);
+    const broken = describeScan('https://pay\npa1.com/sign\tin');
+    expect(broken.link).toMatchObject({ href: 'https://paypa1.com/signin', host: 'paypa1.com' });
+    expect(broken.link?.findings.map((finding) => finding.code)).toEqual(['lookalike']);
+  });
+
   it.each(['javascript:alert(1)', 'JaVaScRiPt:alert(1)', 'data:text/html;base64,PHNjcmlwdD4=', 'vbscript:msgbox(1)', ' java\tscript:alert(1)'])(
     'blocks %s with no link or summary',
     (payload) => {

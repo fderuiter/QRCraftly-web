@@ -82,11 +82,13 @@ When a link is opened, it opens in a new tab with `rel="noopener noreferrer"`, a
 
 The sheet shows the link's actual host as the browser parses it, so `https://paypal.com@evil.example` shows **evil.example**. Hosts written in punycode are shown in Unicode with the ASCII form beside them (`src/utils/hostname.ts`). The `link-safety` package (`src/packages/link-safety`, offline and synchronous) adds notes of two weights. **Cautions** (amber): a `user@host` trick, an IP address in any notation, mixed alphabets, a look-alike of about a hundred brands (UTS #39 confusables for Latin, Cyrillic, Greek and Armenian, plus digit swaps like `paypa1`), a brand named in a subdomain of another site, four or more subdomain levels, and plain `http`. **Notes** (grey): a shortener or redirector, a non-default port, international characters, and a brand named in a sign-in path.
 
+The notes read the address the browser will open, not the raw text: tabs and line breaks are removed and spaces after the host are encoded first, and a trailing dot on the host name is ignored. The Open button uses that same parsed address.
+
 An address with none of these gets neutral wording ("No warning signs found in the address. That is not a guarantee"). The sheet never calls a link safe, because offline text analysis cannot know that. A brand missing from the list is not detected, and a shortener's destination cannot be expanded without a network request.
 
 ### Other kinds of code are explained
 
-The result sheet describes what a non-link code does before anyone acts on it (`src/components/scanner/contentNotes.ts`): every mailto recipient with Cc, Bcc and a pre-filled body called out; dialer (USSD) codes in `tel:`; texts to several numbers or to a short number; Wi-Fi networks with no password or WEP; wallet addresses checked against their checksum (Base58Check, bech32 and bech32m, EIP-55; Solana has none, so only its shape is checked). Wi-Fi passwords and authenticator (`otpauth:`) secrets are hidden behind a Show button, and Share leaves them out unless the person includes them. Hidden direction and zero-width characters are spelled out as `[U+202E]` in the raw content and values, and the text is isolated with `<bdi>` so it cannot reorder what is around it.
+The result sheet describes what a non-link code does before anyone acts on it (`src/components/scanner/contentNotes.ts`): every mailto recipient with Cc, Bcc and a pre-filled body called out (header names in any case, and every copy of a repeated field); dialer (USSD) codes in `tel:`; texts to several numbers or to a short number; Wi-Fi networks with no password or WEP; wallet addresses checked against their checksum (Base58Check, bech32 and bech32m, EIP-55; Solana has none, so only its shape is checked). Wi-Fi passwords and authenticator (`otpauth:`) secrets are hidden behind a Show button, and Share leaves them out unless the person includes them. Hidden direction and zero-width characters are spelled out as `[U+202E]` in the raw content and values, and the text is isolated with `<bdi>` so it cannot reorder what is around it.
 
 ### Content is shown as text
 
@@ -131,3 +133,5 @@ No link reputation lookups, no URL expansion through a server, no analytics on w
 ## Private transfers and bundles
 
 Private mode and bundle handling are specified in [ADR 0025](./adr/0025-private-transfers-and-bundles.md). A receiver with a key set accepts only private transfers, and bundle paths are sanitized before any file is offered for saving.
+
+The sender shows the key code's words, and its key QR, only while their button is held, so they are not on screen beside the stream by default. From the moment Start is pressed until the transfer stops, Private, Wallet-compatible, density and the other stream settings cannot be changed, so a switch never shows a setting the running stream does not use.

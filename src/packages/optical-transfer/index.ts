@@ -24,6 +24,7 @@
 
 export {
   verifyHandshakeFrame,
+  drawTransferFrame,
   HANDSHAKE_WATCHDOG_MS,
   type HandshakeVerifierDeps,
   type HandshakeCheckRequest,
