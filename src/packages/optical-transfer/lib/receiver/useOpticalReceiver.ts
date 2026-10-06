@@ -26,9 +26,12 @@ import { FountainRateTracker, type FountainTelemetry } from '../fountain/reassem
 import { layerHint } from '../multicode/layerHint';
 import { frameLayer } from '../multicode/multirate';
 import { decoderPoolSize } from '../multicode/pool';
-import { sha256Hex } from '../fountain/session';
+import { hexToBytes, sha256Hex } from '../fountain/session';
 import { MAX_VIDEO_UPLOAD_BYTES, formatLimit } from '../limits';
-import { looksLikePrismFrame } from '../prism/frame';
+import { FEEDBACK_NONCE_BYTES, encodeFeedbackFrame, looksLikePrismFrame } from '../prism/frame';
+import { createFeedbackMeter } from '../feedback/meter';
+import { paintBeacon } from '../sender/tiles';
+import { loadQrEncoder, type QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
 import { looksLikeKeyQr } from '../prism/words';
 import type { PrismManifestInfo } from '../prism/manifest';
 import { analyseReceivedFile } from '@/utils/fileNames';
@@ -101,6 +104,8 @@ const LOCK_ON_HOLD_MS = 400;
 const MULTI_CODE_FRAME_RATE = 60;
 /** Camera frames the layer hint looks back over (#1143). */
 const LAYER_WINDOW_FRAMES = 30;
+/** How often the feedback code is repainted: the back channel's simulation assumes 4 a second. */
+const FEEDBACK_REFRESH_MS = 250;
 
 const FILE_RECEIVED_MESSAGE = 'File completely received & offline binary reconstruction triggered!';
 
@@ -192,6 +197,11 @@ export function useOpticalReceiver({
   /** When the transfer last made progress (a manifest or a higher rank), or null before it started. */
   const lastProgressRef = useRef<number | null>(null);
   const lastRankRef = useRef(0);
+  /** Show a feedback code the sender's webcam can read to pick its speed and stop (#1146). Off by default. */
+  const [steerSender, setSteerSender] = useState(false);
+  /** The canvas the feedback code is painted on, in a corner of the page. */
+  const feedbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const feedbackMeterRef = useRef(createFeedbackMeter());
   // The multi-code reader takes the camera's frames in place of the scanner's one-code loop.
   const tileReaderRef = useRef<TileReader | null>(null);
   const tileReader = useMemo<TileReader>(
@@ -202,8 +212,9 @@ export function useOpticalReceiver({
           poolSize: decoderPoolSize(typeof navigator === 'undefined' ? undefined : navigator.hardwareConcurrency),
           onText: (text) => handleFrameRef.current(text),
           onCorners: (corners) => markLockOn(corners),
-          onFrameRead: (texts) => {
-            const layer = frameLayer(texts);
+          onFrameRead: (codes) => {
+            feedbackMeterRef.current.record(codes);
+            const layer = frameLayer(codes.map((code) => code.text));
             if (!layer) return;
             const recent = layerWindowRef.current;
             recent.push(layer);
@@ -464,6 +475,7 @@ export function useOpticalReceiver({
   const handleClear = useCallback(() => {
     terminateWorker();
     layerWindowRef.current = [];
+    feedbackMeterRef.current.reset();
     lastProgressRef.current = null;
     lastRankRef.current = 0;
     setLayerHintText(null);
@@ -616,6 +628,49 @@ export function useOpticalReceiver({
     if (cameraStatusRef.current === 'streaming') void startCamera(multiCode ? { frameRate: MULTI_CODE_FRAME_RATE } : {});
   }, [multiCode, startCamera]);
 
+  // The feedback code (#1146): four times a second while the person lets the sender steer, the
+  // receiver repaints a small code with its progress, how well it reads, and done once it has the file.
+  const feedbackSession = multiCode && steerSender && (isScanning || receiverSuccess) ? (manifest?.sessionId ?? null) : null;
+  const fractionRef = useRef(0);
+  const doneRef = useRef(false);
+  useEffect(() => {
+    fractionRef.current = fountainStats && fountainStats.k > 0 ? Math.min(1, fountainStats.rank / fountainStats.k) : 0;
+    doneRef.current = receiverSuccess;
+  }, [fountainStats, receiverSuccess]);
+  useEffect(() => {
+    if (!feedbackSession) return undefined;
+    // A new random nonce per receive: it tells this receiver apart from others and names nobody.
+    const nonce = crypto.getRandomValues(new Uint8Array(FEEDBACK_NONCE_BYTES));
+    const sessionId = hexToBytes(feedbackSession);
+    let cancelled = false;
+    let encoder: QrSymbolEncoder | null = null;
+    const paint = () => {
+      const canvas = feedbackCanvasRef.current;
+      if (!encoder || !canvas) return;
+      const text = encodeFeedbackFrame({
+        sessionId,
+        nonce,
+        fractionDecoded: doneRef.current ? 1 : fractionRef.current,
+        ...feedbackMeterRef.current.measure(),
+        done: doneRef.current,
+      });
+      paintBeacon(canvas, encoder.create(text, { errorCorrectionLevel: 'M' }).modules);
+    };
+    loadQrEncoder().then(
+      (loaded) => {
+        if (cancelled) return;
+        encoder = loaded;
+        paint();
+      },
+      () => undefined
+    );
+    const timer = setInterval(paint, FEEDBACK_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [feedbackSession]);
+
   // Once a second, the multi-code receiver says which layer it reads and whether progress stalled.
   const hintActive = multiCode && isScanning && !receiverSuccess;
   useEffect(() => {
@@ -676,6 +731,12 @@ export function useOpticalReceiver({
     setMultiCode,
     /** Which layer of a multi-rate stream the camera reads, or that progress stalled (#1143); null when all is well. */
     layerHint: layerHintText,
+    /** Show a feedback code so the sender's webcam can steer its speed and stop (#1146). */
+    steerSender,
+    setSteerSender,
+    /** True while the feedback code is shown: the page puts `feedbackCanvasRef` in a corner. */
+    feedbackActive: feedbackSession !== null,
+    feedbackCanvasRef,
     /** Corners of the code the camera read a moment ago (for the lock-on brackets), or null. */
     lockOn,
     /** A finished real BC-UR stream (type and content), or null. */

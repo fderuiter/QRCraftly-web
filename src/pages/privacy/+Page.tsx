@@ -81,8 +81,8 @@ export default function Page() {
         <ArticleHeading id="permissions"><span id="permissions-title">Permissions</span></ArticleHeading>
         <ul className="list-disc space-y-3 pl-6">
           <li>
-            <strong className="text-fg">Camera:</strong> to scan codes, receive a transfer or check a printed code, only
-            when you start those features. Camera frames are read on your device and never recorded or saved.
+            <strong className="text-fg">Camera:</strong> to scan codes, receive a transfer, check a printed code, or let a
+            receiver steer a transfer you send, only when you start those features. Camera frames are read on your device and never recorded or saved.
           </li>
           <li>
             <strong className="text-fg">Photos:</strong> only to add images you choose to save. To scan a photo you pick

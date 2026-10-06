@@ -39,7 +39,14 @@ import { useImage } from '@/hooks/useImage';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from '@/components/ToolWorkspaceLayout';
 import { TransferModeSwitcher } from '@/components/TransferModeSwitcher';
 import { useOpticalSender } from '@/packages/optical-transfer/client';
-import { estimateTransferFrames, neededSymbols, type TransferDensity } from '@/packages/optical-transfer';
+import {
+  MULTI_RATE_PROFILES,
+  estimateTransferFrames,
+  neededSymbols,
+  type FeedbackLinkState,
+  type MultiRateProfileName,
+  type TransferDensity,
+} from '@/packages/optical-transfer';
 import { paintTransferFrame } from './paintTransferFrame';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import {
@@ -81,6 +88,43 @@ function formatDuration(seconds: number): string {
 }
 
 /**
+ * Opens this device's webcam for the back channel (#1146): the front camera, at a size that reads a
+ * small code across a desk. Called only after the person turned steering on and started a transfer.
+ * @returns The camera stream.
+ */
+function openSenderWebcam(): Promise<MediaStream> {
+  return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+}
+
+/**
+ * What the sender says about the back channel while it sends.
+ * @param state - The back channel's state.
+ * @param profile - The profile on screen.
+ * @param receivers - Receivers whose code the camera reads.
+ * @returns One sentence.
+ */
+function steerMessage(state: FeedbackLinkState, profile: MultiRateProfileName | null, receivers: number): string {
+  if (state.status === 'requesting') return 'Asking for the camera so the receiver can steer the speed.';
+  if (state.status === 'listening') {
+    const speed = profile ? `${MULTI_RATE_PROFILES[profile].label} speed` : 'The chosen speed';
+    if (receivers === 0) return `${speed}. Point this device’s camera at the receiving screen’s small code.`;
+    return `${speed}, steered by ${receivers} receiver${receivers === 1 ? '' : 's'}.`;
+  }
+  if (state.status === 'one-way') {
+    const why =
+      state.reason === 'denied'
+        ? 'Camera access was refused'
+        : state.reason === 'unavailable'
+          ? 'No camera was found'
+          : state.reason === 'camera-lost'
+            ? 'The camera stopped'
+            : 'The camera could not start';
+    return `${why}, so this transfer runs at the speed you chose and does not stop by itself.`;
+  }
+  return '';
+}
+
+/**
  * High-Performance Animated QR File Transfer Tool - Sender only view
  * @returns The FileTransferToolInner component.
  */
@@ -118,6 +162,12 @@ function FileTransferToolInner() {
     multiCode,
     setMultiCode,
     tileInfo,
+    steer,
+    setSteer,
+    steerState,
+    steeredProfile,
+    steeringReceivers,
+    autoStopped,
     fps,
     setFps,
     currentPass,
@@ -135,6 +185,7 @@ function FileTransferToolInner() {
     logoImg,
     borderLogoImg,
     renderFrame: paintTransferFrame,
+    requestWebcam: openSenderWebcam,
   });
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -432,6 +483,21 @@ function FileTransferToolInner() {
                         : 'Shows up to four large codes at once, timed to the display, with one bigger code every few frames for cameras that cannot read them. Turn on “Read several codes per frame” on the receiving device.'}
                     </p>
                   </div>
+
+                  <div className="space-y-1">
+                    <ToggleSwitch
+                      id="steer-speed"
+                      label="Let the receiver steer (preview)"
+                      checked={steer && multiCode}
+                      onChange={setSteer}
+                      disabled={isTransferring || !multiCode}
+                    />
+                    <p className="text-xs text-fg-muted" data-testid="steer-hint">
+                      {multiCode
+                        ? 'Uses this device’s camera to read a small code on the receiving screen, so the transfer speeds up or slows down for it and stops once it has the file. The camera is asked for when you start, and nothing it sees leaves this device. Turn on “Help the sender pick its speed” on the receiving device.'
+                        : 'Needs “Several codes per frame”.'}
+                    </p>
+                  </div>
                   <p className="text-xs text-fg-muted" data-testid="fountain-symbol-info">
                     {fountainInfo?.tiles
                       ? `Each code carries ${fountainInfo.symbolSize}-byte pieces (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). How fast it goes depends on the receiving camera.`
@@ -571,6 +637,14 @@ function FileTransferToolInner() {
 
               {selectedFile && !isTransferring && !handshakeError && <PairingGuide />}
 
+              {autoStopped && !isTransferring && (
+                <div className="mb-4">
+                  <Alert variant="info" title="Transfer stopped" role="status">
+                    Every receiver in view has the file, so the sender stopped.
+                  </Alert>
+                </div>
+              )}
+
               {/* Handshake scannability failure alert */}
               {handshakeError && (
                 <div className="mb-4">
@@ -645,6 +719,11 @@ function FileTransferToolInner() {
                   {fountainInfo && (
                     <p className="text-fg-muted" data-testid="sender-fingerprint">
                       Transfer code <span className="font-mono font-semibold text-fg-soft">{fountainInfo.fingerprint}</span>. The receiver shows the same four words once it has read the transfer details. If they differ, it is reading another device.
+                    </p>
+                  )}
+                  {steerState.status !== 'off' && (
+                    <p className="text-fg-muted" role="status" data-testid="steer-status">
+                      {steerMessage(steerState, steeredProfile, steeringReceivers)}
                     </p>
                   )}
                   {fountainInfo && (

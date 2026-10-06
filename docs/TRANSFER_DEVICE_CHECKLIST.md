@@ -45,7 +45,7 @@ The bench simulates the display and the camera, so these need a phone before the
 
 ## Webcam back channel (#1146)
 
-The simulation (`docs/FEEDBACK_BENCHMARK.md`) fixes how a receiver's reads are modelled and gives the back channel a delay and a loss rate. None of that was measured. Before the feature leaves its flag, on a laptop sender and at least two receiver phones:
+The simulation (`docs/FEEDBACK_BENCHMARK.md`) fixes how a receiver's reads are modelled and gives the back channel a delay and a loss rate. None of that was measured. Turn on both multi-code switches, "Let the receiver steer (preview)" on the sender and "Help the sender pick its speed (preview)" on each receiver. Before the feature leaves its flag, on a laptop sender and at least two receiver phones:
 
 - Whether the sender's webcam reads the receiver's small corner code at all: distance, angle, glare from the sender's own screen, and the screen brightness of the phone. Record the share of feedback codes read and the delay from the receiver's screen to a decoded report. The simulation assumes 4 refreshes a second, 150 ms and 20% missed.
 - The time from the receiver's "done" to the sender stopping, over at least 10 runs per phone. The target is 1 s at the worst case; the simulation's default channel gave 150 to 400 ms, and it went past 1 s in some runs when a report took 800 ms to decode, when four in five codes were missed, or when the receiver refreshed its code once a second.

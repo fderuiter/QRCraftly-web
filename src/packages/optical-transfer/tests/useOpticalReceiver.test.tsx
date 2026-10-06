@@ -39,6 +39,18 @@ import {
   STALL_HINT_SECONDS,
 } from '../index';
 import { receiverOptions } from './fixtures';
+import { decodeFrame } from '../index';
+
+/** The feedback code's text, as the receiver hands it to the QR encoder (#1146). */
+const encoded = vi.hoisted(() => ({ texts: [] as string[] }));
+vi.mock('@/packages/qr-matrix/encoder', () => ({
+  loadQrEncoder: async () => ({
+    create: (text: string) => {
+      encoded.texts.push(text);
+      return { version: 2, modules: { size: 25, data: new Uint8Array(25 * 25) } };
+    },
+  }),
+}));
 
 const balanced = TRANSFER_DENSITY_PROFILES.balanced;
 const text = (value: string) => new TextEncoder().encode(value);
@@ -449,6 +461,31 @@ describe('useOpticalReceiver', () => {
 
       act(() => result.current.handleClear());
       expect(result.current.layerHint).toBeNull();
+    });
+
+    it('shows a feedback code for the sender only while the person lets it steer (#1146)', async () => {
+      const { result } = renderReceiver();
+      act(() => result.current.setMultiCode(true));
+      await act(async () => {
+        await result.current.startCameraSession();
+      });
+      const stream = await streamFor('feedback for the sender '.repeat(40));
+      await act(async () => {
+        result.current.handleFrame(stream.frameText(0));
+      });
+      await waitFor(() => expect(result.current.manifest).not.toBeNull());
+      expect(result.current.feedbackActive).toBe(false);
+
+      encoded.texts = [];
+      act(() => result.current.setSteerSender(true));
+      expect(result.current.feedbackActive).toBe(true);
+      result.current.feedbackCanvasRef.current = document.createElement('canvas');
+      await waitFor(() => expect(encoded.texts.length).toBeGreaterThan(0));
+      const decoded = decodeFrame(encoded.texts[encoded.texts.length - 1]);
+      expect(decoded.ok && decoded.frame).toMatchObject({ type: 'feedback', sessionId: result.current.manifest?.sessionId, densestLayer: 'none', done: false });
+
+      act(() => result.current.setSteerSender(false));
+      expect(result.current.feedbackActive).toBe(false);
     });
 
     it('releases the camera on unmount', async () => {

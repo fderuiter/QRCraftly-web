@@ -18,9 +18,11 @@
 
 import { loadQrEncoder, type QrEccLetter, type QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
 import { loadFecModule } from './lib/fec/codec';
-import { TRANSFER_DENSITY_PROFILES, resolveTransferDensity, sha256Hex } from './lib/fountain/session';
-import { TILE_LAYOUTS, type TileLayout } from './lib/multicode/layout';
-import { beaconStreamStart } from './lib/prism/session';
+import { TRANSFER_DENSITY_PROFILES, bytesToHex, resolveTransferDensity, sha256Hex } from './lib/fountain/session';
+import { SWITCHABLE_SYMBOL_SIZE } from './lib/feedback/controller';
+import { TILE_LAYOUTS, tileFrameCapacity, type TileLayout, type TileLayoutId } from './lib/multicode/layout';
+import { FRAME_OVERHEAD } from './lib/prism/frame';
+import { BEACON_MANIFEST_INTERVAL, beaconStreamStart, beaconSymbolsFor } from './lib/prism/session';
 import { createPrismBundleSession, createPrismSession, type PrismSession, type PrismStream } from './lib/prism/session';
 import { keyQrText, parseKeyCode } from './lib/prism/words';
 import type {
@@ -40,6 +42,10 @@ let errorCorrectionLevel: QrEccLetter = 'Q';
 let tileLayout: TileLayout | null = null;
 /** The beacons of the running multi-rate transfer (#1143), and where they start in their stream. */
 let beacons: { plan: BeaconPlan; stream: PrismStream; start: number } | null = null;
+/** Beacons generated since the stream (or its last switch) started. */
+let beaconsGenerated = 0;
+/** The running session when the receiver may steer it (#1146), so SWITCH can rebuild its streams. */
+let steered: PrismSession | null = null;
 /** The QR encoder, loaded when the worker starts and awaited by the first START. */
 let encoder: QrSymbolEncoder | null = null;
 let currentSessionId = 0;
@@ -114,6 +120,7 @@ function generateBeacon(index: number, sessionId: number): void {
   try {
     const { size, data } = encoder.create(active.stream.frameText(active.start + index), { errorCorrectionLevel: 'L', version: active.plan.version }).modules;
     const matrix = new Uint8Array(data);
+    beaconsGenerated = Math.max(beaconsGenerated, index + 1);
     post({ type: 'BEACON', index, size, data: matrix }, [matrix.buffer]);
   } catch (err: unknown) {
     post({ type: 'ERROR', message: `Failed to generate beacon ${index}: ${errorMessage(err)}` });
@@ -128,6 +135,18 @@ function validBeaconPlan(plan: BeaconPlan | undefined, layout: TileLayout | null
   if (!Number.isInteger(every) || every < 2 || every > 64) return null;
   return { version, every };
 }
+
+/** Symbols of `symbolSize` bytes that fill one tile of a QR version at ECC L. */
+function tileSymbols(version: number, symbolSize: number): number {
+  return Math.max(1, Math.floor((tileFrameCapacity(version) - FRAME_OVERHEAD) / symbolSize));
+}
+
+/** Frames held ahead of the one shown: every tile takes a frame per display frame. */
+function lookaheadFor(fps: number, layout: TileLayout | null): number {
+  return Math.min(16, Math.max(3, Math.ceil(fps * 0.2))) * (layout?.tiles ?? 1);
+}
+
+let currentFps = 15;
 
 /**
  * Generates frames up to lastAckedIndex + lookaheadLimit. The stream is rateless, so it never ends
@@ -164,12 +183,16 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
   keyQr = null;
 
   const fps = payload?.fps || 15;
+  currentFps = fps;
   const requestedTiles = payload?.tiles;
   tileLayout = requestedTiles && Object.hasOwn(TILE_LAYOUTS, requestedTiles) ? TILE_LAYOUTS[requestedTiles] : null;
   const beaconPlan = validBeaconPlan(payload?.beacon, tileLayout);
   beacons = null;
-  // Every tile takes a frame per display frame, so the look-ahead grows with the tiles.
-  lookaheadLimit = Math.min(16, Math.max(3, Math.ceil(fps * 0.2))) * (tileLayout?.tiles ?? 1);
+  beaconsGenerated = 0;
+  steered = null;
+  // A steered stream shares one symbol size across the layouts it may switch between.
+  const steer = payload?.steer === true && tileLayout !== null;
+  lookaheadLimit = lookaheadFor(fps, tileLayout);
 
   if (!source) {
     post({ type: 'ERROR', message: 'No file provided' });
@@ -195,7 +218,7 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
       maxVersion: profile.maxVersion,
       private: payload?.private === true,
       fecModule: module ?? undefined,
-      tile: tileLayout ?? undefined,
+      tile: tileLayout && steer ? { symbolSize: SWITCHABLE_SYMBOL_SIZE, symbolsPerFrame: tileSymbols(tileLayout.version, SWITCHABLE_SYMBOL_SIZE) } : (tileLayout ?? undefined),
       beaconVersion: beaconPlan?.version,
     };
 
@@ -225,6 +248,7 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
     if (beaconPlan && session.beacon) {
       beacons = { plan: beaconPlan, stream: session.beacon, start: beaconStreamStart(session.stream.k, session.beacon.symbolsPerFrame) };
     }
+    if (steer) steered = session;
     if (session.keyCode) keyQr = keyQrText(parseKeyCode(session.keyCode) ?? new Uint8Array(0));
     info = {
       k: session.stream.k,
@@ -238,6 +262,8 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
       outerCode: session.outerCode,
       tiles: tileLayout?.id ?? null,
       beacon: beacons?.plan ?? null,
+      sessionId: bytesToHex(session.stream.sessionId),
+      steerable: steered !== null,
     };
   } catch (err: unknown) {
     if (sessionId !== currentSessionId) return;
@@ -272,6 +298,39 @@ function postKeyQr(): void {
   }
 }
 
+/**
+ * Changes the layout of a steered transfer (#1146). The new streams belong to the same session and
+ * start past the symbols already shown, so a receiver keeps everything it has and gets nothing twice.
+ */
+async function handleSwitch(payload: { tiles?: TileLayoutId; beacon?: BeaconPlan } | undefined): Promise<void> {
+  const session = steered;
+  const id = payload?.tiles;
+  if (!session || !stream || !id || !Object.hasOwn(TILE_LAYOUTS, id)) return;
+  const layout = TILE_LAYOUTS[id];
+  const plan = validBeaconPlan(payload?.beacon, layout);
+  const shownDense = stream.symbolsBefore(lastAckedIndex + 1);
+  const shownBeacons = beacons ? beacons.stream.symbolsBefore(beacons.start + beaconsGenerated) : null;
+
+  currentSessionId++;
+  const sessionId = currentSessionId;
+  tileLayout = layout;
+  stream = session.restream({ symbolsPerFrame: tileSymbols(layout.version, session.symbolSize), startSymbol: shownDense });
+  beacons = null;
+  if (plan) {
+    const beaconSymbols = beaconSymbolsFor(plan.version, session.symbolSize);
+    // The first beacons of a transfer start past the source symbols; later ones carry on from the last.
+    const startSymbol = shownBeacons ?? beaconStreamStart(session.stream.k, beaconSymbols) * beaconSymbols;
+    beacons = { plan, stream: session.restream({ symbolsPerFrame: beaconSymbols, manifestInterval: BEACON_MANIFEST_INTERVAL, beacon: true, startSymbol }), start: 0 };
+  }
+  beaconsGenerated = 0;
+  nextIndexToGenerate = 0;
+  lastAckedIndex = -1;
+  activeGeneratingSessionId = 0;
+  lookaheadLimit = lookaheadFor(currentFps, layout);
+  post({ type: 'SWITCHED', tiles: layout.id, beacon: beacons?.plan ?? null });
+  await processPipeline(sessionId);
+}
+
 async function handleAck(index: number | undefined): Promise<void> {
   if (!file) return;
   if (typeof index !== 'number' || index <= lastAckedIndex || index >= nextIndexToGenerate) return;
@@ -287,6 +346,8 @@ function handleStop(): void {
   keyQr = null;
   tileLayout = null;
   beacons = null;
+  beaconsGenerated = 0;
+  steered = null;
   nextIndexToGenerate = 0;
   lastAckedIndex = -1;
   totalFrames = 0;
@@ -320,6 +381,9 @@ self.onmessage = async (e: MessageEvent<SliceWorkerIncomingMessage | null>) => {
     }
     case 'KEY_QR':
       postKeyQr();
+      break;
+    case 'SWITCH':
+      await handleSwitch(message.payload);
       break;
     case 'STOP':
       handleStop();
