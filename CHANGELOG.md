@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-06
+
+### Features
+
+- feat(transfer): send Prism with the outer code as an opt-in preview (#1141) (#1227) (`71c779b`)
+- feat(transfer): add Prism's outer code, an LT code over an LDPC precode (#1176) (#1218) (`4dc575d`)
+
+### Bug Fixes
+
+- fix(security): resolve open code-scanning alerts (#1219) (`8ebdfb0`)
+
+---
+
 ## [0.8.0] - 2026-09-03
 
 ### Features
