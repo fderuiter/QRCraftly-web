@@ -19,7 +19,15 @@
 import { sha256 } from '@/utils/sha256';
 import { cborDecode, cborEncode } from '../fountain/cbor';
 import { bytesToHex, hexToBytes, type TransferCompression } from '../fountain/session';
-import { MAX_BUNDLE_ENTRIES, MAX_INDEX_BYTES, MAX_RECEIVE_BYTES, MAX_RECEIVE_MESSAGE_BYTES } from '../limits';
+import { planBlocks, type FecLayout } from '../fec/codec';
+import {
+  MAX_BUNDLE_ENTRIES,
+  MAX_FEC_SOURCE_SYMBOLS,
+  MAX_FEC_SYMBOL_BYTES,
+  MAX_INDEX_BYTES,
+  MAX_RECEIVE_BYTES,
+  MAX_RECEIVE_MESSAGE_BYTES,
+} from '../limits';
 import { SESSION_ID_BYTES } from './frame';
 import { fingerprintWords } from './words';
 
@@ -37,6 +45,9 @@ export interface PrismFileEntry {
  * What a transfer is, sent as frame 1 and again every 16th frame so a receiver that joins late
  * still learns it. It is a CBOR array, not a map, so it stays small and its meaning is fixed by
  * position; a later version appends fields and bumps `version`.
+ *
+ * Version 1 is sent with the LT fountain code. Version 2 is sent with the outer code (#1141,
+ * ADR 0037) and appends `blockSymbols`.
  */
 export interface PrismManifest {
   version: number;
@@ -63,12 +74,27 @@ export interface PrismManifest {
   unpackedSha256: Uint8Array;
   /** Files in a layout-1 transfer that is not private; 0 when unknown or private. */
   entryCount: number;
+  /**
+   * Version 2 only: most source symbols per block of the outer code. The receiver splits the
+   * message into blocks with `planBlocks`, exactly as the sender did.
+   */
+  blockSymbols?: number;
 }
 
 export const LAYOUT_SINGLE = 0;
 export const LAYOUT_BUNDLE = 1;
 
+/** Manifest of a stream sent with the LT fountain code. */
 export const MANIFEST_VERSION = 1;
+/** Manifest of a stream sent with the outer code. */
+export const MANIFEST_VERSION_FEC = 2;
+/**
+ * Most outer-code blocks in one transfer. Each block's decoder reserves its whole matrix up front,
+ * about 9 MB at 8192 symbols plus the block's symbols, and a round-robin stream keeps every block
+ * open until the end, so the receiver's memory grows with the block count. A larger message is
+ * sent with the LT code.
+ */
+export const MAX_FEC_BLOCKS = 4;
 /** Longest file name a manifest carries, in UTF-8 bytes. Longer names are shortened by the sender. */
 export const MAX_MANIFEST_NAME_BYTES = 96;
 export const MAX_MANIFEST_MIME_BYTES = 64;
@@ -108,6 +134,7 @@ export function fitFileName(name: string, maxBytes: number = MAX_MANIFEST_NAME_B
  * @returns Its CBOR bytes.
  */
 export function encodeManifest(manifest: PrismManifest): Uint8Array {
+  const fec = manifest.version === MANIFEST_VERSION_FEC ? [manifest.blockSymbols ?? MAX_FEC_SOURCE_SYMBOLS] : [];
   return cborEncode([
     manifest.version,
     manifest.files.map((file) => [file.name, file.size, file.mimeType, hexToBytes(file.sha256)]),
@@ -121,7 +148,32 @@ export function encodeManifest(manifest: PrismManifest): Uint8Array {
     manifest.unpackedLength,
     manifest.unpackedSha256,
     manifest.entryCount,
+    ...fec,
   ]);
+}
+
+/**
+ * True when a manifest announces a stream sent with the outer code.
+ * @param manifest - A manifest.
+ * @returns Whether its version is {@link MANIFEST_VERSION_FEC}.
+ */
+export function usesOuterCode(manifest: PrismManifest): boolean {
+  return manifest.version === MANIFEST_VERSION_FEC;
+}
+
+/**
+ * The outer-code layout of a version-2 manifest: how its message is cut into blocks.
+ * @param manifest - A version-2 manifest.
+ * @returns The layout the encoder and decoder share.
+ */
+export function fecLayoutOf(manifest: PrismManifest): FecLayout {
+  const symbols = Math.max(1, Math.ceil(manifest.transferLength / manifest.symbolSize));
+  return {
+    messageLength: manifest.transferLength,
+    symbolSize: manifest.symbolSize,
+    seed: manifest.transferCrc32 >>> 0,
+    blocks: planBlocks(symbols, manifest.blockSymbols ?? MAX_FEC_SOURCE_SYMBOLS),
+  };
 }
 
 /**
@@ -181,8 +233,11 @@ export function decodeManifest(bytes: Uint8Array): ManifestResult {
   } catch {
     return MALFORMED;
   }
-  if (!Array.isArray(value) || value.length < 12 || value[0] !== MANIFEST_VERSION) return MALFORMED;
-  const [, files, compression, transferLength, symbolSize, transferCrc32, salt, encryption, layout, unpackedLength, unpackedSha256, entryCount] = value;
+  if (!Array.isArray(value) || value.length < 12) return MALFORMED;
+  const version = value[0];
+  if (version !== MANIFEST_VERSION && !(version === MANIFEST_VERSION_FEC && value.length >= 13)) return MALFORMED;
+  const [, files, compression, transferLength, symbolSize, transferCrc32, salt, encryption, layout, unpackedLength, unpackedSha256, entryCount, blockSymbols] = value;
+  const fec = version === MANIFEST_VERSION_FEC;
   if (layout !== LAYOUT_SINGLE && layout !== LAYOUT_BUNDLE) return MALFORMED;
   // A bundle lists its files inside the message, so the manifest lists none.
   if (!Array.isArray(files) || (layout === LAYOUT_SINGLE ? files.length < 1 || files.length > MAX_MANIFEST_FILES : files.length !== 0)) {
@@ -239,10 +294,22 @@ export function decodeManifest(bytes: Uint8Array): ManifestResult {
   ) {
     return TOO_LARGE;
   }
+  // The outer code takes symbols of a multiple of 8 bytes, up to its limit, in a bounded number of
+  // blocks. The count is worked out, not built: a forged length must not allocate a block list.
+  if (
+    fec &&
+    (!isUint(blockSymbols, MAX_FEC_SOURCE_SYMBOLS) ||
+      blockSymbols < 1 ||
+      symbolSize % 8 !== 0 ||
+      symbolSize > MAX_FEC_SYMBOL_BYTES ||
+      Math.ceil(Math.max(1, Math.ceil(transferLength / symbolSize)) / blockSymbols) > MAX_FEC_BLOCKS)
+  ) {
+    return MALFORMED;
+  }
   return {
     ok: true,
     manifest: {
-      version: MANIFEST_VERSION,
+      version: fec ? MANIFEST_VERSION_FEC : MANIFEST_VERSION,
       files: entries,
       compression: compression === COMPRESSION_FLAGS['deflate-raw'] ? 'deflate-raw' : 'none',
       transferLength,
@@ -254,6 +321,7 @@ export function decodeManifest(bytes: Uint8Array): ManifestResult {
       unpackedLength,
       unpackedSha256,
       entryCount,
+      ...(fec && typeof blockSymbols === 'number' ? { blockSymbols } : {}),
     },
   };
 }

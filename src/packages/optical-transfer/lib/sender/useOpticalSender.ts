@@ -24,6 +24,7 @@ import { PreallocatedFramePool } from '../framePool';
 import { sanitizeStreamConfig, verifyHandshakeFrame, type HandshakeFrameVerifier } from '../handshake';
 import type { SliceWorkerOutgoingMessage, TransferStats } from '../contracts';
 import { DEFAULT_TRANSFER_DENSITY, type TransferCompression, type TransferDensity } from '../fountain/session';
+import type { OuterCode } from '../prism/session';
 import { formatMegabytes, spawnSliceWorker } from './workers';
 
 /** One QR module matrix produced by the slice worker. */
@@ -70,6 +71,8 @@ export interface SenderFountainInfo {
   fileCount: number;
   /** The words of a private transfer's key code; absent when the transfer is not private. */
   keyCode?: string;
+  /** The code the stream is sent with. */
+  outerCode: OuterCode;
 }
 
 const HANDSHAKE_FAILURE_SUFFIX =
@@ -103,6 +106,8 @@ export function useOpticalSender({
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [totalFrames, setTotalFrames] = useState(0);
   const [density, setDensity] = useState<TransferDensity>(DEFAULT_TRANSFER_DENSITY);
+  /** The code to send with: the LT code by default, the outer code (#1141) when chosen under Advanced. */
+  const [outerCode, setOuterCode] = useState<OuterCode>('lt');
   const [fountainInfo, setFountainInfo] = useState<SenderFountainInfo | null>(null);
   const [fps, setFps] = useState(15);
   const [currentPass, setCurrentPass] = useState(1);
@@ -315,6 +320,7 @@ export function useOpticalSender({
           fingerprint: message.fountain.fingerprint,
           fileCount: message.fountain.fileCount,
           keyCode: message.fountain.keyCode,
+          outerCode: message.fountain.outerCode,
         });
         break;
       }
@@ -375,8 +381,8 @@ export function useOpticalSender({
     }
 
     const files = selectedFiles.length > 1 ? { files: selectedFiles } : { file: selectedFiles[0] };
-    workerRef.current.postMessage({ type: 'START', payload: { ...files, fps: fpsRef.current, density, private: isPrivate } });
-  }, [selectedFiles, density, isPrivate, stopTransfer, handleWorkerMessage]);
+    workerRef.current.postMessage({ type: 'START', payload: { ...files, fps: fpsRef.current, density, private: isPrivate, outerCode } });
+  }, [selectedFiles, density, isPrivate, outerCode, stopTransfer, handleWorkerMessage]);
 
   /** Shows the key QR for as long as the person holds the button; it never plays with the stream. */
   const showKeyQr = useCallback(() => workerRef.current?.postMessage({ type: 'KEY_QR' }), []);
@@ -449,6 +455,8 @@ export function useOpticalSender({
     totalFrames,
     density,
     setDensity,
+    outerCode,
+    setOuterCode,
     fps,
     setFps,
     currentPass,

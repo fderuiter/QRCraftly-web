@@ -27,6 +27,7 @@ import {
   encodeSessionMessage,
   FountainEncoder,
   MAX_RECEIVE_BYTES,
+  loadFecModule,
   TRANSFER_DENSITY_PROFILES,
   type PrismManifest,
   type TransferDensity,
@@ -53,13 +54,13 @@ function randomBytes(length: number, seed: number): Uint8Array {
   return Uint8Array.from({ length }, () => Math.floor(prng() * 256));
 }
 
-async function startFountain(file: Blob, options: { density?: string } = {}) {
-  await sliceHandler({ data: { type: 'START', payload: { file, fps: 15, density: options.density } } });
+async function startFountain(file: Blob, options: { density?: string; outerCode?: string } = {}) {
+  await sliceHandler({ data: { type: 'START', payload: { file, fps: 15, density: options.density, outerCode: options.outerCode } } });
   return posted.find(m => m.type === 'INITIALIZED') as
     | {
         totalFrames: number;
         sha256: string;
-        fountain: { k: number; symbolSize: number; compression: string; density: TransferDensity; fingerprint: string };
+        fountain: { k: number; symbolSize: number; compression: string; density: TransferDensity; fingerprint: string; outerCode: string };
       }
     | undefined;
 }
@@ -255,6 +256,32 @@ describe('Fountain sender and receiver workers', () => {
     expect(output).toEqual(bytes);
     expect(complete!.handshake).toMatchObject({ fileName: 'payload.dat', fileSize: bytes.length, mimeType: mime });
     expect(complete!.handshake.sha256).toBe(await sha256Hex(output));
+  });
+
+  it('sends with the outer code when asked, and the receiver rebuilds it from shuffled, lossy frames', async () => {
+    // The reassembly worker loads the module when it starts; wait for the same file here.
+    await loadFecModule();
+    const bytes = randomBytes(5000, 78);
+    const init = await startFountain(new File([bytes], 'outer.bin', { type: 'application/octet-stream' }), { outerCode: 'fec' });
+    expect(init?.fountain.outerCode).toBe('fec');
+    const k = init?.fountain.k ?? 0;
+    await pump(k * 3 + 40);
+    const prng = createPrng(99);
+    const received = qrCalls.map(c => c.text).slice(5).filter(() => prng() >= 0.3);
+    for (let i = received.length - 1; i > 0; i--) {
+      const j = Math.floor(prng() * (i + 1));
+      [received[i], received[j]] = [received[j], received[i]];
+    }
+    posted = [];
+    for (const droplet of received) {
+      await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet } });
+      if (posted.some(m => m.type === 'COMPLETE' || m.type === 'ERROR')) break;
+    }
+    const progress = posted.filter(m => m.type === 'PROGRESS');
+    expect(progress.at(-1)).toMatchObject({ isFountain: true, total: k, rank: k, progress: 100 });
+    const complete = posted.find(m => m.type === 'COMPLETE') as { buffer: ArrayBuffer } | undefined;
+    expect(complete).toBeDefined();
+    expect(new Uint8Array(complete!.buffer)).toEqual(bytes);
   });
 
   it('posts an ERROR (never COMPLETE) when the file SHA-256 does not match the manifest', async () => {

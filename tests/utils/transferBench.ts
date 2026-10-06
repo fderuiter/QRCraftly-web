@@ -23,7 +23,7 @@
  * Everything here is seeded, so the overhead numbers (frames needed divided by K) are
  * identical between runs and machines. Only the decode times depend on the machine.
  */
-import { FountainDecoder, FountainEncoder } from '../../src/packages/optical-transfer/index';
+import { FecDecoder, FecEncoder, FountainDecoder, FountainEncoder } from '../../src/packages/optical-transfer/index';
 import { createRandom } from './scannerCorpus';
 
 /** How frames are lost between the sender's screen and the receiver's decoder. */
@@ -62,21 +62,63 @@ export interface CodecTrial {
 /** A sender never shows more than this many times K before the trial counts as failed. */
 const GIVE_UP_FACTOR = 12;
 
+/** A sender and receiver pair, so one trial loop serves the LT code and the outer code. */
+interface TrialCodec {
+  /** Encodes stream symbol `index` and returns the call that hands it to the decoder. */
+  send(index: number): (copies: number) => void;
+  readonly isComplete: boolean;
+  finalize(): Uint8Array | null;
+}
+
+function ltCodec(message: Uint8Array, blockSize: number): TrialCodec {
+  const encoder = new FountainEncoder(message, { blockSize });
+  const decoder = new FountainDecoder();
+  return {
+    send(index) {
+      const droplet = encoder.getDroplet(encoder.seqForIndex(index));
+      return (copies) => {
+        for (let copy = 0; copy < copies; copy++) decoder.ingest(droplet, droplet.data);
+      };
+    },
+    get isComplete() {
+      return decoder.isComplete;
+    },
+    finalize: () => decoder.finalize(),
+  };
+}
+
+function fecCodec(message: Uint8Array, blockSize: number, module: WebAssembly.Module): TrialCodec {
+  const encoder = new FecEncoder(module, message, { symbolSize: blockSize });
+  const decoder = new FecDecoder(module, encoder.layout);
+  return {
+    send(index) {
+      const { data } = encoder.symbol(index);
+      return (copies) => {
+        for (let copy = 0; copy < copies; copy++) decoder.addAt(index, data);
+      };
+    },
+    get isComplete() {
+      return decoder.isComplete;
+    },
+    finalize: () => decoder.finalize(),
+  };
+}
+
 /**
  * Sends a seeded message through the channel until the decoder rebuilds it.
  * @param k - Number of source blocks.
  * @param blockSize - Bytes per block.
  * @param channel - The erasure channel.
  * @param seed - Seed for the message and the channel.
+ * @param fecModule - The outer code's module, to run the trial with it instead of the LT code (#1141).
  * @returns What it took.
  */
-export function runCodecTrial(k: number, blockSize: number, channel: ErasureChannel, seed: number): CodecTrial {
+export function runCodecTrial(k: number, blockSize: number, channel: ErasureChannel, seed: number, fecModule?: WebAssembly.Module): CodecTrial {
   const random = createRandom(seed);
   const message = new Uint8Array(k * blockSize - Math.floor(random() * Math.min(blockSize, 16)));
   for (let i = 0; i < message.length; i++) message[i] = Math.floor(random() * 256);
 
-  const encoder = new FountainEncoder(message, { blockSize });
-  const decoder = new FountainDecoder();
+  const codec = fecModule ? fecCodec(message, blockSize, fecModule) : ltCodec(message, blockSize);
   let index = channel.randomJoin ? Math.floor(random() * 2 * k) : 0;
   let bad = false;
   let delivered = 0;
@@ -84,8 +126,8 @@ export function runCodecTrial(k: number, blockSize: number, channel: ErasureChan
   let decodeMs = 0;
 
   const limit = GIVE_UP_FACTOR * k;
-  while (!decoder.isComplete && transmitted < limit) {
-    const droplet = encoder.getDroplet(encoder.seqForIndex(index++));
+  while (!codec.isComplete && transmitted < limit) {
+    const deliver = codec.send(index++);
     transmitted += 1;
     if (channel.burst) {
       bad = bad ? random() >= channel.burst.exit : random() < channel.burst.enter;
@@ -94,17 +136,15 @@ export function runCodecTrial(k: number, blockSize: number, channel: ErasureChan
     if (random() < lossChance) continue;
     delivered += 1;
     const copies = random() < channel.duplicate ? 2 : 1;
-    for (let copy = 0; copy < copies; copy++) {
-      const started = performance.now();
-      decoder.ingest(droplet, droplet.data);
-      decodeMs += performance.now() - started;
-    }
+    const started = performance.now();
+    deliver(copies);
+    decodeMs += performance.now() - started;
   }
 
   let ok = false;
-  if (decoder.isComplete) {
+  if (codec.isComplete) {
     const started = performance.now();
-    const rebuilt = decoder.finalize();
+    const rebuilt = codec.finalize();
     decodeMs += performance.now() - started;
     ok = rebuilt !== null && rebuilt.length === message.length && rebuilt.every((byte, i) => byte === message[i]);
   }
@@ -132,6 +172,8 @@ export function codecTrials(k: number, quick: boolean): number {
 
 /** A summary of many trials of one K over one channel. */
 export interface CodecRow {
+  /** The code: the LT fountain code, or the outer code (ADR 0037). */
+  code: 'lt' | 'fec';
   channel: string;
   k: number;
   blockSize: number;
@@ -159,15 +201,16 @@ const round = (value: number, places: number): number => Number(value.toFixed(pl
  * @param blockSize - Bytes per block.
  * @param channel - The erasure channel.
  * @param trials - How many seeded attempts.
+ * @param fecModule - The outer code's module, to bench it instead of the LT code.
  * @returns The summary row.
  */
-export function benchCodec(k: number, blockSize: number, channel: ErasureChannel, trials: number): CodecRow {
+export function benchCodec(k: number, blockSize: number, channel: ErasureChannel, trials: number, fecModule?: WebAssembly.Module): CodecRow {
   const overhead: number[] = [];
   const transmitted: number[] = [];
   const times: number[] = [];
   let failures = 0;
   for (let t = 0; t < trials; t++) {
-    const trial = runCodecTrial(k, blockSize, channel, 1000 + t * 7919 + k);
+    const trial = runCodecTrial(k, blockSize, channel, 1000 + t * 7919 + k, fecModule);
     if (!trial.ok) {
       failures += 1;
       continue;
@@ -178,6 +221,7 @@ export function benchCodec(k: number, blockSize: number, channel: ErasureChannel
   }
   const sortedOverhead = overhead.sort((a, b) => a - b);
   return {
+    code: fecModule ? 'fec' : 'lt',
     channel: channel.name,
     k,
     blockSize,

@@ -45,6 +45,7 @@ import { qrReader } from '../tests/fixtures/qrReader';
 import {
   FountainEncoder,
   TILE_LAYOUTS,
+  loadFecModule,
   TRANSFER_DENSITY_PROFILES,
   modulePxFor,
   prismSymbolSize,
@@ -344,13 +345,13 @@ function render(codec: CodecRow[], optical: OpticalRow[], tileSection: string[])
   parts.push(table(['Density', 'QR code', 'ur:bytes/', 'Prism', 'Gain'], capacityRows()), '');
   parts.push('## Codec through an erasure channel', '');
   parts.push(
-    `Block size ${BLOCK_SIZE} bytes. "Frames needed" is the distinct frames that reached the decoder divided by K, so 1.00 would be a perfect code. "Shown" is what the sender had to display, which adds what the channel lost.`,
+    `Block size ${BLOCK_SIZE} bytes. "Frames needed" is the distinct frames that reached the decoder divided by K, so 1.00 would be a perfect code. "Shown" is what the sender had to display, which adds what the channel lost. "LT" is the fountain code Prism has used since ADR 0024; "outer" is the outer code of ADR 0037, which the sender offers under Advanced (#1141). Its decode time is the whole elimination, most of which runs while frames are still arriving.`,
     ''
   );
   parts.push(
     table(
-      ['Channel', 'K', 'Trials', 'Failed', 'Frames needed ÷ K (median)', 'p95', 'worst', 'Shown ÷ K (median)', 'Decode time (median)'],
-      codec.map((r) => [r.channel, r.k, r.trials, r.failures, r.overheadMedian.toFixed(3), r.overheadP95.toFixed(3), r.overheadWorst.toFixed(3), r.transmittedMedian.toFixed(3), formatSeconds(r.decodeMsMedian)])
+      ['Code', 'Channel', 'K', 'Trials', 'Failed', 'Frames needed ÷ K (median)', 'p95', 'worst', 'Shown ÷ K (median)', 'Decode time (median)'],
+      codec.map((r) => [r.code === 'fec' ? 'outer' : 'LT', r.channel, r.k, r.trials, r.failures, r.overheadMedian.toFixed(3), r.overheadP95.toFixed(3), r.overheadWorst.toFixed(3), r.transmittedMedian.toFixed(3), formatSeconds(r.decodeMsMedian)])
     ),
     ''
   );
@@ -390,14 +391,17 @@ async function main(): Promise<void> {
   const maxK = maxKIndex >= 0 ? Number(args[maxKIndex + 1]) : quick ? 1000 : 10000;
   const ks = [10, 100, 1000, 10000, 50000].filter((k) => k <= maxK);
 
+  const fecModule = await loadFecModule();
   const codec: CodecRow[] = [];
   for (const k of ks) {
     // Large K is slow, so only the clean-join and lossy channels run there.
     const channels = k >= 10000 ? ERASURE_CHANNELS.filter((c) => ['join', 'loss-30'].includes(c.name)) : ERASURE_CHANNELS;
-    for (const channel of channels) {
-      const row = benchCodec(k, BLOCK_SIZE, channel, codecTrials(k, quick));
-      codec.push(row);
-      process.stdout.write(`codec ${channel.name} K=${k}: ${row.overheadMedian.toFixed(3)} (p95 ${row.overheadP95.toFixed(3)}), ${formatSeconds(row.decodeMsMedian)}, ${row.failures} failed\n`);
+    for (const module of [undefined, fecModule]) {
+      for (const channel of channels) {
+        const row = benchCodec(k, BLOCK_SIZE, channel, codecTrials(k, quick), module);
+        codec.push(row);
+        process.stdout.write(`codec ${row.code} ${channel.name} K=${k}: ${row.overheadMedian.toFixed(3)} (p95 ${row.overheadP95.toFixed(3)}), ${formatSeconds(row.decodeMsMedian)}, ${row.failures} failed\n`);
+      }
     }
   }
   const optical = args.includes('--no-optical') ? [] : benchOptical(quick);
@@ -433,6 +437,8 @@ async function main(): Promise<void> {
       for (const channel of ERASURE_CHANNELS) {
         const row = benchCodec(k, BLOCK_SIZE, channel, codecTrials(k, true));
         baseline[`${channel.name}/${k}`] = { overheadMedian: row.overheadMedian, overheadP95: row.overheadP95 };
+        const fec = benchCodec(k, BLOCK_SIZE, channel, codecTrials(k, true), fecModule);
+        baseline[`fec/${channel.name}/${k}`] = { overheadMedian: fec.overheadMedian, overheadP95: fec.overheadP95 };
       }
     }
     fs.writeFileSync(BASELINE_PATH, `${JSON.stringify(baseline, null, 2)}\n`);

@@ -128,3 +128,99 @@ export function runPrismFecBattery(exports: WebAssembly.Exports): Uint8Array {
   pushU32(call('abi_version') >>> 0);
   return new Uint8Array(out);
 }
+
+/** Symbols one engine encoded, for another engine to decode (#1141). */
+export interface PrismFecJob {
+  blocks: Array<{ k: number; t: number; seed: number; esis: number[]; symbols: Uint8Array }>;
+}
+
+/**
+ * Encodes a few blocks and keeps a lossy run of their symbols, from a join point, to hand to
+ * another engine. The source bytes come from the same generator in every engine.
+ * @param exports - The instantiated module's exports.
+ * @returns The job and, per block, the source it must decode to.
+ */
+export function makePrismFecJob(exports: WebAssembly.Exports): { job: PrismFecJob; sources: Uint8Array[] } {
+  const call = (name: string, ...args: number[]): number => {
+    const target = exports[name];
+    if (typeof target !== 'function') throw new Error(`prism-fec.wasm has no ${name} export`);
+    return Number(Reflect.apply(target, undefined, args));
+  };
+  const memory = exports.memory;
+  if (!(memory instanceof WebAssembly.Memory)) throw new Error('prism-fec.wasm does not export its memory');
+  let state = 0x1141;
+  const random = (): number => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const job: PrismFecJob = { blocks: [] };
+  const sources: Uint8Array[] = [];
+  for (const [k, t] of [
+    [40, 16],
+    [2000, 64],
+  ]) {
+    const seed = Math.floor(random() * 4294967296) >>> 0;
+    const source = new Uint8Array(k * t);
+    for (let i = 0; i < source.length; i++) source[i] = Math.floor(random() * 256);
+    const sourcePtr = call('alloc', source.length);
+    new Uint8Array(memory.buffer, sourcePtr, source.length).set(source);
+    const encoder = call('fec_encoder_new', k, t, seed, sourcePtr, source.length) >>> 0;
+    if (encoder === 0) throw new Error(`fec_encoder_new refused K = ${k}`);
+    // Enough symbols for the decoder with room to spare: K plus 40, a third lost on the way.
+    const esis: number[] = [];
+    const symbols = new Uint8Array((k + 40) * t);
+    let esi = Math.floor(random() * 1000);
+    while (esis.length < k + 40) {
+      esi += 1;
+      if (random() < 0.33) continue;
+      symbols.set(new Uint8Array(memory.buffer, call('fec_encoder_symbol', encoder, esi) >>> 0, t), esis.length * t);
+      esis.push(esi);
+    }
+    call('fec_encoder_free', encoder);
+    call('free', sourcePtr, source.length);
+    job.blocks.push({ k, t, seed, esis, symbols });
+    sources.push(source);
+  }
+  return { job, sources };
+}
+
+/**
+ * Decodes a job another engine made. Self-contained, so it can run in a worker as source text.
+ * @param exports - The instantiated module's exports.
+ * @param job - The symbols.
+ * @returns Each block's decoded source, concatenated.
+ */
+export function decodePrismFecJob(exports: WebAssembly.Exports, job: PrismFecJob): Uint8Array {
+  const call = (name: string, ...args: number[]): number => {
+    const target = exports[name];
+    if (typeof target !== 'function') throw new Error(`prism-fec.wasm has no ${name} export`);
+    return Number(Reflect.apply(target, undefined, args));
+  };
+  const memory = exports.memory;
+  if (!(memory instanceof WebAssembly.Memory)) throw new Error('prism-fec.wasm does not export its memory');
+  const parts: Uint8Array[] = [];
+  for (const { k, t, seed, esis, symbols } of job.blocks) {
+    const decoder = call('fec_decoder_new', k, t, seed) >>> 0;
+    if (decoder === 0) throw new Error(`fec_decoder_new refused K = ${k}`);
+    const inbox = call('fec_decoder_inbox', decoder) >>> 0;
+    let status = 0;
+    for (let i = 0; i < esis.length && status !== 2; i++) {
+      new Uint8Array(memory.buffer, inbox, t).set(symbols.subarray(i * t, (i + 1) * t));
+      status = call('fec_decoder_add', decoder, esis[i]) >>> 0;
+    }
+    const solved = call('fec_decoder_solve', decoder) >>> 0;
+    if (solved === 0) throw new Error(`K = ${k} did not decode`);
+    parts.push(new Uint8Array(memory.buffer, solved, k * t).slice());
+    call('fec_decoder_free', decoder);
+  }
+  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}

@@ -122,6 +122,14 @@ export class FountainReassembler {
     this.prism.setKey(secret);
   }
 
+  /**
+   * Hands in the outer code's module for Prism streams sent with it, or null when it failed to load.
+   * @param module The module from `loadFecModule`, or null.
+   */
+  public provideFecModule(module: WebAssembly.Module | null): void {
+    this.prism.provideFecModule(module);
+  }
+
   /** True while a private transfer is waiting for its key code. */
   public get needsKey(): boolean {
     return this.prism.needsKey;

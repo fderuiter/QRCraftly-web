@@ -25,7 +25,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { test, expect } from './fixtures';
-import { runPrismFecBattery, PRISM_FEC_BATTERY_SHA256 } from '../tests/foundry/prismFecBattery';
+import { decodePrismFecJob, makePrismFecJob, runPrismFecBattery, PRISM_FEC_BATTERY_SHA256 } from '../tests/foundry/prismFecBattery';
 import { runQrDecodeBattery, QR_DECODE_BATTERY_SHA256 } from '../tests/foundry/qrDecodeBattery';
 import { runQrEncodeBattery, QR_ENCODE_BATTERY_SHA256 } from '../tests/foundry/qrEncodeBattery';
 import { runSelftestBattery, SELFTEST_BATTERY_SHA256 } from '../tests/foundry/selftestBattery';
@@ -85,3 +85,55 @@ onmessage = async (event) => {
     expect(digest).toBe(sha256);
   });
 }
+
+/**
+ * Prism's outer code across engines (#1141): Node encodes and drops a third of the symbols, and
+ * each browser engine decodes what is left in a worker, as a receiver would, back to Node's bytes.
+ */
+test('the prism-fec module decodes in a worker what Node encoded', async ({ page }) => {
+  const moduleBytes = fs.readFileSync(new URL('../src/wasm/prism-fec.wasm', import.meta.url));
+  const { instance } = await WebAssembly.instantiate(moduleBytes, {});
+  const { job, sources } = makePrismFecJob(instance.exports);
+  const expected = createHash('sha256');
+  for (const source of sources) expected.update(source);
+
+  const modulePath = '/__foundry/prism-fec.wasm';
+  const workerPath = '/__foundry/prism-fec-decode-worker.js';
+  const workerSource = `const decode = ${decodePrismFecJob.toString()};
+const fromHex = (hex) => Uint8Array.from(hex.match(/../g) ?? [], (pair) => parseInt(pair, 16));
+onmessage = async (event) => {
+  try {
+    const { module, blocks } = event.data;
+    const { exports } = await WebAssembly.instantiate(module, {});
+    const bytes = decode(exports, { blocks: blocks.map((block) => ({ ...block, symbols: fromHex(block.symbols) })) });
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    postMessage({ sha256: Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('') });
+  } catch (error) {
+    postMessage({ error: String(error) });
+  }
+};`;
+  await page.context().route(`**${modulePath}`, (route) => route.fulfill({ body: moduleBytes, contentType: 'application/wasm' }));
+  await page.context().route(`**${workerPath}`, (route) => route.fulfill({ body: workerSource, contentType: 'text/javascript' }));
+  await page.goto('/about');
+
+  const blocks = job.blocks.map((block) => ({ ...block, symbols: Buffer.from(block.symbols).toString('hex') }));
+  const result = await page.evaluate(
+    async ({ modulePath, workerPath, blocks }) => {
+      const module = await WebAssembly.compileStreaming(fetch(new URL(modulePath, location.href)));
+      const worker = new Worker(new URL(workerPath, location.href));
+      try {
+        return await new Promise<{ sha256?: string; error?: string }>((resolve) => {
+          worker.onmessage = (event) => resolve(event.data);
+          worker.onerror = (event) => resolve({ error: `worker failed: ${event.message || 'no message'}` });
+          worker.postMessage({ module, blocks });
+        });
+      } finally {
+        worker.terminate();
+      }
+    },
+    { modulePath, workerPath, blocks }
+  );
+
+  expect(result.error).toBeUndefined();
+  expect(result.sha256).toBe(expected.digest('hex'));
+});

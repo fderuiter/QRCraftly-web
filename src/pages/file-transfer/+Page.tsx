@@ -39,7 +39,7 @@ import { useImage } from '@/hooks/useImage';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from '@/components/ToolWorkspaceLayout';
 import { TransferModeSwitcher } from '@/components/TransferModeSwitcher';
 import { useOpticalSender } from '@/packages/optical-transfer/client';
-import { estimateTransferFrames, type TransferDensity } from '@/packages/optical-transfer';
+import { estimateTransferFrames, neededSymbols, type TransferDensity } from '@/packages/optical-transfer';
 import { paintTransferFrame } from './paintTransferFrame';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import {
@@ -113,6 +113,8 @@ function FileTransferToolInner() {
     totalFrames,
     density,
     setDensity,
+    outerCode,
+    setOuterCode,
     fps,
     setFps,
     currentPass,
@@ -190,13 +192,13 @@ function FileTransferToolInner() {
   const estimate = React.useMemo(() => {
     if (!selectedFile) return null;
     try {
-      return estimateTransferFrames(selectedSize, density);
+      return estimateTransferFrames(selectedSize, density, outerCode);
     } catch {
       return null;
     }
-  }, [selectedFile, selectedSize, density]);
+  }, [selectedFile, selectedSize, density, outerCode]);
   // Fountain streams never end: show frames against the typical number a receiver needs.
-  const framesNeeded = fountainInfo ? Math.ceil(fountainInfo.k * 1.15) : totalFrames;
+  const framesNeeded = fountainInfo ? neededSymbols(fountainInfo.k, fountainInfo.outerCode) : totalFrames;
   const senderPercent = fountainInfo
     ? Math.min(100, Math.round((currentFrameIndex / Math.max(1, framesNeeded)) * 100))
     : progress;
@@ -397,9 +399,24 @@ function FileTransferToolInner() {
                     />
                     <p className="text-xs text-fg-muted">{activeDensityHint}</p>
                   </div>
+
+                  <div className="space-y-1">
+                    <ToggleSwitch
+                      id="outer-code"
+                      label="New transfer format (preview)"
+                      checked={outerCode === 'fec'}
+                      onChange={(checked) => setOuterCode(checked ? 'fec' : 'lt')}
+                      disabled={isTransferring}
+                    />
+                    <p className="text-xs text-fg-muted" data-testid="outer-code-hint">
+                      {fountainInfo && outerCode === 'fec' && fountainInfo.outerCode === 'lt'
+                        ? 'This transfer uses the standard format: it is too large for the new one, or this browser cannot run it.'
+                        : 'Copes better with missed frames: the receiver needs only a few frames beyond the file’s size, where the standard format can need 15% more. The receiving device needs the latest QRCraftly.'}
+                    </p>
+                  </div>
                   <p className="text-xs text-fg-muted" data-testid="fountain-symbol-info">
                     {fountainInfo
-                      ? `Each QR carries ${fountainInfo.symbolSize} bytes (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). The receiver needs about ${Math.ceil(fountainInfo.k * 1.15)} frames, ${formatDuration((fountainInfo.k * 1.15) / fps)} at ${fps} frames/sec.`
+                      ? `Each QR carries ${fountainInfo.symbolSize} bytes (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). The receiver needs about ${framesNeeded} frames, ${formatDuration(framesNeeded / fps)} at ${fps} frames/sec.`
                       : estimate
                         ? `Estimated transfer time: up to ${formatDuration(estimate.frames / fps)} at ${fps} frames/sec (${estimate.symbolSize} bytes per QR). Text and other compressible files go faster.`
                         : 'Choose a file to see how long the transfer will take.'}

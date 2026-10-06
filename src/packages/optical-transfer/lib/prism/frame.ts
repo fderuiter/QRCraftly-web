@@ -45,8 +45,14 @@ export const FRAME_FEEDBACK = 2;
 
 export const FLAG_ENCRYPTED = 0b00001;
 export const FLAG_MULTI_BLOCK = 0b00010;
+/**
+ * Every frame of a stream sent with the outer code (#1141, ADR 0037) carries this flag. A receiver
+ * from before the outer code refuses the flag and asks to be updated, instead of misreading the
+ * stream as an LT one.
+ */
+export const FLAG_OUTER_CODE = 0b00100;
 /** Flags this version understands; a frame carrying another one is refused rather than misread. */
-const KNOWN_FLAGS = FLAG_ENCRYPTED | FLAG_MULTI_BLOCK;
+const KNOWN_FLAGS = FLAG_ENCRYPTED | FLAG_MULTI_BLOCK | FLAG_OUTER_CODE;
 
 export const SESSION_ID_BYTES = 6;
 /** Largest symbol ID a frame can name (24 bits). */

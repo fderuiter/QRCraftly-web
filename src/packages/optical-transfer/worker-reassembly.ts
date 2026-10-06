@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { loadFecModule } from './lib/fec/codec';
 import { FountainReassembler } from './lib/fountain/reassembler';
 import { parseKeyCode, parseKeyQr } from './lib/prism/words';
 
@@ -57,6 +58,28 @@ export type FileReassemblyIncomingMessage =
 
 let reassembler: FountainReassembler | null = null;
 let finalizing = false;
+/** The outer code's module (#1141): undefined while it loads, null if this browser cannot load it. */
+let fecModule: WebAssembly.Module | null | undefined;
+
+// Load the outer code with the worker, so it is ready by the time a stream that uses it is in view.
+loadFecModule().then(
+  (module) => {
+    fecModule = module;
+    reassembler?.provideFecModule(module);
+  },
+  () => {
+    fecModule = null;
+    reassembler?.provideFecModule(null);
+  }
+);
+
+function activeReassembler(): FountainReassembler {
+  if (!reassembler) {
+    reassembler = new FountainReassembler();
+    if (fecModule !== undefined) reassembler.provideFecModule(fecModule);
+  }
+  return reassembler;
+}
 
 function post(message: Record<string, unknown>, transfer: Transferable[] = []): void {
   self.postMessage(message, { transfer });
@@ -140,8 +163,7 @@ async function handleKey(active: FountainReassembler, secret: Uint8Array | null)
  */
 async function handleFrame(text: string): Promise<void> {
   if (finalizing) return;
-  if (!reassembler) reassembler = new FountainReassembler();
-  const active = reassembler;
+  const active = activeReassembler();
 
   const keySecret = parseKeyQr(text);
   if (keySecret) {
@@ -165,19 +187,19 @@ self.onmessage = async (e: MessageEvent<FileReassemblyIncomingMessage>) => {
       resetWorkerState();
       return;
     }
-    if (!reassembler) reassembler = new FountainReassembler();
+    const active = activeReassembler();
     if (data.type === 'IGNORE_SESSION') {
-      reassembler.ignoreSession(data.session);
+      active.ignoreSession(data.session);
       return;
     }
     if (data.type === 'SET_KEY') {
-      await handleKey(reassembler, parseKeyCode(data.code));
+      await handleKey(active, parseKeyCode(data.code));
       return;
     }
     if (data.type === 'SWITCH_DECISION') {
-      if (data.accept) reassembler.acceptSwitch(data.session);
-      else reassembler.declineSwitch(data.session);
-      postNotices(reassembler);
+      if (data.accept) active.acceptSwitch(data.session);
+      else active.declineSwitch(data.session);
+      postNotices(active);
       return;
     }
     if (data.type === 'FOUNTAIN_DROPLET' || data.type === 'DROPLET') {
