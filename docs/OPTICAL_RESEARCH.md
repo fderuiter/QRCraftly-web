@@ -2,6 +2,8 @@
 
 Research notes for QRCraftly Optical (#1161), written for issue #1166 (temporal and rolling-shutter modulation), with the findings of #1164 and #1165 collected at the end. Read it as a record of what is known, what was reasoned and what nobody has measured. **No phone was used for any of this.** Every figure that comes from this repository is a simulator result, and a model of a camera is not a camera.
 
+The architecture, protocol and validation plan these notes feed into are in [Optical Transfer design](optical-transfer/README.md).
+
 ## How to read the claims
 
 - **Measured here**: produced by a command in this repository, on the channel simulator or in a headless browser. The command is named.

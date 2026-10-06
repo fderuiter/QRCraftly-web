@@ -17,7 +17,7 @@ Run it after changing any of these, then commit the files it rewrites:
 
 It runs, in order:
 
-1. `scripts/audit_markdown.js`: relative links, heading anchors, unfinished-work placeholder markers and type-checked `ts`/`tsx` snippets in `docs/*.md`, `docs/public/`, `docs/adr/`, `docs/agents/`, `README.md`, `CONTEXT.md`, `AGENTS.md`, `src/packages/README.md`, `src/components/inputs/README.md` and `.github/rulesets/README.md`. Pages in `docs/public/` also need `publish-approved: true` frontmatter. Placeholders are allowed in files marked `draft: true`.
+1. `scripts/audit_markdown.js`: relative links, heading anchors, unfinished-work placeholder markers and type-checked `ts`/`tsx` snippets in `docs/*.md`, `docs/public/`, `docs/adr/`, `docs/agents/`, `docs/optical-transfer/`, `README.md`, `CONTEXT.md`, `AGENTS.md`, `src/packages/README.md`, `src/components/inputs/README.md` and `.github/rulesets/README.md`. Pages in `docs/public/` also need `publish-approved: true` frontmatter. Placeholders are allowed in files marked `draft: true`.
 2. `scripts/validate_adrs.js`: ADR files are named `NNNN-kebab-title.md`, numbers start at `0001` with no gaps or duplicates, each ADR opens with a `# Title` heading, and an optional `status` is one of `proposed`, `accepted`, `deprecated` or `superseded`.
 3. `scripts/validate_ui_catalog.js`: every UI component and its companion test is listed in `docs/public/UI_CATALOG.md`.
 4. `scripts/compile_docs_manifest.js --check`: `src/data/docs_manifest.json` matches the current docs.

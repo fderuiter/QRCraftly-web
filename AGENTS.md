@@ -39,7 +39,7 @@ Packages are deep modules: see [src/packages/README.md](./src/packages/README.md
 ### Documentation checks
 
 - Run `pnpm run docs:sync` after changing a UI component in `src/components/ui/`, `src/components/inputs/` or `src/components/style-controls/`, or any page in `docs/public/` or `docs/SECURITY.md`. It regenerates `docs/public/UI_CATALOG.md` entries and `src/data/docs_manifest.json`. Commit what it changes.
-- Run `pnpm run docs:lint` after editing any Markdown. It checks links, anchors, unfinished-work placeholder markers and TS snippets in `docs/`, `docs/public/`, `docs/adr/`, `docs/agents/`, `README.md`, `CONTEXT.md` and `AGENTS.md`; ADR file names and gap-free numbering; the UI catalog; and that the docs manifest is current. Every error prints a `Fix:` hint. `pnpm run lint`, CI and the pre-commit hook (for staged `*.md` files) run the same checks.
+- Run `pnpm run docs:lint` after editing any Markdown. It checks links, anchors, unfinished-work placeholder markers and TS snippets in `docs/`, `docs/public/`, `docs/adr/`, `docs/agents/`, `docs/optical-transfer/`, `README.md`, `CONTEXT.md` and `AGENTS.md`; ADR file names and gap-free numbering; the UI catalog; and that the docs manifest is current. Every error prints a `Fix:` hint. `pnpm run lint`, CI and the pre-commit hook (for staged `*.md` files) run the same checks.
 
 See `docs/agents/docs-maintenance.md`.
 
