@@ -25,6 +25,16 @@ import { senderOptions } from './fixtures';
 import { encodeFeedbackFrame } from '../index';
 import { QRStyle } from '@/types';
 
+/**
+ * Gives a canvas a 2D context that only takes fills. The multi-code tests check the timeline, not
+ * pixels, and the setup's per-pixel canvas mock takes most of a second to fill a 1000 px tile
+ * canvas, which raced the default `waitFor` timeout on a busy machine (#1246).
+ * @param canvas - The transfer canvas.
+ */
+function giveFillOnlyContext(canvas: HTMLCanvasElement) {
+  const ctx = { fillStyle: '', fillRect: vi.fn() };
+  canvas.getContext = vi.fn(() => ctx) as unknown as HTMLCanvasElement['getContext'];
+}
 
 describe('useOpticalSender', () => {
   beforeEach(() => {
@@ -102,6 +112,7 @@ describe('useOpticalSender', () => {
       const container = document.createElement('div');
       Object.defineProperty(container, 'clientWidth', { value: width, configurable: true });
       const canvas = document.createElement('canvas');
+      giveFillOnlyContext(canvas);
       container.appendChild(canvas);
       current.canvasRef.current = canvas;
       return canvas;
@@ -337,6 +348,7 @@ describe('useOpticalSender', () => {
       const container = document.createElement('div');
       Object.defineProperty(container, 'clientWidth', { value: 1000, configurable: true });
       const canvas = document.createElement('canvas');
+      giveFillOnlyContext(canvas);
       container.appendChild(canvas);
       result.current.canvasRef.current = canvas;
 
