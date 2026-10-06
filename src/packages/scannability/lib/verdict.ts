@@ -91,10 +91,12 @@ export function getScanAdvice({
   if (status === 'fail') {
     return { message: 'A camera could not read this design. Stronger contrast usually fixes it.', fix: 'increase-contrast' };
   }
+  // The print simulation loses modules that are too thin or too faint to survive blur (#1248).
+  // Spare error correction recovers a few of them; a bolder pattern keeps them.
   if (status === 'digital-pass') {
     return canRaiseEc
-      ? { message: 'It scans on a screen, but the print simulation struggled. Higher error correction helps; test with a phone camera before printing.', fix: 'raise-error-correction' }
-      : { message: 'It scans on a screen, but the print simulation struggled. Test with a phone camera before printing.' };
+      ? { message: 'It scans on a screen, but some modules blur away in the print simulation. Higher error correction or a bolder pattern helps; test with a phone camera before printing.', fix: 'raise-error-correction' }
+      : { message: 'It scans on a screen, but some modules blur away in the print simulation. A bolder pattern or stronger contrast helps; test with a phone camera before printing.', fix: 'standard-pattern' };
   }
   return top ? { message: top } : null;
 }

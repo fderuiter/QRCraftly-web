@@ -39,8 +39,13 @@ describe('getScanAdvice', () => {
     expect(advice?.message).not.toMatch(/module zone|ratio/i);
   });
 
-  it('advises a camera test for a screen-only pass', () => {
-    expect(getScanAdvice({ status: 'digital-pass', health: { score: 100, warnings: [] }, errorCorrectionLevel: 'H' })?.message).toMatch(/phone camera/);
+  it.each([
+    ['M', 'raise-error-correction'],
+    ['H', 'standard-pattern'],
+  ])('offers a print fix and a camera test for a screen-only pass (EC %s)', (errorCorrectionLevel, fix) => {
+    const advice = getScanAdvice({ status: 'digital-pass', health: { score: 100, warnings: [] }, errorCorrectionLevel });
+    expect(advice?.fix).toBe(fix);
+    expect(advice?.message).toMatch(/blur away.*phone camera/);
   });
 
   it('suggests contrast for a failure without warnings', () => {
