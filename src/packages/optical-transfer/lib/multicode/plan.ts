@@ -20,7 +20,7 @@
  * The one switch for multi-code transfer (#1142). Nothing outside this package calls it yet: the
  * sender keeps showing one small code per frame unless a caller passes `enabled: true`.
  */
-import { selectLayout, type LayoutOptions, type ScreenSize, type TileLayout } from './layout';
+import { MIN_MODULE_CSS_PX, TILE_LAYOUTS, modulePxFor, selectLayout, type LayoutOptions, type ScreenSize, type TileLayout, type TileLayoutId } from './layout';
 import { effectiveFps, holdForTargetFps } from './pacing';
 import { decoderPoolSize } from './pool';
 import { worstIntactFraction } from './stagger';
@@ -36,6 +36,8 @@ export interface MultiCodeOptions {
   targetFps?: number;
   /** "single" asks for one large code (a distant camera). */
   prefer?: LayoutOptions['prefer'];
+  /** A layout to use when it fits the screen, as a speed profile asks (#1143); otherwise the screen picks. */
+  layoutId?: TileLayoutId;
   /** The receiver's `navigator.hardwareConcurrency`. */
   hardwareConcurrency?: number;
 }
@@ -66,7 +68,9 @@ export interface MultiCodePlan {
  */
 export function planMultiCode(options: MultiCodeOptions): MultiCodePlan | null {
   if (options.enabled !== true) return null;
-  const choice = selectLayout(options.screen, { prefer: options.prefer });
+  const wanted = options.layoutId ? TILE_LAYOUTS[options.layoutId] : null;
+  const wantedPx = wanted ? modulePxFor(wanted, options.screen) : 0;
+  const choice = wanted && wantedPx >= MIN_MODULE_CSS_PX ? { layout: wanted, modulePx: wantedPx } : selectLayout(options.screen, { prefer: options.prefer });
   if (!choice) return null;
   const hold = holdForTargetFps(options.refreshHz, options.targetFps ?? 30);
   const fps = effectiveFps(options.refreshHz, hold);

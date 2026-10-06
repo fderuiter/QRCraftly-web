@@ -51,8 +51,14 @@ export const FLAG_MULTI_BLOCK = 0b00010;
  * stream as an LT one.
  */
 export const FLAG_OUTER_CODE = 0b00100;
+/**
+ * A beacon of a multi-rate stream (#1143, ADR 0031): one large code between the dense tiles. It
+ * carries the same session's symbols, so a receiver decodes it like any other frame; the flag only
+ * tells it which layer it is reading.
+ */
+export const FLAG_BEACON = 0b01000;
 /** Flags this version understands; a frame carrying another one is refused rather than misread. */
-const KNOWN_FLAGS = FLAG_ENCRYPTED | FLAG_MULTI_BLOCK | FLAG_OUTER_CODE;
+const KNOWN_FLAGS = FLAG_ENCRYPTED | FLAG_MULTI_BLOCK | FLAG_OUTER_CODE | FLAG_BEACON;
 
 export const SESSION_ID_BYTES = 6;
 /** Largest symbol ID a frame can name (24 bits). */

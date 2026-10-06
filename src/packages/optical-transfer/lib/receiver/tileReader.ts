@@ -171,6 +171,8 @@ export interface TileReaderOptions {
   onText: (text: string) => void;
   /** Receives where the first code of a frame sat, for the lock-on brackets. */
   onCorners?: (corners: ScanCorners) => void;
+  /** Receives the text of every code a camera frame read, repeats included, once per frame that read any. */
+  onFrameRead?: (texts: readonly string[]) => void;
   /** Starts one decoder worker. */
   spawnWorker: () => TileWorker;
   /** Grabs the current camera frame. Defaults to `createImageBitmap`. */
@@ -230,6 +232,7 @@ export function createTileReader(options: TileReaderOptions): TileReader {
     if (codes.length > 0) {
       const [first] = codes;
       options.onCorners?.([first.corners[0], first.corners[1], first.corners[2], first.corners[3]]);
+      options.onFrameRead?.(codes.map((code) => code.text));
     }
     for (const code of codes) {
       if (dedup.accept(code.text)) options.onText(code.text);

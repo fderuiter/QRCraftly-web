@@ -35,6 +35,8 @@ import {
   createPrng,
   keyQrText,
   parseKeyCode,
+  STALL_HINT,
+  STALL_HINT_SECONDS,
 } from '../index';
 import { receiverOptions } from './fixtures';
 
@@ -425,6 +427,28 @@ describe('useOpticalReceiver', () => {
       });
       expect(getUserMedia).toHaveBeenCalledTimes(2);
       expect(getUserMedia.mock.calls[1][0].video).toMatchObject({ frameRate: { ideal: 30, max: 30 } });
+    });
+
+    it('suggests a lower speed when a multi-code transfer makes no progress for five seconds (#1143)', async () => {
+      const { result } = renderReceiver();
+      act(() => result.current.setMultiCode(true));
+      await act(async () => {
+        await result.current.startCameraSession();
+      });
+      const stream = await streamFor('stalled transfer '.repeat(40));
+      let now = 1000;
+      vi.spyOn(performance, 'now').mockImplementation(() => now);
+      await act(async () => {
+        result.current.handleFrame(stream.frameText(0));
+      });
+      await waitFor(() => expect(result.current.manifest).not.toBeNull());
+      expect(result.current.layerHint).toBeNull();
+
+      now += STALL_HINT_SECONDS * 1000;
+      await waitFor(() => expect(result.current.layerHint).toBe(STALL_HINT), { timeout: 2500 });
+
+      act(() => result.current.handleClear());
+      expect(result.current.layerHint).toBeNull();
     });
 
     it('releases the camera on unmount', async () => {

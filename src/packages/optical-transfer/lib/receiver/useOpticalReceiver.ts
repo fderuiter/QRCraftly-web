@@ -23,6 +23,8 @@ import type { BcUrDecoder, BcUrResult } from '../../bcur';
 import type { HandshakeInfo } from '../contracts';
 import { isFountainDropletString } from '../fountain/envelope';
 import { FountainRateTracker, type FountainTelemetry } from '../fountain/reassembler';
+import { layerHint } from '../multicode/layerHint';
+import { frameLayer } from '../multicode/multirate';
 import { decoderPoolSize } from '../multicode/pool';
 import { sha256Hex } from '../fountain/session';
 import { MAX_VIDEO_UPLOAD_BYTES, formatLimit } from '../limits';
@@ -97,6 +99,8 @@ const STREAM_MAX_SAMPLING_DELAY_MS = 150;
 const LOCK_ON_HOLD_MS = 400;
 /** Frames per second the multi-code receiver asks the camera for, as an ideal (#1142). */
 const MULTI_CODE_FRAME_RATE = 60;
+/** Camera frames the layer hint looks back over (#1143). */
+const LAYER_WINDOW_FRAMES = 30;
 
 const FILE_RECEIVED_MESSAGE = 'File completely received & offline binary reconstruction triggered!';
 
@@ -181,6 +185,13 @@ export function useOpticalReceiver({
   const handleFrameRef = useRef<(decodedText: string) => void>(() => {});
   /** Read several codes per camera frame (#1142), chosen under Advanced. Off by default. */
   const [multiCode, setMultiCode] = useState(false);
+  /** What the multi-code receiver tells the person about the layer it reads (#1143), or null. */
+  const [layerHintText, setLayerHintText] = useState<string | null>(null);
+  /** The layers of the last camera frames that read a transfer code. */
+  const layerWindowRef = useRef<Array<'dense' | 'beacon'>>([]);
+  /** When the transfer last made progress (a manifest or a higher rank), or null before it started. */
+  const lastProgressRef = useRef<number | null>(null);
+  const lastRankRef = useRef(0);
   // The multi-code reader takes the camera's frames in place of the scanner's one-code loop.
   const tileReaderRef = useRef<TileReader | null>(null);
   const tileReader = useMemo<TileReader>(
@@ -191,6 +202,13 @@ export function useOpticalReceiver({
           poolSize: decoderPoolSize(typeof navigator === 'undefined' ? undefined : navigator.hardwareConcurrency),
           onText: (text) => handleFrameRef.current(text),
           onCorners: (corners) => markLockOn(corners),
+          onFrameRead: (texts) => {
+            const layer = frameLayer(texts);
+            if (!layer) return;
+            const recent = layerWindowRef.current;
+            recent.push(layer);
+            if (recent.length > LAYER_WINDOW_FRAMES) recent.shift();
+          },
           spawnWorker: spawnTileWorker,
         });
         tileReaderRef.current.start();
@@ -328,6 +346,7 @@ export function useOpticalReceiver({
         const { type, progress, current, total, rank, dropletsReceived } = message;
 
         if (type === 'MANIFEST' && message.manifest) {
+          lastProgressRef.current ??= performance.now();
           setReceiverError(null);
           setManifest(message.manifest);
           setNeedsKey(Boolean(message.needsKey));
@@ -336,6 +355,10 @@ export function useOpticalReceiver({
         } else if (type === 'SWITCH_OFFER' && message.offer) {
           setSwitchOffer(message.offer);
         } else if (type === 'PROGRESS') {
+          if ((rank ?? 0) > lastRankRef.current) {
+            lastRankRef.current = rank ?? 0;
+            lastProgressRef.current = performance.now();
+          }
           // A fresh decode (after a failed one) clears the old error.
           setReceiverError(null);
           setFountainStats(
@@ -440,6 +463,10 @@ export function useOpticalReceiver({
 
   const handleClear = useCallback(() => {
     terminateWorker();
+    layerWindowRef.current = [];
+    lastProgressRef.current = null;
+    lastRankRef.current = 0;
+    setLayerHintText(null);
     setFountainStats(null);
     setManifest(null);
     setNeedsKey(false);
@@ -589,6 +616,26 @@ export function useOpticalReceiver({
     if (cameraStatusRef.current === 'streaming') void startCamera(multiCode ? { frameRate: MULTI_CODE_FRAME_RATE } : {});
   }, [multiCode, startCamera]);
 
+  // Once a second, the multi-code receiver says which layer it reads and whether progress stalled.
+  const hintActive = multiCode && isScanning && !receiverSuccess;
+  useEffect(() => {
+    if (!hintActive) {
+      setLayerHintText(null);
+      return undefined;
+    }
+    const timer = setInterval(() => {
+      const recent = layerWindowRef.current;
+      const since = lastProgressRef.current;
+      const hint = layerHint({
+        denseFrames: recent.filter((layer) => layer === 'dense').length,
+        beaconFrames: recent.filter((layer) => layer === 'beacon').length,
+        secondsWithoutProgress: since === null ? 0 : Math.floor((performance.now() - since) / 1000),
+      });
+      setLayerHintText((current) => (current === hint ? current : hint));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [hintActive]);
+
   const stopCameraSession = useCallback(() => {
     setIsScanning(false);
     stopStream();
@@ -627,6 +674,8 @@ export function useOpticalReceiver({
     /** Whether several codes are read per camera frame (#1142). */
     multiCode,
     setMultiCode,
+    /** Which layer of a multi-rate stream the camera reads, or that progress stalled (#1143); null when all is well. */
+    layerHint: layerHintText,
     /** Corners of the code the camera read a moment ago (for the lock-on brackets), or null. */
     lockOn,
     /** A finished real BC-UR stream (type and content), or null. */

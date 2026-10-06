@@ -5,7 +5,7 @@ import {
   TILE_LAYOUTS,
   ROBUST_LAYER_HINT,
   STALL_HINT,
-  classifyFrameText,
+  frameLayer,
   createMultiRateSender,
   createPrismSession,
   createPrng,
@@ -60,8 +60,10 @@ describe('the multi-rate sender', () => {
     expect(dense.texts).toHaveLength(layout.tiles);
     expect(beacon.kind).toBe('beacon');
     expect(beacon.texts).toHaveLength(1);
-    for (const text of dense.texts) expect(classifyFrameText(text, layout, MULTI_RATE_PROFILES[name].beaconVersion)).toBe('dense');
-    expect(classifyFrameText(beacon.texts[0], layout, MULTI_RATE_PROFILES[name].beaconVersion)).toBe('beacon');
+    expect(frameLayer(dense.texts)).toBe('dense');
+    expect(frameLayer(beacon.texts)).toBe('beacon');
+    expect(frameLayer([...beacon.texts, dense.texts[0]])).toBe('dense');
+    expect(frameLayer(['https://example.com'])).toBeNull();
     expect(sender.beaconSymbols).toBeGreaterThan(sender.denseSymbols);
   });
 

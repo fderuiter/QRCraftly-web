@@ -41,6 +41,7 @@ The bench simulates the display and the camera, so these need a phone before the
 - Real decodes per second with the pool the receiver picks, and whether the preview and the sender page keep their frame rate.
 - Torn frames: record the share of tiles that decode on a 60 Hz and a 120 Hz sender, staggered and not.
 - The refresh rate the sender measures, against the display's real rate (power saving can change it mid-transfer).
+- Beacons (#1143): move the receiver back until the tiles stop reading. Confirm the receiver says it reads the robust layer only and the transfer still finishes, and that it suggests a lower speed when nothing reads for five seconds. Record how far back the beacons still read at each density.
 
 ## Webcam back channel (#1146)
 

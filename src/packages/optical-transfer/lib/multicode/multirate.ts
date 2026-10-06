@@ -27,9 +27,9 @@
  * starting points taken from the simulator; a real-device run (docs/TRANSFER_DEVICE_CHECKLIST.md)
  * sets the final ones.
  */
-import { FRAME_OVERHEAD } from '../prism/frame';
+import { FLAG_BEACON, FRAME_OVERHEAD, decodeFrame } from '../prism/frame';
 import type { PrismManifest } from '../prism/manifest';
-import { PrismStream } from '../prism/session';
+import { BEACON_MANIFEST_INTERVAL, PrismStream, beaconStreamStart, beaconSymbolsFor } from '../prism/session';
 import { TILE_LAYOUTS, tileFrameCapacity, type TileLayout, type TileLayoutId } from './layout';
 
 export type MultiRateProfileName = 'steady' | 'balanced' | 'fast';
@@ -67,9 +67,6 @@ export const MULTI_RATE_PROFILES: Readonly<Record<MultiRateProfileName, MultiRat
   fast: { name: 'fast', label: 'Fast', layoutId: '2x2-v25', targetFps: 60, beaconEvery: 12, beaconVersion: 40, targetKBps: [150, 300] },
 };
 
-/** Beacons between manifests in the beacon stream. */
-const BEACON_MANIFEST_INTERVAL = 4;
-
 /** What one display frame shows. */
 export type MultiRateFrame =
   | { kind: 'dense'; /** One text per tile and channel: tile 0's channels first. A single-channel stream has one per tile. */ texts: string[] }
@@ -86,20 +83,20 @@ export function isBeaconFrame(frameIndex: number, beaconEvery: number): boolean 
 }
 
 /**
- * Tells a beacon from a dense tile by its size: a beacon's text does not fit a dense tile.
- * @param text - The decoded frame text.
- * @param layout - The dense layout of the stream.
- * @param beaconVersion - The beacon's QR version.
- * @returns "beacon" or "dense".
+ * Which layer of a multi-rate stream one camera frame's codes came from. A beacon sets
+ * `FLAG_BEACON` (#1143), so any frame without it makes the camera frame a dense one.
+ * @param texts - The codes the camera frame read.
+ * @returns "dense", "beacon", or null when none of them is a transfer frame.
  */
-export function classifyFrameText(text: string, layout: TileLayout, beaconVersion: number): 'dense' | 'beacon' {
-  return text.length > tileFrameCapacityChars(layout.version) && text.length <= tileFrameCapacityChars(beaconVersion) ? 'beacon' : 'dense';
-}
-
-/** Alphanumeric characters a frame of a QR version can hold, as used for the size test above. */
-function tileFrameCapacityChars(version: number): number {
-  // A Base45 text of `tileFrameCapacity` bytes is at most this many characters.
-  return Math.ceil((tileFrameCapacity(version) * 3) / 2);
+export function frameLayer(texts: readonly string[]): 'dense' | 'beacon' | null {
+  let beacon = false;
+  for (const text of texts) {
+    const decoded = decodeFrame(text);
+    if (!decoded.ok || decoded.frame.type === 'feedback') continue;
+    if ((decoded.frame.flags & FLAG_BEACON) === 0) return 'dense';
+    beacon = true;
+  }
+  return beacon ? 'beacon' : null;
 }
 
 /** Inputs for {@link createMultiRateSender}. */
@@ -144,11 +141,11 @@ export function createMultiRateSender(options: MultiRateSenderOptions): MultiRat
   const manifest: PrismManifest = { ...options.manifest, symbolSize };
   const denseSymbols = Math.max(1, Math.floor((tileFrameCapacity(layout.version) - FRAME_OVERHEAD) / symbolSize));
   const dense = new PrismStream(options.message, manifest, { symbolsPerFrame: denseSymbols });
-  const beaconSymbols = Math.max(1, Math.floor((tileFrameCapacity(profile.beaconVersion) - FRAME_OVERHEAD) / symbolSize));
+  const beaconSymbols = beaconSymbolsFor(profile.beaconVersion, symbolSize);
   // A receiver needs the manifest before it can use a symbol, so a beacon-only camera gets one every 4th beacon.
-  const beacon = new PrismStream(options.message, manifest, { symbolsPerFrame: beaconSymbols, manifestInterval: BEACON_MANIFEST_INTERVAL });
+  const beacon = new PrismStream(options.message, manifest, { symbolsPerFrame: beaconSymbols, manifestInterval: BEACON_MANIFEST_INTERVAL, beacon: true });
   // Past the source symbols, so beacons carry repair symbols (the dense stream sends the source ones first).
-  const beaconBase = Math.ceil((dense.k / beaconSymbols) * 1.1) + 2;
+  const beaconBase = beaconStreamStart(dense.k, beaconSymbols);
 
   return {
     layout,

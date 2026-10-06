@@ -429,7 +429,7 @@ function FileTransferToolInner() {
                     <p className="text-xs text-fg-muted" data-testid="multi-code-hint">
                       {fountainInfo && multiCode && !fountainInfo.tiles
                         ? 'This screen is too small for several codes, so this transfer shows one at a time.'
-                        : 'Shows up to four large codes at once, timed to the display. Turn on “Read several codes per frame” on the receiving device.'}
+                        : 'Shows up to four large codes at once, timed to the display, with one bigger code every few frames for cameras that cannot read them. Turn on “Read several codes per frame” on the receiving device.'}
                     </p>
                   </div>
                   <p className="text-xs text-fg-muted" data-testid="fountain-symbol-info">

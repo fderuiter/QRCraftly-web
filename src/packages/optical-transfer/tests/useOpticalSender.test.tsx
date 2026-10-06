@@ -127,7 +127,7 @@ describe('useOpticalSender', () => {
       expect(result.current.tileInfo).toBeNull();
     });
 
-    it('holds every frame for whole display refreshes and staggers the diagonal tile groups', async () => {
+    it('holds every frame for whole display refreshes, staggers the diagonal tile groups and slots in beacons', async () => {
       vi.stubGlobal('innerHeight', 1000);
       vi.stubGlobal('devicePixelRatio', 1);
       const callbacks: Array<(time: number) => void> = [];
@@ -145,24 +145,29 @@ describe('useOpticalSender', () => {
       let start: any = null;
       let refresh = -1;
       const acks: Array<{ refresh: number; index: number }> = [];
+      let heals = 0;
+      const sentHeal = () => heals > 0;
       globalThis.mockWorkerControl.setInterceptor((message: any, worker: any) => {
         if (message.type === 'ACK') acks.push({ refresh, index: message.payload.index });
+        if (message.type === 'HEAL') heals += 1;
         if (message.type !== 'START') return;
         start = message;
         worker.dispatchMessage({ type: 'PROGRESS', total: 64 });
-        // A 2x2 v25 layout: tiles of 117 modules.
-        for (let index = 0; index < 24; index++) worker.dispatchMessage({ type: 'FRAME', index, total: 64, size: 117, data: new Uint8Array(117 * 117) });
+        // Balanced prefers a 2x2 v20 layout (tiles of 97 modules) with a v30 beacon every 8th frame.
+        for (let index = 0; index < 40; index++) worker.dispatchMessage({ type: 'FRAME', index, total: 64, size: 97, data: new Uint8Array(97 * 97) });
+        worker.dispatchMessage({ type: 'BEACON', index: 0, size: 137, data: new Uint8Array(137 * 137) });
       });
 
       act(() => result.current.startTransfer());
       await waitFor(() => expect(result.current.isTransferring).toBe(true));
-      expect(start.payload.tiles).toBe('2x2-v25');
+      expect(start.payload.tiles).toBe('2x2-v20');
+      expect(start.payload.beacon).toEqual({ version: 30, every: 8 });
       // Tiles are painted dark on light whatever the page's colours, so the colour gate does not run.
       expect(options.verifyFrame).not.toHaveBeenCalled();
 
       // 20 refreshes at 60 Hz measure the display; the next callback is the first locked refresh.
       const interval = 1000 / 60;
-      for (let step = 0; step < 33; step++) {
+      for (let step = 0; step < 55; step++) {
         const callback = callbacks.shift();
         expect(callback).toBeDefined();
         if (step >= 19) refresh = step - 19;
@@ -174,10 +179,12 @@ describe('useOpticalSender', () => {
       }
 
       // 15 frames/sec on a 60 Hz display holds each frame for 4 refreshes.
-      expect(result.current.tileInfo).toEqual({ layout: '2x2-v25', hold: 4, refreshHz: 60 });
-      // Tiles 0 and 3 change on refreshes 4, 8, 12; tiles 1 and 2 two refreshes later.
-      expect(acks.map((ack) => ack.refresh)).toEqual([0, 4, 6, 8, 10, 12]);
-      expect(acks.map((ack) => ack.index)).toEqual([3, 7, 6, 11, 10, 15]);
+      expect(result.current.tileInfo).toEqual({ layout: '2x2-v20', hold: 4, refreshHz: 60 });
+      // Tiles 0 and 3 change every 4 refreshes; tiles 1 and 2 two refreshes later. Display frame 7
+      // (refreshes 28 to 31) is the beacon, and the tiles carry on with the next dense frame after it.
+      expect(acks.map((ack) => ack.refresh)).toEqual([0, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 32, 34]);
+      expect(acks.map((ack) => ack.index)).toEqual([3, 7, 6, 11, 10, 15, 14, 19, 18, 23, 22, 27, 26, 31, 30]);
+      expect(sentHeal()).toBe(false);
     });
   });
 

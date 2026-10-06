@@ -104,6 +104,7 @@ export {
 export { encodeBase45, decodeBase45, base45Length } from './lib/prism/base45';
 export {
   PRISM_VERSION,
+  FLAG_BEACON,
   FLAG_ENCRYPTED,
   FLAG_OUTER_CODE,
   FRAME_OVERHEAD,
@@ -233,7 +234,7 @@ export type { TileCode, TileReadRequest, TileReadResponse } from './lib/receiver
 export {
   MULTI_RATE_PROFILES,
   isBeaconFrame,
-  classifyFrameText,
+  frameLayer,
   createMultiRateSender,
   type MultiRateProfile,
   type MultiRateProfileName,
@@ -241,7 +242,7 @@ export {
   type MultiRateSender,
   type MultiRateSenderOptions,
 } from './lib/multicode/multirate';
-export { layerHint, ROBUST_LAYER_HINT, STALL_HINT, type LayerObservation } from './lib/multicode/layerHint';
+export { layerHint, ROBUST_LAYER_HINT, STALL_HINT, STALL_HINT_SECONDS, type LayerObservation } from './lib/multicode/layerHint';
 
 // Webcam back channel (#1146). Off unless a caller opts in through `createFeedbackLink().enable()`; nothing in the app imports these yet.
 export {
