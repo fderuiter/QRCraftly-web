@@ -16,18 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { rsDecode, rsEncode } from './rs';
+import { modemKernels } from './kernels';
 
 /** The format version this build reads and writes. */
 export const MODEM_VERSION = 1;
 /** First byte of every header. */
-export const HEADER_MAGIC = 0xb7;
+const HEADER_MAGIC = 0xb7;
 /** Message bytes in a header. */
-export const HEADER_MESSAGE_BYTES = 18;
+const HEADER_MESSAGE_BYTES = 18;
 /** Check bytes in a header: 24 of 42 bytes, so a header survives 12 wrong bytes. */
-export const HEADER_PARITY = 24;
-/** Bytes in the header codeword. */
-export const HEADER_CODEWORD_BYTES = HEADER_MESSAGE_BYTES + HEADER_PARITY;
+const HEADER_PARITY = 24;
 
 /** What every frame says about itself. */
 export interface FrameHeader {
@@ -69,28 +67,26 @@ export function encodeHeader(header: FrameHeader): Uint8Array {
   view.setUint16(14, header.rows);
   message[16] = header.parity;
   message[17] = header.flags;
-  return rsEncode(message, HEADER_PARITY);
+  return modemKernels().rsEncode(message, HEADER_PARITY);
 }
 
 /**
- * Reads a header codeword.
- * @param codeword - 42 bytes, possibly damaged.
- * @returns The header, or null when the code cannot repair it or the magic byte is wrong.
+ * Reads the fields of a header message the modem module has already repaired and checked.
+ * @param message - The 18 message bytes.
+ * @returns The header.
  */
-export function decodeHeader(codeword: Uint8Array): FrameHeader | null {
-  const result = rsDecode(codeword, HEADER_PARITY);
-  if (!result.ok || result.message[0] !== HEADER_MAGIC) return null;
-  const view = new DataView(result.message.buffer, result.message.byteOffset, result.message.byteLength);
+export function parseHeader(message: Uint8Array): FrameHeader {
+  const view = new DataView(message.buffer, message.byteOffset, message.byteLength);
   return {
-    version: result.message[1] >> 4,
-    profile: result.message[1] & 15,
-    constellation: result.message[2],
-    packetBytes: result.message[3],
+    version: message[1] >> 4,
+    profile: message[1] & 15,
+    constellation: message[2],
+    packetBytes: message[3],
     session: view.getUint32(4),
     seq: view.getUint32(8),
     cols: view.getUint16(12),
     rows: view.getUint16(14),
-    parity: result.message[16],
-    flags: result.message[17],
+    parity: message[16],
+    flags: message[17],
   };
 }

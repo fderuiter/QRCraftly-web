@@ -116,7 +116,41 @@ export const BENCH_CALLS: Record<string, WasmBenchCall[]> = {
       prepare: (instance) => prepareDecode(instance, decodeRequest(renderGrid(qrEncoder.create('https://qrcraftly.com/menu?table=12').modules, 6, 640, 480), 640, 480, 1)),
     },
   ],
+  modem: [
+    {
+      name: 'sample P4 grid (160 x 72 cells, 640x360)',
+      prepare: (instance) => prepareModemFrame(instance).sample,
+    },
+    {
+      name: 'decode P4 frame, soft (36 blocks)',
+      prepare: (instance) => prepareModemFrame(instance).decode,
+    },
+  ],
 };
+
+/**
+ * A receiver over a noisy 640x360 picture of P4's grid (crates/modem): the homography and a
+ * 16-colour palette are set directly, so the calls time the per-frame kernels, not acquisition.
+ */
+function prepareModemFrame(instance: WasmInstance): { sample: () => void; decode: () => void } {
+  const [cols, rows, dataRows] = [160, 90, 72];
+  const rx = instance.fn('modem_rx_new')() >>> 0;
+  const image = instance.fn('modem_rx_image')(rx, 640, 360) >>> 0;
+  instance.write(
+    image,
+    new Uint8Array(640 * 360 * 4).map((_, i) => (Math.imul(i >> 6, 2654435761) >>> 24) & 0xff),
+  );
+  const io = new Float64Array(instance.memory.buffer, instance.fn('modem_rx_io')(rx) >>> 0, 256);
+  io.set([3.9, 0.01, 8, -0.01, 3.9, 4, 0.00001, -0.00002, 1], 12);
+  for (let s = 0; s < 16; s++) io.set([(s & 1) * 230 + 10, ((s >> 1) & 1) * 230 + 10, ((s >> 2) & 1) * 200 + (s >> 3) * 40], 21 + 3 * s);
+  const sample = instance.fn('modem_rx_sample');
+  const decode = instance.fn('modem_rx_decode');
+  sample(rx, cols, dataRows, 9, 16);
+  return {
+    sample: () => sample(rx, cols, dataRows, 9, 16),
+    decode: () => decode(rx, 4, cols, rows, 80, 80, 1, 1, 32),
+  };
+}
 
 const FEC_SYMBOL = 64;
 const FEC_SEED = 1176;

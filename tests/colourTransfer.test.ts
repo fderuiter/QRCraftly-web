@@ -17,13 +17,15 @@
 */
 
 import { qrEncoder as QRCode } from './fixtures/qrEncoder';
-import { describe, expect, it } from 'vitest';
-import { COLOUR_FALLBACK_HINT, composeBeacon, composeColourTile, fitCrossTalk, qrModuleCount, samplePatch, splitChannels } from '../src/packages/optical-transfer/index';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { COLOUR_FALLBACK_HINT, composeBeacon, composeColourTile, fitCrossTalk, loadCrossTalkKernels, qrModuleCount, samplePatch, splitChannels } from '../src/packages/optical-transfer/index';
 import { CLEAN_CHANNEL, COLOUR_BLIND_CHANNEL, REFERENCE_CHANNEL, capture, qrDecoders, runColourTransfer } from './utils/colourBench';
 import { createRandom } from './utils/scannerCorpus';
 
 // A smaller screen makes every full-frame decode cheaper; the beacons (3 px modules) still read.
 const SMALL_SCREEN = { width: 800, height: 800, modulePx: 3 };
+
+beforeAll(() => loadCrossTalkKernels());
 
 describe('Colour layer simulation (#1147)', () => {
   it('moves a file through cross-talk, a white balance shift and JPEG-like noise, three decodes per tile', async () => {

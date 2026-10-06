@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   DEFAULT_LADDER_WEIGHTS,
   LADDER,
@@ -35,6 +35,7 @@ import {
   simulateCapture,
   type FrameObservation,
   type LinkState,
+  loadOpticalModem,
 } from '../index';
 
 const FPS = 30;
@@ -50,6 +51,8 @@ function feed(make: (index: number) => FrameObservation, seconds: number): LinkS
   for (let i = 0; i < seconds * FPS; i++) tracker.record(make(i));
   return tracker.state();
 }
+
+beforeAll(() => loadOpticalModem());
 
 describe('the ladder', () => {
   it('has six rungs numbered like the frame header, with the modem rungs tied to the profiles', () => {

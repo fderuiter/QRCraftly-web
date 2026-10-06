@@ -31,6 +31,7 @@ export const WASM_MODULE_BUDGETS_KB = {
   'qr-encode': 20,
   'qr-decode': 32,
   'prism-fec': 10,
+  modem: 40,
 };
 
 /**

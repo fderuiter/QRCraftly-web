@@ -16,9 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { GPU_FALLBACK_MESSAGES, createGpuKernel, createVerifiedGpuKernel, selfTestGpuKernel, type GpuCanvas, type GpuKernel } from '../gpu';
-import { runReferenceKernel, type KernelUniforms } from '../index';
+import { runReferenceKernel, type KernelUniforms , loadOpticalModem } from '../index';
 
 type Call = [string, unknown[]];
 
@@ -50,6 +50,8 @@ const canvasOf = (gl: WebGL2RenderingContext | null): GpuCanvas => ({ getContext
 
 const UNIFORMS: KernelUniforms = { cols: 3, dataRows: 2, rowOffset: 9, homography: Float32Array.from([1, 0, 0, 0, 1, 0, 0, 0, 1]), palette: Int32Array.from([0, 0, 0, 255, 255, 255]) };
 const IMAGE = { width: 2, height: 2, data: new Uint8ClampedArray(16).fill(9) };
+
+beforeAll(() => loadOpticalModem());
 
 describe('GPU kernel set-up', () => {
   it('says why there is no kernel, in words the receiver can show', () => {

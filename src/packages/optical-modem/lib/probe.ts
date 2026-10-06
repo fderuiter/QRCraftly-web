@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { constellationId, getConstellation } from './constellation';
+import { constellationId, constellationShape } from './constellation';
 import { drawFrame } from './frame';
 import { BAND_ROWS, createLayout, type GridGeometry, type RgbaImage } from './layout';
 import { createRng } from './prng';
@@ -158,7 +158,7 @@ export function unpackProbeSeq(seq: number): { patternIndex: number; counter: nu
  * @returns One symbol per data cell.
  */
 export function probeSymbols(pattern: ProbePattern, session: number, variant: number): Uint8Array {
-  const { size } = getConstellation(pattern.constellation);
+  const { size } = constellationShape(pattern.constellation);
   const rng = createRng((session ^ Math.imul(pattern.index + 1, 0x9e3779b1) ^ Math.imul(variant + 1, 0x85ebca6b)) >>> 0);
   const count = createLayout(pattern.cols, pattern.rows, size).dataCells;
   const out = new Uint8Array(count);
@@ -186,7 +186,7 @@ function fillRect(image: RgbaImage, x0: number, y0: number, x1: number, y1: numb
  * @returns The frame at `pattern.pitch` device pixels per cell.
  */
 export function drawProbeFrame(pattern: ProbePattern, session: number, counter: number): RgbaImage {
-  const layout = createLayout(pattern.cols, pattern.rows, getConstellation(pattern.constellation).size);
+  const layout = createLayout(pattern.cols, pattern.rows, constellationShape(pattern.constellation).size);
   const header = {
     version: 1,
     profile: PROBE_PROFILE,

@@ -17,8 +17,7 @@
 */
 
 import { createRng } from './prng';
-import type { Point } from './locate';
-import { solveHomography } from './locate';
+import { modemKernels, type Point } from './kernels';
 import type { RgbaImage } from './layout';
 
 /** How a screen becomes a camera frame in the simulator. Everything is optional except the placement. */
@@ -108,7 +107,7 @@ function warp(frame: RgbaImage, next: RgbaImage | undefined, params: ChannelPara
     { x: frame.width, y: frame.height },
     { x: 0, y: frame.height },
   ];
-  const inverse = solveHomography(source, target);
+  const inverse = modemKernels().solveHomography(source, target);
   if (!inverse) throw new Error('Degenerate screen placement');
   const planes = [new Float32Array(width * height), new Float32Array(width * height), new Float32Array(width * height)];
   const sample = [0, 0, 0];

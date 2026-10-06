@@ -16,15 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { getConstellation } from './constellation';
+import { constellationShape } from './constellation';
 import { acquireFrame, drawFrame, type AcquireFailure } from './frame';
-import { kernelUniforms, runReferenceKernel, type KernelUniforms } from './kernel';
 import { MODEM_VERSION, type FrameHeader } from './header';
+import { kernelUniforms, type KernelUniforms, type SampledGrid } from './kernel';
+import { modemKernels } from './kernels';
 import { BAND_ROWS, type GridGeometry, type RgbaImage } from './layout';
-import { createRng } from './prng';
 import { MODEM_GEOMETRIES, type ModemProfile } from './profile';
-import { rsDecode, rsEncode, type RsResult } from './rs';
-import type { SampledGrid } from './sample';
 
 /** What a profile can carry in one frame. */
 export interface FrameCapacity {
@@ -51,7 +49,7 @@ export type FrameShape = Pick<ModemProfile, 'constellation' | 'cols' | 'rows' | 
  * @throws Error when a block would not fit a Reed-Solomon codeword or no block fits the grid.
  */
 export function frameCapacity(shape: FrameShape): FrameCapacity {
-  const bitsPerCell = getConstellation(shape.constellation).bitsPerCell;
+  const { bitsPerCell } = constellationShape(shape.constellation);
   const blockBytes = shape.packetBytes + shape.parity;
   if (shape.packetBytes < 1 || shape.parity < 0 || blockBytes > 255) throw new Error('A block is 1 to 255 bytes, data and check bytes together');
   const dataCells = shape.cols * (shape.rows - 2 * BAND_ROWS);
@@ -61,19 +59,11 @@ export function frameCapacity(shape: FrameShape): FrameCapacity {
   return { dataCells, bitsPerCell, streamBytes, blockBytes, blocks, payloadBytes: blocks * shape.packetBytes };
 }
 
-/** XORs a byte stream with a pseudo-random one, so long runs of one colour do not occur. */
-function whiten(stream: Uint8Array, session: number, seq: number): void {
-  const rng = createRng((session ^ Math.imul(seq + 1, 0x9e3779b1)) >>> 0);
-  for (let i = 0; i < stream.length; i += 4) {
-    const word = rng.nextUint32();
-    for (let k = 0; k < 4 && i + k < stream.length; k++) stream[i + k] ^= (word >>> (8 * k)) & 255;
-  }
-}
-
 /**
  * Encodes one frame. Each block is a Reed-Solomon codeword; bytes of different blocks alternate
  * across the grid, so a stripe lost to a screen refresh or a smudge costs every block a few bytes
- * rather than one block all of its bytes.
+ * rather than one block all of its bytes. The stream is whitened so long runs of one colour do not
+ * occur. The coding runs in the modem module.
  * @param profile - The profile, or any custom shape with a grid and an inner code.
  * @param payload - Up to `payloadBytes` bytes; the rest of the frame is zero padded.
  * @param session - Session id, 32 bits.
@@ -84,24 +74,7 @@ function whiten(stream: Uint8Array, session: number, seq: number): void {
 export function encodeModemFrame(profile: Pick<ModemProfile, 'id'> & FrameShape, payload: Uint8Array, session: number, seq: number, pitch: number): RgbaImage {
   const capacity = frameCapacity(profile);
   if (payload.length > capacity.payloadBytes) throw new Error(`A frame of this profile carries at most ${capacity.payloadBytes} bytes`);
-  const stream = new Uint8Array(capacity.streamBytes);
-  const message = new Uint8Array(capacity.payloadBytes);
-  message.set(payload);
-  for (let b = 0; b < capacity.blocks; b++) {
-    const word = rsEncode(message.subarray(b * profile.packetBytes, (b + 1) * profile.packetBytes), profile.parity);
-    for (let i = 0; i < capacity.blockBytes; i++) stream[i * capacity.blocks + b] = word[i];
-  }
-  whiten(stream, session, seq);
-  const symbols = new Uint8Array(capacity.dataCells);
-  for (let c = 0; c < capacity.dataCells; c++) {
-    let value = 0;
-    for (let k = 0; k < capacity.bitsPerCell; k++) {
-      const bit = c * capacity.bitsPerCell + k;
-      const byte = bit >> 3;
-      value = (value << 1) | (byte < stream.length ? (stream[byte] >> (7 - (bit & 7))) & 1 : 0);
-    }
-    symbols[c] = value;
-  }
+  const symbols = modemKernels().encodeFrame(capacity.bitsPerCell, profile, payload, session, seq);
   const header: FrameHeader = {
     version: MODEM_VERSION,
     profile: profile.id,
@@ -156,7 +129,8 @@ export type DecodedFrame =
 /**
  * Reads a captured frame: finds it, reads its header, classifies the cells against the live
  * calibration patches, and decodes every block. A frame whose header is damaged or whose blocks
- * fail gives no data for those blocks; the outer code asks for more.
+ * fail gives no data for those blocks; the outer code asks for more. Each block spends at most
+ * all its check bytes on erasures, the least sure bytes first; if that fails, half, then none.
  * @param image - The captured image.
  * @param options - Geometries to try and how to use confidence.
  * @returns The decoded blocks or why the frame was unreadable.
@@ -171,57 +145,29 @@ export function decodeModemFrame(image: RgbaImage, options: DecodeOptions = {}):
   } catch {
     return { ok: false, reason: 'invalid-header' };
   }
+  const kernels = modemKernels();
   const uniforms = kernelUniforms(acquired.frame);
-  const grid = options.sampleGrid?.(image, uniforms) ?? runReferenceKernel(image, uniforms);
-  const bits = capacity.bitsPerCell;
-  const stream = new Uint8Array(capacity.streamBytes);
-  const sure = new Uint8Array(capacity.streamBytes).fill(255);
-  for (let byte = 0; byte < stream.length; byte++) {
-    let value = 0;
-    for (let k = 0; k < 8; k++) {
-      const bit = byte * 8 + k;
-      const cell = Math.floor(bit / bits);
-      value = (value << 1) | ((grid.symbols[cell] >> (bits - 1 - (bit % bits))) & 1);
+  const cells = capacity.dataCells;
+  const external = options.sampleGrid?.(image, uniforms) ?? null;
+  if (external) {
+    const grid = kernels.grid(cells);
+    grid.fill(0);
+    grid.set(external.symbols.subarray(0, cells), 0);
+    grid.set(external.confidence.subarray(0, cells), cells);
+    grid.set(external.means.subarray(0, 3 * cells), 2 * cells);
+  } else {
+    if (options.sampleGrid) {
+      // The sampler may have used the module's image and uniforms for something else.
+      kernels.setImage(image);
+      kernels.setUniforms(uniforms.homography, uniforms.palette);
     }
-    stream[byte] = value;
-    const first = Math.floor((byte * 8) / bits);
-    const last = Math.floor((byte * 8 + 7) / bits);
-    for (let cell = first; cell <= last; cell++) sure[byte] = Math.min(sure[byte], grid.confidence[cell]);
+    kernels.sample(uniforms.cols, uniforms.dataRows, uniforms.rowOffset, uniforms.palette.length / 3);
   }
-  whiten(stream, header.session, header.seq);
   const soft = options.soft ?? true;
-  const threshold = options.threshold ?? DEFAULT_ERASURE_THRESHOLD;
+  const decoded = kernels.decode(capacity.bitsPerCell, header, header.session, header.seq, soft ? (options.threshold ?? DEFAULT_ERASURE_THRESHOLD) : null);
   const blocks: (Uint8Array | null)[] = [];
-  let erasureTotal = 0;
-  let corrected = 0;
   for (let b = 0; b < capacity.blocks; b++) {
-    const word = new Uint8Array(capacity.blockBytes);
-    const unsure: { at: number; confidence: number }[] = [];
-    for (let i = 0; i < capacity.blockBytes; i++) {
-      word[i] = stream[i * capacity.blocks + b];
-      const confidence = sure[i * capacity.blocks + b];
-      if (soft && confidence < threshold) unsure.push({ at: i, confidence });
-    }
-    // Spend at most all the check bytes on erasures, the least sure first; if that fails, half, then none.
-    unsure.sort((x, y) => x.confidence - y.confidence || x.at - y.at);
-    let result: RsResult = { ok: false };
-    let used = 0;
-    for (const limit of [header.parity, header.parity >> 1, 0]) {
-      const marked = unsure.slice(0, limit).map((u) => u.at);
-      result = rsDecode(word, header.parity, marked);
-      if (result.ok) {
-        used = marked.length;
-        break;
-      }
-      if (marked.length === 0) break;
-    }
-    if (result.ok) {
-      blocks.push(result.message);
-      erasureTotal += used;
-      corrected += result.corrected;
-    } else {
-      blocks.push(null);
-    }
+    blocks.push(decoded.ok[b] ? decoded.data.slice(b * header.packetBytes, (b + 1) * header.packetBytes) : null);
   }
-  return { ok: true, header, blocks, blocksOk: blocks.filter((x) => x !== null).length, erasures: erasureTotal, corrected };
+  return { ok: true, header, blocks, blocksOk: decoded.blocksOk, erasures: decoded.erasures, corrected: decoded.corrected };
 }

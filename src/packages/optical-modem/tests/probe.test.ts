@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   ProbeRun,
   constellationId,
@@ -11,6 +11,7 @@ import {
   type ChannelPreset,
   type ProbePattern,
   type RgbaImage,
+  loadOpticalModem,
 } from '../index';
 
 const meta = { device: 'synthetic', mode: 'propped' as const, direction: 'test' };
@@ -35,6 +36,8 @@ function blendData(a: RgbaImage, b: RgbaImage, p: ProbePattern): RgbaImage {
   for (let i = from; i < to; i++) data[i] = (a.data[i] + b.data[i]) / 2;
   return { width: a.width, height: a.height, data };
 }
+
+beforeAll(() => loadOpticalModem());
 
 describe('constellations', () => {
   it('spaces the OKLab designs further apart than the RGB corners', () => {

@@ -31,7 +31,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { qrEncoder as QRCode } from '../tests/fixtures/qrEncoder';
-import { composeBeacon, composeColourTile, fitCrossTalk, qrModuleCount, samplePatch, splitChannels } from '../src/packages/optical-transfer/index.ts';
+import { composeBeacon, composeColourTile, fitCrossTalk, loadCrossTalkKernels, qrModuleCount, samplePatch, splitChannels } from '../src/packages/optical-transfer/index.ts';
 import { CLEAN_CHANNEL, COLOUR_BLIND_CHANNEL, MILD_CHANNEL, REFERENCE_CHANNEL, capture, qrDecoders, runColourTransfer, type CameraChannel, type ColourRunMode, type ColourRunResult } from '../tests/utils/colourBench.ts';
 import { createRandom } from '../tests/utils/scannerCorpus.ts';
 
@@ -179,6 +179,7 @@ function splice(report: string, block: string): string {
 }
 
 async function main(): Promise<void> {
+  await loadCrossTalkKernels();
   const args = process.argv.slice(2);
   const bytes = args.includes('--quick') ? 300_000 : 1_000_000;
   const scenarios: Scenario[] = [

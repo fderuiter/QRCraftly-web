@@ -25,6 +25,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { test, expect } from './fixtures';
+import { runModemBattery, MODEM_BATTERY_SHA256 } from '../tests/foundry/modemBattery';
 import { decodePrismFecJob, makePrismFecJob, runPrismFecBattery, PRISM_FEC_BATTERY_SHA256 } from '../tests/foundry/prismFecBattery';
 import { runQrDecodeBattery, QR_DECODE_BATTERY_SHA256 } from '../tests/foundry/qrDecodeBattery';
 import { runQrEncodeBattery, QR_ENCODE_BATTERY_SHA256 } from '../tests/foundry/qrEncodeBattery';
@@ -35,6 +36,7 @@ const BATTERIES = [
   { module: 'qr-encode', battery: runQrEncodeBattery, sha256: QR_ENCODE_BATTERY_SHA256 },
   { module: 'qr-decode', battery: runQrDecodeBattery, sha256: QR_DECODE_BATTERY_SHA256 },
   { module: 'prism-fec', battery: runPrismFecBattery, sha256: PRISM_FEC_BATTERY_SHA256 },
+  { module: 'modem', battery: runModemBattery, sha256: MODEM_BATTERY_SHA256 },
 ];
 
 for (const { module: name, battery, sha256 } of BATTERIES) {

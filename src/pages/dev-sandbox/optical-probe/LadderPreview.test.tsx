@@ -7,6 +7,7 @@ vi.mock('@/packages/optical-modem', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/packages/optical-modem')>();
   return {
     ...original,
+    loadOpticalModem: vi.fn(() => Promise.resolve()),
     encodeModemFrame: vi.fn(() => ({ width: 1, height: 1, data: new Uint8ClampedArray(4) })),
     simulateCapture: vi.fn(() => ({ width: 1, height: 1, data: new Uint8ClampedArray(4) })),
     decodeModemFrame: vi.fn((_image: unknown, options?: { geometries?: { cols: number }[] }) => {

@@ -16,10 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { KERNEL_MAX_SYMBOLS, compareGrids, runReferenceKernel, type GridDifference, type KernelUniforms } from './kernel';
+import { KERNEL_MAX_SYMBOLS, compareGrids, runReferenceKernel, type GridDifference, type KernelUniforms, type SampledGrid } from './kernel';
 import type { RgbaImage } from './layout';
 import { createRng } from './prng';
-import type { SampledGrid } from './sample';
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './shader';
 
 /** Why the GPU kernel is not in use. The receiver shows this and stays on the QR profiles. */

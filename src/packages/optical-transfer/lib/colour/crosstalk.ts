@@ -27,10 +27,17 @@
  * closed form with no iteration: each matrix entry is the mean over the four swatches where the
  * emitting channel is on minus the mean over the four where it is off.
  *
- * Determinism: only `+ - * /` on integers and doubles, and one `Math.round`, so every JavaScript
+ * The fit, the inverse and the channel split run in the modem module (`crates/modem/src/crosstalk.rs`,
+ * #1198), which rejects a patch with a channel swing under 40 levels, a channel that follows another
+ * more than itself, channels too mixed to separate (determinant under a quarter of the diagonal's
+ * product) or a swatch the fit misses by more than 40 levels. Only `+ - * /` on doubles, so every
  * engine returns the same bits. Nothing here is gamma-aware; the model is fitted on the coded values
- * a camera frame holds, which is what the correction is applied to.
+ * a camera frame holds, which is what the correction is applied to. Call
+ * {@link loadCrossTalkKernels} once before using it.
  */
+import { fitCrossTalkKernel, rescaleCrossTalkKernel, splitCrossTalkKernel, type CrossTalkNumbers } from '@/packages/optical-modem/crosstalk';
+
+export { loadCrossTalkKernels } from '@/packages/optical-modem/crosstalk';
 
 /** Three channel values, red first. */
 export type Rgb = readonly [number, number, number];
@@ -50,16 +57,10 @@ export const CALIBRATION_SWATCHES: readonly Rgb[] = [
   [1, 1, 1],
 ];
 
-/** Smallest swing, in levels of 255, a channel must show between its own off and on. Below it the channel cannot be read. */
-export const MIN_CHANNEL_SWING = 40;
-/** Largest residual, in levels, between the fitted model and any swatch. Past it the patch was not read cleanly. */
-export const MAX_FIT_RESIDUAL = 40;
 /** A channel's white level that moves by more than this many levels counts as white balance drift. */
 export const WHITE_DRIFT_LEVELS = 10;
 /** A quiet-zone white further than this share from the model's is taken for a bad sample (a box on the wrong thing), not for drift. */
 const MAX_WHITE_RESCALE = 0.3;
-/** Smallest ratio of the determinant to the product of the diagonal. Below it the channels are too mixed to separate. */
-const MIN_CONDITION = 0.25;
 
 /** The fitted camera response and its inverse. */
 export interface CrossTalkModel {
@@ -75,30 +76,23 @@ export interface CrossTalkModel {
   residual: number;
 }
 
-const times = (m: Matrix3, e: Rgb): Rgb => [
-  m[0][0] * e[0] + m[0][1] * e[1] + m[0][2] * e[2],
-  m[1][0] * e[0] + m[1][1] * e[1] + m[1][2] * e[2],
-  m[2][0] * e[0] + m[2][1] * e[1] + m[2][2] * e[2],
+const matrixOf = (m: readonly number[]): Matrix3 => [
+  [m[0], m[1], m[2]],
+  [m[3], m[4], m[5]],
+  [m[6], m[7], m[8]],
 ];
 
-/**
- * Inverts a 3x3 matrix through its cofactors.
- * @param m - The matrix.
- * @returns The inverse, or null when it is singular or the channels are too mixed to separate.
- */
-function invertMatrix3(m: Matrix3): Matrix3 | null {
-  const [[a, b, c], [d, e, f], [g, h, i]] = m;
-  const c00 = e * i - f * h;
-  const c01 = f * g - d * i;
-  const c02 = d * h - e * g;
-  const det = a * c00 + b * c01 + c * c02;
-  const diagonal = a * e * i;
-  if (!(Math.abs(det) > 0) || !(Math.abs(det) >= MIN_CONDITION * Math.abs(diagonal))) return null;
-  return [
-    [c00 / det, (c * h - b * i) / det, (b * f - c * e) / det],
-    [c01 / det, (a * i - c * g) / det, (c * d - a * f) / det],
-    [c02 / det, (b * g - a * h) / det, (a * e - b * d) / det],
-  ];
+const flat = (m: Matrix3): number[] => [...m[0], ...m[1], ...m[2]];
+
+function modelOf(numbers: CrossTalkNumbers): CrossTalkModel {
+  const { offset, white } = numbers;
+  return {
+    matrix: matrixOf(numbers.matrix),
+    offset: [offset[0], offset[1], offset[2]],
+    inverse: matrixOf(numbers.inverse),
+    white: [white[0], white[1], white[2]],
+    residual: numbers.residual,
+  };
 }
 
 /**
@@ -106,52 +100,12 @@ function invertMatrix3(m: Matrix3): Matrix3 | null {
  * @param observed - What the camera reported for each of {@link CALIBRATION_SWATCHES}, in order, in levels.
  * @returns The model, or null when the patch cannot be trusted: a channel with too little swing, a
  * channel that follows another more than itself, channels too mixed to separate, or a swatch the fit
- * misses by more than {@link MAX_FIT_RESIDUAL}.
+ * misses by too much.
  */
 export function fitCrossTalk(observed: readonly Rgb[]): CrossTalkModel | null {
   if (observed.length !== CALIBRATION_SWATCHES.length) return null;
-  const rows: number[][] = [[], [], []];
-  const offset: number[] = [];
-  for (let i = 0; i < 3; i++) {
-    let total = 0;
-    for (const swatch of observed) total += swatch[i];
-    for (let j = 0; j < 3; j++) {
-      let on = 0;
-      let off = 0;
-      CALIBRATION_SWATCHES.forEach((emitted, s) => {
-        if (emitted[j] === 1) on += observed[s][i];
-        else off += observed[s][i];
-      });
-      rows[i].push((on - off) / 4);
-    }
-    offset.push(total / 8 - (rows[i][0] + rows[i][1] + rows[i][2]) / 2);
-  }
-  const matrix: Matrix3 = [
-    [rows[0][0], rows[0][1], rows[0][2]],
-    [rows[1][0], rows[1][1], rows[1][2]],
-    [rows[2][0], rows[2][1], rows[2][2]],
-  ];
-  for (let i = 0; i < 3; i++) {
-    if (!(matrix[i][i] >= MIN_CHANNEL_SWING)) return null;
-    for (let j = 0; j < 3; j++) if (j !== i && Math.abs(matrix[i][j]) > matrix[i][i]) return null;
-  }
-  const inverse = invertMatrix3(matrix);
-  if (!inverse) return null;
-  const offsetRgb: Rgb = [offset[0], offset[1], offset[2]];
-  let residual = 0;
-  CALIBRATION_SWATCHES.forEach((emitted, s) => {
-    const predicted = times(matrix, emitted);
-    for (let i = 0; i < 3; i++) residual = Math.max(residual, Math.abs(observed[s][i] - (predicted[i] + offset[i])));
-  });
-  if (residual > MAX_FIT_RESIDUAL) return null;
-  const sum = times(matrix, [1, 1, 1]);
-  return {
-    matrix,
-    offset: offsetRgb,
-    inverse,
-    white: [sum[0] + offset[0], sum[1] + offset[1], sum[2] + offset[2]],
-    residual: Math.round(residual),
-  };
+  const fit = fitCrossTalkKernel(observed.flatMap((swatch) => [swatch[0], swatch[1], swatch[2]]));
+  return fit ? modelOf(fit) : null;
 }
 
 /**
@@ -162,29 +116,6 @@ export function fitCrossTalk(observed: readonly Rgb[]): CrossTalkModel | null {
  */
 function whiteShift(a: Rgb, b: Rgb): number {
   return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
-}
-
-/**
- * Follows a white balance change without a new patch: every camera channel is scaled so that white
- * lands where it was seen, matrix and black level together.
- * @param model - The model to adjust.
- * @param white - The white the camera reports now, in levels.
- * @returns The adjusted model, or the same model when the new white is unusable.
- */
-function rescaleToWhite(model: CrossTalkModel, white: Rgb): CrossTalkModel {
-  const gain = [white[0] / model.white[0], white[1] / model.white[1], white[2] / model.white[2]];
-  if (!gain.every((g) => g > 0 && Number.isFinite(g))) return model;
-  const scaleRow = (row: Rgb, g: number): Rgb => [row[0] * g, row[1] * g, row[2] * g];
-  const matrix: Matrix3 = [scaleRow(model.matrix[0], gain[0]), scaleRow(model.matrix[1], gain[1]), scaleRow(model.matrix[2], gain[2])];
-  const inverse = invertMatrix3(matrix);
-  if (!inverse) return model;
-  return {
-    ...model,
-    matrix,
-    inverse,
-    offset: [model.offset[0] * gain[0], model.offset[1] * gain[1], model.offset[2] * gain[2]],
-    white: [white[0], white[1], white[2]],
-  };
 }
 
 /** An RGBA picture, as a canvas `ImageData` holds one. */
@@ -209,11 +140,7 @@ interface Region {
   height: number;
 }
 
-const IDENTITY: Matrix3 = [
-  [1, 0, 0],
-  [0, 1, 0],
-  [0, 0, 1],
-];
+const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
 /**
  * Splits a picture into its red, green and blue channels, undoing the cross-talk first. Each plane is
@@ -226,25 +153,18 @@ const IDENTITY: Matrix3 = [
  */
 export function splitChannels(image: RgbaImage, region: Region | null, model: CrossTalkModel | null): [GreyPlane, GreyPlane, GreyPlane] {
   const box = region ?? { x: 0, y: 0, width: image.width, height: image.height };
-  const plane = (): GreyPlane => ({ data: new Uint8ClampedArray(box.width * box.height), width: box.width, height: box.height });
-  const planes: [GreyPlane, GreyPlane, GreyPlane] = [plane(), plane(), plane()];
-  const inv = model?.inverse ?? IDENTITY;
-  const off = model?.offset ?? [0, 0, 0];
-  // The model gives the emitted channel as 0 (off) to 1 (on); the planes are bytes.
-  const scale = model ? 255 : 1;
-  for (let row = 0; row < box.height; row++) {
-    let source = ((box.y + row) * image.width + box.x) * 4;
-    let target = row * box.width;
-    for (let column = 0; column < box.width; column++, source += 4, target++) {
-      const r = image.data[source] - off[0];
-      const g = image.data[source + 1] - off[1];
-      const b = image.data[source + 2] - off[2];
-      planes[0].data[target] = (inv[0][0] * r + inv[0][1] * g + inv[0][2] * b) * scale;
-      planes[1].data[target] = (inv[1][0] * r + inv[1][1] * g + inv[1][2] * b) * scale;
-      planes[2].data[target] = (inv[2][0] * r + inv[2][1] * g + inv[2][2] * b) * scale;
+  const count = box.width * box.height;
+  const fill = (input: Uint8Array): void => {
+    const pixels = new Uint8Array(image.data.buffer, image.data.byteOffset, image.data.length);
+    for (let row = 0; row < box.height; row++) {
+      const source = ((box.y + row) * image.width + box.x) * 4;
+      input.set(pixels.subarray(source, source + box.width * 4), row * box.width * 4);
     }
-  }
-  return planes;
+  };
+  // The model gives the emitted channel as 0 (off) to 1 (on); the planes are bytes.
+  const planes = splitCrossTalkKernel(count, fill, model ? flat(model.inverse) : IDENTITY, model?.offset ?? [0, 0, 0], model ? 255 : 1);
+  const plane = (c: number): GreyPlane => ({ data: new Uint8ClampedArray(planes.subarray(c * count, (c + 1) * count)), width: box.width, height: box.height });
+  return [plane(0), plane(1), plane(2)];
 }
 
 /** What a calibration update did. */
@@ -310,7 +230,9 @@ export class ColourCalibrator {
   }
 
   /**
-   * Checks the white of a tile's quiet zone (all three channels on) against the model.
+   * Checks the white of a tile's quiet zone (all three channels on) against the model. When it has
+   * moved, every camera channel is scaled so that white lands where it was seen, matrix and black
+   * level together.
    * @param white - The mean colour of the quiet zone, in levels.
    * @returns True when the model was rescaled to follow it.
    */
@@ -318,9 +240,9 @@ export class ColourCalibrator {
     const model = this.current;
     if (!model || whiteShift(model.white, white) <= WHITE_DRIFT_LEVELS) return false;
     if (white.some((level, i) => Math.abs(level - model.white[i]) > MAX_WHITE_RESCALE * model.white[i])) return false;
-    const next = rescaleToWhite(model, white);
-    if (next === model) return false;
-    this.current = next;
+    const next = rescaleCrossTalkKernel({ matrix: flat(model.matrix), offset: [...model.offset], inverse: flat(model.inverse), white: [...model.white], residual: model.residual }, white);
+    if (!next) return false;
+    this.current = modelOf(next);
     this.rescaleCount += 1;
     return true;
   }

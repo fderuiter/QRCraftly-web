@@ -11,6 +11,7 @@ import {
   decodeModemFrame,
   encodeModemFrame,
   frameCapacity,
+  loadOpticalModem,
   ladderSchedule,
   observeDecode,
   simulateCapture,
@@ -102,7 +103,15 @@ export default function LadderPreview() {
       if (seen) outcomes.set(job.id, [...(outcomes.get(job.id) ?? []), seen]);
       timer = window.setTimeout(next, 0);
     };
-    timer = window.setTimeout(next, 0);
+    // The encoder, simulator and decoder run in the modem module, which loads once per page.
+    loadOpticalModem().then(
+      () => {
+        if (!cancelled) timer = window.setTimeout(next, 0);
+      },
+      () => {
+        if (!cancelled) setPhase("idle");
+      }
+    );
   }, [receiverName]);
 
   return (

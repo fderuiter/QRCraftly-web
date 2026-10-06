@@ -8,6 +8,7 @@ import {
   drawProbeFrame,
   formatProbeReport,
   grantedSettings,
+  loadOpticalModem,
   probeSequence,
   watchFrames,
   type FrameTick,
@@ -81,12 +82,22 @@ function SenderScreen({ onStop, flicker }: SenderProps & { flicker: boolean }) {
       if (counter % 20 === 1) setLabel(`${index + 1} of ${patterns.length}: ${patterns[index].label}`);
       frame = requestAnimationFrame(tick);
     };
-    frame = requestAnimationFrame(tick);
+    let cancelled = false;
+    // The frames are drawn with the modem module's constellations and header code.
+    loadOpticalModem().then(
+      () => {
+        if (!cancelled) frame = requestAnimationFrame(tick);
+      },
+      () => {
+        if (!cancelled) onStop();
+      }
+    );
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') onStop();
     };
     window.addEventListener('keydown', onKey);
     return () => {
+      cancelled = true;
       cancelAnimationFrame(frame);
       window.removeEventListener('keydown', onKey);
     };
@@ -172,6 +183,8 @@ function Receiver({ meta }: ReceiverProps) {
     setReport('');
     setMessage('');
     try {
+      // The analysis runs in the modem module.
+      await loadOpticalModem();
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: { facingMode: 'environment', width: { ideal: want4k ? 3840 : 1920 }, height: { ideal: want4k ? 2160 : 1080 }, frameRate: { ideal: 60 } },
