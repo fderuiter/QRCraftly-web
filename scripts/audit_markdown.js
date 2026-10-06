@@ -44,7 +44,7 @@ export const docsPublicDir = path.join(repoRoot, 'docs', 'public');
  * Directories whose Markdown files are audited in full (non-recursive).
  * Paths are repository-relative POSIX paths.
  */
-export const AUDITED_DOC_DIRS = ['docs', 'docs/public', 'docs/adr', 'docs/agents'];
+export const AUDITED_DOC_DIRS = ['docs', 'docs/public', 'docs/adr', 'docs/agents', 'docs/optical-transfer'];
 
 /**
  * Individual Markdown files audited outside the directories above.

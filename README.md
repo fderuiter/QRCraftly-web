@@ -1,10 +1,26 @@
 # QRCraftly
 
-[![CI/CD Pipeline](https://github.com/fderuiter/QRCraftly/actions/workflows/main.yml/badge.svg)](https://github.com/fderuiter/QRCraftly/actions/workflows/main.yml)
+[![CI/CD Pipeline](https://github.com/fderuiter/QRCraftly-web/actions/workflows/main.yml/badge.svg)](https://github.com/fderuiter/QRCraftly-web/actions/workflows/main.yml)
+[![Latest release](https://img.shields.io/github/v/release/fderuiter/QRCraftly-web)](https://github.com/fderuiter/QRCraftly-web/releases)
+[![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)](LICENSE.md)
 
-**[Visit the production site: https://qrcraftly.com](https://qrcraftly.com)**
+**[qrcraftly.com](https://qrcraftly.com)** is a free QR code studio that runs entirely in your browser. It makes styled, scannable QR codes for links, Wi-Fi, contacts, payments and more; scans and checks existing codes; and sends files between devices as an animated stream of QR codes, with no network. Nothing you type or upload leaves your device.
 
-[QRCraftly](https://qrcraftly.com) is a powerful, privacy-focused, and user-friendly React application for generating customized QR codes. It supports various data types including URLs, text, WiFi credentials, vCards, emails, and crypto payments. Users can extensively customize the appearance of their QR codes, including colors, patterns, and embedded logos, all while ensuring data privacy through client-side processing.
+## Contents
+
+- [The QRCraftly Pledge](#the-qrcraftly-pledge)
+- [Features](#features)
+- [Privacy and security model](#privacy-and-security-model)
+- [Quick start](#quick-start)
+- [Everyday commands](#everyday-commands)
+- [Architecture](#architecture)
+- [Project structure](#project-structure)
+- [Quality gates](#quality-gates)
+- [Contributing](#contributing)
+- [Releases and deployment](#releases-and-deployment)
+- [Documentation map](#documentation-map)
+- [Security](#security)
+- [License](#license)
 
 ## The QRCraftly Pledge
 
@@ -14,239 +30,230 @@ Read the full pledge, and exactly what is and isn't collected, in [docs/PLEDGE.m
 
 ## Features
 
-- **Multiple Data Types**: Generate QR codes for URLs, plain text, WiFi networks (WPA/WEP/EAP/Open), Email, vCard contacts, Phone numbers, SMS, Cryptocurrency payments, Calendar Events, GPS Location Coordinates, Video Meetings (Zoom, Microsoft Teams, Google Meet), and Social Profiles (Instagram, X / Twitter, TikTok).
-- **Visual Customization**:
-  - **Patterns**: Choose from Standard Industrial, Modern Soft, Swiss Dot, Fluid Ink, Cyber Circuit, The Hive, Grunge, and Starburst styles.
-  - **Colors**: Customize foreground, background, and finder pattern colors. Includes accessibility-checked preset themes.
-  - **Logos**: Upload and embed custom logos with configurable padding, sizes, and border styles (Square, Circle, None). Maximum logo size is 30% to maintain scannability.
-  - **Mosaic QR**: Upload a design and tile it across the whole code. Each module takes the image colour under it while keeping its dark or light value, so the code still scans (Halftone or Tiles layout, adjustable Scan Contrast; see [ADR 0019](docs/adr/0019-mosaic-qr-module-level-image-tiling.md)).
-  - **Upload Limits**: Supported custom logo formats are image/jpeg, image/png, image/webp, image/svg+xml. Maximum file size is 2MB.
-- **Privacy First**: Client-side architecture. All sensitive data processing happens locally in your browser with volatile in-memory guarantees; no user payloads are sent to any server, and there is no analytics or diagnostics reporting.
-- **Static Codes Only**: Every code holds its content directly, so it keeps working without QRCraftly and nobody can track or switch it off. There are no dynamic (redirect) codes and no server; production serves static assets only. See [ADR 0022](docs/adr/0022-no-dynamic-qr-codes-client-side-only.md).
-- **Scan to Fill**: Scan an existing QR code with the webcam or from an image file to load its content into the matching input form. Decoding runs in the browser.
-- **Air-Gapped File Transfer (Beta)**: Send a file from one device to another as an animated stream of QR codes (`/file-transfer`) and receive it with a camera (`/file-transfer/receive`). No network, Bluetooth or USB is involved. The sender picks Steady, Balanced or Fast (raw frame rate and density sit under Advanced) and sees the time for the file before starting; the receiver watches the file assemble as a field of dots and finishes with a verified summary, a thumbnail for images and Open, Save and Receive-another actions. A haptic buzz and an optional chime (off by default) mark the finish; the buzz is skipped under reduced motion.
-- **QR Arcade**: Stress-test a QR design by damaging it and watching whether a real scanner still decodes it (`/arcade`).
-- **Advanced Architecture**:
-  - **Scannability Web Workers**: Real-time QR code scannability, module-aligned relative luminance audits, and orientation decoding run off-thread, passing pixel data as transferable `ArrayBuffer`s (zero-copy) so the UI stays responsive. The camera scanner recycles its frame buffers through a `DoubleBufferPool`.
-  - **Client-Side SVG Export**: Features a custom `SvgContext` that mimics the Canvas 2D API to generate high-quality, resolution-independent vector graphics directly in the browser.
-- **Live Preview**: See your changes instantly as you edit.
-  - **In the wild**: Switch the preview to a poster, business card, table tent, phone screen or sticker, all drawn in code (no photos or outside files). Set the printed width to see the module size, the estimated scan distance and a warning when it is too small, run a viewing test (distance, glare, dim light, tilt) through the scannability evaluator, and download the scene as a PNG made on your device. The scenes load only when you pick one.
-- **Power Features**:
-  - **Style Gallery**: Every pattern and colour preset drawn on your own QR code; hover to preview, click to apply, or press "Surprise me" for a look that is expected to scan.
-  - **Undo and redo**: Up to 50 appearance steps per generator, kept in memory only (never stored).
-  - **Command palette and shortcuts**: `Ctrl/Cmd+K` opens a searchable list of 30+ actions; `Ctrl/Cmd+Z`, `Ctrl/Cmd+S`, `Ctrl/Cmd+C` (on the preview) and `?` do the obvious things.
-  - **Style files**: Save the look to a `.qrcraftly.json` file and load it again (or drop it on the page). A style file holds colours and layout only: never your content or images.
-- **Download & Share**:
-  - Save as high-quality PNG, JPEG, WebP, or vector SVG.
-  - Native "Save As" support via File System Access API.
-  - Web Share API integration for mobile sharing.
-- **Accessibility**:
-  - WCAG contrast checks for generated codes.
-  - Fully accessible UI with keyboard navigation and screen reader support.
-- **Compliance**:
-  - Privacy-first architecture aligned with [HIPAA Technical Safeguards](docs/public/COMPLIANCE.md).
-- **Dark Mode**: Fully supported dark mode interface.
-- **Responsive Design**: Works seamlessly on desktop and mobile devices.
+### Generator
 
-## Getting Started
+- **Content types:** URLs, plain text, Wi-Fi networks (WPA, WEP, EAP or open), email, vCard contacts, phone numbers, SMS, cryptocurrency payments, calendar events, GPS locations, video meetings (Zoom, Microsoft Teams, Google Meet) and social profiles (Instagram, X, TikTok). Each type has its own page, such as `/wifi-qr-code`.
+- **Bulk CSV:** turn a spreadsheet of up to 500 rows into a ZIP of codes (`/bulk-csv-qr-code`). Every row goes through the same payload checks as a single code.
+- **Patterns:** Standard Industrial, Modern Soft, Swiss Dot, Fluid Ink, Cyber Circuit, The Hive, Grunge and Starburst.
+- **Colours:** foreground, background and finder-pattern colours, with contrast-checked presets and a "Low Contrast" warning.
+- **Logos:** embed a logo with padding and a square, circle or no border. Supported custom logo formats are image/jpeg, image/png, image/webp, image/svg+xml. Maximum file size is 2MB. Maximum logo size is 30% of the code, so it still scans.
+- **Mosaic QR:** tile a picture across the whole code. Each module takes the image's colour while keeping its dark or light value, so the code still scans (Halftone or Tiles, with adjustable Scan Contrast; [ADR 0019](docs/adr/0019-mosaic-qr-module-level-image-tiling.md)).
+- **Live scannability:** a worker re-checks contrast and decodes the code as you edit, and warns before you export a code that may not scan.
+- **In the wild:** preview the code on a poster, business card, table tent, phone screen or sticker, all drawn in code. Set a printed width to see module size and estimated scan distance, and run a viewing test (distance, glare, dim light, tilt).
+- **Style tools:** a gallery of every pattern and preset drawn on your own code, "Surprise me", up to 50 steps of undo and redo in memory, and a command palette (`Ctrl/Cmd+K`) with keyboard shortcuts (`?` lists them).
+- **Style files and templates:** save a look as a `.qrcraftly.json` file, or as a brand template in the browser. Both hold colours and layout only, never your content or images.
+- **Export:** PNG, JPEG, WebP or vector SVG, with native "Save As" where the browser supports it and the Web Share API on mobile.
+- **Use-case pages:** presets for jobs such as a menu, a Google review link, WhatsApp, Instagram, a PDF link or a code with a logo, plus printing and safety guides under `/guides`.
 
-Follow these instructions to get a copy of the project up and running on your local machine for development and testing purposes.
+### Scanner and checker
+
+- **Scan to fill:** scan a code with the camera or from an image file and load it into the matching form.
+- **Scanner** (`/qr-code-scanner`) and **checker** (`/qr-code-checker`): decode a code on your device and explain what it does before you act on it. Links show their real host and are checked offline for disguises such as look-alike domains; dialer codes, texts to short numbers, Wi-Fi without a password and wallet checksums are called out. Only `http` and `https` links can be opened from the result. See [ABUSE_PROTECTIONS.md](docs/ABUSE_PROTECTIONS.md).
+- The decoder is our own Rust module, `crates/qr-decode`, compiled to WebAssembly and run in a worker ([ADR 0036](docs/adr/0036-in-house-qr-decoder-replaces-zxing-wasm.md)).
+
+### Air-Gapped File Transfer (beta)
+
+- Send a file or folder from one device's screen (`/file-transfer`) to another device's camera (`/file-transfer/receive`) as an animated stream of QR codes. No network, Bluetooth or USB is involved.
+- The sender picks Steady, Balanced or Fast and sees the time for the file before it starts. The receiver can join at any point, watches the file assemble, and finishes with a verified summary and Open, Save and Receive-another actions.
+- Private transfers encrypt the file with AES-256-GCM. The key never appears in the stream: it is shown as eight words or a separate key QR ([ADR 0025](docs/adr/0025-private-transfers-and-bundles.md)). Received file names are sanitised, risky types need confirmation, and receives are capped at 100 MiB.
+- Several faster modes are previews behind switches under Advanced: a new outer code, several codes per frame, and a webcam back channel that lets the receiver steer the speed. A wallet-compatible BC-UR mode is also available. Speeds come from simulation only until the [device checklist](docs/TRANSFER_DEVICE_CHECKLIST.md) has real results.
+- The design, its status and its evidence rules are in [docs/optical-transfer](docs/optical-transfer/README.md).
+
+### QR Arcade
+
+Damage a QR design and watch whether a real decoder still reads it (`/arcade`). It shows how error correction works.
+
+### Everywhere
+
+- **Works offline after one visit:** a service worker caches the homepage shell on the first visit and other pages as you open them.
+- **Accessible:** keyboard navigation, screen-reader labels, visible focus and WCAG contrast checks, tested with axe in unit and end-to-end tests.
+- **Light and dark themes**, a layout that works from phones to desktops, and reduced-motion support.
+
+## Privacy and security model
+
+| Promise                       | How it is kept                                                                                                                                                                                                                                        |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Your content stays on device  | Generation, scanning, export and file transfer run in the browser. Content is never sent over the network or put in a URL query string. There is no server code, API or database ([ADR 0022](docs/adr/0022-no-dynamic-qr-codes-client-side-only.md)). |
+| Static codes only             | Every code holds its content directly, so it keeps working without QRCraftly and nobody can track or switch it off. There are no redirect ("dynamic") codes.                                                                                          |
+| Nothing is stored by surprise | Persistent browser storage is limited to an allowlist (theme preference and saved style templates), enforced by an AST audit before every build ([ADR 0001](docs/adr/0001-client-side-storage-allowlist.md)).                                         |
+| No tracking                   | No ads, analytics, telemetry or third-party scripts ([PLEDGE.md](docs/PLEDGE.md)). The host still sees ordinary request logs; the [privacy page](https://qrcraftly.com/privacy) says exactly what.                                                    |
+| Hardened pages                | A strict Content Security Policy with hashed inline scripts, a Permissions Policy, SVG and link sanitisation ([SECURITY.md](docs/SECURITY.md)).                                                                                                       |
+
+For regulated settings, [COMPLIANCE.md](docs/public/COMPLIANCE.md) describes the volatile-memory guarantees and what the host can see.
+
+## Quick start
 
 ### Prerequisites
 
-Ensure you have the following installed on your machine:
+- [Node.js](https://nodejs.org/) `^22.22.2` or `>=24.15.0`. `.nvmrc` pins the version CI uses.
+- [pnpm](https://pnpm.io/), at the version pinned in `package.json` (`packageManager`). Run `corepack enable` once to get it. Never use `npm` or `yarn`.
+- Rust only if you change something in `crates/`. The built WebAssembly modules are committed in `src/wasm/`, so building and testing need no Rust ([docs/RUST.md](docs/RUST.md)).
 
-- [Node.js](https://nodejs.org/) 22.22.2 or a later 22.x release, or 24.15.0 or later (the lockfile's dependencies require it; `.nvmrc` pins the version CI uses)
-- [pnpm](https://pnpm.io/) (strictly mandated, do not use `npm` or `yarn`). The exact version is pinned in `package.json` under `packageManager`; running `corepack enable` once makes the pinned version available automatically.
-
-### Installation
-
-1.  **Clone the repository:**
-
-    ```bash
-    git clone https://github.com/fderuiter/QRCraftly.git
-    cd QRCraftly
-    ```
-
-2.  **Install dependencies:**
-    ```bash
-    pnpm install
-    ```
-
-### Running the Application
-
-To start the development server:
+### Install and run
 
 ```bash
+git clone https://github.com/fderuiter/QRCraftly-web.git
+cd QRCraftly-web
+pnpm install
 pnpm dev
 ```
 
-The application will typically start at `http://localhost:3000` (or another available port shown in the terminal).
+The dev server runs at `http://localhost:3000`. `pnpm install` also installs the Husky Git hooks. `pnpm run wizard:dev` walks through the local setup interactively.
 
-### Building for Production
-
-To create a production-ready build (Static Site Generation via Vike):
+### Build and preview
 
 ```bash
-pnpm build
+pnpm build     # pre-renders every page to static HTML in dist/, then runs the post-build security scripts
+pnpm preview   # serves dist/ at http://localhost:3000
 ```
 
-The build artifacts will be stored in the `dist/` directory.
+## Everyday commands
 
-To preview the production build locally:
+| Command                      | What it does                                                                                                    |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                   | Starts the Vite dev server.                                                                                     |
+| `pnpm exec vitest run`       | Runs the unit tests once (`pnpm test` watches). Add `--coverage` for a coverage report.                         |
+| `pnpm test:e2e`              | Runs the Playwright end-to-end tests. Run `pnpm exec playwright install` once on a fresh machine.               |
+| `pnpm run lint`              | Runs every static check that CI runs (see [Quality gates](#quality-gates)).                                     |
+| `pnpm run format`            | Formats the repository with Prettier. `pnpm run format:classes` sorts Tailwind classes.                         |
+| `pnpm build`                 | Builds the site, including the sitemap, social images, service worker and CSP hashes.                           |
+| `pnpm run check-bundle-size` | Checks the built site against the size budgets. Run it after `pnpm build`.                                      |
+| `pnpm run docs:sync`         | Regenerates the UI catalog entries and the docs manifest after UI or public-doc changes.                        |
+| `pnpm run docs:lint`         | Checks Markdown links, anchors, ADR numbering, the UI catalog and the docs manifest.                            |
+| `pnpm run wasm:build`        | Rebuilds the Rust modules into `src/wasm/` (needs Rust). `wasm:check` verifies the committed builds.            |
+| `pnpm run licenses:sync`     | Updates the list of packages shipped to the browser, shown on `/acknowledgements`.                              |
+| `pnpm run bench:*`           | Benchmarks: `scanner`, `wasm`, `qr-encode`, `transfer`, `outer-code`, `colour`, `optical`, `feedback` and more. |
+| `pnpm run release:dry-run`   | Previews the next version and changelog from the Conventional Commits on `main`.                                |
 
-```bash
-pnpm preview
+## Architecture
+
+### Stack
+
+| Layer       | Choice                                                                                                                                                                                                                            |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UI          | React 19 and TypeScript (strict)                                                                                                                                                                                                  |
+| Routing     | Vike, with every page pre-rendered to static HTML at build time; page scripts start after first paint ([ADR 0034](docs/adr/0034-page-content-at-prerender.md), [ADR 0035](docs/adr/0035-page-scripts-start-after-first-paint.md)) |
+| Build       | Vite 6                                                                                                                                                                                                                            |
+| Styling     | Tailwind CSS v4, CSS-first: tokens and the dark variant live in `src/layouts/index.css` (`@theme`, `@variant`); there is no `tailwind.config.js` ([STYLE_GUIDE.md](docs/public/STYLE_GUIDE.md))                                   |
+| Compute     | Our own Rust compiled to WebAssembly, with no third-party crates ([ADR 0033](docs/adr/0033-rust-webassembly-modules.md), [RUST.md](docs/RUST.md))                                                                                 |
+| Concurrency | Web Workers for scannability, matrix and maze building, scanning and decoding, passing pixels as transferable `ArrayBuffer`s ([SCALING.md](docs/public/SCALING.md))                                                               |
+| Hosting     | Cloudflare Workers with Static Assets only, no server code ([ADR 0012](docs/adr/0012-cloudflare-workers-static-assets-and-multi-environment.md))                                                                                  |
+| Tests       | Vitest with jsdom and vitest-axe; Playwright with axe for end-to-end tests                                                                                                                                                        |
+
+Runtime dependencies are only React, React DOM, Vike, vike-react and lucide-react. Our own code comes first: a new runtime dependency needs its own ADR ([ADR 0040](docs/adr/0040-in-house-first.md)).
+
+### Deep modules
+
+Core features live in deep modules under `src/packages/`. App code imports a package only through its root entry points, and dependency-cruiser enforces the boundaries ([ADR 0007](docs/adr/0007-deep-modules-dependency-cruiser.md), [src/packages/README.md](src/packages/README.md)).
+
+| Package            | Responsibility                                                                                              |
+| ------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `qr-matrix`        | Turns a configuration into a module matrix and draws it: patterns, eyes, logos, mosaic and mazes            |
+| `qr-payload`       | Builds, parses and validates the payload for every content type                                             |
+| `qr-export`        | Templates and self-contained, sanitised SVG export                                                          |
+| `qr-decode`        | Our QR decoder (`crates/qr-decode`)                                                                         |
+| `scannability`     | Off-thread contrast audits, decoding checks and the scannability verdict                                    |
+| `optical-scanner`  | The Camera Session and off-thread decoding for live cameras and image files                                 |
+| `optical-transfer` | Air-Gapped Optical Transfer: Prism frames, fountain and outer codes, sender, receiver, multi-code, feedback |
+| `optical-modem`    | Experimental colour modem, off unless the build sets `VITE_OPTICAL_MODEM=true`                              |
+| `link-safety`      | Offline checks for disguised links                                                                          |
+| `bulk-csv`         | The Bulk CSV generator's parsing and batching                                                               |
+| `arcade`           | Game logic and damage analytics for the QR Arcade                                                           |
+| `wasm-runtime`     | Loads and instantiates our WebAssembly modules                                                              |
+
+### Rust crates
+
+| Crate       | Module in `src/wasm/` | What it does                                                      |
+| ----------- | --------------------- | ----------------------------------------------------------------- |
+| `qr-encode` | `qr-encode.wasm`      | QR encoder                                                        |
+| `qr-decode` | `qr-decode.wasm`      | QR decoder, including the tracked fast path for file transfer     |
+| `prism-fec` | `prism-fec.wasm`      | The file-transfer outer code (LT over an LDPC precode)            |
+| `modem`     | `modem.wasm`          | Experimental optical modem kernels                                |
+| `core`      | (shared)              | GF(256), Reed-Solomon, CRC-32, QR tables and the module allocator |
+| `selftest`  | `selftest.wasm`       | A tiny module that proves the toolchain, build and loader work    |
+
+## Project structure
+
+```text
+.
+├── AGENTS.md            Invariants for contributors and AI agents
+├── CONTEXT.md           Domain glossary (use these terms)
+├── RELEASING.md         Release, deployment and rollback runbook
+├── crates/              Rust sources for the WebAssembly modules
+├── docs/                Design docs, ADRs, benchmarks and public guides (see the map below)
+├── e2e/                 Playwright end-to-end tests
+├── public/              Static assets, _headers, _redirects and the web app manifest
+├── scripts/             Build, audit, benchmark and release scripts
+├── src/
+│   ├── components/      React components; ui/ holds the shared primitives (see UI_CATALOG.md)
+│   ├── data/            Page copy, navigation, landing pages and the docs manifest
+│   ├── hooks/           React hooks (download, upload, scannability, focus)
+│   ├── layouts/         Layout, document head and index.css (theme tokens)
+│   ├── packages/        Deep modules (see above)
+│   ├── pages/           Vike routes: one folder per page
+│   ├── utils/           App utilities (colour math, file names, storage of templates)
+│   └── wasm/            Committed, reproducible WebAssembly builds
+└── tests/               Vitest tests for scripts, tooling and cross-cutting behaviour
 ```
 
-### Running Tests
+## Quality gates
 
-To run the unit test suite (Vitest, watch mode by default; use `pnpm exec vitest run` for a single pass):
+`pnpm run lint` runs the same static checks as CI:
 
-```bash
-pnpm test
-```
+- **Policy audits:** dependency licences and the allowlist, no third-party Rust crates, code-to-doc pairing, the storage allowlist, platform-independent paths and static SVG paths.
+- **Docs:** links, anchors, ADR numbering, the UI catalog and the docs manifest.
+- **Code:** TypeScript, dependency-cruiser boundaries, ESLint (including jsx-a11y and security rules), Knip for dead code, Prettier and a duplication limit.
+- **Design:** WCAG contrast of UI colours, and a design-token audit that rejects raw palette colours in shared UI and arbitrary colour or size values anywhere.
 
-To run coverage reports:
+CI also runs the unit tests with coverage, the end-to-end tests, the build with its post-build security scripts (bundle AST audit, CSP hashing), a reproducibility check of the committed WebAssembly, a dependency audit and Lighthouse. Size budgets, checked by `pnpm run check-bundle-size`:
 
-```bash
-pnpm exec vitest run --coverage
-```
+- The check fails if any page's first load (HTML, CSS and startup scripts, gzipped) exceeds 260 KB.
+- It fails if all shipped JavaScript and CSS together exceed 650 KB gzipped.
+- Each Rust module has its own gzipped budget, for example 32 KB for `qr-decode` and 10 KB for `prism-fec`.
 
-To run End-to-End (E2E) tests (Playwright):
-
-Note: On a fresh environment, you must install the required browsers first.
-
-```bash
-pnpm exec playwright install
-pnpm test:e2e
-```
-
-### Local Verification
-
-This project enforces strict quality checks in CI. Run the complete quality suite locally to prevent build failures. This combined script performs linting, type-checking, and accessibility verification matching the CI pipeline logic:
-
-```bash
-pnpm run lint
-```
-
-**Bundle Size Check:**
-CI fails if any page's first load (its HTML, CSS and startup scripts, gzipped) exceeds 260 KB, or if the JavaScript and CSS in `dist/client` together exceed 650 KB (`scripts/check-bundle-size.js`; the scanner's lazily loaded `.wasm` reader has its own 450 KB budget). `pnpm build` does not run this check; run it yourself after a build:
-
-```bash
-pnpm build
-pnpm run check-bundle-size
-```
-
-**Performance & SEO:**
-Lighthouse CI runs on every Pull Request to audit performance, accessibility, best practices, and SEO.
-
-## Usage Guide
-
-1.  **Select Content Type**: Use the icon grid at the top of the input panel to choose the type of QR code you want to create (e.g., URL, WiFi).
-2.  **Enter Data**: Fill in the required fields for the selected type. The QR code preview will update automatically.
-3.  **Customize Appearance**:
-    - Scroll down to the "Appearance" section.
-    - Select a **Pattern Style**.
-    - Choose a **Color Preset** or manually adjust the Foreground, Background, and Eye colors.
-    - _Tip_: Watch out for the "Low Contrast" warning to ensure your QR code is scannable.
-4.  **Add a Logo (Optional)**:
-    - Click "Upload Logo" to add an image to the center of the QR code.
-    - Adjust the logo size, border style, and padding.
-    - Or click "Upload Mosaic Design" to tile a picture across the whole code, then pick Halftone or Tiles and raise Scan Contrast if the scan badge warns.
-5.  **Download**:
-    - Click the **Download** button to save as a high-quality PNG.
-    - Click the arrow next to Download to choose other formats (JPEG, WebP).
-    - Use "Save to Photos" on mobile devices or "Share" to send it to other apps.
-
-## Project Structure
-
-- `CONTEXT.md`: Root domain glossary defining canonical project terminology.
-- `RELEASING.md`: Release, promotion and rollback runbook.
-- `docs/`: Architectural specifications and system documentation.
-  - `adr/`: Architectural Decision Records.
-  - `public/`: Public guides, UI component catalog, edge architecture, scaling, and compliance specifications.
-  - `SECURITY.md`: Security policy, Content Security Policy, and vulnerability reporting.
-  - `ABUSE_PROTECTIONS.md`: What QRCraftly does to stop harmful codes and to protect people who scan codes or receive files, and its limits.
-  - `WORKFLOWS.md`: Branching model and CI pipeline.
-  - `agents/`: Instructions for AI agents (issue tracker, triage labels, domain docs).
-- `e2e/`: Playwright end-to-end tests.
-- `src/`: Source code.
-  - `components/`: Reusable React components.
-    - `InputPanel.tsx`: Main controller for data input; orchestrates sub-components.
-    - `inputs/`: Modular input components for each QR type (e.g., `WifiInput`, `VCardInput`).
-    - `StyleControls.tsx`: UI for customizing colors, patterns, and logos.
-    - `QRCanvas.tsx`: The core component that renders the QR code using HTML5 Canvas.
-    - `QRTool.tsx`: The main container component that integrates inputs, controls, and canvas.
-    - `QRScanner.tsx`: Webcam and file-upload QR scanner used by the input panel.
-    - `arcade/`: Components for the QR Arcade page.
-  - `packages/`: Deep modules with small public entry points (`qr-matrix`, `qr-export`, `qr-payload`, `scannability`, `optical-scanner`, `optical-transfer`, `arcade`). See [src/packages/README.md](src/packages/README.md).
-  - `hooks/`: React hooks (camera, image upload, download).
-  - `layouts/`: Application layouts.
-    - `LayoutDefault.tsx`: The main layout wrapper.
-    - `Head.tsx`: Manages document head elements.
-  - `pages/`: Page-level components (Vike routing).
-    - `index/+Page.tsx`: The home page.
-    - `about/+Page.tsx`: The about page.
-    - `acknowledgements/+Page.tsx`: Open-source packages the site ships, with their licenses.
-    - `wifi-qr-code/+Page.tsx` and the other `*-qr-code/` folders: One page per QR type.
-    - `file-transfer/+Page.tsx` and `file-transfer/receive/+Page.tsx`: Air-gapped file sender and receiver.
-    - `arcade/+Page.tsx`: QR Arcade (`/game` and `/destroy-the-qr` redirect here).
-    - `+config.ts`: Global Vike configuration.
-  - `types.ts`: TypeScript definitions for application state and data structures.
-  - `constants.ts`: Default configurations and preset data.
-- `scripts/`: Utility scripts.
-  - `contrast_check.js`: Checks WCAG contrast compliance for UI elements.
-  - `check-bundle-size.js`: Per-page first-load budget (260 KB gzipped), a loose 650 KB ceiling on shipped JavaScript and CSS and a separate 450 KB budget for the lazily loaded scanner WebAssembly, run in CI.
-  - `vite/thirdPartyLicenses.ts`: Builds the acknowledgements data and checks `vite/shipped-packages.json` against the client bundle (`pnpm run licenses:sync` rewrites the list).
-  - `storage_privacy_ast_auditor.js`: Blocks browser storage keys that are not on the allowlist.
-- `tests/`: Vitest tests for the repository scripts and CI tooling.
-- `public/`: Static assets (favicon, etc.).
+Before every commit, Husky and lint-staged format and lint the staged files and run the secret, storage and docs audits, then the type check, the duplication audit and the unit tests ([ADR 0010](docs/adr/0010-husky-and-lint-staged-git-guardrails.md)).
 
 ## Contributing
 
-- **Branch from `main`.** `main` is the only long-lived branch, and every merge to it deploys to production. Name branches with a standard prefix (`feat/`, `fix/`, `docs/`, `refactor/`, `chore/`, `agent/`) and open pull requests against `main`. PRs are squash-merged once the `CI` and `PR Title` checks pass. Releases are described in [RELEASING.md](RELEASING.md).
-- **Use [Conventional Commits](https://www.conventionalcommits.org/)** for PR titles (`feat:`, `fix:`, `docs:`, `chore:`, ...). The squashed title becomes the commit on `main`, and the release engine derives the next SemVer version and the changelog from it.
-- **Run the checks before pushing.** Husky runs formatting, typechecking, duplication audits and tests on commit. CI additionally runs `pnpm run lint`, `pnpm exec vitest run --coverage`, `pnpm test:e2e` and `pnpm build`.
-- **Read the guardrails.** [AGENTS.md](AGENTS.md) lists the project invariants (client-side only generation, storage allowlist, UI component reuse, workflow hardening), and [CONTEXT.md](CONTEXT.md) defines the domain vocabulary.
-- **Report bugs and ideas** through the GitHub issue forms; report security issues privately as described in [SECURITY.md](docs/SECURITY.md).
+1. **Read the guardrails.** [AGENTS.md](AGENTS.md) holds the invariants: client-side only, the storage allowlist, reuse of shared UI components, semantic design tokens, hardened workflows and in-house first. Use the vocabulary in [CONTEXT.md](CONTEXT.md), and check [docs/adr](docs/adr/) before changing a settled decision.
+2. **Branch from `main`** with a prefix: `feat/`, `fix/`, `docs/`, `refactor/`, `chore/` or `agent/`. `main` is the only long-lived branch ([ADR 0020](docs/adr/0020-trunk-based-releases-on-main.md)).
+3. **Reuse before you build.** Check [UI_CATALOG.md](docs/public/UI_CATALOG.md) before adding a visual element; sliders, buttons and colour pickers have shared components, and colour maths lives in `src/utils/colorUtils.ts`.
+4. **Keep docs in step.** Run `pnpm run docs:sync` after changing shared UI or a public doc, and record a new architectural decision as an ADR ([docs-maintenance.md](docs/agents/docs-maintenance.md)).
+5. **Check locally:** `pnpm run lint` and `pnpm exec vitest run`; add `pnpm build` and `pnpm test:e2e` when you touch the build, routing, rendering or input flows.
+6. **Open a pull request against `main`** with a [Conventional Commits](https://www.conventionalcommits.org/) title (`feat(scanner): …`, `fix: …`, `docs: …`). The title becomes the squash commit and drives the next version. Fill in the PR template.
+7. **Merge on green.** The required checks are `CI`, `PR Title` and `Workers Builds: qrcraftly`, on a branch that is up to date with `main`. Enable auto-merge (squash) once the PR is complete. Prefer fewer, larger, fully tested PRs, because every merge deploys.
 
-## Contributor Guide for Dependencies
+**Dependencies:** Dependabot proposes npm updates daily and GitHub Actions updates weekly, grouped to keep the noise down; security fixes come on their own. A new dev dependency or third-party Action needs a one-line reason in the PR and a row in the [FOUNDRY.md](docs/FOUNDRY.md) scorecard. When a package that ships to the browser is added or removed, the build fails until you run `pnpm run licenses:sync` and check its licence.
 
-To maintain security and reduce repository noise, QRCraftly uses **Dependabot** to manage third-party dependencies.
+**Issues:** use the GitHub issue forms for bugs and ideas. Labels follow [triage-labels.md](docs/agents/triage-labels.md).
 
-- **Automated Scanning**: Dependabot checks for outdated packages daily and monitors for security vulnerabilities.
-- **Grouped Updates**: Non-security routine updates are consolidated into logical groups (e.g., `dev-dependencies`, `production-dependencies`) to minimize PR volume.
-- **Security Priority**: Critical security patches bypass routine grouping and are issued as isolated PRs for immediate visibility.
-- **Review Process**: All dependency update PRs require human review. Before merging, ensure the CI pipeline (the `CI` check, which covers static validation, unit tests, E2E tests, and the build with its bundle size check) has passed successfully.
-- **Open-source acknowledgements**: The `/acknowledgements` page lists every third-party package whose code ships to the browser, with its version and license text, read from the installed packages at build time. `scripts/vite/shipped-packages.json` names those packages, and every build checks it against the client bundle (pages, web workers and CSS). When an update adds or removes a shipped package, the build fails with a `Fix:` hint: run `pnpm run licenses:sync`, check the new package's license and commit the updated list.
-- **Package Manager**: QRCraftly strictly mandates **pnpm**. Dependabot is configured to respect `pnpm-lock.yaml`. Never use `npm install` or `yarn` when manually updating dependencies.
+## Releases and deployment
 
-## Technologies Used
+- Cloudflare Workers Builds deploys every push to `main` to production (`https://qrcraftly.com`) and every other branch to a preview URL, `https://<branch>-qrcraftly.fpderuiter.workers.dev`. GitHub Actions never deploys; it is the quality gate, and after each merge it smoke tests production.
+- Versions follow SemVer and come from the Conventional Commits on `main`. `pnpm run release:prepare` opens a `release/vX.Y.Z` pull request with the version bump and `CHANGELOG.md`; merging it tags the release and publishes it on GitHub. A maintainer merges release pull requests by hand. Never edit the version in `package.json` or create tags manually.
+- To roll back, restore the previous version in Cloudflare, then fix forward with a pull request.
 
-- **React 19**: UI library.
-- **TypeScript**: Static typing for better code quality.
-- **Vite 6**: Fast build tool and development server.
-- **Vike**: Routing and build-time pre-rendering (every page is pre-rendered to static HTML).
-- **Tailwind CSS v4**: Utility-first CSS framework for styling.
-- **Rust and WebAssembly**: QRCraftly's own QR encoder (`crates/qr-encode`), built to `src/wasm/` (see [docs/RUST.md](docs/RUST.md)).
-- **Lucide React**: Icon set.
-- **Vitest**: Testing framework.
+Details are in [RELEASING.md](RELEASING.md) and [WORKFLOWS.md](docs/WORKFLOWS.md).
 
-## Styling and Theme Configuration
+## Documentation map
 
-QRCraftly uses **Tailwind CSS v4**, which introduces a streamlined CSS-first configuration model. The legacy `tailwind.config.js` file is obsolete and has been removed to maintain a single source of truth for all styling.
+| Topic                     | Where                                                                                                                                                                                                                               |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Invariants and vocabulary | [AGENTS.md](AGENTS.md), [CONTEXT.md](CONTEXT.md)                                                                                                                                                                                    |
+| Decisions                 | [docs/adr](docs/adr/)                                                                                                                                                                                                               |
+| Product                   | [product.md](product.md), [PLEDGE.md](docs/PLEDGE.md)                                                                                                                                                                               |
+| Security and abuse        | [SECURITY.md](docs/SECURITY.md), [ABUSE_PROTECTIONS.md](docs/ABUSE_PROTECTIONS.md), [COMPLIANCE.md](docs/public/COMPLIANCE.md)                                                                                                      |
+| UI and styling            | [UI_CATALOG.md](docs/public/UI_CATALOG.md), [STYLE_GUIDE.md](docs/public/STYLE_GUIDE.md)                                                                                                                                            |
+| Performance and workers   | [SCALING.md](docs/public/SCALING.md), [RUST.md](docs/RUST.md)                                                                                                                                                                       |
+| File transfer             | [Optical Transfer design](docs/optical-transfer/README.md), [TRANSFER_BENCHMARK.md](docs/TRANSFER_BENCHMARK.md), [TRANSFER_DEVICE_CHECKLIST.md](docs/TRANSFER_DEVICE_CHECKLIST.md), [OPTICAL_RESEARCH.md](docs/OPTICAL_RESEARCH.md) |
+| Workflow and releases     | [WORKFLOWS.md](docs/WORKFLOWS.md), [RELEASING.md](RELEASING.md), [CHANGELOG.md](CHANGELOG.md), [FOUNDRY.md](docs/FOUNDRY.md)                                                                                                        |
+| SEO                       | [SEO_MEASUREMENT.md](docs/SEO_MEASUREMENT.md)                                                                                                                                                                                       |
+| Agents                    | [docs/agents](docs/agents/), [src/packages/README.md](src/packages/README.md)                                                                                                                                                       |
 
-All custom styling, theme extensions, and Tailwind configurations are now managed directly in the main CSS entrypoint: `src/layouts/index.css`.
+## Security
 
-### How to Manage Styles
-
-- **Theme Variables**: The app currently uses Tailwind's default palette, and `src/layouts/index.css` has no `@theme` block. To add custom brand colors, breakpoints, fonts, or other theme extensions, add an `@theme` block to that file.
-- **Dark Mode**: The class-based dark mode is configured using a custom variant directly in the CSS (`@variant dark (&:where(.dark, .dark *));`), replacing the legacy JS configuration.
-- **Utility Classes**: Continue writing standard Tailwind utility classes in your React components. The PostCSS setup will automatically handle processing via the `@tailwindcss/postcss` plugin.
-
-For developers customizing the UI or extending the design system, `src/layouts/index.css` is the definitive file to modify.
+Please report vulnerabilities privately, as described in [SECURITY.md](docs/SECURITY.md#reporting-a-vulnerability). Do not open a public issue for a security problem.
 
 ## License
 
-[AGPL-3.0](LICENSE.md)
+[AGPL-3.0-or-later](LICENSE.md). The `/acknowledgements` page lists the open-source packages the site ships, with their licences.

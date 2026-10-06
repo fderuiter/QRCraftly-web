@@ -85,7 +85,11 @@ The new outer code ([ADR 0037](./adr/0037-prism-outer-code-lt-over-ldpc-precode.
 
 A feature stays behind its flag until the median run reaches the tier it claims, on at least two different phones.
 
+The proposed capability classes in [Optical Transfer performance](optical-transfer/PERFORMANCE.md#proposed-reference-classes), from a minimum qualified link up to an experimental stretch, are qualification targets for later campaigns. Until a reviewed change replaces them, the tiers above remain the gate.
+
 ## Results
+
+Record each run with the fields of the [evidence record template](optical-transfer/VALIDATION.md#evidence-record-template), including failed trials.
 
 | Date     | Sender | Receiver phone | File | Profile | KB/s | Notes |
 | -------- | ------ | -------------- | ---- | ------- | ---- | ----- |
