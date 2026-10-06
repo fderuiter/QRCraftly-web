@@ -168,7 +168,7 @@ export class BcUrDecoder {
     this.chooser = new FragmentChooser(part.seqLen);
   }
 
-  /** Peeling decoder: reduce by known fragments, promote singletons, reduce the rest by them. */
+  /** Peeling decoder: reduce by known fragments and stored mixed parts, promote singletons, reduce the rest by them. */
   private absorb(first: Pending): void {
     const queue: Pending[] = [first];
     while (queue.length > 0) {
@@ -183,7 +183,19 @@ export class BcUrDecoder {
         queue.push(...this.pending);
         this.pending = [];
       } else if (this.pending.length < MAX_PENDING_PARTS && !this.pending.some(p => sameIndexes(p.indexes, reduced.indexes))) {
-        this.pending.push(reduced);
+        // BCR-2024-001 reduces both ways: stored mixed parts that contain the new one shrink by it.
+        const kept: Pending[] = [];
+        for (const other of this.pending) {
+          if (other.indexes.length > reduced.indexes.length && reduced.indexes.every(i => other.indexes.includes(i))) {
+            const data = other.data.slice();
+            xorInto(data, reduced.data);
+            queue.push({ indexes: other.indexes.filter(i => !reduced.indexes.includes(i)), data });
+          } else {
+            kept.push(other);
+          }
+        }
+        kept.push(reduced);
+        this.pending = kept;
       }
     }
   }

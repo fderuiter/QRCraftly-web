@@ -1,12 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { URDecoder } from '@ngraveio/bc-ur';
 import { BcUrDecoder, BcUrEncoder, isBcUr, type BcUrIngest } from '../bcur';
 import { cborEncode } from '../index';
-import vectors from './fixtures/bcurReference.json';
+import reference from './fixtures/bcur/reference-streams.json';
+import published from './fixtures/bcur/published.json';
+import crossChecks from './fixtures/bcur/ours-decoded-by-reference.json';
+
+// Vectors frozen from @ngraveio/bc-ur 1.1.13 and the BCR specs by
+// scripts/fixtures/generate_bcur_vectors.ts (#1181, ADR 0040).
+const vectors = reference.vectors;
 
 const fromHex = (hex: string): Uint8Array => Uint8Array.from(hex.match(/../g) ?? [], pair => parseInt(pair, 16));
 
-function feed(parts: string[]): BcUrIngest {
+function feed(parts: readonly string[]): BcUrIngest {
   const decoder = new BcUrDecoder();
   let last: BcUrIngest = { status: 'rejected' };
   for (const part of parts) {
@@ -16,83 +21,103 @@ function feed(parts: string[]): BcUrIngest {
   return last;
 }
 
-describe('BC-UR codec against @ngraveio/bc-ur vectors', () => {
-  for (const vector of vectors) {
-    const file = fromHex(vector.fileHex);
+function vector(name: string): (typeof vectors)[number] {
+  const found = vectors.find(v => v.name === name);
+  if (!found) throw new Error(`missing vector ${name}`);
+  return found;
+}
 
-    it(`${vector.name}: decodes the reference stream`, () => {
-      const result = feed(vector.parts);
+describe('BC-UR codec against the reference encoder', () => {
+  for (const entry of vectors) {
+    const file = fromHex(entry.fileHex);
+
+    it(`${entry.name}: decodes the reference stream`, () => {
+      const result = feed(entry.parts);
       expect(result.status).toBe('complete');
       if (result.status !== 'complete') return;
       expect(result.result.type).toBe('bytes');
       expect(result.result.content).toEqual({ kind: 'file', bytes: file });
     });
 
-    it(`${vector.name}: decodes uppercase and out-of-order parts`, () => {
-      const shuffled = vector.parts.map(p => p.toUpperCase()).reverse();
+    it(`${entry.name}: decodes uppercase and out-of-order parts`, () => {
+      const shuffled = entry.parts.map(p => p.toUpperCase()).reverse();
       const result = feed(shuffled);
       expect(result.status).toBe('complete');
     });
 
-    it(`${vector.name}: emits the exact reference strings`, () => {
-      const encoder = BcUrEncoder.forBytes(file, vector.maxFragmentLength);
-      expect(vector.parts.map(() => encoder.nextPart())).toEqual(vector.parts);
-    });
-
-    it(`${vector.name}: the reference decoder reads our stream`, () => {
-      const encoder = BcUrEncoder.forBytes(file, vector.maxFragmentLength);
-      const reference = new URDecoder();
-      for (let i = 0; i < encoder.fragmentCount * 4 && !reference.isComplete(); i++) {
-        reference.receivePart(encoder.nextPart());
-      }
-      expect(reference.isSuccess()).toBe(true);
-      expect(Uint8Array.from(reference.resultUR().decodeCBOR())).toEqual(file);
+    it(`${entry.name}: emits the exact reference strings`, () => {
+      const encoder = BcUrEncoder.forBytes(file, entry.maxFragmentLength);
+      expect(entry.parts.map(() => encoder.nextPart())).toEqual(entry.parts);
     });
   }
 
-  it('recovers from mixed parts alone (pure parts lost)', () => {
-    const vector = vectors.find(v => v.name === 'tiny-fragments');
-    if (!vector) throw new Error('missing vector');
-    const total = Number(/\/\d+-(\d+)\//.exec(vector.parts[0])?.[1]);
-    const result = feed(vector.parts.slice(Math.floor(total / 2)));
+  it('recovers when half the pure parts are lost', () => {
+    const entry = vector('medium');
+    const total = Number(/\/\d+-(\d+)\//.exec(entry.parts[0])?.[1]);
+    const result = feed(entry.parts.slice(Math.floor(total / 2)));
     expect(result.status).toBe('complete');
   });
+});
 
-  it('reference decoder reads mixed-only parts from our encoder', () => {
-    const file = fromHex(vectors[3].fileHex);
-    const encoder = BcUrEncoder.forBytes(file, 10);
-    const total = encoder.fragmentCount;
-    for (let i = 0; i < total; i++) encoder.nextPart();
-    const ours = new BcUrDecoder();
-    const reference = new URDecoder();
-    for (let i = 0; i < total * 3 && !(ours.progress === 1 && reference.isComplete()); i++) {
-      const part = encoder.nextPart();
-      ours.ingest(part);
-      reference.receivePart(part);
+describe('BC-UR codec against the reference decoder', () => {
+  for (const entry of crossChecks.vectors) {
+    const file = fromHex(entry.fileHex);
+
+    it(`${entry.name}: still emits the parts the reference decoder read back`, () => {
+      const encoder = BcUrEncoder.forBytes(file, entry.maxFragmentLength);
+      if (entry.skipPure) for (let i = 0; i < encoder.fragmentCount; i++) encoder.nextPart();
+      expect(entry.parts.map(() => encoder.nextPart())).toEqual(entry.parts);
+    });
+
+    it(`${entry.name}: our decoder reads the same parts`, () => {
+      const result = feed(entry.parts);
+      expect(result.status).toBe('complete');
+      if (result.status === 'complete') expect(result.result.content).toEqual({ kind: 'file', bytes: file });
+    });
+  }
+});
+
+describe('BC-UR published test vectors', () => {
+  it('BCR-2020-005: decodes the single-part seed URs', () => {
+    for (const entry of published.bcr2020005.singlePart) {
+      const result = feed([entry.ur]);
+      expect(result).toMatchObject({ status: 'complete', result: { type: entry.type, content: { kind: 'cbor', bytes: fromHex(entry.cborHex) } } });
+      expect(new BcUrEncoder(entry.type, fromHex(entry.cborHex)).nextPart()).toBe(entry.ur);
     }
-    expect(ours.progress).toBe(1);
-    expect(reference.isSuccess()).toBe(true);
+  });
+
+  it('BCR-2020-005: reads the first part of a multipart seed', () => {
+    const { ur, type, seqLen } = published.bcr2020005.firstOfMultiPart;
+    const decoder = new BcUrDecoder();
+    expect(decoder.ingest(ur)).toMatchObject({ status: 'progress', received: 1, type });
+    expect(decoder.progress).toBeCloseTo(1 / seqLen);
+  });
+
+  it('BCR-2024-001 testEncoderCBOR: emits the published fountain parts', () => {
+    const { messageHex, maxFragmentLength, parts } = published.bcr2024001.testEncoderCBOR;
+    const encoder = new BcUrEncoder('bytes', fromHex(messageHex), maxFragmentLength);
+    expect(parts.map(() => encoder.nextPart())).toEqual(parts);
   });
 });
 
 describe('BcUrDecoder behaviour', () => {
   it('reports progress and ignores duplicates', () => {
-    const vector = vectors[1];
+    const stream = vector('seven-fragments');
     const decoder = new BcUrDecoder();
-    const first = decoder.ingest(vector.parts[0]);
+    const first = decoder.ingest(stream.parts[0]);
     expect(first).toMatchObject({ status: 'progress', received: 1, type: 'bytes' });
-    expect(decoder.ingest(vector.parts[0])).toMatchObject({ status: 'progress', received: 1 });
+    expect(decoder.ingest(stream.parts[0])).toMatchObject({ status: 'progress', received: 1 });
     expect(decoder.progress).toBeGreaterThan(0);
   });
 
   it('rejects junk, bad checksums and a different message', () => {
     const decoder = new BcUrDecoder();
     expect(decoder.ingest('hello')).toEqual({ status: 'rejected' });
-    const bad = vectors[1].parts[0].slice(0, -2) + (vectors[1].parts[0].endsWith('aa') ? 'bb' : 'aa');
+    const bad = vector('seven-fragments').parts[0].slice(0, -2) + (vector('seven-fragments').parts[0].endsWith('aa') ? 'bb' : 'aa');
     expect(decoder.ingest(bad)).toEqual({ status: 'rejected' });
-    expect(decoder.ingest(vectors[1].parts[0]).status).toBe('progress');
-    expect(decoder.ingest(vectors[2].parts[0])).toEqual({ status: 'rejected' });
-    expect(decoder.ingest(vectors[1].parts[0].replace('ur:bytes', 'ur:other'))).toEqual({ status: 'rejected' });
+    expect(decoder.ingest(vector('seven-fragments').parts[0]).status).toBe('progress');
+    expect(decoder.ingest(vector('medium').parts[0])).toEqual({ status: 'rejected' });
+    expect(decoder.ingest(vector('seven-fragments').parts[0].replace('ur:bytes', 'ur:other'))).toEqual({ status: 'rejected' });
   });
 
   it('offers text for a CBOR text string and raw CBOR otherwise', () => {
@@ -122,8 +147,8 @@ describe('BcUrDecoder behaviour', () => {
   });
 
   it('detects UR syntax', () => {
-    expect(isBcUr(vectors[1].parts[3])).toBe(true);
-    expect(isBcUr(vectors[0].parts[0].toUpperCase())).toBe(true);
+    expect(isBcUr(vector('seven-fragments').parts[3])).toBe(true);
+    expect(isBcUr(vector('single-small').parts[0].toUpperCase())).toBe(true);
     expect(isBcUr('https://example.com')).toBe(false);
     expect(isBcUr('ur:bytes/')).toBe(false);
   });

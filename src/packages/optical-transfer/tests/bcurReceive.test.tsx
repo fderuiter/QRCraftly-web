@@ -3,9 +3,9 @@ import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useOpticalReceiver } from '../client';
 import { receiverOptions } from './fixtures';
-import reference from './fixtures/bcurReference.json';
+import reference from './fixtures/bcur/reference-streams.json';
 
-const stream = reference.find((entry) => entry.name === 'twenty-parts')!;
+const stream = reference.vectors.find((entry) => entry.name === 'seven-fragments')!;
 
 describe('real BC-UR streams in the receiver (#1149)', () => {
   // The receiver loads the codec on the first UR code; load it up front so a busy machine does not time the test out.
