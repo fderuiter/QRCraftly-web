@@ -115,6 +115,9 @@ function FileTransferToolInner() {
     setDensity,
     outerCode,
     setOuterCode,
+    multiCode,
+    setMultiCode,
+    tileInfo,
     fps,
     setFps,
     currentPass,
@@ -414,8 +417,25 @@ function FileTransferToolInner() {
                         : 'Copes better with missed frames: the receiver needs only a few frames beyond the file’s size, where the standard format can need 15% more. The receiving device needs the latest QRCraftly.'}
                     </p>
                   </div>
+
+                  <div className="space-y-1">
+                    <ToggleSwitch
+                      id="multi-code"
+                      label="Several codes per frame (preview)"
+                      checked={multiCode}
+                      onChange={setMultiCode}
+                      disabled={isTransferring}
+                    />
+                    <p className="text-xs text-fg-muted" data-testid="multi-code-hint">
+                      {fountainInfo && multiCode && !fountainInfo.tiles
+                        ? 'This screen is too small for several codes, so this transfer shows one at a time.'
+                        : 'Shows up to four large codes at once, timed to the display. Turn on “Read several codes per frame” on the receiving device.'}
+                    </p>
+                  </div>
                   <p className="text-xs text-fg-muted" data-testid="fountain-symbol-info">
-                    {fountainInfo
+                    {fountainInfo?.tiles
+                      ? `Each code carries ${fountainInfo.symbolSize}-byte pieces (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). How fast it goes depends on the receiving camera.`
+                      : fountainInfo
                       ? `Each QR carries ${fountainInfo.symbolSize} bytes (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). The receiver needs about ${framesNeeded} frames, ${formatDuration(framesNeeded / fps)} at ${fps} frames/sec.`
                       : estimate
                         ? `Estimated transfer time: up to ${formatDuration(estimate.frames / fps)} at ${fps} frames/sec (${estimate.symbolSize} bytes per QR). Text and other compressible files go faster.`
@@ -640,7 +660,7 @@ function FileTransferToolInner() {
                 <div className="relative w-full overflow-hidden rounded-lg">
                   <canvas
                     ref={canvasRef}
-                    className="aspect-square max-h-[60vh] w-full rounded-lg bg-surface object-contain shadow-sm"
+                    className={`aspect-square w-full rounded-lg bg-surface object-contain shadow-sm ${tileInfo ? 'max-h-[85vh]' : 'max-h-[60vh]'}`}
                     role="img"
                     aria-label="Transfer QR code"
                     width={512}

@@ -29,6 +29,8 @@ export interface CameraInfo {
   /** The size it streams at (0 when unknown). */
   width: number;
   height: number;
+  /** The frame rate it streams at (0 when unknown). */
+  frameRate: number;
   /** The torch (flashlight): whether the camera has one, and whether it is on. */
   torch: { supported: boolean; on: boolean };
   /** Optical or digital zoom range and current value, or null when the camera has none. */
@@ -79,6 +81,11 @@ export interface CameraFrameLoop {
 export interface CameraSessionStartOptions {
   /** A specific camera; defaults to the rear-facing one. */
   deviceId?: string;
+  /**
+   * Frames per second to ask for at full HD, as an ideal, never exact (default 30, which is also
+   * the cap). Prism's multi-code receiver asks for 60 (#1142).
+   */
+  frameRate?: number;
 }
 
 /** The parts of `navigator.mediaDevices` the session uses. */
@@ -166,7 +173,9 @@ export function cameraConstraints(options: CameraSessionStartOptions, sizeStep: 
   const camera: MediaTrackConstraints = options.deviceId
     ? { deviceId: { exact: options.deviceId } }
     : { facingMode: { ideal: 'environment' } };
-  return { video: { ...camera, ...CAPTURE_SIZES[Math.min(sizeStep, CAPTURE_SIZES.length - 1)] }, audio: false };
+  const size = CAPTURE_SIZES[Math.min(sizeStep, CAPTURE_SIZES.length - 1)];
+  const fast = sizeStep === 0 && options.frameRate !== undefined && options.frameRate > 30;
+  return { video: { ...camera, ...size, ...(fast ? { frameRate: { ideal: options.frameRate } } : {}) }, audio: false };
 }
 
 /** Image Capture capabilities (focus, torch, zoom), not yet in TypeScript's DOM lib. */
@@ -180,6 +189,7 @@ interface CaptureSettings {
   facingMode?: string;
   width?: number;
   height?: number;
+  frameRate?: number;
   zoom?: number;
   torch?: boolean;
 }
@@ -227,6 +237,7 @@ function describeTrack(track: ControllableTrack | null, torchOn: boolean): Camer
     facing: settings.facingMode === 'user' || settings.facingMode === 'environment' ? settings.facingMode : null,
     width: settings.width ?? 0,
     height: settings.height ?? 0,
+    frameRate: settings.frameRate ?? 0,
     torch: { supported: capabilities.torch === true, on: capabilities.torch === true && torchOn },
     zoom: zoomRange,
   };
@@ -379,7 +390,7 @@ export function createCameraSession(config: CameraSessionConfig): CameraSession 
     start(options = {}) {
       if (destroyed) return Promise.resolve();
       wanted = true;
-      const sameCamera = options.deviceId === lastOptions.deviceId;
+      const sameCamera = options.deviceId === lastOptions.deviceId && options.frameRate === lastOptions.frameRate;
       lastOptions = options;
       if (sameCamera && pending && (state.status === 'requesting' || state.status === 'streaming')) return pending;
       if (state.status === 'streaming' || state.status === 'requesting') release();

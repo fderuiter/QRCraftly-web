@@ -167,7 +167,7 @@ Once a tile has been found, the receiver knows its corners, version and level, s
 | Fast path, same crop                                   | 1512       |
 | Fast path, whole 1080p frame, 4 tiles per call (tiles) | 1400       |
 
-On the same crop the fast path is 3.9 times as fast as a full read (the bar in #1178 is 3 times). The receiver does not use it yet; #1142 switches its tracked frames over.
+On the same crop the fast path is 3.9 times as fast as a full read (the bar in #1178 is 3 times). The multi-code receiver reads its tracked frames with it.
 
 ### What this proves and what it does not (#1142)
 
@@ -180,7 +180,7 @@ On the same crop the fast path is 3.9 times as fast as a full read (the bar in #
 | Hold is a whole number of refreshes                          | Unit test with a stepped frame clock (`multicode.test.ts`)                        | Met, tested.                                                                                       |
 | Scanner page behaviour unchanged                             | No scanner file changed; the new code is imported by nothing in the app           | Met by construction.                                                                               |
 
-Not measured at all: a real camera's focus, exposure and rolling shutter; whether a phone resolves 4 px modules; how often tracking is lost with a hand-held phone (the crop margin is 3 modules, so a camera that drifts more than that between frames falls back to a full search); decoding in browser workers on a phone; thermal throttling; and the receiver's capture request and `requestVideoFrameCallback` (not built yet). The 60 fps row assumes a camera that really captures 60 distinct frames per second. The full search here scans layout hypotheses, reading one code per crop, so its cost is not the cost of our reader's multi-code read. The device list is in [the device checklist](TRANSFER_DEVICE_CHECKLIST.md).
+Not measured at all: a real camera's focus, exposure and rolling shutter; whether a phone resolves 4 px modules; how often tracking is lost with a hand-held phone (the crop margin is 3 modules, so a camera that drifts more than that between frames falls back to a full search); decoding in browser workers on a phone; thermal throttling; and the receiver's capture request and `requestVideoFrameCallback` (built, never run on a phone). The 60 fps row assumes a camera that really captures 60 distinct frames per second. The full search here scans layout hypotheses, reading one code per crop, so its cost is not the cost of our reader's multi-code read. The device list is in [the device checklist](TRANSFER_DEVICE_CHECKLIST.md).
 
 <!-- colour-bench:start -->
 

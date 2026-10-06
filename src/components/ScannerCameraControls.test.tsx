@@ -9,6 +9,7 @@ const camera = (overrides: Partial<CameraInfo> = {}): CameraInfo => ({
   facing: 'environment',
   width: 1920,
   height: 1080,
+  frameRate: 30,
   torch: { supported: false, on: false },
   zoom: null,
   ...overrides,

@@ -95,6 +95,92 @@ describe('useOpticalSender', () => {
     expect(startMessage.payload.fps).toBe(15);
   });
 
+  describe('several codes per frame (#1142)', () => {
+    /** Attaches a transfer canvas inside a container of the given width. */
+    function attachCanvas(current: { canvasRef: React.MutableRefObject<HTMLCanvasElement | null> }, width: number) {
+      const container = document.createElement('div');
+      Object.defineProperty(container, 'clientWidth', { value: width, configurable: true });
+      const canvas = document.createElement('canvas');
+      container.appendChild(canvas);
+      current.canvasRef.current = canvas;
+      return canvas;
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('keeps one code per frame when the screen is too small for tiles', async () => {
+      const { result } = renderHook(() => useOpticalSender(senderOptions()));
+      act(() => {
+        result.current.setSelectedFile(new File(['tiny'], 'tiny.txt', { type: 'text/plain' }));
+        result.current.setMultiCode(true);
+      });
+      attachCanvas(result.current, 200);
+      let start: any = null;
+      globalThis.mockWorkerControl.setInterceptor((message: any) => {
+        if (message.type === 'START') start = message;
+      });
+      act(() => result.current.startTransfer());
+      await waitFor(() => expect(start).not.toBeNull());
+      expect(start.payload.tiles).toBeUndefined();
+      expect(result.current.tileInfo).toBeNull();
+    });
+
+    it('holds every frame for whole display refreshes and staggers the diagonal tile groups', async () => {
+      vi.stubGlobal('innerHeight', 1000);
+      vi.stubGlobal('devicePixelRatio', 1);
+      const callbacks: Array<(time: number) => void> = [];
+      vi.stubGlobal('requestAnimationFrame', (callback: (time: number) => void) => callbacks.push(callback));
+      vi.stubGlobal('cancelAnimationFrame', () => undefined);
+
+      const options = senderOptions();
+      const { result } = renderHook(() => useOpticalSender(options));
+      act(() => {
+        result.current.setSelectedFile(new File(['tile content'], 'tiles.txt', { type: 'text/plain' }));
+        result.current.setMultiCode(true);
+      });
+      attachCanvas(result.current, 1000);
+
+      let start: any = null;
+      let refresh = -1;
+      const acks: Array<{ refresh: number; index: number }> = [];
+      globalThis.mockWorkerControl.setInterceptor((message: any, worker: any) => {
+        if (message.type === 'ACK') acks.push({ refresh, index: message.payload.index });
+        if (message.type !== 'START') return;
+        start = message;
+        worker.dispatchMessage({ type: 'PROGRESS', total: 64 });
+        // A 2x2 v25 layout: tiles of 117 modules.
+        for (let index = 0; index < 24; index++) worker.dispatchMessage({ type: 'FRAME', index, total: 64, size: 117, data: new Uint8Array(117 * 117) });
+      });
+
+      act(() => result.current.startTransfer());
+      await waitFor(() => expect(result.current.isTransferring).toBe(true));
+      expect(start.payload.tiles).toBe('2x2-v25');
+      // Tiles are painted dark on light whatever the page's colours, so the colour gate does not run.
+      expect(options.verifyFrame).not.toHaveBeenCalled();
+
+      // 20 refreshes at 60 Hz measure the display; the next callback is the first locked refresh.
+      const interval = 1000 / 60;
+      for (let step = 0; step < 33; step++) {
+        const callback = callbacks.shift();
+        expect(callback).toBeDefined();
+        if (step >= 19) refresh = step - 19;
+        await act(async () => {
+          callback?.(step * interval);
+          // The mock worker takes messages on a timer.
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+      }
+
+      // 15 frames/sec on a 60 Hz display holds each frame for 4 refreshes.
+      expect(result.current.tileInfo).toEqual({ layout: '2x2-v25', hold: 4, refreshHz: 60 });
+      // Tiles 0 and 3 change on refreshes 4, 8, 12; tiles 1 and 2 two refreshes later.
+      expect(acks.map((ack) => ack.refresh)).toEqual([0, 4, 6, 8, 10, 12]);
+      expect(acks.map((ack) => ack.index)).toEqual([3, 7, 6, 11, 10, 15]);
+    });
+  });
+
   it('triggers the self-healing watch loop when frame generation is stalled for 100ms', async () => {
     let nowTime = 1000;
     vi.spyOn(performance, 'now').mockImplementation(() => nowTime);

@@ -33,7 +33,7 @@ Run each of these at least once with the 256 KB file:
 
 ## Multi-code frames (#1142)
 
-The bench simulates the display and the camera, so these need a phone before the feature leaves its flag:
+The bench simulates the display and the camera, so these need a phone before the feature leaves its flag. Turn on "Several codes per frame (preview)" under Advanced on the sender and "Read several codes per frame (preview)" on the receiver; the receiver then shows the size and frame rate the camera granted.
 
 - Goodput of 2x2 v25 (1080p sender) and 1 x v40 against the bench's rates, with the receiver camera at 30 fps and at 60 fps.
 - Whether the real camera resolves a 4 px module at the distance people hold it, and how many modules of drift per frame the 3-module crop margin survives with a hand-held phone.

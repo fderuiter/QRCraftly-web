@@ -27,6 +27,7 @@ import {
   encodeSessionMessage,
   FountainEncoder,
   MAX_RECEIVE_BYTES,
+  TILE_LAYOUTS,
   loadFecModule,
   TRANSFER_DENSITY_PROFILES,
   type PrismManifest,
@@ -54,13 +55,13 @@ function randomBytes(length: number, seed: number): Uint8Array {
   return Uint8Array.from({ length }, () => Math.floor(prng() * 256));
 }
 
-async function startFountain(file: Blob, options: { density?: string; outerCode?: string } = {}) {
-  await sliceHandler({ data: { type: 'START', payload: { file, fps: 15, density: options.density, outerCode: options.outerCode } } });
+async function startFountain(file: Blob, options: { density?: string; outerCode?: string; tiles?: string } = {}) {
+  await sliceHandler({ data: { type: 'START', payload: { file, fps: 15, density: options.density, outerCode: options.outerCode, tiles: options.tiles } } });
   return posted.find(m => m.type === 'INITIALIZED') as
     | {
         totalFrames: number;
         sha256: string;
-        fountain: { k: number; symbolSize: number; compression: string; density: TransferDensity; fingerprint: string; outerCode: string };
+        fountain: { k: number; symbolSize: number; compression: string; density: TransferDensity; fingerprint: string; outerCode: string; tiles: string | null };
       }
     | undefined;
 }
@@ -282,6 +283,35 @@ describe('Fountain sender and receiver workers', () => {
     const complete = posted.find(m => m.type === 'COMPLETE') as { buffer: ArrayBuffer } | undefined;
     expect(complete).toBeDefined();
     expect(new Uint8Array(complete!.buffer)).toEqual(bytes);
+  });
+
+  it('sizes every frame as a tile of the multi-code layout, and the receiver rebuilds the file (#1142)', async () => {
+    const layout = TILE_LAYOUTS['2x2-v20'];
+    const bytes = randomBytes(9000, 31);
+    const init = await startFountain(new File([bytes], 'tiles.bin', { type: 'application/octet-stream' }), { tiles: layout.id });
+    expect(init?.fountain).toMatchObject({ tiles: '2x2-v20', symbolSize: layout.symbolSize });
+    await pump(2 * layout.tiles);
+    // Manifest and data frames alike are tiles of one version at ECC L, so the tiles line up.
+    expect(qrCalls.length).toBeGreaterThan(layout.tiles);
+    expect(new Set(qrCalls.map(c => c.version))).toEqual(new Set([layout.version]));
+    expect(new Set(qrCalls.map(c => c.ecc))).toEqual(new Set(['L']));
+    const first = decodeFrame(qrCalls[1].text);
+    expect(first.ok && first.frame.type === 'data' && first.frame.count).toBe(layout.symbolsPerFrame);
+
+    await pump(Math.ceil(((init?.fountain.k ?? 0) / layout.symbolsPerFrame) * 2) + 20);
+    posted = [];
+    for (const { text } of qrCalls) {
+      await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: text } });
+      if (posted.some(m => m.type === 'COMPLETE' || m.type === 'ERROR')) break;
+    }
+    const complete = posted.find(m => m.type === 'COMPLETE') as { buffer: ArrayBuffer } | undefined;
+    expect(new Uint8Array(complete?.buffer ?? new ArrayBuffer(0))).toEqual(bytes);
+  });
+
+  it('ignores an unknown tile layout and sends one code per frame', async () => {
+    const init = await startFountain(new File([randomBytes(800, 4)], 'one.bin', { type: 'application/octet-stream' }), { tiles: 'toString' });
+    expect(init?.fountain.tiles).toBeNull();
+    expect(qrCalls[0].version).toBeLessThan(20);
   });
 
   it('posts an ERROR (never COMPLETE) when the file SHA-256 does not match the manifest', async () => {

@@ -27,6 +27,7 @@ export {
   useOpticalSender,
   type UseOpticalSenderOptions,
   type SenderFountainInfo,
+  type SenderTileInfo,
   type TransferFrame,
   type TransferFrameRenderer,
 } from './lib/sender/useOpticalSender';
