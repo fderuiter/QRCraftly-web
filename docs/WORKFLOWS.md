@@ -11,7 +11,7 @@ QRCraftly is **trunk-based**. `main` is the only long-lived branch (see [ADR 002
 ```
 [ feat/*, fix/*, agent/*, release/* ]
              │
-             ▼ (Pull Request, squash merge, CI + PR Title required)
+             ▼ (Pull Request, squash merge, CI + PR Title + Workers Builds required)
           [ main ]  (Trunk and Production Branch)
                     └── Deploys to: https://qrcraftly.fpderuiter.workers.dev/
                                     https://qrcraftly.com
@@ -78,10 +78,11 @@ GitHub Actions triggers the consolidated CI pipeline on the PR:
 2. `static-validation`: Storage privacy AST audit, UI catalog checks, markdown audit, TypeScript compiler (`tsc --noEmit`), depcruise module boundaries, ESLint, Knip, contrast checks, Prettier, code duplication check, ShellCheck, secret scanner, and Semgrep.
 3. `test`: Vitest unit tests with strict coverage thresholds.
 4. `build`: Production build verification and bundle size budgets. Uploads `dist` as a short-lived artifact.
-5. `lighthouse`: Lighthouse CI audits of every pre-rendered page in that `dist`, three runs per page with the median run asserted (performance at least 0.9).
-6. `e2e`: Downloads the `build` job's `dist` and runs Playwright cross-browser tests across Chromium, Firefox, and WebKit against `vite preview` (no second build), then `pnpm run test:e2e:dev` checks that the Vite development server hydrates without runtime errors.
-7. `dependency-audit`: `pnpm audit --audit-level=high`, reported as its own check. No other job depends on it, so a newly published upstream advisory never skips the checks above, but it does block the merge through `CI`.
-8. `ci`: the aggregate **`CI`** check. It passes only when jobs 1 to 7 all succeed, and it is the check the `main` ruleset requires.
+5. `wasm-reproducible`: `cargo fmt`, Clippy and the Rust tests, then rebuilds the WebAssembly modules and checks they match the committed `src/wasm/*.wasm` files.
+6. `lighthouse`: Lighthouse CI audits of every pre-rendered page in that `dist`, three runs per page with the median run asserted (performance at least 0.9).
+7. `e2e`: Downloads the `build` job's `dist` and runs Playwright cross-browser tests across Chromium, Firefox, and WebKit against `vite preview` (no second build), then `pnpm run test:e2e:dev` checks that the Vite development server hydrates without runtime errors.
+8. `dependency-audit`: `pnpm audit --audit-level=high`, reported as its own check. No other job depends on it, so a newly published upstream advisory never skips the checks above, but it does block the merge through `CI`.
+9. `ci`: the aggregate **`CI`** check. It passes only when jobs 1 to 8 all succeed, and it is the check the `main` ruleset requires.
 
 ### Step 5: Ephemeral Branch Preview Verification
 
@@ -91,7 +92,7 @@ Reviewers and agents can verify changes live in an edge environment before appro
 
 ### Step 6: Merge into `main`
 
-Once `CI` passes and reviews are complete, merge with **Squash and merge**. Cloudflare deploys the merge to production, and the `Verify Production Deployment` job tests production once it serves the new commit. It runs the E2E tests tagged `@prod` against the deployed site: the page loads, the CSP holds, an SVG downloads, the scanner reads with its self-hosted decoder, and file transfers complete in both formats (#1228). Tag a test `@prod` only when it is read-only and needs nothing but the site itself.
+Once `CI`, `PR Title` and `Workers Builds: qrcraftly` pass and reviews are complete, merge with **Squash and merge**. Cloudflare deploys the merge to production, and the `Verify Production Deployment` job tests production once it serves the new commit. It runs the E2E tests tagged `@prod` against the deployed site: the page loads, the CSP holds, an SVG downloads, the scanner reads with its self-hosted decoder, and file transfers complete in both formats (#1228). Tag a test `@prod` only when it is read-only and needs nothing but the site itself.
 
 ---
 
@@ -103,7 +104,7 @@ Releases, versioning, tags, environments and rollback are documented in one plac
 2. Merging that PR makes the `Release` workflow tag `vX.Y.Z`, publish the GitHub Release, and smoke test production.
 3. To roll back, roll back the Cloudflare deployment, then fix forward with a PR.
 
-| Environment    | Branch     | Active Domain                                                          | Access & Indexing                  |
-| -------------- | ---------- | ---------------------------------------------------------------------- | ---------------------------------- |
-| **Production** | `main`     | `https://qrcraftly.fpderuiter.workers.dev`<br/>`https://qrcraftly.com` | Public, indexed by search engines  |
-| **PR Preview** | `<branch>` | `https://<branch>-qrcraftly.fpderuiter.workers.dev`                    | Ephemeral, `X-Robots-Tag: noindex` |
+| Environment    | Branch     | Active Domain                                                          | Access & Indexing                       |
+| -------------- | ---------- | ---------------------------------------------------------------------- | --------------------------------------- |
+| **Production** | `main`     | `https://qrcraftly.fpderuiter.workers.dev`<br/>`https://qrcraftly.com` | Public; only `qrcraftly.com` is indexed |
+| **PR Preview** | `<branch>` | `https://<branch>-qrcraftly.fpderuiter.workers.dev`                    | Ephemeral, `X-Robots-Tag: noindex`      |

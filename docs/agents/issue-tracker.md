@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues (`fderuiter/QRCraftly`). Use the `gh` CLI when it is installed. Cloud agent sessions (for example Claude Code on the web) usually have no `gh`; use the GitHub MCP tools there instead:
+Issues and specs for this repo live as GitHub issues (`fderuiter/QRCraftly-web`). Use the `gh` CLI when it is installed. Cloud agent sessions (for example Claude Code on the web) usually have no `gh`; use the GitHub MCP tools there instead:
 
 | Operation                        | `gh` CLI                          | GitHub MCP tool                 |
 | -------------------------------- | --------------------------------- | ------------------------------- |

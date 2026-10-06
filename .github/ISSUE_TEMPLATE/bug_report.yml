@@ -36,7 +36,7 @@ body:
       label: Where did you see it?
       options:
         - Production (qrcraftly.com)
-        - Preview staging (dev)
+        - Branch preview (<branch>-qrcraftly.fpderuiter.workers.dev)
         - Local development
     validations:
       required: true

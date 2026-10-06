@@ -39,6 +39,8 @@ Mosaic QR is a style option (not a separate page) implemented with technique 3 i
 - The Scannability Worker already decodes the virtual render, and PNG, clipboard and share exports already run `validateScannability` on the canvas, so mosaic codes get the same decode check as every other style.
 - The engine exposes `rasterizeMosaic`, a canvas-free RGBA rasteriser. Tests decode its output with jsQR for several payloads, error-correction levels, images (gradient, noise, black, white, checkerboard, stripes) and both modes, with and without blur.
 
+  > **Amendment (#1178):** the tests now decode with QRCraftly's own decoder (`src/packages/qr-decode`, [ADR 0036](./0036-in-house-qr-decoder-replaces-zxing-wasm.md)), which replaced jsQR everywhere.
+
 ## Rationale
 
 - Recolouring keeps any payload and any content type working, where data-driven art only works for short payloads.

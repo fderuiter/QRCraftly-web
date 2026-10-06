@@ -11,7 +11,7 @@ Run it after changing any of these, then commit the files it rewrites:
 | A component in `src/components/ui/`, `src/components/inputs/` or `src/components/style-controls/` | Entries in `docs/public/UI_CATALOG.md`                           |
 | A page in `docs/public/` or `docs/SECURITY.md`                                                    | `src/data/docs_manifest.json` (rendered on the `/security` page) |
 
-`pnpm dev` also recompiles the docs manifest on start. `pnpm build` and `pnpm run lint` only verify it and fail if it is stale.
+Only `docs:sync` rewrites the docs manifest. `pnpm build` and `pnpm run lint` only verify it and fail if it is stale.
 
 ## `pnpm run docs:lint`: check the docs
 
