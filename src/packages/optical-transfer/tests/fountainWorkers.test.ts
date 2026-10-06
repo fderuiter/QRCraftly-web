@@ -27,6 +27,7 @@ import {
   encodeSessionMessage,
   FountainEncoder,
   MAX_RECEIVE_BYTES,
+  FLAG_BEACON,
   TILE_LAYOUTS,
   loadFecModule,
   TRANSFER_DENSITY_PROFILES,
@@ -55,13 +56,23 @@ function randomBytes(length: number, seed: number): Uint8Array {
   return Uint8Array.from({ length }, () => Math.floor(prng() * 256));
 }
 
-async function startFountain(file: Blob, options: { density?: string; outerCode?: string; tiles?: string } = {}) {
-  await sliceHandler({ data: { type: 'START', payload: { file, fps: 15, density: options.density, outerCode: options.outerCode, tiles: options.tiles } } });
+async function startFountain(file: Blob, options: { density?: string; outerCode?: string; tiles?: string; beacon?: { version: number; every: number } } = {}) {
+  const { density, outerCode, tiles, beacon } = options;
+  await sliceHandler({ data: { type: 'START', payload: { file, fps: 15, density, outerCode, tiles, beacon } } });
   return posted.find(m => m.type === 'INITIALIZED') as
     | {
         totalFrames: number;
         sha256: string;
-        fountain: { k: number; symbolSize: number; compression: string; density: TransferDensity; fingerprint: string; outerCode: string; tiles: string | null };
+        fountain: {
+          k: number;
+          symbolSize: number;
+          compression: string;
+          density: TransferDensity;
+          fingerprint: string;
+          outerCode: string;
+          tiles: string | null;
+          beacon: { version: number; every: number } | null;
+        };
       }
     | undefined;
 }
@@ -306,6 +317,35 @@ describe('Fountain sender and receiver workers', () => {
     }
     const complete = posted.find(m => m.type === 'COMPLETE') as { buffer: ArrayBuffer } | undefined;
     expect(new Uint8Array(complete?.buffer ?? new ArrayBuffer(0))).toEqual(bytes);
+  });
+
+  it('slots a flagged beacon in after every 7 dense frames, and beacons alone rebuild the file (#1143)', async () => {
+    const layout = TILE_LAYOUTS['2x2-v20'];
+    const bytes = randomBytes(7000, 32);
+    const init = await startFountain(new File([bytes], 'beacons.bin', { type: 'application/octet-stream' }), { tiles: layout.id, beacon: { version: 30, every: 8 } });
+    expect(init?.fountain.beacon).toEqual({ version: 30, every: 8 });
+    await pump(7 * layout.tiles);
+    const beacons = posted.filter(m => m.type === 'BEACON');
+    expect(beacons[0]).toMatchObject({ index: 0, size: 137 });
+
+    // Run until enough beacons went out to rebuild the file from them alone.
+    await pump(400 * layout.tiles);
+    const beaconTexts = qrCalls.filter(c => c.version === 30).map(c => c.text);
+    expect(beaconTexts.length).toBeGreaterThan(10);
+    const first = decodeFrame(beaconTexts[1]);
+    expect(first.ok && (first.frame.flags & FLAG_BEACON) !== 0).toBe(true);
+    posted = [];
+    for (const droplet of beaconTexts) {
+      await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet } });
+      if (posted.some(m => m.type === 'COMPLETE' || m.type === 'ERROR')) break;
+    }
+    const complete = posted.find(m => m.type === 'COMPLETE') as { buffer: ArrayBuffer } | undefined;
+    expect(new Uint8Array(complete?.buffer ?? new ArrayBuffer(0))).toEqual(bytes);
+  });
+
+  it('drops a beacon that is no larger than the tiles', async () => {
+    const init = await startFountain(new File([randomBytes(900, 6)], 'b.bin', { type: 'application/octet-stream' }), { tiles: '2x2-v25', beacon: { version: 20, every: 8 } });
+    expect(init?.fountain.beacon).toBeNull();
   });
 
   it('ignores an unknown tile layout and sends one code per frame', async () => {

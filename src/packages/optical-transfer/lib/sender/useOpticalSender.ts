@@ -22,14 +22,15 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { QRConfig } from '@/types';
 import { PreallocatedFramePool } from '../framePool';
 import { sanitizeStreamConfig, verifyHandshakeFrame, type HandshakeFrameVerifier } from '../handshake';
-import type { SliceWorkerOutgoingMessage, TransferStats } from '../contracts';
+import type { BeaconPlan, SliceWorkerOutgoingMessage, TransferStats } from '../contracts';
 import { DEFAULT_TRANSFER_DENSITY, type TransferCompression, type TransferDensity } from '../fountain/session';
 import type { TileLayoutId } from '../multicode/layout';
 import { holdForTargetFps, createVsyncPacer, type VsyncPacer } from '../multicode/pacing';
+import { MULTI_RATE_PROFILES, isBeaconFrame, type MultiRateProfileName } from '../multicode/multirate';
 import { planMultiCode, type MultiCodePlan } from '../multicode/plan';
 import { tileFrameIndex, tileSlot } from '../multicode/stagger';
 import type { OuterCode } from '../prism/session';
-import { paintTile, prepareTileCanvas, tileScreenOf } from './tiles';
+import { clearTile, paintBeacon, paintTile, prepareTileCanvas, tileScreenOf } from './tiles';
 import { formatMegabytes, spawnSliceWorker } from './workers';
 
 /** One QR module matrix produced by the slice worker. */
@@ -80,6 +81,8 @@ export interface SenderFountainInfo {
   outerCode: OuterCode;
   /** The multi-code layout the stream is shown with, or null for one code per frame. */
   tiles: TileLayoutId | null;
+  /** The beacons between the tiles, or null for none. */
+  beacon: BeaconPlan | null;
 }
 
 /** How a running multi-code stream is shown (#1142). */
@@ -90,6 +93,9 @@ export interface SenderTileInfo {
   /** Measured display refresh rate, or null while measuring. */
   refreshHz: number | null;
 }
+
+/** The multi-rate profile (#1143) that goes with each density, as the page's speed presets pair them. */
+const PROFILE_FOR_DENSITY: Readonly<Record<TransferDensity, MultiRateProfileName>> = { reliable: 'steady', balanced: 'balanced', fast: 'fast' };
 
 const HANDSHAKE_FAILURE_SUFFIX =
   'failed scannability check. Transfer playback remains paused. Please increase contrast or reduce visual complexity.';
@@ -165,8 +171,16 @@ export function useOpticalSender({
   const pacerRef = useRef<VsyncPacer | null>(null);
   /** Display refreshes held per frame; 1 until the pacer has measured the display. */
   const holdRef = useRef(1);
-  /** Frame index each tile shows, -1 before its first. */
+  /** Frame index each tile shows: -1 before its first, -2 while it is cleared for a beacon. */
   const tileShownRef = useRef<number[]>([]);
+  /** The last dense frame index painted in each tile, for recycling and healing. */
+  const lastDenseRef = useRef<number[]>([]);
+  /** The beacons of the running multi-rate stream (#1143), or null. */
+  const beaconPlanRef = useRef<BeaconPlan | null>(null);
+  /** Beacon matrices from the worker, by beacon number. */
+  const beaconPoolRef = useRef<Map<number, TransferFrame>>(new Map());
+  /** The beacon on the canvas, or null while it shows tiles. */
+  const beaconShownRef = useRef<number | null>(null);
   /** Refreshes played before the last pause, so a resumed stream carries on where it stopped. */
   const refreshBaseRef = useRef(0);
   const lastRefreshRef = useRef(-1);
@@ -230,6 +244,9 @@ export function useOpticalSender({
     pacerRef.current?.stop();
     pacerRef.current = null;
     tileShownRef.current = [];
+    lastDenseRef.current = [];
+    beaconPoolRef.current.clear();
+    beaconShownRef.current = null;
     refreshBaseRef.current = 0;
     lastRefreshRef.current = -1;
     setTileInfo(null);
@@ -324,6 +341,9 @@ export function useOpticalSender({
     }
     const shown = tileShownRef.current;
     const base = refreshBaseRef.current;
+    const every = beaconPlanRef.current?.every ?? 0;
+    /** Display slots before `slot` that were beacons, so dense slot numbers skip them. */
+    const beaconsBefore = (slot: number) => (every >= 2 ? Math.floor((slot + 1) / every) : 0);
     const pacer = createVsyncPacer({
       clock: { request: (callback) => requestAnimationFrame(callback), cancel: (handle) => cancelAnimationFrame(handle) },
       hold: holdRef.current,
@@ -339,23 +359,56 @@ export function useOpticalSender({
         lastRefreshRef.current = at;
         const hold = holdRef.current;
         const pool = framePoolRef.current;
+        const staggered = layout.tiles > 1 && hold > 1;
         let newest = -1;
         let missing = false;
-        for (let tile = 0; tile < layout.tiles; tile++) {
-          const slot = layout.tiles > 1 && hold > 1 ? tileSlot(layout, tile, at, hold) : Math.floor(at / hold);
-          const index = tileFrameIndex(layout, tile, slot);
-          if (index === shown[tile]) continue;
-          const frame = pool.getFrame(index);
-          if (!frame) {
-            // The tile keeps its last frame until the worker catches up.
-            missing = true;
-            continue;
+
+        // A beacon fills the whole canvas for the first group's slot; the tiles come back after it.
+        const leadSlot = Math.floor(at / hold);
+        if (every >= 2 && isBeaconFrame(leadSlot, every)) {
+          const number = (leadSlot + 1) / every - 1;
+          if (beaconShownRef.current !== number) {
+            const beacon = beaconPoolRef.current.get(number);
+            if (beacon) {
+              paintBeacon(canvas, beacon);
+              beaconPoolRef.current.delete(number);
+              beaconShownRef.current = number;
+              shown.fill(-2);
+            } else {
+              missing = true;
+            }
           }
-          paintTile(ctx, layout, modulePx, tile, frame);
-          // Recycle every slot this tile has moved past, skipped frames included.
-          for (let old = Math.max(tile, shown[tile]); old < index; old += layout.tiles) pool.delete(old);
-          shown[tile] = index;
-          newest = Math.max(newest, index);
+        } else {
+          if (beaconShownRef.current !== null) {
+            prepareTileCanvas(canvas, layout, modulePx);
+            beaconShownRef.current = null;
+          }
+          for (let tile = 0; tile < layout.tiles; tile++) {
+            const slot = staggered ? tileSlot(layout, tile, at, hold) : leadSlot;
+            if (every >= 2 && isBeaconFrame(slot, every)) {
+              // The lagging group's share of the beacon slot: an empty cell until its next frame.
+              if (shown[tile] !== -2) {
+                clearTile(ctx, layout, modulePx, tile);
+                shown[tile] = -2;
+              }
+              continue;
+            }
+            const index = tileFrameIndex(layout, tile, slot - beaconsBefore(slot));
+            if (index === shown[tile]) continue;
+            const frame = pool.getFrame(index);
+            if (!frame) {
+              // The tile keeps its last frame until the worker catches up.
+              missing = true;
+              continue;
+            }
+            paintTile(ctx, layout, modulePx, tile, frame);
+            // Recycle every slot this tile has moved past, skipped frames included.
+            const last = lastDenseRef.current[tile] ?? -1;
+            for (let old = Math.max(tile, last); old < index; old += layout.tiles) pool.delete(old);
+            lastDenseRef.current[tile] = index;
+            shown[tile] = index;
+            newest = Math.max(newest, index);
+          }
         }
         const worker = workerRef.current;
         if (newest >= 0) {
@@ -371,7 +424,7 @@ export function useOpticalSender({
           }
         } else if (missing && now - lastRenderSuccessTimeRef.current >= 100) {
           lastRenderSuccessTimeRef.current = now;
-          worker?.postMessage({ type: 'HEAL', payload: { lastAckedIndex: Math.max(...shown) } });
+          worker?.postMessage({ type: 'HEAL', payload: { lastAckedIndex: Math.max(-1, ...lastDenseRef.current) } });
         }
       },
     });
@@ -432,7 +485,13 @@ export function useOpticalSender({
           keyCode: message.fountain.keyCode,
           outerCode: message.fountain.outerCode,
           tiles: message.fountain.tiles,
+          beacon: message.fountain.beacon,
         });
+        break;
+      }
+
+      case 'BEACON': {
+        beaconPoolRef.current.set(message.index, { size: message.size, data: message.data });
         break;
       }
 
@@ -493,15 +552,20 @@ export function useOpticalSender({
 
     // A screen too small for 3 CSS px modules keeps one code per frame.
     const canvas = canvasRef.current;
-    const plan = multiCode && canvas ? planMultiCode({ enabled: true, screen: tileScreenOf(canvas), refreshHz: 60, targetFps: fpsRef.current }) : null;
+    // The speed profile of the same name (#1143) prefers a layout and sets how often a beacon comes.
+    const profile = MULTI_RATE_PROFILES[PROFILE_FOR_DENSITY[density]];
+    const plan = multiCode && canvas
+      ? planMultiCode({ enabled: true, screen: tileScreenOf(canvas), refreshHz: 60, targetFps: fpsRef.current, layoutId: profile.layoutId })
+      : null;
     tilePlanRef.current = plan;
+    beaconPlanRef.current = plan && profile.beaconVersion > plan.layout.version ? { version: profile.beaconVersion, every: profile.beaconEvery } : null;
     holdRef.current = 1;
     if (plan) setTileInfo({ layout: plan.layout.id, hold: null, refreshHz: null });
 
     const files = selectedFiles.length > 1 ? { files: selectedFiles } : { file: selectedFiles[0] };
     workerRef.current.postMessage({
       type: 'START',
-      payload: { ...files, fps: fpsRef.current, density, private: isPrivate, outerCode, tiles: plan?.layout.id },
+      payload: { ...files, fps: fpsRef.current, density, private: isPrivate, outerCode, tiles: plan?.layout.id, beacon: beaconPlanRef.current ?? undefined },
     });
   }, [selectedFiles, density, isPrivate, outerCode, multiCode, stopTransfer, handleWorkerMessage]);
 

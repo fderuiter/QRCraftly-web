@@ -34,6 +34,7 @@ import {
   type TransferDensity,
 } from '../fountain/session';
 import { MAX_FEC_SOURCE_SYMBOLS, MAX_FEC_SYMBOL_BYTES, MAX_RECEIVE_BYTES, formatLimit } from '../limits';
+import { tileFrameCapacity } from '../multicode/layout';
 import { base45Length } from './base45';
 import { unpackBundle, packBundle, type BundleFile, type BundleSource } from './bundle';
 import {
@@ -48,7 +49,7 @@ import {
   type PrivateKeys,
 } from './crypto';
 import { formatKeyCode } from './words';
-import { FLAG_ENCRYPTED, FLAG_OUTER_CODE, FRAME_OVERHEAD, MAX_SYMBOL_ID, encodeDataFrame, encodeManifestFrame } from './frame';
+import { FLAG_BEACON, FLAG_ENCRYPTED, FLAG_OUTER_CODE, FRAME_OVERHEAD, MAX_SYMBOL_ID, encodeDataFrame, encodeManifestFrame } from './frame';
 import {
   LAYOUT_BUNDLE,
   LAYOUT_SINGLE,
@@ -144,6 +145,8 @@ export interface PrismStreamOptions {
   manifestInterval?: number;
   /** The compiled outer-code module (`loadFecModule`); required when the manifest is version 2. */
   fecModule?: WebAssembly.Module;
+  /** Mark every frame as a beacon of a multi-rate stream (`FLAG_BEACON`, #1143). */
+  beacon?: boolean;
 }
 
 /** Which code carries a stream's symbols: the LT fountain code or the outer code (ADR 0037). */
@@ -181,7 +184,8 @@ export class PrismStream {
     this.sessionId = options.keys ? privateSessionId(options.keys, manifestBytes) : sessionIdOf(manifestBytes);
     this.fingerprint = describeManifest(manifest, bytesToHex(this.sessionId)).fingerprint;
     this.outerCode = usesOuterCode(manifest) ? 'fec' : 'lt';
-    this.flags = (manifest.encryption !== 0 ? FLAG_ENCRYPTED : 0) | (this.outerCode === 'fec' ? FLAG_OUTER_CODE : 0);
+    this.flags =
+      (manifest.encryption !== 0 ? FLAG_ENCRYPTED : 0) | (this.outerCode === 'fec' ? FLAG_OUTER_CODE : 0) | (options.beacon ? FLAG_BEACON : 0);
     this.manifestText = encodeManifestFrame({ sessionId: this.sessionId, manifest: manifestBytes, flags: this.flags });
     this.fecCeiling = MAX_SYMBOL_ID - (MAX_SYMBOL_ID % this.symbolsPerFrame);
     if (this.outerCode === 'fec') {
@@ -263,6 +267,11 @@ export interface PrismSessionOptions {
    * symbols of this size per frame. `maxVersion` and `symbolsPerFrame` are then ignored.
    */
   tile?: { symbolSize: number; symbolsPerFrame: number };
+  /**
+   * Also build the beacon stream of a multi-rate transfer (#1143): frames of the same session and
+   * symbol size that fill a code of this QR version. Only with `tile`.
+   */
+  beaconVersion?: number;
 }
 
 /** What a sender session hands back. */
@@ -274,6 +283,32 @@ export interface PrismSession {
   keyCode?: string;
   /** The code the stream was sent with. */
   outerCode: OuterCode;
+  /** The beacon stream, when `beaconVersion` was given. */
+  beacon?: PrismStream;
+}
+
+/** Beacons between manifests in a beacon stream. */
+export const BEACON_MANIFEST_INTERVAL = 4;
+
+/**
+ * Symbols one beacon carries: as many as fill a code of its version.
+ * @param version - The beacon's QR version.
+ * @param symbolSize - Bytes per symbol, shared with the dense tiles.
+ * @returns Symbols per beacon frame, 1 to 255.
+ */
+export function beaconSymbolsFor(version: number, symbolSize: number): number {
+  return Math.min(255, Math.max(1, Math.floor((tileFrameCapacity(version) - FRAME_OVERHEAD) / symbolSize)));
+}
+
+/**
+ * Where the beacons start in their own stream: past the source symbols, so a receiver that already
+ * read the dense tiles (which send the source symbols first) gets mostly new symbols from them.
+ * @param k - Source symbols.
+ * @param beaconSymbols - Symbols per beacon.
+ * @returns The index of beacon 0 in the beacon stream.
+ */
+export function beaconStreamStart(k: number, beaconSymbols: number): number {
+  return Math.ceil((k / beaconSymbols) * 1.1) + 2;
 }
 
 /** Fields a plain single-file manifest has no use for. */
@@ -286,7 +321,7 @@ function clampMime(mimeType: string): string {
 
 type StreamOptions = Pick<
   PrismSessionOptions,
-  'errorCorrectionLevel' | 'maxVersion' | 'requestedSymbolSize' | 'symbolsPerFrame' | 'fecModule' | 'fecBlockSymbols' | 'tile'
+  'errorCorrectionLevel' | 'maxVersion' | 'requestedSymbolSize' | 'symbolsPerFrame' | 'fecModule' | 'fecBlockSymbols' | 'tile' | 'beaconVersion'
 >;
 
 /**
@@ -308,7 +343,7 @@ function buildStream(
   options: StreamOptions,
   fields: Omit<PrismManifest, 'transferLength' | 'symbolSize' | 'transferCrc32'>,
   keys?: PrivateKeys
-): { stream: PrismStream; manifest: PrismManifest; symbolSize: number; outerCode: OuterCode } {
+): { stream: PrismStream; manifest: PrismManifest; symbolSize: number; outerCode: OuterCode; beacon?: PrismStream } {
   const symbolsPerFrame = options.tile?.symbolsPerFrame ?? options.symbolsPerFrame ?? 1;
   const fitted = options.tile?.symbolSize ?? prismSymbolSize(options.errorCorrectionLevel, options.maxVersion, symbolsPerFrame);
   const ltSymbolSize = Math.max(MIN_PRISM_SYMBOL_SIZE, Math.min(fitted, options.requestedSymbolSize ?? fitted));
@@ -322,7 +357,16 @@ function buildStream(
     transferCrc32: crc32(message),
   };
   const stream = new PrismStream(message, manifest, { symbolsPerFrame, keys, fecModule: options.fecModule });
-  return { stream, manifest, symbolSize, outerCode: stream.outerCode };
+  if (!options.tile || options.beaconVersion === undefined) return { stream, manifest, symbolSize, outerCode: stream.outerCode };
+  // A beacon-only camera needs the manifest before it can use a symbol, so every 4th beacon is one.
+  const beacon = new PrismStream(message, manifest, {
+    symbolsPerFrame: beaconSymbolsFor(options.beaconVersion, symbolSize),
+    manifestInterval: BEACON_MANIFEST_INTERVAL,
+    keys,
+    fecModule: options.fecModule,
+    beacon: true,
+  });
+  return { stream, manifest, symbolSize, outerCode: stream.outerCode, beacon };
 }
 
 /**

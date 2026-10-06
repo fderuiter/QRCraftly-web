@@ -68,19 +68,54 @@ export function paintTile(ctx: CanvasRenderingContext2D, layout: TileLayout, mod
   if (matrix.size !== layout.modules) return;
   ctx.fillStyle = TILE_DARK;
   const origin = TILE_QUIET_MODULES * modulePx;
+  fillModules(ctx, matrix, left + origin, top + origin, modulePx);
+}
+
+/** Fills the dark modules of a matrix whose top-left module is at (left, top). */
+function fillModules(ctx: CanvasRenderingContext2D, matrix: TileMatrix, left: number, top: number, modulePx: number): void {
   for (let row = 0; row < matrix.size; row++) {
-    const y = top + origin + row * modulePx;
+    const y = top + row * modulePx;
     let run = -1;
     // One rectangle per run of dark modules keeps a v25 tile to a few thousand fills.
     for (let column = 0; column <= matrix.size; column++) {
       const dark = column < matrix.size && matrix.data[row * matrix.size + column] === 1;
       if (dark && run < 0) run = column;
       if (!dark && run >= 0) {
-        ctx.fillRect(left + origin + run * modulePx, y, (column - run) * modulePx, modulePx);
+        ctx.fillRect(left + run * modulePx, y, (column - run) * modulePx, modulePx);
         run = -1;
       }
     }
   }
+}
+
+/**
+ * Empties one tile's cell, quiet zone included.
+ * @param ctx - The canvas context.
+ * @param layout - The layout.
+ * @param modulePx - Canvas pixels per module.
+ * @param tile - Tile number, row by row.
+ */
+export function clearTile(ctx: CanvasRenderingContext2D, layout: TileLayout, modulePx: number, tile: number): void {
+  paintTile(ctx, layout, modulePx, tile, { size: 0, data: new Uint8Array(0) });
+}
+
+/**
+ * Paints a beacon (#1143): one code as large as the canvas allows, centred, with its quiet zone,
+ * over the whole grid. The canvas keeps its size, so the tiles return in the same places.
+ * @param canvas - The transfer canvas, sized for the tiles.
+ * @param matrix - The beacon's module matrix.
+ */
+export function paintBeacon(canvas: HTMLCanvasElement, matrix: TileMatrix): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.fillStyle = TILE_LIGHT;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const side = matrix.size + 2 * TILE_QUIET_MODULES;
+  const modulePx = Math.max(1, Math.floor(Math.min(canvas.width, canvas.height) / side));
+  const left = Math.floor((canvas.width - side * modulePx) / 2) + TILE_QUIET_MODULES * modulePx;
+  const top = Math.floor((canvas.height - side * modulePx) / 2) + TILE_QUIET_MODULES * modulePx;
+  ctx.fillStyle = TILE_DARK;
+  fillModules(ctx, matrix, left, top, modulePx);
 }
 
 /**

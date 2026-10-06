@@ -95,6 +95,7 @@ function FileTransferReceiveInner() {
     camera,
     multiCode,
     setMultiCode,
+    layerHint,
     lockOn,
     bcur,
     bcurProgress,
@@ -440,6 +441,11 @@ function FileTransferReceiveInner() {
                   ? `The camera streams ${camera.width}×${camera.height}${camera.frameRate > 0 ? ` at ${Math.round(camera.frameRate)} frames/sec` : ''}.`
                   : 'For a sender showing several codes at once. Asks the camera for 60 frames a second.'}
               </p>
+              {multiCode && (
+                <p role="status" className="text-sm font-medium text-fg" data-testid="layer-hint">
+                  {layerHint ?? ''}
+                </p>
+              )}
             </div>
 
             {/* Beta notice after the primary actions so they stay in the first mobile viewport. */}

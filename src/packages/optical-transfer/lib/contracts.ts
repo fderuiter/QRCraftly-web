@@ -56,6 +56,16 @@ export interface SliceStartPayload {
   outerCode?: OuterCode;
   /** Size the frames for this multi-code layout's tiles (#1142) instead of the density's QR version. */
   tiles?: TileLayoutId;
+  /** With `tiles`: also make a beacon of this QR version for every `every`th display frame (#1143). */
+  beacon?: BeaconPlan;
+}
+
+/** The beacons of a multi-rate stream (#1143, ADR 0031). */
+export interface BeaconPlan {
+  /** QR version of a beacon; larger than the tiles'. */
+  version: number;
+  /** Every this many display frames is a beacon, 2 or more. */
+  every: number;
 }
 
 /** Messages the slice worker accepts. */
@@ -85,6 +95,8 @@ export interface FountainInitInfo {
   outerCode: OuterCode;
   /** The multi-code layout the frames were sized for, or null for one code per frame. */
   tiles: TileLayoutId | null;
+  /** The beacons sent between the tiles, or null for none. */
+  beacon: BeaconPlan | null;
 }
 
 /** Messages the slice worker emits. */
@@ -93,4 +105,6 @@ export type SliceWorkerOutgoingMessage =
   | { type: 'PROGRESS'; index: number; total: number; fileName?: string; fileSize?: number }
   | { type: 'INITIALIZED'; totalFrames: number; sha256: string; fountain: FountainInitInfo }
   | { type: 'KEY_FRAME'; size: number; data: Uint8Array }
+  /** Beacon `index` of a multi-rate stream: it follows dense display frame `(index + 1) * (every - 1) - 1`. */
+  | { type: 'BEACON'; index: number; size: number; data: Uint8Array }
   | { type: 'ERROR'; message: string };
