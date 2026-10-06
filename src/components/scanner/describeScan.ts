@@ -89,14 +89,15 @@ function readLink(text: string): ScanLink | null {
     return null;
   }
   const host = toUnicodeHostname(url.hostname);
+  // The parsed form is what the browser opens, so it is what gets offered and checked.
   return {
-    href: trimmed,
+    href: url.href,
     host,
     asciiHost: url.hostname,
     secure: url.protocol === 'https:',
     international: host !== url.hostname,
     mixedScripts: hasMixedScripts(host),
-    findings: analyseLink(trimmed),
+    findings: analyseLink(url.href),
   };
 }
 

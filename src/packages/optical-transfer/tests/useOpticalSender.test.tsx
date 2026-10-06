@@ -23,7 +23,6 @@ import React from 'react';
 import { useOpticalSender } from '../client';
 import { senderOptions } from './fixtures';
 import { encodeFeedbackFrame } from '../index';
-import { QRStyle } from '@/types';
 
 /**
  * Gives a canvas a 2D context that only takes fills. The multi-code tests check the timeline, not
@@ -577,21 +576,10 @@ describe('useOpticalSender', () => {
 
     await waitFor(() => expect(result.current.isTransferring).toBe(true));
     expect(options.verifyFrame).toHaveBeenCalledTimes(1);
-    // Fountain frames are checked as they are shown: sanitized, without logos.
-    expect(options.verifyFrame).toHaveBeenCalledWith(
-      expect.objectContaining({ size: 21 }),
-      expect.objectContaining({ style: QRStyle.STANDARD, logoUrl: null }),
-      null,
-      null
-    );
+    // Frames are checked and painted in the one fixed transfer look: no style travels with them.
+    expect(options.verifyFrame).toHaveBeenCalledWith(expect.objectContaining({ size: 21 }));
     await waitFor(() => expect(options.renderFrame).toHaveBeenCalled());
-    expect(options.renderFrame).toHaveBeenCalledWith(
-      result.current.canvasRef.current,
-      expect.objectContaining({ size: 21 }),
-      expect.objectContaining({ fgColor: '#000000' }),
-      null,
-      null
-    );
+    expect(options.renderFrame).toHaveBeenCalledWith(result.current.canvasRef.current, expect.objectContaining({ size: 21 }));
     act(() => result.current.stopTransfer());
     globalThis.mockWorkerControl.setInterceptor(null);
   });
@@ -634,28 +622,42 @@ describe('useOpticalSender', () => {
     globalThis.mockWorkerControl.setInterceptor(null);
   });
 
-  it('never paints decoration on transfer frames, whatever the page style', async () => {
-    const options = senderOptions({
-      config: { ...senderOptions().config, isMazeEnabled: true, isMazeBridgesEnabled: true },
+  it('keeps the settings a stream was started with from Start until Stop', async () => {
+    const options = senderOptions({ verifyFrame: vi.fn(() => new Promise<boolean>(() => {})) });
+    const hook = renderHook(() => useOpticalSender(options));
+    hook.result.current.canvasRef.current = document.createElement('canvas');
+    act(() => {
+      hook.result.current.setSelectedFile(new File(['payload'], 'p.txt', { type: 'text/plain' }));
     });
-    const { result } = await startWithFrames(options);
+    let start: any = null;
+    globalThis.mockWorkerControl.setInterceptor((message: any, worker: any) => {
+      if (message.type !== 'START') return;
+      start = message;
+      worker.dispatchMessage({ type: 'PROGRESS', index: 0, total: 1 });
+      worker.dispatchMessage({ type: 'FRAME', index: 0, total: 1, size: 21, data: new Uint8Array(441) });
+    });
+    await act(async () => {
+      hook.result.current.startTransfer();
+    });
+    // Still checking the first frame: nothing the person switches now can differ from the stream.
+    await waitFor(() => expect(options.verifyFrame).toHaveBeenCalled());
+    expect(hook.result.current.isVerifyingHandshake).toBe(true);
+    expect(hook.result.current.settingsLocked).toBe(true);
+    act(() => {
+      hook.result.current.setIsPrivate(true);
+      hook.result.current.setWalletCompat(true);
+      hook.result.current.setDensity('fast');
+      hook.result.current.setOuterCode('fec');
+      hook.result.current.setMultiCode(true);
+      hook.result.current.setSteer(true);
+    });
+    expect(start.payload.private).toBe(false);
+    expect(hook.result.current).toMatchObject({ isPrivate: false, walletCompat: false, density: 'balanced', outerCode: 'lt', multiCode: false, steer: false });
 
-    await waitFor(() => expect(result.current.isTransferring).toBe(true));
-    expect(options.verifyFrame).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ isMazeEnabled: false, isMazeBridgesEnabled: false }),
-      null,
-      null
-    );
-    await waitFor(() => expect(options.renderFrame).toHaveBeenCalled());
-    expect(options.renderFrame).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({ isMazeEnabled: false, isMazeBridgesEnabled: false }),
-      null,
-      null
-    );
-    act(() => result.current.stopTransfer());
+    act(() => hook.result.current.stopTransfer());
+    expect(hook.result.current.settingsLocked).toBe(false);
+    act(() => hook.result.current.setIsPrivate(true));
+    expect(hook.result.current.isPrivate).toBe(true);
     globalThis.mockWorkerControl.setInterceptor(null);
   });
 

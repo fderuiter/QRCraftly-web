@@ -80,13 +80,34 @@ function readableDate(value: string): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+/**
+ * The header fields of a `mailto` address by lower-case name, every value kept. Header names are
+ * case-insensitive (RFC 6068), and a mail app may honour each copy of a repeated field, so `BCC=`
+ * and a second `bcc=` must count as much as the first `bcc=`.
+ * @param text - The `mailto` address.
+ * @returns The values of each field, in order.
+ */
+function mailtoHeaders(text: string): Map<string, string[]> {
+  const headers = new Map<string, string[]>();
+  const trimmed = text.trim();
+  const start = trimmed.indexOf('?');
+  if (start === -1) return headers;
+  new URLSearchParams(trimmed.slice(start + 1)).forEach((value, key) => {
+    const name = key.toLowerCase();
+    headers.set(name, [...(headers.get(name) ?? []), value]);
+  });
+  return headers;
+}
+
 function emailNotes(text: string): ContentNotes | null {
   const parsed = parseProtocol(text);
   if (!parsed || parsed.scheme !== 'mailto') return null;
-  const to = recipients(decode(parsed.path)).concat(recipients(parsed.params.get('to')));
-  const cc = recipients(parsed.params.get('cc'));
-  const bcc = recipients(parsed.params.get('bcc'));
-  const body = parsed.params.get('body') ?? '';
+  const headers = mailtoHeaders(text);
+  const field = (name: string) => headers.get(name) ?? [];
+  const to = recipients(decode(parsed.path)).concat(recipients(field('to').join(',')));
+  const cc = recipients(field('cc').join(','));
+  const bcc = recipients(field('bcc').join(','));
+  const body = field('body').filter(Boolean).join('\n');
   const cautions: string[] = [];
   if (bcc.length > 0) cautions.push('This message also goes to hidden recipients (Bcc) you cannot see on the sent message.');
   if (cc.length > 0) cautions.push('This message is copied to other people (Cc).');
@@ -97,7 +118,7 @@ function emailNotes(text: string): ContentNotes | null {
       ['To', to.join(', ')],
       ['Cc', cc.join(', ')],
       ['Bcc', bcc.join(', ')],
-      ['Subject', parsed.params.get('subject') ?? ''],
+      ['Subject', field('subject').find(Boolean) ?? ''],
       ['Message', body],
     ]),
     cautions,

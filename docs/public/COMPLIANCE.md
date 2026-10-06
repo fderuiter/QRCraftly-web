@@ -42,7 +42,7 @@ QRCraftly runs no analytics, telemetry or diagnostics of its own, and keeps no l
 
 ### 4. Private file transfers
 
-File transfer can encrypt the stream with a key code that stays on the two screens (AES-256-GCM, key derived with HKDF-SHA-256). This protects against a camera that sees the sender's screen but does not have the key. It does not hide that a transfer is happening, and anyone who learns the key code can read the file. The key code is never written to storage or sent over the network.
+File transfer can encrypt the stream with a key code that stays on the two screens (AES-256-GCM, key derived with HKDF-SHA-256). The sender shows the key code only while a button is held. This protects against a camera that sees the sender's screen but does not have the key. It does not hide that a transfer is happening, and anyone who learns the key code can read the file. The key code is never written to storage or sent over the network.
 
 ## Certification Note
 

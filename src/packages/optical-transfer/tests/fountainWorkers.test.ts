@@ -105,6 +105,11 @@ async function feedUntilDone(stream: PrismStream, count = stream.k * 3 + 40) {
   }
 }
 
+/** Module counts of the frames the slice worker posted, in order. */
+function frameSizes(): unknown[] {
+  return posted.filter(m => m.type === 'FRAME').map(m => m.size);
+}
+
 /** ACKs frames one by one so the lookahead pipeline keeps generating. */
 async function pump(count: number) {
   for (let i = 0; i < count; i++) {
@@ -160,9 +165,9 @@ describe('Fountain sender and receiver workers', () => {
     for (const call of qrCalls) {
       const decoded = decodeFrame(call.text);
       expect(decoded.ok).toBe(true);
-      expect(call.ecc).toBe('Q');
-      // Only the occasional manifest frame may be a larger code than the data frames.
-      if (decoded.ok && decoded.frame.type === 'data') expect(call.version).toBeLessThanOrEqual(7);
+      expect(call.version).toBe(7);
+      // The manifest is longer than a Reliable data frame, so it drops to a weaker level to stay at version 7.
+      if (decoded.ok && decoded.frame.type === 'data') expect(call.ecc).toBe('Q');
     }
     expect(decodeFrame(qrCalls[0].text)).toMatchObject({ ok: true, frame: { type: 'manifest' } });
   });
@@ -190,15 +195,30 @@ describe('Fountain sender and receiver workers', () => {
       const { maxVersion, errorCorrectionLevel } = TRANSFER_DENSITY_PROFILES[density];
       const init = await startFountain(new File([randomBytes(6000, 5)], 'd.bin'), { density });
       expect(init?.fountain.density).toBe(density);
-      await pump(10);
-      expect(qrCalls.length).toBeGreaterThan(10);
+      await pump(20);
+      expect(qrCalls.length).toBeGreaterThan(16);
       for (const call of qrCalls) {
-        expect(call.ecc).toBe(errorCorrectionLevel);
         const decoded = decodeFrame(call.text);
-        if (decoded.ok && decoded.frame.type === 'data') expect(call.version).toBeLessThanOrEqual(maxVersion);
+        if (decoded.ok && decoded.frame.type === 'data') {
+          expect(call.ecc).toBe(errorCorrectionLevel);
+          expect(call.version).toBeLessThanOrEqual(maxVersion);
+        }
       }
+      // Manifest and data frames are one version, so the code never changes size on screen (#1306).
+      expect(new Set(qrCalls.map(c => c.version)).size).toBe(1);
+      const sizes = frameSizes();
+      expect(sizes.length).toBeGreaterThan(16);
+      expect(new Set(sizes).size).toBe(1);
     }
   );
+
+  it('gives a tiny file the manifest\'s version, so its frames keep one size too (#1306)', async () => {
+    await startFountain(new File([randomBytes(40, 12)], 'a-rather-long-file-name-for-a-tiny-file.bin'));
+    await pump(20);
+    const sizes = frameSizes();
+    expect(sizes.length).toBeGreaterThan(16);
+    expect(new Set(sizes).size).toBe(1);
+  });
 
   it('carries more bytes per droplet as density rises', async () => {
     const sizes: number[] = [];

@@ -108,8 +108,10 @@ function tokens(label: string): string[] {
  * an ordinary one.
  */
 export function analyseLink(url: string): LinkFinding[] {
-  const text = url.trim();
-  if (!text || /[\s]/.test(text)) return [];
+  // Read the address the browser will open: the URL parser drops tabs and line breaks anywhere
+  // and percent-encodes spaces after the host, so text with them can still be a working link.
+  const text = url.trim().replace(/[\t\n\r]/g, '');
+  if (!text) return [];
   const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(text) && !/^[^/?#]*:\d+(?:[/?#]|$)/.test(text);
   let parsed: URL;
   try {
@@ -121,7 +123,8 @@ export function analyseLink(url: string): LinkFinding[] {
 
   const findings: LinkFinding[] = [];
   const add = (code: LinkFindingCode, severity: LinkFindingSeverity, message: string) => findings.push({ code, severity, message });
-  const hostname = parsed.hostname.toLowerCase();
+  // A trailing dot names the same site (`example.com.`), so it must not hide the registrable domain.
+  const hostname = parsed.hostname.toLowerCase().replace(/\.+$/, '');
   const host = toUnicodeHostname(hostname);
 
   if (parsed.protocol === 'http:' && hasScheme) {

@@ -18,38 +18,7 @@
 
 
 import { vi } from 'vitest';
-import { QRConfig, QRType, QRStyle, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from '@/types';
 import type { UseOpticalReceiverOptions, UseOpticalSenderOptions } from '../client';
-
-/** A plain, high-contrast configuration for transfer hook tests. */
-export const transferTestConfig: QRConfig = {
-  value: 'Hello',
-  type: QRType.TEXT,
-  fgColor: '#000000',
-  bgColor: '#ffffff',
-  style: QRStyle.STANDARD,
-  logoUrl: null,
-  logoSize: 0.2,
-  logoPaddingStyle: 'none',
-  logoPadding: 1,
-  logoBackgroundColor: '#ffffff',
-  eyeColor: '#000000',
-  errorCorrectionLevel: QRErrorCorrectionLevel.M,
-  isBorderEnabled: false,
-  borderSize: 0.05,
-  borderColor: '#000000',
-  borderStyle: 'solid',
-  borderText: '',
-  borderTextPosition: 'bottom-center',
-  borderTextColor: '#ffffff',
-  borderLogoUrl: null,
-  borderLogoPosition: 'bottom-center',
-  socialFormat: SocialFormat.SQUARE_1_1,
-  templateStyle: TemplateStyle.NONE,
-  templateHeadline: '',
-  templateSubtext: '',
-  templateQrScale: 1.0,
-};
 
 /**
  * Sender options with a no-op renderer and a scannability gate that always passes.
@@ -57,9 +26,6 @@ export const transferTestConfig: QRConfig = {
  */
 export function senderOptions(overrides: Partial<UseOpticalSenderOptions> = {}): UseOpticalSenderOptions {
   return {
-    config: transferTestConfig,
-    logoImg: null,
-    borderLogoImg: null,
     renderFrame: vi.fn(),
     verifyFrame: vi.fn(async () => true),
     ...overrides,
