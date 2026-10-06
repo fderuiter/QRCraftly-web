@@ -1,6 +1,6 @@
 # Foundry
 
-Foundry is how QRCraftly replaces a third-party package with its own code ([#1175](https://github.com/fderuiter/QRCraftly-web/issues/1175)). Compute kernels are rewritten in plain Rust and compiled to WebAssembly ([ADR 0033](./adr/0033-rust-webassembly-modules.md), [RUST.md](./RUST.md)). Everything else is rewritten in TypeScript. Nothing is removed until the replacement has been shown to match it.
+Foundry is how QRCraftly replaces a third-party package with its own code ([#1175](https://github.com/fderuiter/QRCraftly-web/issues/1175)). Compute kernels are rewritten in plain Rust and compiled to WebAssembly ([ADR 0033](./adr/0033-rust-webassembly-modules.md), [RUST.md](./RUST.md)). Everything else is rewritten in TypeScript. Nothing is removed until the replacement has been shown to match it. The policy behind it, and what a new dependency must justify, is [ADR 0040](./adr/0040-in-house-first.md).
 
 ## Stages
 
@@ -44,7 +44,7 @@ Each replacement moves through these stages in order. The scorecard below record
 | `davelosert/vitest-coverage-report-action` | our own coverage summary (#1185)             | Contract |
 | `vitest-axe`                               | our own matcher on axe-core (#1186)          | Contract |
 | `@testing-library/jest-dom`                | our own DOM matchers (#1188)                 | Contract |
-| `@ngraveio/bc-ur`                          | frozen vectors (#1181)                       | Contract |
+| `@ngraveio/bc-ur`                          | frozen vectors (#1181)                       | Removed  |
 | `tsx`                                      | Node's own type stripping (#1189)            | Contract |
 | `husky`, `lint-staged`                     | our own hooks and staged-file runner (#1190) | Contract |
 | `marked`                                   | our own Markdown parser (#1191)              | Contract |

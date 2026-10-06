@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.join(__dirname, '..');
 
-// 1. Strict Allowed Production Dependencies List
+// 1. Strict Allowed Production Dependencies List. Each addition needs its own ADR (ADR 0040, In-House First).
 export const ALLOWED_DEPENDENCIES = new Set([
   'lucide-react',
   'react',
@@ -235,7 +235,9 @@ export function runComplianceAudit() {
     console.error('💡 How to resolve:');
     console.error('   1. Ensure all third-party libraries run strictly client-side.');
     console.error('   2. Do not introduce packages that trigger unauthorized network requests.');
-    console.error('   3. If you must add a dependency, consult security/auditors to allowlist it.\n');
+    console.error('   3. Our own code comes first (docs/adr/0040-in-house-first.md). A new runtime dependency needs its own ADR');
+    console.error('      (why our code cannot do it, size, licence, maintainers, network behaviour, patents, exit plan)');
+    console.error('      before it joins ALLOWED_DEPENDENCIES.\n');
 
     process.exit(1);
   }
