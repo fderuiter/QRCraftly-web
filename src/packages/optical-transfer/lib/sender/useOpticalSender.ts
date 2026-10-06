@@ -37,6 +37,7 @@ import { spawnTileWorker } from '../receiver/media';
 import { createTileReader, type TileReader } from '../receiver/tileReader';
 import { clearTile, paintBeacon, paintTile, prepareTileCanvas, tileScreenOf } from './tiles';
 import { formatMegabytes, spawnSliceWorker } from './workers';
+import { openWalletStream, type WalletStream } from './walletStream';
 
 /** One QR module matrix produced by the slice worker. */
 export interface TransferFrame {
@@ -116,6 +117,9 @@ export interface SenderTileInfo {
 }
 
 /** The multi-rate profile (#1143) that goes with each density, as the page's speed presets pair them. */
+/** Shown when wallet-compatible mode is asked to send several files. */
+const WALLET_ONE_FILE = 'Wallet-compatible mode sends one file at a time. Pick a single file, or turn the mode off.';
+
 const PROFILE_FOR_DENSITY: Readonly<Record<TransferDensity, MultiRateProfileName>> = { reliable: 'steady', balanced: 'balanced', fast: 'fast' };
 
 const HANDSHAKE_FAILURE_SUFFIX =
@@ -166,6 +170,8 @@ export function useOpticalSender({
   const [steeringReceivers, setSteeringReceivers] = useState(0);
   /** True when the sender stopped because every receiver it could see had the file. */
   const [autoStopped, setAutoStopped] = useState(false);
+  /** Sends real BC-UR parts that wallets can read, in place of Prism (#1149). */
+  const [walletCompat, setWalletCompat] = useState(false);
   const [fountainInfo, setFountainInfo] = useState<SenderFountainInfo | null>(null);
   const [fps, setFps] = useState(15);
   const [currentPass, setCurrentPass] = useState(1);
@@ -229,6 +235,10 @@ export function useOpticalSender({
   /** Refreshes played before the last pause, so a resumed stream carries on where it stopped. */
   const refreshBaseRef = useRef(0);
   const lastRefreshRef = useRef(-1);
+  /** The running wallet-compatible stream, or null. */
+  const walletRef = useRef<WalletStream | null>(null);
+  /** Bumped on every start and stop, so a wallet stream that opens late is dropped. */
+  const walletRunRef = useRef(0);
 
   useEffect(() => {
     configRef.current = config;
@@ -293,6 +303,8 @@ export function useOpticalSender({
     setHandshakeError(null);
     setHandshakeVerified(false);
     setKeyFrame(null);
+    walletRef.current = null;
+    walletRunRef.current += 1;
     endSteering();
     setSteerState({ status: 'off' });
     setSteeredProfile(null);
@@ -389,6 +401,73 @@ export function useOpticalSender({
     animationIdRef.current = requestAnimationFrame(loop);
   }, [paint]);
 
+  /** Plays a wallet-compatible stream: a new BC-UR part every frame, endlessly, as wallets expect. */
+  const runWalletLoop = useCallback(() => {
+    const loop = () => {
+      const wallet = walletRef.current;
+      if (!wallet || !isTransferringRef.current || isPausedRef.current) return;
+      const now = performance.now();
+      const interval = 1000 / fpsRef.current;
+      const elapsed = now - lastFrameTimeRef.current;
+      if (elapsed >= interval) {
+        lastFrameTimeRef.current = now - (elapsed % interval);
+        paint(wallet.nextFrame());
+        const shown = wallet.shown;
+        setCurrentFrameIndex(shown);
+        setProgress(Math.min(100, Math.round((shown / wallet.fragmentCount) * 100)));
+        const passNumber = Math.floor((shown - 1) / wallet.fragmentCount) + 1;
+        if (passNumber !== passCountRef.current) {
+          passCountRef.current = passNumber;
+          setCurrentPass(passNumber);
+        }
+      }
+      animationIdRef.current = requestAnimationFrame(loop);
+    };
+    animationIdRef.current = requestAnimationFrame(loop);
+  }, [paint]);
+
+  /**
+   * Opens and checks a wallet-compatible stream, then plays it. Only one file, sent as plain
+   * `ur:bytes`: no name, type, compression or key, which BC-UR has no place for.
+   * @param file The file to send.
+   */
+  const startWalletTransfer = useCallback((file: File) => {
+    const run = walletRunRef.current;
+    const fail = (message: string) => {
+      if (run !== walletRunRef.current) return;
+      isVerifyingHandshakeRef.current = false;
+      setIsVerifyingHandshake(false);
+      setHandshakeError(message);
+    };
+    file
+      .arrayBuffer()
+      .then((buffer) => openWalletStream(new Uint8Array(buffer), density))
+      .then(async (wallet) => {
+        if (run !== walletRunRef.current) return;
+        const first = wallet.nextFrame();
+        const isScannable = await verifyFrameRef.current(first, sanitizeStreamConfig(configRef.current), null, null);
+        if (run !== walletRunRef.current) return;
+        if (!isScannable) {
+          fail(`Transfer QR frame ${HANDSHAKE_FAILURE_SUFFIX}`);
+          return;
+        }
+        walletRef.current = wallet;
+        totalFramesRef.current = wallet.fragmentCount;
+        setTotalFrames(wallet.fragmentCount);
+        setFountainInfo(null);
+        isVerifyingHandshakeRef.current = false;
+        setIsVerifyingHandshake(false);
+        setHandshakeVerified(true);
+        setIsTransferring(true);
+        isTransferringRef.current = true;
+        paint(first);
+        setCurrentFrameIndex(1);
+        lastFrameTimeRef.current = performance.now();
+        runWalletLoop();
+      })
+      .catch((error: unknown) => fail(error instanceof Error ? error.message : 'Could not start the wallet-compatible stream.'));
+  }, [density, paint, runWalletLoop]);
+
   /**
    * Plays a multi-code stream (#1142): the pacer locks to the display's refreshes, each frame is
    * held for a whole number of them, and the two diagonal groups of tiles change on alternate
@@ -406,9 +485,10 @@ export function useOpticalSender({
     }
     const shown = tileShownRef.current;
     /**
-     * The stream's own refresh count. It stands still while a frame is missing: the worker only
-     * makes frames a little past the last one shown, so a timeline that ran on would ask for frames
-     * that never come and the stream would stop.
+     * The stream's own refresh count. The worker only makes frames a little past the last one shown,
+     * so a timeline that ran ahead would ask for frames that never come and the stream would stop.
+     * It stands still while a frame is missing, and moves at most one frame per tick when the
+     * browser skips refreshes (a busy or throttled page) rather than jumping past frames.
      */
     let at = refreshBaseRef.current;
     let lastRefresh = -1;
@@ -427,7 +507,7 @@ export function useOpticalSender({
       onTick: ({ refresh }) => {
         if (!isTransferringRef.current || isPausedRef.current) return;
         const now = performance.now();
-        if (lastRefresh >= 0 && !waiting) at += refresh - lastRefresh;
+        if (lastRefresh >= 0 && !waiting) at += Math.min(refresh - lastRefresh, holdRef.current);
         lastRefresh = refresh;
         lastRefreshRef.current = at;
         const hold = holdRef.current;
@@ -763,6 +843,18 @@ export function useOpticalSender({
       startTime: Date.now(),
     });
 
+    if (walletCompat && !isPrivate) {
+      if (selectedFiles.length > 1) {
+        isVerifyingHandshakeRef.current = false;
+        setIsVerifyingHandshake(false);
+        setHandshakeError(WALLET_ONE_FILE);
+        return;
+      }
+      tilePlanRef.current = null;
+      startWalletTransfer(selectedFiles[0]);
+      return;
+    }
+
     if (!workerRef.current) {
       const worker = spawnSliceWorker();
       workerRef.current = worker;
@@ -800,7 +892,7 @@ export function useOpticalSender({
         steer: steered,
       },
     });
-  }, [selectedFiles, density, isPrivate, outerCode, multiCode, steer, stopTransfer, handleWorkerMessage]);
+  }, [selectedFiles, density, isPrivate, outerCode, multiCode, steer, walletCompat, stopTransfer, handleWorkerMessage, startWalletTransfer]);
 
   /** Shows the key QR for as long as the person holds the button; it never plays with the stream. */
   const showKeyQr = useCallback(() => workerRef.current?.postMessage({ type: 'KEY_QR' }), []);
@@ -827,9 +919,10 @@ export function useOpticalSender({
     setIsPaused(false);
     lastFrameTimeRef.current = performance.now();
     lastRenderSuccessTimeRef.current = performance.now();
-    if (tilePlanRef.current) runTileLoop(tilePlanRef.current);
+    if (walletRef.current) runWalletLoop();
+    else if (tilePlanRef.current) runTileLoop(tilePlanRef.current);
     else runAnimationLoop();
-  }, [runAnimationLoop, runTileLoop]);
+  }, [runAnimationLoop, runTileLoop, runWalletLoop]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
@@ -888,6 +981,8 @@ export function useOpticalSender({
     steeredProfile,
     steeringReceivers,
     autoStopped,
+    walletCompat,
+    setWalletCompat,
     fps,
     setFps,
     currentPass,

@@ -24,7 +24,6 @@ import { useOpticalReceiver } from '../client';
 import {
   PrismStream,
   TRANSFER_DENSITY_PROFILES,
-  createFountainSession,
   createPrismSession,
   crc32,
   crc32c,
@@ -211,21 +210,6 @@ describe('useOpticalReceiver', () => {
     });
 
     await waitFor(() => expect(result.current.receiverError).toMatch(/newer version/));
-  });
-
-  it('still receives a legacy ur:bytes stream', async () => {
-    const options = receiverOptions();
-    const { encoder } = await createFountainSession(text('legacy stream '.repeat(20)), { fileName: 'old.txt', mimeType: 'text/plain' });
-    const { result } = renderHook(() => useOpticalReceiver(options));
-
-    for (let i = 3; i < encoder.k * 4 + 20 && !result.current.receiverSuccess; i++) {
-      await act(async () => {
-        result.current.handleFrame(encoder.dropletStringForIndex(i));
-        await new Promise(resolve => setTimeout(resolve, 0));
-      });
-    }
-    await waitFor(() => expect(result.current.receiverSuccess).toBe(true));
-    expect(options.saveFile).toHaveBeenCalledWith(expect.any(Uint8Array), 'old.txt', 'text/plain');
   });
 
   describe('Dual-Mode Receiver & Object URL Management', () => {

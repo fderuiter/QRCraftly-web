@@ -36,7 +36,7 @@ interface TransferFile {
   buffer: Buffer;
 }
 
-async function openSender(sender: Page, file: TransferFile, speed?: 'Steady' | 'Balanced' | 'Fast', options: { outerCode?: boolean; multiCode?: boolean; steer?: boolean } = {}) {
+async function openSender(sender: Page, file: TransferFile, speed?: 'Steady' | 'Balanced' | 'Fast', options: { outerCode?: boolean; multiCode?: boolean; steer?: boolean; wallet?: boolean } = {}) {
   await sender.goto('/file-transfer');
   await sender.waitForSelector('main[data-hydrated="true"]');
   await sender.getByLabel('Choose a file to send').setInputFiles(file);
@@ -55,6 +55,11 @@ async function openSender(sender: Page, file: TransferFile, speed?: 'Steady' | '
   if (options.steer) {
     await sender.getByText('Let the receiver steer (preview)', { exact: true }).click();
     await expect(sender.getByLabel('Let the receiver steer (preview)')).toBeChecked();
+  }
+  if (options.wallet) {
+    await sender.getByRole('button', { name: 'Advanced', exact: true }).click();
+    await sender.getByText('Wallet-compatible (BC-UR)', { exact: true }).click();
+    await expect(sender.getByLabel('Wallet-compatible (BC-UR)')).toBeChecked();
   }
   await sender.getByRole('button', { name: 'Start file transfer' }).click();
   await expect(sender.getByRole('button', { name: 'Stop file transfer' })).toBeVisible({ timeout: 20_000 });
@@ -77,9 +82,12 @@ async function openReceiver(receiver: Page, options: { multiCode?: boolean; stee
 
 const isComplete = (receiver: Page) => () => receiver.getByTestId('inline-complete-panel').isVisible();
 
-async function blocksDecoded(receiver: Page): Promise<number> {
-  const text = (await receiver.getByTestId('fountain-rank').textContent({ timeout: 500 }).catch(() => null)) ?? '';
-  return Number(/^(\d+)/.exec(text)?.[1] ?? 0);
+/** The receiver's frames scanned and "decoded / needed" blocks, or zeros before the first frame. */
+async function decodeProgress(receiver: Page): Promise<{ scanned: number; decoded: number; needed: number }> {
+  const read = (id: string) => receiver.getByTestId(id).textContent({ timeout: 500 }).catch(() => null);
+  const [scanned, rank] = await Promise.all([read('fountain-droplets'), read('fountain-rank')]);
+  const match = /^(\d+)\s*\/\s*(\d+)/.exec(rank ?? '');
+  return { scanned: Number(scanned ?? 0) || 0, decoded: Number(match?.[1] ?? 0), needed: Number(match?.[2] ?? 0) };
 }
 
 async function relayUntilComplete(
@@ -151,6 +159,25 @@ test.describe('Optical file transfer', () => {
       await expectDownloadedCopy(receiver, file);
     });
 
+    test('sends a wallet-compatible BC-UR stream that the receiver reads as one (#1149)', async ({ page: receiver, context }) => {
+      await installSyntheticCamera(context);
+      const sender = await context.newPage();
+      const file = { name: 'psbt.bin', mimeType: 'application/octet-stream', buffer: randomBytes(1500) };
+      await openSender(sender, file, undefined, { wallet: true });
+      await openReceiver(receiver);
+      await relayFrames(sender, receiver, {
+        drop: n => n % 3 === 0,
+        until: () => receiver.getByTestId('bcur-complete-panel').isVisible(),
+        timeoutMs: 90_000,
+      });
+      await expect(receiver.getByTestId('bcur-summary')).toContainText('Type bytes');
+
+      const downloadPromise = receiver.waitForEvent('download');
+      await receiver.getByTestId('bcur-complete-panel').getByRole('button', { name: 'Save', exact: true }).click();
+      const received = await readFile(await (await downloadPromise).path());
+      expect(received.equals(file.buffer)).toBe(true);
+    });
+
     test('shows several codes per frame and reads them all when both sides choose it (#1142)', async ({ page: receiver, context }) => {
       await installSyntheticCamera(context);
       const sender = await context.newPage();
@@ -199,11 +226,18 @@ test.describe('Optical file transfer', () => {
       await openSender(sender, file, 'Steady');
       await openReceiver(receiver);
 
-      await relayFrames(sender, receiver, { until: async () => (await blocksDecoded(receiver)) >= 40, timeoutMs: 60_000 });
+      // Pause once half the needed frames are in. Decoded blocks are a lower bound that can jump to
+      // the total after an elimination pass, so they cannot say how far along the receiver is.
+      const halfway = async () => {
+        const { scanned, needed } = await decodeProgress(receiver);
+        return needed > 0 && scanned >= Math.ceil(needed / 2);
+      };
+      await relayFrames(sender, receiver, { until: halfway, timeoutMs: 60_000 });
       await receiver.getByRole('button', { name: 'Deactivate camera scanner' }).click();
       await sender.getByRole('button', { name: 'Stop file transfer' }).click();
-      const before = await blocksDecoded(receiver);
-      expect(before).toBeGreaterThanOrEqual(40);
+      const before = await decodeProgress(receiver);
+      expect(before.scanned).toBeGreaterThanOrEqual(Math.ceil(before.needed / 2));
+      expect(before.decoded).toBeLessThan(before.needed);
 
       await sender.getByRole('button', { name: 'Start file transfer' }).click();
       await receiver.getByRole('button', { name: 'Activate camera scanner' }).click();

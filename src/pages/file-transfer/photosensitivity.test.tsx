@@ -70,6 +70,8 @@ vi.mock('@/packages/optical-transfer/client', () => ({
     steeredProfile: null,
     steeringReceivers: 0,
     autoStopped: false,
+    walletCompat: false,
+    setWalletCompat: vi.fn(),
     transferStats: { frameBufferMemory: '0 MB' },
     canvasRef: { current: null },
     handleFileChange: vi.fn(),

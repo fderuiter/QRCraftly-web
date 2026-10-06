@@ -53,23 +53,21 @@ describe('real BC-UR streams in the receiver (#1149)', () => {
     expect(result.current.bcurProgress).toBeNull();
   }, 20_000);
 
-  it('drops the droplet decoder\'s error once the BC-UR stream completes', async () => {
-    // Our own droplets are `ur:bytes` codes too, so the droplet worker also reads a wallet's parts and
-    // can fail on them, in any order relative to the BC-UR decoder. Make it fail on every part.
-    globalThis.mockWorkerControl.setResponseOverride({ type: 'ERROR', error: 'Malformed fountain session header.' });
+  it('reads UR codes with the BC-UR decoder only, never the transfer worker', async () => {
+    const posted: unknown[] = [];
+    globalThis.mockWorkerControl.setInterceptor((message: unknown) => {
+      posted.push(message);
+    });
     const { result } = renderHook(() => useOpticalReceiver(receiverOptions({ autoDownload: false })));
     for (const part of stream.parts) {
       if (result.current.bcur) break;
       await act(async () => {
-        result.current.handleFrame(part);
+        result.current.handleFrame(part.toUpperCase());
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
     }
     await waitFor(() => expect(result.current.bcur).not.toBeNull());
-    // Let any worker reply still in flight arrive.
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    });
+    expect(posted).toEqual([]);
     expect(result.current.receiverError).toBeNull();
   }, 20_000);
 });

@@ -17,20 +17,14 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import {
   FountainEncoder,
   FountainDecoder,
-  FountainReassembler,
   FountainRateTracker,
   buildRobustSolitonCdf,
   sampleDegreeFromCdf,
   getNeighborsForSeq,
   createPrng,
-  serializeDroplet,
-  MAX_RECEIVE_MESSAGE_BYTES,
-  parseDropletString,
-  isFountainDropletString,
   cborEncode,
   cborDecode,
   encodeBytewordsMinimal,
@@ -38,21 +32,15 @@ import {
   crc32,
   crc32Hex,
   solveGF2,
-  createFountainSession,
-  openFountainSession,
-  encodeSessionMessage,
-  decodeSessionMessage,
   compressForTransfer,
   decompressTransferPayload,
-  resolveFountainSymbolSize,
-  maxDropletStringLength,
   sha256Hex,
-  MAX_QR_VERSION,
   TRANSFER_DENSITY_PROFILES,
   DEFAULT_TRANSFER_DENSITY,
   resolveTransferDensity,
   estimateTransferFrames,
   MANIFEST_INTERVAL,
+  type FountainDroplet,
 } from '../index';
 
 /** Deterministic pseudo-random bytes (incompressible). */
@@ -157,69 +145,6 @@ describe('Robust Soliton distribution', () => {
   });
 });
 
-describe('BC-UR droplet envelope', () => {
-  const droplet = {
-    seq: 42,
-    k: 10,
-    messageLength: 48,
-    checksum: 0xa1b2c3d4,
-    degree: 1,
-    indices: [3],
-    data: new Uint8Array([1, 2, 3, 4, 5]),
-  };
-
-  it('serializes as uppercase ur:bytes/<seq>-<k>/<bytewords> and round-trips', () => {
-    const str = serializeDroplet(droplet);
-    expect(str).toMatch(/^UR:BYTES\/42-10\/[A-Z]+$/);
-    expect(isFountainDropletString(str)).toBe(true);
-    expect(isFountainDropletString(str.toLowerCase())).toBe(true);
-
-    const parsed = parseDropletString(str.toLowerCase());
-    expect(parsed).not.toBeNull();
-    expect(parsed!.meta).toEqual({ seq: 42, k: 10, messageLength: 48, checksum: 0xa1b2c3d4 });
-    expect(parsed!.data).toEqual(droplet.data);
-
-    // The body is a BC-UR fragment: CBOR [seq, k, messageLen, checksum, data]
-    const body = decodeBytewordsMinimal(str.split('/')[2]);
-    expect(cborDecode(body!)).toEqual([42, 10, 48, 0xa1b2c3d4, droplet.data]);
-  });
-
-  it('rejects a droplet claiming more than the receive limit, or a huge block count (#1154)', () => {
-    const claim = (k: number, messageLength: number, data = new Uint8Array(32)) =>
-      serializeDroplet({ seq: 1, k, messageLength, checksum: 1, degree: 1, indices: [0], data });
-    // Valid shape: k fragments of 32 bytes.
-    expect(parseDropletString(claim(10, 10 * 32 - 5))).not.toBeNull();
-    // A claim of 134 MB (k * 32 B) fits the arithmetic but not the receive limit.
-    expect(parseDropletString(claim(1 << 22, (1 << 22) * 32 - 1))).toBeNull();
-    // k above the absolute cap.
-    expect(parseDropletString(claim((1 << 22) + 1, (1 << 22) + 1))).toBeNull();
-    // Just under the receive limit is still accepted.
-    expect(parseDropletString(claim(MAX_RECEIVE_MESSAGE_BYTES / 32, MAX_RECEIVE_MESSAGE_BYTES - 1))).not.toBeNull();
-  });
-
-  it('rejects malformed, mismatched or corrupted droplets', () => {
-    const str = serializeDroplet(droplet);
-    expect(parseDropletString('F|0|2|abc')).toBeNull();
-    expect(parseDropletString('ur:bytes/')).toBeNull();
-    expect(parseDropletString('ur:bytes/42-10')).toBeNull();
-    expect(parseDropletString(str.replace('/42-10/', '/43-10/'))).toBeNull();
-    expect(parseDropletString(str.replace('/42-10/', '/42-11/'))).toBeNull();
-    // Flip one byteword: CRC must catch it
-    const body = str.split('/')[2];
-    const flipped = (body.startsWith('AE') ? 'AD' : 'AE') + body.slice(2);
-    expect(parseDropletString(`UR:BYTES/42-10/${flipped}`)).toBeNull();
-
-    const wrap = (value: Parameters<typeof cborEncode>[0]) =>
-      `ur:bytes/42-10/${encodeBytewordsMinimal(cborEncode(value))}`;
-    expect(parseDropletString(wrap([42, 10, 45]))).toBeNull();
-    expect(parseDropletString(wrap('not-an-array'))).toBeNull();
-    expect(parseDropletString(wrap([42, 10, 45, 1, new Uint8Array(0)]))).toBeNull();
-    expect(parseDropletString(wrap([42, 10, 500, 1, new Uint8Array(5)]))).toBeNull();
-    expect(parseDropletString(wrap([42, 10, 45, 1, 'text']))).toBeNull();
-    expect(parseDropletString(`ur:bytes/42-10/${encodeBytewordsMinimal(new Uint8Array([0x5f]))}`)).toBeNull();
-  });
-});
-
 describe('GF(2) Gaussian elimination', () => {
   it('solves a full-rank system and reports residual equations when under-determined', () => {
     const a = new Uint8Array([1, 0]);
@@ -276,7 +201,8 @@ describe('Fountain decoder', () => {
     const encoder = new FountainEncoder(original, { blockSize: 100 });
     expect(encoder.k).toBe(1);
     const decoder = new FountainDecoder();
-    expect(decoder.ingestString(encoder.nextDropletString())).toBe(true);
+    const droplet = encoder.nextDroplet();
+    expect(decoder.ingest(droplet, droplet.data)).toBe(true);
     expect(decoder.isComplete).toBe(true);
     expect(decoder.progress).toBe(100);
     expect(new TextDecoder().decode(decoder.finalize()!)).toBe('Small payload');
@@ -352,12 +278,15 @@ describe('Fountain decoder', () => {
     expect(decoder.ingestEquation([99], d1.data)).toBe(false);
     expect(decoder.ingestEquation([0], d1.data)).toBe(false);
     expect(decoder.ingestEquation([1, 1], d1.data)).toBe(false);
-    expect(decoder.ingestString('not a droplet')).toBe(false);
     expect(decoder.finalize()).toBeNull();
 
-    for (let seq = 2; seq <= encoder.k; seq++) decoder.ingestString(serializeDroplet(encoder.getDroplet(seq)));
+    for (let seq = 2; seq <= encoder.k; seq++) {
+      const d = encoder.getDroplet(seq);
+      decoder.ingest(d, d.data);
+    }
     expect(decoder.isComplete).toBe(true);
-    expect(decoder.ingestString(serializeDroplet(encoder.getDroplet(encoder.k + 1)))).toBe(false);
+    const late = encoder.getDroplet(encoder.k + 1);
+    expect(decoder.ingest(late, late.data)).toBe(false);
   });
 
   it('throws on CRC mismatch of the reassembled message', () => {
@@ -376,7 +305,8 @@ describe('Fountain decoder', () => {
     for (let i = 0; i < 25; i++) encoder.nextDroplet();
     let n = 0;
     while (!decoder.isComplete && n < 400) {
-      decoder.ingestString(encoder.nextDropletString());
+      const d = encoder.nextDroplet();
+      decoder.ingest(d, d.data);
       n++;
     }
     expect(decoder.isComplete).toBe(true);
@@ -387,7 +317,7 @@ describe('Fountain decoder', () => {
     const encoder = new FountainEncoder(randomBytes(40, 2), { blockSize: 10, maxSeq: 6 });
     expect(encoder.k).toBe(4);
     expect([0, 3, 4, 5, 6, 7, 8].map(i => encoder.seqForIndex(i))).toEqual([1, 4, 5, 6, 5, 6, 5]);
-    expect(parseDropletString(encoder.dropletStringForIndex(6))!.meta.seq).toBe(5);
+    expect(encoder.getDroplet(encoder.seqForIndex(6)).seq).toBe(5);
     encoder.nextDroplet();
     encoder.reset();
     expect(encoder.nextDroplet().seq).toBe(1);
@@ -403,14 +333,14 @@ describe('Fountain decoder', () => {
       const encoder = new FountainEncoder(original, { blockSize });
       const drop = createPrng(seed * 7919 + Math.round(erasure * 100));
 
-      const stream: string[] = [];
+      const stream: FountainDroplet[] = [];
       for (let i = 0; i < encoder.k * 4; i++) {
-        const s = encoder.nextDropletString();
-        if (drop() >= erasure) stream.push(s);
+        const d = encoder.nextDroplet();
+        if (drop() >= erasure) stream.push(d);
       }
       const decoder = new FountainDecoder();
       for (const s of shuffled(stream, seed)) {
-        decoder.ingestString(s);
+        decoder.ingest(s, s.data);
         if (decoder.isComplete) break;
       }
       expect(decoder.isComplete).toBe(true);
@@ -422,22 +352,6 @@ describe('Fountain decoder', () => {
 });
 
 describe('Fountain session layer', () => {
-  it('round-trips the session header and rejects malformed messages', () => {
-    const header = {
-      fileName: 'notes.txt',
-      mimeType: 'text/plain',
-      fileSize: 3,
-      sha256: 'ab'.repeat(32),
-      compression: 'deflate-raw' as const,
-    };
-    const message = encodeSessionMessage(header, new Uint8Array([1, 2, 3]));
-    expect(decodeSessionMessage(message)).toEqual({ header, payload: new Uint8Array([1, 2, 3]) });
-    expect(decodeSessionMessage(cborEncode([1, 2]))).toBeNull();
-    expect(decodeSessionMessage(cborEncode(cborEncode([2, 'a', 'b', 1, new Uint8Array(32), 0, new Uint8Array(0)])))).toBeNull();
-    expect(decodeSessionMessage(cborEncode(cborEncode([1, 'a', 'b', 1, new Uint8Array(32), 7, new Uint8Array(0)])))).toBeNull();
-    expect(decodeSessionMessage(new Uint8Array([0xff]))).toBeNull();
-  });
-
   it('compresses compressible text with deflate-raw and restores it', async () => {
     const text = new TextEncoder().encode('air-gapped optical transfer '.repeat(200));
     const { data, compression } = await compressForTransfer(text, 'text/plain');
@@ -461,54 +375,6 @@ describe('Fountain session layer', () => {
     expect(await decompressTransferPayload(noise, 'none')).toBe(noise);
   });
 
-  it('keeps every droplet within QR version 7 at ECC Q and H for any file size', () => {
-    const sizes = { Q: [1, 100, 5000, 250_000, 5_000_000, 60_000_000], H: [1, 100, 5000, 250_000, 5_000_000] };
-    for (const ecc of ['Q', 'H'] as const) {
-      for (const size of sizes[ecc]) {
-        const { symbolSize, k, maxSeq } = resolveFountainSymbolSize(size, ecc);
-        expect(symbolSize).toBeGreaterThanOrEqual(8);
-        expect(symbolSize).toBeLessThanOrEqual(100);
-        expect(k).toBe(Math.ceil(size / symbolSize));
-        const longest = maxDropletStringLength(symbolSize, k, size, maxSeq);
-
-        // Build a real worst-case droplet string and encode it.
-        const worst = serializeDroplet({
-          seq: maxSeq,
-          k,
-          messageLength: size,
-          checksum: 0xffffffff,
-          degree: 1,
-          indices: [0],
-          data: new Uint8Array(symbolSize).fill(0xff),
-        });
-        expect(worst.length).toBeLessThanOrEqual(longest);
-        const qr = QRCode.create(worst, { errorCorrectionLevel: ecc });
-        expect(qr.version).toBeLessThanOrEqual(7);
-      }
-    }
-  });
-
-  it.each(Object.entries(TRANSFER_DENSITY_PROFILES))(
-    'keeps every %s droplet within its QR version and ECC for any file size',
-    (_density, { maxVersion, errorCorrectionLevel }) => {
-      expect(maxVersion).toBeLessThanOrEqual(MAX_QR_VERSION);
-      for (const size of [1, 100, 5000, 250_000, 5_000_000]) {
-        const { symbolSize, k, maxSeq } = resolveFountainSymbolSize(size, errorCorrectionLevel, undefined, maxVersion);
-        const worst = serializeDroplet({
-          seq: maxSeq,
-          k,
-          messageLength: size,
-          checksum: 0xffffffff,
-          degree: 1,
-          indices: [0],
-          data: new Uint8Array(symbolSize).fill(0xff),
-        });
-        expect(worst.length).toBeLessThanOrEqual(maxDropletStringLength(symbolSize, k, size, maxSeq));
-        expect(QRCode.create(worst, { errorCorrectionLevel }).version).toBeLessThanOrEqual(maxVersion);
-      }
-    }
-  );
-
   it('resolves unknown densities to the default and estimates frames per density', () => {
     expect(resolveTransferDensity('fast')).toBe('fast');
     expect(resolveTransferDensity('turbo')).toBe(DEFAULT_TRANSFER_DENSITY);
@@ -526,101 +392,9 @@ describe('Fountain session layer', () => {
     expect(estimateTransferFrames(12 * 1024)).toEqual(balanced);
   });
 
-  it('honours a smaller requested symbol size and lower version ceilings', () => {
-    expect(resolveFountainSymbolSize(1000, 'Q', 12).symbolSize).toBe(12);
-    const v5 = resolveFountainSymbolSize(1000, 'M', 100, 5);
-    const v7 = resolveFountainSymbolSize(1000, 'M', 100, 7);
-    expect(v5.symbolSize).toBeLessThan(v7.symbolSize);
-    expect(() => resolveFountainSymbolSize(1000, 'H', 100, 1)).toThrow(RangeError);
-    // ECC H leaves too little room for the header of very large sessions.
-    expect(() => resolveFountainSymbolSize(60_000_000, 'H')).toThrow(/too large/);
-  });
-
-  it('creates and opens a verified session end-to-end, detecting tampering', async () => {
-    const file = new TextEncoder().encode('Transfer me through the air gap. '.repeat(40));
-    const { encoder, header, symbolSize } = await createFountainSession(file, {
-      fileName: 'gap.txt',
-      mimeType: 'text/plain',
-      errorCorrectionLevel: 'Q',
-    });
-    expect(header.compression).toBe('deflate-raw');
-    expect(header.sha256).toBe(await sha256Hex(file));
-    expect(encoder.blockSize).toBe(symbolSize);
-
-    const reassembler = new FountainReassembler();
-    let index = 0;
-    while (!reassembler.isComplete && index < encoder.k * 4) {
-      reassembler.ingest(encoder.dropletStringForIndex(index++));
-    }
-    const {
-      files: [{ data, header: received }],
-    } = await reassembler.finalize();
-    expect(data).toEqual(file);
-    expect(received).toEqual(header);
-
-    const badHash = encodeSessionMessage({ ...header, compression: 'none', fileSize: 3, sha256: '00'.repeat(32) }, new Uint8Array([1, 2, 3]));
-    await expect(openFountainSession(badHash)).rejects.toThrow(/SHA-256 mismatch/);
-    const badSize = encodeSessionMessage({ ...header, compression: 'none', fileSize: 9 }, new Uint8Array([1, 2, 3]));
-    await expect(openFountainSession(badSize)).rejects.toThrow(/size/);
-    await expect(openFountainSession(new Uint8Array([0]))).rejects.toThrow(/Malformed/);
-    await expect(new FountainReassembler().finalize()).rejects.toThrow(/not complete/);
-  });
 });
 
-describe('FountainReassembler & telemetry', () => {
-  it('reports droplet/rank progress, ignores junk and switches to a new session after a streak', async () => {
-    const a = await createFountainSession(randomBytes(600, 21), { fileName: 'a.bin', mimeType: 'application/octet-stream' });
-    const b = await createFountainSession(randomBytes(300, 22), { fileName: 'b.bin', mimeType: 'application/octet-stream' });
-
-    const reassembler = new FountainReassembler();
-    expect(reassembler.snapshot()).toBeNull();
-    expect(reassembler.ingest('hello')).toBeNull();
-    const first = reassembler.ingest(a.encoder.dropletStringForIndex(0))!;
-    expect(first).toMatchObject({ k: a.encoder.k, rank: 1, resolved: 1, dropletsReceived: 1 });
-    expect(reassembler.ingest(a.encoder.dropletStringForIndex(0))).toBeNull();
-
-    for (let i = 0; i < 7; i++) expect(reassembler.ingest(b.encoder.dropletStringForIndex(i))).toBeNull();
-    const switched = reassembler.ingest(b.encoder.dropletStringForIndex(7))!;
-    expect(switched.k).toBe(b.encoder.k);
-    expect(switched.dropletsReceived).toBe(1);
-
-    reassembler.reset();
-    expect(reassembler.snapshot()).toBeNull();
-  });
-
-  it('ignores the finished session after a reset until another session is accepted', async () => {
-    const a = await createFountainSession(randomBytes(200, 31), { fileName: 'a.bin', mimeType: 'application/octet-stream' });
-    const b = await createFountainSession(randomBytes(200, 32), { fileName: 'b.bin', mimeType: 'application/octet-stream' });
-    const reassembler = new FountainReassembler();
-    let index = 0;
-    while (!reassembler.isComplete) reassembler.ingest(a.encoder.dropletStringForIndex(index++));
-    expect((await reassembler.finalize()).files[0].header.fileName).toBe('a.bin');
-
-    // A camera still pointed at the finished stream must not start receiving the same file again.
-    reassembler.reset();
-    for (let i = 0; i < 20; i++) expect(reassembler.ingest(a.encoder.dropletStringForIndex(i))).toBeNull();
-    expect(reassembler.snapshot()).toBeNull();
-
-    expect(reassembler.ingest(b.encoder.dropletStringForIndex(0))).toMatchObject({ k: b.encoder.k, dropletsReceived: 1 });
-    reassembler.reset();
-    expect(reassembler.ingest(a.encoder.dropletStringForIndex(0))).toMatchObject({ k: a.encoder.k, dropletsReceived: 1 });
-  });
-
-  it('carries the finished session over to a fresh reassembler', async () => {
-    const a = await createFountainSession(randomBytes(200, 33), { fileName: 'a.bin', mimeType: 'application/octet-stream' });
-    const first = new FountainReassembler();
-    expect(first.finishedSessionKey).toBeNull();
-    let index = 0;
-    while (!first.isComplete) first.ingest(a.encoder.dropletStringForIndex(index++));
-    await first.finalize();
-    const key = first.finishedSessionKey;
-    expect(key).toEqual(expect.any(String));
-
-    const next = new FountainReassembler();
-    next.ignoreSession(key!);
-    expect(next.ingest(a.encoder.dropletStringForIndex(0))).toBeNull();
-  });
-
+describe('FountainRateTracker', () => {
   it('computes FPS over a sliding window and an ETA', () => {
     const tracker = new FountainRateTracker(1000);
     expect(tracker.fps(0)).toBe(0);
@@ -632,35 +406,5 @@ describe('FountainReassembler & telemetry', () => {
     expect(tracker.telemetry({ k: 10, rank: 10, resolved: 10, dropletsReceived: 12, progress: 100 }, 1000).etaSeconds).toBe(0);
     tracker.reset();
     expect(tracker.telemetry({ k: 10, rank: 1, resolved: 1, dropletsReceived: 1, progress: 10 }, 5000).etaSeconds).toBeNull();
-  });
-});
-
-describe('large block counts are confirmed before decoder tables are built (#1154)', () => {
-  it('needs 8 consistent droplets for a stream claiming k > 65,536', () => {
-    const reassembler = new FountainReassembler();
-    const k = 100_000;
-    const droplet = (seq: number) =>
-      serializeDroplet({ seq, k, messageLength: k * 32 - 1, checksum: 7, degree: 1, indices: [0], data: new Uint8Array(32) });
-
-    for (let seq = 1; seq <= 7; seq++) {
-      expect(reassembler.ingest(droplet(seq))).toBeNull();
-    }
-    expect(reassembler.snapshot()).toBeNull();
-    expect(reassembler.ingest(droplet(8))).not.toBeNull();
-  });
-
-  it('does not let one-off bogus droplets build tables', () => {
-    const reassembler = new FountainReassembler();
-    for (let i = 0; i < 20; i++) {
-      const k = 100_000 + i;
-      const text = serializeDroplet({ seq: 1, k, messageLength: k * 32 - 1, checksum: i, degree: 1, indices: [0], data: new Uint8Array(32) });
-      expect(reassembler.ingest(text)).toBeNull();
-    }
-    expect(reassembler.snapshot()).toBeNull();
-  });
-
-  it('accepts ordinary streams on the first droplet', () => {
-    const encoder = new FountainEncoder(new Uint8Array(500).fill(7), { blockSize: 32, maxSeq: 1000 });
-    expect(new FountainReassembler().ingest(encoder.nextDropletString())).not.toBeNull();
   });
 });

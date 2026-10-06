@@ -19,7 +19,6 @@
 import { DropletMetadata } from './contracts';
 import { buildRobustSolitonCdf, getNeighborsForSeq } from './soliton';
 import { crc32 } from './crc32';
-import { parseDropletString } from './envelope';
 import { solveGF2 } from './gf2';
 
 interface PendingEquation {
@@ -138,17 +137,6 @@ export class FountainDecoder {
         this.checksum === meta.checksum &&
         this.blockSize === blockSize)
     );
-  }
-
-  /**
-   * Ingests a raw droplet string (`ur:bytes/...`).
-   * @param str Decoded QR text.
-   * @returns True if the droplet advanced decoding.
-   */
-  public ingestString(str: string): boolean {
-    const parsed = parseDropletString(str);
-    if (!parsed) return false;
-    return this.ingest(parsed.meta, parsed.data);
   }
 
   /**

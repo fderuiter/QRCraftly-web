@@ -24,8 +24,6 @@ import {
   crc32,
   decodeFrame,
   sha256Hex,
-  encodeSessionMessage,
-  FountainEncoder,
   MAX_RECEIVE_BYTES,
   FLAG_BEACON,
   TILE_LAYOUTS,
@@ -418,20 +416,6 @@ describe('Fountain sender and receiver workers', () => {
     expect(posted[0]).toMatchObject({ type: 'MANIFEST', manifest: { totalSize: 400, files: [{ name: 'f.bin', size: 400 }] } });
   });
 
-  it('still posts an ERROR for a forged legacy ur:bytes session', async () => {
-    const bytes = new TextEncoder().encode('forged');
-    const message = encodeSessionMessage(
-      { fileName: 'f.txt', mimeType: 'text/plain', fileSize: bytes.length, sha256: 'ff'.repeat(32), compression: 'none' },
-      bytes
-    );
-    const encoder = new FountainEncoder(message, { blockSize: 16 });
-    for (let i = 0; i < encoder.k; i++) {
-      await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: encoder.dropletStringForIndex(i) } });
-    }
-    expect(posted.some(m => m.type === 'COMPLETE')).toBe(false);
-    expect(posted.find(m => m.type === 'ERROR')).toMatchObject({ isFountain: true, error: expect.stringMatching(/SHA-256/) });
-  });
-
   it('ignores junk and duplicate droplets without stalling', async () => {
     await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: 'UR:BYTES/1-1/NOTBYTEWORDS' } });
     await reassemblyHandler({ data: { type: 'DROPLET', droplet: 'hello' } });
@@ -466,38 +450,5 @@ describe('Fountain sender and receiver workers', () => {
       expect(String(posted.find(m => m.type === 'ERROR')?.error)).toMatch(/expands to more than the 1024 bytes/);
     });
 
-    it('stops a legacy deflate bomb at the size the header declares', async () => {
-      // 8 MB of zeros deflate to a few KB; the header lies and declares 1 KB.
-      const bomb = new Uint8Array(8 * 1024 * 1024);
-      const stream = new Blob([bomb]).stream().pipeThrough(new CompressionStream('deflate-raw'));
-      const compressed = new Uint8Array(await new Response(stream).arrayBuffer());
-      expect(compressed.length).toBeLessThan(64 * 1024);
-
-      const message = encodeSessionMessage(
-        { fileName: 'bomb.bin', mimeType: 'application/octet-stream', fileSize: 1024, sha256: '0'.repeat(64), compression: 'deflate-raw' },
-        compressed
-      );
-      const encoder = new FountainEncoder(message, { blockSize: 64, maxSeq: 100_000 });
-      for (let i = 0; i < encoder.k * 3; i++) {
-        await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: encoder.nextDropletString() } });
-        if (posted.some(m => m.type === 'ERROR' || m.type === 'COMPLETE')) break;
-      }
-      const error = posted.find(m => m.type === 'ERROR');
-      expect(posted.some(m => m.type === 'COMPLETE')).toBe(false);
-      expect(String(error?.error)).toMatch(/expands to more than the 1024 bytes/);
-    });
-
-    it('rejects a header that claims more than the receive limit', async () => {
-      const message = encodeSessionMessage(
-        { fileName: 'huge.bin', mimeType: 'application/octet-stream', fileSize: 2_000_000_000, sha256: '0'.repeat(64), compression: 'none' },
-        new Uint8Array(64)
-      );
-      const encoder = new FountainEncoder(message, { blockSize: 64, maxSeq: 10_000 });
-      for (let i = 0; i < encoder.k * 3; i++) {
-        await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: encoder.nextDropletString() } });
-        if (posted.some(m => m.type === 'ERROR' || m.type === 'COMPLETE')) break;
-      }
-      expect(String(posted.find(m => m.type === 'ERROR')?.error)).toMatch(/more than the 100 MB limit/);
-    });
   });
 });

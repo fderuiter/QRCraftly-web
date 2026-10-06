@@ -226,7 +226,7 @@ const loadLt: Loader = async () => ({
     const encoder = new FountainEncoder(message, { blockSize: symbolSize });
     const decoder = new FountainDecoder();
     return {
-      wire: (index) => new TextEncoder().encode(encoder.dropletStringForIndex(index)),
+      wire: (index) => encoder.getDroplet(encoder.seqForIndex(index)).data,
       send: (index) => {
         const droplet = encoder.getDroplet(encoder.seqForIndex(index));
         return () => {
