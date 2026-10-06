@@ -1,6 +1,6 @@
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
-import { describe, it, expect } from 'vitest';
+import { beforeAll, describe, it, expect } from 'vitest';
 import {
   CALIBRATION_SWATCHES,
   COLOUR_FALLBACK_BEACONS,
@@ -28,6 +28,7 @@ import {
   type Matrix3,
   type Rgb,
   type RgbaImage,
+  loadCrossTalkKernels,
 } from '../index';
 
 const MATRIX: Matrix3 = [
@@ -61,6 +62,8 @@ function throughCamera(image: RgbaImage, matrix: Matrix3 = MATRIX, gains: Rgb = 
 }
 
 const grid = (text: string, version: number) => QRCode.create(text, { errorCorrectionLevel: 'L', version }).modules;
+
+beforeAll(() => loadCrossTalkKernels());
 
 describe('cross-talk fit (#1147)', () => {
   it('recovers the matrix and the black level from the eight swatches', () => {

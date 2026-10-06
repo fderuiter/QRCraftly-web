@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   FRAGMENT_SHADER,
   FrameRateMeter,
@@ -33,6 +33,7 @@ import {
   watchFrames,
   type KernelUniforms,
   type SampledGrid,
+  loadOpticalModem,
 } from '../index';
 
 const PROFILE = MODEM_PROFILES[0];
@@ -54,6 +55,8 @@ function uniformsOf(image: ReturnType<typeof capture>['image']): KernelUniforms 
   if (!found) throw new Error('The frame was not found');
   return found;
 }
+
+beforeAll(() => loadOpticalModem());
 
 describe('reference kernel', () => {
   it('is what the decoder uses: a hook that returns the reference result changes nothing, and null falls back to it', () => {

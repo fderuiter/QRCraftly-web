@@ -41,6 +41,7 @@ import {
   encodeModemFrame,
   frameCapacity,
   getConstellation,
+  loadOpticalModem,
   probeSequence,
   simulateCapture,
   type ChannelPreset,
@@ -48,6 +49,7 @@ import {
   type ProbePattern,
 } from '../src/packages/optical-modem/index.ts';
 import { FountainDecoder, FountainEncoder } from '../src/packages/optical-transfer/index.ts';
+import { createFrameTimer } from './utils/frameTimer.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPORT_PATH = path.join(root, 'docs', 'OPTICAL_BENCHMARK.md');
@@ -56,6 +58,9 @@ const PRESETS: ChannelPreset[] = ['studio', 'typical', 'poor'];
 /** The sender shows 60 display frames per second; the simulated camera takes every second one. */
 const DISPLAY_TICKS_PER_CAMERA_FRAME = 2;
 const CAMERA_FPS = 30;
+/** Time per captured frame on the receive side: the probe analysis and the frame decoder. */
+const probeTimer = createFrameTimer();
+const decodeTimer = createFrameTimer();
 
 function table(header: string[], rows: (string | number)[][]): string {
   const lines = [`| ${header.join(' | ')} |`, `| ${header.map(() => '---').join(' | ')} |`];
@@ -94,7 +99,7 @@ function benchProbe(quick: boolean): ProbeRow[] {
         for (let c = 0; c < frames; c++) {
           const counter = c * DISPLAY_TICKS_PER_CAMERA_FRAME;
           const capture = simulateCapture(drawProbeFrame(pattern, SESSION, counter), preset, { pixelsPerCell: cameraPx, cellPitch: pattern.pitch, seed: c + 1 });
-          run.ingest(capture, (counter * 1000) / 60);
+          probeTimer.time(() => run.ingest(capture, (counter * 1000) / 60));
         }
         const [grid] = run.report().grids;
         const max = getConstellation(pattern.constellation).bitsPerCell;
@@ -131,7 +136,7 @@ function codecTrial(shape: ModemProfile, preset: ChannelPreset, cameraPx: number
     const payload = Uint8Array.from({ length: capacity.payloadBytes }, (_, i) => (i * 31 + seed * 7 + 5) & 255);
     const capture = simulateCapture(encodeModemFrame(shape, payload, SESSION, seed, CODEC_PITCH), preset, { pixelsPerCell: cameraPx, cellPitch: CODEC_PITCH, seed });
     thresholds.forEach((threshold, t) => {
-      const result = decodeModemFrame(capture, { geometries: [shape], soft: threshold > 0, threshold });
+      const result = decodeTimer.time(() => decodeModemFrame(capture, { geometries: [shape], soft: threshold > 0, threshold }));
       if (!result.ok) return;
       if (t === 0) readable++;
       // A block counts only when its bytes are the bytes that were sent.
@@ -221,7 +226,7 @@ function transfer(shape: ModemProfile, preset: ChannelPreset, cameraPx: number, 
     const payload = new Uint8Array(capacity.payloadBytes);
     droplets.forEach((d, b) => payload.set(d.data, b * shape.packetBytes));
     const capture = simulateCapture(encodeModemFrame(shape, payload, SESSION, frame, CODEC_PITCH), preset, { pixelsPerCell: cameraPx, cellPitch: CODEC_PITCH, seed: frame + 1 });
-    const result = decodeModemFrame(capture, { geometries: [shape] });
+    const result = decodeTimer.time(() => decodeModemFrame(capture, { geometries: [shape] }));
     if (!result.ok) continue;
     result.blocks.forEach((block, b) => {
       if (block) decoder.ingest({ seq: seqs[b], k: encoder.k, messageLength: encoder.messageLength, checksum: encoder.checksum }, block);
@@ -296,10 +301,12 @@ function main(): void {
   const probe = benchProbe(quick);
   const codec = codecTables(quick);
   const end = transferTable(quick);
+  process.stdout.write(`${probeTimer.summary('receive, probe analysis')}\n${decodeTimer.summary('receive, frame decode')}\n`);
   if (process.argv.includes('--write')) {
     fs.writeFileSync(REPORT_PATH, render(probe, codec, end), 'utf8');
     process.stdout.write(`wrote ${path.relative(root, REPORT_PATH).split(path.sep).join('/')}\n`);
   }
 }
 
+await loadOpticalModem();
 main();

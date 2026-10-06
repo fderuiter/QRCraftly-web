@@ -17,11 +17,31 @@
 */
 
 import type { AcquiredFrame } from './frame';
+import { modemKernels } from './kernels';
 import { BAND_ROWS, type RgbaImage } from './layout';
-import { sampleDataGrid, type SampledGrid } from './sample';
 
 /** Most symbols a constellation has, which is also the palette size the shader reserves. */
 export const KERNEL_MAX_SYMBOLS = 16;
+
+/**
+ * Where inside a cell the nine samples fall, as fractions of the cell. All are exact in binary, so
+ * the sample positions are the same in 32-bit and 64-bit arithmetic. The reference kernel in
+ * `crates/modem/src/sample.rs` uses the same three.
+ */
+export const SAMPLE_OFFSETS: readonly number[] = [0.3125, 0.5, 0.6875];
+
+/** Distance weights for the red, green and blue differences when matching a cell to a patch, as in `crates/modem/src/sample.rs`. */
+export const CHANNEL_WEIGHTS: readonly [number, number, number] = [3, 4, 2];
+
+/** The data grid as the receiver reads it. */
+export interface SampledGrid {
+  /** Best symbol for each data cell, row by row. */
+  symbols: Uint8Array;
+  /** Confidence of each decision, 0 to 255. */
+  confidence: Uint8Array;
+  /** Mean colour of each cell, three bytes per cell. */
+  means: Uint8Array;
+}
 
 /**
  * Everything the per-cell decode kernel reads besides the pixels. The reference kernel and the
@@ -48,7 +68,7 @@ export interface KernelUniforms {
  * @returns The kernel inputs.
  */
 export function kernelUniforms(frame: AcquiredFrame): KernelUniforms {
-  return { cols: frame.layout.cols, dataRows: frame.layout.dataRows, rowOffset: BAND_ROWS, homography: frame.homography, palette: frame.palette.symbols };
+  return { cols: frame.cols, dataRows: frame.dataRows, rowOffset: BAND_ROWS, homography: frame.homography, palette: frame.palette };
 }
 
 /**
@@ -60,7 +80,13 @@ export function kernelUniforms(frame: AcquiredFrame): KernelUniforms {
  * @returns A symbol, a confidence and a mean colour for each data cell.
  */
 export function runReferenceKernel(image: RgbaImage, uniforms: KernelUniforms): SampledGrid {
-  return sampleDataGrid(image, uniforms.homography, { cols: uniforms.cols, dataCells: uniforms.cols * uniforms.dataRows }, { symbols: uniforms.palette }, uniforms.rowOffset);
+  const kernels = modemKernels();
+  kernels.setImage(image);
+  kernels.setUniforms(uniforms.homography, uniforms.palette);
+  kernels.sample(uniforms.cols, uniforms.dataRows, uniforms.rowOffset, uniforms.palette.length / 3);
+  const cells = uniforms.cols * uniforms.dataRows;
+  const grid = kernels.grid(cells);
+  return { symbols: grid.slice(0, cells), confidence: grid.slice(cells, 2 * cells), means: grid.slice(2 * cells, 5 * cells) };
 }
 
 /** How two kernel results differ. All zero means bit for bit equal. */

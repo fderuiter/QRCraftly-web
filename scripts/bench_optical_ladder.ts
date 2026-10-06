@@ -42,6 +42,7 @@ import {
   frameCapacity,
   ladderSchedule,
   linkLabel,
+  loadOpticalModem,
   lockedSchedule,
   observeDecode,
   simulateCapture,
@@ -49,6 +50,7 @@ import {
   type ModemProfile,
 } from '../src/packages/optical-modem/index.ts';
 import { FountainDecoder, FountainEncoder } from '../src/packages/optical-transfer/index.ts';
+import { createFrameTimer } from './utils/frameTimer.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPORT_PATH = path.join(root, 'docs', 'OPTICAL_LADDER_BENCHMARK.md');
@@ -59,6 +61,8 @@ const PITCH = 4;
 const SYMBOL_BYTES = 16;
 /** Time for a lock to reach the sender through the feedback code and for the sender to switch, in camera frames. */
 const FEEDBACK_DELAY_FRAMES = 30;
+/** Time per captured frame on the receive side. */
+const decodeTimer = createFrameTimer();
 
 type Strategy = 'single' | 'ladder' | 'duplex';
 
@@ -123,7 +127,7 @@ function run(receiver: SimulatedReceiver, strategy: Strategy, bestProfile: numbe
       const pixelsPerCell = receiver.widthPx / profile.cols;
       // The frame number in the header is the index of its first droplet, so any profile's blocks name their droplets.
       const capture = simulateCapture(encodeModemFrame(profile, payload, SESSION, first, PITCH), receiver.preset, { pixelsPerCell, cellPitch: PITCH, seed: frame + 1 });
-      const result = decodeModemFrame(capture, { geometries: [profile] });
+      const result = decodeTimer.time(() => decodeModemFrame(capture, { geometries: [profile] }));
       tracker.record(observeDecode(timeMs, result));
       if (result.ok) {
         result.blocks.forEach((block, b) => {
@@ -166,7 +170,7 @@ function bestProfileFor(receiver: SimulatedReceiver): { best: number; shares: Ma
     for (const seed of [1, 2, 3]) {
       const payload = new Uint8Array(capacity.payloadBytes).fill(seed);
       const capture = simulateCapture(encodeModemFrame(profile, payload, SESSION, seed, PITCH), receiver.preset, { pixelsPerCell: receiver.widthPx / profile.cols, cellPitch: PITCH, seed });
-      const result = decodeModemFrame(capture, { geometries: [profile] });
+      const result = decodeTimer.time(() => decodeModemFrame(capture, { geometries: [profile] }));
       if (result.ok) ok += result.blocksOk;
     }
     shares.set(profile.id, ok / (3 * capacity.blocks));
@@ -232,10 +236,12 @@ function main(): void {
     '',
   ].join('\n');
   process.stdout.write(`\n${report}\n`);
+  process.stdout.write(`${decodeTimer.summary('receive, frame decode')}\n`);
   if (process.argv.includes('--write')) {
     fs.writeFileSync(REPORT_PATH, `${report}\n`, 'utf8');
     process.stdout.write(`wrote ${path.relative(root, REPORT_PATH).split(path.sep).join('/')}\n`);
   }
 }
 
+await loadOpticalModem();
 main();

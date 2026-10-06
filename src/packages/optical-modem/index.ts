@@ -35,7 +35,8 @@ export {
   type KernelUniforms,
   type GridDifference,
 } from './lib/kernel';
-export type { SampledGrid } from './lib/sample';
+export type { SampledGrid } from './lib/kernel';
+export { loadModemKernels as loadOpticalModem } from './lib/kernels';
 export { FRAGMENT_SHADER, VERTEX_SHADER } from './lib/shader';
 export { grantedSettings, watchFrames, FrameRateMeter, type StreamGrant, type FrameTick, type FrameWatcher } from './lib/frameSource';
 export {

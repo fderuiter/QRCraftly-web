@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { describe, expect, it } from 'vitest';
-import { MODEM_PROFILES, decodeModemFrame, encodeModemFrame, frameCapacity, simulateCapture, type ModemProfile, type RgbaImage } from '../index';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { MODEM_PROFILES, decodeModemFrame, encodeModemFrame, frameCapacity, simulateCapture, type ModemProfile, type RgbaImage , loadOpticalModem } from '../index';
 
 const SESSION = 99;
 const PITCH = 4;
@@ -37,6 +37,8 @@ function repairedAll(result: ReturnType<typeof decodeModemFrame>, payload: Uint8
   if (!result.ok) return false;
   return result.blocks.every((block, b) => block !== null && block.every((v, i) => v === payload[b * profile.packetBytes + i]));
 }
+
+beforeAll(() => loadOpticalModem());
 
 describe('frame capacity', () => {
   it('fills the grid with whole blocks and refuses shapes that cannot hold one', () => {

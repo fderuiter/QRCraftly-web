@@ -16,8 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { KERNEL_MAX_SYMBOLS } from './kernel';
-import { CHANNEL_WEIGHTS, SAMPLE_OFFSETS } from './sample';
+import { CHANNEL_WEIGHTS, KERNEL_MAX_SYMBOLS, SAMPLE_OFFSETS } from './kernel';
 
 /** Vertex shader: one triangle that covers the render target, with no vertex buffer. */
 export const VERTEX_SHADER = `#version 300 es
@@ -31,7 +30,8 @@ const glslFloat = (value: number): string => (Number.isInteger(value) ? value.to
 
 /**
  * Fragment shader of the decode kernel: one fragment is one data cell. It is a line-by-line port of
- * `sampleCell` and `classifyColour` in `sample.ts`, and the reference kernel decides what is right.
+ * `sample_cell` and `classify` in `crates/modem/src/sample.rs`, and the reference kernel decides what
+ * is right.
  *
  * - Pixel values and every sum, distance and confidence are integers, which are exact on a GPU.
  * - The homography uses only `+ - * /` on 32-bit floats in the same order as the reference. The

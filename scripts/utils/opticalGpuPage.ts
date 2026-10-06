@@ -22,6 +22,7 @@
  * kernel and every comparison stay in Node.
  */
 import { createGpuKernel, selfTestGpuKernel, type GpuKernel, type GpuSelfTest } from '../../src/packages/optical-modem/gpu.ts';
+import { loadOpticalModem } from '../../src/packages/optical-modem/index.ts';
 
 /** Kernel inputs as plain numbers, so they cross the browser boundary as JSON. */
 export interface WireUniforms {
@@ -33,7 +34,8 @@ export interface WireUniforms {
 }
 
 export interface PageApi {
-  init(): { ok: true; renderer: string | null; selfTest: GpuSelfTest } | { ok: false; reason: string };
+  /** Loads the modem module from its bytes (the reference kernel of the self-test runs in it), then builds the GPU kernel. */
+  init(moduleBase64: string): Promise<{ ok: true; renderer: string | null; selfTest: GpuSelfTest } | { ok: false; reason: string }>;
   run(width: number, height: number, pixels: string, uniforms: WireUniforms): { symbols: string; confidence: string; means: string } | null;
   time(width: number, height: number, uniforms: WireUniforms, reps: number): number[];
 }
@@ -56,7 +58,8 @@ let kernel: GpuKernel | null = null;
 const unwire = (u: WireUniforms) => ({ cols: u.cols, dataRows: u.dataRows, rowOffset: u.rowOffset, homography: Float32Array.from(u.homography), palette: Int32Array.from(u.palette) });
 
 window.opticalGpu = {
-  init() {
+  async init(moduleBase64) {
+    await loadOpticalModem(fromBase64(moduleBase64));
     const made = createGpuKernel();
     if (!made.ok) return { ok: false, reason: made.reason };
     kernel = made.kernel;

@@ -96,22 +96,58 @@ impl Poly {
         Poly { c, len: 1 }
     }
 
+    /// Value at `x`, term by term in the log domain: the terms do not depend
+    /// on each other, unlike the steps of Horner's rule.
     fn eval(&self, x: u8) -> u8 {
-        self.c[..self.len]
-            .iter()
-            .rev()
-            .fold(0, |acc, &c| gf256::mul(acc, x) ^ c)
+        if x == 0 {
+            return self.c[0];
+        }
+        let step = gf256::LOG[x as usize] as usize;
+        let mut power = 0usize;
+        let mut sum = 0u8;
+        for &c in &self.c[..self.len] {
+            if c != 0 {
+                sum ^= gf256::EXP[gf256::LOG[c as usize] as usize + power];
+            }
+            power += step;
+            if power >= 255 {
+                power -= 255;
+            }
+        }
+        sum
     }
 
     /// Value of the formal derivative at `x` (only odd powers survive in GF(2^8)).
     fn eval_derivative(&self, x: u8) -> u8 {
+        if x == 0 {
+            return if self.len > 1 { self.c[1] } else { 0 };
+        }
+        // c_i x^(i - 1) for odd i, the power stepping by x^2.
+        let step = (2 * gf256::LOG[x as usize] as usize) % 255;
+        let mut power = 0usize;
         let mut sum = 0u8;
         let mut i = 1;
         while i < self.len {
-            sum ^= gf256::mul(self.c[i], gf256::pow(x, (i - 1) as u32));
+            let c = self.c[i];
+            if c != 0 {
+                sum ^= gf256::EXP[gf256::LOG[c as usize] as usize + power];
+            }
+            power += step;
+            if power >= 255 {
+                power -= 255;
+            }
             i += 2;
         }
         sum
+    }
+
+    /// Multiplies by `1 + root x` in place, growing by one coefficient.
+    fn mul_linear(&mut self, root: u8) {
+        self.c[self.len] = 0;
+        for i in (1..=self.len).rev() {
+            self.c[i] ^= gf256::mul(self.c[i - 1], root);
+        }
+        self.len += 1;
     }
 
     /// `self * other`, keeping at most `limit` coefficients.
@@ -124,9 +160,11 @@ impl Poly {
             if a == 0 {
                 continue;
             }
-            for (j, &b) in other.c[..other.len].iter().enumerate() {
-                if i + j < out.len {
-                    out.c[i + j] ^= gf256::mul(a, b);
+            let log_a = gf256::LOG[a as usize] as usize;
+            let reach = other.len.min(out.len.saturating_sub(i));
+            for (j, &b) in other.c[..reach].iter().enumerate() {
+                if b != 0 {
+                    out.c[i + j] ^= gf256::EXP[log_a + gf256::LOG[b as usize] as usize];
                 }
             }
         }
@@ -151,8 +189,11 @@ fn berlekamp_massey(syndromes: &[u8]) -> Option<Poly> {
     let mut last = 1u8;
     for n in 0..syndromes.len() {
         let mut d = syndromes[n];
-        for i in 1..=l {
-            d ^= gf256::mul(c.c[i], syndromes[n - i]);
+        for (&ci, &si) in c.c[1..=l].iter().zip(syndromes[..n].iter().rev()) {
+            if ci != 0 && si != 0 {
+                d ^=
+                    gf256::EXP[gf256::LOG[ci as usize] as usize + gf256::LOG[si as usize] as usize];
+            }
         }
         if d == 0 {
             m += 1;
@@ -164,8 +205,11 @@ fn berlekamp_massey(syndromes: &[u8]) -> Option<Poly> {
         if len > MAX_BLOCK {
             return None;
         }
-        for i in 0..b.len {
-            c.c[i + m] ^= gf256::mul(scale, b.c[i]);
+        let log_scale = gf256::LOG[scale as usize] as usize;
+        for (target, &bi) in c.c[m..m + b.len].iter_mut().zip(&b.c[..b.len]) {
+            if bi != 0 {
+                *target ^= gf256::EXP[log_scale + gf256::LOG[bi as usize] as usize];
+            }
         }
         c.len = len;
         if 2 * l <= n {
@@ -193,8 +237,85 @@ fn berlekamp_massey(syndromes: &[u8]) -> Option<Poly> {
 /// corrected (it is then left as it was). A result is only returned when every
 /// syndrome of the corrected block is zero.
 pub fn decode(block: &mut [u8], check: usize, erasures: &[usize]) -> Option<usize> {
+    decode_errata(block, check, erasures).map(|errata| errata.changed)
+}
+
+/// What [`decode_errata`] repaired.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Errata {
+    /// Symbols whose value changed.
+    pub changed: usize,
+    /// Positions the decoder located: every erasure plus every error it found,
+    /// erasures that held the right value included. 0 for a block that was
+    /// already clean.
+    pub located: usize,
+}
+
+/// Writes the first `check` syndromes of `block` (its values at 2^0 .. 2^(check - 1),
+/// index 0 the highest power) into `out[..check]`. Returns `false`, writing
+/// nothing, when `out` is too short or the block too long.
+pub fn syndromes(block: &[u8], check: usize, out: &mut [u8]) -> bool {
+    if block.len() > MAX_BLOCK || check > MAX_DEGREE || out.len() < check {
+        return false;
+    }
+    // Summed position by position: each symbol's share of the `check`
+    // syndromes is independent of the others', which keeps the work out of one
+    // long chain of dependent table lookups.
+    let out = &mut out[..check];
+    out.fill(0);
+    for (index, &value) in block.iter().enumerate() {
+        add_to_syndromes(out, block.len(), index, value);
+    }
+    true
+}
+
+/// Adds `value` at `index` of an `n`-symbol block to its syndromes: the change
+/// to every syndrome when that symbol is XORed with `value`. Syndromes are
+/// linear, so a caller that edits a few symbols of a long block can update
+/// them instead of recomputing [`syndromes`].
+pub fn add_to_syndromes(syndromes: &mut [u8], n: usize, index: usize, value: u8) {
+    if value == 0 || index >= n || n > MAX_BLOCK {
+        return;
+    }
+    // value * (2^j)^(n - 1 - index), stepping the logarithm by n - 1 - index.
+    let step = (n - 1 - index) % 255;
+    let mut log = gf256::LOG[value as usize] as usize;
+    for s in syndromes.iter_mut() {
+        *s ^= gf256::EXP[log];
+        log += step;
+        if log >= 255 {
+            log -= 255;
+        }
+    }
+}
+
+/// [`decode`], also reporting how many positions were located. The optical
+/// modem's inner code (#1198) counts its repairs that way.
+pub fn decode_errata(block: &mut [u8], check: usize, erasures: &[usize]) -> Option<Errata> {
+    let mut computed = [0u8; MAX_DEGREE];
+    if !syndromes(block, check, &mut computed) {
+        return None;
+    }
+    decode_errata_with_syndromes(block, check, erasures, &computed[..check])
+}
+
+/// [`decode_errata`] for a caller that already holds the block's syndromes
+/// (see [`syndromes`] and [`add_to_syndromes`]). `syndromes` must be exactly
+/// those of `block`; the result is then the same as [`decode_errata`]'s.
+pub fn decode_errata_with_syndromes(
+    block: &mut [u8],
+    check: usize,
+    erasures: &[usize],
+    syndromes: &[u8],
+) -> Option<Errata> {
     let n = block.len();
-    if check == 0 || check > MAX_DEGREE || n > MAX_BLOCK || check >= n || erasures.len() > check {
+    if check == 0
+        || check > MAX_DEGREE
+        || n > MAX_BLOCK
+        || check >= n
+        || erasures.len() > check
+        || syndromes.len() != check
+    {
         return None;
     }
     for (k, &index) in erasures.iter().enumerate() {
@@ -205,39 +326,24 @@ pub fn decode(block: &mut [u8], check: usize, erasures: &[usize]) -> Option<usiz
     // Index i holds the coefficient of x^(n - 1 - i).
     let locator_of = |index: usize| gf256::exp2((n - 1 - index) as u32);
 
-    let mut syndromes = Poly {
+    let mut given = Poly {
         c: [0u8; MAX_BLOCK + 1],
         len: check,
     };
-    let mut clean = true;
-    for j in 0..check {
-        // Horner's rule at 2^j, multiplying in the log domain: j < 255 and
-        // log < 255, so the index stays inside the doubled table.
-        let s = block.iter().fold(0u8, |acc, &c| {
-            let product = if acc == 0 {
-                0
-            } else {
-                gf256::EXP[gf256::LOG[acc as usize] as usize + j]
-            };
-            product ^ c
+    given.c[..check].copy_from_slice(syndromes);
+    let syndromes = given;
+    if syndromes.c[..check].iter().all(|&s| s == 0) {
+        return Some(Errata {
+            changed: 0,
+            located: 0,
         });
-        syndromes.c[j] = s;
-        clean &= s == 0;
-    }
-    if clean {
-        return Some(0);
     }
 
     // Erasure locator: the product of (1 + X x) over the erased positions.
+    // At most `check` < 255 factors, so the product fits.
     let mut erased = Poly::one();
     for &index in erasures {
-        let factor = {
-            let mut f = Poly::one();
-            f.c[1] = locator_of(index);
-            f.len = 2;
-            f
-        };
-        erased = erased.mul_trunc(&factor, MAX_BLOCK + 1);
+        erased.mul_linear(locator_of(index));
     }
 
     // Forney syndromes remove the erasures; what is left locates the unknown errors.
@@ -246,45 +352,91 @@ pub fn decode(block: &mut [u8], check: usize, erasures: &[usize]) -> Option<usiz
     if 2 * errors.degree() + erasures.len() > check {
         return None;
     }
-    let locator = errors.mul_trunc(&erased, MAX_BLOCK + 1);
-    let evaluator = syndromes.mul_trunc(&locator, check);
-
-    let expected = locator.degree();
-    let mut fixes = [(0usize, 0u8); MAX_BLOCK];
+    // The full locator is errors x erased. Its roots among the positions are
+    // the erasures, which are roots of `erased` by construction, and the
+    // roots of `errors`, so only `errors` needs a Chien search. The full
+    // locator has as many distinct roots as its degree exactly when `errors`
+    // has as many as its own and none of them is an erasure (that would be a
+    // repeated root); otherwise the block cannot be decoded.
+    let wanted = errors.degree();
+    let mut roots = [0usize; MAX_BLOCK];
     let mut found = 0;
-    for index in 0..n {
-        let x = locator_of(index);
-        let x_inv = gf256::inv(x)?;
-        if locator.eval(x_inv) != 0 {
-            continue;
+    // Chien search in the log domain. Position `index` has locator 2^(n - 1 - index), whose
+    // inverse is 2^e with e = index - (n - 1) mod 255; each term c_k (2^e)^k is kept as its
+    // logarithm and steps by k as the index grows by one.
+    let mut terms = [(0usize, 0usize); MAX_BLOCK + 1];
+    let mut term_count = 0;
+    let start = (255 - (n - 1) % 255) % 255;
+    for (k, &c) in errors.c[..errors.len].iter().enumerate() {
+        if c != 0 {
+            terms[term_count] = (k % 255, (gf256::LOG[c as usize] as usize + k * start) % 255);
+            term_count += 1;
         }
-        let denominator = locator.eval_derivative(x_inv);
-        let magnitude = gf256::div(gf256::mul(x, evaluator.eval(x_inv)), denominator)?;
-        if found == expected {
+    }
+    for index in 0..n {
+        // A polynomial of degree `wanted` has at most that many roots, and
+        // every position is a different point: once all are found, or too few
+        // positions are left to find them, the rest of the search cannot
+        // change the outcome.
+        if found == wanted {
+            break;
+        }
+        if n - index < wanted - found {
             return None;
         }
-        fixes[found] = (index, magnitude);
-        found += 1;
+        let mut value = 0u8;
+        for term in &mut terms[..term_count] {
+            value ^= gf256::EXP[term.1];
+            term.1 += term.0;
+            if term.1 >= 255 {
+                term.1 -= 255;
+            }
+        }
+        if value == 0 {
+            if erasures.contains(&index) {
+                return None;
+            }
+            roots[found] = index;
+            found += 1;
+        }
     }
-    if found != expected {
+    if found != wanted {
         return None;
     }
+
+    let locator = errors.mul_trunc(&erased, MAX_BLOCK + 1);
+    let evaluator = syndromes.mul_trunc(&locator, check);
+    let mut fixes = [(0usize, 0u8); MAX_BLOCK];
+    let positions = erasures.iter().chain(&roots[..found]);
+    for (slot, &index) in fixes.iter_mut().zip(positions) {
+        let x = locator_of(index);
+        let x_inv = gf256::inv(x)?;
+        let denominator = locator.eval_derivative(x_inv);
+        let magnitude = gf256::div(gf256::mul(x, evaluator.eval(x_inv)), denominator)?;
+        *slot = (index, magnitude);
+    }
+    let found = erasures.len() + found;
     let mut changed = 0;
     for &(index, magnitude) in &fixes[..found] {
         block[index] ^= magnitude;
         changed += usize::from(magnitude != 0);
     }
-    // Belt and braces: a decoder failure must never pass as a correction.
-    for j in 0..check {
-        let root = gf256::exp2(j as u32);
-        if block.iter().fold(0, |acc, &c| gf256::mul(acc, root) ^ c) != 0 {
-            for &(index, magnitude) in &fixes[..found] {
-                block[index] ^= magnitude;
-            }
-            return None;
-        }
+    // Belt and braces: a decoder failure must never pass as a correction. The
+    // corrected block's syndromes are the received ones plus each fix's share.
+    let mut after = syndromes;
+    for &(index, magnitude) in &fixes[..found] {
+        add_to_syndromes(&mut after.c[..check], n, index, magnitude);
     }
-    Some(changed)
+    if after.c[..check].iter().any(|&s| s != 0) {
+        for &(index, magnitude) in &fixes[..found] {
+            block[index] ^= magnitude;
+        }
+        return None;
+    }
+    Some(Errata {
+        changed,
+        located: found,
+    })
 }
 
 #[cfg(test)]
@@ -457,6 +609,80 @@ mod tests {
                 None => assert_eq!(word, before),
             }
         }
+    }
+
+    #[test]
+    fn decode_errata_counts_located_positions() {
+        let mut rng = Rng(5);
+        let (original, n) = codeword(&mut rng, 20, 10);
+        let mut word = original;
+        // Two erasures, one of them holding the right value, and one error.
+        word[3] ^= 0x55;
+        word[9] ^= 0x0f;
+        let errata = decode_errata(&mut word[..n], 10, &[3, 7]).unwrap();
+        assert_eq!(word[..n], original[..n]);
+        assert_eq!(
+            errata,
+            Errata {
+                changed: 2,
+                located: 3
+            }
+        );
+        let mut clean = original;
+        assert_eq!(
+            decode_errata(&mut clean[..n], 10, &[1]),
+            Some(Errata {
+                changed: 0,
+                located: 0
+            })
+        );
+    }
+
+    #[test]
+    fn updated_syndromes_match_recomputed_ones() {
+        let mut rng = Rng(0x0119_8000);
+        for _ in 0..500 {
+            let check = 2 + rng.below(40);
+            let data_len = 1 + rng.below(200);
+            let (original, n) = codeword(&mut rng, data_len.min(254 - check), check);
+            let mut word = original;
+            let mut tracked = [0u8; MAX_DEGREE];
+            assert!(syndromes(&word[..n], check, &mut tracked));
+            assert!(tracked[..check].iter().all(|&s| s == 0));
+            let mut erasures = [0usize; 8];
+            for slot in &mut erasures {
+                let i = rng.below(n);
+                let value = rng.next() as u8;
+                word[i] ^= value;
+                add_to_syndromes(&mut tracked[..check], n, i, value);
+                *slot = i;
+            }
+            let mut fresh = [0u8; MAX_DEGREE];
+            assert!(syndromes(&word[..n], check, &mut fresh));
+            assert_eq!(tracked[..check], fresh[..check]);
+            for (j, &s) in fresh[..check].iter().enumerate() {
+                let horner = word[..n]
+                    .iter()
+                    .fold(0u8, |acc, &c| gf256::mul(acc, gf256::exp2(j as u32)) ^ c);
+                assert_eq!(s, horner);
+            }
+            let mut erasures = erasures[..check.min(4)].to_vec();
+            erasures.sort_unstable();
+            erasures.dedup();
+            let mut a = word;
+            let mut b = word;
+            assert_eq!(
+                decode_errata(&mut a[..n], check, &erasures),
+                decode_errata_with_syndromes(&mut b[..n], check, &erasures, &fresh[..check])
+            );
+            assert_eq!(a, b);
+        }
+        assert!(!syndromes(&[0u8; 256], 4, &mut [0u8; 4]));
+        assert!(!syndromes(&[0u8; 10], 4, &mut [0u8; 3]));
+        assert_eq!(
+            decode_errata_with_syndromes(&mut [0u8; 10], 4, &[], &[0u8; 3]),
+            None
+        );
     }
 
     #[test]

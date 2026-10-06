@@ -18,7 +18,7 @@
 
 import type { ChannelPreset } from './channel';
 import type { DecodedFrame, DecodeFailure } from './codec';
-import { getConstellation } from './constellation';
+import { constellationShape } from './constellation';
 import { MODEM_PROFILES, type ModemProfile } from './profile';
 
 /** One step of the profile ladder (#1161). */
@@ -265,7 +265,7 @@ export function formatRate(bytesPerSecond: number): string {
 export function linkLabel(state: LinkState): string {
   const rung = LADDER.find((r) => r.id === state.lockedProfile);
   if (!rung?.modem) return 'Optical link: looking for the sender';
-  const colours = getConstellation(rung.modem.constellation).size;
+  const colours = constellationShape(rung.modem.constellation).size;
   return `Optical link: ${colours}-colour · ${rung.modem.cols}×${rung.modem.rows} · ${Math.round(state.cameraFps)} Hz · ${formatRate(state.bytesPerSecond)}`;
 }
 

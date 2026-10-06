@@ -44,6 +44,7 @@ import {
   createMultiRateSender,
   createPrismSession,
   createSymbolDedup,
+  loadCrossTalkKernels,
   qrModuleCount,
   type ColourFallbackReason,
   type ColourState,
@@ -381,6 +382,7 @@ export interface ColourRunResult {
  * @returns What the transfer took.
  */
 export async function runColourTransfer(options: ColourRunOptions): Promise<ColourRunResult> {
+  await loadCrossTalkKernels();
   const random = createRandom(options.seed ?? 11);
   const file = new Uint8Array(options.bytes);
   for (let i = 0; i < file.length; i++) file[i] = Math.floor(random() * 256);

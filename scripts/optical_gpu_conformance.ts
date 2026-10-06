@@ -27,6 +27,7 @@
  * phone GPU's speed or rounding. The timing it prints is for that software path and the machine it
  * ran on, and is labelled so.
  */
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
@@ -38,6 +39,7 @@ import {
   decodeModemFrame,
   encodeModemFrame,
   frameCapacity,
+  loadOpticalModem,
   runReferenceKernel,
   simulateCapture,
   type ChannelPreset,
@@ -93,6 +95,9 @@ async function main(): Promise<void> {
   const executablePath = argument('--chromium') ?? process.env.OPTICAL_CHROMIUM_PATH;
   const browser = await chromium.launch({ executablePath, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const bundle = await bundlePage();
+  // The reference kernel runs in the modem module, in Node and in the page.
+  await loadOpticalModem();
+  const moduleBase64 = fs.readFileSync(path.join(root, 'src', 'wasm', 'modem.wasm')).toString('base64');
   // The site's own policy, without the inline-script allowance that production replaces with hashes.
   const strictCsp = BASE_CSP_PATTERN.replace("script-src 'self' 'unsafe-inline'", "script-src 'self'");
   const cspPage = await browser.newPage();
@@ -110,7 +115,7 @@ async function main(): Promise<void> {
     if (/content security policy/i.test(message.text())) violations.push(message.text());
   });
   await cspPage.goto('https://qrcraftly.test/');
-  const underCsp = await cspPage.evaluate(() => window.opticalGpu.init());
+  const underCsp = await cspPage.evaluate((base64) => window.opticalGpu.init(base64), moduleBase64);
   process.stdout.write(
     `Under the site's CSP (script-src 'self' 'wasm-unsafe-eval', no 'unsafe-eval', no blob: or data: scripts): ${underCsp.ok ? `kernel built, self-test ${underCsp.selfTest.exact ? 'exact' : 'MISMATCH'}` : `no kernel (${underCsp.reason})`}, ${violations.length} policy violations.\n`
   );
@@ -118,7 +123,7 @@ async function main(): Promise<void> {
   await cspPage.close();
   const page = await browser.newPage();
   await page.addScriptTag({ content: bundle });
-  const init = await page.evaluate(() => window.opticalGpu.init());
+  const init = await page.evaluate((base64) => window.opticalGpu.init(base64), moduleBase64);
   if (!init.ok) {
     process.stdout.write(`No GPU kernel in this browser: ${init.reason}\n`);
     await browser.close();

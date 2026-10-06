@@ -259,6 +259,7 @@ export {
   CALIBRATION_SWATCHES,
   ColourCalibrator,
   fitCrossTalk,
+  loadCrossTalkKernels,
   splitChannels,
   type CalibrationEvent,
   type CrossTalkModel,

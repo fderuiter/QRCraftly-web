@@ -126,17 +126,6 @@ export function createLayout(cols: number, rows: number, symbolCount: number): F
 }
 
 /**
- * The centre of a fiducial in cell coordinates (a cell spans one unit).
- * @param layout - The frame layout.
- * @param index - Which fiducial.
- * @returns Column and row coordinates of its centre.
- */
-export function fiducialCentre(layout: FrameLayout, index: FiducialIndex): [number, number] {
-  const [col, row] = layout.fiducialOrigins[index];
-  return [col + 4.5, row + 4.5];
-}
-
-/**
  * Whether a cell of a fiducial block is dark. A fiducial is a 7 x 7 dark ring, a light ring and a
  * 3 x 3 dark core. The core loses cells fiducial by fiducial (9, 7, 5 and 3 dark cells), which is
  * the orientation mark: the receiver ranks the four cores by area.

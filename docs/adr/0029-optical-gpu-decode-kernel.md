@@ -71,5 +71,5 @@ The shader is compiled by the graphics driver from a string, which is not JavaSc
 ## Consequences
 
 - A receiver picks the kernel at start: `createVerifiedGpuKernel` first, the reference kernel otherwise. Both go through `decodeModemFrame`'s `sampleGrid` hook, so the decoder is the same.
-- Any change to `sample.ts`, the shader or the palette format must keep `pnpm run bench:optical-gpu` at zero mismatches, and the unit tests pin what can be pinned without a GPU (the shader source, the upload and read-back calls, the self-test logic).
+- Any change to the reference kernel (`crates/modem/src/sample.rs` since #1198, `sample.ts` before), the shader or the palette format must keep `pnpm run bench:optical-gpu` at zero mismatches, and the unit tests pin what can be pinned without a GPU (the shader source, the upload and read-back calls, the self-test logic).
 - The device table in [ADR 0027](0027-optical-channel-probe.md) is where real-device GPU results belong once someone runs the page on phones.
