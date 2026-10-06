@@ -150,6 +150,23 @@ describe('createCameraSession', () => {
     expect(camera.requests[0].constraints.video).toMatchObject({ deviceId: { exact: 'front' }, width: { ideal: 1920 } });
   });
 
+  it('asks for a higher frame rate as an ideal at full HD only, and re-acquires when it changes (#1142)', async () => {
+    expect(cameraConstraints({ frameRate: 60 }, 0).video).toMatchObject({ width: { ideal: 1920 }, frameRate: { ideal: 60 } });
+    expect(cameraConstraints({ frameRate: 60 }, 1).video).not.toHaveProperty('frameRate');
+    expect(cameraConstraints({ frameRate: 24 }, 0).video).toMatchObject({ frameRate: { ideal: 30, max: 30 } });
+
+    const session = create();
+    const first = session.start();
+    camera.requests[0].grant();
+    await first;
+    const faster = session.start({ frameRate: 60 });
+    expect(camera.requests).toHaveLength(2);
+    camera.requests[1].grant();
+    await faster;
+    expect(camera.live()).toBe(1);
+    expect(session.getState().status).toBe('streaming');
+  });
+
   it('is idempotent: start while requesting or streaming asks only once', async () => {
     const session = create();
     const first = session.start();
@@ -348,6 +365,7 @@ describe('createCameraSession', () => {
         facing: 'user',
         width: 1280,
         height: 720,
+        frameRate: 0,
         torch: { supported: false, on: false },
         zoom: null,
       });

@@ -19,6 +19,7 @@
 import { loadQrEncoder, type QrEccLetter, type QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
 import { loadFecModule } from './lib/fec/codec';
 import { TRANSFER_DENSITY_PROFILES, resolveTransferDensity, sha256Hex } from './lib/fountain/session';
+import { TILE_LAYOUTS, type TileLayout } from './lib/multicode/layout';
 import { createPrismBundleSession, createPrismSession, type PrismSession, type PrismStream } from './lib/prism/session';
 import { keyQrText, parseKeyCode } from './lib/prism/words';
 import type {
@@ -33,6 +34,8 @@ let totalFrames = 0; // K: the first pass; the stream is rateless and runs past 
 let nextIndexToGenerate = 0;
 let lastAckedIndex = -1;
 let errorCorrectionLevel: QrEccLetter = 'Q';
+/** The multi-code layout of the running transfer (#1142): every frame is a tile of its fixed version. */
+let tileLayout: TileLayout | null = null;
 /** The QR encoder, loaded when the worker starts and awaited by the first START. */
 let encoder: QrSymbolEncoder | null = null;
 let currentSessionId = 0;
@@ -82,7 +85,8 @@ function generateFrame(index: number, sessionId: number): void {
   if (sessionId !== currentSessionId || !active || !encoder) return;
 
   try {
-    const qr = encoder.create(active.frameText(index), { errorCorrectionLevel });
+    // Tiles share one fixed version, so a short manifest frame is the same size as a data frame.
+    const qr = encoder.create(active.frameText(index), { errorCorrectionLevel, version: tileLayout?.version });
     const { size, data } = qr.modules;
     if (sessionId !== currentSessionId) return;
 
@@ -129,7 +133,10 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
   keyQr = null;
 
   const fps = payload?.fps || 15;
-  lookaheadLimit = Math.min(16, Math.max(3, Math.ceil(fps * 0.2)));
+  const requestedTiles = payload?.tiles;
+  tileLayout = requestedTiles && Object.hasOwn(TILE_LAYOUTS, requestedTiles) ? TILE_LAYOUTS[requestedTiles] : null;
+  // Every tile takes a frame per display frame, so the look-ahead grows with the tiles.
+  lookaheadLimit = Math.min(16, Math.max(3, Math.ceil(fps * 0.2))) * (tileLayout?.tiles ?? 1);
 
   if (!source) {
     post({ type: 'ERROR', message: 'No file provided' });
@@ -143,8 +150,8 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
     if (sessionId !== currentSessionId) return;
     const density = resolveTransferDensity(payload?.density);
     const profile = TRANSFER_DENSITY_PROFILES[density];
-    // Frames use the density's ECC, not the page's appearance ECC.
-    errorCorrectionLevel = profile.errorCorrectionLevel;
+    // Frames use the density's ECC, not the page's appearance ECC. Tiles are large codes at ECC L.
+    errorCorrectionLevel = tileLayout ? 'L' : profile.errorCorrectionLevel;
     // Without the module (an old browser) the transfer goes out with the LT code, which every receiver reads.
     const module = payload?.outerCode === 'fec' ? await outerCodeModule() : null;
     if (sessionId !== currentSessionId) return;
@@ -155,6 +162,7 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
       maxVersion: profile.maxVersion,
       private: payload?.private === true,
       fecModule: module ?? undefined,
+      tile: tileLayout ?? undefined,
     };
 
     let session: PrismSession;
@@ -191,6 +199,7 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
       fileCount: sources.length,
       keyCode: session.keyCode,
       outerCode: session.outerCode,
+      tiles: tileLayout?.id ?? null,
     };
   } catch (err: unknown) {
     if (sessionId !== currentSessionId) return;
@@ -238,6 +247,7 @@ function handleStop(): void {
   file = null;
   stream = null;
   keyQr = null;
+  tileLayout = null;
   nextIndexToGenerate = 0;
   lastAckedIndex = -1;
   totalFrames = 0;

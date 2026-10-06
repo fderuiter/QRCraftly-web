@@ -220,6 +220,17 @@ export {
 } from './lib/multicode/pool';
 export { planMultiCode, type MultiCodeOptions, type MultiCodePlan } from './lib/multicode/plan';
 export {
+  createTileReader,
+  layoutForCodes,
+  TileReadSession,
+  type TilePlan,
+  type TileReader,
+  type TileReaderOptions,
+  type TileVideoSource,
+  type TileWorker,
+} from './lib/receiver/tileReader';
+export type { TileCode, TileReadRequest, TileReadResponse } from './lib/receiver/tileContracts';
+export {
   MULTI_RATE_PROFILES,
   isBeaconFrame,
   classifyFrameText,

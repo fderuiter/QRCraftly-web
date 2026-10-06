@@ -92,6 +92,9 @@ function FileTransferReceiveInner() {
     receiverError,
     isScanning,
     cameraError,
+    camera,
+    multiCode,
+    setMultiCode,
     lockOn,
     bcur,
     bcurProgress,
@@ -429,6 +432,15 @@ function FileTransferReceiveInner() {
             </section>
 
             <ToggleSwitch id="receive-sound" label="Play a chime when the file arrives" checked={soundOn} onChange={setSoundOn} />
+
+            <div className="space-y-1">
+              <ToggleSwitch id="receive-multi-code" label="Read several codes per frame (preview)" checked={multiCode} onChange={setMultiCode} />
+              <p className="text-xs text-fg-muted" data-testid="receive-multi-code-hint">
+                {multiCode && camera && camera.width > 0
+                  ? `The camera streams ${camera.width}×${camera.height}${camera.frameRate > 0 ? ` at ${Math.round(camera.frameRate)} frames/sec` : ''}.`
+                  : 'For a sender showing several codes at once. Asks the camera for 60 frames a second.'}
+              </p>
+            </div>
 
             {/* Beta notice after the primary actions so they stay in the first mobile viewport. */}
             <BetaNotice />

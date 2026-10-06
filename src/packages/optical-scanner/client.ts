@@ -10,6 +10,7 @@ import {
 import {
   createCameraSession,
   type CameraDevice,
+  type CameraFrameLoop,
   type CameraSession,
   type CameraSessionStartOptions,
   type CameraSessionState,
@@ -17,6 +18,7 @@ import {
 
 export type {
   CameraDevice,
+  CameraFrameLoop,
   CameraInfo,
   CameraProblemStatus,
   CameraSessionState,
@@ -72,6 +74,11 @@ export interface UseQrScannerOptions {
    * decode). Read once, when scanning first starts.
    */
   repeatHoldMs?: number;
+  /**
+   * Runs this loop instead of the scanner's own while the camera streams, for a caller that reads
+   * the frames itself (Prism's multi-code receiver, #1142). Read each time the camera starts.
+   */
+  frameLoop?: CameraFrameLoop | null;
 }
 
 /**
@@ -144,6 +151,7 @@ export function useQrScanner({
   maxSamplingDelay = 1000,
   confirmations,
   repeatHoldMs,
+  frameLoop,
 }: UseQrScannerOptions = {}): UseQrScannerResult {
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [status, setStatus] = useState<ScannerStatus>('idle');
@@ -154,10 +162,12 @@ export function useQrScanner({
   const ownVideoRef = useRef<HTMLVideoElement | null>(null);
   const resolvedVideoRef = videoRef ?? ownVideoRef;
 
-  const latest = useRef({ videoRef: resolvedVideoRef, onScanSuccess, onScanFail });
+  const latest = useRef({ videoRef: resolvedVideoRef, onScanSuccess, onScanFail, frameLoop });
   useEffect(() => {
-    latest.current = { videoRef: resolvedVideoRef, onScanSuccess, onScanFail };
-  }, [resolvedVideoRef, onScanSuccess, onScanFail]);
+    latest.current = { videoRef: resolvedVideoRef, onScanSuccess, onScanFail, frameLoop };
+  }, [resolvedVideoRef, onScanSuccess, onScanFail, frameLoop]);
+  /** The caller's loop while it runs in place of the scanner's own. */
+  const runningLoopRef = useRef<CameraFrameLoop | null>(null);
 
   const pending = useRef<{ status: ScannerStatus; metrics: CameraScannerEngineMetrics; dirty: boolean }>({
     status: 'idle',
@@ -237,7 +247,19 @@ export function useQrScanner({
     if (sessionRef.current) return sessionRef.current;
     const session = createCameraSession({
       getVideo: () => latest.current.videoRef.current,
-      loop: { start: startScanning, stop: stopScanning },
+      loop: {
+        start: () => {
+          const custom = latest.current.frameLoop ?? null;
+          runningLoopRef.current = custom;
+          if (custom) custom.start();
+          else startScanning();
+        },
+        stop: () => {
+          runningLoopRef.current?.stop();
+          runningLoopRef.current = null;
+          stopScanning();
+        },
+      },
     });
     session.subscribe(setCameraState);
     sessionRef.current = session;

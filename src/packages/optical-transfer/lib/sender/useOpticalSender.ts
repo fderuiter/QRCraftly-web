@@ -24,7 +24,12 @@ import { PreallocatedFramePool } from '../framePool';
 import { sanitizeStreamConfig, verifyHandshakeFrame, type HandshakeFrameVerifier } from '../handshake';
 import type { SliceWorkerOutgoingMessage, TransferStats } from '../contracts';
 import { DEFAULT_TRANSFER_DENSITY, type TransferCompression, type TransferDensity } from '../fountain/session';
+import type { TileLayoutId } from '../multicode/layout';
+import { holdForTargetFps, createVsyncPacer, type VsyncPacer } from '../multicode/pacing';
+import { planMultiCode, type MultiCodePlan } from '../multicode/plan';
+import { tileFrameIndex, tileSlot } from '../multicode/stagger';
 import type { OuterCode } from '../prism/session';
+import { paintTile, prepareTileCanvas, tileScreenOf } from './tiles';
 import { formatMegabytes, spawnSliceWorker } from './workers';
 
 /** One QR module matrix produced by the slice worker. */
@@ -73,6 +78,17 @@ export interface SenderFountainInfo {
   keyCode?: string;
   /** The code the stream is sent with. */
   outerCode: OuterCode;
+  /** The multi-code layout the stream is shown with, or null for one code per frame. */
+  tiles: TileLayoutId | null;
+}
+
+/** How a running multi-code stream is shown (#1142). */
+export interface SenderTileInfo {
+  layout: TileLayoutId;
+  /** Display refreshes each frame is held for, once the refresh rate is measured. */
+  hold: number | null;
+  /** Measured display refresh rate, or null while measuring. */
+  refreshHz: number | null;
 }
 
 const HANDSHAKE_FAILURE_SUFFIX =
@@ -108,6 +124,10 @@ export function useOpticalSender({
   const [density, setDensity] = useState<TransferDensity>(DEFAULT_TRANSFER_DENSITY);
   /** The code to send with: the LT code by default, the outer code (#1141) when chosen under Advanced. */
   const [outerCode, setOuterCode] = useState<OuterCode>('lt');
+  /** Several codes per frame (#1142), chosen under Advanced. Off by default. */
+  const [multiCode, setMultiCode] = useState(false);
+  /** The running multi-code stream's layout and pacing, or null. */
+  const [tileInfo, setTileInfo] = useState<SenderTileInfo | null>(null);
   const [fountainInfo, setFountainInfo] = useState<SenderFountainInfo | null>(null);
   const [fps, setFps] = useState(15);
   const [currentPass, setCurrentPass] = useState(1);
@@ -140,6 +160,16 @@ export function useOpticalSender({
   const animationIdRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef(0);
   const lastRenderSuccessTimeRef = useRef(0);
+  /** The multi-code plan of the running transfer, or null when it shows one code per frame. */
+  const tilePlanRef = useRef<MultiCodePlan | null>(null);
+  const pacerRef = useRef<VsyncPacer | null>(null);
+  /** Display refreshes held per frame; 1 until the pacer has measured the display. */
+  const holdRef = useRef(1);
+  /** Frame index each tile shows, -1 before its first. */
+  const tileShownRef = useRef<number[]>([]);
+  /** Refreshes played before the last pause, so a resumed stream carries on where it stopped. */
+  const refreshBaseRef = useRef(0);
+  const lastRefreshRef = useRef(-1);
 
   useEffect(() => {
     configRef.current = config;
@@ -163,6 +193,7 @@ export function useOpticalSender({
       if (animationIdRef.current) {
         cancelAnimationFrame(animationIdRef.current);
       }
+      pacerRef.current?.stop();
     };
   }, []);
 
@@ -196,6 +227,12 @@ export function useOpticalSender({
       cancelAnimationFrame(animationIdRef.current);
       animationIdRef.current = null;
     }
+    pacerRef.current?.stop();
+    pacerRef.current = null;
+    tileShownRef.current = [];
+    refreshBaseRef.current = 0;
+    lastRefreshRef.current = -1;
+    setTileInfo(null);
     framePoolRef.current.clear();
     passCountRef.current = 1;
     setCurrentPass(1);
@@ -270,12 +307,84 @@ export function useOpticalSender({
     animationIdRef.current = requestAnimationFrame(loop);
   }, [paint]);
 
+  /**
+   * Plays a multi-code stream (#1142): the pacer locks to the display's refreshes, each frame is
+   * held for a whole number of them, and the two diagonal groups of tiles change on alternate
+   * refreshes so a camera exposure that straddles a change still sees half the tiles whole.
+   */
+  const runTileLoop = useCallback((plan: MultiCodePlan) => {
+    const { layout } = plan;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const modulePx = Math.max(1, Math.round(plan.modulePx * (window.devicePixelRatio || 1)));
+    if (tileShownRef.current.length !== layout.tiles) {
+      prepareTileCanvas(canvas, layout, modulePx);
+      tileShownRef.current = Array.from({ length: layout.tiles }, () => -1);
+    }
+    const shown = tileShownRef.current;
+    const base = refreshBaseRef.current;
+    const pacer = createVsyncPacer({
+      clock: { request: (callback) => requestAnimationFrame(callback), cancel: (handle) => cancelAnimationFrame(handle) },
+      hold: holdRef.current,
+      onLocked: ({ refreshHz }) => {
+        holdRef.current = holdForTargetFps(refreshHz, fpsRef.current);
+        pacer.setHold(holdRef.current);
+        setTileInfo({ layout: layout.id, hold: holdRef.current, refreshHz });
+      },
+      onTick: ({ refresh }) => {
+        if (!isTransferringRef.current || isPausedRef.current) return;
+        const now = performance.now();
+        const at = base + refresh;
+        lastRefreshRef.current = at;
+        const hold = holdRef.current;
+        const pool = framePoolRef.current;
+        let newest = -1;
+        let missing = false;
+        for (let tile = 0; tile < layout.tiles; tile++) {
+          const slot = layout.tiles > 1 && hold > 1 ? tileSlot(layout, tile, at, hold) : Math.floor(at / hold);
+          const index = tileFrameIndex(layout, tile, slot);
+          if (index === shown[tile]) continue;
+          const frame = pool.getFrame(index);
+          if (!frame) {
+            // The tile keeps its last frame until the worker catches up.
+            missing = true;
+            continue;
+          }
+          paintTile(ctx, layout, modulePx, tile, frame);
+          // Recycle every slot this tile has moved past, skipped frames included.
+          for (let old = Math.max(tile, shown[tile]); old < index; old += layout.tiles) pool.delete(old);
+          shown[tile] = index;
+          newest = Math.max(newest, index);
+        }
+        const worker = workerRef.current;
+        if (newest >= 0) {
+          lastRenderSuccessTimeRef.current = now;
+          worker?.postMessage({ type: 'ACK', payload: { index: newest } });
+          const total = totalFramesRef.current || 1;
+          setCurrentFrameIndex(newest + 1);
+          setProgress(Math.min(100, Math.round(((newest + 1) / total) * 100)));
+          const passNumber = Math.floor(newest / total) + 1;
+          if (passNumber !== passCountRef.current) {
+            passCountRef.current = passNumber;
+            setCurrentPass(passNumber);
+          }
+        } else if (missing && now - lastRenderSuccessTimeRef.current >= 100) {
+          lastRenderSuccessTimeRef.current = now;
+          worker?.postMessage({ type: 'HEAL', payload: { lastAckedIndex: Math.max(...shown) } });
+        }
+      },
+    });
+    pacerRef.current = pacer;
+  }, []);
+
   /** Runs the scannability gate on the first frame, then starts or refuses playback. */
   const gateFirstFrame = useCallback(async (frame: TransferFrame) => {
     isVerifyingHandshakeRef.current = false;
 
-    // The first frame is checked as it will be shown: sanitized, without a logo.
-    const isScannable = await verifyFrameRef.current(frame, sanitizeStreamConfig(configRef.current), null, null);
+    // The first frame is checked as it will be shown: sanitized, without a logo. Tiles are always
+    // painted dark on light whatever the page's colours, so they skip the check.
+    const isScannable = tilePlanRef.current ? true : await verifyFrameRef.current(frame, sanitizeStreamConfig(configRef.current), null, null);
 
     setIsVerifyingHandshake(false);
 
@@ -284,7 +393,8 @@ export function useOpticalSender({
       setHandshakeError(null);
       setIsTransferring(true);
       isTransferringRef.current = true;
-      runAnimationLoop();
+      if (tilePlanRef.current) runTileLoop(tilePlanRef.current);
+      else runAnimationLoop();
       return;
     }
 
@@ -297,7 +407,7 @@ export function useOpticalSender({
       workerRef.current.terminate();
       workerRef.current = null;
     }
-  }, [runAnimationLoop]);
+  }, [runAnimationLoop, runTileLoop]);
 
   const handleWorkerMessage = useCallback((message: SliceWorkerOutgoingMessage | null) => {
     if (!message) return;
@@ -321,6 +431,7 @@ export function useOpticalSender({
           fileCount: message.fountain.fileCount,
           keyCode: message.fountain.keyCode,
           outerCode: message.fountain.outerCode,
+          tiles: message.fountain.tiles,
         });
         break;
       }
@@ -380,9 +491,19 @@ export function useOpticalSender({
       worker.onmessage = (e: MessageEvent<SliceWorkerOutgoingMessage | null>) => handleWorkerMessage(e.data);
     }
 
+    // A screen too small for 3 CSS px modules keeps one code per frame.
+    const canvas = canvasRef.current;
+    const plan = multiCode && canvas ? planMultiCode({ enabled: true, screen: tileScreenOf(canvas), refreshHz: 60, targetFps: fpsRef.current }) : null;
+    tilePlanRef.current = plan;
+    holdRef.current = 1;
+    if (plan) setTileInfo({ layout: plan.layout.id, hold: null, refreshHz: null });
+
     const files = selectedFiles.length > 1 ? { files: selectedFiles } : { file: selectedFiles[0] };
-    workerRef.current.postMessage({ type: 'START', payload: { ...files, fps: fpsRef.current, density, private: isPrivate, outerCode } });
-  }, [selectedFiles, density, isPrivate, outerCode, stopTransfer, handleWorkerMessage]);
+    workerRef.current.postMessage({
+      type: 'START',
+      payload: { ...files, fps: fpsRef.current, density, private: isPrivate, outerCode, tiles: plan?.layout.id },
+    });
+  }, [selectedFiles, density, isPrivate, outerCode, multiCode, stopTransfer, handleWorkerMessage]);
 
   /** Shows the key QR for as long as the person holds the button; it never plays with the stream. */
   const showKeyQr = useCallback(() => workerRef.current?.postMessage({ type: 'KEY_QR' }), []);
@@ -397,6 +518,9 @@ export function useOpticalSender({
       cancelAnimationFrame(animationIdRef.current);
       animationIdRef.current = null;
     }
+    pacerRef.current?.stop();
+    pacerRef.current = null;
+    refreshBaseRef.current = lastRefreshRef.current + 1;
   }, []);
 
   /** Carries on from the frame where the stream was paused. */
@@ -406,8 +530,9 @@ export function useOpticalSender({
     setIsPaused(false);
     lastFrameTimeRef.current = performance.now();
     lastRenderSuccessTimeRef.current = performance.now();
-    runAnimationLoop();
-  }, [runAnimationLoop]);
+    if (tilePlanRef.current) runTileLoop(tilePlanRef.current);
+    else runAnimationLoop();
+  }, [runAnimationLoop, runTileLoop]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
@@ -457,6 +582,9 @@ export function useOpticalSender({
     setDensity,
     outerCode,
     setOuterCode,
+    multiCode,
+    setMultiCode,
+    tileInfo,
     fps,
     setFps,
     currentPass,

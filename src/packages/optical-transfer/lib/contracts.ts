@@ -17,6 +17,7 @@
 */
 
 import type { TransferCompression, TransferDensity } from './fountain/session';
+import type { TileLayoutId } from './multicode/layout';
 import type { OuterCode } from './prism/session';
 
 /**
@@ -53,6 +54,8 @@ export interface SliceStartPayload {
   density?: TransferDensity;
   /** Send with the outer code (ADR 0037) instead of the LT code; falls back to LT when it cannot. */
   outerCode?: OuterCode;
+  /** Size the frames for this multi-code layout's tiles (#1142) instead of the density's QR version. */
+  tiles?: TileLayoutId;
 }
 
 /** Messages the slice worker accepts. */
@@ -80,6 +83,8 @@ export interface FountainInitInfo {
   keyCode?: string;
   /** The code the stream is sent with. */
   outerCode: OuterCode;
+  /** The multi-code layout the frames were sized for, or null for one code per frame. */
+  tiles: TileLayoutId | null;
 }
 
 /** Messages the slice worker emits. */

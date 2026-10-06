@@ -407,6 +407,26 @@ describe('useOpticalReceiver', () => {
       expect(addToast).not.toHaveBeenCalledWith(expect.objectContaining({ message: 'Camera scanner activated.' }));
     });
 
+    it('reads several codes per frame with its own workers at 60 frames a second when chosen (#1142)', async () => {
+      const { result } = renderReceiver();
+      const spawned = globalThis.mockWorkerControl.getInstances().length;
+      act(() => result.current.setMultiCode(true));
+      await act(async () => {
+        await result.current.startCameraSession();
+      });
+      expect(getUserMedia.mock.calls[0][0].video).toMatchObject({ frameRate: { ideal: 60 } });
+      // The decoder pool's workers (two at least) start with the camera, besides the reassembly worker.
+      expect(globalThis.mockWorkerControl.getInstances().length - spawned).toBeGreaterThanOrEqual(3);
+
+      // Switching back while the camera streams re-opens it at the usual rate.
+      await act(async () => {
+        result.current.setMultiCode(false);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(getUserMedia).toHaveBeenCalledTimes(2);
+      expect(getUserMedia.mock.calls[1][0].video).toMatchObject({ frameRate: { ideal: 30, max: 30 } });
+    });
+
     it('releases the camera on unmount', async () => {
       const { result, unmount } = renderReceiver();
       await act(async () => {

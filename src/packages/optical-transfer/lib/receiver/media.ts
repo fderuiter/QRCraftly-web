@@ -27,6 +27,14 @@ export function spawnReassemblyWorker(): Worker {
 }
 
 /**
+ * Spawns one decoder worker of the multi-code receiver (#1142).
+ * @returns The worker.
+ */
+export function spawnTileWorker(): Worker {
+  return new Worker(new URL('../../worker-tiles.ts', import.meta.url), { type: 'module' });
+}
+
+/**
  * Detaches any camera stream or file source from a video element and releases its decoder.
  * @param video The element, or null.
  * @param options `release` also pauses and reloads the element to free hardware decoders.

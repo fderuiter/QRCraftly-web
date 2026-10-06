@@ -258,6 +258,11 @@ export interface PrismSessionOptions {
   fecModule?: WebAssembly.Module;
   /** Most source symbols per outer-code block, mostly for tests (default and cap 8192). */
   fecBlockSymbols?: number;
+  /**
+   * Fill the frames of a multi-code tile (#1142) instead of the density's QR version: this many
+   * symbols of this size per frame. `maxVersion` and `symbolsPerFrame` are then ignored.
+   */
+  tile?: { symbolSize: number; symbolsPerFrame: number };
 }
 
 /** What a sender session hands back. */
@@ -281,7 +286,7 @@ function clampMime(mimeType: string): string {
 
 type StreamOptions = Pick<
   PrismSessionOptions,
-  'errorCorrectionLevel' | 'maxVersion' | 'requestedSymbolSize' | 'symbolsPerFrame' | 'fecModule' | 'fecBlockSymbols'
+  'errorCorrectionLevel' | 'maxVersion' | 'requestedSymbolSize' | 'symbolsPerFrame' | 'fecModule' | 'fecBlockSymbols' | 'tile'
 >;
 
 /**
@@ -304,8 +309,8 @@ function buildStream(
   fields: Omit<PrismManifest, 'transferLength' | 'symbolSize' | 'transferCrc32'>,
   keys?: PrivateKeys
 ): { stream: PrismStream; manifest: PrismManifest; symbolSize: number; outerCode: OuterCode } {
-  const symbolsPerFrame = options.symbolsPerFrame ?? 1;
-  const fitted = prismSymbolSize(options.errorCorrectionLevel, options.maxVersion, symbolsPerFrame);
+  const symbolsPerFrame = options.tile?.symbolsPerFrame ?? options.symbolsPerFrame ?? 1;
+  const fitted = options.tile?.symbolSize ?? prismSymbolSize(options.errorCorrectionLevel, options.maxVersion, symbolsPerFrame);
   const ltSymbolSize = Math.max(MIN_PRISM_SYMBOL_SIZE, Math.min(fitted, options.requestedSymbolSize ?? fitted));
   const fec = options.fecModule ? fecPlan(message.length, ltSymbolSize, options) : null;
   const symbolSize = fec?.symbolSize ?? ltSymbolSize;
