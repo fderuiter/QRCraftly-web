@@ -58,6 +58,11 @@ export interface SliceStartPayload {
   tiles?: TileLayoutId;
   /** With `tiles`: also make a beacon of this QR version for every `every`th display frame (#1143). */
   beacon?: BeaconPlan;
+  /**
+   * With `tiles`: the receiver may steer the speed (#1146), so every layout shares one symbol size
+   * (`SWITCHABLE_SYMBOL_SIZE`) and SWITCH can change the layout without changing the session.
+   */
+  steer?: boolean;
 }
 
 /** The beacons of a multi-rate stream (#1143, ADR 0031). */
@@ -75,6 +80,8 @@ export type SliceWorkerIncomingMessage =
   | { type: 'HEAL'; payload?: { lastAckedIndex?: unknown } }
   /** Asks for the key QR of a private transfer; answered with KEY_FRAME. */
   | { type: 'KEY_QR' }
+  /** A steered transfer changes layout (#1146): answered with SWITCHED, then frames of the new layout from index 0. */
+  | { type: 'SWITCH'; payload?: { tiles?: TileLayoutId; beacon?: BeaconPlan } }
   | { type: 'STOP' };
 
 /** Session details reported on INITIALIZED. */
@@ -97,6 +104,10 @@ export interface FountainInitInfo {
   tiles: TileLayoutId | null;
   /** The beacons sent between the tiles, or null for none. */
   beacon: BeaconPlan | null;
+  /** The session ID as 12 hex characters, which a receiver's feedback code names (#1146). */
+  sessionId: string;
+  /** Whether SWITCH may change the layout: the transfer was started with `steer` and tiles. */
+  steerable: boolean;
 }
 
 /** Messages the slice worker emits. */
@@ -107,4 +118,6 @@ export type SliceWorkerOutgoingMessage =
   | { type: 'KEY_FRAME'; size: number; data: Uint8Array }
   /** Beacon `index` of a multi-rate stream: it follows dense display frame `(index + 1) * (every - 1) - 1`. */
   | { type: 'BEACON'; index: number; size: number; data: Uint8Array }
+  /** The layout changed: frames and beacons posted before this belong to the old one. */
+  | { type: 'SWITCHED'; tiles: TileLayoutId; beacon: BeaconPlan | null }
   | { type: 'ERROR'; message: string };

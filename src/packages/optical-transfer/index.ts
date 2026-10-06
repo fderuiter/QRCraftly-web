@@ -145,6 +145,7 @@ export {
   neededSymbols,
   type OuterCode,
   type PrismStreamOptions,
+  type RestreamOptions,
   type PrismSessionOptions,
 } from './lib/prism/session';
 export { packBundle, unpackBundle, sanitizeRelativePath, type BundleSource, type BundleFile } from './lib/prism/bundle';
@@ -244,7 +245,7 @@ export {
 } from './lib/multicode/multirate';
 export { layerHint, ROBUST_LAYER_HINT, STALL_HINT, STALL_HINT_SECONDS, type LayerObservation } from './lib/multicode/layerHint';
 
-// Webcam back channel (#1146). Off unless a caller opts in through `createFeedbackLink().enable()`; nothing in the app imports these yet.
+// Webcam back channel (#1146). Off unless both pages opt in: the sender's "Let the receiver steer" and the receiver's "Help the sender pick its speed" preview switches.
 export {
   SPEED_LADDER,
   SWITCHABLE_SYMBOL_SIZE,
@@ -265,6 +266,7 @@ export {
   type FeedbackLinkOptions,
   type FeedbackLinkState,
 } from './lib/feedback/link';
+export { FEEDBACK_WINDOW_FRAMES, createFeedbackMeter, type FeedbackMeter, type ReadCode, type ReadingMeasure } from './lib/feedback/meter';
 
 // Colour layer (#1147). Off: `createColourSender` returns null unless a caller passes `enabled: true`, and nothing in the app imports these.
 export {

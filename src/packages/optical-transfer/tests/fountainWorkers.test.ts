@@ -56,9 +56,9 @@ function randomBytes(length: number, seed: number): Uint8Array {
   return Uint8Array.from({ length }, () => Math.floor(prng() * 256));
 }
 
-async function startFountain(file: Blob, options: { density?: string; outerCode?: string; tiles?: string; beacon?: { version: number; every: number } } = {}) {
-  const { density, outerCode, tiles, beacon } = options;
-  await sliceHandler({ data: { type: 'START', payload: { file, fps: 15, density, outerCode, tiles, beacon } } });
+async function startFountain(file: Blob, options: { density?: string; outerCode?: string; tiles?: string; beacon?: { version: number; every: number }; steer?: boolean } = {}) {
+  const { density, outerCode, tiles, beacon, steer } = options;
+  await sliceHandler({ data: { type: 'START', payload: { file, fps: 15, density, outerCode, tiles, beacon, steer } } });
   return posted.find(m => m.type === 'INITIALIZED') as
     | {
         totalFrames: number;
@@ -72,6 +72,8 @@ async function startFountain(file: Blob, options: { density?: string; outerCode?
           outerCode: string;
           tiles: string | null;
           beacon: { version: number; every: number } | null;
+          sessionId: string;
+          steerable: boolean;
         };
       }
     | undefined;
@@ -341,6 +343,54 @@ describe('Fountain sender and receiver workers', () => {
     }
     const complete = posted.find(m => m.type === 'COMPLETE') as { buffer: ArrayBuffer } | undefined;
     expect(new Uint8Array(complete?.buffer ?? new ArrayBuffer(0))).toEqual(bytes);
+  });
+
+  it('switches a steered transfer to another layout in the same session, without resending a symbol (#1146)', async () => {
+    const bytes = randomBytes(9000, 33);
+    const init = await startFountain(new File([bytes], 'steer.bin', { type: 'application/octet-stream' }), { tiles: '2x2-v20', beacon: { version: 30, every: 8 }, steer: true });
+    expect(init?.fountain).toMatchObject({ steerable: true, symbolSize: 350, tiles: '2x2-v20' });
+    expect(init?.fountain.sessionId).toMatch(/^[0-9a-f]{12}$/);
+    await pump(8);
+    const before = qrCalls.filter(c => c.version === 20).slice(0, 8).map(c => c.text);
+
+    qrCalls = [];
+    await sliceHandler({ data: { type: 'SWITCH', payload: { tiles: '2x2-v25', beacon: { version: 40, every: 12 } } } });
+    expect(posted.find(m => m.type === 'SWITCHED')).toEqual({ type: 'SWITCHED', tiles: '2x2-v25', beacon: { version: 40, every: 12 } });
+    await pump(4 * 12);
+    const after = qrCalls.filter(c => c.version === 25).map(c => c.text);
+    expect(after.length).toBeGreaterThan(8);
+    expect(qrCalls.some(c => c.version === 40)).toBe(true);
+
+    const ids = (texts: string[]) => {
+      const found = new Set<number>();
+      for (const text of texts) {
+        const decoded = decodeFrame(text);
+        expect(decoded.ok && decoded.frame.sessionId).toBe(init?.fountain.sessionId);
+        if (decoded.ok && decoded.frame.type === 'data') for (let offset = 0; offset < decoded.frame.count; offset++) found.add(decoded.frame.firstSymbol + offset);
+      }
+      return found;
+    };
+    const shown = ids(before);
+    const next = ids(after);
+    expect([...next].filter(id => shown.has(id))).toEqual([]);
+    expect(Math.min(...next)).toBeGreaterThan(Math.max(...shown));
+
+    // The frames shown before and after the switch rebuild the file together.
+    await pump(200);
+    posted = [];
+    for (const { text } of [...before.map(text => ({ text })), ...qrCalls]) {
+      await reassemblyHandler({ data: { type: 'FOUNTAIN_DROPLET', droplet: text } });
+      if (posted.some(m => m.type === 'COMPLETE' || m.type === 'ERROR')) break;
+    }
+    const complete = posted.find(m => m.type === 'COMPLETE') as { buffer: ArrayBuffer } | undefined;
+    expect(new Uint8Array(complete?.buffer ?? new ArrayBuffer(0))).toEqual(bytes);
+  });
+
+  it('ignores a switch when the transfer was not started for steering', async () => {
+    const init = await startFountain(new File([randomBytes(900, 7)], 's.bin', { type: 'application/octet-stream' }), { tiles: '2x2-v20' });
+    expect(init?.fountain.steerable).toBe(false);
+    await sliceHandler({ data: { type: 'SWITCH', payload: { tiles: '2x2-v25' } } });
+    expect(posted.some(m => m.type === 'SWITCHED')).toBe(false);
   });
 
   it('drops a beacon that is no larger than the tiles', async () => {

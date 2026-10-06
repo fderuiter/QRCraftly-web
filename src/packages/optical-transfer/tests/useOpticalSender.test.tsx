@@ -22,6 +22,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { useOpticalSender } from '../client';
 import { senderOptions } from './fixtures';
+import { encodeFeedbackFrame } from '../index';
 import { QRStyle } from '@/types';
 
 
@@ -185,6 +186,174 @@ describe('useOpticalSender', () => {
       expect(acks.map((ack) => ack.refresh)).toEqual([0, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 32, 34]);
       expect(acks.map((ack) => ack.index)).toEqual([3, 7, 6, 11, 10, 15, 14, 19, 18, 23, 22, 27, 26, 31, 30]);
       expect(sentHeal()).toBe(false);
+    });
+
+    it('waits for a worker that falls behind and carries on with its next frames', async () => {
+      vi.stubGlobal('innerHeight', 1000);
+      vi.stubGlobal('devicePixelRatio', 1);
+      const callbacks: Array<(time: number) => void> = [];
+      vi.stubGlobal('requestAnimationFrame', (callback: (time: number) => void) => callbacks.push(callback));
+      vi.stubGlobal('cancelAnimationFrame', () => undefined);
+
+      const { result } = renderHook(() => useOpticalSender(senderOptions()));
+      act(() => {
+        result.current.setSelectedFile(new File(['tile content'], 'tiles.txt', { type: 'text/plain' }));
+        result.current.setMultiCode(true);
+      });
+      attachCanvas(result.current, 1000);
+
+      const acks: number[] = [];
+      let sendFrames: (from: number, to: number) => void = () => undefined;
+      globalThis.mockWorkerControl.setInterceptor((message: any, worker: any) => {
+        if (message.type === 'ACK') acks.push(message.payload.index);
+        if (message.type !== 'START') return;
+        sendFrames = (from, to) => {
+          for (let index = from; index < to; index++) worker.dispatchMessage({ type: 'FRAME', index, total: 64, size: 97, data: new Uint8Array(97 * 97) });
+        };
+        worker.dispatchMessage({ type: 'PROGRESS', total: 64 });
+        // Only the first two display frames are ready; the worker is busy for a while after them.
+        sendFrames(0, 8);
+      });
+
+      act(() => result.current.startTransfer());
+      await waitFor(() => expect(result.current.isTransferring).toBe(true));
+
+      const interval = 1000 / 60;
+      let step = 0;
+      const run = async (refreshes: number) => {
+        for (let end = step + refreshes; step < end; step++) {
+          const callback = callbacks.shift();
+          await act(async () => {
+            callback?.(step * interval);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          });
+        }
+      };
+      // Two seconds pass with the worker stalled: the stream shows what it has and then waits.
+      await run(140);
+      expect(Math.max(...acks)).toBe(7);
+
+      // The worker catches up: the next frames are shown rather than skipped for ones it never made.
+      await act(async () => {
+        sendFrames(8, 16);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      await run(30);
+      expect(Math.max(...acks)).toBe(15);
+    });
+  });
+
+  describe('the receiver steers the speed (#1146)', () => {
+    const SESSION = 'a1b2c3d4e5f6';
+    const sessionBytes = new Uint8Array(SESSION.match(/../g)?.map((pair) => parseInt(pair, 16)) ?? []);
+
+    /** A receiver's feedback code: how well it reads, and whether it has the file. */
+    function feedbackText(densestLayer: 'none' | 'steady' | 'balanced' | 'fast', done = false) {
+      return encodeFeedbackFrame({ sessionId: sessionBytes, nonce: new Uint8Array([1, 2, 3, 4]), fractionDecoded: done ? 1 : 0.3, frameSuccessRate: 1, densestLayer, done });
+    }
+
+    /** A webcam stream whose one track is live until it is stopped. */
+    function fakeWebcam() {
+      const track = { readyState: 'live', stop: vi.fn(() => { track.readyState = 'ended'; }) };
+      return { track, stream: { getTracks: () => [track], getVideoTracks: () => [track] } as unknown as MediaStream };
+    }
+
+    beforeEach(() => {
+      vi.stubGlobal('innerHeight', 1000);
+      vi.stubGlobal('devicePixelRatio', 1);
+      // jsdom has no media pipeline: the webcam's video reports a playing 640x480 frame.
+      vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(4);
+      vi.spyOn(HTMLVideoElement.prototype, 'videoWidth', 'get').mockReturnValue(640);
+      vi.spyOn(HTMLVideoElement.prototype, 'videoHeight', 'get').mockReturnValue(480);
+      vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+
+    /** Starts a steered multi-code transfer against a scripted worker and feedback reader. */
+    async function startSteered(requestWebcam: () => Promise<MediaStream>) {
+      const options = senderOptions({ requestWebcam });
+      const { result, unmount } = renderHook(() => useOpticalSender(options));
+      act(() => {
+        result.current.setSelectedFile(new File(['steered content'], 'steer.txt', { type: 'text/plain' }));
+        result.current.setMultiCode(true);
+        result.current.setSteer(true);
+      });
+      const container = document.createElement('div');
+      Object.defineProperty(container, 'clientWidth', { value: 1000, configurable: true });
+      const canvas = document.createElement('canvas');
+      container.appendChild(canvas);
+      result.current.canvasRef.current = canvas;
+
+      const script = { feedback: feedbackText('balanced') };
+      const sent: any[] = [];
+      globalThis.mockWorkerControl.setInterceptor((message: any, worker: any) => {
+        if (message.image) {
+          // The webcam's decoder worker reads the receiver's feedback code.
+          worker.dispatchMessage({ id: message.id, codes: [{ text: script.feedback, corners: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }], version: 2, level: 'M' }] });
+          return;
+        }
+        sent.push(message);
+        if (message.type === 'START') {
+          worker.dispatchMessage({ type: 'PROGRESS', total: 64 });
+          worker.dispatchMessage({
+            type: 'INITIALIZED',
+            totalFrames: 64,
+            sha256: '',
+            fountain: { k: 64, density: 'balanced', symbolSize: 350, compression: 'none', messageLength: 9000, fingerprint: 'a b c d', fileCount: 1, outerCode: 'lt', tiles: '2x2-v20', beacon: { version: 30, every: 8 }, sessionId: SESSION, steerable: true },
+          });
+          for (let index = 0; index < 8; index++) worker.dispatchMessage({ type: 'FRAME', index, total: 64, size: 97, data: new Uint8Array(97 * 97) });
+        }
+        if (message.type === 'SWITCH') worker.dispatchMessage({ type: 'SWITCHED', tiles: message.payload.tiles, beacon: message.payload.beacon ?? null });
+      });
+      return { result, unmount, script, sent, requestWebcam };
+    }
+
+    it('asks for the webcam only once a steered transfer starts, drops to what the receiver reads and stops when it is done', async () => {
+      const webcam = fakeWebcam();
+      const requestWebcam = vi.fn(async () => webcam.stream);
+      const { result, script, sent } = await startSteered(requestWebcam);
+      expect(requestWebcam).not.toHaveBeenCalled();
+
+      act(() => result.current.startTransfer());
+      await waitFor(() => expect(result.current.steerState).toEqual({ status: 'listening' }));
+      expect(requestWebcam).toHaveBeenCalledTimes(1);
+      expect(sent.find((message) => message.type === 'START').payload.steer).toBe(true);
+      expect(result.current.steeredProfile).toBe('balanced');
+      await waitFor(() => expect(result.current.steeringReceivers).toBe(1));
+
+      // A receiver that reads only the Steady layer pulls the sender down to it at once.
+      script.feedback = feedbackText('steady');
+      await waitFor(() => expect(result.current.steeredProfile).toBe('steady'));
+      expect(sent.find((message) => message.type === 'SWITCH').payload).toEqual({ tiles: '1xv30', beacon: { version: 40, every: 4 } });
+
+      // Done: the sender stops by itself and lets the webcam go.
+      script.feedback = feedbackText('steady', true);
+      await waitFor(() => expect(result.current.autoStopped).toBe(true));
+      expect(result.current.isTransferring).toBe(false);
+      expect(webcam.track.stop).toHaveBeenCalled();
+      expect(result.current.steerState).toEqual({ status: 'off' });
+    });
+
+    it('carries on one way at the chosen speed when the webcam is refused', async () => {
+      const requestWebcam = vi.fn(async (): Promise<MediaStream> => {
+        throw new DOMException('Permission denied', 'NotAllowedError');
+      });
+      const { result } = await startSteered(requestWebcam);
+      act(() => result.current.startTransfer());
+      await waitFor(() => expect(result.current.steerState).toEqual({ status: 'one-way', reason: 'denied' }));
+      expect(result.current.isTransferring).toBe(true);
+      expect(result.current.steeredProfile).toBe('balanced');
+      expect(result.current.autoStopped).toBe(false);
+    });
+
+    it('never asks for a webcam when the page cannot open one', async () => {
+      const { result } = await startSteered(undefined as unknown as () => Promise<MediaStream>);
+      act(() => result.current.startTransfer());
+      await waitFor(() => expect(result.current.steerState).toEqual({ status: 'one-way', reason: 'unavailable' }));
     });
   });
 

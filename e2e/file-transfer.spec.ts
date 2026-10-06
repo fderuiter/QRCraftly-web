@@ -28,7 +28,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { installSyntheticCamera, relayFrames, type CameraCondition } from './utils/opticalLink';
+import { installSyntheticCamera, paintCamera, relayFrames, type CameraCondition } from './utils/opticalLink';
 
 interface TransferFile {
   name: string;
@@ -36,7 +36,7 @@ interface TransferFile {
   buffer: Buffer;
 }
 
-async function openSender(sender: Page, file: TransferFile, speed?: 'Steady' | 'Balanced' | 'Fast', options: { outerCode?: boolean; multiCode?: boolean } = {}) {
+async function openSender(sender: Page, file: TransferFile, speed?: 'Steady' | 'Balanced' | 'Fast', options: { outerCode?: boolean; multiCode?: boolean; steer?: boolean } = {}) {
   await sender.goto('/file-transfer');
   await sender.waitForSelector('main[data-hydrated="true"]');
   await sender.getByLabel('Choose a file to send').setInputFiles(file);
@@ -52,16 +52,24 @@ async function openSender(sender: Page, file: TransferFile, speed?: 'Steady' | '
     await sender.getByText('Several codes per frame (preview)', { exact: true }).click();
     await expect(sender.getByLabel('Several codes per frame (preview)')).toBeChecked();
   }
+  if (options.steer) {
+    await sender.getByText('Let the receiver steer (preview)', { exact: true }).click();
+    await expect(sender.getByLabel('Let the receiver steer (preview)')).toBeChecked();
+  }
   await sender.getByRole('button', { name: 'Start file transfer' }).click();
   await expect(sender.getByRole('button', { name: 'Stop file transfer' })).toBeVisible({ timeout: 20_000 });
 }
 
-async function openReceiver(receiver: Page, options: { multiCode?: boolean } = {}) {
+async function openReceiver(receiver: Page, options: { multiCode?: boolean; steer?: boolean } = {}) {
   await receiver.goto('/file-transfer/receive');
   await receiver.waitForSelector('main[data-hydrated="true"]');
   if (options.multiCode) {
     await receiver.getByText('Read several codes per frame (preview)', { exact: true }).click();
     await expect(receiver.getByLabel('Read several codes per frame (preview)')).toBeChecked();
+  }
+  if (options.steer) {
+    await receiver.getByText('Help the sender pick its speed (preview)', { exact: true }).click();
+    await expect(receiver.getByLabel('Help the sender pick its speed (preview)')).toBeChecked();
   }
   await receiver.getByRole('button', { name: 'Activate camera scanner' }).click();
   await expect(receiver.getByRole('button', { name: 'Deactivate camera scanner' })).toBeVisible();
@@ -155,6 +163,33 @@ test.describe('Optical file transfer', () => {
       await openReceiver(receiver, { multiCode: true });
       await relayUntilComplete(sender, receiver, { condition: { scale: 0.95 } });
       await expectDownloadedCopy(receiver, file);
+    });
+
+    test('lets the receiver steer the sender through its webcam and stop it once the file is in (#1146)', async ({ page: receiver, context }) => {
+      await installSyntheticCamera(context);
+      const sender = await context.newPage();
+      await sender.setViewportSize({ width: 1400, height: 1000 });
+      const file = { name: 'steered.bin', mimeType: 'application/octet-stream', buffer: randomBytes(12 * 1024) };
+      await openSender(sender, file, undefined, { multiCode: true, steer: true });
+      await expect(sender.getByTestId('steer-status')).toContainText(/Balanced speed\. Point this device/);
+      await openReceiver(receiver, { multiCode: true, steer: true });
+      await relayUntilComplete(sender, receiver, { condition: { scale: 0.95 } });
+      await expectDownloadedCopy(receiver, file);
+
+      // The receiver's corner code now says done; the sender's webcam reads it and stops by itself.
+      const feedback = receiver.getByTestId('feedback-code');
+      await expect(feedback).toBeVisible();
+      await expect
+        .poll(
+          async () => {
+            const image = await feedback.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL('image/png'));
+            await paintCamera(sender, image, { scale: 0.4 });
+            return sender.getByText('Every receiver in view has the file, so the sender stopped.').isVisible();
+          },
+          { timeout: 20_000, intervals: [500] }
+        )
+        .toBe(true);
+      await expect(sender.getByRole('button', { name: 'Start file transfer' })).toBeVisible();
     });
 
     test('keeps progress when the scanner pauses and the sender restarts', async ({ page: receiver, context }) => {

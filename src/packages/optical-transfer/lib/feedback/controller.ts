@@ -25,8 +25,8 @@
  * lives in memory, holds at most {@link MAX_RECEIVERS} entries, and an entry that stops reporting
  * expires. Nothing here touches the network or storage.
  *
- * Nothing outside this package calls it yet; the feature is off unless a caller opts in
- * (see `createFeedbackLink`).
+ * The sender hook runs it while the person has "Let the receiver steer (preview)" on; it is off
+ * otherwise (see `createFeedbackLink`).
  */
 import type { FeedbackLayer, FeedbackReport } from '../prism/frame';
 import { MULTI_RATE_PROFILES, type MultiRateProfile, type MultiRateProfileName } from '../multicode/multirate';

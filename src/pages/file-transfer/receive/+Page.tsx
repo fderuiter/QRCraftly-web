@@ -96,6 +96,10 @@ function FileTransferReceiveInner() {
     multiCode,
     setMultiCode,
     layerHint,
+    steerSender,
+    setSteerSender,
+    feedbackActive,
+    feedbackCanvasRef,
     lockOn,
     bcur,
     bcurProgress,
@@ -447,6 +451,34 @@ function FileTransferReceiveInner() {
                 </p>
               )}
             </div>
+
+            <div className="space-y-1">
+              <ToggleSwitch
+                id="receive-steer"
+                label="Help the sender pick its speed (preview)"
+                checked={steerSender && multiCode}
+                onChange={setSteerSender}
+                disabled={!multiCode}
+              />
+              <p className="text-xs text-fg-muted" data-testid="receive-steer-hint">
+                {multiCode
+                  ? 'Shows a small code in the corner of this screen with how well this device reads, so a sender with “Let the receiver steer” on can change speed and stop once you have the file. Keep that corner in view of the sender’s camera.'
+                  : 'Needs “Read several codes per frame”.'}
+              </p>
+            </div>
+
+            {/* The feedback code sits in a corner, where the sender's webcam can see it. */}
+            {feedbackActive && (
+              <canvas
+                ref={feedbackCanvasRef}
+                className="fixed right-4 bottom-4 z-50 size-32 rounded-md bg-surface shadow-lg"
+                role="img"
+                aria-label="Feedback code for the sender"
+                data-testid="feedback-code"
+                width={256}
+                height={256}
+              />
+            )}
 
             {/* Beta notice after the primary actions so they stay in the first mobile viewport. */}
             <BetaNotice />

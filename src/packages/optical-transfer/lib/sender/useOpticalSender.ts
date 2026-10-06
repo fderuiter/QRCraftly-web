@@ -30,6 +30,11 @@ import { MULTI_RATE_PROFILES, isBeaconFrame, type MultiRateProfileName } from '.
 import { planMultiCode, type MultiCodePlan } from '../multicode/plan';
 import { tileFrameIndex, tileSlot } from '../multicode/stagger';
 import type { OuterCode } from '../prism/session';
+import { createSpeedController, switchableProfile, type ControllerDecision, type SpeedController } from '../feedback/controller';
+import { createFeedbackLink, type CameraPermission, type FeedbackLink, type FeedbackLinkState } from '../feedback/link';
+import { decodeFrame } from '../prism/frame';
+import { spawnTileWorker } from '../receiver/media';
+import { createTileReader, type TileReader } from '../receiver/tileReader';
 import { clearTile, paintBeacon, paintTile, prepareTileCanvas, tileScreenOf } from './tiles';
 import { formatMegabytes, spawnSliceWorker } from './workers';
 
@@ -59,6 +64,20 @@ export interface UseOpticalSenderOptions {
   renderFrame: TransferFrameRenderer;
   /** Scannability gate run on the first frame before playback. Defaults to `verifyHandshakeFrame`. */
   verifyFrame?: HandshakeFrameVerifier;
+  /**
+   * Opens the sending device's webcam for the back channel (#1146). Called only after the person
+   * turned on "Let the receiver steer" and started a transfer. Without it, steering is unavailable.
+   */
+  requestWebcam?: () => Promise<MediaStream>;
+}
+
+/** What asking for the webcam came back with: a refusal and a missing camera are told apart. */
+function permissionOf(error: unknown): CameraPermission {
+  // A DOMException is not an Error everywhere, so read its name as a plain property.
+  const name = typeof error === 'object' && error !== null && 'name' in error ? String(error.name) : '';
+  if (name === 'NotAllowedError' || name === 'SecurityError') return 'denied';
+  if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'NotReadableError') return 'unavailable';
+  throw error;
 }
 
 /** Session details reported by the slice worker. */
@@ -83,6 +102,8 @@ export interface SenderFountainInfo {
   tiles: TileLayoutId | null;
   /** The beacons between the tiles, or null for none. */
   beacon: BeaconPlan | null;
+  /** Whether the receiver can steer this transfer's speed (#1146). */
+  steerable: boolean;
 }
 
 /** How a running multi-code stream is shown (#1142). */
@@ -110,6 +131,7 @@ export function useOpticalSender({
   borderLogoImg,
   renderFrame,
   verifyFrame = verifyHandshakeFrame,
+  requestWebcam,
 }: UseOpticalSenderOptions) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   /** Encrypt the next transfer under a key code (#1144). */
@@ -134,6 +156,16 @@ export function useOpticalSender({
   const [multiCode, setMultiCode] = useState(false);
   /** The running multi-code stream's layout and pacing, or null. */
   const [tileInfo, setTileInfo] = useState<SenderTileInfo | null>(null);
+  /** Let the receiver steer the speed through the webcam (#1146), chosen under Advanced. Off by default. */
+  const [steer, setSteer] = useState(false);
+  /** The back channel: off, asking for the webcam, listening, or one-way after a refusal or loss. */
+  const [steerState, setSteerState] = useState<FeedbackLinkState>({ status: 'off' });
+  /** The profile a steered transfer shows now, or null. */
+  const [steeredProfile, setSteeredProfile] = useState<MultiRateProfileName | null>(null);
+  /** Receivers whose feedback code the webcam reads. */
+  const [steeringReceivers, setSteeringReceivers] = useState(0);
+  /** True when the sender stopped because every receiver it could see had the file. */
+  const [autoStopped, setAutoStopped] = useState(false);
   const [fountainInfo, setFountainInfo] = useState<SenderFountainInfo | null>(null);
   const [fps, setFps] = useState(15);
   const [currentPass, setCurrentPass] = useState(1);
@@ -181,6 +213,19 @@ export function useOpticalSender({
   const beaconPoolRef = useRef<Map<number, TransferFrame>>(new Map());
   /** The beacon on the canvas, or null while it shows tiles. */
   const beaconShownRef = useRef<number | null>(null);
+  /** Frames a second a steered stream aims at: its profile's, in place of the page's setting. */
+  const targetFpsRef = useRef<number | null>(null);
+  const requestWebcamRef = useRef(requestWebcam);
+  const linkRef = useRef<FeedbackLink | null>(null);
+  const controllerRef = useRef<SpeedController | null>(null);
+  const webcamRef = useRef<{ stream: MediaStream; video: HTMLVideoElement } | null>(null);
+  const feedbackReaderRef = useRef<TileReader | null>(null);
+  const steerTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** The profile on screen and the one being switched to; frames of the old layout are dropped meanwhile. */
+  const profileRef = useRef<MultiRateProfileName | null>(null);
+  const switchingRef = useRef<{ plan: MultiCodePlan; beacon: BeaconPlan | null; profile: MultiRateProfileName } | null>(null);
+  /** Applies a speed decision; set below, read by the webcam reader and the steering timer. */
+  const applyDecisionRef = useRef<(decision: ControllerDecision) => void>(() => {});
   /** Refreshes played before the last pause, so a resumed stream carries on where it stopped. */
   const refreshBaseRef = useRef(0);
   const lastRefreshRef = useRef(-1);
@@ -195,7 +240,20 @@ export function useOpticalSender({
     isVerifyingHandshakeRef.current = isVerifyingHandshake;
     fpsRef.current = fps;
     totalFramesRef.current = totalFrames;
-  }, [config, logoImg, borderLogoImg, renderFrame, verifyFrame, isTransferring, isVerifyingHandshake, fps, totalFrames]);
+    requestWebcamRef.current = requestWebcam;
+  }, [config, logoImg, borderLogoImg, renderFrame, verifyFrame, isTransferring, isVerifyingHandshake, fps, totalFrames, requestWebcam]);
+
+  /** Turns the back channel off and lets the webcam go. */
+  const endSteering = useCallback(() => {
+    if (steerTimerRef.current) clearInterval(steerTimerRef.current);
+    steerTimerRef.current = null;
+    feedbackReaderRef.current?.stop();
+    feedbackReaderRef.current = null;
+    linkRef.current?.disable();
+    linkRef.current = null;
+    controllerRef.current = null;
+    switchingRef.current = null;
+  }, []);
 
   // Terminate background worker on unmount
   useEffect(() => {
@@ -208,8 +266,9 @@ export function useOpticalSender({
         cancelAnimationFrame(animationIdRef.current);
       }
       pacerRef.current?.stop();
+      endSteering();
     };
-  }, []);
+  }, [endSteering]);
 
   /** Paints a frame. Transfer frames are always sanitized: no logo, no decoration that could cost a read. */
   const paint = useCallback((frame: TransferFrame) => {
@@ -234,6 +293,12 @@ export function useOpticalSender({
     setHandshakeError(null);
     setHandshakeVerified(false);
     setKeyFrame(null);
+    endSteering();
+    setSteerState({ status: 'off' });
+    setSteeredProfile(null);
+    setSteeringReceivers(0);
+    profileRef.current = null;
+    targetFpsRef.current = null;
     if (workerRef.current) {
       workerRef.current.postMessage({ type: 'STOP' });
     }
@@ -256,7 +321,7 @@ export function useOpticalSender({
     currentPlayIndexRef.current = 0;
     setCurrentFrameIndex(0);
     setProgress(0);
-  }, []);
+  }, [endSteering]);
 
   const runAnimationLoop = useCallback(() => {
     const loop = () => {
@@ -340,7 +405,14 @@ export function useOpticalSender({
       tileShownRef.current = Array.from({ length: layout.tiles }, () => -1);
     }
     const shown = tileShownRef.current;
-    const base = refreshBaseRef.current;
+    /**
+     * The stream's own refresh count. It stands still while a frame is missing: the worker only
+     * makes frames a little past the last one shown, so a timeline that ran on would ask for frames
+     * that never come and the stream would stop.
+     */
+    let at = refreshBaseRef.current;
+    let lastRefresh = -1;
+    let waiting = false;
     const every = beaconPlanRef.current?.every ?? 0;
     /** Display slots before `slot` that were beacons, so dense slot numbers skip them. */
     const beaconsBefore = (slot: number) => (every >= 2 ? Math.floor((slot + 1) / every) : 0);
@@ -348,14 +420,15 @@ export function useOpticalSender({
       clock: { request: (callback) => requestAnimationFrame(callback), cancel: (handle) => cancelAnimationFrame(handle) },
       hold: holdRef.current,
       onLocked: ({ refreshHz }) => {
-        holdRef.current = holdForTargetFps(refreshHz, fpsRef.current);
+        holdRef.current = holdForTargetFps(refreshHz, targetFpsRef.current ?? fpsRef.current);
         pacer.setHold(holdRef.current);
         setTileInfo({ layout: layout.id, hold: holdRef.current, refreshHz });
       },
       onTick: ({ refresh }) => {
         if (!isTransferringRef.current || isPausedRef.current) return;
         const now = performance.now();
-        const at = base + refresh;
+        if (lastRefresh >= 0 && !waiting) at += refresh - lastRefresh;
+        lastRefresh = refresh;
         lastRefreshRef.current = at;
         const hold = holdRef.current;
         const pool = framePoolRef.current;
@@ -410,6 +483,7 @@ export function useOpticalSender({
             newest = Math.max(newest, index);
           }
         }
+        waiting = missing;
         const worker = workerRef.current;
         if (newest >= 0) {
           lastRenderSuccessTimeRef.current = now;
@@ -462,6 +536,140 @@ export function useOpticalSender({
     }
   }, [runAnimationLoop, runTileLoop]);
 
+  /** Asks the worker for a profile's layout; the stream changes over when SWITCHED comes back. */
+  const requestSwitch = useCallback((name: MultiRateProfileName) => {
+    const canvas = canvasRef.current;
+    const worker = workerRef.current;
+    if (!canvas || !worker || switchingRef.current) return;
+    const profile = switchableProfile(name);
+    const plan = planMultiCode({ enabled: true, screen: tileScreenOf(canvas), refreshHz: 60, targetFps: profile.targetFps, layoutId: profile.layoutId });
+    // A screen too small for the profile's layout stays where it is.
+    if (!plan || plan.layout.id !== profile.layoutId) return;
+    const beacon = profile.beaconVersion > plan.layout.version ? { version: profile.beaconVersion, every: profile.beaconEvery } : null;
+    switchingRef.current = { plan, beacon, profile: name };
+    worker.postMessage({ type: 'SWITCH', payload: { tiles: plan.layout.id, beacon: beacon ?? undefined } });
+  }, []);
+
+  /** Shows the new layout from its first frame once the worker has switched. */
+  const finishSwitch = useCallback((tiles: TileLayoutId) => {
+    const next = switchingRef.current;
+    if (!next || next.plan.layout.id !== tiles) return;
+    pacerRef.current?.stop();
+    pacerRef.current = null;
+    framePoolRef.current.clear();
+    tileShownRef.current = [];
+    lastDenseRef.current = [];
+    beaconPoolRef.current.clear();
+    beaconShownRef.current = null;
+    refreshBaseRef.current = 0;
+    lastRefreshRef.current = -1;
+    tilePlanRef.current = next.plan;
+    beaconPlanRef.current = next.beacon;
+    targetFpsRef.current = MULTI_RATE_PROFILES[next.profile].targetFps;
+    holdRef.current = 1;
+    profileRef.current = next.profile;
+    switchingRef.current = null;
+    setSteeredProfile(next.profile);
+    setTileInfo({ layout: next.plan.layout.id, hold: null, refreshHz: null });
+    if (isTransferringRef.current && !isPausedRef.current) runTileLoop(next.plan);
+  }, [runTileLoop]);
+  const finishSwitchRef = useRef(finishSwitch);
+
+  /** Follows the speed controller: stops once every receiver is done, else shows the profile it asks for. */
+  const applyDecision = useCallback((decision: ControllerDecision) => {
+    const link = linkRef.current;
+    const current = profileRef.current;
+    if (!link || !current) return;
+    setSteeringReceivers(decision.receivers);
+    if (link.shouldStop(decision.stop)) {
+      stopTransfer();
+      setAutoStopped(true);
+      return;
+    }
+    const wanted = link.profileFor(current, decision.profile);
+    if (wanted !== current) requestSwitch(wanted);
+  }, [stopTransfer, requestSwitch]);
+
+  /**
+   * Opens the back channel for a steerable transfer: asks for the webcam, then reads the receivers'
+   * feedback codes with one decoder worker and runs the controller's timers every 100 ms.
+   */
+  const startSteering = useCallback((sessionId: string) => {
+    endSteering();
+    const initial = profileRef.current ?? 'balanced';
+    const controller = createSpeedController({ sessionId, initial });
+    const releaseCamera = () => {
+      const webcam = webcamRef.current;
+      webcamRef.current = null;
+      webcam?.stream.getTracks().forEach((track) => track.stop());
+      if (webcam) webcam.video.srcObject = null;
+    };
+    const requestCamera = async (): Promise<CameraPermission> => {
+      const open = requestWebcamRef.current;
+      if (!open) return 'unavailable';
+      let stream: MediaStream;
+      try {
+        stream = await open();
+      } catch (error) {
+        return permissionOf(error);
+      }
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.srcObject = stream;
+      webcamRef.current = { stream, video };
+      try {
+        await video.play();
+      } catch {
+        // A video that will not autoplay still delivers frames once it can; the reader waits for them.
+      }
+      return 'granted';
+    };
+    const link = createFeedbackLink({ requestCamera, releaseCamera });
+    linkRef.current = link;
+    controllerRef.current = controller;
+    setSteerState({ status: 'requesting' });
+    void link.enable().then((state) => {
+      if (linkRef.current !== link) return;
+      setSteerState(state);
+      if (state.status !== 'listening') return;
+      const reader = createTileReader({
+        getVideo: () => webcamRef.current?.video ?? null,
+        poolSize: 1,
+        onText: () => undefined,
+        onFrameRead: (codes) => {
+          for (const code of codes) {
+            const decoded = decodeFrame(code.text);
+            if (!decoded.ok || decoded.frame.type !== 'feedback') continue;
+            applyDecisionRef.current(controller.report(decoded.frame, decoded.frame.sessionId, performance.now()));
+          }
+        },
+        spawnWorker: spawnTileWorker,
+      });
+      feedbackReaderRef.current = reader;
+      reader.start();
+      steerTimerRef.current = setInterval(() => {
+        const live = webcamRef.current?.stream.getVideoTracks().some((track) => track.readyState === 'live') ?? false;
+        if (!live) {
+          // The camera went away: carry on one way with the profile on screen, and no auto-stop.
+          link.cameraLost();
+          setSteerState(link.state);
+          feedbackReaderRef.current?.stop();
+          if (steerTimerRef.current) clearInterval(steerTimerRef.current);
+          steerTimerRef.current = null;
+          return;
+        }
+        applyDecisionRef.current(controller.tick(performance.now()));
+      }, 100);
+    });
+  }, [endSteering]);
+  const startSteeringRef = useRef(startSteering);
+  useEffect(() => {
+    finishSwitchRef.current = finishSwitch;
+    applyDecisionRef.current = applyDecision;
+    startSteeringRef.current = startSteering;
+  }, [finishSwitch, applyDecision, startSteering]);
+
   const handleWorkerMessage = useCallback((message: SliceWorkerOutgoingMessage | null) => {
     if (!message) return;
 
@@ -486,12 +694,20 @@ export function useOpticalSender({
           outerCode: message.fountain.outerCode,
           tiles: message.fountain.tiles,
           beacon: message.fountain.beacon,
+          steerable: message.fountain.steerable,
         });
+        if (message.fountain.steerable) startSteeringRef.current(message.fountain.sessionId);
         break;
       }
 
       case 'BEACON': {
+        if (switchingRef.current) break;
         beaconPoolRef.current.set(message.index, { size: message.size, data: message.data });
+        break;
+      }
+
+      case 'SWITCHED': {
+        finishSwitchRef.current(message.tiles);
         break;
       }
 
@@ -501,6 +717,8 @@ export function useOpticalSender({
       }
 
       case 'FRAME': {
+        // Frames of the old layout still in flight after a switch was asked for are not shown.
+        if (switchingRef.current) break;
         const { index, size, data } = message;
         framePoolRef.current.storeFrame(index, size, data);
         setFrameBufferBytes(framePoolRef.current.byteLength);
@@ -525,6 +743,7 @@ export function useOpticalSender({
     if (selectedFiles.length === 0) return;
 
     stopTransfer();
+    setAutoStopped(false);
 
     setIsVerifyingHandshake(true);
     isVerifyingHandshakeRef.current = true;
@@ -561,13 +780,27 @@ export function useOpticalSender({
     beaconPlanRef.current = plan && profile.beaconVersion > plan.layout.version ? { version: profile.beaconVersion, every: profile.beaconEvery } : null;
     holdRef.current = 1;
     if (plan) setTileInfo({ layout: plan.layout.id, hold: null, refreshHz: null });
+    // A steered stream (#1146) starts on the density's profile and runs at that profile's pace.
+    const steered = plan !== null && steer;
+    profileRef.current = steered ? PROFILE_FOR_DENSITY[density] : null;
+    targetFpsRef.current = steered ? profile.targetFps : null;
+    setSteeredProfile(profileRef.current);
 
     const files = selectedFiles.length > 1 ? { files: selectedFiles } : { file: selectedFiles[0] };
     workerRef.current.postMessage({
       type: 'START',
-      payload: { ...files, fps: fpsRef.current, density, private: isPrivate, outerCode, tiles: plan?.layout.id, beacon: beaconPlanRef.current ?? undefined },
+      payload: {
+        ...files,
+        fps: fpsRef.current,
+        density,
+        private: isPrivate,
+        outerCode,
+        tiles: plan?.layout.id,
+        beacon: beaconPlanRef.current ?? undefined,
+        steer: steered,
+      },
     });
-  }, [selectedFiles, density, isPrivate, outerCode, multiCode, stopTransfer, handleWorkerMessage]);
+  }, [selectedFiles, density, isPrivate, outerCode, multiCode, steer, stopTransfer, handleWorkerMessage]);
 
   /** Shows the key QR for as long as the person holds the button; it never plays with the stream. */
   const showKeyQr = useCallback(() => workerRef.current?.postMessage({ type: 'KEY_QR' }), []);
@@ -649,6 +882,12 @@ export function useOpticalSender({
     multiCode,
     setMultiCode,
     tileInfo,
+    steer,
+    setSteer,
+    steerState,
+    steeredProfile,
+    steeringReceivers,
+    autoStopped,
     fps,
     setFps,
     currentPass,
