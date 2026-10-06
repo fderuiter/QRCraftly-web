@@ -1,5 +1,5 @@
 import { AdaptiveFrameScheduler } from '@/packages/optical-scanner/scheduler';
-import { applyOpticalSimulationMath } from '@/packages/scannability';
+import { simulatePrint } from '@/packages/scannability';
 import type { QrReader } from '@/packages/qr-decode';
 import { qrReader } from '../fixtures/qrReader';
 
@@ -7,14 +7,6 @@ import { qrReader } from '../fixtures/qrReader';
  * Optical degradation profile options for simulated scannability checks.
  */
 export interface OpticalProfile {
-  /**
-   * Optional custom blur radius (if omitted, uses 5% of image width).
-   */
-  blurRadius?: number;
-  /**
-   * Intensity of randomized noise (default: 10).
-   */
-  noiseLevel?: number;
   /**
    * Whether to enable optical degradation simulation (default: true).
    */
@@ -257,7 +249,6 @@ export class OpticalScannerHarness {
     this.config = config;
     this.reader = config.reader ?? qrReader;
     this.opticalProfile = {
-      noiseLevel: 10,
       enabled: true,
       ...config.opticalProfile,
     };
@@ -354,7 +345,7 @@ export class OpticalScannerHarness {
     const digitalScannable = !!digitalCode;
     const decodedData = digitalCode ? digitalCode.text : null;
 
-    if (!digitalScannable) {
+    if (!digitalCode) {
       return {
         digitalScannable: false,
         opticalScannable: false,
@@ -373,12 +364,11 @@ export class OpticalScannerHarness {
       };
     }
 
-    const noiseLevel = this.opticalProfile.noiseLevel ?? 10;
-    const degradedPixels = applyOpticalSimulationMath(pixels, width, height, noiseLevel);
+    const printed = simulatePrint({ data: clampedPixels, width, height }, digitalCode);
 
-    let [opticalCode] = this.reader.read(degradedPixels, width, height);
+    let [opticalCode] = this.reader.read(printed.data, printed.width, printed.height);
     if (!opticalCode) {
-      [opticalCode] = this.reader.read(degradedPixels, width, height, { inverted: true });
+      [opticalCode] = this.reader.read(printed.data, printed.width, printed.height, { inverted: true });
     }
     const opticalScannable = !!opticalCode;
 

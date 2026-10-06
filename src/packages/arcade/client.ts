@@ -126,7 +126,6 @@ export function useEmpiricalScan(options: UseEmpiricalScanOptions): UseEmpirical
       onResult: setState,
       detector,
       createWorker: createScannabilityWorker,
-      isTest: typeof navigator !== 'undefined' && !!navigator.webdriver,
     });
     pipelineRef.current = pipeline;
     return () => {

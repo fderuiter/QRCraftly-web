@@ -18,11 +18,7 @@
     "@/*": ["./src/*"]
   },
   "ignoreExportsUsedInFile": true,
-  "ignoreFiles": [
-    "src/packages/*/index.ts",
-    "src/packages/scannability/opticalSimulation.ts",
-    "tests/semgrep/**"
-  ],
+  "ignoreFiles": ["src/packages/*/index.ts", "tests/semgrep/**"],
   "ignoreIssues": {
     "src/packages/*/*.ts": ["types"],
     "src/packages/scannability/**": ["exports", "types"]

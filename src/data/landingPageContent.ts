@@ -499,7 +499,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
       {
         question: 'What does “scans, but fragile” mean?',
         answer:
-          'The code was read from the picture, but not after the print simulation, which adds blur and noise like a cheap printer or a shaky camera. Make the code larger, raise its contrast or increase the error correction before you print it.',
+          'The code was read from the picture, but not after the print simulation, which redraws it the way a phone sees it on paper, with ink spread, a slightly soft focus and sensor noise. Bolder modules, stronger contrast or higher error correction usually fix it before you print.',
       },
       {
         question: 'Can it check a code that someone else made?',

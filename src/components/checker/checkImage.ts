@@ -103,7 +103,7 @@ export async function checkQrImage(file: Blob): Promise<CheckOutcome> {
         import('@/packages/scannability/checker'),
         import('@/packages/qr-decode'),
       ]);
-      const result = performScannabilityCheck(await loadQrReader(), frame, frame.width, frame.height, false);
+      const result = performScannabilityCheck(await loadQrReader(), frame, frame.width, frame.height);
       if (result.success && result.physicalReady) status = 'physical-pass';
     }
   } catch {

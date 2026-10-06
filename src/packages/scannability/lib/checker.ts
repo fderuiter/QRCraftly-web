@@ -16,10 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { QrReader } from '@/packages/qr-decode';
+import type { QrRead, QrReadOptions, QrReader } from '@/packages/qr-decode';
 import { isDangerousUrl } from '@/utils/security';
-import { applyOpticalSimulationMath } from './opticalSimulation';
+import { simulatePrint, type OpticalScratchBuffers, type PixelFrame } from './opticalSimulation';
 import { auditModuleContrast } from './contrastAudit';
+
+export type { OpticalScratchBuffers, PixelFrame } from './opticalSimulation';
 
 export interface ScannabilityResult {
   success: boolean;
@@ -29,34 +31,25 @@ export interface ScannabilityResult {
   minLocalContrast?: number;
 }
 
-/** Raw RGBA pixels with their dimensions (an `ImageData` satisfies it). */
-export interface PixelFrame {
-  data: Uint8ClampedArray;
-  width: number;
-  height: number;
-}
-
 /**
- * Reusable scratch memory for the optical print simulation. The worker keeps one pair alive
- * across requests so continuous slider edits do not allocate two full-frame buffers per check.
+ * Attempts one read with our reader (#1178). Reader exceptions are treated as "no code found" so
+ * a failure in one pass never prevents the next.
  */
-export interface OpticalScratchBuffers {
-  dst?: Uint8ClampedArray;
-  temp?: Uint8ClampedArray;
-}
-
-/**
- * Attempts one read with our reader (#1178): dark-on-light only, or both polarities. Reader
- * exceptions are treated as "no code found" so a failure in one pass never prevents the next.
- */
-function tryDecode(reader: QrReader, frame: PixelFrame, inverted: boolean): string | null {
+function tryRead(reader: QrReader, frame: PixelFrame, options: QrReadOptions): QrRead | null {
   try {
-    const [code] = reader.read(frame.data, frame.width, frame.height, { inverted });
-    return code ? code.text : null;
+    const [code] = reader.read(frame.data, frame.width, frame.height, options);
+    return code ?? null;
   } catch {
     return null;
   }
 }
+
+/**
+ * How the physical check reads the simulated print: as the scanner's camera fallback does
+ * (`optical-scanner` `decodeSync`), with both polarities, a whole-frame threshold and a half-size
+ * retry, so the verdict tracks what a camera would read rather than one binarizer's limits.
+ */
+const CAMERA_READ: QrReadOptions = { inverted: true, global: true, half: true };
 
 /**
  * The single Scannability Health check, written as a generator so the Scannability Worker can
@@ -65,11 +58,11 @@ function tryDecode(reader: QrReader, frame: PixelFrame, inverted: boolean): stri
  * where the caller may stop iterating.
  *
  * Stages: localized module contrast audit, two-pass (normal, then inverted) digital decode, the
- * dangerous-URL security check, optical print simulation, then a two-pass physical decode.
+ * dangerous-URL security check, the optical print simulation of the code the decode found, then
+ * a physical decode, read as the camera scanner reads, that must find the same text.
  *
  * @param reader - The QR reader, from `loadQrReader`.
  * @param frame - Pixels to evaluate.
- * @param isTest - Skips the randomized optical simulation (deterministic automation runs).
  * @param moduleCount - QR modules per side; enables the localized contrast audit.
  * @param scratch - Optional reusable buffers for the optical simulation.
  * @returns A generator whose return value is the check result.
@@ -77,12 +70,9 @@ function tryDecode(reader: QrReader, frame: PixelFrame, inverted: boolean): stri
 export function* scannabilitySteps(
   reader: QrReader,
   frame: PixelFrame,
-  isTest: boolean,
   moduleCount?: number,
   scratch?: OpticalScratchBuffers
 ): Generator<void, ScannabilityResult, void> {
-  const { width, height } = frame;
-
   // 0. Localized module contrast audit
   let localContrastViolations = 0;
   let minLocalContrast = 21;
@@ -94,45 +84,32 @@ export function* scannabilitySteps(
   const metrics = { localContrastViolations, minLocalContrast };
 
   // 1. Digital check (pass 1: normal polarity, pass 2: inverted polarity)
-  let decoded = tryDecode(reader, frame, false);
-  if (decoded === null) {
+  let digital = tryRead(reader, frame, { inverted: false });
+  if (digital === null) {
     yield;
-    decoded = tryDecode(reader, frame, true);
+    digital = tryRead(reader, frame, { inverted: true });
   }
 
-  if (decoded === null) {
+  if (digital === null) {
     return { success: false, physicalReady: false, error: 'NOT_FOUND', ...metrics };
   }
 
   // Security check: a code that decodes to a dangerous URL is never reported as scannable.
-  if (isDangerousUrl(decoded)) {
+  if (isDangerousUrl(digital.text)) {
     return { success: false, physicalReady: false, error: 'SECURITY_VIOLATION', ...metrics };
   }
 
   yield;
 
-  // 2. Optical print simulation
-  let simulated: PixelFrame = frame;
-  if (!isTest) {
-    const length = width * height * 4;
-    if (scratch) {
-      if (!scratch.dst || scratch.dst.length !== length) scratch.dst = new Uint8ClampedArray(length);
-      if (!scratch.temp || scratch.temp.length !== length) scratch.temp = new Uint8ClampedArray(length);
-    }
-    const dst = applyOpticalSimulationMath(frame.data, width, height, 10, scratch?.dst, scratch?.temp);
-    simulated = { data: dst, width, height };
-  }
+  // 2. Optical print simulation, in module units around the code the digital check found (#1248)
+  const printed = simulatePrint(frame, digital, scratch);
 
   yield;
 
-  // 3. Physical check (pass 1: normal polarity, pass 2: inverted polarity)
-  let physicalReady = tryDecode(reader, simulated, false) !== null;
-  if (!physicalReady) {
-    yield;
-    physicalReady = tryDecode(reader, simulated, true) !== null;
-  }
+  // 3. Physical check, read the way the camera scanner reads. A misread is not a pass.
+  const physical = tryRead(reader, printed, CAMERA_READ);
 
-  return { success: true, physicalReady, ...metrics };
+  return { success: true, physicalReady: physical?.text === digital.text, ...metrics };
 }
 
 /**
@@ -146,10 +123,9 @@ export function performScannabilityCheck(
   imageData: PixelFrame,
   width: number,
   height: number,
-  isTest: boolean,
   moduleCount?: number
 ): ScannabilityResult {
-  const steps = scannabilitySteps(reader, { data: imageData.data, width, height }, isTest, moduleCount);
+  const steps = scannabilitySteps(reader, { data: imageData.data, width, height }, moduleCount);
   let step = steps.next();
   while (!step.done) step = steps.next();
   return step.value;

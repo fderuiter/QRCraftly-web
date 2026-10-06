@@ -7,6 +7,7 @@ import { TargetSettings } from '../src/components/arcade/TargetSettings';
 import type { ArcadeTarget } from '../src/packages/arcade/handoff';
 import { drawQRInternal } from '../src/utils/qrRenderer';
 import * as scannabilityChecker from '@/packages/scannability/checker';
+import { qrReader } from './fixtures/qrReader';
 import { qrEncoder as QRCode } from './fixtures/qrEncoder';
 
 describe('Style-Adaptive Maze Clearance and Masking Suite', () => {
@@ -202,7 +203,7 @@ describe('Style-Adaptive Maze Clearance and Masking Suite', () => {
         });
 
         const imgData = ctx.getImageData(0, 0, displaySize, displaySize);
-        const scannability = scannabilityChecker.performScannabilityCheck(imgData, displaySize, displaySize, true, modules.size);
+        const scannability = scannabilityChecker.performScannabilityCheck(qrReader, imgData, displaySize, displaySize, modules.size);
 
         expect(checkSpy).toHaveBeenCalled();
         expect(scannability.success).toBe(true);

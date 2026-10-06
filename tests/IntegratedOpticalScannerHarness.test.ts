@@ -29,7 +29,7 @@ describe('Integrated Optical Scanner Test Harness - Integration Suite', () => {
     const frameResults: HarnessFrameResult[] = [];
     harness = new OpticalScannerHarness({
       reader,
-      opticalProfile: { noiseLevel: 10, enabled: true },
+      opticalProfile: { enabled: true },
       workerConfig: { latencyMs: 20 },
       onFrameProcessed: (res) => frameResults.push(res),
     });
@@ -173,7 +173,7 @@ describe('Integrated Optical Scanner Test Harness - Integration Suite', () => {
     expect(discardedSeqIds).toEqual([1]);
   });
 
-  it('Acceptance Criteria 5: System returns expected optical scannability classifications when processing frames with simulated box blur and noise', () => {
+  it('Acceptance Criteria 5: System returns expected optical scannability classifications when processing frames through the print simulation', () => {
     const mockPixels = new Uint8ClampedArray(400);
 
     harness = new OpticalScannerHarness({ reader });

@@ -42,7 +42,7 @@ describe('OpticalScannerHarness Unit & Integration Tests', () => {
     harness = new OpticalScannerHarness({
       reader,
       onFrameProcessed: (res) => processedResults.push(res),
-      opticalProfile: { noiseLevel: 5, enabled: true },
+      opticalProfile: { enabled: true },
     });
 
     harness.start();
@@ -227,7 +227,7 @@ describe('OpticalScannerHarness Unit & Integration Tests', () => {
 
     harness = new OpticalScannerHarness({
       reader,
-      opticalProfile: { noiseLevel: 5 },
+      opticalProfile: { enabled: true },
     });
 
     const mockPixels = new Uint8ClampedArray(400);

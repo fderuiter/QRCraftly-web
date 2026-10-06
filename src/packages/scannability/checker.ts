@@ -39,7 +39,6 @@ export interface ScannabilityEvaluation {
 }
 
 export interface EvaluateScannabilityOptions {
-  isTest?: boolean;
   moduleCount?: number;
 }
 
@@ -50,7 +49,7 @@ export interface EvaluateScannabilityOptions {
  * @param reader - The QR reader, from `loadQrReader`.
  * @param source - Image pixel data with dimensions.
  * @param config - Current QR code configuration profile.
- * @param options - Optional evaluation parameters (e.g. test flags, module count).
+ * @param options - Optional evaluation parameters (the module count).
  * @returns Complete scannability evaluation outcome.
  */
 export function evaluateScannability(
@@ -59,15 +58,7 @@ export function evaluateScannability(
   config: QRConfig,
   options: EvaluateScannabilityOptions = {}
 ): ScannabilityEvaluation {
-  const isTest = options.isTest ?? (typeof navigator !== 'undefined' ? !!navigator.webdriver : false);
-  const result = performScannabilityCheck(
-    reader,
-    source,
-    source.width,
-    source.height,
-    isTest,
-    options.moduleCount
-  );
+  const result = performScannabilityCheck(reader, source, source.width, source.height, options.moduleCount);
 
   const localMetrics =
     result.localContrastViolations !== undefined

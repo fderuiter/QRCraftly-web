@@ -27,7 +27,14 @@ export { getExportRiskPolicy } from './lib/exportRiskPolicy';
 export { getScanVerdict, getScanAdvice, getScanChecks, RELIABLE_SCORE } from './lib/verdict';
 export type { ScanVerdict, ScanFix, ScanAdvice } from './lib/verdict';
 export { auditModuleContrast } from './lib/contrastAudit';
-export { calculateBlurRadius, applyOpticalSimulationMath } from './lib/opticalSimulation';
+export {
+  simulatePrint,
+  PRINT_PX_PER_MODULE,
+  PRINT_QUIET_ZONE_MODULES,
+  PRINT_BLUR_MODULES,
+  type GreyFrame,
+  type PrintPlacement,
+} from './lib/opticalSimulation';
 export {
   isWorkerRequest,
   assertWorkerRequest,

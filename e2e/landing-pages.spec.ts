@@ -58,7 +58,8 @@ test.describe('QR code checker', () => {
     const photo = await renderPhoto(page, 'https://qrcraftly.com/checked-here', { width: 800, height: 600, modulePx: 8 });
     await page.getByLabel('Choose a picture of a QR code').setInputFiles({ name: 'code.jpg', mimeType: 'image/jpeg', buffer: photo });
     await expect(page.getByTestId('scan-result-host')).toHaveText('qrcraftly.com', { timeout: 15_000 });
-    await expect(page.getByText(/Scans reliably|Scans, but fragile/)).toBeVisible();
+    // A sharp photo of a plain code passes the print simulation too (#1248).
+    await expect(page.getByText('Scans reliably')).toBeVisible();
     await page.getByRole('button', { name: 'Scan another' }).click();
     await expect(page.getByRole('button', { name: 'Choose picture' })).toBeVisible();
   });

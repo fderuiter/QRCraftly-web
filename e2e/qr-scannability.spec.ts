@@ -67,6 +67,14 @@ test.describe('QR Code Scannability via Headless Browser', () => {
     }
   });
 
+  test('rates the default code as scanning reliably, print simulation included (#1248)', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('main[data-hydrated="true"]');
+
+    // The print simulation runs in automated browsers too, so a plain code must pass it.
+    await expect(page.getByTestId('scannability-verdict')).toHaveText('Scans reliably', { timeout: 15000 });
+  });
+
   test('shows a passing scannability verdict for Fluid Ink across default and dense payloads', async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('main[data-hydrated="true"]');

@@ -126,7 +126,7 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       data.fill(255);
 
       const config = getBaseConfig();
-      const assessment = evaluateScannability(qrReader, { data, width, height }, config, { isTest: true });
+      const assessment = evaluateScannability(qrReader, { data, width, height }, config);
 
       expect(assessment).toHaveProperty('status');
       expect(assessment).toHaveProperty('health');

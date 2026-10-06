@@ -16,7 +16,6 @@ export function isWorkerRequest(data: unknown): data is {
   width: number;
   height: number;
   configId?: string | null;
-  isTest?: boolean;
   moduleCount?: number;
 } {
   if (typeof data !== 'object' || data === null) return false;
@@ -35,7 +34,6 @@ export function isWorkerRequest(data: unknown): data is {
   if (typeof d.width !== 'number' || isNaN(d.width) || d.width <= 0) return false;
   if (typeof d.height !== 'number' || isNaN(d.height) || d.height <= 0) return false;
   if (d.configId !== undefined && d.configId !== null && typeof d.configId !== 'string') return false;
-  if (d.isTest !== undefined && typeof d.isTest !== 'boolean') return false;
   if (d.moduleCount !== undefined && d.moduleCount !== null && (typeof d.moduleCount !== 'number' || isNaN(d.moduleCount) || d.moduleCount <= 0)) return false;
   return true;
 }
@@ -80,9 +78,6 @@ export function assertWorkerRequest(data: unknown): asserts data is WorkerReques
   }
   if (d.configId !== undefined && d.configId !== null && typeof d.configId !== 'string') {
     throw new Error('Worker request configId must be a string');
-  }
-  if (d.isTest !== undefined && typeof d.isTest !== 'boolean') {
-    throw new Error('Worker request isTest must be a boolean');
   }
   if (d.moduleCount !== undefined && d.moduleCount !== null && (typeof d.moduleCount !== 'number' || isNaN(d.moduleCount) || d.moduleCount <= 0)) {
     throw new Error('Worker request moduleCount must be a positive number');
