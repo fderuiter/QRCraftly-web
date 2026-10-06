@@ -139,6 +139,21 @@ describe('File Transfer Page & Pipeline', () => {
     expect(canvas).toBeInTheDocument();
   });
 
+  it('offers wallet-compatible sending only for a transfer that is not private (#1149)', () => {
+    render(<Page />);
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+    const wallet = screen.getByRole('switch', { name: 'Wallet-compatible (BC-UR)' });
+    expect(wallet).toBeEnabled();
+    fireEvent.click(wallet);
+    expect(wallet).toBeChecked();
+    expect(screen.getByTestId('fountain-symbol-info')).toHaveTextContent(/fewer bytes per QR/);
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Private transfer' }));
+    expect(wallet).toBeDisabled();
+    expect(wallet).not.toBeChecked();
+    expect(screen.getByTestId('wallet-bcur-hint')).toHaveTextContent(/no encryption/);
+  });
+
   it('does not expose the high-load simulation control in production', () => {
     vi.stubEnv('DEV', false);
     render(<Page />);

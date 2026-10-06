@@ -18,13 +18,13 @@ Optical transfer uses the Prism frame format.
 - **Manifest:** a positional CBOR array carrying the file entries (name, size, type, SHA-256), the compression flag, the transfer length, the symbol size, the transfer CRC-32C, the salt and the encryption block. It is sent as frame 0 and again every 16th frame. Version 2 of the manifest announces a stream sent with the outer code instead of LT, and its frames carry the outer-code flag ([ADR 0038](./0038-prism-manifest-v2-outer-code-opt-in.md)). The session ID is the first 6 bytes of the SHA-256 of the manifest bytes, so a manifest that does not match its session ID is ignored.
 - **Code:** the same Luby Transform code with a robust soliton distribution. Symbol IDs are 24 bits and consecutive within a frame.
 - **Receiver:** limits are enforced before any decoder or buffer is allocated. The receiver shows the manifest (name, type, size, fingerprint) before the file completes, verifies the SHA-256 and the size at the end, and bounds decompression by the manifest size. A stream that needs more than the large-block threshold of blocks must repeat 8 times before tables are built. It switches to another session only after 8 frames from a known candidate manifest. Frames that are encrypted or multi-block are ignored until the features that read them ship. A newer format version shows a one-time message.
-- **Removed:** `ur:bytes/` sending, the `H|`/`F|` legacy carousel and stream lookahead. The receiver still reads `ur:bytes/` frames for one release and then drops that path.
+- **Removed:** `ur:bytes/` sending, the `H|`/`F|` legacy carousel and stream lookahead. The receiver still read `ur:bytes/` frames for one release (v0.10.0); [ADR 0041](./0041-wallet-compatible-bc-ur-sending.md) dropped that path.
 
 The density profiles of [ADR 0021](./0021-transfer-density-profiles-and-stream-scanning.md) still choose the QR version and error correction level. Prism only changes what goes inside the QR code.
 
 ## Consequences
 
 - More payload per frame, so fewer frames and a shorter transfer at every density. `pnpm run bench:transfer` reports the gain; see [the benchmark report](../TRANSFER_BENCHMARK.md).
-- A sender and a receiver on different releases only interoperate through the one-release `ur:bytes/` receive path.
+- A sender and a receiver on different releases only interoperated through the one-release `ur:bytes/` receive path, which [ADR 0041](./0041-wallet-compatible-bc-ur-sending.md) removed.
 - Fields that later work needs (multi-block, encryption, feedback) are reserved in the format, so they do not need another version.
-- BC-UR interoperability is no longer free. The receiver now reads real BC-UR multipart streams (BCR-2024-001) from wallets next to its own (#1149); sending in that format is still open.
+- BC-UR interoperability is no longer free. The receiver now reads real BC-UR multipart streams (BCR-2024-001) from wallets next to its own (#1149); the sender offers it as a switch ([ADR 0041](./0041-wallet-compatible-bc-ur-sending.md)).

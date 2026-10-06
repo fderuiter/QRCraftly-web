@@ -90,19 +90,6 @@ export function cborEncode(value: CborValue): Uint8Array {
   return Uint8Array.from(out);
 }
 
-/**
- * Returns the encoded size in bytes of a CBOR head (major type + argument).
- * @param value The unsigned integer or length argument.
- * @returns Header length in bytes (1, 2, 3, 5 or 9).
- */
-export function cborHeadLength(value: number): number {
-  if (value < 24) return 1;
-  if (value <= 0xff) return 2;
-  if (value <= 0xffff) return 3;
-  if (value <= 0xffffffff) return 5;
-  return 9;
-}
-
 class CborReader {
   private offset = 0;
 

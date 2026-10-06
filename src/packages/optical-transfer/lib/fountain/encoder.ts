@@ -19,7 +19,6 @@
 import { FountainDroplet, FountainEncoderOptions } from './contracts';
 import { buildRobustSolitonCdf, getNeighborsForSeq } from './soliton';
 import { crc32 } from './crc32';
-import { serializeDroplet } from './envelope';
 
 /**
  * Returns the default highest sequence number for a stream of `k` source blocks.
@@ -100,15 +99,6 @@ export class FountainEncoder {
   }
 
   /**
-   * Serialized BC-UR string for a zero-based emission index.
-   * @param index Zero-based frame index.
-   * @returns The UR droplet string.
-   */
-  public dropletStringForIndex(index: number): string {
-    return serializeDroplet(this.getDroplet(this.seqForIndex(index)));
-  }
-
-  /**
    * Emits the next droplet in the rateless stream.
    * @returns The droplet.
    */
@@ -116,14 +106,6 @@ export class FountainEncoder {
     const seq = this.seqForIndex(this.emitted);
     this.emitted += 1;
     return this.getDroplet(seq);
-  }
-
-  /**
-   * Emits the next serialized BC-UR droplet string.
-   * @returns The UR droplet string.
-   */
-  public nextDropletString(): string {
-    return serializeDroplet(this.nextDroplet());
   }
 
   /**

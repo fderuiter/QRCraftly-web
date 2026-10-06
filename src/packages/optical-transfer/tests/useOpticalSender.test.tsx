@@ -241,6 +241,58 @@ describe('useOpticalSender', () => {
       await run(30);
       expect(Math.max(...acks)).toBe(15);
     });
+
+    it('shows every frame in turn when the browser skips refreshes', async () => {
+      vi.stubGlobal('innerHeight', 1000);
+      vi.stubGlobal('devicePixelRatio', 1);
+      const callbacks: Array<(time: number) => void> = [];
+      vi.stubGlobal('requestAnimationFrame', (callback: (time: number) => void) => callbacks.push(callback));
+      vi.stubGlobal('cancelAnimationFrame', () => undefined);
+
+      const { result } = renderHook(() => useOpticalSender(senderOptions()));
+      act(() => {
+        result.current.setSelectedFile(new File(['tile content'], 'tiles.txt', { type: 'text/plain' }));
+        result.current.setMultiCode(true);
+      });
+      attachCanvas(result.current, 1000);
+
+      const acks: number[] = [];
+      // Like the slice worker, frames are made only a few past the last one acknowledged.
+      let made = 0;
+      const makeUpTo = (worker: any, lastAcked: number) => {
+        for (; made <= lastAcked + 12; made++) worker.dispatchMessage({ type: 'FRAME', index: made, total: 64, size: 97, data: new Uint8Array(97 * 97) });
+      };
+      globalThis.mockWorkerControl.setInterceptor((message: any, worker: any) => {
+        if (message.type === 'ACK') {
+          acks.push(message.payload.index);
+          makeUpTo(worker, message.payload.index);
+        }
+        if (message.type === 'HEAL') makeUpTo(worker, Math.min(message.payload.lastAckedIndex, made - 1));
+        if (message.type !== 'START') return;
+        worker.dispatchMessage({ type: 'PROGRESS', total: 64 });
+        makeUpTo(worker, -1);
+      });
+
+      act(() => result.current.startTransfer());
+      await waitFor(() => expect(result.current.isTransferring).toBe(true));
+
+      const interval = 1000 / 60;
+      let time = 0;
+      const tick = async (refreshes: number) => {
+        const callback = callbacks.shift();
+        await act(async () => {
+          callback?.(time);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+        time += refreshes * interval;
+      };
+      // 20 regular refreshes measure the display.
+      for (let step = 0; step < 21; step++) await tick(1);
+      // A busy page then gets a callback only every 30 refreshes: the stream slows down instead of
+      // asking for frames the worker has not made yet.
+      for (let step = 0; step < 30; step++) await tick(30);
+      expect(Math.max(...acks)).toBeGreaterThanOrEqual(24);
+    });
   });
 
   describe('the receiver steers the speed (#1146)', () => {

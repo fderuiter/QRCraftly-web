@@ -21,7 +21,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQrScanner, type CameraInfo, type ScanCorners } from '@/packages/optical-scanner/client';
 import type { BcUrDecoder, BcUrResult } from '../../bcur';
 import type { HandshakeInfo } from '../contracts';
-import { isFountainDropletString } from '../fountain/envelope';
 import { FountainRateTracker, type FountainTelemetry } from '../fountain/reassembler';
 import { layerHint } from '../multicode/layerHint';
 import { frameLayer } from '../multicode/multirate';
@@ -525,9 +524,8 @@ export function useOpticalReceiver({
 
   const handleFrame = useCallback((decodedText: string) => {
     if (!decodedText || receiverSuccess || isVerifying || bcur) return;
-    // A real BC-UR stream (a wallet's animated QR) is read by its own decoder, loaded on the first
-    // such code so the page does not carry it. Our own `ur:bytes` droplets look the same, so they
-    // also go on to the droplet path below; whichever stream is real completes.
+    // A BC-UR stream (a wallet's animated QR, or our sender's wallet-compatible mode) is read by its
+    // own decoder, loaded on the first such code so the page does not carry it.
     if (/^ur:/i.test(decodedText)) {
       void (bcurLoadingRef.current ??= import('../../bcur').then(({ BcUrDecoder: Decoder }) => new Decoder())).then((decoder) => {
         bcurDecoderRef.current = decoder;
@@ -535,8 +533,7 @@ export function useOpticalReceiver({
         if (outcome.status === 'progress') {
           setBcurProgress({ received: outcome.received, total: outcome.total });
         } else if (outcome.status === 'complete') {
-          // The stream was a real BC-UR one, so the droplet path was reading parts it cannot use
-          // and may have failed on them. Stop it and drop its error.
+          // Stop any Prism decode an earlier frame started, and drop its error.
           terminateWorker();
           setReceiverError(null);
           setBcur(outcome.result);
@@ -547,9 +544,10 @@ export function useOpticalReceiver({
           setReceiverError(outcome.reason);
         }
       });
+      return;
     }
     // Every other code the camera sees (a poster, a URL) is not part of a transfer.
-    if (!isFountainDropletString(decodedText) && !looksLikePrismFrame(decodedText) && !looksLikeKeyQr(decodedText)) return;
+    if (!looksLikePrismFrame(decodedText) && !looksLikeKeyQr(decodedText)) return;
     // Frames are always accepted, even after an error: the worker starts a fresh decode, so a
     // failed transfer recovers by simply scanning on.
     rateTrackerRef.current.record(performance.now());

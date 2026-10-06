@@ -168,6 +168,8 @@ function FileTransferToolInner() {
     steeredProfile,
     steeringReceivers,
     autoStopped,
+    walletCompat,
+    setWalletCompat,
     fps,
     setFps,
     currentPass,
@@ -498,8 +500,24 @@ function FileTransferToolInner() {
                         : 'Needs “Several codes per frame”.'}
                     </p>
                   </div>
+                  <div className="space-y-1">
+                    <ToggleSwitch
+                      id="wallet-bcur"
+                      label="Wallet-compatible (BC-UR)"
+                      checked={walletCompat && !isPrivate}
+                      onChange={setWalletCompat}
+                      disabled={isTransferring || isPrivate}
+                    />
+                    <p className="text-xs text-fg-muted" data-testid="wallet-bcur-hint">
+                      {isPrivate
+                        ? 'Not available for a private transfer: BC-UR has no encryption.'
+                        : 'Sends the file as a standard BC-UR animated QR (ur:bytes) that hardware wallets and other BC-UR apps can read, as well as QRCraftly. It is slower, carries only the file’s bytes, not its name, and sends one file at a time. The other options above do not apply to it.'}
+                    </p>
+                  </div>
                   <p className="text-xs text-fg-muted" data-testid="fountain-symbol-info">
-                    {fountainInfo?.tiles
+                    {walletCompat && !isPrivate
+                      ? 'A wallet-compatible stream carries fewer bytes per QR than QRCraftly’s own format, so it takes longer. It repeats until you stop it.'
+                      : fountainInfo?.tiles
                       ? `Each code carries ${fountainInfo.symbolSize}-byte pieces (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). How fast it goes depends on the receiving camera.`
                       : fountainInfo
                       ? `Each QR carries ${fountainInfo.symbolSize} bytes (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). The receiver needs about ${framesNeeded} frames, ${formatDuration(framesNeeded / fps)} at ${fps} frames/sec.`

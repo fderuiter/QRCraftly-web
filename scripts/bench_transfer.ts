@@ -22,7 +22,7 @@
  * Two parts, both seeded so the numbers are repeatable:
  *   1. Codec: the fountain codec through an erasure channel (random loss, bursts, duplicate
  *      frames, joining mid-stream). Reports frames needed divided by K and the decode time.
- *   2. Optical: real QR frames of a droplet, degraded the way a phone camera degrades them
+ *   2. Optical: real QR frames of a BC-UR part, degraded the way a phone camera degrades them
  *      (blur, noise, dim screen, tilt, rolling-shutter tear) at 720p and 1080p, decoded with
  *      our reader (qr-decode, #1178). Reports the decode rate and an estimated throughput with its spec tier.
  *
@@ -42,14 +42,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { qrEncoder as QRCode } from '../tests/fixtures/qrEncoder';
 import { qrReader } from '../tests/fixtures/qrReader';
+import { BcUrEncoder } from '../src/packages/optical-transfer/bcur.ts';
 import {
-  FountainEncoder,
   TILE_LAYOUTS,
   loadFecModule,
   TRANSFER_DENSITY_PROFILES,
   modulePxFor,
   prismSymbolSize,
-  resolveFountainSymbolSize,
   type TileLayoutId,
   type TransferDensity,
 } from '../src/packages/optical-transfer/index.ts';
@@ -111,14 +110,16 @@ function benchOptical(quick: boolean): OpticalRow[] {
   const conditions = quick ? OPTICAL_CONDITIONS.slice(0, 3) : OPTICAL_CONDITIONS;
   for (const resolution of OPTICAL_RESOLUTIONS) {
     for (const blockSize of OPTICAL_BLOCK_SIZES) {
-      const encoder = new FountainEncoder(message, { blockSize });
+      // A real BC-UR part carries one block in the same `ur:bytes/` framing the old droplets used.
+      const encoder = new BcUrEncoder('bytes', message, blockSize);
+      const texts = Array.from({ length: frames * 3 + 2 }, () => encoder.nextPart().toUpperCase());
       for (const condition of conditions) {
         let decoded = 0;
         let modules = 0;
         let modulePx = 0;
         const times: number[] = [];
         for (let i = 0; i < frames; i++) {
-          const text = encoder.dropletStringForIndex(i * 3 + 1);
+          const text = texts[i * 3 + 1];
           // The sender fills the screen, so the code takes about 90% of the frame height.
           const side = resolution.height * 0.9;
           const count = QRCode.create(text, { errorCorrectionLevel: 'L' }).modules.size;
@@ -323,11 +324,17 @@ function formatSeconds(ms: number): string {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms.toFixed(1)} ms`;
 }
 
+/**
+ * Payload bytes per frame of the `ur:bytes/` droplets (ADR 0014) at each density, measured for a
+ * 256 KB file before #1149 removed that format. Kept as the comparison for Prism.
+ */
+const UR_BYTES_PAYLOAD: Readonly<Record<TransferDensity, number>> = { reliable: 27, balanced: 98, fast: 150 };
+
 /** Payload bytes per frame at each density: the old `ur:bytes/` framing against Prism. */
 function capacityRows(): Array<Array<string | number>> {
   return (Object.keys(TRANSFER_DENSITY_PROFILES) as TransferDensity[]).map((density) => {
     const { errorCorrectionLevel, maxVersion } = TRANSFER_DENSITY_PROFILES[density];
-    const old = resolveFountainSymbolSize(256 * 1024, errorCorrectionLevel, undefined, maxVersion).symbolSize;
+    const old = UR_BYTES_PAYLOAD[density];
     const prism = prismSymbolSize(errorCorrectionLevel, maxVersion);
     return [density, `${errorCorrectionLevel}, version ${maxVersion}`, `${old} B`, `${prism} B`, `${(prism / old).toFixed(2)}x`];
   });
@@ -341,7 +348,7 @@ function render(codec: CodecRow[], optical: OpticalRow[], tileSection: string[])
     ''
   );
   parts.push('## Payload per frame', '');
-  parts.push('Bytes of file data in each frame at every density, for a 256 KB file. `ur:bytes/` is the format before Prism (ADR 0014); Prism is the format since (ADR 0024).', '');
+  parts.push('Bytes of file data in each frame at every density, for a 256 KB file. `ur:bytes/` is the format before Prism (ADR 0014), as measured before it was removed; Prism is the format since (ADR 0024).', '');
   parts.push(table(['Density', 'QR code', 'ur:bytes/', 'Prism', 'Gain'], capacityRows()), '');
   parts.push('## Codec through an erasure channel', '');
   parts.push(
@@ -358,7 +365,7 @@ function render(codec: CodecRow[], optical: OpticalRow[], tileSection: string[])
   if (optical.length > 0) {
     parts.push('## Optical channel simulator', '');
     parts.push(
-      'Real QR frames of one droplet each (error correction L), degraded and decoded with our reader (qr-decode), one pass. The estimate is `min(fps, decode rate) × success rate × block size ÷ 1.1` (the 1.1 is the coding overhead). It ignores display tearing between refreshes beyond the rolling-shutter row, and a real camera adds exposure, focus hunting and dropped frames.',
+      'Real QR frames of one BC-UR part each (error correction L), degraded and decoded with our reader (qr-decode), one pass. The estimate is `min(fps, decode rate) × success rate × block size ÷ 1.1` (the 1.1 is the coding overhead). It ignores display tearing between refreshes beyond the rolling-shutter row, and a real camera adds exposure, focus hunting and dropped frames.',
       ''
     );
     parts.push(

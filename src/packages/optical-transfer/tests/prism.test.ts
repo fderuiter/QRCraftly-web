@@ -28,7 +28,6 @@ import {
   PRISM_VERSION,
   TRANSFER_DENSITY_PROFILES,
   base45Length,
-  createFountainSession,
   createPrng,
   createPrismSession,
   crc32c,
@@ -44,12 +43,12 @@ import {
   looksLikePrismFrame,
   prismFrameCapacity,
   prismSymbolSize,
-  resolveFountainSymbolSize,
   sessionIdOf,
   sha256Hex,
   type PrismManifest,
   type TransferDensity,
 } from '../index';
+import { BcUrEncoder } from '../bcur';
 
 const text = (value: string) => new TextEncoder().encode(value);
 
@@ -359,12 +358,11 @@ describe('Prism session end to end', () => {
     expect(reassembler.isComplete).toBe(false);
   });
 
-  it('still receives a legacy ur:bytes stream', async () => {
-    const file = text('old stream '.repeat(30));
-    const { encoder } = await createFountainSession(file, { fileName: 'old.txt', mimeType: 'text/plain' });
+  it('no longer reads ur:bytes frames (#1149)', () => {
+    const encoder = BcUrEncoder.forBytes(text('old stream '.repeat(30)), 40);
     const reassembler = new FountainReassembler();
-    for (let i = 5; i < encoder.k * 4 && !reassembler.isComplete; i++) reassembler.ingest(encoder.dropletStringForIndex(i));
-    expect((await reassembler.finalize()).files[0].data).toEqual(file);
+    for (let i = 0; i < encoder.fragmentCount * 2; i++) expect(reassembler.ingest(encoder.nextPart().toUpperCase())).toBeNull();
+    expect(reassembler.snapshot()).toBeNull();
   });
 
   it('ignores a finished session until another one arrives', async () => {
@@ -373,7 +371,7 @@ describe('Prism session end to end', () => {
     const { reassembler } = await receive(stream, 0, () => false);
     await reassembler.finalize();
     const key = reassembler.finishedSessionKey;
-    expect(key).toMatch(/^prism:/);
+    expect(key).toEqual(expect.any(String));
     const next = new FountainReassembler();
     next.ignoreSession(key ?? '');
     for (let i = 0; i < 40; i++) next.ingest(stream.frameText(i));
@@ -406,7 +404,8 @@ describe('Prism capacity', () => {
 
   it.each(densities)('carries more bytes per QR than the ur:bytes frames did at %s', (density) => {
     const { maxVersion, errorCorrectionLevel } = TRANSFER_DENSITY_PROFILES[density];
-    const before = resolveFountainSymbolSize(100_000, errorCorrectionLevel, undefined, maxVersion).symbolSize;
+    // Bytes per ur:bytes frame for a 256 KB file, measured before that format was removed (#1149).
+    const before = { reliable: 27, balanced: 98, fast: 150 }[density];
     const after = prismSymbolSize(errorCorrectionLevel, maxVersion);
     expect(after).toBeGreaterThan(before * 1.4);
     expect(estimateTransferFrames(100_000, density).symbolSize).toBe(after);

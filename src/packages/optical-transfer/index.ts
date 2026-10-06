@@ -53,11 +53,6 @@ export {
   getNeighborsForSeq,
   createPrng,
 } from './lib/fountain/soliton';
-export {
-  serializeDroplet,
-  parseDropletString,
-  isFountainDropletString,
-} from './lib/fountain/envelope';
 export { cborEncode, cborDecode, type CborValue } from './lib/fountain/cbor';
 export { encodeBytewordsMinimal, decodeBytewordsMinimal } from './lib/fountain/bytewords';
 export { crc32, crc32c, crc32Hex } from './lib/fountain/crc32';
@@ -67,21 +62,13 @@ export {
   type FountainEncoderOptions,
 } from './lib/fountain/contracts';
 export {
-  createFountainSession,
-  openFountainSession,
-  encodeSessionMessage,
-  decodeSessionMessage,
   compressForTransfer,
   decompressTransferPayload,
-  resolveFountainSymbolSize,
   resolveTransferDensity,
   TRANSFER_DENSITY_PROFILES,
   DEFAULT_TRANSFER_DENSITY,
-  maxDropletStringLength,
   sha256Hex,
-  MAX_QR_VERSION,
   type FountainSessionHeader,
-  type FountainSessionOptions,
   type TransferCompression,
   type TransferDensity,
   type TransferDensityProfile,
@@ -90,7 +77,6 @@ export {
 export {
   MAX_BUNDLE_ENTRIES,
   MAX_RECEIVE_BYTES,
-  MAX_RECEIVE_MESSAGE_BYTES,
   MAX_FEC_SOURCE_SYMBOLS,
   MAX_FEC_SYMBOL_BYTES,
 } from './lib/limits';

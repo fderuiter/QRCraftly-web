@@ -16,10 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { cborDecode, cborEncode, cborHeadLength } from './cbor';
-import { FountainEncoder, defaultMaxSeq } from './encoder';
-import { FOUNTAIN_URI_PREFIX } from './envelope';
-import { MAX_RECEIVE_BYTES, formatLimit } from '../limits';
 
 /**
  * Payload compression applied before fountain encoding.
@@ -27,17 +23,10 @@ import { MAX_RECEIVE_BYTES, formatLimit } from '../limits';
  */
 export type TransferCompression = 'none' | 'deflate-raw';
 
-const COMPRESSION_FLAGS: Record<TransferCompression, number> = { none: 0, 'deflate-raw': 1 };
-const SESSION_FORMAT_VERSION = 1;
-
 /** Compression must save at least this fraction of the input to be kept. */
 export const MIN_COMPRESSION_SAVING = 0.05;
 
-/**
- * Session header carried inside the fountain message, ahead of the payload.
- * Every droplet binds to it through the BC-UR message checksum, so a receiver
- * that joins mid-stream learns it as soon as the message is reconstructed.
- */
+/** What a receiver knows about each received file once its bytes are verified. */
 export interface FountainSessionHeader {
   fileName: string;
   mimeType: string;
@@ -58,65 +47,6 @@ export function hexToBytes(hex: string): Uint8Array {
 
 export function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-}
-
-/**
- * Encodes the fountain message: a CBOR byte string (so the UR type `bytes`
- * holds) wrapping `[version, fileName, mimeType, fileSize, sha256, compression, payload]`.
- * @param header Session header.
- * @param payload Possibly compressed file bytes.
- * @returns The message bytes to fountain-encode.
- */
-export function encodeSessionMessage(header: FountainSessionHeader, payload: Uint8Array): Uint8Array {
-  const inner = cborEncode([
-    SESSION_FORMAT_VERSION,
-    header.fileName,
-    header.mimeType,
-    header.fileSize,
-    hexToBytes(header.sha256),
-    COMPRESSION_FLAGS[header.compression],
-    payload,
-  ]);
-  return cborEncode(inner);
-}
-
-/**
- * Decodes a fountain message produced by {@link encodeSessionMessage}.
- * @param message Reassembled message bytes.
- * @returns The header and payload, or null when malformed.
- */
-export function decodeSessionMessage(message: Uint8Array): { header: FountainSessionHeader; payload: Uint8Array } | null {
-  try {
-    const outer = cborDecode(message);
-    if (!(outer instanceof Uint8Array)) return null;
-    const inner = cborDecode(outer);
-    if (!Array.isArray(inner) || inner.length !== 7) return null;
-    const [version, fileName, mimeType, fileSize, sha, flag, payload] = inner;
-    if (
-      version !== SESSION_FORMAT_VERSION ||
-      typeof fileName !== 'string' ||
-      typeof mimeType !== 'string' ||
-      typeof fileSize !== 'number' ||
-      !(sha instanceof Uint8Array) ||
-      sha.length !== 32 ||
-      (flag !== COMPRESSION_FLAGS.none && flag !== COMPRESSION_FLAGS['deflate-raw']) ||
-      !(payload instanceof Uint8Array)
-    ) {
-      return null;
-    }
-    return {
-      header: {
-        fileName,
-        mimeType,
-        fileSize,
-        sha256: bytesToHex(sha),
-        compression: flag === COMPRESSION_FLAGS['deflate-raw'] ? 'deflate-raw' : 'none',
-      },
-      payload,
-    };
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -237,11 +167,6 @@ export async function decompressTransferPayload(
 
 /** Highest QR version any transfer density may produce (ISO/IEC 18004). */
 export const MAX_QR_VERSION = 20;
-/** Upper bound for a fountain symbol (fragment) in bytes. */
-export const MAX_SYMBOL_SIZE = 400;
-/** Lower bound for a fountain symbol (fragment) in bytes. */
-export const MIN_SYMBOL_SIZE = 8;
-
 /** QR error correction levels a transfer stream can use. */
 export type StreamErrorCorrection = 'L' | 'M' | 'Q' | 'H';
 
@@ -285,132 +210,4 @@ export const DEFAULT_TRANSFER_DENSITY: TransferDensity = 'balanced';
  */
 export function resolveTransferDensity(value: unknown): TransferDensity {
   return value === 'reliable' || value === 'balanced' || value === 'fast' ? value : DEFAULT_TRANSFER_DENSITY;
-}
-
-function toStreamEcc(level: string): StreamErrorCorrection {
-  return level === 'L' || level === 'M' || level === 'H' ? level : 'Q';
-}
-
-/**
- * Worst-case length of a serialized droplet string for the given session shape.
- * @param symbolSize Fragment size in bytes.
- * @param k Source block count.
- * @param messageLength Message length in bytes.
- * @param maxSeq Highest sequence number the stream will emit.
- * @returns Maximum number of characters in `UR:BYTES/<seq>-<k>/<bytewords>`.
- */
-export function maxDropletStringLength(symbolSize: number, k: number, messageLength: number, maxSeq: number): number {
-  const cborLength =
-    1 + cborHeadLength(maxSeq) + cborHeadLength(k) + cborHeadLength(messageLength) + cborHeadLength(0xffffffff) +
-    cborHeadLength(symbolSize) + symbolSize;
-  const path = FOUNTAIN_URI_PREFIX.length + String(maxSeq).length + 1 + String(k).length + 1;
-  return path + 2 * (cborLength + 4);
-}
-
-/**
- * Picks the largest symbol size (≤ `requested`, clamped to
- * [{@link MIN_SYMBOL_SIZE}, {@link MAX_SYMBOL_SIZE}]) whose worst-case droplet
- * still fits a QR code of version ≤ `maxVersion` at the given ECC level in
- * alphanumeric mode.
- * @param messageLength Fountain message length in bytes.
- * @param errorCorrectionLevel ECC level L, M, Q or H; anything else is treated as Q.
- * @param requested Optional requested symbol size cap.
- * @param maxVersion Highest allowed QR version (1-{@link MAX_QR_VERSION}).
- * @returns The chosen symbol size, K and sequence ceiling.
- * @throws RangeError if even the minimum symbol size cannot fit.
- */
-export function resolveFountainSymbolSize(
-  messageLength: number,
-  errorCorrectionLevel: string,
-  requested: number = MAX_SYMBOL_SIZE,
-  maxVersion: number = TRANSFER_DENSITY_PROFILES.reliable.maxVersion
-): { symbolSize: number; k: number; maxSeq: number } {
-  const ecc = toStreamEcc(errorCorrectionLevel);
-  const version = Math.min(MAX_QR_VERSION, Math.max(1, Math.floor(maxVersion)));
-  const capacity = ALPHANUMERIC_CAPACITY[ecc][version - 1];
-  const ceiling = Math.min(MAX_SYMBOL_SIZE, Math.max(MIN_SYMBOL_SIZE, Math.floor(requested) || MAX_SYMBOL_SIZE));
-  const length = Math.max(1, messageLength);
-
-  for (let symbolSize = ceiling; symbolSize >= MIN_SYMBOL_SIZE; symbolSize--) {
-    const k = Math.ceil(length / symbolSize);
-    const maxSeq = defaultMaxSeq(k);
-    if (maxDropletStringLength(symbolSize, k, length, maxSeq) <= capacity) {
-      return { symbolSize, k, maxSeq };
-    }
-  }
-  throw new RangeError(`File is too large to stream within QR version ${version} at ECC ${ecc}.`);
-}
-
-/** Inputs for {@link createFountainSession}. */
-export interface FountainSessionOptions {
-  fileName: string;
-  mimeType: string;
-  /** ECC level of the droplet QR codes (defaults to Q). */
-  errorCorrectionLevel?: string;
-  requestedSymbolSize?: number;
-  /** Highest QR version a droplet may use (defaults to 7). */
-  maxVersion?: number;
-  /** Precomputed SHA-256 of `bytes`, to avoid hashing twice. */
-  sha256?: string;
-}
-
-/**
- * Builds a complete sender session: hashes and compresses the file, wraps it in
- * the session header and returns a density-bounded fountain encoder.
- * @param bytes Original file bytes.
- * @param options File metadata and density options.
- * @returns The encoder, header and chosen symbol size.
- */
-export async function createFountainSession(
-  bytes: Uint8Array,
-  options: FountainSessionOptions
-): Promise<{ encoder: FountainEncoder; header: FountainSessionHeader; symbolSize: number }> {
-  const sha256 = options.sha256 ?? (await sha256Hex(bytes));
-  const { data, compression } = await compressForTransfer(bytes, options.mimeType);
-  const header: FountainSessionHeader = {
-    fileName: options.fileName,
-    mimeType: options.mimeType || 'application/octet-stream',
-    fileSize: bytes.length,
-    sha256,
-    compression,
-  };
-  const message = encodeSessionMessage(header, data);
-  const { symbolSize, maxSeq } = resolveFountainSymbolSize(
-    message.length,
-    options.errorCorrectionLevel ?? 'Q',
-    options.requestedSymbolSize,
-    options.maxVersion
-  );
-  return { encoder: new FountainEncoder(message, { blockSize: symbolSize, maxSeq }), header, symbolSize };
-}
-
-/**
- * Opens a reconstructed fountain message: parses the header, decompresses the
- * payload and verifies its SHA-256 against the header.
- * @param message Reassembled message bytes.
- * @returns The verified file bytes and header.
- * @throws Error when the header is malformed, decompression fails or the hash mismatches.
- */
-export async function openFountainSession(message: Uint8Array): Promise<{ data: Uint8Array; header: FountainSessionHeader }> {
-  const decoded = decodeSessionMessage(message);
-  if (!decoded) throw new Error('Malformed fountain session header.');
-  const { fileSize } = decoded.header;
-  if (!Number.isSafeInteger(fileSize) || fileSize < 0) {
-    throw new Error('Malformed fountain session header: invalid file size.');
-  }
-  // Refuse an oversized claim before any buffer is allocated.
-  if (fileSize > MAX_RECEIVE_BYTES) {
-    throw new Error(`File transfer rejected: the sender claims ${fileSize} bytes, more than the ${formatLimit(MAX_RECEIVE_BYTES)} limit.`);
-  }
-  const data = await decompressTransferPayload(decoded.payload, decoded.header.compression, fileSize);
-  if (data.length !== decoded.header.fileSize) {
-    throw new Error('Integrity validation failed! Reconstructed size does not match the session header.');
-  }
-  const actual = await sha256Hex(data);
-  if (actual !== decoded.header.sha256) {
-    throw new Error(
-      `Integrity validation failed! SHA-256 mismatch.\nExpected: ${decoded.header.sha256}\nActual: ${actual}`
-    );
-  }
-  return { data, header: decoded.header };
 }
