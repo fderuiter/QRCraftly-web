@@ -146,12 +146,13 @@ export function analyseLink(url: string): LinkFinding[] {
       add('international', 'info', `The address uses international characters. Its plain form is ${hostname}.`);
     }
 
+    const labelSkeletons = skeletons(label);
     const lookalike = BRANDS.find(
       (brand) =>
         brand.label.length >= MIN_BRAND_LENGTH &&
         label !== brand.label &&
         !brandOwns(brand, registrable) &&
-        skeletons(label).includes(brand.label)
+        labelSkeletons.includes(brand.label)
     );
     if (lookalike) {
       add('lookalike', 'caution', `The name ${label} imitates ${lookalike.label}. The real site is ${lookalike.domains[0]}.`);

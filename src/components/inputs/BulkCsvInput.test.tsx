@@ -151,7 +151,7 @@ describe('BulkCsvInput Component', () => {
     expect(screen.getByText(/exceeding 100 rows/)).toBeInTheDocument();
   });
 
-  it('shows error modal when CSV contains rows with empty payload values', async () => {
+  it('renders preflight summary card and updates button label when CSV contains rows with empty payload values', async () => {
     const csvContent = 'URL,Name\nhttps://example.com/1,Code1\n,Code2\nhttps://example.com/3,Code3';
 
     const data: BulkCsvData = {
@@ -164,12 +164,27 @@ describe('BulkCsvInput Component', () => {
 
     renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
 
-    const generateBtn = screen.getByRole('button', { name: 'Generate Batch' });
+    expect(screen.getByTestId('preflight-summary-card')).toBeInTheDocument();
+    expect(screen.getByTestId('count-total')).toHaveTextContent('3');
+    expect(screen.getByTestId('count-valid')).toHaveTextContent('2');
+    expect(screen.getByTestId('count-empty')).toHaveTextContent('1');
+
+    // Toggle row details
+    const toggleBtn = screen.getByTestId('preflight-expand-toggle');
+    fireEvent.click(toggleBtn);
+
+    expect(screen.getByTestId('preflight-details-list')).toBeInTheDocument();
+    expect(screen.getByText("Missing value in payload column 'URL'")).toBeInTheDocument();
+
+    const generateBtn = screen.getByRole('button', { name: 'Generate Batch for 2 Valid Rows' });
     fireEvent.click(generateBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('CSV Row Validation Errors')).toBeInTheDocument();
-      expect(screen.getByText("Row 2: Empty value in payload column 'URL'")).toBeInTheDocument();
+      expect(downloadManager.triggerFileDownload).toHaveBeenCalledWith(
+        expect.any(Uint8Array),
+        'qr-codes-batch.zip',
+        'application/zip'
+      );
     });
   });
 
@@ -245,7 +260,7 @@ describe('BulkCsvInput Component', () => {
     };
 
     renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
+    fireEvent.click(screen.getByRole('button', { name: /Generate Batch/ }));
 
     await waitFor(() => expect(downloadManager.triggerFileDownload).toHaveBeenCalled());
     expect(zipEntryNames(downloadedZip())).toEqual(['Good.svg', 'Mail.svg']);
@@ -259,7 +274,7 @@ describe('BulkCsvInput Component', () => {
     expect(list.textContent).not.toContain('Row 1:');
   });
 
-  it('makes no ZIP when every row is blocked', async () => {
+  it('makes no ZIP and disables button when every row is blocked', async () => {
     const data: BulkCsvData = {
       ...initialData,
       csvContent: 'URL,Name\njavascript:alert(1),A',
@@ -268,12 +283,13 @@ describe('BulkCsvInput Component', () => {
       exportFormat: 'svg',
     };
     renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
-    expect(await screen.findByTestId('bulk-skipped-rows')).toBeInTheDocument();
+    const btn = screen.getByRole('button', { name: 'No Valid Rows to Generate' });
+    expect(btn).toBeDisabled();
+    expect(screen.getByTestId('count-unsafe')).toHaveTextContent('1');
     expect(downloadManager.triggerFileDownload).not.toHaveBeenCalled();
   });
 
-  it('skips rows without a payload and de-duplicates file names after confirmation', async () => {
+  it('skips rows without a payload and de-duplicates file names directly', async () => {
     const csvContent = 'URL,Name\nhttps://example.com/1,Same\n,Empty\nhttps://example.com/3,same\nhttps://example.com/4,a/b';
     const data: BulkCsvData = {
       ...initialData,
@@ -284,8 +300,7 @@ describe('BulkCsvInput Component', () => {
     };
 
     renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Skip Bad Rows & Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch for 3 Valid Rows' }));
 
     await waitFor(() => {
       expect(downloadManager.triggerFileDownload).toHaveBeenCalledWith(
@@ -314,7 +329,7 @@ describe('BulkCsvInput Component', () => {
 
     expect(screen.getByText(/Could not read this CSV/)).toBeInTheDocument();
     expect(screen.getByText(/Unterminated quoted field/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Generate Batch' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'No Valid Rows to Generate' })).toBeDisabled();
   });
 
   it('stores the detected column defaults', async () => {
