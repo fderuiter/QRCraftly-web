@@ -201,7 +201,13 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
     } else if (fix === 'smaller-logo') {
       store.updateConfig({ logoSize: SYSTEM_LIMITS.MAX_LOGO_SIZE });
     } else {
-      store.updateConfig({ fgColor: '#000000', bgColor: '#ffffff', eyeColor: '#000000' });
+      store.updateConfig({
+        fgColor: '#000000',
+        bgColor: '#ffffff',
+        eyeColor: '#000000',
+        eyeFrameColor: '#000000',
+        eyeBallColor: '#000000',
+      });
     }
   }, [store]);
 
@@ -211,6 +217,8 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
       fgColor: DEFAULT_CONFIG.fgColor,
       bgColor: DEFAULT_CONFIG.bgColor,
       eyeColor: DEFAULT_CONFIG.eyeColor,
+      eyeFrameColor: undefined,
+      eyeBallColor: undefined,
     });
     notifyUndo('Colors reset');
   }, [store, notifyUndo]);

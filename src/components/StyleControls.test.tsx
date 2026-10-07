@@ -75,9 +75,13 @@ describe('StyleControls Component', () => {
     fireEvent.change(bgInput, { target: { value: '#00ff00' } });
     expect(mockOnChange).toHaveBeenCalledWith({ bgColor: '#00ff00' });
 
-    const eyeInput = screen.getByLabelText('Eye Color (Corners)');
-    fireEvent.change(eyeInput, { target: { value: '#0000ff' } });
-    expect(mockOnChange).toHaveBeenCalledWith({ eyeColor: '#0000ff' });
+    const eyeFrameInput = screen.getByLabelText('Eye Frame');
+    fireEvent.change(eyeFrameInput, { target: { value: '#0000ff' } });
+    expect(mockOnChange).toHaveBeenCalledWith({ eyeFrameColor: '#0000ff' });
+
+    const eyeBallInput = screen.getByLabelText('Eye Ball');
+    fireEvent.change(eyeBallInput, { target: { value: '#00ff00' } });
+    expect(mockOnChange).toHaveBeenCalledWith({ eyeBallColor: '#00ff00' });
   });
 
   it('updates colors via hex text inputs', () => {

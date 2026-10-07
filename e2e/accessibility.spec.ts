@@ -51,7 +51,7 @@ test.describe('Accessibility Suite', () => {
     const bgColorInput = page.locator('input#bg-color');
     await bgColorInput.fill('#ffffff');
 
-    const eyeColorInput = page.locator('input#eye-color');
+    const eyeColorInput = page.locator('input#eye-frame-color');
     await eyeColorInput.fill('#ff0000');
 
     // Wait for contrast warning text

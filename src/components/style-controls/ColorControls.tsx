@@ -14,14 +14,22 @@ interface ColorControlsProps {
 export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }) => {
   const contrastRatios = useMemo(() => {
     const fgContrast = getContrastRatio(config.fgColor, config.bgColor);
-    const eyeContrast = getContrastRatio(config.eyeColor, config.bgColor);
-    return { fg: fgContrast, eye: eyeContrast };
-  }, [config.fgColor, config.bgColor, config.eyeColor]);
+    const eyeFrameContrast = getContrastRatio(config.eyeFrameColor || config.eyeColor, config.bgColor);
+    const eyeBallContrast = getContrastRatio(config.eyeBallColor || config.eyeColor, config.bgColor);
+    return { fg: fgContrast, eyeFrame: eyeFrameContrast, eyeBall: eyeBallContrast };
+  }, [config.fgColor, config.bgColor, config.eyeColor, config.eyeFrameColor, config.eyeBallColor]);
 
-  const isLowContrast = contrastRatios.fg < MIN_CONTRAST_THRESHOLD || contrastRatios.eye < MIN_CONTRAST_THRESHOLD;
-  const worstContrast = Math.min(contrastRatios.fg, contrastRatios.eye);
+  const isLowContrast =
+    contrastRatios.fg < MIN_CONTRAST_THRESHOLD ||
+    contrastRatios.eyeFrame < MIN_CONTRAST_THRESHOLD ||
+    contrastRatios.eyeBall < MIN_CONTRAST_THRESHOLD;
+  const worstContrast = Math.min(contrastRatios.fg, contrastRatios.eyeFrame, contrastRatios.eyeBall);
   const selectedPreset = PRESET_COLORS.find(
-    (preset) => config.fgColor === preset.fg && config.bgColor === preset.bg && config.eyeColor === preset.eye
+    (preset) =>
+      config.fgColor === preset.fg &&
+      config.bgColor === preset.bg &&
+      (config.eyeFrameColor || config.eyeColor) === preset.eye &&
+      (config.eyeBallColor || config.eyeColor) === preset.eye
   );
 
   return (
@@ -39,7 +47,15 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
         value={selectedPreset?.label ?? ''}
         onChange={(label) => {
           const preset = PRESET_COLORS.find((p) => p.label === label);
-          if (preset) onChange({ fgColor: preset.fg, bgColor: preset.bg, eyeColor: preset.eye });
+          if (preset) {
+            onChange({
+              fgColor: preset.fg,
+              bgColor: preset.bg,
+              eyeColor: preset.eye,
+              eyeFrameColor: preset.eye,
+              eyeBallColor: preset.eye,
+            });
+          }
         }}
         options={PRESET_COLORS.map((preset) => ({
           value: preset.label,
@@ -74,14 +90,18 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
           value={config.bgColor}
           onChange={(val) => onChange({ bgColor: val })}
         />
-        <div className="col-span-2">
-          <ColorInput
-            id="eye-color"
-            label="Eye Color (Corners)"
-            value={config.eyeColor}
-            onChange={(val) => onChange({ eyeColor: val })}
-          />
-        </div>
+        <ColorInput
+          id="eye-frame-color"
+          label="Eye Frame"
+          value={config.eyeFrameColor || config.eyeColor}
+          onChange={(val) => onChange({ eyeFrameColor: val })}
+        />
+        <ColorInput
+          id="eye-ball-color"
+          label="Eye Ball"
+          value={config.eyeBallColor || config.eyeColor}
+          onChange={(val) => onChange({ eyeBallColor: val })}
+        />
       </div>
       <ContrastBanner
         isVisible={isLowContrast}
