@@ -88,20 +88,44 @@ export interface AssetOptions extends ExportOptions {
 export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'svg' | 'eps' | 'pdf' | 'clipboard' | 'share' | 'svg-copy';
 
 /**
- * Returns the canvas to encode: the preview itself, or a copy scaled to `size` pixels wide.
+ * Prepares the canvas for export: resizes to `size` pixels wide if requested,
+ * and flattens transparent background to solid white (`#ffffff`) for JPEG exports.
  * Upscaling keeps module edges crisp (no smoothing); downscaling smooths.
  * @param canvas - The preview canvas.
+ * @param format - Export format ('jpeg', 'png', 'webp', etc.).
  * @param size - Target width in pixels.
- * @returns The canvas to export.
+ * @returns The canvas prepared for export.
  */
-function scaledCanvas(canvas: HTMLCanvasElement, size?: number): HTMLCanvasElement {
-  if (!size || size === canvas.width || !canvas.width) return canvas;
+function prepareExportCanvas(
+  canvas: HTMLCanvasElement,
+  format?: string,
+  size?: number
+): HTMLCanvasElement {
+  if (!canvas.width) return canvas;
+
+  const isJpeg = format === 'jpeg' || format === 'jpg';
+  const hasSizeChange = Boolean(size && size !== canvas.width);
+
+  if (!isJpeg && !hasSizeChange) {
+    return canvas;
+  }
+
   const out = document.createElement('canvas');
-  out.width = size;
-  out.height = Math.round((size * canvas.height) / canvas.width);
+  const targetWidth = size || canvas.width;
+  const targetHeight = size ? Math.round((size * canvas.height) / canvas.width) : canvas.height;
+  out.width = targetWidth;
+  out.height = targetHeight;
+
   const ctx = out.getContext('2d');
   if (!ctx) return canvas;
-  ctx.imageSmoothingEnabled = size < canvas.width;
+
+  ctx.imageSmoothingEnabled = size ? size < canvas.width : false;
+
+  if (isJpeg) {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, out.width, out.height);
+  }
+
   ctx.drawImage(canvas, 0, 0, out.width, out.height);
   return out;
 }
@@ -213,11 +237,12 @@ export function useQRDownload(
     if (blocked) return blocked;
     const canvas = qrRef.current?.querySelector('canvas');
     if (canvas) {
-      if (!options?.allowUnsafe && !(await validateScannability(canvas))) {
+      const exportCanvas = prepareExportCanvas(canvas, format, options?.size);
+      if (!options?.allowUnsafe && !(await validateScannability(exportCanvas))) {
         return { success: false, format, error: new Error('SCAN_VALIDATION_FAILED') };
       }
       try {
-        const url = scaledCanvas(canvas, options?.size).toDataURL(`image/${format}`);
+        const url = exportCanvas.toDataURL(`image/${format}`);
         const link = document.createElement('a');
         const ext = getExtension(format);
         link.download = getFilename(ext, options?.filename);
@@ -246,7 +271,9 @@ export function useQRDownload(
     const canvas = qrRef.current?.querySelector('canvas');
     if (!canvas) return { success: false, format, error: new Error('Canvas not found') };
 
-    if (!options?.allowUnsafe && !(await validateScannability(canvas))) {
+    const exportCanvas = prepareExportCanvas(canvas, format, options?.size);
+
+    if (!options?.allowUnsafe && !(await validateScannability(exportCanvas))) {
       return { success: false, format, error: new Error('SCAN_VALIDATION_FAILED') };
     }
 
@@ -254,7 +281,7 @@ export function useQRDownload(
     if (canSaveFilePicker) {
       try {
         const blob = await new Promise<Blob | null>((resolve) =>
-          scaledCanvas(canvas, options?.size).toBlob(resolve, `image/${format}`)
+          exportCanvas.toBlob(resolve, `image/${format}`)
         );
 
         if (!blob) throw new Error('Failed to create image blob');
@@ -300,12 +327,14 @@ export function useQRDownload(
     const canvas = qrRef.current?.querySelector('canvas');
     if (!canvas) return { success: false, format: 'clipboard', error: new Error('Canvas not found') };
 
-    if (!options?.allowUnsafe && !(await validateScannability(canvas))) {
+    const exportCanvas = prepareExportCanvas(canvas, 'png');
+
+    if (!options?.allowUnsafe && !(await validateScannability(exportCanvas))) {
       return { success: false, format: 'clipboard', error: new Error('SCAN_VALIDATION_FAILED') };
     }
 
     try {
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      const blob = await new Promise<Blob | null>((resolve) => exportCanvas.toBlob(resolve, 'image/png'));
       if (!blob) return { success: false, format: 'clipboard', error: new Error('Blob creation failed') };
 
       // Note: ClipboardItem is not supported in all browsers, but works in modern ones
@@ -333,12 +362,14 @@ export function useQRDownload(
     const canvas = qrRef.current?.querySelector('canvas');
     if (!canvas) return { success: false, format: 'share', error: new Error('Canvas not found') };
 
-    if (!options?.allowUnsafe && !(await validateScannability(canvas))) {
+    const exportCanvas = prepareExportCanvas(canvas, 'png', options?.size);
+
+    if (!options?.allowUnsafe && !(await validateScannability(exportCanvas))) {
       return { success: false, format: 'share', error: new Error('SCAN_VALIDATION_FAILED') };
     }
 
     return new Promise<ExportStatus>((resolve) => {
-      scaledCanvas(canvas, options?.size).toBlob(async (blob) => {
+      exportCanvas.toBlob(async (blob) => {
         if (!blob) {
           resolve({ success: false, format: 'share', error: new Error('Blob creation failed') });
           return;
