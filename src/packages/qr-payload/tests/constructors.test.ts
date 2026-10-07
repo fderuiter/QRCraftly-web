@@ -398,6 +398,31 @@ describe('Social generator', () => {
         .toBe('https://tiktok.com/@myuser');
     });
 
+    it('generates a LinkedIn profile URL', () => {
+      expect(constructSocialString({ platform: SocialPlatform.LINKEDIN, handle: 'myuser' }))
+        .toBe('https://linkedin.com/in/myuser');
+    });
+
+    it('generates a YouTube profile URL', () => {
+      expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: 'myuser' }))
+        .toBe('https://youtube.com/@myuser');
+    });
+
+    it('generates a Facebook profile URL', () => {
+      expect(constructSocialString({ platform: SocialPlatform.FACEBOOK, handle: 'myuser' }))
+        .toBe('https://facebook.com/myuser');
+    });
+
+    it('generates a WhatsApp profile URL', () => {
+      expect(constructSocialString({ platform: SocialPlatform.WHATSAPP, handle: '15551234567' }))
+        .toBe('https://wa.me/15551234567');
+    });
+
+    it('generates a GitHub profile URL', () => {
+      expect(constructSocialString({ platform: SocialPlatform.GITHUB, handle: 'myuser' }))
+        .toBe('https://github.com/myuser');
+    });
+
     it('strips @ from handle in generated URL', () => {
       expect(constructSocialString({ platform: SocialPlatform.INSTAGRAM, handle: '@myuser' }))
         .toBe('https://instagram.com/myuser');
