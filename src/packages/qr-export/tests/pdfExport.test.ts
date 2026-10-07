@@ -80,4 +80,19 @@ describe('PDF Vector Export', () => {
     expect(pdfStr).toContain('0 0 1 rg');
     expect(pdfStr).toContain('(PDF TEST) Tj');
   });
+
+  it('converts SVG paths containing H, h, V, v, and Z subpath resets to PDF operators', () => {
+    const sampleSvg = `<svg width="200" height="200"><path d="M 10 10 H 50 v 20 h -10 V 10 Z m 5 5 h 10" fill="#000000"/></svg>`;
+    const pdfBytes = convertSvgToPdf(sampleSvg);
+    const pdfStr = new TextDecoder().decode(pdfBytes);
+
+    expect(pdfStr).toContain('10 10 m');
+    expect(pdfStr).toContain('50 10 l');
+    expect(pdfStr).toContain('50 30 l');
+    expect(pdfStr).toContain('40 30 l');
+    expect(pdfStr).toContain('40 10 l');
+    expect(pdfStr).toContain('h');
+    expect(pdfStr).toContain('15 15 m');
+    expect(pdfStr).toContain('25 15 l');
+  });
 });
