@@ -60,7 +60,7 @@ These components capture specialized data structures required to construct disti
 - **EventInput** (`EventInput.tsx`): Calendar appointment configuration form specifying title, times, description, and venue.
 - **FieldHints** (`FieldHints.tsx` / `FieldHints.test.tsx`): How long typing pauses before an address is read.
 - **LazyBulkCsvInput** (`LazyBulkCsvInput.tsx`): Registry entry for the Bulk CSV Batch type. Renders a placeholder during prerendering and hydration, then loads the batch generator chunk on the client.
-- **LocationInput** (`LocationInput.tsx` / `LocationInput.test.tsx`): High-accuracy coordinate form requiring proper latitude and longitude decimals.
+- **LocationInput** (`LocationInput.tsx` / `LocationInput.test.tsx`): High-accuracy coordinate form with address search geocoding and device geolocation.
 - **MeetingInput** (`MeetingInput.tsx` / `MeetingInput.test.tsx`): Specialized input fields to enter URL links and meeting passwords.
 - **PaymentInput** (`PaymentInput.tsx`): Cryptocurrency checkout fields validating address formats and value sizes.
 - **PhoneInput** (`PhoneInput.tsx`): Clean, accessible phone dial code layout.

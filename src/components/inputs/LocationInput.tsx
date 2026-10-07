@@ -21,8 +21,53 @@ export const LocationInput: React.FC<LocationInputProps> = ({
   data,
   onChange,
 }) => {
+  const [addressQuery, setAddressQuery] = useState("");
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+
+  const handleSearchAddress = async () => {
+    if (!addressQuery.trim()) {
+      setAddressError("Please enter an address to search.");
+      return;
+    }
+
+    setIsSearchingAddress(true);
+    setAddressError(null);
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          addressQuery.trim(),
+        )}&limit=1`,
+      );
+
+      if (!response.ok) {
+        throw new Error("Network error while searching address.");
+      }
+
+      const results = await response.json();
+
+      if (Array.isArray(results) && results.length > 0) {
+        const { lat, lon } = results[0];
+        onChange({
+          latitude: String(lat),
+          longitude: String(lon),
+        });
+        announcePolitely("Location coordinates populated");
+        setAddressError(null);
+      } else {
+        setAddressError("No location found for the specified address.");
+      }
+    } catch {
+      setAddressError(
+        "Failed to search address. Please check your network connection and try again.",
+      );
+    } finally {
+      setIsSearchingAddress(false);
+    }
+  };
 
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -56,6 +101,37 @@ export const LocationInput: React.FC<LocationInputProps> = ({
 
   return (
     <FormBlock legend="Geo-Location">
+      <TextField
+        id="location-address-search"
+        label="Search Address"
+        type="text"
+        placeholder="e.g. 1600 Pennsylvania Ave NW, Washington, DC"
+        value={addressQuery}
+        onChange={(e) => setAddressQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            handleSearchAddress();
+          }
+        }}
+      />
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={handleSearchAddress}
+        disabled={isSearchingAddress}
+        aria-busy={isSearchingAddress}
+        size="sm"
+        fullWidth
+        data-testid="search-address-button"
+      >
+        {isSearchingAddress ? "Searching address…" : "Search Address"}
+      </Button>
+      {addressError && (
+        <p role="alert" className="text-xs text-danger">
+          {addressError}
+        </p>
+      )}
       <TextField
         id="location-latitude"
         label="Latitude"

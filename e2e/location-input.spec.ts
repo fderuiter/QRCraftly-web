@@ -64,4 +64,23 @@ test.describe('Location QR type', () => {
     // A valid QR code should be rendered (img alt changes from "Empty" to content)
     await expect(page.getByRole('img', { name: /qr code for location - scan to view content/i })).toBeVisible();
   });
+
+  test('address search fills fields and generates QR when address is searched', async ({ page }) => {
+    // Mock the Nominatim API response
+    await page.route('https://nominatim.openstreetmap.org/search*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([{ lat: '40.7128', lon: '-74.0060' }]),
+      });
+    });
+
+    await page.getByLabel('Search Address').fill('New York City');
+    await page.getByTestId('search-address-button').click();
+
+    await expect(page.getByLabel('Latitude')).toHaveValue('40.7128');
+    await expect(page.getByLabel('Longitude')).toHaveValue('-74.0060');
+    await page.screenshot({ path: '/tmp/location_input_geocoding.png' });
+    await expect(page.getByRole('img', { name: /qr code for location - scan to view content/i })).toBeVisible();
+  });
 });

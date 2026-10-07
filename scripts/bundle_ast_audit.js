@@ -27,7 +27,8 @@ const BANNED_APIS = new Set(['fetch', 'WebSocket', 'XMLHttpRequest', 'sendBeacon
 export const AUTHORIZED_FETCH_SCOPE_LITERALS = [
   'FileReader error', // Logo/image URL loading that is routed through sanitizeSvg (svgExport)
   "pageContext couldn't be fetched because an error occurred on the server-side", // Vike client router pageContext.json requests
-  'wasm-runtime: same-origin module fetch failed with HTTP ' // src/packages/wasm-runtime: same-origin fetch of our own Rust modules (ADR 0033)
+  'wasm-runtime: same-origin module fetch failed with HTTP ', // src/packages/wasm-runtime: same-origin fetch of our own Rust modules (ADR 0033)
+  'Network error while searching address.' // LocationInput: address geocoding via OpenStreetMap Nominatim
 ];
 
 // Generated files (paths relative to dist/, POSIX separators) in which `fetch`

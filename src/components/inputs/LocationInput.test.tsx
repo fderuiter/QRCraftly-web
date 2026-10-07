@@ -387,4 +387,118 @@ describe('LocationInput component', () => {
       });
     });
   });
+
+  // ─── Address Search / Geocoding ────────────────────────────────────────────
+
+  describe('Address Search / Geocoding', () => {
+    it('renders search address field and button', () => {
+      renderLocationInput();
+      expect(screen.getByLabelText('Search Address')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /search address/i })).toBeInTheDocument();
+    });
+
+    it('shows error if search is triggered with empty input', async () => {
+      renderLocationInput();
+      fireEvent.click(screen.getByRole('button', { name: /search address/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent(/please enter an address/i);
+      });
+    });
+
+    it('fetches coordinates from Nominatim API and populates location on success', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ lat: '38.8977', lon: '-77.0365' }],
+      } as Response);
+
+      const { onChange } = renderLocationInput();
+      const addressInput = screen.getByLabelText('Search Address');
+
+      fireEvent.change(addressInput, {
+        target: { value: '1600 Pennsylvania Ave NW, Washington, DC' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /search address/i }));
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledWith(
+          'https://nominatim.openstreetmap.org/search?format=json&q=1600%20Pennsylvania%20Ave%20NW%2C%20Washington%2C%20DC&limit=1'
+        );
+        expect(onChange).toHaveBeenCalledWith({
+          latitude: '38.8977',
+          longitude: '-77.0365',
+        });
+        expect(announcePolitely).toHaveBeenCalledWith('Location coordinates populated');
+      });
+    });
+
+    it('triggers address search when pressing Enter key in search input', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ lat: '48.8566', lon: '2.3522' }],
+      } as Response);
+
+      const { onChange } = renderLocationInput();
+      const addressInput = screen.getByLabelText('Search Address');
+
+      fireEvent.change(addressInput, { target: { value: 'Paris, France' } });
+      fireEvent.keyDown(addressInput, { key: 'Enter', code: 'Enter' });
+
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        expect(onChange).toHaveBeenCalledWith({
+          latitude: '48.8566',
+          longitude: '2.3522',
+        });
+      });
+    });
+
+    it('displays error when Nominatim returns no results', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: async () => [],
+      } as Response);
+
+      renderLocationInput();
+      const addressInput = screen.getByLabelText('Search Address');
+
+      fireEvent.change(addressInput, { target: { value: 'Nonexistent Place XYZ 12345' } });
+      fireEvent.click(screen.getByRole('button', { name: /search address/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent(/no location found/i);
+      });
+    });
+
+    it('displays error when API returns a non-ok HTTP status', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+      } as Response);
+
+      renderLocationInput();
+      const addressInput = screen.getByLabelText('Search Address');
+
+      fireEvent.change(addressInput, { target: { value: 'Main Street' } });
+      fireEvent.click(screen.getByRole('button', { name: /search address/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent(/failed to search address/i);
+      });
+    });
+
+    it('displays error when fetch network request fails', async () => {
+      vi.spyOn(global, 'fetch').mockRejectedValueOnce(new TypeError('Network failure'));
+
+      renderLocationInput();
+      const addressInput = screen.getByLabelText('Search Address');
+
+      fireEvent.change(addressInput, { target: { value: 'Main Street' } });
+      fireEvent.click(screen.getByRole('button', { name: /search address/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent(/failed to search address/i);
+      });
+    });
+  });
 });
