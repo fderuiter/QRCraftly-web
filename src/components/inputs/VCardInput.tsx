@@ -1,6 +1,6 @@
 import React from "react";
 import { VCardData } from "../../types";
-import { TextField } from "../ui/FormFields";
+import { TextField, SelectField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
 import { isDangerousUrl } from "../../utils/security";
 import { FormBlock } from "../ui/FormBlock";
@@ -21,6 +21,20 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
 
   return (
     <FormBlock legend="Contact Details (vCard)">
+      <SelectField
+        id="vcard-version"
+        label="Contact Format"
+        value={data.version || "3.0"}
+        onChange={(e) =>
+          onChange({ version: e.target.value as VCardData["version"] })
+        }
+      >
+        <option value="3.0">vCard 3.0 (Standard)</option>
+        <option value="4.0">vCard 4.0 (Modern RFC 6350)</option>
+        <option value="2.1">vCard 2.1 (Legacy)</option>
+        <option value="mecard">MECard (Compact / NTT DoCoMo)</option>
+      </SelectField>
+
       <div className={GRID_TWO_COLUMNS_CLASSES}>
         <TextField
           id="vcard-firstname"

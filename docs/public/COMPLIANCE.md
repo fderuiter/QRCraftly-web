@@ -10,7 +10,7 @@ This application is designed to **support** HIPAA-compliant workflows through a 
 
 ### 1. Data Privacy (The "Won't Use Your Data" Guarantee)
 
-- **Local Processing:** All QR code generation happens locally within the user's browser using HTML5 Canvas and JavaScript.
+- **Local Processing:** All QR code generation (including vCard 2.1, 3.0, 4.0, and MECard contact payloads) happens locally within the user's browser using HTML5 Canvas and JavaScript.
 - **Data Transmission:** The sensitive data you enter to generate a QR code (which may include PHI) remains strictly in your device's memory and is not sent to our servers.
 - **Volatile Memory:** QR content you enter is held only in memory and is cleared when the browser tab is closed or refreshed. The only values written to persistent browser storage are the keys listed under Technical Safeguards below.
 - **Undo History and Style Files:** The generator keeps up to 50 appearance steps for Undo and Redo in volatile memory only; QR content is never part of a step, and a reload clears them. A style file (`.qrcraftly.json`) is a download you choose to make: it holds colours, pattern and layout settings only (never the QR value, text or uploaded images), and loading one accepts only a fixed set of known settings.
@@ -32,7 +32,7 @@ QRCraftly runs no analytics, telemetry or diagnostics of its own, and keeps no l
 - **What is stored on your device:**
   - Only the colour-theme preference (`qrcraftly:theme`) and any brand templates you save (`qrcraftly:brand-templates`, see above). QR content is never stored.
 - **What is NOT Logged:**
-  - **User Input:** Since the application runs client-side, the text, URLs, or WiFi passwords (including WPA2-Enterprise EAP method, phase 2 and identity fields) you type are never part of the HTTP request to the server.
+  - **User Input:** Since the application runs client-side, the text, URLs, WiFi passwords (including WPA2-Enterprise EAP method, phase 2 and identity fields), or payment details (including crypto addresses, SEPA IBANs, and payment handles) you type are never part of the HTTP request to the server.
   - **Generated Images:** The QR codes created are generated in the browser and never uploaded.
   - **Diagnostics:** Scannability failures are handled on the device and never reported.
 

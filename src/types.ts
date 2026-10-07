@@ -268,6 +268,8 @@ export interface EmailData {
  * Data structure for a vCard (electronic business card).
  */
 export interface VCardData {
+  /** The contact format standard version. Defaults to '3.0'. */
+  version?: '2.1' | '3.0' | '4.0' | 'mecard';
   /** The first name of the contact. */
   firstName: string;
   /** The last name of the contact. */
@@ -340,28 +342,38 @@ export interface EventData {
 }
 
 /**
- * Supported cryptocurrency networks for payment.
+ * Supported payment networks (Crypto & Fiat).
  */
 export enum CryptoNetwork {
   BITCOIN = 'bitcoin',
   ETHEREUM = 'ethereum',
   SOLANA = 'solana',
   LITECOIN = 'litecoin',
+  EPC_SEPA = 'epc_sepa',
+  PAYPAL = 'paypal',
+  VENMO = 'venmo',
+  CASH_APP = 'cash_app',
   CUSTOM = 'custom',
 }
 
 /**
- * Data structure for Payment information (Crypto).
+ * Data structure for Payment information (Crypto & Fiat).
  */
 export interface PaymentData {
-  /** The cryptocurrency network (e.g. bitcoin, ethereum). */
+  /** The payment network (e.g. bitcoin, epc_sepa, paypal). */
   network: CryptoNetwork;
-  /** The wallet address. */
+  /** The wallet address, account ID, or handle. */
   address: string;
   /** The amount to request (optional). */
   amount: string;
   /** Label or message for the transaction (optional). */
   label: string;
+  /** Beneficiary name for SEPA transfers (optional). */
+  name?: string;
+  /** IBAN for SEPA transfers (optional). */
+  iban?: string;
+  /** BIC / SWIFT code for SEPA transfers (optional). */
+  bic?: string;
 }
 
 /**

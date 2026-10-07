@@ -71,57 +71,158 @@ const encodeAddress = (address: string): string => {
   return encodeURIComponent(address.trim()).replace(/%40/g, '@');
 };
 
+const cleanIban = (iban: string): string => {
+  return iban.replace(/\s+/g, '').toUpperCase();
+};
+
+const cleanPayPalHandle = (handle: string): string => {
+  let clean = handle.trim();
+  // eslint-disable-next-line security/detect-unsafe-regex -- linear: non-overlapping optional scheme and domain prefix.
+  clean = clean.replace(/^(https?:\/\/)?(www\.)?paypal\.me\//i, '');
+  clean = clean.replace(/^@/, '');
+  return clean;
+};
+
+const cleanVenmoHandle = (handle: string): string => {
+  let clean = handle.trim();
+  // eslint-disable-next-line security/detect-unsafe-regex -- linear: non-overlapping optional scheme and domain prefix.
+  clean = clean.replace(/^(https?:\/\/)?(www\.)?venmo\.com\/(u\/)?/i, '');
+  clean = clean.replace(/^@/, '');
+  return clean;
+};
+
+const cleanCashAppHandle = (handle: string): string => {
+  let clean = handle.trim();
+  // eslint-disable-next-line security/detect-unsafe-regex -- linear: non-overlapping optional scheme and domain prefix.
+  clean = clean.replace(/^(https?:\/\/)?(www\.)?cash\.app\//i, '');
+  clean = clean.replace(/^\$/, '');
+  return clean;
+};
+
 /**
- * Constructs the crypto payment URI string.
+ * Constructs the payment URI or payload string.
  */
 export const constructPaymentString = (data: PaymentData): string => {
   if (!data) return '';
-  let paymentString = '';
 
   if (data.network === CryptoNetwork.CUSTOM) {
     if (isDangerousUrl(data.address)) {
       return '';
     }
-    paymentString = data.address;
-  } else {
-    // Ensure network is a valid known network to prevent protocol injection
-    const validNetworks = [
-      CryptoNetwork.BITCOIN,
-      CryptoNetwork.ETHEREUM,
-      CryptoNetwork.SOLANA,
-      CryptoNetwork.LITECOIN,
+    return data.address;
+  }
+
+  if (data.network === CryptoNetwork.EPC_SEPA) {
+    const iban = cleanIban(data.iban || data.address || '');
+    const name = sanitizeInput(data.name || '').trim();
+    const bic = sanitizeInput(data.bic || '').trim().toUpperCase();
+    const label = sanitizeInput(data.label || '').trim();
+    let amountStr = (data.amount || '').trim();
+    if (amountStr && !amountStr.toUpperCase().startsWith('EUR')) {
+      amountStr = `EUR${amountStr}`;
+    }
+
+    const lines = [
+      'BCD',
+      '002',
+      '1',
+      'SCT',
+      bic,
+      name,
+      iban,
+      amountStr,
+      '', // Purpose
+      '', // Remittance Reference
+      label, // Remittance Text
+      '', // Information
     ];
+    return lines.join('\n');
+  }
 
-    if (!validNetworks.includes(data.network)) {
-      return '';
+  if (data.network === CryptoNetwork.PAYPAL) {
+    const handle = cleanPayPalHandle(sanitizeInput(data.address || ''));
+    if (!handle) return '';
+    const parts = handle.split('/').filter(Boolean);
+    const username = parts[0] ? encodeURIComponent(parts[0]) : '';
+    if (!username) return '';
+    const amount = data.amount ? data.amount.trim() : (parts[1] || '');
+    let url = `https://paypal.me/${username}`;
+    if (amount) {
+      url += `/${encodeURIComponent(amount)}`;
     }
+    if (isDangerousUrl(url)) return '';
+    return url;
+  }
 
-    // Sanitize address to prevent parameter injection if user accidentally pastes a full URI or malicious string
-    const safeAddress = encodeAddress(sanitizeInput(data.address || ''));
-    paymentString = `${data.network}:${safeAddress}`;
+  if (data.network === CryptoNetwork.VENMO) {
+    const username = cleanVenmoHandle(sanitizeInput(data.address || ''));
+    if (!username) return '';
+    const encodedUser = encodeURIComponent(username);
+    let url = `https://venmo.com/u/${encodedUser}`;
     const params: string[] = [];
-
     if (data.amount) {
-      if (data.network === CryptoNetwork.ETHEREUM) {
-        // EIP-681: the amount is `value=` in wei; wallets ignore `amount=`.
-        const wei = etherToWei(data.amount);
-        if (wei !== null) {
-          params.push(`value=${wei}`);
-        }
-      } else {
-        // Encode amount to prevent parameter injection
-        params.push(`amount=${encodeURIComponent(data.amount)}`);
-      }
+      params.push(`amount=${encodeURIComponent(data.amount.trim())}`);
     }
-
     if (data.label) {
-      params.push(`label=${encodeURIComponent(data.label)}`);
+      params.push(`note=${encodeURIComponent(data.label.trim())}`);
     }
-
     if (params.length > 0) {
-      paymentString += `?${params.join('&')}`;
+      params.push('txn=pay');
+      url += `?${params.join('&')}`;
+    }
+    if (isDangerousUrl(url)) return '';
+    return url;
+  }
+
+  if (data.network === CryptoNetwork.CASH_APP) {
+    const cashtag = cleanCashAppHandle(sanitizeInput(data.address || ''));
+    if (!cashtag) return '';
+    let url = `https://cash.app/$${encodeURIComponent(cashtag)}`;
+    if (data.amount) {
+      url += `/${encodeURIComponent(data.amount.trim())}`;
+    }
+    if (isDangerousUrl(url)) return '';
+    return url;
+  }
+
+  // Known crypto networks
+  const validCryptoNetworks = [
+    CryptoNetwork.BITCOIN,
+    CryptoNetwork.ETHEREUM,
+    CryptoNetwork.SOLANA,
+    CryptoNetwork.LITECOIN,
+  ];
+
+  if (!validCryptoNetworks.includes(data.network)) {
+    return '';
+  }
+
+  // Sanitize address to prevent parameter injection
+  const safeAddress = encodeAddress(sanitizeInput(data.address || ''));
+  let paymentString = `${data.network}:${safeAddress}`;
+  const params: string[] = [];
+
+  if (data.amount) {
+    if (data.network === CryptoNetwork.ETHEREUM) {
+      // EIP-681: the amount is `value=` in wei; wallets ignore `amount=`.
+      const wei = etherToWei(data.amount);
+      if (wei !== null) {
+        params.push(`value=${wei}`);
+      }
+    } else {
+      params.push(`amount=${encodeURIComponent(data.amount)}`);
     }
   }
+
+  if (data.label) {
+    params.push(`label=${encodeURIComponent(data.label)}`);
+  }
+
+  if (params.length > 0) {
+    paymentString += `?${params.join('&')}`;
+  }
+
+  if (isDangerousUrl(paymentString)) return '';
   return paymentString;
 };
 
@@ -138,6 +239,78 @@ export const hydratePaymentData = (raw: string): PaymentData => {
 
   if (!raw || typeof raw !== 'string') return result;
 
+  // 1. EPC SEPA QR parsing
+  if (raw.startsWith('BCD\n') || raw.startsWith('BCD\r\n')) {
+    const lines = raw.split(/\r?\n/);
+    if (lines[0] === 'BCD') {
+      const bic = lines[4] || '';
+      const name = lines[5] || '';
+      const iban = lines[6] || '';
+      const rawAmount = lines[7] || '';
+      const amount = rawAmount.toUpperCase().startsWith('EUR') ? rawAmount.slice(3) : rawAmount;
+      const label = lines[10] || '';
+      return {
+        network: CryptoNetwork.EPC_SEPA,
+        address: iban,
+        iban,
+        name,
+        bic,
+        amount,
+        label,
+      };
+    }
+  }
+
+  // 2. Fiat Payment Links (PayPal, Venmo, Cash App)
+  if (/paypal\.me\//i.test(raw)) {
+    const idx = raw.toLowerCase().indexOf('paypal.me/');
+    const path = raw.substring(idx + 10);
+    const parts = path.split('?')[0].split('/').filter(Boolean);
+    const address = safeDecodeURIComponent(parts[0] || '');
+    const amount = parts[1] ? safeDecodeURIComponent(parts[1]) : '';
+    return {
+      network: CryptoNetwork.PAYPAL,
+      address,
+      amount,
+      label: '',
+    };
+  }
+
+  if (/venmo\.com\//i.test(raw)) {
+    const idx = raw.toLowerCase().indexOf('venmo.com/');
+    const pathAndQuery = raw.substring(idx + 10);
+    const [path, query] = pathAndQuery.split('?');
+    const cleanPath = path.replace(/^u\//i, '').replace(/\/$/, '');
+    const address = safeDecodeURIComponent(cleanPath);
+    const searchParams = new URLSearchParams(query || '');
+    const amount = searchParams.get('amount') || '';
+    const label = searchParams.get('note') || searchParams.get('label') || '';
+    return {
+      network: CryptoNetwork.VENMO,
+      address,
+      amount,
+      label,
+    };
+  }
+
+  if (/cash\.app\//i.test(raw)) {
+    const idx = raw.toLowerCase().indexOf('cash.app/');
+    const path = raw.substring(idx + 9);
+    const parts = path.split('?')[0].split('/').filter(Boolean);
+    let handle = safeDecodeURIComponent(parts[0] || '');
+    if (handle && !handle.startsWith('$')) {
+      handle = `$${handle}`;
+    }
+    const amount = parts[1] ? safeDecodeURIComponent(parts[1]) : '';
+    return {
+      network: CryptoNetwork.CASH_APP,
+      address: handle,
+      amount,
+      label: '',
+    };
+  }
+
+  // 3. Known crypto networks
   const validNetworks = [
     CryptoNetwork.BITCOIN,
     CryptoNetwork.ETHEREUM,
@@ -169,10 +342,7 @@ export const hydratePaymentData = (raw: string): PaymentData => {
     }
   }
 
-  // If it doesn't match a known crypto network, we assume it's either an invalid
-  // string (e.g. switching types) or a CUSTOM string.
-  // We'll return it as CUSTOM so it can be edited, but if it starts with http/https
-  // we return default state so it falls back to the default BITCOIN state silently.
+  // If starts with http/https and wasn't matched above, fall back safely to default BITCOIN state
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     return {
       network: CryptoNetwork.BITCOIN,
