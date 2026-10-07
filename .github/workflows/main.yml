@@ -63,6 +63,10 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
       - name: Validate Conventional Commit Title / Subject
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -452,7 +456,7 @@ jobs:
   ci:
     name: CI
     needs: [setup, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse, pr-title]
-    if: always()
+    if: !cancelled()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
