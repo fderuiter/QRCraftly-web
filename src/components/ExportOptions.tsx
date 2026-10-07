@@ -22,17 +22,27 @@ import { SegmentedControl } from './ui/SegmentedControl';
 import { TextField } from './ui/TextField';
 
 /** Download formats offered by the generator. */
-export type DownloadFormat = 'png' | 'svg' | 'jpeg' | 'webp';
+export type DownloadFormat = 'png' | 'svg' | 'eps' | 'pdf' | 'jpeg' | 'webp';
 
 /** Button and announcement label of each format. */
-export const FORMAT_LABELS: Record<DownloadFormat, string> = { png: 'PNG', svg: 'SVG', jpeg: 'JPEG', webp: 'WebP' };
+export const FORMAT_LABELS: Record<DownloadFormat, string> = {
+  png: 'PNG',
+  svg: 'SVG',
+  eps: 'EPS',
+  pdf: 'PDF',
+  jpeg: 'JPEG',
+  webp: 'WebP',
+};
 
 const FORMAT_HINTS: Record<DownloadFormat, string> = {
   png: 'Sharp image that works everywhere.',
   svg: 'Vector: scales to any size, best for print and design tools.',
+  eps: 'EPS vector file for professional prepress and commercial print design workflows.',
+  pdf: 'Portable vector PDF document for cross-platform vector design workflows.',
   jpeg: 'Smallest image, with no transparency.',
   webp: 'Small and sharp, for websites.',
 };
+
 
 /** Raster size presets in pixels. */
 const SIZE_PRESETS = { screen: 512, print: 2048, poster: 4096 } as const;
@@ -107,8 +117,8 @@ export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, 
 
       <div>
         <p id={`${id}-size`} className="mb-1.5 text-sm font-medium text-fg-soft">Size</p>
-        {format === 'svg' ? (
-          <p className="text-xs text-fg-muted">SVG is vector, so it has no pixel size: it stays sharp at any size.</p>
+        {format === 'svg' || format === 'eps' || format === 'pdf' ? (
+          <p className="text-xs text-fg-muted">{format.toUpperCase()} is vector, so it has no pixel size: it stays sharp at any size.</p>
         ) : (
           <>
             <SegmentedControl<SizePreset>

@@ -49,13 +49,13 @@ vi.mock('./QRCanvas', () => ({
 }));
 
 /** The Download button, whatever format it currently exports. */
-const downloadButton = () => screen.getByRole('button', { name: /^Download (PNG|SVG|JPEG|WebP)$/ });
+const downloadButton = () => screen.getByRole('button', { name: /^Download (PNG|SVG|EPS|PDF|JPEG|WebP)$/ });
 
 /**
  * Picks a format in the Download options, then presses Download.
  * @param label - Format label as shown in the options.
  */
-function downloadAs(label: 'PNG' | 'JPEG' | 'WebP' | 'SVG') {
+function downloadAs(label: 'PNG' | 'JPEG' | 'WebP' | 'SVG' | 'EPS' | 'PDF') {
   fireEvent.click(screen.getByRole('button', { name: 'Download options' }));
   fireEvent.click(screen.getByRole('radio', { name: label }));
   fireEvent.click(screen.getByRole('button', { name: `Download ${label}` }));
@@ -187,12 +187,21 @@ describe('QRTool Component', () => {
     expect(options).toHaveAttribute('aria-expanded', 'true');
 
     const panel = screen.getByRole('group', { name: 'Download options' });
-    expect(within(panel).getAllByRole('radio').map((r) => r.textContent)).toEqual(['PNG', 'SVG', 'JPEG', 'WebP', 'Screen', 'Print', 'Poster', 'Custom']);
+    expect(within(panel).getAllByRole('radio').map((r) => r.textContent)).toEqual(['PNG', 'SVG', 'EPS', 'PDF', 'JPEG', 'WebP', 'Screen', 'Print', 'Poster', 'Custom']);
     fireEvent.click(within(panel).getByRole('radio', { name: 'PNG' }));
     fireEvent.click(within(panel).getByRole('radio', { name: 'Print' }));
     expect(screen.getByTestId('print-hint')).toHaveTextContent('2048 px wide. Prints 17.3 cm (6.8 in) wide at 300 dpi and scans from about 1.7 m.');
     expect(within(panel).getByLabelText('File name')).toHaveValue('url-example.com');
     expect(within(panel).getByRole('button', { name: 'Copy as SVG' })).toBeInTheDocument();
+
+    // EPS and PDF have no pixel size.
+    fireEvent.click(within(panel).getByRole('radio', { name: 'EPS' }));
+    expect(within(panel).getByText(/EPS is vector/)).toBeInTheDocument();
+    expect(downloadButton()).toHaveTextContent('Download EPS');
+
+    fireEvent.click(within(panel).getByRole('radio', { name: 'PDF' }));
+    expect(within(panel).getByText(/PDF is vector/)).toBeInTheDocument();
+    expect(downloadButton()).toHaveTextContent('Download PDF');
 
     // SVG has no pixel size.
     fireEvent.click(within(panel).getByRole('radio', { name: 'SVG' }));
