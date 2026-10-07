@@ -17,7 +17,7 @@
 */
 
 import React from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { TextField } from '@/components/ui/TextField';
@@ -46,6 +46,8 @@ interface TargetSettingsProps {
   onResetToGenerator: () => void;
   /** Whether a generator design is available. */
   hasGeneratorDesign: boolean;
+  /** Whether the fallback payload was encoded because the requested payload failed. */
+  usedFallback?: boolean;
 }
 
 /**
@@ -54,7 +56,7 @@ interface TargetSettingsProps {
  * @param props - Panel properties.
  * @returns The panel.
  */
-export function TargetSettings({ target, onChange, onResetToGenerator, hasGeneratorDesign }: TargetSettingsProps) {
+export function TargetSettings({ target, onChange, onResetToGenerator, hasGeneratorDesign, usedFallback }: TargetSettingsProps) {
   return (
     <Card variant="control" className="space-y-4">
       <h2 className="text-sm font-bold text-fg">Target QR</h2>
@@ -66,7 +68,24 @@ export function TargetSettings({ target, onChange, onResetToGenerator, hasGenera
         placeholder="Enter a URL or text to test"
         autoComplete="off"
         spellCheck={false}
+        error={usedFallback ? 'Payload cannot be encoded in a QR code. Showing default target.' : undefined}
       />
+      {usedFallback && (
+        <div
+          className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          data-testid="arcade-fallback-callout"
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+            <div>
+              <p className="font-semibold">Fallback payload active</p>
+              <p className="mt-0.5">
+                The target payload could not be encoded. Encoding default payload <code className="font-mono font-semibold">https://qrcraftly.com</code> instead.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <div>
         <span aria-hidden="true" className="mb-1 block text-sm font-medium text-fg-soft">
           Error correction level

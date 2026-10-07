@@ -163,6 +163,39 @@ describe('Arcade hub: modes and generator sync (#922)', () => {
   });
 });
 
+describe('Matrix fallback state propagation', () => {
+  it('surfaces validation error, settings callout, and HUD fallback badge for empty or unencodable input and recovers when valid', () => {
+    render(<ArcadeApp />);
+    expect(screen.queryByTestId('arcade-fallback-callout')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('arcade-hud-fallback-badge')).not.toBeInTheDocument();
+
+    // Set empty input
+    fireEvent.change(payloadField(), { target: { value: '' } });
+
+    expect(payloadField()).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Payload cannot be encoded in a QR code. Showing default target.')).toBeInTheDocument();
+    expect(screen.getByTestId('arcade-fallback-callout')).toHaveTextContent('https://qrcraftly.com');
+    expect(screen.getByTestId('arcade-hud-fallback-badge')).toHaveTextContent('https://qrcraftly.com');
+
+    // Input recovery: set valid text
+    fireEvent.change(payloadField(), { target: { value: 'https://example.com' } });
+
+    expect(payloadField()).toHaveAttribute('aria-invalid', 'false');
+    expect(screen.queryByTestId('arcade-fallback-callout')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('arcade-hud-fallback-badge')).not.toBeInTheDocument();
+  });
+
+  it('triggers fallback UI when payload exceeds QR capacity', () => {
+    render(<ArcadeApp />);
+    const oversizedPayload = 'X'.repeat(5000);
+    fireEvent.change(payloadField(), { target: { value: oversizedPayload } });
+
+    expect(payloadField()).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByTestId('arcade-fallback-callout')).toBeInTheDocument();
+    expect(screen.getByTestId('arcade-hud-fallback-badge')).toBeInTheDocument();
+  });
+});
+
 describe('Arcade Blaster (#923)', () => {
   const arsenal = () => screen.getByRole('radiogroup', { name: 'Blaster weapons' });
 

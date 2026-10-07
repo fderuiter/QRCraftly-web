@@ -345,7 +345,7 @@ export function SimulatorMode({ target, encoder, settings, announce }: ModeProps
             Click or drag to strike. Keyboard: focus the board, move with the arrow keys, strike with Enter or Space.
           </p>
         }
-        hud={<ScanHud analysis={analysis} empirical={scan.state} isNative={scan.isNative} />}
+        hud={<ScanHud analysis={analysis} empirical={scan.state} isNative={scan.isNative} usedFallback={matrix.usedFallback} />}
         actions={
           <div className="grid grid-cols-2 gap-2">
             <Button variant="outline" onClick={rebuild} disabled={damage.size === 0}>
