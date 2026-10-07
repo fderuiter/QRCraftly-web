@@ -38,7 +38,7 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
 - `UrlInput.tsx`: For `QRType.URL`. Handles URL validation and sanitization.
 - `TextInput.tsx`: For `QRType.TEXT`. Includes character counting.
 - `WifiInput.tsx`: For `QRType.WIFI`. Handles SSID, password, encryption type, hidden network flags, and (for WPA2-Enterprise) the EAP method (`E:`), phase 2 authentication (`PH2:`) and identity (`I:`) fields.
-- `EventInput.tsx`: For `QRType.EVENT`. Builds iCalendar-compatible event payloads.
+- `EventInput.tsx`: For `QRType.EVENT`. Builds iCalendar-compatible event payloads and web calendar direct links (Google, Outlook, Office 365, Yahoo).
 - `EmailInput.tsx`: For `QRType.EMAIL`. Fields for address, subject, and body.
 - `VCardInput.tsx`: For `QRType.VCARD`. Complex form for contact details.
 - `PhoneInput.tsx`: For `QRType.PHONE`. Simple phone number input.

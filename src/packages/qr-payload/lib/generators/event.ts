@@ -16,10 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { EventData, QRType, QRGeneratorContract } from '@/types';
+import { EventData, QRType, QRGeneratorContract, CalendarProvider } from '@/types';
 import { isDangerousUrl } from '@/utils/security';
 import { SafeUrlPipeline } from '@/utils/url';
-import { identifyProtocol } from '../protocol';
+import { identifyProtocol, parseProtocol } from '../protocol';
 import {
   escapeVCardEvent,
   unescapeVCardEvent,
@@ -41,9 +41,66 @@ export const hydrateEventData = (raw: string): EventData => {
     description: '',
   };
 
-  if (!raw || typeof raw !== 'string' || !/begin:v(event|calendar)/i.test(raw)) return result;
+  if (!raw || typeof raw !== 'string') return result;
+  const trimmed = raw.trim();
 
-  const properties = parseRFCProperties(raw);
+  // Check if raw is a web calendar URL
+  const parsed = parseProtocol(trimmed);
+  if (parsed && (parsed.scheme === 'http' || parsed.scheme === 'https')) {
+    const domain = parsed.path.split('/')[0].toLowerCase().replace(/^www\./, '');
+    const isDomain = (d: string) => domain === d || domain.endsWith(`.${d}`);
+
+    if (
+      isDomain('calendar.google.com') ||
+      (isDomain('google.com') && parsed.path.includes('/calendar/'))
+    ) {
+      result.provider = CalendarProvider.GOOGLE;
+      result.title = parsed.params.get('text') || '';
+      const dates = parsed.params.get('dates');
+      if (dates) {
+        const parts = dates.split('/');
+        result.startDate = parseEventDateTime(parts[0] || '');
+        result.endDate = parseEventDateTime(parts[1] || '');
+      }
+      result.location = parsed.params.get('location') || '';
+      result.description = parsed.params.get('details') || '';
+      return result;
+    }
+
+    if (isDomain('outlook.live.com')) {
+      result.provider = CalendarProvider.OUTLOOK;
+      result.title = parsed.params.get('subject') || '';
+      result.startDate = parseEventDateTime(parsed.params.get('startdt') || '');
+      result.endDate = parseEventDateTime(parsed.params.get('enddt') || '');
+      result.location = parsed.params.get('location') || '';
+      result.description = parsed.params.get('body') || '';
+      return result;
+    }
+
+    if (isDomain('outlook.office.com') || isDomain('outlook.office365.com')) {
+      result.provider = CalendarProvider.OFFICE365;
+      result.title = parsed.params.get('subject') || '';
+      result.startDate = parseEventDateTime(parsed.params.get('startdt') || '');
+      result.endDate = parseEventDateTime(parsed.params.get('enddt') || '');
+      result.location = parsed.params.get('location') || '';
+      result.description = parsed.params.get('body') || '';
+      return result;
+    }
+
+    if (isDomain('calendar.yahoo.com')) {
+      result.provider = CalendarProvider.YAHOO;
+      result.title = parsed.params.get('TITLE') || parsed.params.get('title') || '';
+      result.startDate = parseEventDateTime(parsed.params.get('ST') || parsed.params.get('st') || '');
+      result.endDate = parseEventDateTime(parsed.params.get('ET') || parsed.params.get('et') || '');
+      result.location = parsed.params.get('in_loc') || parsed.params.get('location') || '';
+      result.description = parsed.params.get('DESC') || parsed.params.get('desc') || '';
+      return result;
+    }
+  }
+
+  if (!/begin:v(event|calendar)/i.test(trimmed)) return result;
+
+  const properties = parseRFCProperties(trimmed);
   properties.forEach(({ key, value, params }) => {
     switch (key) {
       case 'SUMMARY':
@@ -128,9 +185,60 @@ export const constructEventString = (
   options: EventConstructOptions = {}
 ): string => {
   if (!data) return '';
+
+  const provider = (data.provider || CalendarProvider.ICAL).toLowerCase();
   const startFormatted = formatEventDateTime(data.startDate);
   const endFormatted = formatEventDateTime(data.endDate);
+  const effectiveEnd = endFormatted.value || startFormatted.value;
 
+  if (provider === CalendarProvider.GOOGLE) {
+    const params = new URLSearchParams();
+    params.set('action', 'TEMPLATE');
+    if (data.title) params.set('text', data.title);
+    if (startFormatted.value) {
+      params.set('dates', `${startFormatted.value}/${effectiveEnd}`);
+    }
+    if (data.location) params.set('location', data.location);
+    if (data.description) params.set('details', data.description);
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  }
+
+  if (provider === CalendarProvider.OUTLOOK) {
+    const params = new URLSearchParams();
+    params.set('path', '/calendar/action/compose');
+    params.set('rru', 'addevent');
+    if (data.title) params.set('subject', data.title);
+    if (startFormatted.value) params.set('startdt', startFormatted.value);
+    if (effectiveEnd) params.set('enddt', effectiveEnd);
+    if (data.location) params.set('location', data.location);
+    if (data.description) params.set('body', data.description);
+    return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
+  }
+
+  if (provider === CalendarProvider.OFFICE365) {
+    const params = new URLSearchParams();
+    params.set('path', '/calendar/action/compose');
+    params.set('rru', 'addevent');
+    if (data.title) params.set('subject', data.title);
+    if (startFormatted.value) params.set('startdt', startFormatted.value);
+    if (effectiveEnd) params.set('enddt', effectiveEnd);
+    if (data.location) params.set('location', data.location);
+    if (data.description) params.set('body', data.description);
+    return `https://outlook.office.com/calendar/0/deeplink/compose?${params.toString()}`;
+  }
+
+  if (provider === CalendarProvider.YAHOO) {
+    const params = new URLSearchParams();
+    params.set('v', '60');
+    if (data.title) params.set('TITLE', data.title);
+    if (startFormatted.value) params.set('ST', startFormatted.value);
+    if (effectiveEnd) params.set('ET', effectiveEnd);
+    if (data.description) params.set('DESC', data.description);
+    if (data.location) params.set('in_loc', data.location);
+    return `https://calendar.yahoo.com/?${params.toString()}`;
+  }
+
+  // Standard iCalendar VEVENT block for 'ical' or fallback for unrecognized provider
   const dtstartKey = startFormatted.tzid ? `DTSTART;TZID=${startFormatted.tzid}` : 'DTSTART';
   const dtendKey = endFormatted.tzid ? `DTEND;TZID=${endFormatted.tzid}` : 'DTEND';
 
