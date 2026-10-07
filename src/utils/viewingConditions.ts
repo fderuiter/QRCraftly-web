@@ -79,6 +79,66 @@ export function viewingConditions(widthCm: number): ViewingCondition[] {
   ];
 }
 
+/** Reusable pool of offscreen canvas instances to prevent memory churn and frame drops during condition analysis. */
+class CanvasPool {
+  private frameCanvas: HTMLCanvasElement | null = null;
+  private frameCtx: CanvasRenderingContext2D | null = null;
+  private auxCanvas: HTMLCanvasElement | null = null;
+  private auxCtx: CanvasRenderingContext2D | null = null;
+
+  /**
+   * Acquires the main 512x512 frame canvas, resetting context properties and clearing state.
+   */
+  getFrame(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+    if (!this.frameCanvas) {
+      if (typeof document === 'undefined') return null;
+      this.frameCanvas = document.createElement('canvas');
+      this.frameCanvas.width = FRAME_PX;
+      this.frameCanvas.height = FRAME_PX;
+    }
+    if (!this.frameCtx) {
+      this.frameCtx = this.frameCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    if (!this.frameCtx) return null;
+
+    if (this.frameCanvas.width !== FRAME_PX) this.frameCanvas.width = FRAME_PX;
+    if (this.frameCanvas.height !== FRAME_PX) this.frameCanvas.height = FRAME_PX;
+
+    this.frameCtx.imageSmoothingEnabled = true;
+    this.frameCtx.globalAlpha = 1.0;
+    this.frameCtx.globalCompositeOperation = 'source-over';
+    this.frameCtx.clearRect(0, 0, FRAME_PX, FRAME_PX);
+
+    return { canvas: this.frameCanvas, ctx: this.frameCtx };
+  }
+
+  /**
+   * Acquires an auxiliary transformation canvas resized to (width x height) and cleared.
+   */
+  getAux(width: number, height: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+    if (!this.auxCanvas) {
+      if (typeof document === 'undefined') return null;
+      this.auxCanvas = document.createElement('canvas');
+    }
+    if (!this.auxCtx) {
+      this.auxCtx = this.auxCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    if (!this.auxCtx) return null;
+
+    if (this.auxCanvas.width !== width) this.auxCanvas.width = width;
+    if (this.auxCanvas.height !== height) this.auxCanvas.height = height;
+
+    this.auxCtx.imageSmoothingEnabled = true;
+    this.auxCtx.globalAlpha = 1.0;
+    this.auxCtx.globalCompositeOperation = 'source-over';
+    this.auxCtx.clearRect(0, 0, width, height);
+
+    return { canvas: this.auxCanvas, ctx: this.auxCtx };
+  }
+}
+
+const canvasPool = new CanvasPool();
+
 /**
  * Tries each condition in turn: draws the code under it, then asks `evaluate` whether it still
  * scans. A condition that cannot be drawn or checked reports `null` rather than a guess.
@@ -97,8 +157,7 @@ export async function runViewingTest(
     const frame = render(condition);
     let status: ScannabilityStatus | null = null;
     if (frame) {
-      // A superseded or dropped check answers null; one retry is enough since checks run one at a time.
-      status = (await evaluate(frame)) ?? (await evaluate(frame));
+      status = await evaluate(frame);
     }
     results.push({
       id: condition.id,
@@ -110,16 +169,16 @@ export async function runViewingTest(
 }
 
 /**
- * Draws a canvas into a square frame, kept in proportion on white, and returns a fresh canvas.
+ * Draws a canvas into a square frame, kept in proportion on white, using the reusable canvas pool.
  * @param source - The preview canvas.
  * @returns The frame canvas, or null when no 2D context is available.
  */
 function frameFrom(source: HTMLCanvasElement): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
-  const canvas = document.createElement('canvas');
-  canvas.width = FRAME_PX;
-  canvas.height = FRAME_PX;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx || source.width === 0 || source.height === 0) return null;
+  if (source.width === 0 || source.height === 0) return null;
+  const frame = canvasPool.getFrame();
+  if (!frame) return null;
+  const { canvas, ctx } = frame;
+
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, FRAME_PX, FRAME_PX);
   const scale = Math.min(FRAME_PX / source.width, FRAME_PX / source.height);
@@ -145,11 +204,9 @@ export function renderCondition(source: HTMLCanvasElement, condition: ViewingCon
       const raster = Math.round(Math.min(FRAME_PX, Math.max(MIN_RASTER_PX, pixelsAcross(condition.widthCm, condition.distanceCm))));
       if (raster < FRAME_PX) {
         // Shrink to what a camera would resolve, then stretch back so the decoder sees the blur.
-        const small = document.createElement('canvas');
-        small.width = raster;
-        small.height = raster;
-        const smallCtx = small.getContext('2d');
-        if (!smallCtx) return null;
+        const aux = canvasPool.getAux(raster, raster);
+        if (!aux) return null;
+        const { canvas: small, ctx: smallCtx } = aux;
         smallCtx.imageSmoothingEnabled = true;
         smallCtx.drawImage(canvas, 0, 0, raster, raster);
         ctx.imageSmoothingEnabled = true;
@@ -182,11 +239,9 @@ export function renderCondition(source: HTMLCanvasElement, condition: ViewingCon
       break;
     }
     case 'angle': {
-      const copy = document.createElement('canvas');
-      copy.width = FRAME_PX;
-      copy.height = FRAME_PX;
-      const copyCtx = copy.getContext('2d');
-      if (!copyCtx) return null;
+      const aux = canvasPool.getAux(FRAME_PX, FRAME_PX);
+      if (!aux) return null;
+      const { canvas: copy, ctx: copyCtx } = aux;
       copyCtx.drawImage(canvas, 0, 0);
       const squash = Math.cos((TEST_TILT_DEGREES * Math.PI) / 180);
       ctx.fillStyle = '#ffffff';
