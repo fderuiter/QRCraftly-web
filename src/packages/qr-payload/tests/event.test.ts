@@ -17,8 +17,8 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { constructEventString, hydrateEventData, EventContract } from '../index';
-import { QRType } from '@/types';
+import { constructEventString, hydrateEventData, EventContract, identifyProtocol } from '../index';
+import { QRType, CalendarProvider } from '@/types';
 
 describe('Event generator', () => {
   it('constructs and hydrates successfully', () => {
@@ -203,5 +203,155 @@ describe('Event generator', () => {
     const str = constructEventString(dataWithTzid);
     expect(str).toContain('DTSTART;TZID=America/New_York:20250101T123000');
     expect(str).toContain('DTEND;TZID=America/New_York:20250101T133000');
+  });
+
+  describe('Web calendar providers', () => {
+    it('constructs and hydrates Google Calendar URLs', () => {
+      const data = {
+        title: 'Launch Party',
+        startDate: '2026-10-15T10:00',
+        endDate: '2026-10-15T12:00',
+        location: 'San Francisco, CA',
+        description: 'Launch event details',
+        provider: CalendarProvider.GOOGLE,
+      };
+      const url = constructEventString(data);
+      expect(url).toContain('https://calendar.google.com/calendar/render?');
+      expect(url).toContain('action=TEMPLATE');
+      expect(url).toContain('text=Launch+Party');
+      expect(url).toContain('dates=20261015T100000');
+      expect(url).toContain('location=San+Francisco%2C+CA');
+      expect(url).toContain('details=Launch+event+details');
+
+      const hydrated = hydrateEventData(url);
+      expect(hydrated).toEqual(data);
+    });
+
+    it('constructs and hydrates Outlook Web URLs', () => {
+      const data = {
+        title: 'Weekly Sync',
+        startDate: '2026-10-15T10:00',
+        endDate: '2026-10-15T11:00',
+        location: 'Conference Room B',
+        description: 'Team update',
+        provider: CalendarProvider.OUTLOOK,
+      };
+      const url = constructEventString(data);
+      expect(url).toContain('https://outlook.live.com/calendar/0/deeplink/compose?');
+      expect(url).toContain('rru=addevent');
+      expect(url).toContain('subject=Weekly+Sync');
+      expect(url).toContain('startdt=20261015T100000');
+      expect(url).toContain('enddt=20261015T110000');
+      expect(url).toContain('body=Team+update');
+
+      const hydrated = hydrateEventData(url);
+      expect(hydrated).toEqual(data);
+    });
+
+    it('constructs and hydrates Office 365 URLs', () => {
+      const data = {
+        title: 'Board Meeting',
+        startDate: '2026-10-15T09:00',
+        endDate: '2026-10-15T10:00',
+        location: 'Executive Suite',
+        description: 'Q3 Financials',
+        provider: CalendarProvider.OFFICE365,
+      };
+      const url = constructEventString(data);
+      expect(url).toContain('https://outlook.office.com/calendar/0/deeplink/compose?');
+      expect(url).toContain('subject=Board+Meeting');
+
+      const hydrated = hydrateEventData(url);
+      expect(hydrated).toEqual(data);
+    });
+
+    it('constructs and hydrates Yahoo Calendar URLs', () => {
+      const data = {
+        title: 'Tech Webinar',
+        startDate: '2026-10-15T14:00',
+        endDate: '2026-10-15T15:00',
+        location: 'Online',
+        description: 'Live QA Session',
+        provider: CalendarProvider.YAHOO,
+      };
+      const url = constructEventString(data);
+      expect(url).toContain('https://calendar.yahoo.com/?');
+      expect(url).toContain('v=60');
+      expect(url).toContain('TITLE=Tech+Webinar');
+      expect(url).toContain('ST=20261015T140000');
+      expect(url).toContain('ET=20261015T150000');
+      expect(url).toContain('in_loc=Online');
+      expect(url).toContain('DESC=Live+QA+Session');
+
+      const hydrated = hydrateEventData(url);
+      expect(hydrated).toEqual(data);
+    });
+
+    it('handles missing end dates across provider parameters', () => {
+      const baseData = {
+        title: 'All-day Keynote',
+        startDate: '2026-10-15T10:00',
+        endDate: '',
+        location: 'Auditorium',
+        description: 'Keynote presentation',
+      };
+
+      const googleUrl = constructEventString({ ...baseData, provider: CalendarProvider.GOOGLE });
+      expect(googleUrl).toContain('dates=20261015T100000%2F20261015T100000');
+
+      const outlookUrl = constructEventString({ ...baseData, provider: CalendarProvider.OUTLOOK });
+      expect(outlookUrl).toContain('startdt=20261015T100000');
+      expect(outlookUrl).toContain('enddt=20261015T100000');
+
+      const officeUrl = constructEventString({ ...baseData, provider: CalendarProvider.OFFICE365 });
+      expect(officeUrl).toContain('startdt=20261015T100000');
+      expect(officeUrl).toContain('enddt=20261015T100000');
+
+      const yahooUrl = constructEventString({ ...baseData, provider: CalendarProvider.YAHOO });
+      expect(yahooUrl).toContain('ST=20261015T100000');
+      expect(yahooUrl).toContain('ET=20261015T100000');
+    });
+
+    it('safely falls back to iCal if an invalid provider string arrives', () => {
+      const data = {
+        title: 'Fallback Test',
+        startDate: '2026-10-15T10:00',
+        endDate: '2026-10-15T12:00',
+        location: 'Main Hall',
+        description: 'Testing invalid provider fallback',
+        provider: 'invalid-provider-name',
+      };
+
+      const payload = constructEventString(data);
+      expect(payload).toContain('BEGIN:VCALENDAR');
+      expect(payload).toContain('BEGIN:VEVENT');
+      expect(payload).toContain('SUMMARY:Fallback Test');
+      expect(payload).not.toContain('https://');
+    });
+
+    it('identifies web calendar URLs as QRType.EVENT via identifyProtocol and EventContract.matches', () => {
+      const googleUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Party&dates=20261015T100000/20261015T120000';
+      const outlookUrl = 'https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&subject=Sync';
+      const officeUrl = 'https://outlook.office.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&subject=Sync';
+      const yahooUrl = 'https://calendar.yahoo.com/?v=60&TITLE=Webinar&ST=20261015T140000';
+
+      expect(identifyProtocol(googleUrl)).toBe(QRType.EVENT);
+      expect(identifyProtocol(outlookUrl)).toBe(QRType.EVENT);
+      expect(identifyProtocol(officeUrl)).toBe(QRType.EVENT);
+      expect(identifyProtocol(yahooUrl)).toBe(QRType.EVENT);
+
+      expect(EventContract.matches(googleUrl)).toBe(true);
+      expect(EventContract.matches(outlookUrl)).toBe(true);
+      expect(EventContract.matches(officeUrl)).toBe(true);
+      expect(EventContract.matches(yahooUrl)).toBe(true);
+    });
+
+    it('validates web calendar URLs correctly via EventContract.validate', () => {
+      const googleUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Party&dates=20261015T100000/20261015T120000&location=Main+Hall&details=Fun+time';
+      expect(EventContract.validate?.(googleUrl)).toEqual([]);
+
+      const dangerousGoogleUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Party&dates=20261015T100000/20261015T120000&location=javascript:alert(1)';
+      expect(EventContract.validate?.(dangerousGoogleUrl)).toEqual(['URI_INJECTION_VIOLATION']);
+    });
   });
 });

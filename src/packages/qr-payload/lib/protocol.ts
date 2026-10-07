@@ -280,6 +280,17 @@ export const identifyProtocol = (raw: string): QRType | null => {
       }
 
       const isDomain = (d: string) => domain === d || domain.endsWith(`.${d}`);
+      if (
+        isDomain('calendar.google.com') ||
+        isDomain('outlook.live.com') ||
+        isDomain('outlook.office.com') ||
+        isDomain('outlook.office365.com') ||
+        isDomain('calendar.yahoo.com') ||
+        (isDomain('google.com') && parsed.path.includes('/calendar/'))
+      ) {
+        return QRType.EVENT;
+      }
+
       if (isDomain('zoom.us') || isDomain('teams.microsoft.com') || isDomain('meet.google.com')) {
         return QRType.MEETING;
       }
