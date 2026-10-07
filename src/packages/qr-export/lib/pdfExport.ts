@@ -19,166 +19,40 @@
 import { QRConfig } from '@/types';
 import { generateQRSvg } from './svgExport';
 import { type ModuleRenderOptions } from '@/packages/qr-matrix';
-
-interface RgbColor {
-  r: number;
-  g: number;
-  b: number;
-}
-
-function parseColor(colorStr: string): RgbColor | null {
-  if (!colorStr || colorStr === 'none' || colorStr === 'transparent') {
-    return null;
-  }
-  let c = colorStr.trim().toLowerCase();
-
-  if (c.startsWith('#')) {
-    c = c.substring(1);
-    if (c.length === 3) {
-      const r = parseInt(c[0] + c[0], 16) / 255;
-      const g = parseInt(c[1] + c[1], 16) / 255;
-      const b = parseInt(c[2] + c[2], 16) / 255;
-      return { r, g, b };
-    }
-    if (c.length >= 6) {
-      const r = parseInt(c.substring(0, 2), 16) / 255;
-      const g = parseInt(c.substring(2, 4), 16) / 255;
-      const b = parseInt(c.substring(4, 6), 16) / 255;
-      return { r, g, b };
-    }
-  }
-
-  const rgbMatch = c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-  if (rgbMatch) {
-    return {
-      r: parseInt(rgbMatch[1], 10) / 255,
-      g: parseInt(rgbMatch[2], 10) / 255,
-      b: parseInt(rgbMatch[3], 10) / 255,
-    };
-  }
-
-  if (c === 'black') return { r: 0, g: 0, b: 0 };
-  if (c === 'white') return { r: 1, g: 1, b: 1 };
-
-  return { r: 0, g: 0, b: 0 };
-}
-
-function formatNum(n: number): string {
-  return parseFloat(n.toFixed(3)).toString();
-}
+import {
+  parseColor,
+  formatNum,
+  parseSvgDocument,
+  extractSvgGradients,
+  parseSvgPathCommands,
+} from './vectorUtils';
 
 /**
  * Converts an SVG path `d` attribute string to PDF path operators.
  */
 function svgPathToPdf(d: string): string {
-  const commands: string[] = [];
-  const tokens = d.match(/([a-zA-Z]|-?[\d.eE]+)/g) || [];
-
-  let idx = 0;
-  let currentCmd = '';
-  let curX = 0;
-  let curY = 0;
-
-  while (idx < tokens.length) {
-    const token = tokens[idx];
-    if (/^[a-zA-Z]$/.test(token)) {
-      currentCmd = token;
-      idx++;
-    }
-
-    if (currentCmd === 'M' || currentCmd === 'm') {
-      const x = parseFloat(tokens[idx++]);
-      const y = parseFloat(tokens[idx++]);
-      curX = currentCmd === 'm' ? curX + x : x;
-      curY = currentCmd === 'm' ? curY + y : y;
-      commands.push(`${formatNum(curX)} ${formatNum(curY)} m`);
-      currentCmd = currentCmd === 'M' ? 'L' : 'l';
-    } else if (currentCmd === 'L' || currentCmd === 'l') {
-      const x = parseFloat(tokens[idx++]);
-      const y = parseFloat(tokens[idx++]);
-      curX = currentCmd === 'l' ? curX + x : x;
-      curY = currentCmd === 'l' ? curY + y : y;
-      commands.push(`${formatNum(curX)} ${formatNum(curY)} l`);
-    } else if (currentCmd === 'Q' || currentCmd === 'q') {
-      const cpxRel = parseFloat(tokens[idx++]);
-      const cpyRel = parseFloat(tokens[idx++]);
-      const xRel = parseFloat(tokens[idx++]);
-      const yRel = parseFloat(tokens[idx++]);
-
-      const cpx = currentCmd === 'q' ? curX + cpxRel : cpxRel;
-      const cpy = currentCmd === 'q' ? curY + cpyRel : cpyRel;
-      const x = currentCmd === 'q' ? curX + xRel : xRel;
-      const y = currentCmd === 'q' ? curY + yRel : yRel;
-
-      const cp1x = curX + (2 / 3) * (cpx - curX);
-      const cp1y = curY + (2 / 3) * (cpy - curY);
-      const cp2x = x + (2 / 3) * (cpx - x);
-      const cp2y = y + (2 / 3) * (cpy - y);
-
-      commands.push(`${formatNum(cp1x)} ${formatNum(cp1y)} ${formatNum(cp2x)} ${formatNum(cp2y)} ${formatNum(x)} ${formatNum(y)} c`);
-      curX = x;
-      curY = y;
-    } else if (currentCmd === 'C' || currentCmd === 'c') {
-      const cp1xRel = parseFloat(tokens[idx++]);
-      const cp1yRel = parseFloat(tokens[idx++]);
-      const cp2xRel = parseFloat(tokens[idx++]);
-      const cp2yRel = parseFloat(tokens[idx++]);
-      const xRel = parseFloat(tokens[idx++]);
-      const yRel = parseFloat(tokens[idx++]);
-
-      const cp1x = currentCmd === 'c' ? curX + cp1xRel : cp1xRel;
-      const cp1y = currentCmd === 'c' ? curY + cp1yRel : cp1yRel;
-      const cp2x = currentCmd === 'c' ? curX + cp2xRel : cp2xRel;
-      const cp2y = currentCmd === 'c' ? curY + cp2yRel : cp2yRel;
-      const x = currentCmd === 'c' ? curX + xRel : xRel;
-      const y = currentCmd === 'c' ? curY + yRel : yRel;
-
-      commands.push(`${formatNum(cp1x)} ${formatNum(cp1y)} ${formatNum(cp2x)} ${formatNum(cp2y)} ${formatNum(x)} ${formatNum(y)} c`);
-      curX = x;
-      curY = y;
-    } else if (currentCmd === 'Z' || currentCmd === 'z') {
-      commands.push('h');
-    } else {
-      idx++;
-    }
-  }
-
-  return commands.join('\n');
+  const commands = parseSvgPathCommands(d);
+  return commands
+    .map((cmd) => {
+      switch (cmd.type) {
+        case 'M':
+          return `${formatNum(cmd.x)} ${formatNum(cmd.y)} m`;
+        case 'L':
+          return `${formatNum(cmd.x)} ${formatNum(cmd.y)} l`;
+        case 'C':
+          return `${formatNum(cmd.cp1x)} ${formatNum(cmd.cp1y)} ${formatNum(cmd.cp2x)} ${formatNum(cmd.cp2y)} ${formatNum(cmd.x)} ${formatNum(cmd.y)} c`;
+        case 'Z':
+          return 'h';
+      }
+    })
+    .join('\n');
 }
 
 /**
  * Converts an SVG XML payload string to a valid vector PDF document byte array (Uint8Array).
  */
 export function convertSvgToPdf(svgString: string): Uint8Array {
-  let width = 1080;
-  let height = 1080;
-
-  if (typeof DOMParser !== 'undefined') {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgString, 'image/svg+xml');
-    const svgEl = doc.querySelector('svg');
-    if (svgEl) {
-      const wAttr = svgEl.getAttribute('width');
-      const hAttr = svgEl.getAttribute('height');
-      const vbAttr = svgEl.getAttribute('viewBox');
-
-      if (wAttr) width = parseFloat(wAttr);
-      if (hAttr) height = parseFloat(hAttr);
-
-      if ((!width || !height) && vbAttr) {
-        const parts = vbAttr.split(/[\s,]+/).map(parseFloat);
-        if (parts.length === 4) {
-          width = parts[2];
-          height = parts[3];
-        }
-      }
-    }
-  } else {
-    const wMatch = svgString.match(/width="([\d.]+)"/);
-    const hMatch = svgString.match(/height="([\d.]+)"/);
-    if (wMatch) width = parseFloat(wMatch[1]);
-    if (hMatch) height = parseFloat(hMatch[1]);
-  }
+  const { width, height } = parseSvgDocument(svgString);
 
   const streamLines: string[] = [
     'q',
@@ -186,42 +60,17 @@ export function convertSvgToPdf(svgString: string): Uint8Array {
   ];
 
   // Parse defs for gradients (if any)
-  const gradientMap = new Map<string, { type: 'linear' | 'radial'; x1: number; y1: number; x2: number; y2: number; stops: Array<{ offset: number; color: RgbColor }> }>();
+  const gradientMap = extractSvgGradients(svgString);
   const shadingObjIds: Map<string, number> = new Map();
   let nextObjId = 6;
+
+  for (const id of gradientMap.keys()) {
+    shadingObjIds.set(id, nextObjId++);
+  }
 
   if (typeof DOMParser !== 'undefined') {
     const parser = new DOMParser();
     const doc = parser.parseFromString(svgString, 'image/svg+xml');
-
-    doc.querySelectorAll('linearGradient, radialGradient').forEach((grad) => {
-      const id = grad.getAttribute('id');
-      if (!id) return;
-
-      const stops: Array<{ offset: number; color: RgbColor }> = [];
-      grad.querySelectorAll('stop').forEach((stop) => {
-        const offAttr = stop.getAttribute('offset') || '0%';
-        const off = offAttr.endsWith('%') ? parseFloat(offAttr) / 100 : parseFloat(offAttr);
-        const colAttr = stop.getAttribute('stop-color') || '#000000';
-        const color = parseColor(colAttr) || { r: 0, g: 0, b: 0 };
-        stops.push({ offset: off, color });
-      });
-
-      if (grad.tagName === 'linearGradient') {
-        const x1 = parseFloat(grad.getAttribute('x1') || '0');
-        const y1 = parseFloat(grad.getAttribute('y1') || '0');
-        const x2 = parseFloat(grad.getAttribute('x2') || '100');
-        const y2 = parseFloat(grad.getAttribute('y2') || '100');
-        gradientMap.set(id, { type: 'linear', x1, y1, x2, y2, stops });
-        shadingObjIds.set(id, nextObjId++);
-      } else {
-        const cx = parseFloat(grad.getAttribute('cx') || '50');
-        const cy = parseFloat(grad.getAttribute('cy') || '50');
-        const r = parseFloat(grad.getAttribute('r') || '50');
-        gradientMap.set(id, { type: 'radial', x1: cx, y1: cy, x2: cx + r, y2: cy, stops });
-        shadingObjIds.set(id, nextObjId++);
-      }
-    });
 
     doc.querySelectorAll('path, text').forEach((el) => {
       if (el.tagName === 'path') {

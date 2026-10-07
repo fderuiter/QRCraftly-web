@@ -34,6 +34,20 @@ function identityMatrix(): Matrix {
   return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 }
 
+function isMatrixIdentity(m: Matrix): boolean {
+  return m.a === 1 && m.b === 0 && m.c === 0 && m.d === 1 && m.e === 0 && m.f === 0;
+}
+
+function formatGradientStops(stops: Array<{ offset: number; color: string }>): string {
+  return stops
+    .map((stop) => `      <stop offset="${stop.offset * 100}%" stop-color="${stop.color}" />`)
+    .join('\n');
+}
+
+function getGradientTransformAttr(t: Matrix): string {
+  return isMatrixIdentity(t) ? '' : ` gradientTransform="matrix(${t.a} ${t.b} ${t.c} ${t.d} ${t.e} ${t.f})"`;
+}
+
 function multiplyMatrix(m1: Matrix, m2: Matrix): Matrix {
   return {
     a: m1.a * m2.a + m1.c * m2.b,
@@ -72,15 +86,8 @@ class SvgRadialGradient {
   }
 
   toSvgString(): string {
-    const stopsXml = this.stops.map(stop => 
-      `      <stop offset="${stop.offset * 100}%" stop-color="${stop.color}" />`
-    ).join('\n');
-    
-    // Only apply gradientTransform if it's not the identity matrix
-    const t = this.transform;
-    const isIdentity = t.a === 1 && t.b === 0 && t.c === 0 && t.d === 1 && t.e === 0 && t.f === 0;
-    const transformAttr = isIdentity ? '' : ` gradientTransform="matrix(${t.a} ${t.b} ${t.c} ${t.d} ${t.e} ${t.f})"`;
-
+    const stopsXml = formatGradientStops(this.stops);
+    const transformAttr = getGradientTransformAttr(this.transform);
     const frAttr = this.r0 > 0 ? ` fr="${this.r0}"` : '';
 
     return [
@@ -114,14 +121,8 @@ class SvgLinearGradient {
   }
 
   toSvgString(): string {
-    const stopsXml = this.stops.map(stop => 
-      `      <stop offset="${stop.offset * 100}%" stop-color="${stop.color}" />`
-    ).join('\n');
-    
-    // Only apply gradientTransform if it's not the identity matrix
-    const t = this.transform;
-    const isIdentity = t.a === 1 && t.b === 0 && t.c === 0 && t.d === 1 && t.e === 0 && t.f === 0;
-    const transformAttr = isIdentity ? '' : ` gradientTransform="matrix(${t.a} ${t.b} ${t.c} ${t.d} ${t.e} ${t.f})"`;
+    const stopsXml = formatGradientStops(this.stops);
+    const transformAttr = getGradientTransformAttr(this.transform);
 
     return [
       `    <linearGradient id="${this.id}" x1="${this.x0}" y1="${this.y0}" x2="${this.x1}" y2="${this.y1}" gradientUnits="userSpaceOnUse"${transformAttr}>`,
@@ -501,8 +502,7 @@ export class SvgContext {
 
   private _getTransformAttr(): string {
     const t = this._transform;
-    const isIdentity = t.a === 1 && t.b === 0 && t.c === 0 && t.d === 1 && t.e === 0 && t.f === 0;
-    return isIdentity ? '' : ` transform="matrix(${this._n(t.a)} ${this._n(t.b)} ${this._n(t.c)} ${this._n(t.d)} ${this._n(t.e)} ${this._n(t.f)})"`;
+    return isMatrixIdentity(t) ? '' : ` transform="matrix(${this._n(t.a)} ${this._n(t.b)} ${this._n(t.c)} ${this._n(t.d)} ${this._n(t.e)} ${this._n(t.f)})"`;
   }
 
   /**

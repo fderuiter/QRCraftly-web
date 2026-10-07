@@ -26,3 +26,14 @@ export { generateQREps, convertSvgToEps } from './lib/epsExport';
 export { generateQRPdf, convertSvgToPdf } from './lib/pdfExport';
 export { SvgContext } from './lib/svgContext';
 export { drawWithTemplate, SOCIAL_DIMENSIONS } from './lib/templateRenderer';
+export {
+  parseColor,
+  formatNum,
+  parseSvgDocument,
+  extractSvgGradients,
+  parseSvgPathCommands,
+  type RgbColor,
+  type ParsedSvgDocument,
+  type SvgGradientInfo,
+  type PathCommand,
+} from './lib/vectorUtils';
