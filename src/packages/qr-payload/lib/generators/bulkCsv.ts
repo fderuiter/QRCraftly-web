@@ -37,6 +37,7 @@ export const hydrateBulkCsvData = (raw: string): BulkCsvData => {
     payloadColumn: '',
     filenameColumn: '',
     exportFormat: 'png',
+    exportResolution: 1000,
   };
 };
 

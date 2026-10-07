@@ -43,7 +43,7 @@ Please use the [GitHub Security Advisory](https://github.com/fderuiter/QRCraftly
   - Data leaks (e.g., data being sent to a server).
   - XSS vulnerabilities.
   - Improper configuration of the client-side generator.
-  - Bulk CSV processing & batch ZIP generation privacy boundary violations.
+  - Bulk CSV processing, custom PNG export resolution settings, & batch ZIP generation privacy boundary violations.
 - **Out of Scope:**
   - Physical security of the user's device.
   - Browser-level vulnerabilities.

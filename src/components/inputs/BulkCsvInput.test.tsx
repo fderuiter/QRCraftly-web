@@ -24,6 +24,7 @@ import { LazyBulkCsvInput } from './LazyBulkCsvInput';
 import { BulkCsvData } from '@/types';
 import { QRProvider } from '@/context/QRContext';
 import * as downloadManager from '@/utils/downloadManager';
+import * as qrExport from '@/packages/qr-export';
 import { MAX_BULK_CSV_ROWS, SAMPLE_CSV_TEMPLATE } from '@/packages/bulk-csv';
 
 /** Lists the entry names in the central directory of a stored ZIP archive. */
@@ -345,5 +346,62 @@ describe('BulkCsvInput Component', () => {
   it('loads the batch generator lazily through the registry wrapper', async () => {
     renderWithProvider(<LazyBulkCsvInput data={initialData} onChange={vi.fn()} />);
     expect(await screen.findByText('Upload CSV or TXT File')).toBeInTheDocument();
+  });
+
+  it('renders resolution selector when PNG format is active and updates BulkCsvData on selection', () => {
+    const onChange = vi.fn();
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent: 'URL,Name\nhttps://example.com/1,Code1',
+      exportFormat: 'png',
+      exportResolution: 1000,
+    };
+
+    renderWithProvider(<BulkCsvInput data={data} onChange={onChange} />);
+
+    const resSelect = screen.getByLabelText('PNG Resolution') as HTMLSelectElement;
+    expect(resSelect).toBeInTheDocument();
+    expect(resSelect.value).toBe('1000');
+
+    fireEvent.change(resSelect, { target: { value: '2000' } });
+    expect(onChange).toHaveBeenCalledWith({ exportResolution: 2000 });
+  });
+
+  it('hides resolution selector when SVG format is active', () => {
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent: 'URL,Name\nhttps://example.com/1,Code1',
+      exportFormat: 'svg',
+    };
+
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+
+    expect(screen.queryByLabelText('PNG Resolution')).not.toBeInTheDocument();
+  });
+
+  it('passes configured resolution to rasterizeSvgToCanvas during PNG batch generation', async () => {
+    const rasterizeSpy = vi.spyOn(qrExport, 'rasterizeSvgToCanvas');
+    const csvContent = 'URL,Name\nhttps://example.com/1,Code1';
+
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent,
+      payloadColumn: 'URL',
+      filenameColumn: 'Name',
+      exportFormat: 'png',
+      exportResolution: 2000,
+      fileName: 'urls.csv',
+    };
+
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+
+    const generateBtn = screen.getByRole('button', { name: 'Generate Batch' });
+    fireEvent.click(generateBtn);
+
+    await waitFor(() => {
+      expect(rasterizeSpy).toHaveBeenCalledWith(expect.any(String), 2000, 2000);
+    });
+
+    rasterizeSpy.mockRestore();
   });
 });
