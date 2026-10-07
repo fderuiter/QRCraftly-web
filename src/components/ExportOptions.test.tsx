@@ -53,4 +53,13 @@ describe('ExportOptions (#1052)', () => {
     expect(suggestFilename({ type: QRType.TEXT, value: 'private note' })).toBe('text-qr-code');
     expect(suggestFilename({ type: QRType.URL, value: 'not a url' })).toBe('url-qr-code');
   });
+
+  it('renders a reassurance card confirming static, permanent, and unlimited scan status', () => {
+    renderOptions();
+    const card = screen.getByTestId('export-reassurance-card');
+    expect(card).toBeInTheDocument();
+    expect(card).toHaveTextContent('100% Permanent & Unlimited');
+    expect(card).toHaveTextContent(/static, permanent, and free of scan limits/i);
+    expect(card).toHaveTextContent(/no trial expiration/i);
+  });
 });
