@@ -106,4 +106,32 @@ describe('StyleGallery', () => {
     await waitFor(() => expect(container.querySelectorAll('img').length).toBeGreaterThan(0));
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  it('caps state re-renders during tile generation at or below 2 updates per settlement cycle', async () => {
+    let galleryRenders = 0;
+    function GalleryTracker({ config, onChange }: { config: any; onChange: any }) {
+      galleryRenders++;
+      return <StyleGallery config={config} onChange={onChange} />;
+    }
+
+    function TestHarness() {
+      const store = useQRStore();
+      const config = useQRStoreSelector((s) => s.config);
+      return <GalleryTracker config={config} onChange={store.updateConfig} />;
+    }
+
+    const { container } = render(
+      <ToastProvider>
+        <QRProvider>
+          <TestHarness />
+        </QRProvider>
+      </ToastProvider>
+    );
+
+    const initialRenders = galleryRenders;
+    await waitFor(() => expect(container.querySelectorAll('img')).toHaveLength(PATTERNS.length + PRESET_COLORS.length));
+    const rendersDuringGeneration = galleryRenders - initialRenders;
+
+    expect(rendersDuringGeneration).toBeLessThanOrEqual(2);
+  });
 });
