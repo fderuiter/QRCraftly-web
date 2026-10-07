@@ -42,6 +42,7 @@ on:
       - '.github/actions/**'
   pull_request:
     branches: [main]
+    types: [opened, edited, reopened, synchronize]
   workflow_dispatch:
     # Manual trigger for re-running CI without a code push. Releases are tagged by
     # .github/workflows/release.yml when a release PR merges (see RELEASING.md).
@@ -55,6 +56,44 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  pr-title:
+    name: PR Title
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Validate Conventional Commit Title / Subject
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          HEAD_COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          TITLE=""
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            TITLE="$PR_TITLE"
+          elif [ -n "$HEAD_COMMIT_MSG" ]; then
+            TITLE=$(echo "$HEAD_COMMIT_MSG" | head -n 1)
+          fi
+
+          if [ -z "$TITLE" ]; then
+            TITLE=$(git log -1 --format=%s 2>/dev/null || true)
+          fi
+
+          if [ -z "$TITLE" ]; then
+            echo "::error::Could not determine PR title or commit subject for validation."
+            exit 1
+          fi
+
+          pattern='^(feat|fix|perf|refactor|docs|chore|test|ci|build|style|revert)(\([a-z0-9._/-]+\))?!?: .+'
+          if [[ "$TITLE" =~ $pattern ]]; then
+            echo "OK: $TITLE"
+          else
+            echo "::error::PR title or commit subject must follow Conventional Commits, e.g. 'fix(scanner): handle empty frames'. See RELEASING.md."
+            echo "Got: $TITLE"
+            exit 1
+          fi
+
   # JOB 1: Install Deps & Cache
   setup:
     name: Setup & Install
@@ -412,7 +451,7 @@ jobs:
   # no longer reports. It is also what auto-merge waits on (see RELEASING.md).
   ci:
     name: CI
-    needs: [setup, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse]
+    needs: [setup, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse, pr-title]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

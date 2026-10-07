@@ -12,7 +12,7 @@ Applies to the default branch, `main`, which is the only long-lived branch and d
 - **Approvals:** `0`, because the project has a single maintainer and GitHub never lets authors approve their own PRs. Review threads must be resolved before merging.
 - **Required status checks** (`integration_id` 15368 is GitHub Actions):
   - **CI**: the aggregate job in `.github/workflows/main.yml`. It succeeds only when setup, Dependency Audit, Consolidated Static Validation, Unit Tests, WebAssembly Reproducible Build, E2E Tests, Build and Lighthouse all succeed. Requiring one aggregate check means renaming or adding jobs never leaves a PR waiting on a check that no longer reports.
-  - **PR Title**: `.github/workflows/pr-title.yml`, which enforces Conventional Commit titles.
+  - **PR Title**: the `pr-title` job in `.github/workflows/main.yml`, which enforces Conventional Commit titles.
   - **Workers Builds: qrcraftly**: Cloudflare's build of the PR branch. It has no `integration_id`, so any app reporting that name satisfies it. If Cloudflare ever renames the check, update it here.
 - **Code scanning:** CodeQL (the repository's default setup) must report no high or critical security alerts and no error-level alerts on the PR, and GitHub Code Quality must report no error-level findings.
 - **Branches must be up to date** with `main` before merging (`strict_required_status_checks_policy: true`), so every merge was tested against exactly what it lands on. The project prefers fewer, larger PRs, so re-running CI after a rebase is an acceptable cost.

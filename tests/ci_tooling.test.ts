@@ -211,3 +211,30 @@ describe('CI builds the app once', () => {
     expect(local.webServer).toMatchObject({ command: 'pnpm run build && pnpm run preview' });
   });
 });
+
+describe('PR title validation consolidation in main.yml', () => {
+  it('consolidates pr-title job in main.yml and includes it in ci aggregate needs', () => {
+    const prTitleJob = jobBlock('pr-title');
+    const ciJob = jobBlock('ci');
+
+    expect(prTitleJob).toContain('name: PR Title');
+    expect(ciJob).toMatch(/needs: \[[^\]]*\bpr-title\b[^\]]*\]/);
+    expect(fs.existsSync(path.join(root, '.github/workflows/pr-title.yml'))).toBe(false);
+  });
+
+  it('triggers pull_request events on opened, edited, reopened, and synchronize', () => {
+    const mainYml = read('.github/workflows/main.yml');
+    expect(mainYml).toContain('types: [opened, edited, reopened, synchronize]');
+  });
+
+  it('validates Conventional Commit format correctly in pr-title regex', () => {
+    const pattern = /^(feat|fix|perf|refactor|docs|chore|test|ci|build|style|revert)(\([a-z0-9._/-]+\))?!?: .+/;
+    expect(pattern.test('fix(scanner): handle empty frames')).toBe(true);
+    expect(pattern.test('feat: add logo support')).toBe(true);
+    expect(pattern.test('feat(ui/button)!: breaking change')).toBe(true);
+    expect(pattern.test('chore: update dependencies')).toBe(true);
+    expect(pattern.test('Invalid title')).toBe(false);
+    expect(pattern.test('Fix: capital F type')).toBe(false);
+  });
+});
+
