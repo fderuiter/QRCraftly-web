@@ -125,6 +125,7 @@ export const INPUT_REGISTRY: Registry = {
   [QRType.VCARD]: {
     Component: VCardInput,
     initialState: {
+      version: "3.0",
       firstName: "",
       lastName: "",
       organization: "",
@@ -134,6 +135,7 @@ export const INPUT_REGISTRY: Registry = {
       website: "",
       street: "",
       city: "",
+      zip: "",
       country: "",
     } as VCardData,
     constructFn: QR_GENERATORS[QRType.VCARD].construct,

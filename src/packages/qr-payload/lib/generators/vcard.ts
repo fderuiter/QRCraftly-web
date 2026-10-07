@@ -29,10 +29,32 @@ import {
 } from '../rfcHelper';
 
 /**
- * Hydrates VCardData from a raw string.
+ * Escapes special characters for MECard format.
+ */
+export const escapeMECard = (str: string | undefined): string => {
+  if (!str) return '';
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/\r\n|\r|\n/g, '\\n')
+    .replace(/([:;,])/g, '\\$1');
+};
+
+/**
+ * Unescapes special characters in MECard format.
+ */
+export const unescapeMECard = (str: string | undefined): string => {
+  if (!str) return '';
+  return str.replace(/\\([\\:;,nN])/g, (_match, ch: string) =>
+    ch === 'n' || ch === 'N' ? '\n' : ch
+  );
+};
+
+/**
+ * Hydrates VCardData from a raw string (vCard or MECard format).
  */
 export const hydrateVCardData = (raw: string): VCardData => {
   const result: VCardData = {
+    version: '3.0',
     firstName: '',
     lastName: '',
     organization: '',
@@ -46,12 +68,73 @@ export const hydrateVCardData = (raw: string): VCardData => {
     country: '',
   };
 
-  if (!raw || typeof raw !== 'string' || !/begin:vcard/i.test(raw)) return result;
+  if (!raw || typeof raw !== 'string') return result;
+
+  const trimmed = raw.trim();
+
+  if (/^mecard:/i.test(trimmed)) {
+    result.version = 'mecard';
+    const content = trimmed.substring(7);
+    const segments = splitCompoundField(content, ';');
+
+    segments.forEach((segment) => {
+      const colonIndex = segment.indexOf(':');
+      if (colonIndex <= 0) return;
+
+      const key = segment.substring(0, colonIndex).toUpperCase();
+      const val = segment.substring(colonIndex + 1);
+
+      switch (key) {
+        case 'N': {
+          const nParts = splitCompoundField(val, ',');
+          result.lastName = unescapeMECard(nParts[0] || '');
+          result.firstName = unescapeMECard(nParts[1] || '');
+          break;
+        }
+        case 'ORG':
+          result.organization = unescapeMECard(val);
+          break;
+        case 'TIL':
+        case 'TITLE':
+          result.title = unescapeMECard(val);
+          break;
+        case 'TEL':
+          result.phone = unescapeMECard(val);
+          break;
+        case 'EMAIL':
+          result.email = unescapeMECard(val);
+          break;
+        case 'URL':
+          result.website = unescapeMECard(val);
+          break;
+        case 'ADR': {
+          const cleanVal = val.replace(/;/g, ',');
+          const adrParts = splitCompoundField(cleanVal, ',');
+          result.street = unescapeMECard(adrParts[2] || '');
+          result.city = unescapeMECard(adrParts[3] || '');
+          result.zip = unescapeMECard(adrParts[5] || '');
+          result.country = unescapeMECard(adrParts[6] || '');
+          break;
+        }
+      }
+    });
+
+    return result;
+  }
+
+  if (!/begin:vcard/i.test(raw)) return result;
 
   const properties = parseRFCProperties(raw);
 
   properties.forEach(({ key, value }) => {
     switch (key) {
+      case 'VERSION': {
+        const v = value.trim();
+        if (v === '2.1' || v === '3.0' || v === '4.0') {
+          result.version = v;
+        }
+        break;
+      }
       case 'N': {
         const nParts = splitCompoundField(value, ';');
         result.lastName = unescapeVCardEvent(nParts[0] || '');
@@ -88,10 +171,36 @@ export const hydrateVCardData = (raw: string): VCardData => {
 };
 
 /**
- * Constructs the vCard 3.0 string.
+ * Constructs the contact payload string (vCard 2.1, 3.0, 4.0, or MECard).
  */
 export const constructVCardString = (data: VCardData): string => {
   if (!data) return '';
+  const version = data.version || '3.0';
+
+  if (version === 'mecard') {
+    const lastName = escapeMECard(data.lastName);
+    const firstName = escapeMECard(data.firstName);
+    const normalizedWebsite = normalizeUrl(data.website);
+    const website = escapeMECard(normalizedWebsite);
+    const street = escapeMECard(data.street);
+    const city = escapeMECard(data.city);
+    const zip = escapeMECard(data.zip);
+    const country = escapeMECard(data.country);
+
+    const parts = [
+      'MECARD:',
+      `N:${lastName},${firstName};`,
+      `ORG:${escapeMECard(data.organization)};`,
+      `TIL:${escapeMECard(data.title)};`,
+      `TEL:${escapeMECard(data.phone)};`,
+      `EMAIL:${escapeMECard(data.email)};`,
+      `URL:${website};`,
+      `ADR:,,${street},${city},,${zip},${country};`,
+      ';',
+    ];
+    return parts.join('');
+  }
+
   const lastName = escapeVCardEvent(data.lastName);
   const firstName = escapeVCardEvent(data.firstName);
   // Normalize URL first to handle spaces/protocols
@@ -100,7 +209,7 @@ export const constructVCardString = (data: VCardData): string => {
 
   const parts = [
     'BEGIN:VCARD',
-    'VERSION:3.0',
+    `VERSION:${version}`,
     `N:${lastName};${firstName};;;`,
     `FN:${firstName} ${lastName}`,
     `ORG:${escapeVCardEvent(data.organization)}`,
@@ -122,13 +231,34 @@ export const VCardContract: QRGeneratorContract<VCardData> = {
   matches: (raw: string) => identifyProtocol(raw) === QRType.VCARD,
   validate: (raw: string) => {
     const violations: string[] = [];
-    const properties = parseRFCProperties(raw);
-    for (const { key, value } of properties) {
-      if (key === 'URL') {
-        const vcardUrl = value.trim();
-        if (isDangerousUrl(vcardUrl)) {
-          violations.push('URI_INJECTION_VIOLATION');
-          break;
+    if (!raw) return violations;
+
+    const trimmed = raw.trim();
+    if (/^mecard:/i.test(trimmed)) {
+      const content = trimmed.substring(7);
+      const parts = splitCompoundField(content, ';');
+      for (const part of parts) {
+        const colonIdx = part.indexOf(':');
+        if (colonIdx > 0) {
+          const key = part.substring(0, colonIdx).toUpperCase();
+          if (key === 'URL') {
+            const val = unescapeMECard(part.substring(colonIdx + 1)).trim();
+            if (isDangerousUrl(val)) {
+              violations.push('URI_INJECTION_VIOLATION');
+              break;
+            }
+          }
+        }
+      }
+    } else {
+      const properties = parseRFCProperties(raw);
+      for (const { key, value } of properties) {
+        if (key === 'URL') {
+          const vcardUrl = value.trim();
+          if (isDangerousUrl(vcardUrl)) {
+            violations.push('URI_INJECTION_VIOLATION');
+            break;
+          }
         }
       }
     }
