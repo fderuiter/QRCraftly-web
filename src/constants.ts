@@ -55,6 +55,12 @@ export const DEFAULT_CONFIG = {
   isMazeBridgesEnabled: true,
   mazeColor: '#3b82f6',
   showMazeSolution: false,
+  frameStyle: 'none' as const,
+  frameText: '',
+  frameTextColor: '#ffffff',
+  frameBgColor: '#000000',
+  framePosition: 'bottom' as const,
+  frameIcon: 'none' as const,
 };
 
 /**
