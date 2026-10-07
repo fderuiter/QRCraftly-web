@@ -90,6 +90,10 @@ Finder pattern color properties in `types.ts` (`eyeFrameColor` and `eyeBallColor
 
 Custom frame shape and call-to-action (CTA) badge configurations in `types.ts` (e.g., `frameStyle`, `frameText`, `frameTextColor`, `frameBgColor`, `framePosition`, `frameIcon`) are strictly statically typed. The `frameText` field is validated via `validateConfig()` to reject control or BiDi characters, sanitized client-side without external persistence, and checked for minimum WCAG AA contrast (>= 4.5:1) in real time.
 
+## Gradient Color Controls
+
+Gradient color configurations in `types.ts` (`gradientType`, `gradientColorStops`, `gradientAngle`) are strictly statically typed and validated on the client side during canvas matrix rendering, preserving local processing with zero external script execution.
+
 ## JSON-LD Caching & Performance Security
 
 Structured data is rendered by the server-only Head at prerender time ([ADR 0034](./adr/0034-page-content-at-prerender.md)). To keep repeated renders cheap, the application caches serialized and escaped JSON-LD schema strings. Since JSON-LD requires synchronous regex replacement of unsafe characters (such as `<` and `>`), caching the computed string primitives protects the main thread from CPU-heavy operations while keeping cache keys lightweight and clean of memory leaks. The escaping itself lives in `safeJsonLdStringify` (`src/utils/security.ts`): it serialises any JSON value and rewrites `<`, `>` and `&` as `\u003c`, `\u003e` and `\u0026`, so schema text can never close the surrounding `<script>` element. `JsonLdScript` (`src/components/ui/JsonLdScript.tsx`) is the component that injects the result.

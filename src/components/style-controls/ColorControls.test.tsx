@@ -30,8 +30,6 @@ describe('ColorControls', () => {
     expect(group).toBeInTheDocument();
 
     // Check preset radios have aria-labels
-    // Note: ColorControls renders other buttons/inputs too, so we filter by the preset group
-    // Ideally we query within the group
     const presetsGroup = screen.getByRole('radiogroup', { name: /color presets/i });
     const presetRadios = within(presetsGroup).getAllByRole('radio');
 
@@ -54,6 +52,7 @@ describe('ColorControls', () => {
       eyeColor: '#38bdf8',
       eyeFrameColor: '#38bdf8',
       eyeBallColor: '#38bdf8',
+      gradientType: 'none',
     });
   });
 
@@ -147,5 +146,48 @@ describe('ColorControls', () => {
       />
     );
     expect(screen.queryByText(/Warning: The contrast ratio is low/i)).not.toBeInTheDocument();
+  });
+
+  it('allows switching fill mode to linear gradient and updating start/end colors and angle', () => {
+    const handleChange = vi.fn();
+    render(<ColorControls config={DEFAULT_CONFIG} onChange={handleChange} />);
+
+    const fillModeTrack = screen.getByRole('radiogroup', { name: /fill mode/i });
+    const linearRadio = within(fillModeTrack).getByRole('radio', { name: /linear/i });
+    fireEvent.click(linearRadio);
+
+    expect(handleChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gradientType: 'linear',
+      })
+    );
+  });
+
+  it('renders start/end color inputs and angle slider when gradientType is linear', () => {
+    const handleChange = vi.fn();
+    const configWithLinear = {
+      ...DEFAULT_CONFIG,
+      gradientType: 'linear' as const,
+      gradientColorStops: [
+        { offset: 0, color: '#ff0000' },
+        { offset: 1, color: '#0000ff' },
+      ],
+      gradientAngle: 45,
+    };
+
+    render(<ColorControls config={configWithLinear} onChange={handleChange} />);
+
+    expect(screen.getByLabelText(/^start color$/i)).toHaveValue('#ff0000');
+    expect(screen.getByLabelText(/^end color$/i)).toHaveValue('#0000ff');
+    expect(screen.getByLabelText(/gradient angle/i)).toHaveValue('45');
+
+    fireEvent.change(screen.getByLabelText(/^start color$/i), { target: { value: '#00ff00' } });
+    expect(handleChange).toHaveBeenCalledWith({
+      fgColor: '#00ff00',
+      gradientColorStops: [
+        { offset: 0, color: '#00ff00' },
+        { offset: 1, color: '#0000ff' },
+      ],
+    });
   });
 });
