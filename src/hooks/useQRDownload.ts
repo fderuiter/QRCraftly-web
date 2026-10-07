@@ -52,7 +52,7 @@ export const BLOCKED_EXPORT_MESSAGE = "This code contains a script or data link 
  */
 const blockedExport = (
   config: QRConfig,
-  format: 'png' | 'jpeg' | 'webp' | 'svg' | 'clipboard' | 'share',
+  format: 'png' | 'jpeg' | 'webp' | 'svg' | 'eps' | 'pdf' | 'clipboard' | 'share',
 ): ExportStatus | null =>
   isDangerousUrl(config.value) ? { success: false, format, error: new Error(BLOCKED_EXPORT_MESSAGE) } : null;
 
@@ -85,7 +85,7 @@ export interface AssetOptions extends ExportOptions {
 }
 
 /** Every export the hook performs. `svg-copy` copies the SVG markup as text. */
-export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'svg' | 'clipboard' | 'share' | 'svg-copy';
+export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'svg' | 'eps' | 'pdf' | 'clipboard' | 'share' | 'svg-copy';
 
 /**
  * Returns the canvas to encode: the preview itself, or a copy scaled to `size` pixels wide.
@@ -134,6 +134,10 @@ export interface UseQRDownloadReturn {
   handleSaveAs: (format: 'png' | 'jpeg' | 'webp', options?: AssetOptions) => Promise<ExportStatus>;
   /** Generates and downloads vector SVG QR code. */
   handleSaveSvg: (options?: AssetOptions) => Promise<ExportStatus>;
+  /** Generates and downloads vector EPS QR code. */
+  handleSaveEps: (options?: AssetOptions) => Promise<ExportStatus>;
+  /** Generates and downloads vector PDF QR code. */
+  handleSavePdf: (options?: AssetOptions) => Promise<ExportStatus>;
   /** Shares QR code image via Web Share API. */
   handleShare: (options?: AssetOptions) => Promise<ExportStatus>;
   /** Copies QR code image to system clipboard. */
@@ -405,6 +409,60 @@ export function useQRDownload(
     }
   }, [buildSvg, getFilename, config]);
 
+  const handleSaveEps = useCallback(async (options?: AssetOptions): Promise<ExportStatus> => {
+    const blocked = blockedExport(config, 'eps');
+    if (blocked) return blocked;
+    try {
+      const built = await buildSvg(options);
+      if (!built) return { success: false, format: 'eps', error: new Error('SCAN_VALIDATION_FAILED') };
+
+      const { convertSvgToEps } = await import('@/packages/qr-export');
+      const epsStr = convertSvgToEps(built.svg);
+
+      const blob = new Blob([epsStr], { type: 'application/postscript' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = getFilename('eps', options?.filename);
+      // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return { success: true, format: 'eps', logoOmitted: built.logoOmitted };
+    } catch (err) {
+      console.warn('EPS export failed:', err);
+      return { success: false, format: 'eps', error: toError(err) };
+    }
+  }, [buildSvg, getFilename, config]);
+
+  const handleSavePdf = useCallback(async (options?: AssetOptions): Promise<ExportStatus> => {
+    const blocked = blockedExport(config, 'pdf');
+    if (blocked) return blocked;
+    try {
+      const built = await buildSvg(options);
+      if (!built) return { success: false, format: 'pdf', error: new Error('SCAN_VALIDATION_FAILED') };
+
+      const { convertSvgToPdf } = await import('@/packages/qr-export');
+      const pdfBytes = convertSvgToPdf(built.svg);
+
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = getFilename('pdf', options?.filename);
+      // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return { success: true, format: 'pdf', logoOmitted: built.logoOmitted };
+    } catch (err) {
+      console.warn('PDF export failed:', err);
+      return { success: false, format: 'pdf', error: toError(err) };
+    }
+  }, [buildSvg, getFilename, config]);
+
   /**
    * Copies the SVG markup to the clipboard as text, for pasting into design tools or code.
    * @param options - Optional export options.
@@ -438,6 +496,10 @@ export function useQRDownload(
             : handleSaveAs(format, options);
         case 'svg':
           return handleSaveSvg(options);
+        case 'eps':
+          return handleSaveEps(options);
+        case 'pdf':
+          return handleSavePdf(options);
         case 'clipboard':
           return handleCopy(options);
         case 'share':
@@ -448,8 +510,9 @@ export function useQRDownload(
           return { success: false, format, error: new Error(`Unsupported export format: ${format}`) };
       }
     },
-    [downloadToDevice, handleSaveAs, handleSaveSvg, handleCopy, handleShare, handleCopySvg]
+    [downloadToDevice, handleSaveAs, handleSaveSvg, handleSaveEps, handleSavePdf, handleCopy, handleShare, handleCopySvg]
   );
 
-  return { exportAsset, downloadToDevice, handleSaveAs, handleSaveSvg, handleShare, handleCopy };
+  return { exportAsset, downloadToDevice, handleSaveAs, handleSaveSvg, handleSaveEps, handleSavePdf, handleShare, handleCopy };
+
 }
