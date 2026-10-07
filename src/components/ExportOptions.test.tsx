@@ -28,12 +28,16 @@ describe('ExportOptions (#1052)', () => {
     expect(onCopySvg).toHaveBeenCalled();
   });
 
-  it('takes a custom width and hides the size for SVG', () => {
-    renderOptions('png', 1000);
+  it('takes a custom width and hides the size for SVG, EPS, and PDF', () => {
+    renderOptions('png' as any, 1000);
     expect(screen.getByRole('radio', { name: 'Custom' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByLabelText('Width in pixels')).toHaveValue(1000);
-    renderOptions('svg');
+    renderOptions('svg' as any);
     expect(screen.getByText(/SVG is vector/)).toBeInTheDocument();
+    renderOptions('eps' as any);
+    expect(screen.getByText(/EPS is vector/)).toBeInTheDocument();
+    renderOptions('pdf' as any);
+    expect(screen.getByText(/PDF is vector/)).toBeInTheDocument();
   });
 
   it('clamps widths and describes the printed size', () => {

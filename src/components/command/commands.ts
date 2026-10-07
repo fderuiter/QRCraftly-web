@@ -62,7 +62,7 @@ export function buildCommands(host: CommandHost): Command[] {
   const { store, actions, modLabel, notifyUndo } = host;
   const state = store.getState();
   const { config } = state;
-  const formats: [DownloadFormat, string][] = [['png', 'PNG'], ['svg', 'SVG'], ['jpeg', 'JPEG'], ['webp', 'WebP']];
+  const formats: [DownloadFormat, string][] = [['png', 'PNG'], ['svg', 'SVG'], ['eps', 'EPS'], ['pdf', 'PDF'], ['jpeg', 'JPEG'], ['webp', 'WebP']];
 
   const commands: Command[] = [
     ...formats.map(([format, name]): Command => ({

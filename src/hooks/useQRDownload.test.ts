@@ -667,10 +667,48 @@ describe('useQRDownload', () => {
     );
   });
 
+  describe('handleSaveEps and handleSavePdf', () => {
+    it('creates a download link for EPS vector exports', async () => {
+      const { result } = renderHook(() => useQRDownload(mockQrRef, DEFAULT_CONFIG as QRConfig), { wrapper: ToastProvider });
+      const appendSpy = vi.spyOn(document.body, 'appendChild');
+      const removeSpy = vi.spyOn(document.body, 'removeChild');
+
+      const status = await result.current.handleSaveEps();
+
+      expect(status.success).toBe(true);
+      expect(status.format).toBe('eps');
+      expect(appendSpy).toHaveBeenCalled();
+      expect(removeSpy).toHaveBeenCalled();
+      const link = appendSpy.mock.calls[0][0] as HTMLAnchorElement;
+      expect(link.download).toMatch(/\.eps$/);
+
+      appendSpy.mockRestore();
+      removeSpy.mockRestore();
+    });
+
+    it('creates a download link for PDF vector exports', async () => {
+      const { result } = renderHook(() => useQRDownload(mockQrRef, DEFAULT_CONFIG as QRConfig), { wrapper: ToastProvider });
+      const appendSpy = vi.spyOn(document.body, 'appendChild');
+      const removeSpy = vi.spyOn(document.body, 'removeChild');
+
+      const status = await result.current.handleSavePdf();
+
+      expect(status.success).toBe(true);
+      expect(status.format).toBe('pdf');
+      expect(appendSpy).toHaveBeenCalled();
+      expect(removeSpy).toHaveBeenCalled();
+      const link = appendSpy.mock.calls[0][0] as HTMLAnchorElement;
+      expect(link.download).toMatch(/\.pdf$/);
+
+      appendSpy.mockRestore();
+      removeSpy.mockRestore();
+    });
+  });
+
   describe('dangerous content (hard export block)', () => {
     const dangerous = { ...DEFAULT_CONFIG, type: QRType.TEXT, value: 'javascript:alert(1)' } as QRConfig;
 
-    it.each(['png', 'svg', 'clipboard', 'share'] as const)('refuses %s even with allowUnsafe', async (format) => {
+    it.each(['png', 'svg', 'eps', 'pdf', 'clipboard', 'share'] as const)('refuses %s even with allowUnsafe', async (format) => {
       const { result } = renderHook(() => useQRDownload(mockQrRef, dangerous), { wrapper: ToastProvider });
       const status = await result.current.exportAsset(format, { allowUnsafe: true });
       expect(status.success).toBe(false);
