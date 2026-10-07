@@ -479,6 +479,8 @@ export interface BulkCsvData {
   filenameColumn: string;
   /** Output file format ('png' or 'svg'). */
   exportFormat: 'png' | 'svg';
+  /** PNG export resolution in pixels (e.g. 500, 1000, 2000, 3000). Defaults to 1000. */
+  exportResolution?: number;
   /** Original file name. */
   fileName?: string;
 }

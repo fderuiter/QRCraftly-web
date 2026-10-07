@@ -49,6 +49,7 @@ describe('BulkCsvContract', () => {
     const hydrated = hydrateBulkCsvData(raw);
     expect(hydrated.csvContent).toBe(raw);
     expect(hydrated.exportFormat).toBe('png');
+    expect(hydrated.exportResolution).toBe(1000);
   });
 
   it('implements BulkCsvContract contract correctly', () => {
