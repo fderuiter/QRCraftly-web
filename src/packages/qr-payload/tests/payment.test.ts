@@ -73,9 +73,118 @@ describe('Payment generator', () => {
     expect(result.label).toBe('');
   });
 
+  describe('EPC SEPA QR codes', () => {
+    it('constructs and hydrates SEPA EPC QR payloads', () => {
+      const sepaData = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: 'DE89370400440532013000',
+        iban: 'DE89370400440532013000',
+        name: 'Jane Doe',
+        bic: 'MIDLGB22',
+        amount: '12.50',
+        label: 'Invoice 123',
+      };
+      const str = constructPaymentString(sepaData);
+      expect(str).toBe('BCD\n002\n1\nSCT\nMIDLGB22\nJane Doe\nDE89370400440532013000\nEUR12.50\n\n\nInvoice 123\n');
+
+      const hydrated = hydratePaymentData(str);
+      expect(hydrated).toEqual(sepaData);
+    });
+
+    it('handles SEPA payload without BIC or amount', () => {
+      const sepaData = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: 'FR7630006000011234567890189',
+        iban: 'FR7630006000011234567890189',
+        name: 'John Smith',
+        bic: '',
+        amount: '',
+        label: 'Gift',
+      };
+      const str = constructPaymentString(sepaData);
+      expect(str).toBe('BCD\n002\n1\nSCT\n\nJohn Smith\nFR7630006000011234567890189\n\n\n\nGift\n');
+
+      const hydrated = hydratePaymentData(str);
+      expect(hydrated.network).toBe(CryptoNetwork.EPC_SEPA);
+      expect(hydrated.iban).toBe('FR7630006000011234567890189');
+      expect(hydrated.name).toBe('John Smith');
+      expect(hydrated.amount).toBe('');
+      expect(hydrated.label).toBe('Gift');
+    });
+  });
+
+  describe('PayPal payment preset', () => {
+    it('constructs and hydrates PayPal link', () => {
+      const paypalData = {
+        network: CryptoNetwork.PAYPAL,
+        address: 'johndoe',
+        amount: '25',
+        label: '',
+      };
+      const str = constructPaymentString(paypalData);
+      expect(str).toBe('https://paypal.me/johndoe/25');
+
+      const hydrated = hydratePaymentData(str);
+      expect(hydrated.network).toBe(CryptoNetwork.PAYPAL);
+      expect(hydrated.address).toBe('johndoe');
+      expect(hydrated.amount).toBe('25');
+    });
+
+    it('cleans handle with full URL', () => {
+      const str = constructPaymentString({
+        network: CryptoNetwork.PAYPAL,
+        address: 'https://paypal.me/johndoe',
+        amount: '',
+        label: '',
+      });
+      expect(str).toBe('https://paypal.me/johndoe');
+    });
+  });
+
+  describe('Venmo payment preset', () => {
+    it('constructs and hydrates Venmo link', () => {
+      const venmoData = {
+        network: CryptoNetwork.VENMO,
+        address: '@johndoe',
+        amount: '15.50',
+        label: 'Lunch',
+      };
+      const str = constructPaymentString(venmoData);
+      expect(str).toBe('https://venmo.com/u/johndoe?amount=15.50&note=Lunch&txn=pay');
+
+      const hydrated = hydratePaymentData(str);
+      expect(hydrated.network).toBe(CryptoNetwork.VENMO);
+      expect(hydrated.address).toBe('johndoe');
+      expect(hydrated.amount).toBe('15.50');
+      expect(hydrated.label).toBe('Lunch');
+    });
+  });
+
+  describe('Cash App payment preset', () => {
+    it('constructs and hydrates Cash App link', () => {
+      const cashData = {
+        network: CryptoNetwork.CASH_APP,
+        address: '$johndoe',
+        amount: '50',
+        label: '',
+      };
+      const str = constructPaymentString(cashData);
+      expect(str).toBe('https://cash.app/$johndoe/50');
+
+      const hydrated = hydratePaymentData(str);
+      expect(hydrated.network).toBe(CryptoNetwork.CASH_APP);
+      expect(hydrated.address).toBe('$johndoe');
+      expect(hydrated.amount).toBe('50');
+    });
+  });
+
   it('implements PaymentContract correctly and validates raw strings', () => {
     expect(PaymentContract.type).toBe(QRType.PAYMENT);
     expect(PaymentContract.matches('bitcoin:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa')).toBe(true);
+    expect(PaymentContract.matches('BCD\n002\n1\nSCT\n\nJane Doe\nDE89370400440532013000\nEUR10\n\n\nInvoice\n')).toBe(true);
+    expect(PaymentContract.matches('https://paypal.me/johndoe')).toBe(true);
+    expect(PaymentContract.matches('https://cash.app/$johndoe')).toBe(true);
+    expect(PaymentContract.matches('https://venmo.com/u/johndoe')).toBe(true);
     expect(PaymentContract.matches('random')).toBe(false);
 
     // Empty validation
