@@ -22,6 +22,11 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
         <option value={SocialPlatform.INSTAGRAM}>Instagram</option>
         <option value={SocialPlatform.TWITTER}>Twitter / X</option>
         <option value={SocialPlatform.TIKTOK}>TikTok</option>
+        <option value={SocialPlatform.LINKEDIN}>LinkedIn</option>
+        <option value={SocialPlatform.YOUTUBE}>YouTube</option>
+        <option value={SocialPlatform.FACEBOOK}>Facebook</option>
+        <option value={SocialPlatform.WHATSAPP}>WhatsApp</option>
+        <option value={SocialPlatform.GITHUB}>GitHub</option>
       </SelectField>
       <TextField
         id="social-handle"

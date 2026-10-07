@@ -57,6 +57,44 @@ describe('Social generator', () => {
     expect(hydrated.handle).toBe('qrcraftly');
   });
 
+  it('hydrates linkedin with /in/ prefix', () => {
+    const hydrated = hydrateSocialData('https://linkedin.com/in/qrcraftly');
+    expect(hydrated.platform).toBe(SocialPlatform.LINKEDIN);
+    expect(hydrated.handle).toBe('qrcraftly');
+
+    const hydratedWww = hydrateSocialData('https://www.linkedin.com/in/qrcraftly');
+    expect(hydratedWww.platform).toBe(SocialPlatform.LINKEDIN);
+    expect(hydratedWww.handle).toBe('qrcraftly');
+  });
+
+  it('hydrates youtube with @ handle', () => {
+    const hydrated = hydrateSocialData('https://youtube.com/@qrcraftly');
+    expect(hydrated.platform).toBe(SocialPlatform.YOUTUBE);
+    expect(hydrated.handle).toBe('qrcraftly');
+  });
+
+  it('hydrates facebook', () => {
+    const hydrated = hydrateSocialData('https://facebook.com/qrcraftly');
+    expect(hydrated.platform).toBe(SocialPlatform.FACEBOOK);
+    expect(hydrated.handle).toBe('qrcraftly');
+  });
+
+  it('hydrates whatsapp', () => {
+    const hydrated = hydrateSocialData('https://wa.me/15551234567');
+    expect(hydrated.platform).toBe(SocialPlatform.WHATSAPP);
+    expect(hydrated.handle).toBe('15551234567');
+
+    const hydratedCom = hydrateSocialData('https://whatsapp.com/15551234567');
+    expect(hydratedCom.platform).toBe(SocialPlatform.WHATSAPP);
+    expect(hydratedCom.handle).toBe('15551234567');
+  });
+
+  it('hydrates github', () => {
+    const hydrated = hydrateSocialData('https://github.com/qrcraftly');
+    expect(hydrated.platform).toBe(SocialPlatform.GITHUB);
+    expect(hydrated.handle).toBe('qrcraftly');
+  });
+
   it('hydrates handle fallback', () => {
     const hydrated = hydrateSocialData('https://instagram.com/');
     expect(hydrated.handle).toBe('');

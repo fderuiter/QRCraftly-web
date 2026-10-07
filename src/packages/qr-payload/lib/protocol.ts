@@ -24,6 +24,12 @@ export const SOCIAL_DOMAINS: Record<string, SocialPlatform> = {
   'x.com': SocialPlatform.TWITTER,
   'twitter.com': SocialPlatform.TWITTER,
   'tiktok.com': SocialPlatform.TIKTOK,
+  'linkedin.com': SocialPlatform.LINKEDIN,
+  'youtube.com': SocialPlatform.YOUTUBE,
+  'facebook.com': SocialPlatform.FACEBOOK,
+  'whatsapp.com': SocialPlatform.WHATSAPP,
+  'wa.me': SocialPlatform.WHATSAPP,
+  'github.com': SocialPlatform.GITHUB,
 };
 
 export const PROTOCOL_PREFIXES = {
@@ -319,5 +325,9 @@ export const canHydrate = (raw: string, type: QRType): boolean => {
   const identified = identifyProtocol(raw);
   if (identified === type) return true;
   if (type === QRType.TEXT) return true;
+  if (type === QRType.URL) {
+    const parsed = parseProtocol(raw);
+    return parsed !== null && (parsed.scheme === 'http' || parsed.scheme === 'https');
+  }
   return false;
 };
