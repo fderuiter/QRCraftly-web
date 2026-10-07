@@ -47,6 +47,45 @@ describe('SocialInput', () => {
     expect(mockOnChange).toHaveBeenCalledWith({ handle: 'johndoe' });
   });
 
+  it('renders all platform options in the select dropdown', () => {
+    render(<SocialInput data={defaultData} onChange={mockOnChange} />);
+
+    const options = screen.getAllByRole('option') as HTMLOptionElement[];
+    const optionValues = options.map((opt) => opt.value);
+
+    expect(optionValues).toEqual([
+      SocialPlatform.INSTAGRAM,
+      SocialPlatform.TWITTER,
+      SocialPlatform.TIKTOK,
+      SocialPlatform.LINKEDIN,
+      SocialPlatform.YOUTUBE,
+      SocialPlatform.FACEBOOK,
+      SocialPlatform.WHATSAPP,
+      SocialPlatform.GITHUB,
+    ]);
+  });
+
+  it('calls onChange when new platforms are selected', () => {
+    render(<SocialInput data={defaultData} onChange={mockOnChange} />);
+
+    const platformSelect = screen.getByLabelText('Platform');
+
+    fireEvent.change(platformSelect, { target: { value: SocialPlatform.LINKEDIN } });
+    expect(mockOnChange).toHaveBeenCalledWith({ platform: SocialPlatform.LINKEDIN });
+
+    fireEvent.change(platformSelect, { target: { value: SocialPlatform.YOUTUBE } });
+    expect(mockOnChange).toHaveBeenCalledWith({ platform: SocialPlatform.YOUTUBE });
+
+    fireEvent.change(platformSelect, { target: { value: SocialPlatform.FACEBOOK } });
+    expect(mockOnChange).toHaveBeenCalledWith({ platform: SocialPlatform.FACEBOOK });
+
+    fireEvent.change(platformSelect, { target: { value: SocialPlatform.WHATSAPP } });
+    expect(mockOnChange).toHaveBeenCalledWith({ platform: SocialPlatform.WHATSAPP });
+
+    fireEvent.change(platformSelect, { target: { value: SocialPlatform.GITHUB } });
+    expect(mockOnChange).toHaveBeenCalledWith({ platform: SocialPlatform.GITHUB });
+  });
+
   it('populates initial values correctly', () => {
     const data: SocialData = { platform: SocialPlatform.TIKTOK, handle: 'myhandle123' };
     render(<SocialInput data={data} onChange={mockOnChange} />);

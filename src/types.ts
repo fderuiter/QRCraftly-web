@@ -419,6 +419,11 @@ export enum SocialPlatform {
   INSTAGRAM = 'instagram',
   TWITTER = 'twitter',
   TIKTOK = 'tiktok',
+  LINKEDIN = 'linkedin',
+  YOUTUBE = 'youtube',
+  FACEBOOK = 'facebook',
+  WHATSAPP = 'whatsapp',
+  GITHUB = 'github',
 }
 
 /**

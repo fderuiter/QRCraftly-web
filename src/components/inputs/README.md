@@ -46,7 +46,7 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
 - `PaymentInput.tsx`: For `QRType.PAYMENT`. Supports Bitcoin, Ethereum, Solana, Litecoin, SEPA credit transfers (EPC QR), PayPal, Venmo, and Cash App.
 - `LocationInput.tsx`: For `QRType.LOCATION`. Collects latitude and longitude with support for browser geolocation APIs.
 - `MeetingInput.tsx`: For `QRType.MEETING`. Handles online meeting links for Zoom, Microsoft Teams, and Google Meet, with automatic parsing.
-- `SocialInput.tsx`: For `QRType.SOCIAL`. Configures social media platform username and handle details for Instagram, Twitter / X, and TikTok.
+- `SocialInput.tsx`: For `QRType.SOCIAL`. Configures social media platform username and handle details for Instagram, Twitter / X, TikTok, LinkedIn, YouTube, Facebook, WhatsApp, and GitHub.
 - `BulkCsvInput.tsx`: For `QRType.BULK_CSV`. Client-side main-thread CSV parsing and ZIP generation through `@/packages/bulk-csv` (no third-party libraries). The registry loads it through `LazyBulkCsvInput.tsx` so the code is fetched only on the Bulk CSV type. Supports column mapping, PNG/SVG format selection, a 500-row batch limit, malformed CSV error handling, progress tracking, and zero network calls.
 
 ## Adding a New Input Type

@@ -19,7 +19,7 @@
 import { UrlData, QRType, QRGeneratorContract } from '@/types';
 import { validateUrlAndInject } from '@/utils/security';
 import { normalizeUrl } from '@/utils/url';
-import { identifyProtocol, CONTAINMENT_PROFILES } from '../protocol';
+import { identifyProtocol, parseProtocol, CONTAINMENT_PROFILES } from '../protocol';
 
 /**
  * Constructs the URL QR code string.
@@ -44,7 +44,12 @@ export const UrlContract: QRGeneratorContract<UrlData> = {
   type: QRType.URL,
   construct: constructUrlString,
   hydrate: hydrateUrlData,
-  matches: (raw: string) => identifyProtocol(raw) === QRType.URL,
+  matches: (raw: string) => {
+    const identified = identifyProtocol(raw);
+    if (identified === QRType.URL) return true;
+    const parsed = parseProtocol(raw);
+    return parsed !== null && (parsed.scheme === 'http' || parsed.scheme === 'https');
+  },
   validate: (raw: string) => {
     return validateUrlAndInject(raw, CONTAINMENT_PROFILES.URL);
   },
