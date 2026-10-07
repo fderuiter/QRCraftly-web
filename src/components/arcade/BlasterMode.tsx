@@ -496,7 +496,7 @@ export function BlasterMode({ target, encoder, settings, announce }: ModeProps) 
             Move the pointer to aim · click or Space to fire · 1, 2, 3 switch weapons · arrow keys aim when the arena is focused
           </p>
         }
-        hud={<ScanHud analysis={analysis} empirical={scan.state} isNative={scan.isNative} />}
+        hud={<ScanHud analysis={analysis} empirical={scan.state} isNative={scan.isNative} usedFallback={matrix.usedFallback} />}
         actions={
           <Card variant="control" className="space-y-3">
             <div className="flex items-baseline justify-between">

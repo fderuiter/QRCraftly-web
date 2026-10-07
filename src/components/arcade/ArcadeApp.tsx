@@ -16,9 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Gamepad2 } from 'lucide-react';
-import { ARCADE_MODES, ArcadeMode, arcadeModeHref, parseArcadeMode } from '@/packages/arcade';
+import { ARCADE_MODES, ArcadeMode, arcadeModeHref, blankTargetMatrix, buildTargetMatrix, parseArcadeMode } from '@/packages/arcade';
 import { BlasterMode } from './BlasterMode';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { SimulatorMode } from './SimulatorMode';
@@ -74,6 +74,11 @@ export function ArcadeApp() {
     if (meta) announce(`${meta.label} mode.`);
   };
 
+  const matrix = useMemo(
+    () => (encoder ? buildTargetMatrix(target.payload, target.ecc, encoder) : blankTargetMatrix(target.payload, target.ecc)),
+    [target.payload, target.ecc, encoder]
+  );
+
   const settings = (
     <TargetSettings
       target={target}
@@ -83,6 +88,7 @@ export function ArcadeApp() {
         announce('Target reset to the generator QR.');
       }}
       hasGeneratorDesign={hasGeneratorDesign}
+      usedFallback={matrix.usedFallback}
     />
   );
 
