@@ -295,4 +295,103 @@ describe('VCard generator', () => {
     expect(hydrated.zip).toBe('10001');
     expect(hydrated.country).toBe('USA');
   });
+
+  it('omits empty or whitespace-only optional property lines in vCard format', () => {
+    const partialData = {
+      version: '3.0' as const,
+      firstName: 'Alice',
+      lastName: 'Smith',
+      organization: '   ',
+      title: '',
+      phone: '   ',
+      email: '',
+      website: '',
+      street: '   ',
+      city: '',
+      zip: '',
+      country: '   ',
+    };
+
+    const str = constructVCardString(partialData);
+
+    expect(str).toContain('BEGIN:VCARD');
+    expect(str).toContain('VERSION:3.0');
+    expect(str).toContain('N:Smith;Alice;;;');
+    expect(str).toContain('FN:Alice Smith');
+    expect(str).toContain('END:VCARD');
+
+    expect(str).not.toContain('ORG:');
+    expect(str).not.toContain('TITLE:');
+    expect(str).not.toContain('TEL:');
+    expect(str).not.toContain('EMAIL:');
+    expect(str).not.toContain('URL:');
+    expect(str).not.toContain('ADR:');
+
+    const hydrated = hydrateVCardData(str);
+    expect(hydrated.firstName).toBe('Alice');
+    expect(hydrated.lastName).toBe('Smith');
+    expect(hydrated.organization).toBe('');
+    expect(hydrated.phone).toBe('');
+  });
+
+  it('emits ADR line in vCard format when at least one address component is populated', () => {
+    const partialAddressData = {
+      version: '3.0' as const,
+      firstName: 'Bob',
+      lastName: 'Jones',
+      organization: '',
+      title: '',
+      phone: '',
+      email: '',
+      website: '',
+      street: '',
+      city: 'Metropolis',
+      zip: '',
+      country: '',
+    };
+
+    const str = constructVCardString(partialAddressData);
+    expect(str).toContain('ADR:;;;Metropolis;;;');
+
+    const hydrated = hydrateVCardData(str);
+    expect(hydrated.city).toBe('Metropolis');
+    expect(hydrated.street).toBe('');
+  });
+
+  it('omits empty optional property lines in MECard format while preserving structural tags', () => {
+    const partialMecard = {
+      version: 'mecard' as const,
+      firstName: 'Charlie',
+      lastName: 'Brown',
+      organization: '  ',
+      title: '',
+      phone: '+15550001111',
+      email: '  ',
+      website: '',
+      street: '',
+      city: '',
+      zip: '',
+      country: '',
+    };
+
+    const str = constructVCardString(partialMecard);
+
+    expect(str.startsWith('MECARD:')).toBe(true);
+    expect(str.endsWith(';')).toBe(true);
+    expect(str).toContain('N:Brown,Charlie;');
+    expect(str).toContain('TEL:+15550001111;');
+
+    expect(str).not.toContain('ORG:');
+    expect(str).not.toContain('TIL:');
+    expect(str).not.toContain('EMAIL:');
+    expect(str).not.toContain('URL:');
+    expect(str).not.toContain('ADR:');
+
+    const hydrated = hydrateVCardData(str);
+    expect(hydrated.version).toBe('mecard');
+    expect(hydrated.firstName).toBe('Charlie');
+    expect(hydrated.lastName).toBe('Brown');
+    expect(hydrated.phone).toBe('+15550001111');
+    expect(hydrated.organization).toBe('');
+  });
 });

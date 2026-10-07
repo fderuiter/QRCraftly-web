@@ -170,6 +170,8 @@ export const hydrateVCardData = (raw: string): VCardData => {
   return result;
 };
 
+const isPopulated = (str: string | undefined): boolean => Boolean(str && str.trim().length > 0);
+
 /**
  * Constructs the contact payload string (vCard 2.1, 3.0, 4.0, or MECard).
  */
@@ -180,6 +182,10 @@ export const constructVCardString = (data: VCardData): string => {
   if (version === 'mecard') {
     const lastName = escapeMECard(data.lastName);
     const firstName = escapeMECard(data.firstName);
+    const org = escapeMECard(data.organization);
+    const title = escapeMECard(data.title);
+    const phone = escapeMECard(data.phone);
+    const email = escapeMECard(data.email);
     const normalizedWebsite = normalizeUrl(data.website);
     const website = escapeMECard(normalizedWebsite);
     const street = escapeMECard(data.street);
@@ -187,39 +193,59 @@ export const constructVCardString = (data: VCardData): string => {
     const zip = escapeMECard(data.zip);
     const country = escapeMECard(data.country);
 
-    const parts = [
+    const parts: string[] = [
       'MECARD:',
       `N:${lastName},${firstName};`,
-      `ORG:${escapeMECard(data.organization)};`,
-      `TIL:${escapeMECard(data.title)};`,
-      `TEL:${escapeMECard(data.phone)};`,
-      `EMAIL:${escapeMECard(data.email)};`,
-      `URL:${website};`,
-      `ADR:,,${street},${city},,${zip},${country};`,
-      ';',
     ];
+
+    if (isPopulated(org)) parts.push(`ORG:${org};`);
+    if (isPopulated(title)) parts.push(`TIL:${title};`);
+    if (isPopulated(phone)) parts.push(`TEL:${phone};`);
+    if (isPopulated(email)) parts.push(`EMAIL:${email};`);
+    if (isPopulated(website)) parts.push(`URL:${website};`);
+
+    if (isPopulated(street) || isPopulated(city) || isPopulated(zip) || isPopulated(country)) {
+      parts.push(`ADR:,,${street},${city},,${zip},${country};`);
+    }
+
+    parts.push(';');
     return parts.join('');
   }
 
   const lastName = escapeVCardEvent(data.lastName);
   const firstName = escapeVCardEvent(data.firstName);
+  const org = escapeVCardEvent(data.organization);
+  const title = escapeVCardEvent(data.title);
+  const phone = escapeVCardEvent(data.phone);
+  const email = escapeVCardEvent(data.email);
+
   // Normalize URL first to handle spaces/protocols
   const normalizedWebsite = normalizeUrl(data.website);
   const website = normalizedWebsite;
 
-  const parts = [
+  const street = escapeVCardEvent(data.street);
+  const city = escapeVCardEvent(data.city);
+  const zip = escapeVCardEvent(data.zip);
+  const country = escapeVCardEvent(data.country);
+
+  const parts: string[] = [
     'BEGIN:VCARD',
     `VERSION:${version}`,
     `N:${lastName};${firstName};;;`,
     `FN:${firstName} ${lastName}`,
-    `ORG:${escapeVCardEvent(data.organization)}`,
-    `TITLE:${escapeVCardEvent(data.title)}`,
-    `TEL:${escapeVCardEvent(data.phone)}`,
-    `EMAIL:${escapeVCardEvent(data.email)}`,
-    `URL:${website}`,
-    `ADR:;;${escapeVCardEvent(data.street)};${escapeVCardEvent(data.city)};;${escapeVCardEvent(data.zip)};${escapeVCardEvent(data.country)}`,
-    'END:VCARD',
   ];
+
+  if (isPopulated(org)) parts.push(`ORG:${org}`);
+  if (isPopulated(title)) parts.push(`TITLE:${title}`);
+  if (isPopulated(phone)) parts.push(`TEL:${phone}`);
+  if (isPopulated(email)) parts.push(`EMAIL:${email}`);
+  if (isPopulated(website)) parts.push(`URL:${website}`);
+
+  if (isPopulated(street) || isPopulated(city) || isPopulated(zip) || isPopulated(country)) {
+    parts.push(`ADR:;;${street};${city};;${zip};${country}`);
+  }
+
+  parts.push('END:VCARD');
 
   return foldString(parts.join('\r\n'));
 };
