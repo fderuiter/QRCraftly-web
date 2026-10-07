@@ -194,7 +194,7 @@ export class SvgContext {
   private readonly _width: number;
   private readonly _height: number;
   private _elements: string[] = [];
-  private _pathData: string = '';
+  private _pathChunks: string[] = [];
   private _transform: Matrix = identityMatrix();
   private _stateStack: ContextState[] = [];
   private _dashArray: number[] = [];
@@ -228,22 +228,9 @@ export class SvgContext {
 
   // ── Transform helpers ──────────────────────────────────────────────────────
 
-  private _applyTransform(x: number, y: number): [number, number] {
-    const m = this._transform;
-    return [
-      m.a * x + m.c * y + m.e,
-      m.b * x + m.d * y + m.f,
-    ];
-  }
-
-  /** Returns a formatted number with up to 3 decimal places, no trailing zeros. */
-  private _n(v: number): string {
-    return parseFloat(v.toFixed(3)).toString();
-  }
-
-  private _pt(x: number, y: number): string {
-    const [tx, ty] = this._applyTransform(x, y);
-    return `${this._n(tx)} ${this._n(ty)}`;
+  /** Returns a formatted number rounded to up to 3 decimal places using fast arithmetic. */
+  private _n(v: number): number {
+    return Math.round(v * 1000) / 1000;
   }
 
   // ── State management ───────────────────────────────────────────────────────
@@ -298,27 +285,45 @@ export class SvgContext {
   // ── Path API ───────────────────────────────────────────────────────────────
 
   beginPath(): void {
-    this._pathData = '';
+    this._pathChunks.length = 0;
   }
 
   closePath(): void {
-    this._pathData += 'Z ';
+    this._pathChunks.push('Z');
   }
 
   moveTo(x: number, y: number): void {
-    this._pathData += `M ${this._pt(x, y)} `;
+    const m = this._transform;
+    const tx = Math.round((m.a * x + m.c * y + m.e) * 1000) / 1000;
+    const ty = Math.round((m.b * x + m.d * y + m.f) * 1000) / 1000;
+    this._pathChunks.push(`M ${tx} ${ty}`);
   }
 
   lineTo(x: number, y: number): void {
-    this._pathData += `L ${this._pt(x, y)} `;
+    const m = this._transform;
+    const tx = Math.round((m.a * x + m.c * y + m.e) * 1000) / 1000;
+    const ty = Math.round((m.b * x + m.d * y + m.f) * 1000) / 1000;
+    this._pathChunks.push(`L ${tx} ${ty}`);
   }
 
   quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): void {
-    this._pathData += `Q ${this._pt(cpx, cpy)} ${this._pt(x, y)} `;
+    const m = this._transform;
+    const tcpx = Math.round((m.a * cpx + m.c * cpy + m.e) * 1000) / 1000;
+    const tcpy = Math.round((m.b * cpx + m.d * cpy + m.f) * 1000) / 1000;
+    const tx = Math.round((m.a * x + m.c * y + m.e) * 1000) / 1000;
+    const ty = Math.round((m.b * x + m.d * y + m.f) * 1000) / 1000;
+    this._pathChunks.push(`Q ${tcpx} ${tcpy} ${tx} ${ty}`);
   }
 
   bezierCurveTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number): void {
-    this._pathData += `C ${this._pt(cp1x, cp1y)}, ${this._pt(cp2x, cp2y)}, ${this._pt(x, y)} `;
+    const m = this._transform;
+    const tcp1x = Math.round((m.a * cp1x + m.c * cp1y + m.e) * 1000) / 1000;
+    const tcp1y = Math.round((m.b * cp1x + m.d * cp1y + m.f) * 1000) / 1000;
+    const tcp2x = Math.round((m.a * cp2x + m.c * cp2y + m.e) * 1000) / 1000;
+    const tcp2y = Math.round((m.b * cp2x + m.d * cp2y + m.f) * 1000) / 1000;
+    const tx = Math.round((m.a * x + m.c * y + m.e) * 1000) / 1000;
+    const ty = Math.round((m.b * x + m.d * y + m.f) * 1000) / 1000;
+    this._pathChunks.push(`C ${tcp1x} ${tcp1y} ${tcp2x} ${tcp2y} ${tx} ${ty}`);
   }
 
   /**
@@ -326,10 +331,19 @@ export class SvgContext {
    * The four corners are transformed individually so rotated rects are handled correctly.
    */
   rect(x: number, y: number, w: number, h: number): void {
-    this._pathData += `M ${this._pt(x, y)} `;
-    this._pathData += `L ${this._pt(x + w, y)} `;
-    this._pathData += `L ${this._pt(x + w, y + h)} `;
-    this._pathData += `L ${this._pt(x, y + h)} Z `;
+    const m = this._transform;
+    const ma = m.a, mb = m.b, mc = m.c, md = m.d, me = m.e, mf = m.f;
+
+    const tx0 = Math.round((ma * x + mc * y + me) * 1000) / 1000;
+    const ty0 = Math.round((mb * x + md * y + mf) * 1000) / 1000;
+    const tx1 = Math.round((ma * (x + w) + mc * y + me) * 1000) / 1000;
+    const ty1 = Math.round((mb * (x + w) + md * y + mf) * 1000) / 1000;
+    const tx2 = Math.round((ma * (x + w) + mc * (y + h) + me) * 1000) / 1000;
+    const ty2 = Math.round((mb * (x + w) + md * (y + h) + mf) * 1000) / 1000;
+    const tx3 = Math.round((ma * x + mc * (y + h) + me) * 1000) / 1000;
+    const ty3 = Math.round((mb * x + md * (y + h) + mf) * 1000) / 1000;
+
+    this._pathChunks.push(`M ${tx0} ${ty0} L ${tx1} ${ty1} L ${tx2} ${ty2} L ${tx3} ${ty3} Z`);
   }
 
   /**
@@ -340,16 +354,56 @@ export class SvgContext {
   roundRect(x: number, y: number, w: number, h: number, r: number): void {
     // Clamp radius so it doesn't exceed half the shorter side and is not negative
     const safeR = clampCornerRadius(r, w, h);
+    const m = this._transform;
+    const ma = m.a, mb = m.b, mc = m.c, md = m.d, me = m.e, mf = m.f;
 
-    this._pathData += `M ${this._pt(x + safeR, y)} `;
-    this._pathData += `L ${this._pt(x + w - safeR, y)} `;
-    this._pathData += `Q ${this._pt(x + w, y)} ${this._pt(x + w, y + safeR)} `;
-    this._pathData += `L ${this._pt(x + w, y + h - safeR)} `;
-    this._pathData += `Q ${this._pt(x + w, y + h)} ${this._pt(x + w - safeR, y + h)} `;
-    this._pathData += `L ${this._pt(x + safeR, y + h)} `;
-    this._pathData += `Q ${this._pt(x, y + h)} ${this._pt(x, y + h - safeR)} `;
-    this._pathData += `L ${this._pt(x, y + safeR)} `;
-    this._pathData += `Q ${this._pt(x, y)} ${this._pt(x + safeR, y)} Z `;
+    const tx0 = Math.round((ma * (x + safeR) + mc * y + me) * 1000) / 1000;
+    const ty0 = Math.round((mb * (x + safeR) + md * y + mf) * 1000) / 1000;
+
+    const tx1 = Math.round((ma * (x + w - safeR) + mc * y + me) * 1000) / 1000;
+    const ty1 = Math.round((mb * (x + w - safeR) + md * y + mf) * 1000) / 1000;
+
+    const tx2 = Math.round((ma * (x + w) + mc * y + me) * 1000) / 1000;
+    const ty2 = Math.round((mb * (x + w) + md * y + mf) * 1000) / 1000;
+
+    const tx3 = Math.round((ma * (x + w) + mc * (y + safeR) + me) * 1000) / 1000;
+    const ty3 = Math.round((mb * (x + w) + md * (y + safeR) + mf) * 1000) / 1000;
+
+    const tx4 = Math.round((ma * (x + w) + mc * (y + h - safeR) + me) * 1000) / 1000;
+    const ty4 = Math.round((mb * (x + w) + md * (y + h - safeR) + mf) * 1000) / 1000;
+
+    const tx5 = Math.round((ma * (x + w) + mc * (y + h) + me) * 1000) / 1000;
+    const ty5 = Math.round((mb * (x + w) + md * (y + h) + mf) * 1000) / 1000;
+
+    const tx6 = Math.round((ma * (x + w - safeR) + mc * (y + h) + me) * 1000) / 1000;
+    const ty6 = Math.round((mb * (x + w - safeR) + md * (y + h) + mf) * 1000) / 1000;
+
+    const tx7 = Math.round((ma * (x + safeR) + mc * (y + h) + me) * 1000) / 1000;
+    const ty7 = Math.round((mb * (x + safeR) + md * (y + h) + mf) * 1000) / 1000;
+
+    const tx8 = Math.round((ma * x + mc * (y + h) + me) * 1000) / 1000;
+    const ty8 = Math.round((mb * x + md * (y + h) + mf) * 1000) / 1000;
+
+    const tx9 = Math.round((ma * x + mc * (y + h - safeR) + me) * 1000) / 1000;
+    const ty9 = Math.round((mb * x + md * (y + h - safeR) + mf) * 1000) / 1000;
+
+    const tx10 = Math.round((ma * x + mc * (y + safeR) + me) * 1000) / 1000;
+    const ty10 = Math.round((mb * x + md * (y + safeR) + mf) * 1000) / 1000;
+
+    const tx11 = Math.round((ma * x + mc * y + me) * 1000) / 1000;
+    const ty11 = Math.round((mb * x + md * y + mf) * 1000) / 1000;
+
+    this._pathChunks.push(
+      `M ${tx0} ${ty0} ` +
+      `L ${tx1} ${ty1} ` +
+      `Q ${tx2} ${ty2} ${tx3} ${ty3} ` +
+      `L ${tx4} ${ty4} ` +
+      `Q ${tx5} ${ty5} ${tx6} ${ty6} ` +
+      `L ${tx7} ${ty7} ` +
+      `Q ${tx8} ${ty8} ${tx9} ${ty9} ` +
+      `L ${tx10} ${ty10} ` +
+      `Q ${tx11} ${ty11} ${tx0} ${ty0} Z`
+    );
   }
 
   /**
@@ -382,6 +436,9 @@ export class SvgContext {
     const numSegments = Math.max(1, Math.ceil(totalSweep / maxSegmentAngle));
     const segmentSweep = signedSweep / numSegments;
 
+    const m = this._transform;
+    const ma = m.a, mb = m.b, mc = m.c, md = m.d, me = m.e, mf = m.f;
+
     // Draw the segments
     for (let i = 0; i < numSegments; i++) {
       const a1 = startAngle + i * segmentSweep;
@@ -400,43 +457,81 @@ export class SvgContext {
       const p2y = p3y - k * r * Math.cos(a2);
 
       if (i === 0) {
-        // First segment start point
-        const isNewSubpath = !this._pathData.trim() || this._pathData.trim().endsWith('Z');
+        let isNewSubpath = true;
+        if (this._pathChunks.length > 0) {
+          const last = this._pathChunks[this._pathChunks.length - 1].trim();
+          if (!last.endsWith('Z')) {
+            isNewSubpath = false;
+          }
+        }
+
+        const tp0x = Math.round((ma * p0x + mc * p0y + me) * 1000) / 1000;
+        const tp0y = Math.round((mb * p0x + md * p0y + mf) * 1000) / 1000;
+
         if (isNewSubpath) {
-          this._pathData += `M ${this._pt(p0x, p0y)} `;
+          this._pathChunks.push(`M ${tp0x} ${tp0y}`);
         } else {
-          this._pathData += `L ${this._pt(p0x, p0y)} `;
+          this._pathChunks.push(`L ${tp0x} ${tp0y}`);
         }
       }
 
-      // Add the cubic Bezier curve to the path
-      this._pathData += `C ${this._pt(p1x, p1y)}, ${this._pt(p2x, p2y)}, ${this._pt(p3x, p3y)} `;
+      const tp1x = Math.round((ma * p1x + mc * p1y + me) * 1000) / 1000;
+      const tp1y = Math.round((mb * p1x + md * p1y + mf) * 1000) / 1000;
+      const tp2x = Math.round((ma * p2x + mc * p2y + me) * 1000) / 1000;
+      const tp2y = Math.round((mb * p2x + md * p2y + mf) * 1000) / 1000;
+      const tp3x = Math.round((ma * p3x + mc * p3y + me) * 1000) / 1000;
+      const tp3y = Math.round((mb * p3x + md * p3y + mf) * 1000) / 1000;
+
+      this._pathChunks.push(`C ${tp1x} ${tp1y}, ${tp2x} ${tp2y}, ${tp3x} ${tp3y}`);
     }
   }
 
   // ── Immediate draw calls ───────────────────────────────────────────────────
 
+  private _getPathData(): string {
+    return this._pathChunks.join(' ').trim();
+  }
+
   fill(): void {
-    if (!this._pathData.trim()) return;
+    const d = this._getPathData();
+    if (!d) return;
     const fill = this._cssColor(this.fillStyle);
-    this._elements.push(`<path d="${this._pathData.trim()}" fill="${fill}" fill-rule="evenodd"/>`);
+    this._elements.push(`<path d="${d}" fill="${fill}" fill-rule="evenodd"/>`);
   }
 
   stroke(): void {
-    if (!this._pathData.trim()) return;
+    const d = this._getPathData();
+    if (!d) return;
     const stroke = this._cssColor(this.strokeStyle);
     const dash = this._dashArray.length > 0
       ? ` stroke-dasharray="${this._dashArray.join(' ')}"`
       : '';
+    const lw = this._n(this.lineWidth);
     this._elements.push(
-      `<path d="${this._pathData.trim()}" fill="none" stroke="${stroke}" stroke-width="${this._n(this.lineWidth)}"${dash}/>`
+      `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${lw}"${dash}/>`
     );
+  }
+
+  private _getRectPath(x: number, y: number, w: number, h: number): string {
+    const m = this._transform;
+    const ma = m.a, mb = m.b, mc = m.c, md = m.d, me = m.e, mf = m.f;
+
+    const tx0 = Math.round((ma * x + mc * y + me) * 1000) / 1000;
+    const ty0 = Math.round((mb * x + md * y + mf) * 1000) / 1000;
+    const tx1 = Math.round((ma * (x + w) + mc * y + me) * 1000) / 1000;
+    const ty1 = Math.round((mb * (x + w) + md * y + mf) * 1000) / 1000;
+    const tx2 = Math.round((ma * (x + w) + mc * (y + h) + me) * 1000) / 1000;
+    const ty2 = Math.round((mb * (x + w) + md * (y + h) + mf) * 1000) / 1000;
+    const tx3 = Math.round((ma * x + mc * (y + h) + me) * 1000) / 1000;
+    const ty3 = Math.round((mb * x + md * (y + h) + mf) * 1000) / 1000;
+
+    return `M ${tx0} ${ty0} L ${tx1} ${ty1} L ${tx2} ${ty2} L ${tx3} ${ty3} Z`;
   }
 
   /** Fills a rectangle directly (without modifying the current path). */
   fillRect(x: number, y: number, w: number, h: number): void {
     const fill = this._cssColor(this.fillStyle);
-    const d = `M ${this._pt(x, y)} L ${this._pt(x + w, y)} L ${this._pt(x + w, y + h)} L ${this._pt(x, y + h)} Z`;
+    const d = this._getRectPath(x, y, w, h);
     this._elements.push(`<path d="${d}" fill="${fill}"/>`);
   }
 
@@ -449,9 +544,10 @@ export class SvgContext {
     const dash = this._dashArray.length > 0
       ? ` stroke-dasharray="${this._dashArray.join(' ')}"`
       : '';
-    const d = `M ${this._pt(x, y)} L ${this._pt(x + w, y)} L ${this._pt(x + w, y + h)} L ${this._pt(x, y + h)} Z`;
+    const d = this._getRectPath(x, y, w, h);
+    const lw = this._n(this.lineWidth);
     this._elements.push(
-      `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${this._n(this.lineWidth)}"${dash}/>`
+      `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${lw}"${dash}/>`
     );
   }
 
@@ -488,7 +584,9 @@ export class SvgContext {
   /** Renders text as an SVG <text> element. */
   fillText(text: string, x: number, y: number, maxWidth?: number): void {
     const fill = this._cssColor(this.fillStyle);
-    const [tx, ty] = this._applyTransform(x, y);
+    const m = this._transform;
+    const tx = Math.round((m.a * x + m.c * y + m.e) * 1000) / 1000;
+    const ty = Math.round((m.b * x + m.d * y + m.f) * 1000) / 1000;
     const anchor = this._svgTextAnchor(this.textAlign);
     const baseline = this._svgDominantBaseline(this.textBaseline);
 
