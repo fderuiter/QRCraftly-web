@@ -1,13 +1,18 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import { VCardData } from "../../types";
 import { TextField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
 import { isDangerousUrl } from "../../utils/security";
 import { FormBlock } from "../ui/FormBlock";
+import { Button } from "../ui/Button";
+import { Upload, X } from "lucide-react";
+import { combineIds } from "../../utils/a11y";
 import {
   GRID_TWO_COLUMNS_CLASSES,
   SUB_CONTAINER_SPACING_CLASSES,
 } from "../ui/styles";
+
+const MAX_PHOTO_SIZE_BYTES = 100 * 1024; // 100 KB
 
 interface VCardInputProps {
   data: VCardData;
@@ -15,12 +20,96 @@ interface VCardInputProps {
 }
 
 export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
   const websiteError = data.website && isDangerousUrl(data.website)
     ? "Unsafe URL scheme or malicious protocol detected."
     : undefined;
 
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setPhotoError(null);
+    if (file) {
+      if (file.size > MAX_PHOTO_SIZE_BYTES) {
+        setPhotoError("Image size must be under 100 KB.");
+        e.target.value = "";
+        onChange({ photo: "" });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        onChange({ photo: result });
+      };
+      reader.readAsDataURL(file);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoError(null);
+    onChange({ photo: "" });
+  };
+
   return (
     <FormBlock legend="Contact Details (vCard)">
+      <FormBlock legend="Profile Photo" isSubFieldset={true}>
+        <div className="space-y-3">
+          {data.photo ? (
+            <div className="flex items-center gap-4">
+              <img
+                src={data.photo}
+                alt="Profile preview"
+                className="size-16 rounded-full border border-line bg-surface object-cover shadow-xs"
+              />
+              <div className="flex flex-col items-start gap-1">
+                <Button
+                  variant="error"
+                  size="xs"
+                  onClick={handleRemovePhoto}
+                >
+                  <X className="mr-1 size-3.5" aria-hidden="true" />
+                  Remove Photo
+                </Button>
+                <p className="text-xs text-fg-muted">Uploaded profile photo</p>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  aria-describedby={combineIds("vcard-photo-help", photoError ? "vcard-photo-error" : undefined)}
+                >
+                  <Upload className="mr-1.5 size-4" aria-hidden="true" />
+                  Upload Photo
+                </Button>
+                <span id="vcard-photo-help" className="text-xs text-fg-muted">
+                  JPEG or PNG, max 100 KB
+                </span>
+              </div>
+            </div>
+          )}
+          {photoError && (
+            <p id="vcard-photo-error" role="alert" className="text-xs text-danger">
+              {photoError}
+            </p>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png"
+            className="hidden"
+            onChange={handlePhotoChange}
+            aria-label="Upload profile photo"
+          />
+        </div>
+      </FormBlock>
+
       <div className={GRID_TWO_COLUMNS_CLASSES}>
         <TextField
           id="vcard-firstname"

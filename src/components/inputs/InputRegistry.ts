@@ -137,6 +137,7 @@ export const INPUT_REGISTRY: Registry = {
       street: "",
       city: "",
       country: "",
+      photo: "",
     } as VCardData,
     constructFn: QR_GENERATORS[QRType.VCARD].construct,
     hydrateFn: QR_GENERATORS[QRType.VCARD].hydrate,

@@ -56,6 +56,10 @@ To prevent injection of arbitrary characters or command payloads into telephone 
 - **SMS Multi-Recipient Isolation**: To support advanced client-side SMS campaign configurations, the SMS generator uses an isolated sanitization option that preserves semicolons and commas, while rejecting letters, other symbols, and line-break control characters.
 - **URI Delimiter Encoding**: After sanitization, `#` in a dial string is percent-encoded as `%23` (RFC 3966) so it cannot start a URI fragment and truncate the number. Mailto recipients are percent-encoded (RFC 6068, keeping `@`) so `?`, `&`, and `#` in the address cannot inject headers, and crypto wallet addresses are percent-encoded so `&` or `#` cannot inject payment parameters.
 
+## vCard Profile Photo Processing
+
+Profile photos uploaded for vCard contact generation (JPEG or PNG, capped at 100 KB) are processed entirely in client-side memory using FileReader to produce Base64-encoded vCard PHOTO properties. Image file size validation prevents bloated QR payloads, and image data is stored strictly in volatile memory without network transmission.
+
 ## SVG Sanitization & Path Tracking
 
 To prevent custom SVG logo uploads and native vector exports from exposing users to DOM-XSS and structural XML injection, QRCraftly incorporates two security controls:

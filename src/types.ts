@@ -290,6 +290,8 @@ export interface VCardData {
   zip: string;
   /** The country of the contact. */
   country: string;
+  /** Optional profile photo encoded as a Base64 string or URL. */
+  photo?: string;
 }
 
 /**

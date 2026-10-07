@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { constructVCardString, hydrateVCardData, VCardContract } from '../index';
+import { constructVCardString, hydrateVCardData, VCardContract, unfoldString } from '../index';
 import { QRType } from '@/types';
 
 describe('VCard generator', () => {
@@ -34,6 +34,7 @@ describe('VCard generator', () => {
       city: 'Anytown',
       zip: '12345',
       country: 'USA',
+      photo: '',
     };
     const str = constructVCardString(data);
     const hydrated = hydrateVCardData(str);
@@ -54,6 +55,7 @@ describe('VCard generator', () => {
       city: '',
       zip: '',
       country: '',
+      photo: '',
     });
   });
 
@@ -212,5 +214,94 @@ describe('VCard generator', () => {
 
     // URL with parameter but no colon, should have no violations
     expect(VCardContract.validate?.('BEGIN:VCARD\nURL;TYPE=WORK\nEND:VCARD')).toEqual([]);
+  });
+
+  describe('PHOTO serialization and hydration', () => {
+    it('serializes and hydrates JPEG base64 photos correctly', () => {
+      const sampleBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      const data = {
+        firstName: 'Alice',
+        lastName: 'Smith',
+        organization: 'Tech Corp',
+        title: 'Developer',
+        phone: '555-0100',
+        email: 'alice@example.com',
+        website: 'https://example.com',
+        street: '456 Tech Way',
+        city: 'Silicon Valley',
+        zip: '94000',
+        country: 'USA',
+        photo: `data:image/jpeg;base64,${sampleBase64}`,
+      };
+
+      const vcardStr = constructVCardString(data);
+      expect(vcardStr).toContain('PHOTO;TYPE=JPEG;ENCODING=b:');
+      expect(unfoldString(vcardStr)).toContain(sampleBase64);
+
+      const hydrated = hydrateVCardData(vcardStr);
+      expect(hydrated.photo).toBe(`data:image/jpeg;base64,${sampleBase64}`);
+      expect(hydrated.firstName).toBe('Alice');
+    });
+
+    it('serializes and hydrates PNG base64 photos correctly', () => {
+      const sampleBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      const data = {
+        firstName: 'Bob',
+        lastName: 'Jones',
+        organization: '',
+        title: '',
+        phone: '',
+        email: '',
+        website: '',
+        street: '',
+        city: '',
+        zip: '',
+        country: '',
+        photo: `data:image/png;base64,${sampleBase64}`,
+      };
+
+      const vcardStr = constructVCardString(data);
+      expect(vcardStr).toContain('PHOTO;TYPE=PNG;ENCODING=b:');
+
+      const hydrated = hydrateVCardData(vcardStr);
+      expect(hydrated.photo).toBe(`data:image/png;base64,${sampleBase64}`);
+    });
+
+    it('handles raw base64 string in photo field during construct', () => {
+      const sampleBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      const data = {
+        firstName: 'Charlie',
+        lastName: 'Brown',
+        organization: '',
+        title: '',
+        phone: '',
+        email: '',
+        website: '',
+        street: '',
+        city: '',
+        zip: '',
+        country: '',
+        photo: sampleBase64,
+      };
+
+      const vcardStr = constructVCardString(data);
+      expect(vcardStr).toContain('PHOTO;TYPE=JPEG;ENCODING=b:');
+      const hydrated = hydrateVCardData(vcardStr);
+      expect(hydrated.photo).toBe(`data:image/jpeg;base64,${sampleBase64}`);
+    });
+
+    it('hydrates PHOTO with HTTP URL', () => {
+      const raw = `BEGIN:VCARD\r\nVERSION:3.0\r\nN:Doe;John;;;\r\nPHOTO;VALUE=uri:https://example.com/photo.jpg\r\nEND:VCARD`;
+      const hydrated = hydrateVCardData(raw);
+      expect(hydrated.photo).toBe('https://example.com/photo.jpg');
+    });
+
+    it('returns empty photo string for invalid encoding parameters or non-base64 photo data', () => {
+      const invalidParamVCard = `BEGIN:VCARD\r\nVERSION:3.0\r\nN:Doe;John;;;\r\nPHOTO;TYPE=JPEG;ENCODING=UNKNOWN:notvalid\r\nEND:VCARD`;
+      expect(hydrateVCardData(invalidParamVCard).photo).toBe('');
+
+      const invalidDataVCard = `BEGIN:VCARD\r\nVERSION:3.0\r\nN:Doe;John;;;\r\nPHOTO;TYPE=JPEG;ENCODING=b:Invalid Base64 With Special Chars! #$%^&*\r\nEND:VCARD`;
+      expect(hydrateVCardData(invalidDataVCard).photo).toBe('');
+    });
   });
 });
