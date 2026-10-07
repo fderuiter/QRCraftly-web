@@ -105,6 +105,7 @@ export const INPUT_REGISTRY: Registry = {
       title: "",
       startDate: "",
       endDate: "",
+      timezone: "",
       location: "",
       description: "",
       provider: CalendarProvider.ICAL,

@@ -48,6 +48,26 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
         value={data.endDate}
         onChange={(e) => onChange({ endDate: e.target.value })}
       />
+      <SelectField
+        id="event-timezone"
+        label="Timezone"
+        value={data.timezone || ""}
+        onChange={(e) => onChange({ timezone: e.target.value })}
+      >
+        <option value="">Floating / Local Time</option>
+        <option value="UTC">UTC</option>
+        <option value="America/New_York">Eastern Time (America/New_York)</option>
+        <option value="America/Chicago">Central Time (America/Chicago)</option>
+        <option value="America/Denver">Mountain Time (America/Denver)</option>
+        <option value="America/Los_Angeles">Pacific Time (America/Los_Angeles)</option>
+        <option value="Europe/London">London (Europe/London)</option>
+        <option value="Europe/Paris">Paris (Europe/Paris)</option>
+        <option value="Europe/Berlin">Berlin (Europe/Berlin)</option>
+        <option value="Asia/Tokyo">Tokyo (Asia/Tokyo)</option>
+        <option value="Asia/Shanghai">Shanghai (Asia/Shanghai)</option>
+        <option value="Asia/Kolkata">Kolkata (Asia/Kolkata)</option>
+        <option value="Australia/Sydney">Sydney (Australia/Sydney)</option>
+      </SelectField>
       <TextField
         id="event-location"
         label="Location"

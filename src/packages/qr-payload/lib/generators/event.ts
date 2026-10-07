@@ -59,8 +59,11 @@ export const hydrateEventData = (raw: string): EventData => {
       const dates = parsed.params.get('dates');
       if (dates) {
         const parts = dates.split('/');
-        result.startDate = parseEventDateTime(parts[0] || '');
-        result.endDate = parseEventDateTime(parts[1] || '');
+        result.startDate = parseEventDateTime(parts[0] || '').replace(/Z$/i, '');
+        result.endDate = parseEventDateTime(parts[1] || '').replace(/Z$/i, '');
+      }
+      if (parsed.params.get('ctz')) {
+        result.timezone = parsed.params.get('ctz')!;
       }
       result.location = parsed.params.get('location') || '';
       result.description = parsed.params.get('details') || '';
@@ -70,8 +73,11 @@ export const hydrateEventData = (raw: string): EventData => {
     if (isDomain('outlook.live.com')) {
       result.provider = CalendarProvider.OUTLOOK;
       result.title = parsed.params.get('subject') || '';
-      result.startDate = parseEventDateTime(parsed.params.get('startdt') || '');
-      result.endDate = parseEventDateTime(parsed.params.get('enddt') || '');
+      result.startDate = parseEventDateTime(parsed.params.get('startdt') || '').replace(/Z$/i, '');
+      result.endDate = parseEventDateTime(parsed.params.get('enddt') || '').replace(/Z$/i, '');
+      if (parsed.params.get('ctz')) {
+        result.timezone = parsed.params.get('ctz')!;
+      }
       result.location = parsed.params.get('location') || '';
       result.description = parsed.params.get('body') || '';
       return result;
@@ -80,8 +86,11 @@ export const hydrateEventData = (raw: string): EventData => {
     if (isDomain('outlook.office.com') || isDomain('outlook.office365.com')) {
       result.provider = CalendarProvider.OFFICE365;
       result.title = parsed.params.get('subject') || '';
-      result.startDate = parseEventDateTime(parsed.params.get('startdt') || '');
-      result.endDate = parseEventDateTime(parsed.params.get('enddt') || '');
+      result.startDate = parseEventDateTime(parsed.params.get('startdt') || '').replace(/Z$/i, '');
+      result.endDate = parseEventDateTime(parsed.params.get('enddt') || '').replace(/Z$/i, '');
+      if (parsed.params.get('ctz')) {
+        result.timezone = parsed.params.get('ctz')!;
+      }
       result.location = parsed.params.get('location') || '';
       result.description = parsed.params.get('body') || '';
       return result;
@@ -90,8 +99,8 @@ export const hydrateEventData = (raw: string): EventData => {
     if (isDomain('calendar.yahoo.com')) {
       result.provider = CalendarProvider.YAHOO;
       result.title = parsed.params.get('TITLE') || parsed.params.get('title') || '';
-      result.startDate = parseEventDateTime(parsed.params.get('ST') || parsed.params.get('st') || '');
-      result.endDate = parseEventDateTime(parsed.params.get('ET') || parsed.params.get('et') || '');
+      result.startDate = parseEventDateTime(parsed.params.get('ST') || parsed.params.get('st') || '').replace(/Z$/i, '');
+      result.endDate = parseEventDateTime(parsed.params.get('ET') || parsed.params.get('et') || '').replace(/Z$/i, '');
       result.location = parsed.params.get('in_loc') || parsed.params.get('location') || '';
       result.description = parsed.params.get('DESC') || parsed.params.get('desc') || '';
       return result;
@@ -106,12 +115,36 @@ export const hydrateEventData = (raw: string): EventData => {
       case 'SUMMARY':
         result.title = unescapeVCardEvent(value);
         break;
-      case 'DTSTART':
-        result.startDate = parseEventDateTime(value, params);
+      case 'DTSTART': {
+        const parsed = parseEventDateTime(value, params);
+        result.startDate = parsed.replace(/;TZID=[^;:\s\n]+/i, '').replace(/Z$/i, '');
+        if (params) {
+          const tzidMatch = params.match(/;?TZID=([^;:\s\n]+)/i);
+          if (tzidMatch) {
+            result.timezone = tzidMatch[1];
+          }
+        }
+        if (value.toUpperCase().endsWith('Z')) {
+          result.timezone = 'UTC';
+        }
         break;
-      case 'DTEND':
-        result.endDate = parseEventDateTime(value, params);
+      }
+      case 'DTEND': {
+        const parsed = parseEventDateTime(value, params);
+        result.endDate = parsed.replace(/;TZID=[^;:\s\n]+/i, '').replace(/Z$/i, '');
+        if (!result.timezone) {
+          if (params) {
+            const tzidMatch = params.match(/;?TZID=([^;:\s\n]+)/i);
+            if (tzidMatch) {
+              result.timezone = tzidMatch[1];
+            }
+          }
+          if (value.toUpperCase().endsWith('Z')) {
+            result.timezone = 'UTC';
+          }
+        }
         break;
+      }
       case 'LOCATION':
         result.location = unescapeVCardEvent(value);
         break;
@@ -152,7 +185,7 @@ const fnv1a = (input: string, seed: number): string => {
  * instead of duplicating it.
  */
 const deriveEventUid = (data: EventData): string => {
-  const key = [data.title, data.startDate, data.endDate, data.location, data.description]
+  const key = [data.title, data.startDate, data.endDate, data.timezone, data.location, data.description]
     .map((part) => part || '')
     .join('\u001f');
   return `${fnv1a(key, 0x811c9dc5)}${fnv1a(key, 0x01000193)}@qrcraftly.com`;
@@ -187,8 +220,8 @@ export const constructEventString = (
   if (!data) return '';
 
   const provider = (data.provider || CalendarProvider.ICAL).toLowerCase();
-  const startFormatted = formatEventDateTime(data.startDate);
-  const endFormatted = formatEventDateTime(data.endDate);
+  const startFormatted = formatEventDateTime(data.startDate, data.timezone);
+  const endFormatted = formatEventDateTime(data.endDate, data.timezone);
   const effectiveEnd = endFormatted.value || startFormatted.value;
 
   if (provider === CalendarProvider.GOOGLE) {
@@ -198,6 +231,7 @@ export const constructEventString = (
     if (startFormatted.value) {
       params.set('dates', `${startFormatted.value}/${effectiveEnd}`);
     }
+    if (data.timezone) params.set('ctz', data.timezone);
     if (data.location) params.set('location', data.location);
     if (data.description) params.set('details', data.description);
     return `https://calendar.google.com/calendar/render?${params.toString()}`;
@@ -210,6 +244,7 @@ export const constructEventString = (
     if (data.title) params.set('subject', data.title);
     if (startFormatted.value) params.set('startdt', startFormatted.value);
     if (effectiveEnd) params.set('enddt', effectiveEnd);
+    if (data.timezone) params.set('ctz', data.timezone);
     if (data.location) params.set('location', data.location);
     if (data.description) params.set('body', data.description);
     return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
@@ -222,6 +257,7 @@ export const constructEventString = (
     if (data.title) params.set('subject', data.title);
     if (startFormatted.value) params.set('startdt', startFormatted.value);
     if (effectiveEnd) params.set('enddt', effectiveEnd);
+    if (data.timezone) params.set('ctz', data.timezone);
     if (data.location) params.set('location', data.location);
     if (data.description) params.set('body', data.description);
     return `https://outlook.office.com/calendar/0/deeplink/compose?${params.toString()}`;

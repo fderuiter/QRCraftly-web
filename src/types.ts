@@ -389,6 +389,8 @@ export interface EventData {
   startDate: string;
   /** The event end date and time (ISO string from datetime-local input). */
   endDate: string;
+  /** Optional IANA timezone identifier (e.g. 'America/New_York', 'UTC') or local. */
+  timezone?: string;
   /** The event location. */
   location: string;
   /** The event description. */
