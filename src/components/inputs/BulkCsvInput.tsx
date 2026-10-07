@@ -35,6 +35,7 @@ import {
   hasPayload,
   PAYLOAD_COLUMN_PATTERN,
   FILENAME_COLUMN_PATTERN,
+  SAMPLE_CSV_TEMPLATE,
 } from '@/packages/bulk-csv';
 import { BulkCsvData, QRConfig, QRType } from '@/types';
 import { Alert } from '../ui/Alert';
@@ -47,7 +48,7 @@ import { generateQRSvg, rasterizeSvgToCanvas } from '@/packages/qr-export';
 import { validateConfig, describeViolation } from '@/packages/qr-payload';
 import { analyseLink } from '@/packages/link-safety';
 import { triggerFileDownload } from '@/utils/downloadManager';
-import { FileSpreadsheet, Upload, AlertTriangle, Loader2 } from 'lucide-react';
+import { FileSpreadsheet, Upload, Download, AlertTriangle, Loader2 } from 'lucide-react';
 
 export interface BulkCsvInputProps {
   data: BulkCsvData;
@@ -183,6 +184,11 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     }
   };
 
+  const handleDownloadTemplate = () => {
+    const bytes = new TextEncoder().encode(SAMPLE_CSV_TEMPLATE);
+    triggerFileDownload(bytes, 'qrcraftly-sample-template.csv', 'text/csv');
+  };
+
   const startBatchGeneration = async (validRowsOnly = false) => {
     if (!payloadCol) {
       addToast({
@@ -306,13 +312,25 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     <div className="space-y-6">
       {!data.csvContent ? (
         <BulkCsvDropZone>
-          <label className="mt-4 cursor-pointer">
-            <span className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-800 focus:ring-2 focus:ring-teal-500 focus:outline-hidden">
-              <Upload className="size-4" />
-              Choose File
-            </span>
-            {fileInput('Upload CSV or TXT file')}
-          </label>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+            <label className="cursor-pointer">
+              <span className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-800 focus:ring-2 focus:ring-teal-500 focus:outline-hidden">
+                <Upload className="size-4" />
+                Choose File
+              </span>
+              {fileInput('Upload CSV or TXT file')}
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={handleDownloadTemplate}
+              className="flex items-center gap-2"
+            >
+              <Download className="size-4" />
+              Download Sample Template
+            </Button>
+          </div>
         </BulkCsvDropZone>
       ) : (
         <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-800">

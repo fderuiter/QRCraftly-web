@@ -24,7 +24,7 @@ import { LazyBulkCsvInput } from './LazyBulkCsvInput';
 import { BulkCsvData } from '@/types';
 import { QRProvider } from '@/context/QRContext';
 import * as downloadManager from '@/utils/downloadManager';
-import { MAX_BULK_CSV_ROWS } from '@/packages/bulk-csv';
+import { MAX_BULK_CSV_ROWS, SAMPLE_CSV_TEMPLATE } from '@/packages/bulk-csv';
 
 /** Lists the entry names in the central directory of a stored ZIP archive. */
 function zipEntryNames(bytes: Uint8Array): string[] {
@@ -72,11 +72,29 @@ describe('BulkCsvInput Component', () => {
     vi.clearAllMocks();
   });
 
-  it('renders upload prompt when no CSV content is loaded', () => {
+  it('renders upload prompt and sample template button when no CSV content is loaded', () => {
     renderWithProvider(<BulkCsvInput data={initialData} onChange={vi.fn()} />);
 
     expect(screen.getByText('Upload CSV or TXT File')).toBeInTheDocument();
     expect(screen.getByText('Choose File')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download Sample Template' })).toBeInTheDocument();
+  });
+
+  it('triggers download of sample CSV template when Download Sample Template button is clicked', () => {
+    renderWithProvider(<BulkCsvInput data={initialData} onChange={vi.fn()} />);
+
+    const downloadBtn = screen.getByRole('button', { name: 'Download Sample Template' });
+    fireEvent.click(downloadBtn);
+
+    expect(downloadManager.triggerFileDownload).toHaveBeenCalledWith(
+      expect.anything(),
+      'qrcraftly-sample-template.csv',
+      'text/csv'
+    );
+
+    const callArgs = vi.mocked(downloadManager.triggerFileDownload).mock.calls[0];
+    const downloadedText = new TextDecoder().decode(callArgs[0]);
+    expect(downloadedText).toBe(SAMPLE_CSV_TEMPLATE);
   });
 
   it('parses uploaded CSV file, detects columns, and displays controls', async () => {
