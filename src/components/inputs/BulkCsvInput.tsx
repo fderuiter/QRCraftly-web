@@ -69,7 +69,6 @@ interface SkippedRow {
 
 /** Row count above which the main-thread processing warning is shown. */
 const LARGE_BATCH_WARNING_ROWS = 100;
-const PNG_EXPORT_SIZE = 1000;
 
 type ParseOutcome = { table: CsvTable; error: null } | { table: null; error: string };
 
@@ -264,7 +263,8 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
         if (exportFormat === 'svg') {
           entries.push({ name, data: svgString });
         } else {
-          const canvas = await rasterizeSvgToCanvas(svgString, PNG_EXPORT_SIZE, PNG_EXPORT_SIZE);
+          const exportResolution = data.exportResolution || 1000;
+          const canvas = await rasterizeSvgToCanvas(svgString, exportResolution, exportResolution);
           entries.push({ name, data: await canvasToPngBytes(canvas) });
         }
 
@@ -399,7 +399,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
             </Alert>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className={`grid gap-4 ${exportFormat === 'png' ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
             <SelectField
               id="bulk-payload-column"
               label="Payload Column (QR Content)"
@@ -438,6 +438,20 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
               <option value="png">PNG Image</option>
               <option value="svg">SVG Vector Image</option>
             </SelectField>
+
+            {exportFormat === 'png' && (
+              <SelectField
+                id="bulk-export-resolution"
+                label="PNG Resolution"
+                value={String(data.exportResolution || 1000)}
+                onChange={(e) => onChange({ exportResolution: Number(e.target.value) })}
+              >
+                <option value="500">500px</option>
+                <option value="1000">1000px</option>
+                <option value="2000">2000px</option>
+                <option value="3000">3000px</option>
+              </SelectField>
+            )}
           </div>
 
           <p className="text-xs text-slate-600 dark:text-slate-400" data-testid="bulk-preview-row">
