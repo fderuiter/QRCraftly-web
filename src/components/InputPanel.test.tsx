@@ -301,10 +301,18 @@ describe('InputPanel Component', () => {
       renderPanel({ type: QRType.EMAIL });
 
       const emailInput = screen.getByLabelText('Email Address');
+      const ccInput = screen.getByLabelText('CC');
+      const bccInput = screen.getByLabelText('BCC');
       const subjectInput = screen.getByLabelText('Subject');
       const bodyInput = screen.getByLabelText('Body');
 
       fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
+      act(() => { vi.advanceTimersByTime(100); });
+
+      fireEvent.change(ccInput, { target: { value: 'cc@example.com' } });
+      act(() => { vi.advanceTimersByTime(100); });
+
+      fireEvent.change(bccInput, { target: { value: 'bcc@example.com' } });
       act(() => { vi.advanceTimersByTime(100); });
 
       fireEvent.change(subjectInput, { target: { value: 'Hello World' } });
@@ -313,7 +321,7 @@ describe('InputPanel Component', () => {
       fireEvent.change(bodyInput, { target: { value: 'This is a test.' } });
       act(() => { vi.advanceTimersByTime(100); });
 
-      const expectedValue = `mailto:test@example.com?subject=Hello%20World&body=This%20is%20a%20test.`;
+      const expectedValue = `mailto:test@example.com?cc=cc%40example.com&bcc=bcc%40example.com&subject=Hello%20World&body=This%20is%20a%20test.`;
       expect(mockOnChange).toHaveBeenLastCalledWith({ value: expectedValue });
   });
 
@@ -637,6 +645,12 @@ describe('InputPanel Security (Input Limits)', () => {
 
     const emailAddressInput = screen.getByLabelText('Email Address');
     expect(emailAddressInput).toHaveAttribute('maxLength', '254'); // RFC 5321
+
+    const ccInput = screen.getByLabelText('CC');
+    expect(ccInput).toHaveAttribute('maxLength', '254');
+
+    const bccInput = screen.getByLabelText('BCC');
+    expect(bccInput).toHaveAttribute('maxLength', '254');
 
     const subject = screen.getByLabelText('Subject');
     expect(subject).toHaveAttribute('maxLength', '200');

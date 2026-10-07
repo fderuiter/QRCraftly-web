@@ -33,7 +33,7 @@ QRCraftly runs no analytics, telemetry or diagnostics of its own, and keeps no l
 - **What is stored on your device:**
   - Only the colour-theme preference (`qrcraftly:theme`) and any brand templates you save (`qrcraftly:brand-templates`, see above). QR content is never stored.
 - **What is NOT Logged:**
-  - **User Input:** Since the application runs client-side, the text, URLs, WiFi passwords (including WPA2-Enterprise EAP method, phase 2 and identity fields), or payment details (including crypto addresses, SEPA IBANs, and payment handles) you type are never part of the HTTP request to the server.
+  - **User Input:** Since the application runs client-side, the text, URLs, email addresses (including CC and BCC fields), WiFi passwords (including WPA2-Enterprise EAP method, phase 2 and identity fields), or payment details (including crypto addresses, SEPA IBANs, and payment handles) you type are never part of the HTTP request to the server.
   - **Generated Images:** The QR codes created are generated in the browser and never uploaded.
   - **Diagnostics:** Scannability failures are handled on the device and never reported.
 
