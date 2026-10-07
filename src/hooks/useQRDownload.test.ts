@@ -42,6 +42,7 @@ describe('useQRDownload', () => {
     mockCanvas.toDataURL = vi.fn(() => 'data:image/png;base64,mock');
     mockCanvas.toBlob = vi.fn((callback) => callback(new Blob(['mock']), 'image/png'));
     const mockCtx = {
+      fillRect: vi.fn(),
       getImageData: vi.fn(() => ({
         data: new Uint8ClampedArray(40000),
         width: 100,
@@ -66,6 +67,7 @@ describe('useQRDownload', () => {
         return {
           canvas: this,
           drawImage: vi.fn(),
+          fillRect: vi.fn(),
           getImageData: vi.fn().mockImplementation((x: number, y: number, w: number, h: number) => {
             const width = w || this.width || 100;
             const height = h || this.height || 100;
@@ -728,6 +730,154 @@ describe('useQRDownload', () => {
       const { result } = renderHook(() => useQRDownload(mockQrRef, DEFAULT_CONFIG as QRConfig), { wrapper: ToastProvider });
       const status = await result.current.exportAsset('png', { directDownload: true });
       expect(status.success).toBe(true);
+    });
+  });
+
+  describe('JPEG export canvas preparation and scannability validation', () => {
+    it('flattens JPEG exports with solid white background before scannability check and download', async () => {
+      const fillRectSpy = vi.fn();
+      const drawImageSpy = vi.fn();
+      let capturedCtx: any = null;
+
+      const originalCreateElement = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+        const elem = originalCreateElement(tagName) as any;
+        if (tagName.toLowerCase() === 'canvas') {
+          elem.getContext = vi.fn((contextId: string) => {
+            if (contextId === '2d') {
+              if (!elem._ctx) {
+                elem._ctx = {
+                  canvas: elem,
+                  fillStyle: '',
+                  imageSmoothingEnabled: false,
+                  fillRect: fillRectSpy,
+                  drawImage: drawImageSpy,
+                  getImageData: vi.fn(() => ({
+                    data: new Uint8ClampedArray(40000),
+                    width: 100,
+                    height: 100,
+                  })),
+                };
+              }
+              capturedCtx = elem._ctx;
+              return elem._ctx;
+            }
+            return null;
+          }) as any;
+          elem.toDataURL = vi.fn(() => 'data:image/jpeg;base64,flattened-jpeg');
+        }
+        return elem;
+      });
+
+      const transparentConfig = {
+        ...DEFAULT_CONFIG,
+        bgColor: 'transparent',
+      } as QRConfig;
+
+      const { result } = renderHook(() => useQRDownload(mockQrRef, transparentConfig), { wrapper: ToastProvider });
+
+      const status = await result.current.downloadToDevice('jpeg');
+
+      expect(status.success).toBe(true);
+      expect(status.format).toBe('jpeg');
+      expect(capturedCtx).not.toBeNull();
+      expect(capturedCtx.fillStyle).toBe('#ffffff');
+      expect(fillRectSpy).toHaveBeenCalledWith(0, 0, 100, 100);
+      expect(drawImageSpy).toHaveBeenCalledWith(mockCanvas, 0, 0, 100, 100);
+    });
+
+    it('flattens JPEG exports for handleSaveAs and validates scannability on prepared export canvas', async () => {
+      const fillRectSpy = vi.fn();
+      const drawImageSpy = vi.fn();
+      let capturedCtx: any = null;
+
+      const originalCreateElement = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+        const elem = originalCreateElement(tagName) as any;
+        if (tagName.toLowerCase() === 'canvas') {
+          elem.getContext = vi.fn((contextId: string) => {
+            if (contextId === '2d') {
+              if (!elem._ctx) {
+                elem._ctx = {
+                  canvas: elem,
+                  fillStyle: '',
+                  imageSmoothingEnabled: false,
+                  fillRect: fillRectSpy,
+                  drawImage: drawImageSpy,
+                  getImageData: vi.fn(() => ({
+                    data: new Uint8ClampedArray(40000),
+                    width: 100,
+                    height: 100,
+                  })),
+                };
+              }
+              capturedCtx = elem._ctx;
+              return elem._ctx;
+            }
+            return null;
+          }) as any;
+          elem.toBlob = vi.fn((cb) => cb(new Blob(['flattened-jpeg-blob']), 'image/jpeg'));
+        }
+        return elem;
+      });
+
+      const transparentConfig = {
+        ...DEFAULT_CONFIG,
+        bgColor: 'transparent',
+      } as QRConfig;
+
+      const { result } = renderHook(() => useQRDownload(mockQrRef, transparentConfig), { wrapper: ToastProvider });
+
+      const status = await result.current.handleSaveAs('jpeg');
+
+      expect(status.success).toBe(true);
+      expect(capturedCtx).not.toBeNull();
+      expect(capturedCtx.fillStyle).toBe('#ffffff');
+      expect(fillRectSpy).toHaveBeenCalledWith(0, 0, 100, 100);
+      expect(drawImageSpy).toHaveBeenCalledWith(mockCanvas, 0, 0, 100, 100);
+    });
+
+    it('does not flatten PNG exports, preserving original transparency', async () => {
+      const fillRectSpy = vi.fn();
+      const mockCtxWithSpy = {
+        fillRect: fillRectSpy,
+        getImageData: vi.fn(() => ({
+          data: new Uint8ClampedArray(40000),
+          width: 100,
+          height: 100,
+        })),
+      };
+      mockCanvas.getContext = vi.fn(() => mockCtxWithSpy as any);
+
+      const transparentConfig = {
+        ...DEFAULT_CONFIG,
+        bgColor: 'transparent',
+      } as QRConfig;
+
+      const { result } = renderHook(() => useQRDownload(mockQrRef, transparentConfig), { wrapper: ToastProvider });
+
+      const status = await result.current.downloadToDevice('png');
+
+      expect(status.success).toBe(true);
+      expect(fillRectSpy).not.toHaveBeenCalled();
+    });
+
+    it('falls back to raw canvas if context creation fails on prepared canvas', async () => {
+      const originalCreateElement = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+        const elem = originalCreateElement(tagName) as any;
+        if (tagName.toLowerCase() === 'canvas') {
+          elem.getContext = vi.fn(() => null) as any;
+        }
+        return elem;
+      });
+
+      const { result } = renderHook(() => useQRDownload(mockQrRef, DEFAULT_CONFIG as QRConfig), { wrapper: ToastProvider });
+
+      const status = await result.current.downloadToDevice('jpeg');
+
+      expect(status.success).toBe(true);
+      expect(mockCanvas.toDataURL).toHaveBeenCalledWith('image/jpeg');
     });
   });
 });

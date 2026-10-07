@@ -234,7 +234,7 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
           const isSelected = selectedId === template.id;
           const bg = template.config.bgColor || '#ffffff';
           const fg = template.config.fgColor || '#000000';
-          const eye = template.config.eyeColor || fg;
+          const eyeFrame = template.config.eyeFrameColor || template.config.eyeColor || fg;
           const borderColor = template.config.borderColor || fg;
           const hasBorder = template.config.isBorderEnabled;
 
@@ -264,11 +264,11 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
                     style={{ backgroundColor: fg }}
                   >
                     <div className="flex justify-between">
-                      <div className="rounded-2xs size-1.5" style={{ backgroundColor: eye }} />
-                      <div className="rounded-2xs size-1.5" style={{ backgroundColor: eye }} />
+                      <div className="rounded-2xs size-1.5" style={{ backgroundColor: eyeFrame }} />
+                      <div className="rounded-2xs size-1.5" style={{ backgroundColor: eyeFrame }} />
                     </div>
                     <div className="flex justify-start">
-                      <div className="rounded-2xs size-1.5" style={{ backgroundColor: eye }} />
+                      <div className="rounded-2xs size-1.5" style={{ backgroundColor: eyeFrame }} />
                     </div>
                   </div>
                 </div>

@@ -93,7 +93,13 @@ export function buildCommands(host: CommandHost): Command[] {
       group: 'Colors',
       keywords: 'theme palette preset',
       run: () => {
-        store.updateConfig({ fgColor: preset.fg, bgColor: preset.bg, eyeColor: preset.eye });
+        store.updateConfig({
+          fgColor: preset.fg,
+          bgColor: preset.bg,
+          eyeColor: preset.eye,
+          eyeFrameColor: preset.eye,
+          eyeBallColor: preset.eye,
+        });
         notifyUndo(`${preset.label} colors applied`);
       },
     });
@@ -127,7 +133,13 @@ export function buildCommands(host: CommandHost): Command[] {
       group: 'Edit',
       keywords: 'black white default',
       run: () => {
-        store.updateConfig({ fgColor: DEFAULT_CONFIG.fgColor, bgColor: DEFAULT_CONFIG.bgColor, eyeColor: DEFAULT_CONFIG.eyeColor });
+        store.updateConfig({
+          fgColor: DEFAULT_CONFIG.fgColor,
+          bgColor: DEFAULT_CONFIG.bgColor,
+          eyeColor: DEFAULT_CONFIG.eyeColor,
+          eyeFrameColor: undefined,
+          eyeBallColor: undefined,
+        });
         notifyUndo('Colors reset');
       },
     },

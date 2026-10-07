@@ -37,7 +37,7 @@ export const renderEyes = (
 
   const threshold = options?.luminanceThreshold ?? config.luminanceThreshold ?? 0.25;
 
-  let fgColorDark = options?.fgColorDark || config.fgColorDark || config.eyeColor || config.fgColor;
+  let fgColorDark = options?.fgColorDark || config.fgColorDark || config.eyeFrameColor || config.eyeColor || config.fgColor;
   let fgColorLight = options?.fgColorLight || config.fgColorLight || '#ffffff';
 
   if (!options?.fgColorDark && !config.fgColorDark) {
@@ -59,7 +59,8 @@ export const renderEyes = (
     const y = drawY + r * cellSize;
     const size = 7 * cellSize;
 
-    let eyeColor = config.eyeColor;
+    let frameColor = config.eyeFrameColor || config.eyeColor;
+    let ballColor = config.eyeBallColor || config.eyeColor;
     let holeColor = config.bgColor;
 
     if (cellLuminance || config.isLuminanceMaskingEnabled) {
@@ -74,10 +75,12 @@ export const renderEyes = (
       }
       const avgLum = count > 0 ? totalLum / count : 1.0;
       if (avgLum < threshold) {
-        eyeColor = fgColorLight;
+        frameColor = fgColorLight;
+        ballColor = fgColorLight;
         holeColor = '#000000';
       } else {
-        eyeColor = fgColorDark;
+        frameColor = fgColorDark;
+        ballColor = fgColorDark;
         holeColor = '#ffffff';
       }
     }
@@ -89,7 +92,7 @@ export const renderEyes = (
       size,
       cellSize,
       config.style,
-      eyeColor,
+      frameColor,
       holeColor
     );
 
@@ -100,7 +103,7 @@ export const renderEyes = (
       size,
       cellSize,
       config.style,
-      eyeColor,
+      ballColor,
       holeColor
     );
   };
