@@ -227,7 +227,13 @@ describe('QRTool Component', () => {
     vi.spyOn(document, 'createElement').mockImplementation((tag: string, options?: ElementCreationOptions) => {
       const el = createElement(tag, options);
       if (tag === 'canvas') {
-        Object.defineProperty(el, 'getContext', { value: () => ({ drawImage, imageSmoothingEnabled: true }) });
+        Object.defineProperty(el, 'getContext', {
+          value: () => ({
+            drawImage,
+            imageSmoothingEnabled: true,
+            getImageData: () => ({ data: new Uint8ClampedArray(40000), width: 100, height: 100 }),
+          }),
+        });
       }
       return el;
     });
