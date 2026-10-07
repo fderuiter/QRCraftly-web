@@ -1,6 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
+
+const require = createRequire(import.meta.url);
+const ts = require('typescript');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,23 +36,25 @@ export const AUTHORIZED_NETWORK_FILES = new Set([
 ]);
 
 /**
- * Determines whether a file is a test file or in a dev/sandbox directory.
+ * Determines whether a file or directory is a test file or in a dev/sandbox directory.
  */
-function isExcludedFile(filePath) {
-  const normalized = filePath.replace(/\\/g, '/');
+export function isExcludedFile(filePath) {
+  const relPath = path.isAbsolute(filePath)
+    ? path.relative(repoRoot, filePath).replace(/\\/g, '/')
+    : filePath.replace(/\\/g, '/');
   return (
-    normalized.includes('node_modules') ||
-    normalized.includes('.git') ||
-    normalized.includes('dist') ||
-    normalized.includes('coverage') ||
-    normalized.startsWith('scripts/') ||
-    normalized.startsWith('tests/') ||
-    normalized.startsWith('e2e/') ||
-    normalized.includes('dev-sandbox') ||
-    normalized.endsWith('.test.ts') ||
-    normalized.endsWith('.test.tsx') ||
-    normalized.endsWith('.spec.ts') ||
-    normalized.endsWith('.spec.tsx')
+    relPath.includes('node_modules') ||
+    relPath.includes('.git') ||
+    relPath.includes('dist') ||
+    relPath.includes('coverage') ||
+    relPath.startsWith('scripts/') ||
+    relPath.startsWith('tests/') ||
+    relPath.startsWith('e2e/') ||
+    relPath.includes('dev-sandbox') ||
+    relPath.endsWith('.test.ts') ||
+    relPath.endsWith('.test.tsx') ||
+    relPath.endsWith('.spec.ts') ||
+    relPath.endsWith('.spec.tsx')
   );
 }
 
@@ -81,7 +87,34 @@ export function auditPackageJson() {
 }
 
 /**
- * Scan a single file for forbidden imports or network patterns.
+ * Statically evaluates a string node expression (literals, template strings, string concatenation).
+ */
+export function evaluateExpression(node) {
+  if (!node) return null;
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+    return node.text;
+  }
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const left = evaluateExpression(node.left);
+    const right = evaluateExpression(node.right);
+    if (left !== null && right !== null) {
+      return left + right;
+    }
+  }
+  if (ts.isTemplateExpression(node)) {
+    let text = node.head.text;
+    for (const span of node.templateSpans) {
+      const expr = evaluateExpression(span.expression);
+      if (expr === null) return null;
+      text += expr + span.literal.text;
+    }
+    return text;
+  }
+  return null;
+}
+
+/**
+ * Scan a single file for forbidden imports or network patterns using TypeScript AST parsing.
  */
 export function scanFileForCompliance(filePath) {
   const absolutePath = path.resolve(filePath);
@@ -91,99 +124,171 @@ export function scanFileForCompliance(filePath) {
   if (isExcludedFile(relativePath)) return [];
 
   const content = fs.readFileSync(absolutePath, 'utf8');
-  const lines = content.split(/\r?\n/);
+  let sourceFile;
+  try {
+    sourceFile = ts.createSourceFile(relativePath, content, ts.ScriptTarget.Latest, true);
+  } catch (_err) {
+    return [];
+  }
+
   const violations = [];
 
-  // 1. Scan for forbidden imports (ES imports or CommonJS requires)
-  FORBIDDEN_IMPORTS.forEach(forbidden => {
-    const importRegex = new RegExp(`from\\s+['"]${forbidden}['"]|require\\s*\\(\\s*['"]${forbidden}['"]\\)`, 'i');
-    lines.forEach((line, index) => {
-      if (importRegex.test(line)) {
+  function checkForbiddenImport(specifier, node) {
+    if (!specifier) return;
+    const lowerSpec = specifier.toLowerCase();
+    for (const forbidden of FORBIDDEN_IMPORTS) {
+      const lowerForbidden = forbidden.toLowerCase();
+      if (lowerSpec === lowerForbidden || lowerSpec.startsWith(lowerForbidden + '/')) {
+        const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
         violations.push({
           file: relativePath,
-          line: index + 1,
+          line: line + 1,
           type: 'Forbidden Network/Server-Side Import',
           message: `Attempted to import or require '${forbidden}' which is forbidden to protect client-side boundaries.`
         });
+        break;
       }
-    });
-  });
+    }
+  }
 
-  // 2. Scan for network requests if not authorized
-  const hasFetch = content.includes('fetch(') || content.includes('fetch ');
-  const hasXhr = content.includes('XMLHttpRequest');
-  const hasWebSocket = content.includes('WebSocket(') || content.includes('new WebSocket');
-  const hasSendBeacon = content.includes('sendBeacon(');
+  function visit(node) {
+    // 1. Static imports and exports
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      if (node.moduleSpecifier) {
+        const specifier = evaluateExpression(node.moduleSpecifier);
+        checkForbiddenImport(specifier, node);
+      }
+    }
+    // 2. Import equals declaration (e.g. import foo = require('bar'))
+    if (ts.isImportEqualsDeclaration(node)) {
+      if (node.moduleReference && ts.isExternalModuleReference(node.moduleReference)) {
+        const specifier = evaluateExpression(node.moduleReference.expression);
+        checkForbiddenImport(specifier, node);
+      }
+    }
+    // 3. Call expressions: CommonJS require(...) and dynamic import(...)
+    if (ts.isCallExpression(node)) {
+      if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+        if (node.arguments.length > 0) {
+          const specifier = evaluateExpression(node.arguments[0]);
+          checkForbiddenImport(specifier, node);
+        }
+      } else if (ts.isIdentifier(node.expression) && node.expression.text === 'require') {
+        if (node.arguments.length > 0) {
+          const specifier = evaluateExpression(node.arguments[0]);
+          checkForbiddenImport(specifier, node);
+        }
+      }
+    }
 
-  if (!AUTHORIZED_NETWORK_FILES.has(relativePath)) {
-    if (hasFetch) {
-      lines.forEach((line, index) => {
-        if ((line.includes('fetch(') || line.includes('fetch ')) && !line.trim().startsWith('//') && !line.trim().startsWith('*')) {
+    // 4. Scan for network requests if not authorized
+    if (!AUTHORIZED_NETWORK_FILES.has(relativePath)) {
+      // fetch call or expression
+      if (ts.isCallExpression(node)) {
+        const expr = node.expression;
+        let isFetchCall = false;
+        if (ts.isIdentifier(expr) && expr.text === 'fetch') {
+          isFetchCall = true;
+        } else if (
+          ts.isPropertyAccessExpression(expr) &&
+          expr.name.text === 'fetch' &&
+          ts.isIdentifier(expr.expression) &&
+          ['window', 'globalThis', 'self'].includes(expr.expression.text)
+        ) {
+          isFetchCall = true;
+        }
+        if (isFetchCall) {
+          const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
           violations.push({
             file: relativePath,
-            line: index + 1,
+            line: line + 1,
             type: 'Unauthorized Network Call',
             message: `Unauthorized network call via 'fetch' in a non-whitelisted file. Client-side boundary violated.`
           });
         }
-      });
-    }
+      }
 
-    if (hasXhr) {
-      lines.forEach((line, index) => {
-        if (line.includes('XMLHttpRequest') && !line.trim().startsWith('//') && !line.trim().startsWith('*')) {
+      // XMLHttpRequest
+      if (
+        (ts.isNewExpression(node) || ts.isCallExpression(node)) &&
+        ((ts.isIdentifier(node.expression) && node.expression.text === 'XMLHttpRequest') ||
+          (ts.isPropertyAccessExpression(node.expression) &&
+            node.expression.name.text === 'XMLHttpRequest' &&
+            ts.isIdentifier(node.expression.expression) &&
+            ['window', 'globalThis', 'self'].includes(node.expression.expression.text)))
+      ) {
+        const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+        violations.push({
+          file: relativePath,
+          line: line + 1,
+          type: 'Unauthorized Network Call',
+          message: `Unauthorized network call via 'XMLHttpRequest'. Client-side boundary violated.`
+        });
+      }
+
+      // WebSocket
+      if (
+        (ts.isNewExpression(node) || ts.isCallExpression(node)) &&
+        ((ts.isIdentifier(node.expression) && node.expression.text === 'WebSocket') ||
+          (ts.isPropertyAccessExpression(node.expression) &&
+            node.expression.name.text === 'WebSocket' &&
+            ts.isIdentifier(node.expression.expression) &&
+            ['window', 'globalThis', 'self'].includes(node.expression.expression.text)))
+      ) {
+        const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+        violations.push({
+          file: relativePath,
+          line: line + 1,
+          type: 'Unauthorized Network Call',
+          message: `Unauthorized network call via 'WebSocket'. Client-side boundary violated.`
+        });
+      }
+
+      // navigator.sendBeacon
+      if (ts.isCallExpression(node)) {
+        const expr = node.expression;
+        if (
+          ts.isPropertyAccessExpression(expr) &&
+          expr.name.text === 'sendBeacon' &&
+          ((ts.isIdentifier(expr.expression) && expr.expression.text === 'navigator') ||
+            (ts.isPropertyAccessExpression(expr.expression) &&
+              expr.expression.name.text === 'navigator' &&
+              ts.isIdentifier(expr.expression.expression) &&
+              ['window', 'globalThis', 'self'].includes(expr.expression.expression.text)))
+        ) {
+          const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
           violations.push({
             file: relativePath,
-            line: index + 1,
-            type: 'Unauthorized Network Call',
-            message: `Unauthorized network call via 'XMLHttpRequest'. Client-side boundary violated.`
-          });
-        }
-      });
-    }
-
-    if (hasWebSocket) {
-      lines.forEach((line, index) => {
-        if ((line.includes('WebSocket(') || line.includes('new WebSocket')) && !line.trim().startsWith('//') && !line.trim().startsWith('*')) {
-          violations.push({
-            file: relativePath,
-            line: index + 1,
-            type: 'Unauthorized Network Call',
-            message: `Unauthorized network call via 'WebSocket'. Client-side boundary violated.`
-          });
-        }
-      });
-    }
-
-    if (hasSendBeacon) {
-      lines.forEach((line, index) => {
-        if (line.includes('sendBeacon(') && !line.trim().startsWith('//') && !line.trim().startsWith('*')) {
-          violations.push({
-            file: relativePath,
-            line: index + 1,
+            line: line + 1,
             type: 'Unauthorized Network Call',
             message: `Unauthorized network call via 'navigator.sendBeacon'. Client-side boundary violated.`
           });
         }
-      });
+      }
     }
+
+    ts.forEachChild(node, visit);
   }
 
+  visit(sourceFile);
   return violations;
 }
 
 /**
- * Recursively find files to audit under src/
+ * Recursively find JS/TS files to audit under repoRoot.
  */
-function findSourceFiles(dir) {
+function findSourceFiles(dir = repoRoot) {
   let results = [];
   const list = fs.readdirSync(dir);
   list.forEach(file => {
     const fullPath = path.join(dir, file);
+    const relPath = path.relative(repoRoot, fullPath).replace(/\\/g, '/');
     const stat = fs.statSync(fullPath);
     if (stat && stat.isDirectory()) {
-      results = results.concat(findSourceFiles(fullPath));
-    } else if (file.endsWith('.ts') || file.endsWith('.tsx') || file.endsWith('.js') || file.endsWith('.jsx')) {
+      if (!isExcludedFile(relPath + '/') && !isExcludedFile(relPath)) {
+        results = results.concat(findSourceFiles(fullPath));
+      }
+    } else if (/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(file) && !isExcludedFile(relPath)) {
       results.push(fullPath);
     }
   });
@@ -201,8 +306,7 @@ export function runComplianceAudit() {
     packageViolations = [err.message];
   }
 
-  const srcDir = path.join(repoRoot, 'src');
-  const sourceFiles = findSourceFiles(srcDir);
+  const sourceFiles = findSourceFiles(repoRoot);
   let codeViolations = [];
 
   for (const file of sourceFiles) {
