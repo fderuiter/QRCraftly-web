@@ -104,6 +104,7 @@ class CanvasPool {
     if (this.frameCanvas.width !== FRAME_PX) this.frameCanvas.width = FRAME_PX;
     if (this.frameCanvas.height !== FRAME_PX) this.frameCanvas.height = FRAME_PX;
 
+    this.frameCtx.setTransform?.(1, 0, 0, 1, 0, 0);
     this.frameCtx.imageSmoothingEnabled = true;
     this.frameCtx.globalAlpha = 1.0;
     this.frameCtx.globalCompositeOperation = 'source-over';
@@ -128,6 +129,7 @@ class CanvasPool {
     if (this.auxCanvas.width !== width) this.auxCanvas.width = width;
     if (this.auxCanvas.height !== height) this.auxCanvas.height = height;
 
+    this.auxCtx.setTransform?.(1, 0, 0, 1, 0, 0);
     this.auxCtx.imageSmoothingEnabled = true;
     this.auxCtx.globalAlpha = 1.0;
     this.auxCtx.globalCompositeOperation = 'source-over';
