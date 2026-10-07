@@ -24,6 +24,11 @@ const SOCIAL_PLATFORM_URLS: Record<SocialPlatform, (handle: string) => string> =
   [SocialPlatform.INSTAGRAM]: (handle) => `https://instagram.com/${handle}`,
   [SocialPlatform.TWITTER]: (handle) => `https://x.com/${handle}`,
   [SocialPlatform.TIKTOK]: (handle) => `https://tiktok.com/@${handle}`,
+  [SocialPlatform.LINKEDIN]: (handle) => `https://linkedin.com/in/${handle}`,
+  [SocialPlatform.YOUTUBE]: (handle) => `https://youtube.com/@${handle}`,
+  [SocialPlatform.FACEBOOK]: (handle) => `https://facebook.com/${handle}`,
+  [SocialPlatform.WHATSAPP]: (handle) => `https://wa.me/${handle}`,
+  [SocialPlatform.GITHUB]: (handle) => `https://github.com/${handle}`,
 };
 
 /**
@@ -67,6 +72,9 @@ export const hydrateSocialData = (raw: string): SocialData => {
     if (SOCIAL_DOMAINS[domain]) {
       result.platform = SOCIAL_DOMAINS[domain];
       let handlePart = pathParts[1] || '';
+      if (domain === 'linkedin.com' && handlePart === 'in') {
+        handlePart = pathParts[2] || '';
+      }
       if (handlePart.startsWith('@')) {
         handlePart = handlePart.substring(1);
       }
