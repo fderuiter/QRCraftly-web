@@ -140,6 +140,10 @@ export interface QRConfig {
   logoBackgroundColor: string;
   /** The color of the position detection patterns (eyes) in the corners. */
   eyeColor: string;
+  /** Optional independent color for the outer finder eye frames. Falls back to eyeColor. */
+  eyeFrameColor?: string;
+  /** Optional independent color for the inner eyeballs. Falls back to eyeColor. */
+  eyeBallColor?: string;
   /** The error correction level. */
   errorCorrectionLevel: QRErrorCorrectionLevel;
   /** Whether to draw a border around the QR code. */

@@ -131,4 +131,90 @@ describe('renderEyes', () => {
     expect(ctx.clearRect).not.toHaveBeenCalled();
     expect(ctx.fillRect).toHaveBeenCalled();
   });
+
+  it('paints outer frame and eyeball with distinct eyeFrameColor and eyeBallColor', () => {
+    const fillStyleSetter = vi.fn();
+    const ctx = createMockCtx();
+    Object.defineProperty(ctx, 'fillStyle', {
+      set: fillStyleSetter,
+      get: () => '',
+      configurable: true,
+    });
+
+    renderEyes(
+      ctx,
+      {
+        ...baseConfig,
+        style: QRStyle.STANDARD,
+        eyeColor: '#000000',
+        eyeFrameColor: '#ff0000',
+        eyeBallColor: '#0000ff',
+      },
+      0,
+      0,
+      10,
+      21
+    );
+
+    expect(fillStyleSetter).toHaveBeenCalledWith('#ff0000');
+    expect(fillStyleSetter).toHaveBeenCalledWith('#0000ff');
+  });
+
+  it('falls back to eyeColor when eyeFrameColor or eyeBallColor are omitted', () => {
+    const fillStyleSetter = vi.fn();
+    const ctx = createMockCtx();
+    Object.defineProperty(ctx, 'fillStyle', {
+      set: fillStyleSetter,
+      get: () => '',
+      configurable: true,
+    });
+
+    renderEyes(
+      ctx,
+      {
+        ...baseConfig,
+        style: QRStyle.STANDARD,
+        eyeColor: '#123456',
+        eyeFrameColor: undefined,
+        eyeBallColor: undefined,
+      },
+      0,
+      0,
+      10,
+      21
+    );
+
+    expect(fillStyleSetter).toHaveBeenCalledWith('#123456');
+  });
+
+  it('overrides both eye frame and ball colors when luminance masking is enabled', () => {
+    const fillStyleSetter = vi.fn();
+    const ctx = createMockCtx();
+    Object.defineProperty(ctx, 'fillStyle', {
+      set: fillStyleSetter,
+      get: () => '',
+      configurable: true,
+    });
+
+    renderEyes(
+      ctx,
+      {
+        ...baseConfig,
+        style: QRStyle.STANDARD,
+        eyeFrameColor: '#00ff00',
+        eyeBallColor: '#ff00ff',
+        fgColorDark: '#111111',
+        fgColorLight: '#eeeeee',
+        isLuminanceMaskingEnabled: true,
+      },
+      0,
+      0,
+      10,
+      21
+    );
+
+    expect(fillStyleSetter).not.toHaveBeenCalledWith('#00ff00');
+    expect(fillStyleSetter).not.toHaveBeenCalledWith('#ff00ff');
+    expect(fillStyleSetter).toHaveBeenCalledWith('#111111');
+  });
 });

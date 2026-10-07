@@ -48,7 +48,48 @@ describe('ColorControls', () => {
     const classic = screen.getByRole('radio', { name: /select classic theme/i });
     expect(classic).toHaveAttribute('aria-checked', 'true');
     fireEvent.click(screen.getByRole('radio', { name: /select midnight theme/i }));
-    expect(handleChange).toHaveBeenCalledWith({ fgColor: '#f8fafc', bgColor: '#020617', eyeColor: '#38bdf8' });
+    expect(handleChange).toHaveBeenCalledWith({
+      fgColor: '#f8fafc',
+      bgColor: '#020617',
+      eyeColor: '#38bdf8',
+      eyeFrameColor: '#38bdf8',
+      eyeBallColor: '#38bdf8',
+    });
+  });
+
+  it('allows updating eye frame and eye ball colors independently', () => {
+    const handleChange = vi.fn();
+    render(<ColorControls config={{ ...DEFAULT_CONFIG, fgColor: '#000000', bgColor: '#ffffff', eyeColor: '#000000' }} onChange={handleChange} />);
+
+    const eyeFrameInput = screen.getByLabelText('Eye Frame');
+    fireEvent.change(eyeFrameInput, { target: { value: '#ff0000' } });
+    expect(handleChange).toHaveBeenCalledWith({ eyeFrameColor: '#ff0000' });
+
+    const eyeBallInput = screen.getByLabelText('Eye Ball');
+    fireEvent.change(eyeBallInput, { target: { value: '#00ff00' } });
+    expect(handleChange).toHaveBeenCalledWith({ eyeBallColor: '#00ff00' });
+  });
+
+  it('triggers low contrast warning when either eye frame or eye ball color has low contrast against background', () => {
+    const handleChange = vi.fn();
+
+    // Low contrast eye frame (#ffffff on #ffffff)
+    const { rerender } = render(
+      <ColorControls
+        config={{ ...DEFAULT_CONFIG, fgColor: '#000000', bgColor: '#ffffff', eyeFrameColor: '#ffffff', eyeBallColor: '#000000' }}
+        onChange={handleChange}
+      />
+    );
+    expect(screen.getByText(/Warning: The contrast ratio is low/i)).toBeInTheDocument();
+
+    // Low contrast eye ball (#ffffff on #ffffff)
+    rerender(
+      <ColorControls
+        config={{ ...DEFAULT_CONFIG, fgColor: '#000000', bgColor: '#ffffff', eyeFrameColor: '#000000', eyeBallColor: '#ffffff' }}
+        onChange={handleChange}
+      />
+    );
+    expect(screen.getByText(/Warning: The contrast ratio is low/i)).toBeInTheDocument();
   });
 
   it('keeps one tab stop and no checked radio for custom colours', () => {

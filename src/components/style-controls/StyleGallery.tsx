@@ -121,7 +121,7 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
   const colorTiles = useMemo<Tile[]>(
     () =>
       PRESET_COLORS.map((c) => {
-        const patch = { fgColor: c.fg, bgColor: c.bg, eyeColor: c.eye };
+        const patch = { fgColor: c.fg, bgColor: c.bg, eyeColor: c.eye, eyeFrameColor: c.eye, eyeBallColor: c.eye };
         return { id: `color:${c.label}`, name: c.label, patch, choice: choiceOf(source, patch) };
       }),
     [source]
@@ -135,7 +135,7 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
     let cancelled = false;
     const tiles = [
       ...PATTERNS.map((p) => ({ id: `pattern:${p.id}`, choice: choiceOf(settled, { style: p.id }) })),
-      ...PRESET_COLORS.map((c) => ({ id: `color:${c.label}`, choice: choiceOf(settled, { fgColor: c.fg, bgColor: c.bg, eyeColor: c.eye }) })),
+      ...PRESET_COLORS.map((c) => ({ id: `color:${c.label}`, choice: choiceOf(settled, { fgColor: c.fg, bgColor: c.bg, eyeColor: c.eye, eyeFrameColor: c.eye, eyeBallColor: c.eye }) })),
     ];
     void (async () => {
       for (const tile of tiles) {

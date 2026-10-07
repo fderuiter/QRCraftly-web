@@ -82,6 +82,10 @@ Animation configuration structures in `types.ts` are strictly statically typed t
 
 Maze overlay configurations in `types.ts` (e.g., `isMazeEnabled`, `isMazeBridgesEnabled`, `mazeColor`, `mazePathWidth`, `showMazeSolution`) are statically typed and strictly validated at runtime. This prevents injection or path manipulation during maze rendering. Web calendar providers (`CalendarProvider` in `types.ts`) construct direct calendar URLs for Google, Outlook, Office 365, and Yahoo, validating all parameter links with `isDangerousUrl` to prevent URI injection attacks.
 
+## Independent Eye Colors
+
+Finder pattern color properties in `types.ts` (`eyeFrameColor` and `eyeBallColor`) are statically typed visual parameters. They allow distinct outer frame and inner eyeball styling while falling back safely to `eyeColor`.
+
 ## JSON-LD Caching & Performance Security
 
 Structured data is rendered by the server-only Head at prerender time ([ADR 0034](./adr/0034-page-content-at-prerender.md)). To keep repeated renders cheap, the application caches serialized and escaped JSON-LD schema strings. Since JSON-LD requires synchronous regex replacement of unsafe characters (such as `<` and `>`), caching the computed string primitives protects the main thread from CPU-heavy operations while keeping cache keys lightweight and clean of memory leaks. The escaping itself lives in `safeJsonLdStringify` (`src/utils/security.ts`): it serialises any JSON value and rewrites `<`, `>` and `&` as `\u003c`, `\u003e` and `\u0026`, so schema text can never close the surrounding `<script>` element. `JsonLdScript` (`src/components/ui/JsonLdScript.tsx`) is the component that injects the result.
