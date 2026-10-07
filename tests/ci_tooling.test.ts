@@ -138,7 +138,7 @@ describe('setup composite action', () => {
   it('supports cache-playwright input with actions/cache for ~/.cache/ms-playwright', () => {
     expect(action).toContain('cache-playwright:');
     expect(action).toContain('default: "false"');
-    expect(action).toMatch(/uses: actions\/cache@[0-9a-f]{40}/);
+    expect(action).toMatch(/uses: actions\/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57/);
     expect(action).toContain('path: ~/.cache/ms-playwright');
     expect(action).toContain("key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}");
   });
