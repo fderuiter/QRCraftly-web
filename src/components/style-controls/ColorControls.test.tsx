@@ -98,4 +98,54 @@ describe('ColorControls', () => {
     expect(radios.filter((r) => r.getAttribute('aria-checked') === 'true')).toHaveLength(0);
     expect(radios.filter((r) => r.tabIndex === 0)).toHaveLength(1);
   });
+
+  it('toggles transparent background and disables background color input', () => {
+    const handleChange = vi.fn();
+    render(<ColorControls config={{ ...DEFAULT_CONFIG, fgColor: '#000000', bgColor: '#ffffff' }} onChange={handleChange} />);
+
+    const bgInput = screen.getByLabelText('Background');
+    expect(bgInput).not.toBeDisabled();
+
+    const checkbox = screen.getByRole('checkbox', { name: /transparent background/i });
+    expect(checkbox).not.toBeChecked();
+
+    fireEvent.click(checkbox);
+    expect(handleChange).toHaveBeenCalledWith({ bgColor: 'transparent' });
+  });
+
+  it('renders disabled background input and checked toggle when bgColor is transparent', () => {
+    const handleChange = vi.fn();
+    render(<ColorControls config={{ ...DEFAULT_CONFIG, fgColor: '#000000', bgColor: 'transparent' }} onChange={handleChange} />);
+
+    const bgInput = screen.getByLabelText('Background');
+    expect(bgInput).toBeDisabled();
+
+    const checkbox = screen.getByRole('checkbox', { name: /transparent background/i });
+    expect(checkbox).toBeChecked();
+
+    fireEvent.click(checkbox);
+    expect(handleChange).toHaveBeenCalledWith({ bgColor: '#ffffff' });
+  });
+
+  it('evaluates contrast ratio against white fallback when bgColor is transparent', () => {
+    const handleChange = vi.fn();
+
+    // White foreground on transparent background (evaluated against #ffffff -> low contrast)
+    const { rerender } = render(
+      <ColorControls
+        config={{ ...DEFAULT_CONFIG, fgColor: '#ffffff', bgColor: 'transparent' }}
+        onChange={handleChange}
+      />
+    );
+    expect(screen.getByText(/Warning: The contrast ratio is low/i)).toBeInTheDocument();
+
+    // Black foreground on transparent background (evaluated against #ffffff -> high contrast)
+    rerender(
+      <ColorControls
+        config={{ ...DEFAULT_CONFIG, fgColor: '#000000', bgColor: 'transparent' }}
+        onChange={handleChange}
+      />
+    );
+    expect(screen.queryByText(/Warning: The contrast ratio is low/i)).not.toBeInTheDocument();
+  });
 });

@@ -61,8 +61,11 @@ function drawNoneBackground(
   width: number,
   height: number
 ): void {
-  ctx.fillStyle = resolveTemplateBg(config);
-  ctx.fillRect(0, 0, width, height);
+  const bg = resolveTemplateBg(config);
+  if (bg !== 'transparent') {
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, width, height);
+  }
 }
 
 /**
@@ -273,7 +276,7 @@ export function drawWithTemplate(
   if (!isNoneSquare) {
     const safePad = qrSize * 0.05;
     ctx.save();
-    ctx.fillStyle = config.bgColor; // always the QR's own background
+    ctx.fillStyle = config.bgColor === 'transparent' ? '#ffffff' : config.bgColor; // always the QR's own background
     const r = qrSize * 0.04; // corner radius
     const rx = qrX - safePad;
     const ry = qrY - safePad;
