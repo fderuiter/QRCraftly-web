@@ -313,6 +313,17 @@ export interface SmsData {
 }
 
 /**
+ * Supported web calendar providers.
+ */
+export enum CalendarProvider {
+  ICAL = 'ical',
+  GOOGLE = 'google',
+  OUTLOOK = 'outlook',
+  OFFICE365 = 'office365',
+  YAHOO = 'yahoo',
+}
+
+/**
  * Data structure for calendar event information.
  */
 export interface EventData {
@@ -326,6 +337,8 @@ export interface EventData {
   location: string;
   /** The event description. */
   description: string;
+  /** Target web calendar provider or standard iCal. */
+  provider?: CalendarProvider | string;
 }
 
 /**

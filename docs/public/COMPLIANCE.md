@@ -19,6 +19,7 @@ This application is designed to **support** HIPAA-compliant workflows through a 
 - **Animation Loop Frames:** Any cached frames or matrices generated for animation loops are also kept solely in volatile client-side memory.
 - **Playable Maze Overlay:** All coordinates, keep-out boundary zones, scannability-audited finder pattern bridge channels, and solutions computed for the playable maze overlay are processed completely in-memory locally in the user's browser, ensuring absolute privacy and data isolation.
 - **Bulk CSV Batch Processing:** An uploaded CSV, the rows parsed from it (at most 500 per batch) and the QR codes and ZIP archive built from them stay in volatile memory on the main thread. The parser and ZIP writer are local code (`src/packages/bulk-csv/`) with no network access, nothing is persisted, and the download's Blob URL is revoked right after the download starts.
+- **Calendar Event Processing:** Calendar events and target web calendar URLs (iCal, Google Calendar, Outlook Web, Office 365, Yahoo Calendar) are constructed and formatted purely in client-side memory without transmission to external servers.
 
 ### 2. Logging & Metrics Policy
 

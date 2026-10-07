@@ -45,3 +45,4 @@ export {
   FILENAME_COLUMN_PATTERN,
   type BulkCsvPreview,
 } from './lib/preview';
+export { SAMPLE_CSV_TEMPLATE } from './lib/template';

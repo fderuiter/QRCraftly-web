@@ -66,6 +66,8 @@ interface ScanHudProps {
   empirical: EmpiricalState;
   /** Whether a native BarcodeDetector is in use. */
   isNative: boolean;
+  /** Whether the fallback payload was encoded because the requested payload failed. */
+  usedFallback?: boolean;
 }
 
 /**
@@ -75,7 +77,7 @@ interface ScanHudProps {
  * @param props - HUD properties.
  * @returns The HUD card.
  */
-export function ScanHud({ analysis, empirical, isNative }: ScanHudProps) {
+export function ScanHud({ analysis, empirical, isNative, usedFallback }: ScanHudProps) {
   const tone = healthTone(analysis.healthPercent);
   const finderPercent = Math.round(analysis.worstFinderRatio * 100);
 
@@ -149,6 +151,14 @@ export function ScanHud({ analysis, empirical, isNative }: ScanHudProps) {
             {empirical.status === 'scannable' && empirical.decoded ? empirical.decoded : <span className="text-rose-700 italic dark:text-rose-300">[No data decoded]</span>}
           </p>
         </div>
+        {usedFallback && (
+          <p className="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200" data-testid="arcade-hud-fallback-badge">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+            <span>
+              Scanner reads fallback default address <code className="font-mono font-semibold">https://qrcraftly.com</code> because input payload failed to encode.
+            </span>
+          </p>
+        )}
         <p className="mt-2 text-xs text-fg-muted">
           {isNative ? 'Decoded by the native BarcodeDetector.' : 'Decoded off-thread by the Scannability Worker.'} Frames are downscaled to 256×256 and never leave this device.
         </p>

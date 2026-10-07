@@ -77,9 +77,9 @@ The build and pre-commit pipelines run static AST analysis (`scripts/storage_pri
 
 Animation configuration structures in `types.ts` are strictly statically typed to prevent any runtime execution or script-injection pathways during high-frequency loop playbacks.
 
-## Playable Maze Overlay
+## Playable Maze Overlay & Web Calendar Integration
 
-Maze overlay configurations in `types.ts` (e.g., `isMazeEnabled`, `isMazeBridgesEnabled`, `mazeColor`, `mazePathWidth`, `showMazeSolution`) are statically typed and strictly validated at runtime. This prevents injection or path manipulation during maze rendering.
+Maze overlay configurations in `types.ts` (e.g., `isMazeEnabled`, `isMazeBridgesEnabled`, `mazeColor`, `mazePathWidth`, `showMazeSolution`) are statically typed and strictly validated at runtime. This prevents injection or path manipulation during maze rendering. Web calendar providers (`CalendarProvider` in `types.ts`) construct direct calendar URLs for Google, Outlook, Office 365, and Yahoo, validating all parameter links with `isDangerousUrl` to prevent URI injection attacks.
 
 ## JSON-LD Caching & Performance Security
 
