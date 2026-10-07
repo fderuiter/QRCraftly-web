@@ -249,7 +249,7 @@ export const identifyProtocol = (raw: string): QRType | null => {
   const lower = trimmed.toLowerCase();
   if (lower.startsWith('geo:')) return QRType.LOCATION;
   if (lower.startsWith('wifi:')) return QRType.WIFI;
-  if (/begin:vcard/i.test(trimmed)) return QRType.VCARD;
+  if (/begin:vcard/i.test(trimmed) || /^mecard:/i.test(trimmed)) return QRType.VCARD;
   if (/begin:v(event|calendar)/i.test(trimmed)) return QRType.EVENT;
   if (/^(bitcoin|ethereum|litecoin|solana):/i.test(trimmed)) return QRType.PAYMENT;
   if (/^BCD\r?\n/i.test(trimmed)) return QRType.PAYMENT;

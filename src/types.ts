@@ -268,6 +268,8 @@ export interface EmailData {
  * Data structure for a vCard (electronic business card).
  */
 export interface VCardData {
+  /** The contact format standard version. Defaults to '3.0'. */
+  version?: '2.1' | '3.0' | '4.0' | 'mecard';
   /** The first name of the contact. */
   firstName: string;
   /** The last name of the contact. */
