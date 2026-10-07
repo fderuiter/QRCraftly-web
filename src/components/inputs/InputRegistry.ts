@@ -2,9 +2,6 @@ import { getPublicDomain } from "../../utils/metadataEngine";
 import React from "react";
 import {
   QRType,
-  WifiEncryption,
-  CryptoNetwork,
-  SocialPlatform,
   UrlData,
   TextData,
   WifiData,
@@ -14,13 +11,12 @@ import {
   SmsData,
   PaymentData,
   EventData,
-  CalendarProvider,
   LocationData,
   MeetingData,
   SocialData,
   BulkCsvData,
 } from "../../types";
-import { QR_GENERATORS } from "@/packages/qr-payload";
+import { QR_GENERATORS, getSamplePayload } from "@/packages/qr-payload";
 
 import { UrlInput } from "./UrlInput";
 import { TextInput } from "./TextInput";
@@ -88,118 +84,70 @@ export const INPUT_REGISTRY: Registry = {
   },
   [QRType.WIFI]: {
     Component: WifiInput,
-    initialState: {
-      ssid: "",
-      password: "",
-      encryption: WifiEncryption.WPA,
-      hidden: false,
-      eapIdentity: "",
-    } as WifiData,
+    initialState: QR_GENERATORS[QRType.WIFI].hydrate(getSamplePayload(QRType.WIFI)),
     constructFn: QR_GENERATORS[QRType.WIFI].construct,
     hydrateFn: QR_GENERATORS[QRType.WIFI].hydrate,
     canHydrateFn: QR_GENERATORS[QRType.WIFI].matches,
   },
   [QRType.EVENT]: {
     Component: EventInput,
-    initialState: {
-      title: "",
-      startDate: "",
-      endDate: "",
-      location: "",
-      description: "",
-      provider: CalendarProvider.ICAL,
-    } as EventData,
+    initialState: QR_GENERATORS[QRType.EVENT].hydrate(getSamplePayload(QRType.EVENT)),
     constructFn: QR_GENERATORS[QRType.EVENT].construct,
     hydrateFn: QR_GENERATORS[QRType.EVENT].hydrate,
     canHydrateFn: QR_GENERATORS[QRType.EVENT].matches,
   },
   [QRType.EMAIL]: {
     Component: EmailInput,
-    initialState: {
-      email: "",
-      subject: "",
-      body: "",
-    } as EmailData,
+    initialState: QR_GENERATORS[QRType.EMAIL].hydrate(getSamplePayload(QRType.EMAIL)),
     constructFn: QR_GENERATORS[QRType.EMAIL].construct,
     hydrateFn: QR_GENERATORS[QRType.EMAIL].hydrate,
     canHydrateFn: QR_GENERATORS[QRType.EMAIL].matches,
   },
   [QRType.VCARD]: {
     Component: VCardInput,
-    initialState: {
-      version: "3.0",
-      firstName: "",
-      lastName: "",
-      organization: "",
-      title: "",
-      phone: "",
-      email: "",
-      website: "",
-      street: "",
-      city: "",
-      zip: "",
-      country: "",
-    } as VCardData,
+    initialState: QR_GENERATORS[QRType.VCARD].hydrate(getSamplePayload(QRType.VCARD)),
     constructFn: QR_GENERATORS[QRType.VCARD].construct,
     hydrateFn: QR_GENERATORS[QRType.VCARD].hydrate,
     canHydrateFn: QR_GENERATORS[QRType.VCARD].matches,
   },
   [QRType.PHONE]: {
     Component: PhoneInput,
-    initialState: {
-      number: "",
-    } as PhoneData,
+    initialState: QR_GENERATORS[QRType.PHONE].hydrate(getSamplePayload(QRType.PHONE)),
     constructFn: QR_GENERATORS[QRType.PHONE].construct,
     hydrateFn: QR_GENERATORS[QRType.PHONE].hydrate,
     canHydrateFn: QR_GENERATORS[QRType.PHONE].matches,
   },
   [QRType.SMS]: {
     Component: SmsInput,
-    initialState: {
-      number: "",
-      message: "",
-    } as SmsData,
+    initialState: QR_GENERATORS[QRType.SMS].hydrate(getSamplePayload(QRType.SMS)),
     constructFn: QR_GENERATORS[QRType.SMS].construct,
     hydrateFn: QR_GENERATORS[QRType.SMS].hydrate,
     canHydrateFn: QR_GENERATORS[QRType.SMS].matches,
   },
   [QRType.PAYMENT]: {
     Component: PaymentInput,
-    initialState: {
-      network: CryptoNetwork.BITCOIN,
-      address: "",
-      amount: "",
-      label: "",
-    } as PaymentData,
+    initialState: QR_GENERATORS[QRType.PAYMENT].hydrate(getSamplePayload(QRType.PAYMENT)),
     constructFn: QR_GENERATORS[QRType.PAYMENT].construct,
     hydrateFn: QR_GENERATORS[QRType.PAYMENT].hydrate,
     canHydrateFn: QR_GENERATORS[QRType.PAYMENT].matches,
   },
   [QRType.LOCATION]: {
     Component: LocationInput,
-    initialState: {
-      latitude: "",
-      longitude: "",
-    } as LocationData,
+    initialState: QR_GENERATORS[QRType.LOCATION].hydrate(getSamplePayload(QRType.LOCATION)),
     constructFn: QR_GENERATORS[QRType.LOCATION].construct,
     hydrateFn: QR_GENERATORS[QRType.LOCATION].hydrate,
     canHydrateFn: QR_GENERATORS[QRType.LOCATION].matches,
   },
   [QRType.MEETING]: {
     Component: MeetingInput,
-    initialState: {
-      url: "",
-    } as MeetingData,
+    initialState: QR_GENERATORS[QRType.MEETING].hydrate(getSamplePayload(QRType.MEETING)),
     constructFn: QR_GENERATORS[QRType.MEETING].construct,
     hydrateFn: QR_GENERATORS[QRType.MEETING].hydrate,
     canHydrateFn: QR_GENERATORS[QRType.MEETING].matches,
   },
   [QRType.SOCIAL]: {
     Component: SocialInput,
-    initialState: {
-      platform: SocialPlatform.INSTAGRAM,
-      handle: "",
-    } as SocialData,
+    initialState: QR_GENERATORS[QRType.SOCIAL].hydrate(getSamplePayload(QRType.SOCIAL)),
     constructFn: QR_GENERATORS[QRType.SOCIAL].construct,
     hydrateFn: QR_GENERATORS[QRType.SOCIAL].hydrate,
     canHydrateFn: QR_GENERATORS[QRType.SOCIAL].matches,

@@ -267,6 +267,57 @@ describe("useInputLogic", () => {
     // Should fall back to default initial state rather than old custom value
     expect(freshHook.current.inputProps.data).toEqual({ url: "https://qrcraftly.com" });
   });
+
+  it("should prepopulate non-URL types with sample input values and emit constructed sample payload on tab switch", () => {
+    const config = createMockConfig(QRType.URL, "https://qrcraftly.com");
+    const onChange = vi.fn();
+
+    const { result, rerender } = renderHook(
+      ({ cfg }) => useInputLogic(cfg, onChange),
+      { initialProps: { cfg: config } }
+    );
+
+    // Swap tab to WiFi with an empty config value (simulating tab switch)
+    const wifiConfig = createMockConfig(QRType.WIFI, "");
+    rerender({ cfg: wifiConfig });
+
+    // Expect initial state for WiFi to be populated with sample data
+    expect((result.current.inputProps.data as any).ssid).toBe("QRCraftly_Guest");
+    expect((result.current.inputProps.data as any).password).toBe("examplepass123");
+    // Expect onChange to be called with the constructed sample payload
+    expect(onChange).toHaveBeenCalledWith({ value: "WIFI:T:WPA;S:QRCraftly_Guest;P:examplepass123;;" });
+
+    // Swap tab to VCARD with an empty config value
+    const vCardConfig = createMockConfig(QRType.VCARD, "");
+    rerender({ cfg: vCardConfig });
+
+    expect((result.current.inputProps.data as any).firstName).toBe("Jane");
+    expect((result.current.inputProps.data as any).organization).toBe("QRCraftly");
+    expect(onChange).toHaveBeenLastCalledWith({
+      value: expect.stringContaining("BEGIN:VCARD"),
+    });
+  });
+
+  it("should preserve explicitly cleared empty non-URL input state across route remounts without overwriting with sample defaults", () => {
+    const onChange1 = vi.fn();
+    const wifiConfig = createMockConfig(QRType.WIFI, "WIFI:T:WPA;S:QRCraftly_Guest;P:examplepass123;;");
+
+    // Route 1 (WiFi generator): user clears all input fields
+    const { result: wifiHook, unmount: unmountWifi } = renderHook(() => useInputLogic(wifiConfig, onChange1));
+    act(() => {
+      wifiHook.current.inputProps.onChange({ ssid: "", password: "" });
+    });
+    unmountWifi();
+
+    // Route 2: Return to WiFi route with default / empty config
+    const onChange2 = vi.fn();
+    const returnWifiConfig = createMockConfig(QRType.WIFI, "");
+    const { result: returnWifiHook } = renderHook(() => useInputLogic(returnWifiConfig, onChange2));
+
+    // Retained cache should preserve the explicitly cleared state ("")
+    expect((returnWifiHook.current.inputProps.data as any).ssid).toBe("");
+    expect((returnWifiHook.current.inputProps.data as any).password).toBe("");
+  });
 });
 
 describe("useInputLogic flush", () => {

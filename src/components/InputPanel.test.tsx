@@ -154,8 +154,8 @@ describe('InputPanel Component', () => {
       vi.advanceTimersByTime(100);
     });
 
-    // Default encryption is WPA
-    const expectedValue = `WIFI:T:WPA;S:MyWiFi;P:;;`;
+    // Default encryption is WPA and initial sample password is examplepass123
+    const expectedValue = `WIFI:T:WPA;S:MyWiFi;P:examplepass123;;`;
     expect(mockOnChange).toHaveBeenCalledWith({ value: expectedValue });
   });
 
@@ -357,6 +357,7 @@ describe('InputPanel Component', () => {
       // Address
       fireEvent.change(screen.getByLabelText('Street'), { target: { value: '123 Main St' } });
       fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Metropolis' } });
+      fireEvent.change(screen.getByLabelText('ZIP / Postal Code'), { target: { value: '' } });
       fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'USA' } });
 
       act(() => { vi.advanceTimersByTime(1000); }); // Wait for all updates
@@ -387,6 +388,11 @@ describe('InputPanel Component', () => {
     renderPanel({ type: QRType.PAYMENT });
 
     const addressInput = screen.getByLabelText('Receiver Address');
+    const amountInput = screen.getByLabelText(/Amount/i);
+    const labelInput = screen.getByLabelText(/Label \/ Note/i);
+
+    fireEvent.change(amountInput, { target: { value: '' } });
+    fireEvent.change(labelInput, { target: { value: '' } });
     fireEvent.change(addressInput, { target: { value: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa' } });
     act(() => { vi.advanceTimersByTime(100); });
 
@@ -394,13 +400,11 @@ describe('InputPanel Component', () => {
     expect(mockOnChange).toHaveBeenLastCalledWith({ value: 'bitcoin:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa' });
 
     // Add amount
-    const amountInput = screen.getByLabelText(/Amount/i);
     fireEvent.change(amountInput, { target: { value: '0.005' } });
     act(() => { vi.advanceTimersByTime(100); });
     expect(mockOnChange).toHaveBeenLastCalledWith({ value: 'bitcoin:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa?amount=0.005' });
 
     // Add label
-    const labelInput = screen.getByLabelText(/Label \/ Note/i);
     fireEvent.change(labelInput, { target: { value: 'Donation for Coffee' } });
     act(() => { vi.advanceTimersByTime(100); });
     expect(mockOnChange).toHaveBeenLastCalledWith({ value: 'bitcoin:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa?amount=0.005&label=Donation%20for%20Coffee' });
