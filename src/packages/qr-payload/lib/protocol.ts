@@ -249,9 +249,12 @@ export const identifyProtocol = (raw: string): QRType | null => {
   const lower = trimmed.toLowerCase();
   if (lower.startsWith('geo:')) return QRType.LOCATION;
   if (lower.startsWith('wifi:')) return QRType.WIFI;
-  if (/begin:vcard/i.test(trimmed)) return QRType.VCARD;
+  if (/begin:vcard/i.test(trimmed) || /^mecard:/i.test(trimmed)) return QRType.VCARD;
   if (/begin:v(event|calendar)/i.test(trimmed)) return QRType.EVENT;
   if (/^(bitcoin|ethereum|litecoin|solana):/i.test(trimmed)) return QRType.PAYMENT;
+  if (/^BCD\r?\n/i.test(trimmed)) return QRType.PAYMENT;
+  // eslint-disable-next-line security/detect-unsafe-regex -- linear: non-overlapping optional scheme, www prefix, and domain choices.
+  if (/^(https?:\/\/)?(www\.)?(paypal\.me|cash\.app|venmo\.com)\//i.test(trimmed)) return QRType.PAYMENT;
 
   const parsed = parseProtocol(trimmed);
 
@@ -271,6 +274,11 @@ export const identifyProtocol = (raw: string): QRType | null => {
         domain = domain.substring(4);
       }
 
+      const isDomain = (d: string) => domain === d || domain.endsWith(`.${d}`);
+      if (isDomain('paypal.me') || isDomain('cash.app') || isDomain('venmo.com')) {
+        return QRType.PAYMENT;
+      }
+
       // Find if any known domain is a suffix of the current domain
       const knownSocial = Object.keys(SOCIAL_DOMAINS).find(
         (d) => domain === d || domain.endsWith(`.${d}`)
@@ -279,7 +287,6 @@ export const identifyProtocol = (raw: string): QRType | null => {
         return QRType.SOCIAL;
       }
 
-      const isDomain = (d: string) => domain === d || domain.endsWith(`.${d}`);
       if (
         isDomain('calendar.google.com') ||
         isDomain('outlook.live.com') ||

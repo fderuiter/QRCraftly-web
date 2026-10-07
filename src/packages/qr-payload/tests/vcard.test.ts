@@ -23,6 +23,7 @@ import { QRType } from '@/types';
 describe('VCard generator', () => {
   it('constructs and hydrates successfully', () => {
     const data = {
+      version: '3.0' as const,
       firstName: 'John',
       lastName: 'Doe',
       organization: 'Acme Corp',
@@ -43,6 +44,7 @@ describe('VCard generator', () => {
 
   it('handles empty values or non-vcard strings', () => {
     expect(hydrateVCardData('random')).toEqual({
+      version: '3.0',
       firstName: '',
       lastName: '',
       organization: '',
@@ -212,5 +214,85 @@ describe('VCard generator', () => {
 
     // URL with parameter but no colon, should have no violations
     expect(VCardContract.validate?.('BEGIN:VCARD\nURL;TYPE=WORK\nEND:VCARD')).toEqual([]);
+
+    // MECard contract matching and URL validation
+    expect(VCardContract.matches('MECARD:N:Doe,John;')).toBe(true);
+    expect(VCardContract.validate?.('MECARD:N:Doe,John;URL:javascript:alert(1);')).toEqual([
+      'URI_INJECTION_VIOLATION',
+    ]);
+    expect(VCardContract.validate?.('MECARD:N:Doe,John;URL:https://example.com;')).toEqual([]);
+  });
+
+  it('supports vCard 2.1, 3.0, and 4.0 versions', () => {
+    const baseData = {
+      firstName: 'Jane',
+      lastName: 'Smith',
+      organization: 'Tech Corp',
+      title: 'Architect',
+      phone: '+15551234567',
+      email: 'jane@tech.example',
+      website: 'https://tech.example',
+      street: '456 Tech Blvd',
+      city: 'Innovate',
+      zip: '90210',
+      country: 'USA',
+    };
+
+    // vCard 2.1
+    const v21Str = constructVCardString({ ...baseData, version: '2.1' });
+    expect(v21Str).toContain('VERSION:2.1');
+    const hydrated21 = hydrateVCardData(v21Str);
+    expect(hydrated21.version).toBe('2.1');
+    expect(hydrated21.firstName).toBe('Jane');
+    expect(hydrated21.lastName).toBe('Smith');
+
+    // vCard 3.0
+    const v30Str = constructVCardString({ ...baseData, version: '3.0' });
+    expect(v30Str).toContain('VERSION:3.0');
+    const hydrated30 = hydrateVCardData(v30Str);
+    expect(hydrated30.version).toBe('3.0');
+
+    // vCard 4.0
+    const v40Str = constructVCardString({ ...baseData, version: '4.0' });
+    expect(v40Str).toContain('VERSION:4.0');
+    const hydrated40 = hydrateVCardData(v40Str);
+    expect(hydrated40.version).toBe('4.0');
+  });
+
+  it('supports MECard format construction, hydration, and special character escaping', () => {
+    const mecardData = {
+      version: 'mecard' as const,
+      firstName: 'John, Jr.',
+      lastName: 'Doe; III',
+      organization: 'Acme: Corp',
+      title: 'VP, Engineering',
+      phone: '+15559876543',
+      email: 'johndoe@example.com',
+      website: 'https://example.com/contact?id=123',
+      street: '789 Main St, Suite 100',
+      city: 'Metropolis',
+      zip: '10001',
+      country: 'USA',
+    };
+
+    const mecardStr = constructVCardString(mecardData);
+    expect(mecardStr.startsWith('MECARD:')).toBe(true);
+    expect(mecardStr).toContain('N:Doe\\; III,John\\, Jr.;');
+    expect(mecardStr).toContain('ORG:Acme\\: Corp;');
+    expect(mecardStr).toContain('TIL:VP\\, Engineering;');
+
+    const hydrated = hydrateVCardData(mecardStr);
+    expect(hydrated.version).toBe('mecard');
+    expect(hydrated.firstName).toBe('John, Jr.');
+    expect(hydrated.lastName).toBe('Doe; III');
+    expect(hydrated.organization).toBe('Acme: Corp');
+    expect(hydrated.title).toBe('VP, Engineering');
+    expect(hydrated.phone).toBe('+15559876543');
+    expect(hydrated.email).toBe('johndoe@example.com');
+    expect(hydrated.website).toBe('https://example.com/contact?id=123');
+    expect(hydrated.street).toBe('789 Main St, Suite 100');
+    expect(hydrated.city).toBe('Metropolis');
+    expect(hydrated.zip).toBe('10001');
+    expect(hydrated.country).toBe('USA');
   });
 });

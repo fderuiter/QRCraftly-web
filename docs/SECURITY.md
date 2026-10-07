@@ -42,7 +42,7 @@ Please use the [GitHub Security Advisory](https://github.com/fderuiter/QRCraftly
 - **In Scope:**
   - Data leaks (e.g., data being sent to a server).
   - XSS vulnerabilities.
-  - Improper configuration of the client-side generator.
+  - Improper configuration of the client-side generator (including vCard 2.1, 3.0, 4.0, and MECard formats).
   - Bulk CSV processing, custom PNG export resolution settings, & batch ZIP generation privacy boundary violations.
 - **Out of Scope:**
   - Physical security of the user's device.
@@ -54,7 +54,7 @@ To prevent injection of arbitrary characters or command payloads into telephone 
 
 - **General Phone Validation**: By default, general telephone input values are cleaned to remove all non-numeric and non-standard telephone symbols. Characters like semicolons and commas are stripped.
 - **SMS Multi-Recipient Isolation**: To support advanced client-side SMS campaign configurations, the SMS generator uses an isolated sanitization option that preserves semicolons and commas, while rejecting letters, other symbols, and line-break control characters.
-- **URI Delimiter Encoding**: After sanitization, `#` in a dial string is percent-encoded as `%23` (RFC 3966) so it cannot start a URI fragment and truncate the number. Mailto recipients are percent-encoded (RFC 6068, keeping `@`) so `?`, `&`, and `#` in the address cannot inject headers, and crypto wallet addresses are percent-encoded so `&` or `#` cannot inject payment parameters.
+- **URI Delimiter Encoding**: After sanitization, `#` in a dial string is percent-encoded as `%23` (RFC 3966) so it cannot start a URI fragment and truncate the number. Mailto recipients are percent-encoded (RFC 6068, keeping `@`) so `?`, `&`, and `#` in the address cannot inject headers, and crypto wallet addresses, SEPA transfer fields, and fiat payment handles (PayPal, Venmo, Cash App) are sanitized and percent-encoded so `&` or `#` cannot inject payment parameters.
 
 ## SVG Sanitization & Path Tracking
 

@@ -62,14 +62,14 @@ These components capture specialized data structures required to construct disti
 - **LazyBulkCsvInput** (`LazyBulkCsvInput.tsx`): Registry entry for the Bulk CSV Batch type. Renders a placeholder during prerendering and hydration, then loads the batch generator chunk on the client.
 - **LocationInput** (`LocationInput.tsx` / `LocationInput.test.tsx`): High-accuracy coordinate form requiring proper latitude and longitude decimals.
 - **MeetingInput** (`MeetingInput.tsx` / `MeetingInput.test.tsx`): Specialized input fields to enter URL links and meeting passwords.
-- **PaymentInput** (`PaymentInput.tsx`): Cryptocurrency checkout fields validating address formats and value sizes.
+- **PaymentInput** (`PaymentInput.tsx`): Cryptocurrency, SEPA credit transfer (EPC QR), and consumer fiat payment checkout fields validating address formats and handles.
 - **PhoneInput** (`PhoneInput.tsx`): Clean, accessible phone dial code layout.
 - **SmsInput** (`SmsInput.tsx`): SMS composer form holding receiver number and predefined message.
 - **SocialInput** (`SocialInput.tsx` / `SocialInput.test.tsx`): Selectors for major platforms alongside handler name parsing.
 - **TextInput** (`TextInput.tsx`): Minimalist form component capturing standard unformatted text.
 - **TypeSelector** (`TypeSelector.tsx` / `TypeSelector.test.tsx`): QR type navigation rendered as ordinary links to each single-code type's dedicated route inside a labelled `nav` list (twelve links, four per row; the Bulk CSV batch tool is linked from the generator list instead so the grid stays three rows on small phones). The current route is marked with `aria-current="page"` and drawn with token colours as a filled accent tint, a stronger border and a check badge, so selection does not rely on colour alone; labels are `text-sm`. Tab reaches every link and arrow keys are not intercepted. Switching type starts a same-document view transition where the browser supports it and motion is allowed (`src/utils/typeViewTransition.ts`); otherwise navigation is unchanged. Uncommitted form input state is preserved in a volatile module-level cache across route switches.
 - **UrlInput** (`UrlInput.tsx` / `UrlInput.test.tsx`): Website URL field that normalizes the protocol on blur and flags dangerous schemes (`isDangerousUrl`). The URL is encoded directly into a static QR code.
-- **VCardInput** (`VCardInput.tsx`): Extensive contact form detailing names, organization, email, phone, and address.
+- **VCardInput** (`VCardInput.tsx`): Extensive contact form detailing names, organization, email, phone, and address, with format selection for vCard 2.1, 3.0, 4.0, and MECard.
 - **WifiInput** (`WifiInput.tsx` / `WifiInput.test.tsx`): Wireless network panel specifying SSID, passwords, and security type, plus EAP method and phase 2 selects for WPA2-Enterprise.
 
 ---
