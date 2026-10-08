@@ -71,6 +71,18 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       expect(health.criticalWarnings).toContain('critical-contrast');
     });
 
+    it('evaluates contrast against white fallback when bgColor is transparent', () => {
+      const config: QRConfig = {
+        ...getBaseConfig(),
+        fgColor: '#000000',
+        bgColor: 'transparent',
+        eyeColor: '#000000',
+      };
+      const health = calculateScannabilityHealth(config);
+      expect(health.score).toBe(100);
+      expect(health.criticalWarnings).not.toContain('critical-contrast');
+    });
+
     it('deducts score when localized contrast violations occur', () => {
       const config = getBaseConfig();
       const health = calculateScannabilityHealth(config, { violations: 4, minContrast: 2.2 });
