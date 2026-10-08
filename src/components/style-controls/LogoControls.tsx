@@ -75,7 +75,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                   isSelected
-                    ? 'text-accent-fg bg-accent shadow-xs'
+                    ? 'bg-accent-soft font-semibold text-accent-strong shadow-xs'
                     : 'hover:bg-surface-active bg-surface-hover text-fg-muted hover:text-fg'
                 }`}
               >
