@@ -62,14 +62,15 @@ function getCachedThumbnail(config: QRConfig, choice: StyleChoice): string | und
   return thumbnailCache.get(cacheId);
 }
 
-const yieldToMain = (): Promise<void> =>
-  new Promise((resolve) => {
-    if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(() => resolve());
-    } else {
-      setTimeout(resolve, 0);
-    }
+const yieldToMain = (): Promise<void> => {
+  const scheduler = (globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+  if (typeof scheduler?.yield === 'function') {
+    return scheduler.yield();
+  }
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
   });
+};
 
 /**
  * Renders a small picture of the person's own QR code in a candidate look, as an SVG data
