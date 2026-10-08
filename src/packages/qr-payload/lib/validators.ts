@@ -46,6 +46,7 @@ export function validateConfig(config: QRConfig): string[] {
   checkTextSink(config.borderText, 'Border Text');
   checkTextSink(config.templateHeadline, 'Template Headline');
   checkTextSink(config.templateSubtext, 'Template Subtext');
+  checkTextSink(config.frameText, 'Frame Text');
 
   // 2. Validate QR payload against containment profiles & generator validators
   if (config.value) {
@@ -68,6 +69,7 @@ export function sanitizeConfig(config: QRConfig): QRConfig {
   if (clean.borderText) clean.borderText = stripText(clean.borderText);
   if (clean.templateHeadline) clean.templateHeadline = stripText(clean.templateHeadline);
   if (clean.templateSubtext) clean.templateSubtext = stripText(clean.templateSubtext);
+  if (clean.frameText) clean.frameText = stripText(clean.frameText);
   if (clean.value) {
     const type = clean.type || identifyProtocol(clean.value);
     if (type === QRType.VCARD || type === QRType.EVENT) {

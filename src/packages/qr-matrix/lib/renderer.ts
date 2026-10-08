@@ -25,6 +25,7 @@ import { renderLogo } from './logo';
 import { renderMaze, MazeData } from './maze';
 import { planMosaic, renderMosaic, DEFAULT_MOSAIC_OPTIONS } from './mosaic';
 import { getMosaicSource } from './mosaicSource';
+import { renderFrame } from './frame';
 
 /**
  * Renders the QR code onto the canvas.
@@ -110,10 +111,14 @@ export const drawQRInternal = (
   }
 
   // 1. Calculate Layout
-  const { drawX, drawY, drawSize, cellSize, borderPx } = calculateLayout(config, displaySize, moduleCount);
+  const layout = calculateLayout(config, displaySize, moduleCount);
+  const { drawX, drawY, drawSize, cellSize, borderPx } = layout;
 
   // 2. Calculate Logo Metrics
   const logoMetrics = getLogoMetrics(config, moduleCount, cellSize);
+
+  // 2b. Render Frame Shape & CTA Badge (if enabled)
+  renderFrame(ctx, config, displaySize, layout);
 
   // 3. Render Backgrounds & Border
   const isBackgroundFilled = config.bgColor !== 'transparent' && !config.isLuminanceMaskingEnabled;

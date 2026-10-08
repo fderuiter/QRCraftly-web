@@ -49,6 +49,10 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
 - `SocialInput.tsx`: For `QRType.SOCIAL`. Configures social media platform username and handle details for Instagram, Twitter / X, TikTok, LinkedIn, YouTube, Facebook, WhatsApp, and GitHub.
 - `BulkCsvInput.tsx`: For `QRType.BULK_CSV`. Client-side main-thread CSV parsing and ZIP generation through `@/packages/bulk-csv` (no third-party libraries). The registry loads it through `LazyBulkCsvInput.tsx` so the code is fetched only on the Bulk CSV type. Supports column mapping, PNG/SVG format selection, customizable PNG export resolution (500px, 1000px, 2000px, 3000px), a 500-row batch limit, malformed CSV error handling, progress tracking, and zero network calls.
 
+## Frame Controls & Call-to-Action Badges
+
+Frame shapes (`frameStyle`), call-to-action text (`frameText`), positions (`framePosition`), icons (`frameIcon`), and color selections are configured via `FrameControls.tsx`. The CTA text input is validated against control and BiDi characters via `validateConfig()`, checked for WCAG AA text contrast, and preserved across brand template applications.
+
 ## Adding a New Input Type
 
 1.  Define the data structure in `src/types.ts`.

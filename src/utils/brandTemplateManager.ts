@@ -21,6 +21,7 @@ export const CONTENT_FIELDS: ReadonlySet<keyof QRConfig> = new Set<keyof QRConfi
   'borderText',
   'templateHeadline',
   'templateSubtext',
+  'frameText',
   'logoUrl',
   'borderLogoUrl',
   'backgroundImageUrl',
