@@ -158,4 +158,28 @@ describe('BcUrDecoder behaviour', () => {
     expect(() => new BcUrEncoder('bytes', new Uint8Array(0))).toThrow(RangeError);
     expect(() => new BcUrEncoder('bytes', new Uint8Array(4), 0)).toThrow(RangeError);
   });
+
+  it('reassembles 2000+ fragment streams under 200ms using inverted index peeling', () => {
+    const file = Uint8Array.from({ length: 20000 }, (_, i) => (i * 17 + 13) & 0xff);
+    const encoder = BcUrEncoder.forBytes(file, 10);
+    expect(encoder.fragmentCount).toBeGreaterThanOrEqual(2000);
+    const decoder = new BcUrDecoder();
+
+    const parts: string[] = [];
+    for (let i = 0; i < encoder.fragmentCount * 1.5; i++) {
+      parts.push(encoder.nextPart());
+    }
+
+    const start = performance.now();
+    let result: BcUrIngest = { status: 'rejected' };
+    for (const part of parts) {
+      result = decoder.ingest(part);
+      if (result.status === 'complete') break;
+    }
+    const duration = performance.now() - start;
+
+    expect(result.status).toBe('complete');
+    if (result.status === 'complete') expect(result.result.content).toEqual({ kind: 'file', bytes: file });
+    expect(duration).toBeLessThan(200);
+  });
 });
