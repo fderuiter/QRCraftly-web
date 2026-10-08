@@ -56,13 +56,34 @@ export type BcUrIngest =
   /** All fragments arrived but the message CRC-32 or CBOR failed. */
   | { status: 'failed'; reason: string };
 
-interface Pending {
-  indexes: number[];
+export interface PendingEquation {
+  indexes: Set<number>;
   data: Uint8Array;
 }
 
 function xorInto(target: Uint8Array, source: Uint8Array): void {
   for (let i = 0; i < target.length; i++) target[i] ^= source[i];
+}
+
+function firstOf(set: Set<number>): number {
+  for (const value of set) return value;
+  return -1;
+}
+
+function isStrictSubset(sub: Set<number>, superSet: Set<number>): boolean {
+  if (sub.size >= superSet.size) return false;
+  for (const item of sub) {
+    if (!superSet.has(item)) return false;
+  }
+  return true;
+}
+
+function areSetsEqual(a: Set<number>, b: Set<number>): boolean {
+  if (a.size !== b.size) return false;
+  for (const item of a) {
+    if (!b.has(item)) return false;
+  }
+  return true;
 }
 
 function classify(type: string, cbor: Uint8Array): BcUrContent {
@@ -88,7 +109,9 @@ export class BcUrDecoder {
   private fragmentLength = 0;
   private chooser: FragmentChooser | null = null;
   private simple = new Map<number, Uint8Array>();
-  private pending: Pending[] = [];
+  private indexToPending = new Map<number, Set<PendingEquation>>();
+  private rippleQueue: Array<{ index: number; data: Uint8Array }> = [];
+  private pendingCount = 0;
   private done: BcUrResult | null = null;
 
   /**
@@ -138,8 +161,10 @@ export class BcUrDecoder {
     this.checksum = 0;
     this.fragmentLength = 0;
     this.chooser = null;
-    this.simple = new Map();
-    this.pending = [];
+    this.simple.clear();
+    this.indexToPending.clear();
+    this.rippleQueue = [];
+    this.pendingCount = 0;
     this.done = null;
   }
 
@@ -168,46 +193,113 @@ export class BcUrDecoder {
     this.chooser = new FragmentChooser(part.seqLen);
   }
 
-  /** Peeling decoder: reduce by known fragments and stored mixed parts, promote singletons, reduce the rest by them. */
-  private absorb(first: Pending): void {
-    const queue: Pending[] = [first];
-    while (queue.length > 0) {
-      const part = queue.shift() as Pending;
-      const reduced = this.reduce(part);
-      if (reduced.indexes.length === 0) continue;
-      if (reduced.indexes.length === 1) {
-        const index = reduced.indexes[0];
-        if (this.simple.has(index)) continue;
-        this.simple.set(index, reduced.data);
-        // Every stored mixed part gets re-examined against the new fragment.
-        queue.push(...this.pending);
-        this.pending = [];
-      } else if (this.pending.length < MAX_PENDING_PARTS && !this.pending.some(p => sameIndexes(p.indexes, reduced.indexes))) {
-        // BCR-2024-001 reduces both ways: stored mixed parts that contain the new one shrink by it.
-        const kept: Pending[] = [];
-        for (const other of this.pending) {
-          if (other.indexes.length > reduced.indexes.length && reduced.indexes.every(i => other.indexes.includes(i))) {
-            const data = other.data.slice();
-            xorInto(data, reduced.data);
-            queue.push({ indexes: other.indexes.filter(i => !reduced.indexes.includes(i)), data });
-          } else {
-            kept.push(other);
-          }
-        }
-        kept.push(reduced);
-        this.pending = kept;
+  private addPending(eq: PendingEquation): void {
+    for (const idx of eq.indexes) {
+      let set = this.indexToPending.get(idx);
+      if (!set) {
+        set = new Set();
+        this.indexToPending.set(idx, set);
       }
+      set.add(eq);
     }
+    this.pendingCount++;
   }
 
-  private reduce(part: Pending): Pending {
-    const indexes: number[] = [];
+  private removePending(eq: PendingEquation): void {
+    for (const idx of eq.indexes) {
+      const set = this.indexToPending.get(idx);
+      if (set) {
+        set.delete(eq);
+        if (set.size === 0) {
+          this.indexToPending.delete(idx);
+        }
+      }
+    }
+    this.pendingCount--;
+  }
+
+  private isDuplicate(eq: PendingEquation): boolean {
+    const candidates = this.findSupersetCandidates(eq.indexes);
+    for (const other of candidates) {
+      if (areSetsEqual(eq.indexes, other.indexes)) return true;
+    }
+    return false;
+  }
+
+  private findSubsetCandidates(indexes: Set<number>): Set<PendingEquation> {
+    const candidates = new Set<PendingEquation>();
+    for (const idx of indexes) {
+      const set = this.indexToPending.get(idx);
+      if (set) {
+        for (const eq of set) {
+          if (eq.indexes.size < indexes.size) {
+            candidates.add(eq);
+          }
+        }
+      }
+    }
+    return candidates;
+  }
+
+  private findSupersetCandidates(indexes: Set<number>): PendingEquation[] {
+    let minSet: Set<PendingEquation> | undefined;
+    for (const idx of indexes) {
+      const set = this.indexToPending.get(idx);
+      if (!set || set.size === 0) return [];
+      if (!minSet || set.size < minSet.size) {
+        minSet = set;
+      }
+    }
+    return minSet ? Array.from(minSet) : [];
+  }
+
+  /** Peeling decoder: reduce by known fragments and stored mixed parts, promote singletons, reduce the rest by them. */
+  private absorb(first: { indexes: number[]; data: Uint8Array }): void {
+    const queue: PendingEquation[] = [
+      { indexes: new Set(first.indexes), data: first.data }
+    ];
+
+    while (queue.length > 0) {
+      const part = queue.shift()!;
+      const reduced = this.reduce(part);
+      if (reduced.indexes.size === 0) continue;
+      if (reduced.indexes.size === 1) {
+        const index = firstOf(reduced.indexes);
+        this.rippleQueue.push({ index, data: reduced.data });
+        this.processRippleQueue();
+      } else if (this.pendingCount < MAX_PENDING_PARTS && !this.isDuplicate(reduced)) {
+        const candidates = this.findSupersetCandidates(reduced.indexes);
+
+        for (const other of candidates) {
+          if (isStrictSubset(reduced.indexes, other.indexes)) {
+            this.removePending(other);
+            const data = other.data.slice();
+            xorInto(data, reduced.data);
+            const remainingIndexes = new Set<number>();
+            for (const idx of other.indexes) {
+              if (!reduced.indexes.has(idx)) {
+                remainingIndexes.add(idx);
+              }
+            }
+            queue.push({ indexes: remainingIndexes, data });
+          }
+        }
+        this.addPending(reduced);
+      }
+    }
+
+    this.processRippleQueue();
+  }
+
+  private reduce(part: PendingEquation): PendingEquation {
+    const indexes = new Set<number>();
     let data = part.data;
     let copied = false;
+
     for (const index of part.indexes) {
       const known = this.simple.get(index);
       if (!known) {
-        indexes.push(index);
+        indexes.add(index);
         continue;
       }
       if (!copied) {
@@ -216,16 +308,65 @@ export class BcUrDecoder {
       }
       xorInto(data, known);
     }
-    // A mixed part that contains another stored mixed part loses its indexes.
-    let result: Pending = { indexes, data };
-    for (const other of this.pending) {
-      if (other.indexes.length < result.indexes.length && other.indexes.every(i => result.indexes.includes(i))) {
-        const merged = result.data.slice();
-        xorInto(merged, other.data);
-        result = { indexes: result.indexes.filter(i => !other.indexes.includes(i)), data: merged };
+
+    const result: PendingEquation = { indexes, data };
+
+    let changed = true;
+    while (changed && result.indexes.size > 1) {
+      changed = false;
+      const candidates = this.findSubsetCandidates(result.indexes);
+
+      for (const other of candidates) {
+        if (isStrictSubset(other.indexes, result.indexes)) {
+          if (!copied) {
+            result.data = result.data.slice();
+            copied = true;
+          }
+          xorInto(result.data, other.data);
+          for (const idx of other.indexes) {
+            result.indexes.delete(idx);
+          }
+          changed = true;
+          break;
+        }
       }
     }
+
     return result;
+  }
+
+  private processRippleQueue(): void {
+    while (this.rippleQueue.length > 0) {
+      const { index, data } = this.rippleQueue.shift()!;
+      if (this.simple.has(index)) continue;
+      this.simple.set(index, data);
+
+      const affected = this.indexToPending.get(index);
+      if (!affected || affected.size === 0) continue;
+
+      const equations = Array.from(affected);
+      this.indexToPending.delete(index);
+
+      for (const eq of equations) {
+        xorInto(eq.data, data);
+        eq.indexes.delete(index);
+
+        if (eq.indexes.size === 1) {
+          const remIdx = firstOf(eq.indexes);
+          const remSet = this.indexToPending.get(remIdx);
+          if (remSet) {
+            remSet.delete(eq);
+            if (remSet.size === 0) {
+              this.indexToPending.delete(remIdx);
+            }
+          }
+          this.pendingCount--;
+          this.rippleQueue.push({ index: remIdx, data: eq.data });
+        } else if (eq.indexes.size === 0) {
+          this.pendingCount--;
+        }
+      }
+    }
   }
 
   private finish(cbor: Uint8Array, expectedChecksum?: number): BcUrIngest {
@@ -234,10 +375,10 @@ export class BcUrDecoder {
       return { status: 'failed', reason: 'checksum mismatch' };
     }
     this.done = { type: this.type, cbor, content: classify(this.type, cbor) };
+    this.indexToPending.clear();
+    this.rippleQueue = [];
+    this.pendingCount = 0;
     return { status: 'complete', result: this.done };
   }
 }
 
-function sameIndexes(a: number[], b: number[]): boolean {
-  return a.length === b.length && a.every(i => b.includes(i));
-}
