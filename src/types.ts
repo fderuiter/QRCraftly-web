@@ -214,7 +214,34 @@ export interface QRConfig {
   mosaicMode?: MosaicMode;
   /** How hard mosaic tiles are pushed towards their dark or light value (0..1). */
   mosaicContrast?: number;
+  /** The visual shape / style of the outer frame CTA badge. */
+  frameStyle?: FrameStyle;
+  /** Call-to-action text displayed inside the frame badge. */
+  frameText?: string;
+  /** Text and icon color for the frame badge. */
+  frameTextColor?: string;
+  /** Background color for the frame badge. */
+  frameBgColor?: string;
+  /** Position of the frame badge relative to the QR code. */
+  framePosition?: FramePosition;
+  /** Optional icon to display inside the frame badge. */
+  frameIcon?: FrameIcon;
 }
+
+/**
+ * Defines the visual shape / style of the outer frame CTA badge.
+ */
+export type FrameStyle = 'none' | 'pill' | 'banner' | 'speech-bubble' | 'card';
+
+/**
+ * Defines the position of the outer frame CTA badge relative to the QR code.
+ */
+export type FramePosition = 'bottom' | 'top' | 'left' | 'right';
+
+/**
+ * Defines the optional icon displayed inside the frame CTA badge.
+ */
+export type FrameIcon = 'none' | 'scan' | 'camera' | 'star' | 'heart' | 'info' | 'phone';
 
 /**
  * Mosaic QR layout (ADR 0019).

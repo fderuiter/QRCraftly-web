@@ -318,6 +318,10 @@ export class SvgContext {
     this._pathData += `Q ${this._pt(cpx, cpy)} ${this._pt(x, y)} `;
   }
 
+  bezierCurveTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number): void {
+    this._pathData += `C ${this._pt(cp1x, cp1y)}, ${this._pt(cp2x, cp2y)}, ${this._pt(x, y)} `;
+  }
+
   /**
    * Adds a rectangular sub-path to the current path (with transform applied).
    * The four corners are transformed individually so rotated rects are handled correctly.
@@ -458,6 +462,28 @@ export class SvgContext {
    */
   clearRect(_x: number, _y: number, _w: number, _h: number): void {
     // Intentional no-op for SVG export (see comment above)
+  }
+
+  /** Measures text width for layout calculations. */
+  measureText(text: string): TextMetrics {
+    let actualWidth: number | null = null;
+    try {
+      const measuringCtx = getMeasuringContext();
+      if (measuringCtx && typeof measuringCtx.measureText === 'function') {
+        measuringCtx.font = this.font;
+        const metrics = measuringCtx.measureText(text);
+        if (metrics && typeof metrics.width === 'number') {
+          actualWidth = metrics.width;
+        }
+      }
+    } catch (_e) {
+      // Fallback
+    }
+    const match = this.font.match(/(\d+)px/);
+    const fontSize = match ? parseInt(match[1], 10) : 16;
+    const estimatedWidth = text.length * fontSize * 0.55;
+    const width = (actualWidth !== null && actualWidth > 0) ? actualWidth : estimatedWidth;
+    return { width } as TextMetrics;
   }
 
   /** Renders text as an SVG <text> element. */
