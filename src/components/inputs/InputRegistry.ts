@@ -117,6 +117,8 @@ export const INPUT_REGISTRY: Registry = {
     Component: EmailInput,
     initialState: {
       email: "",
+      cc: "",
+      bcc: "",
       subject: "",
       body: "",
     } as EmailData,

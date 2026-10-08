@@ -23,6 +23,26 @@ export const EmailInput: React.FC<EmailInputProps> = ({ data, onChange }) => {
         onChange={(e) => onChange({ email: e.target.value })}
       />
       <TextField
+        id="email-cc"
+        name="cc"
+        label="CC"
+        type="text"
+        placeholder="cc@example.com"
+        maxLength={254}
+        value={data.cc || ""}
+        onChange={(e) => onChange({ cc: e.target.value })}
+      />
+      <TextField
+        id="email-bcc"
+        name="bcc"
+        label="BCC"
+        type="text"
+        placeholder="bcc@example.com"
+        maxLength={254}
+        value={data.bcc || ""}
+        onChange={(e) => onChange({ bcc: e.target.value })}
+      />
+      <TextField
         id="email-subject"
         label="Subject"
         type="text"

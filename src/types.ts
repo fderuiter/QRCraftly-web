@@ -310,6 +310,10 @@ export interface WifiData {
 export interface EmailData {
   /** The recipient's email address. */
   email: string;
+  /** Carbon copy recipients (optional). */
+  cc?: string;
+  /** Blind carbon copy recipients (optional). */
+  bcc?: string;
   /** The subject line of the email. */
   subject: string;
   /** The body content of the email. */

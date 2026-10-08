@@ -97,7 +97,7 @@ describe('#974 case 2: mailto recipient is percent-encoded (RFC 6068)', () => {
     // Exactly one query delimiter, so no header can be injected
     expect(payload.split('?')).toHaveLength(2);
     expect(new URLSearchParams(payload.split('?')[1]).get('bcc')).toBeNull();
-    expect(hydrateEmailData(payload)).toEqual({ email, subject: 'S', body: 'B' });
+    expect(hydrateEmailData(payload)).toEqual({ email, cc: '', bcc: '', subject: 'S', body: 'B' });
   });
 
   it('keeps valid addresses valid and flags injected ones', () => {

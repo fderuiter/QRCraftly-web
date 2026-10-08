@@ -110,6 +110,20 @@ describe('QR Helpers', () => {
       expect(result).toBe('mailto:test@example.com?subject=Hello%20World&body=This%20is%20a%20test%20message.');
     });
 
+    it('constructs a mailto string with cc and bcc', () => {
+      const data: EmailData = {
+        email: 'test@example.com',
+        cc: 'cc@example.com',
+        bcc: 'bcc1@example.com, bcc2@example.com',
+        subject: 'Hello World',
+        body: 'This is a test message.'
+      };
+      const result = constructEmailString(data);
+      expect(result).toBe(
+        'mailto:test@example.com?cc=cc%40example.com&bcc=bcc1%40example.com%2C%20bcc2%40example.com&subject=Hello%20World&body=This%20is%20a%20test%20message.'
+      );
+    });
+
     it('handles special characters in subject and body', () => {
       const data: EmailData = {
         email: 'foo@bar.com',
