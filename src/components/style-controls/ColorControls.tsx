@@ -96,7 +96,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
             onChange={(val) => onChange({ bgColor: val })}
             disabled={isTransparent}
           />
-          <label htmlFor="transparent-bg" className="mt-1 flex cursor-pointer items-center gap-2 text-xs font-medium text-fg-muted">
+          <label htmlFor="transparent-bg" className="mt-1 flex min-h-6 cursor-pointer items-center gap-2 text-xs font-medium text-fg-muted">
             <input
               id="transparent-bg"
               type="checkbox"
