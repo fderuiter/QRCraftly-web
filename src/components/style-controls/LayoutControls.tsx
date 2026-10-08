@@ -78,7 +78,7 @@ export const LayoutControls: React.FC<LayoutControlsProps> = ({ config, onChange
   const hasTextOverride = config.templateTextColor !== undefined;
 
   // Resolved colors & contrast
-  const activeBg = config.templateBgColor ?? config.bgColor;
+  const activeBg = config.templateBgColor ?? (config.bgColor === 'transparent' ? '#ffffff' : config.bgColor);
   const activeText = config.templateTextColor ?? config.fgColor;
   const contrastRatio = getContrastRatio(activeText, activeBg);
   const isLowContrast = showAdvanced && contrastRatio < MIN_CONTRAST_THRESHOLD;
