@@ -46,12 +46,17 @@ afterEach(() => {
 
 /** A spy-backed 2D context covering every canvas call QRCanvas makes. */
 function createMockContext() {
+  const mockGradient = {
+    addColorStop: vi.fn(),
+  };
   return {
     arc: vi.fn(),
     beginPath: vi.fn(),
     bezierCurveTo: vi.fn(),
     clearRect: vi.fn(),
     closePath: vi.fn(),
+    createLinearGradient: vi.fn().mockReturnValue(mockGradient),
+    createRadialGradient: vi.fn().mockReturnValue(mockGradient),
     drawImage: vi.fn(),
     fill: vi.fn(),
     fillRect: vi.fn(),
@@ -797,6 +802,40 @@ describe('QRCanvas Rendering Logic Extended', () => {
      await waitFor(() => {
          // Grunge uses drawRoughRect (rotate) and drawScribble (rotate + loop)
          expect(mockContext.rotate).toHaveBeenCalled();
+     });
+  });
+
+  it('renders linear and radial gradient fills across QR code modules', async () => {
+     setModule(10, 10, true);
+     const linearConfig: QRConfig = {
+       ...DEFAULT_CONFIG,
+       gradientType: 'linear',
+       gradientColorStops: [
+         { offset: 0, color: '#ff0000' },
+         { offset: 1, color: '#0000ff' },
+       ],
+       gradientAngle: 180,
+     };
+
+     const { rerender } = render(<QRCanvas config={linearConfig} />);
+
+     await waitFor(() => {
+       expect(mockContext.createLinearGradient).toHaveBeenCalled();
+     });
+
+     const radialConfig: QRConfig = {
+       ...DEFAULT_CONFIG,
+       gradientType: 'radial',
+       gradientColorStops: [
+         { offset: 0, color: '#00ff00' },
+         { offset: 1, color: '#ff00ff' },
+       ],
+     };
+
+     rerender(<QRCanvas config={radialConfig} />);
+
+     await waitFor(() => {
+       expect(mockContext.createRadialGradient).toHaveBeenCalled();
      });
   });
 });

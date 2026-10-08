@@ -64,6 +64,10 @@ Frame shapes (`frameStyle`), call-to-action text (`frameText`), positions (`fram
 
 Input data never leaves the browser. `src/types.ts` has no telemetry or reporting schema, and new input types must not add one (see [the QRCraftly Pledge](../../../docs/PLEDGE.md)).
 
+## Gradient Color Controls
+
+`src/types.ts` defines `GradientType` and `ColorStop` interfaces for linear and radial gradient fill settings on QR code modules. Gradient configuration (`gradientType`, `gradientColorStops`, `gradientAngle`) operates purely client-side without storing user payloads.
+
 ## Brand Design Templates
 
 `src/types.ts` defines `BrandTemplate` and `BrandTemplateExportPayload` interfaces for visual style templates. Templates store visual properties only (colors, pattern styles, borders, logo formatting) and never contain user QR payload input.

@@ -4,6 +4,9 @@ import { QRStyle } from '@/types';
 
 describe('renderModules', () => {
   const createMockCtx = () => {
+    const mockGradient = {
+      addColorStop: vi.fn(),
+    };
     return {
       beginPath: vi.fn(),
       rect: vi.fn(),
@@ -21,6 +24,8 @@ describe('renderModules', () => {
       translate: vi.fn(),
       rotate: vi.fn(),
       stroke: vi.fn(),
+      createLinearGradient: vi.fn().mockReturnValue(mockGradient),
+      createRadialGradient: vi.fn().mockReturnValue(mockGradient),
       fillStyle: '',
       strokeStyle: '',
     } as unknown as CanvasRenderingContext2D;
@@ -159,6 +164,43 @@ describe('renderModules', () => {
     renderModules(ctx, modules, configWithLogo, 0, 0, 10, 21, logoMetricsWithCutout, false);
 
     expect(ctx.rect).not.toHaveBeenCalled();
+  });
+
+  it('builds linear gradient when gradientType is linear', () => {
+    const ctx = createMockCtx();
+    const modules = createMockModules(21, [[10, 10]]);
+    const linearConfig = {
+      ...baseConfig,
+      gradientType: 'linear',
+      gradientColorStops: [
+        { offset: 0, color: '#ff0000' },
+        { offset: 1, color: '#0000ff' },
+      ],
+      gradientAngle: 90,
+    };
+
+    renderModules(ctx, modules, linearConfig, 0, 0, 10, 21, mockLogoMetrics, false);
+
+    expect(ctx.createLinearGradient).toHaveBeenCalled();
+    expect(ctx.fill).toHaveBeenCalled();
+  });
+
+  it('builds radial gradient when gradientType is radial', () => {
+    const ctx = createMockCtx();
+    const modules = createMockModules(21, [[10, 10]]);
+    const radialConfig = {
+      ...baseConfig,
+      gradientType: 'radial',
+      gradientColorStops: [
+        { offset: 0, color: '#00ff00' },
+        { offset: 1, color: '#ff00ff' },
+      ],
+    };
+
+    renderModules(ctx, modules, radialConfig, 0, 0, 10, 21, mockLogoMetrics, false);
+
+    expect(ctx.createRadialGradient).toHaveBeenCalled();
+    expect(ctx.fill).toHaveBeenCalled();
   });
 });
 

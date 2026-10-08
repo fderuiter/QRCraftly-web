@@ -5,6 +5,8 @@ import {
   FrameIcon,
   FramePosition,
   FrameStyle,
+  ColorStop,
+  GradientType,
   LogoPaddingStyle,
   QRConfig,
   QRErrorCorrectionLevel,
@@ -26,7 +28,8 @@ type FieldRule =
   | { kind: 'enum'; values: readonly string[] }
   | { kind: 'color' }
   | { kind: 'number'; min: number; max: number }
-  | { kind: 'boolean' };
+  | { kind: 'boolean' }
+  | { kind: 'colorStops' };
 
 const enumOf = (values: readonly string[]): FieldRule => ({ kind: 'enum', values });
 
@@ -40,6 +43,9 @@ const STYLE_FIELDS: Partial<Record<keyof QRConfig, FieldRule>> = {
   fgColor: { kind: 'color' },
   bgColor: { kind: 'color' },
   eyeColor: { kind: 'color' },
+  gradientType: enumOf(['none', 'linear', 'radial'] satisfies GradientType[]),
+  gradientColorStops: { kind: 'colorStops' },
+  gradientAngle: { kind: 'number', min: 0, max: 360 },
   errorCorrectionLevel: enumOf(Object.values(QRErrorCorrectionLevel)),
   logoSize: { kind: 'number', min: 0.1, max: 0.3 },
   logoPaddingStyle: enumOf(['square', 'circle', 'none'] satisfies LogoPaddingStyle[]),
@@ -79,7 +85,7 @@ export type StyleFileResult =
  * @param value - The value from the file.
  * @returns The cleaned value, or undefined when it is not accepted.
  */
-function cleanValue(rule: FieldRule, value: unknown): string | number | boolean | undefined {
+function cleanValue(rule: FieldRule, value: unknown): string | number | boolean | ColorStop[] | undefined {
   switch (rule.kind) {
     case 'enum':
       return typeof value === 'string' && rule.values.includes(value) ? value : undefined;
@@ -89,6 +95,19 @@ function cleanValue(rule: FieldRule, value: unknown): string | number | boolean 
       return typeof value === 'number' && Number.isFinite(value) && value >= rule.min && value <= rule.max ? value : undefined;
     case 'boolean':
       return typeof value === 'boolean' ? value : undefined;
+    case 'colorStops': {
+      if (!Array.isArray(value)) return undefined;
+      const stops: ColorStop[] = [];
+      for (const item of value) {
+        if (typeof item === 'object' && item !== null && typeof (item as { offset?: unknown }).offset === 'number' && typeof (item as { color?: unknown }).color === 'string') {
+          const color = normalizeHex((item as { color: string }).color);
+          if (color) {
+            stops.push({ offset: Math.max(0, Math.min(1, (item as { offset: number }).offset)), color });
+          }
+        }
+      }
+      return stops.length > 0 ? stops : undefined;
+    }
   }
 }
 
