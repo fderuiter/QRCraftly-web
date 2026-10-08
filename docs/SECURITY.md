@@ -80,7 +80,7 @@ Animation configuration structures in `types.ts` are strictly statically typed t
 
 ## Playable Maze Overlay & Web Calendar Integration
 
-Maze overlay configurations in `types.ts` (e.g., `isMazeEnabled`, `isMazeBridgesEnabled`, `mazeColor`, `mazePathWidth`, `showMazeSolution`) are statically typed and strictly validated at runtime. This prevents injection or path manipulation during maze rendering. Web calendar providers (`CalendarProvider` in `types.ts`) construct direct calendar URLs for Google, Outlook, Office 365, and Yahoo, validating all parameter links with `isDangerousUrl` to prevent URI injection attacks.
+Maze overlay configurations in `types.ts` (e.g., `isMazeEnabled`, `isMazeBridgesEnabled`, `mazeColor`, `mazePathWidth`, `showMazeSolution`) are statically typed and strictly validated at runtime. This prevents injection or path manipulation during maze rendering. Web calendar providers and iCalendar event types (`EventData` and `CalendarProvider` in `types.ts`) construct direct calendar URLs and VEVENT payloads with optional explicit IANA / UTC timezones, validating all parameter links with `isDangerousUrl` to prevent URI injection attacks.
 
 ## Independent Eye Colors
 
