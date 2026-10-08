@@ -2,6 +2,9 @@ import {
   BorderLogoPosition,
   BorderStyle,
   BorderTextPosition,
+  FrameIcon,
+  FramePosition,
+  FrameStyle,
   LogoPaddingStyle,
   QRConfig,
   QRErrorCorrectionLevel,
@@ -58,6 +61,11 @@ const STYLE_FIELDS: Partial<Record<keyof QRConfig, FieldRule>> = {
   isMazeBridgesEnabled: { kind: 'boolean' },
   mazeColor: { kind: 'color' },
   showMazeSolution: { kind: 'boolean' },
+  frameStyle: enumOf(['none', 'pill', 'banner', 'speech-bubble', 'card'] satisfies FrameStyle[]),
+  frameTextColor: { kind: 'color' },
+  frameBgColor: { kind: 'color' },
+  framePosition: enumOf(['bottom', 'top', 'left', 'right'] satisfies FramePosition[]),
+  frameIcon: enumOf(['none', 'scan', 'camera', 'star', 'heart', 'info', 'phone'] satisfies FrameIcon[]),
 };
 
 /** Result of reading a style file. */

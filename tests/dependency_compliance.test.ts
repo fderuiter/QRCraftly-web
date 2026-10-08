@@ -3,14 +3,16 @@ import fs from 'fs';
 import path from 'path';
 import {
   auditPackageJson,
-  scanFileForCompliance,
-  ALLOWED_DEPENDENCIES,
-  FORBIDDEN_IMPORTS
+  scanFileForCompliance
 } from '../scripts/dependency_compliance.js';
 
 describe('Dependency Compliance Guardrail', () => {
   const tempViolatingFile = path.resolve('src/temp-compliance-violating.ts');
   const tempCleanFile = path.resolve('src/temp-compliance-clean.ts');
+  const tempDynamicViolatingFile = path.resolve('src/temp-dynamic-violating.ts');
+  const tempDynamicCleanFile = path.resolve('src/temp-dynamic-clean.ts');
+  const tempOutsideSrcViolatingFile = path.resolve('public/temp-outside-src-violating.ts');
+  const tempCommentedFile = path.resolve('src/temp-commented.ts');
 
   beforeAll(() => {
     // Write a temporary file that contains forbidden imports and calls
@@ -45,11 +47,67 @@ describe('Dependency Compliance Guardrail', () => {
       `,
       'utf8'
     );
+
+    // Write a file with dynamic forbidden imports using string literal, template literal, and string concatenation
+    fs.writeFileSync(
+      tempDynamicViolatingFile,
+      `
+      export async function loadModules() {
+        const axios = await import('axios');
+        const http = await import(\`http\`);
+        const net = await import('n' + 'et');
+      }
+      `,
+      'utf8'
+    );
+
+    // Write a file with clean dynamic imports
+    fs.writeFileSync(
+      tempDynamicCleanFile,
+      `
+      export async function loadLocalModule() {
+        const mod = await import('./localModule.js');
+        return mod;
+      }
+      `,
+      'utf8'
+    );
+
+    // Write a non-src/ workspace file with compliance violations
+    fs.writeFileSync(
+      tempOutsideSrcViolatingFile,
+      `
+      import axios from 'axios';
+      export function clientSetup() {
+        fetch('https://example.com/telemetry');
+      }
+      `,
+      'utf8'
+    );
+
+    // Write a file with commented out violations (should not flag)
+    fs.writeFileSync(
+      tempCommentedFile,
+      `
+      // import axios from 'axios';
+      // fetch('https://example.com/telemetry');
+      /* const http = require('http'); */
+      `,
+      'utf8'
+    );
   });
 
   afterAll(() => {
-    if (fs.existsSync(tempViolatingFile)) fs.unlinkSync(tempViolatingFile);
-    if (fs.existsSync(tempCleanFile)) fs.unlinkSync(tempCleanFile);
+    [
+      tempViolatingFile,
+      tempCleanFile,
+      tempDynamicViolatingFile,
+      tempDynamicCleanFile,
+      tempOutsideSrcViolatingFile,
+      tempCommentedFile
+    ].forEach(f => {
+      if (fs.existsSync(f)) fs.unlinkSync(f);
+    });
   });
 
   describe('auditPackageJson', () => {
@@ -103,6 +161,35 @@ describe('Dependency Compliance Guardrail', () => {
       expect(messages.some(m => m.includes("WebSocket"))).toBe(true);
       expect(messages.some(m => m.includes("XMLHttpRequest"))).toBe(true);
       expect(messages.some(m => m.includes("sendBeacon"))).toBe(true);
+    });
+
+    it('should flag forbidden dynamic import(...) expressions', () => {
+      const violations = scanFileForCompliance(tempDynamicViolatingFile);
+      expect(violations.length).toBe(3);
+
+      const messages = violations.map(v => v.message);
+      expect(messages.some(m => m.includes("axios"))).toBe(true);
+      expect(messages.some(m => m.includes("http"))).toBe(true);
+      expect(messages.some(m => m.includes("net"))).toBe(true);
+    });
+
+    it('should allow compliant clean dynamic imports', () => {
+      const violations = scanFileForCompliance(tempDynamicCleanFile);
+      expect(violations.length).toBe(0);
+    });
+
+    it('should audit non-src/ workspace files and flag violations', () => {
+      const violations = scanFileForCompliance(tempOutsideSrcViolatingFile);
+      expect(violations.length).toBe(2);
+
+      const types = violations.map(v => v.type);
+      expect(types).toContain('Forbidden Network/Server-Side Import');
+      expect(types).toContain('Unauthorized Network Call');
+    });
+
+    it('should ignore commented out imports and network calls', () => {
+      const violations = scanFileForCompliance(tempCommentedFile);
+      expect(violations.length).toBe(0);
     });
 
     it('should not flag compliant clean files', () => {

@@ -21,6 +21,7 @@ import React, { createContext, lazy, Suspense, useContext, useState } from 'reac
 import { QRConfig } from '../types';
 import {
   BorderControls,
+  FrameControls,
   PatternControls,
   ColorControls,
   LogoControls,
@@ -118,6 +119,9 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
           <LayoutControls config={config} onChange={onChange} />
           <div className="border-t border-line pt-5">
             <BorderControls config={config} onChange={onChange} />
+          </div>
+          <div className="border-t border-line pt-5">
+            <FrameControls config={config} onChange={onChange} />
           </div>
         </div>
       </AccordionItem>

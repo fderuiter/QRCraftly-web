@@ -50,10 +50,42 @@ export const calculateLayout = (
     borderPx = minBorderPx;
   }
 
-  const drawSize = displaySize - (borderPx * 2);
+  const hasFrame = config.frameStyle && config.frameStyle !== 'none';
+  const frameMargin = hasFrame ? displaySize * 0.18 : 0;
+  const position = config.framePosition || 'bottom';
+
+  let availableWidth = displaySize;
+  let availableHeight = displaySize;
+
+  if (hasFrame) {
+    if (position === 'bottom' || position === 'top') {
+      availableHeight = displaySize - frameMargin;
+    } else {
+      availableWidth = displaySize - frameMargin;
+    }
+  }
+
+  const drawSize = Math.min(availableWidth, availableHeight) - (borderPx * 2);
   const cellSize = drawSize / moduleCount;
-  const drawX = borderPx;
-  const drawY = borderPx;
+
+  let drawX = borderPx;
+  let drawY = borderPx;
+
+  if (hasFrame) {
+    if (position === 'bottom') {
+      drawX = (displaySize - drawSize) / 2;
+      drawY = borderPx;
+    } else if (position === 'top') {
+      drawX = (displaySize - drawSize) / 2;
+      drawY = frameMargin + borderPx;
+    } else if (position === 'left') {
+      drawX = frameMargin + borderPx;
+      drawY = (displaySize - drawSize) / 2;
+    } else if (position === 'right') {
+      drawX = borderPx;
+      drawY = (displaySize - drawSize) / 2;
+    }
+  }
 
   return {
     drawX,
