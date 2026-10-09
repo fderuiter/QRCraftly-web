@@ -153,6 +153,10 @@ export const drawStar = (ctx: CanvasRenderingContext2D, cx: number, cy: number, 
   }
 };
 
+const ROUGH_RECT_ROTATION = 0.02;
+const ROUGH_RECT_COS = Math.cos(ROUGH_RECT_ROTATION);
+const ROUGH_RECT_SIN = Math.sin(ROUGH_RECT_ROTATION);
+
 /**
  * Draws a roughly rectangular shape (slightly rotated).
  * @param ctx The canvas context.
@@ -163,21 +167,41 @@ export const drawStar = (ctx: CanvasRenderingContext2D, cx: number, cy: number, 
  * @param addToPath Whether to add to the current path instead of filling immediately (default: false).
  */
 export const drawRoughRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, addToPath: boolean = false) => {
+  const hw = w / 2;
+  const hh = h / 2;
+  const cx = x + hw;
+  const cy = y + hh;
+
+  const cosHW = hw * ROUGH_RECT_COS;
+  const sinHW = hw * ROUGH_RECT_SIN;
+  const cosHH = hh * ROUGH_RECT_COS;
+  const sinHH = hh * ROUGH_RECT_SIN;
+
+  const x0 = cx - cosHW + sinHH;
+  const y0 = cy - sinHW - cosHH;
+
+  const x1 = cx + cosHW + sinHH;
+  const y1 = cy + sinHW - cosHH;
+
+  const x2 = cx + cosHW - sinHH;
+  const y2 = cy + sinHW + cosHH;
+
+  const x3 = cx - cosHW - sinHH;
+  const y3 = cy - sinHW + cosHH;
+
   if (!addToPath) {
-    ctx.save();
-    // Just a slight rotation for style
-    ctx.translate(x + w / 2, y + h / 2);
-    ctx.rotate(0.02);
-    ctx.fillRect(-w / 2, -h / 2, w, h);
-    ctx.restore();
-    return;
+    ctx.beginPath();
   }
 
-  ctx.save();
-  ctx.translate(x + w / 2, y + h / 2);
-  ctx.rotate(0.02);
-  ctx.rect(-w / 2, -h / 2, w, h);
-  ctx.restore();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.lineTo(x3, y3);
+  ctx.closePath();
+
+  if (!addToPath) {
+    ctx.fill();
+  }
 };
 
 /**
