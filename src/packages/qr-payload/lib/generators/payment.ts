@@ -17,7 +17,7 @@
 */
 
 import { PaymentData, CryptoNetwork, QRType, QRGeneratorContract } from '@/types';
-import { isDangerousUrl, sanitizeInput } from '@/utils/security';
+import { isDangerousUrl, sanitizeInput, REGEX_STRICT_CONTROL_CHARS } from '@/utils/security';
 import { identifyProtocol, safeDecodeURIComponent } from '../protocol';
 
 /** Number of wei in one ether (10^18), as used by EIP-681 `value=`. */
@@ -99,6 +99,51 @@ const cleanCashAppHandle = (handle: string): string => {
   return clean;
 };
 
+/** Decimal places each network's amount can carry (BIP-21 and EIP-681 amounts, EPC euro cents). */
+const AMOUNT_DECIMALS: Partial<Record<CryptoNetwork, number>> = {
+  [CryptoNetwork.BITCOIN]: 8,
+  [CryptoNetwork.LITECOIN]: 8,
+  [CryptoNetwork.SOLANA]: 9,
+  [CryptoNetwork.ETHEREUM]: WEI_DECIMALS,
+  [CryptoNetwork.EPC_SEPA]: 2,
+  [CryptoNetwork.PAYPAL]: 2,
+  [CryptoNetwork.VENMO]: 2,
+  [CryptoNetwork.CASH_APP]: 2,
+};
+
+/** EPC069-12: at most EUR 999,999,999.99. */
+const EPC_MAX_AMOUNT = 999999999.99;
+
+/**
+ * Says what is wrong with a payment amount, so it is refused instead of encoded as `-1` or
+ * `1e3`, or silently dropped (#1283). Amounts are plain decimals (BIP-21 §`amount`) within the network's decimal places.
+ * @param amount - The typed amount.
+ * @param network - The payment network.
+ * @returns A sentence, or `null` when the amount is empty or fine.
+ */
+export const paymentAmountError = (amount: string | undefined, network: CryptoNetwork): string | null => {
+  const value = (amount || '').trim();
+  const decimals = AMOUNT_DECIMALS[network];
+  if (!value || decimals === undefined) return null;
+  // The integer and fraction digits are split by a literal '.', so the match is linear.
+  // eslint-disable-next-line security/detect-unsafe-regex
+  const match = /^(\d{0,15})(?:\.(\d+))?$/.exec(value);
+  if (!match || !/\d/.test(value)) {
+    return 'Enter the amount as a plain number, such as 12.50.';
+  }
+  if ((match[2] || '').length > decimals) {
+    return `This amount can have at most ${decimals} decimal place${decimals === 1 ? '' : 's'}.`;
+  }
+  if (network === CryptoNetwork.EPC_SEPA && Number(value) > EPC_MAX_AMOUNT) {
+    return 'A SEPA transfer code can ask for at most EUR 999,999,999.99.';
+  }
+  return null;
+};
+
+/** Removes control characters (line breaks would shift every EPC field after them). */
+const epcText = (value: string | undefined, maxLength: number): string =>
+  (value || '').replace(REGEX_STRICT_CONTROL_CHARS, ' ').trim().slice(0, maxLength);
+
 /**
  * Constructs the payment URI or payload string.
  */
@@ -112,15 +157,21 @@ export const constructPaymentString = (data: PaymentData): string => {
     return data.address;
   }
 
+  // An amount the network cannot carry is refused, never encoded or silently dropped (#1283).
+  if (data.network !== CryptoNetwork.EPC_SEPA && paymentAmountError(data.amount, data.network)) {
+    return '';
+  }
+
   if (data.network === CryptoNetwork.EPC_SEPA) {
     const iban = cleanIban(data.iban || data.address || '');
-    const name = sanitizeInput(data.name || '').trim().slice(0, 70);
-    const bic = sanitizeInput(data.bic || '').trim().toUpperCase().slice(0, 11);
-    const label = sanitizeInput(data.label || '').trim().slice(0, 140);
-    let amountStr = (data.amount || '').trim();
-    if (amountStr && !amountStr.toUpperCase().startsWith('EUR')) {
-      amountStr = `EUR${amountStr}`;
-    }
+    // EPC fields are plain lines, so `?` and `&` are ordinary text here (`A? B & Co`).
+    const name = epcText(data.name, 70);
+    const bic = epcText(data.bic, 11).toUpperCase();
+    const label = epcText(data.label, 140);
+    const amount = (data.amount || '').trim().replace(/^EUR/i, '');
+    // The beneficiary name and IBAN are mandatory (EPC069-12), and a bad amount is refused.
+    if (!iban || !name || paymentAmountError(amount, CryptoNetwork.EPC_SEPA)) return '';
+    const amountStr = amount ? `EUR${Number(amount).toFixed(2)}` : '';
 
     const lines = [
       'BCD',
@@ -136,6 +187,8 @@ export const constructPaymentString = (data: PaymentData): string => {
       label, // Remittance Text
       '', // Information
     ];
+    // Trailing empty fields may be left out, and the payload must not end in a line break.
+    while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
     return lines.join('\n');
   }
 
@@ -320,7 +373,8 @@ export const hydratePaymentData = (raw: string): PaymentData => {
 
   const colonIndex = raw.indexOf(':');
   if (colonIndex !== -1) {
-    const networkPart = raw.substring(0, colonIndex) as CryptoNetwork;
+    // Schemes are case-insensitive, and upper-case BIP-21 URIs make smaller QR codes.
+    const networkPart = raw.substring(0, colonIndex).toLowerCase() as CryptoNetwork;
     if (validNetworks.includes(networkPart)) {
       result.network = networkPart;
 
@@ -329,7 +383,10 @@ export const hydratePaymentData = (raw: string): PaymentData => {
       if (qIndex !== -1) {
         result.address = safeDecodeURIComponent(rest.substring(0, qIndex));
         const query = rest.substring(qIndex + 1);
-        const params = new URLSearchParams(query);
+        const params = new Map<string, string>();
+        new URLSearchParams(query).forEach((value, key) => {
+          if (!params.has(key.toLowerCase())) params.set(key.toLowerCase(), value);
+        });
         const weiValue = params.get('value');
         const ether =
           networkPart === CryptoNetwork.ETHEREUM && weiValue ? weiToEther(weiValue) : null;
@@ -366,6 +423,10 @@ export const PaymentContract: QRGeneratorContract<PaymentData> = {
     const violations: string[] = [];
     if (raw && isDangerousUrl(raw)) {
       violations.push('URI_INJECTION_VIOLATION');
+    }
+    const data = hydratePaymentData(raw);
+    if (paymentAmountError(data.amount, data.network)) {
+      violations.push('PAYMENT_AMOUNT_VIOLATION');
     }
     return violations;
   },

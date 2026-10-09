@@ -63,7 +63,7 @@ These components capture specialized data structures required to construct disti
 - **LazyBulkCsvInput** (`LazyBulkCsvInput.tsx`): Registry entry for the Bulk CSV Batch type. Renders a placeholder during prerendering and hydration, then loads the batch generator chunk on the client.
 - **LocationInput** (`LocationInput.tsx` / `LocationInput.test.tsx`): High-accuracy coordinate form taking latitude and longitude in degrees (decimal point or comma, optional N/S/E/W) and explaining any value it cannot read.
 - **MeetingInput** (`MeetingInput.tsx` / `MeetingInput.test.tsx`): Specialized input fields to enter URL links and meeting passwords.
-- **PaymentInput** (`PaymentInput.tsx`): Cryptocurrency, SEPA credit transfer (EPC QR), and consumer fiat payment checkout fields validating address formats and handles.
+- **PaymentInput** (`PaymentInput.tsx`): Cryptocurrency, SEPA credit transfer (EPC QR), and consumer fiat payment checkout fields validating address formats and handles. The amount field explains an amount the network cannot carry (too many decimal places, or above the EPC maximum of 999,999,999.99 EUR), and the SEPA beneficiary name is required.
 - **PhoneInput** (`PhoneInput.tsx` / `PhoneInput.test.tsx`): Clean, accessible phone dial code layout that notes dialer codes and any typed characters the code leaves out.
 - **SmsInput** (`SmsInput.tsx`): SMS composer form holding receiver number and predefined message.
 - **SocialInput** (`SocialInput.tsx` / `SocialInput.test.tsx`): Selectors for major platforms (Instagram, Twitter / X, TikTok, LinkedIn, YouTube, Facebook, WhatsApp, and GitHub) alongside handle name parsing.

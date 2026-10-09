@@ -85,7 +85,7 @@ describe('Payment generator', () => {
         label: 'Invoice 123',
       };
       const str = constructPaymentString(sepaData);
-      expect(str).toBe('BCD\n002\n1\nSCT\nMIDLGB22\nJane Doe\nDE89370400440532013000\nEUR12.50\n\n\nInvoice 123\n');
+      expect(str).toBe('BCD\n002\n1\nSCT\nMIDLGB22\nJane Doe\nDE89370400440532013000\nEUR12.50\n\n\nInvoice 123');
 
       const hydrated = hydratePaymentData(str);
       expect(hydrated).toEqual(sepaData);
@@ -102,7 +102,7 @@ describe('Payment generator', () => {
         label: 'Gift',
       };
       const str = constructPaymentString(sepaData);
-      expect(str).toBe('BCD\n002\n1\nSCT\n\nJohn Smith\nFR7630006000011234567890189\n\n\n\nGift\n');
+      expect(str).toBe('BCD\n002\n1\nSCT\n\nJohn Smith\nFR7630006000011234567890189\n\n\n\nGift');
 
       const hydrated = hydratePaymentData(str);
       expect(hydrated.network).toBe(CryptoNetwork.EPC_SEPA);
