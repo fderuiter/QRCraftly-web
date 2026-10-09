@@ -58,13 +58,13 @@ These components capture specialized data structures required to construct disti
 - **BulkCsvInput** (`BulkCsvInput.tsx` / `BulkCsvInput.test.tsx`): Bulk CSV Batch form, code-split behind `LazyBulkCsvInput.tsx` so it loads only on that type. Parses the CSV and writes the ZIP with `@/packages/bulk-csv` in memory (at most 500 rows). The live preview encodes only the first row with a payload and says which row it shows (`previewRow` from `@/packages/bulk-csv`). Supports column mapping, PNG/SVG format selection, customizable PNG export resolution (500px, 1000px, 2000px, 3000px), downloadable sample template button (`qrcraftly-sample-template.csv`), accessible file upload inputs, malformed CSV and missing-payload handling, progress tracking, and zero network calls.
 - **BulkCsvPreflightSummary** (`BulkCsvPreflightSummary.tsx` / `BulkCsvPreflightSummary.test.tsx`): Scaffolded entry for BulkCsvPreflightSummary.
 - **EmailInput** (`EmailInput.tsx`): Standard email layout supporting primary recipient, CC, BCC, subject, and body message fields.
-- **EventInput** (`EventInput.tsx`): Calendar appointment configuration form specifying target web calendar provider (iCal, Google, Outlook, Office 365, Yahoo), title, start and end date/times, explicit timezone (regional IANA or UTC), venue location, and description.
+- **EventInput** (`EventInput.tsx` / `EventInput.test.tsx`): Calendar appointment configuration form specifying target web calendar provider (iCal, Google, Outlook, Office 365, Yahoo) with a notice that web calendar links send the details to that provider, title, an all-day switch, start and end date/times (or dates), explicit timezone (regional IANA or UTC), venue location, and description.
 - **FieldHints** (`FieldHints.tsx` / `FieldHints.test.tsx`): How long typing pauses before an address is read.
 - **LazyBulkCsvInput** (`LazyBulkCsvInput.tsx`): Registry entry for the Bulk CSV Batch type. Renders a placeholder during prerendering and hydration, then loads the batch generator chunk on the client.
-- **LocationInput** (`LocationInput.tsx` / `LocationInput.test.tsx`): High-accuracy coordinate form requiring proper latitude and longitude decimals.
+- **LocationInput** (`LocationInput.tsx` / `LocationInput.test.tsx`): High-accuracy coordinate form taking latitude and longitude in degrees (decimal point or comma, optional N/S/E/W) and explaining any value it cannot read.
 - **MeetingInput** (`MeetingInput.tsx` / `MeetingInput.test.tsx`): Specialized input fields to enter URL links and meeting passwords.
 - **PaymentInput** (`PaymentInput.tsx`): Cryptocurrency, SEPA credit transfer (EPC QR), and consumer fiat payment checkout fields validating address formats and handles.
-- **PhoneInput** (`PhoneInput.tsx`): Clean, accessible phone dial code layout.
+- **PhoneInput** (`PhoneInput.tsx` / `PhoneInput.test.tsx`): Clean, accessible phone dial code layout that notes dialer codes and any typed characters the code leaves out.
 - **SmsInput** (`SmsInput.tsx`): SMS composer form holding receiver number and predefined message.
 - **SocialInput** (`SocialInput.tsx` / `SocialInput.test.tsx`): Selectors for major platforms (Instagram, Twitter / X, TikTok, LinkedIn, YouTube, Facebook, WhatsApp, and GitHub) alongside handle name parsing.
 - **TextInput** (`TextInput.tsx`): Minimalist form component capturing standard unformatted text.
