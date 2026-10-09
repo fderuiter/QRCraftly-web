@@ -163,6 +163,22 @@ describe('ColorControls', () => {
     );
   });
 
+  it('warns when the gradient end colour has low contrast, not only the start colour (#1365)', () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      fgColor: '#000000',
+      bgColor: '#ffffff',
+      eyeColor: '#000000',
+      gradientType: 'linear' as const,
+      gradientColorStops: [
+        { offset: 0, color: '#000000' },
+        { offset: 1, color: '#ffffff' },
+      ],
+    };
+    render(<ColorControls config={config} onChange={vi.fn()} />);
+    expect(screen.getByText(/Warning: The contrast ratio is low/i)).toBeInTheDocument();
+  });
+
   it('renders start/end color inputs and angle slider when gradientType is linear', () => {
     const handleChange = vi.fn();
     const configWithLinear = {
