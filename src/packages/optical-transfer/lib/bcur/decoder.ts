@@ -24,7 +24,7 @@ import { FragmentChooser } from './schedule';
 import { decodeUrPart, parseUr, type BcUrPart } from './uri';
 
 /** Source block count above which a claimed stream is refused (bounds alias-table and mixing work). */
-const MAX_FRAGMENTS = 1 << 16;
+export const MAX_BCUR_FRAGMENTS = 1 << 16;
 /** Mixed parts held while waiting for more data. */
 const MAX_PENDING_PARTS = 4096;
 
@@ -49,8 +49,11 @@ export interface BcUrResult {
 
 /** Outcome of feeding one scanned string to the decoder. */
 export type BcUrIngest =
-  /** Not a valid, consistent part of this stream (bad syntax, CRC, other type or other message). */
-  | { status: 'rejected' }
+  /**
+   * Not a valid, consistent part of this stream (bad syntax, CRC, other type or other message).
+   * `too-large` marks a well-formed part of a stream over the receiver's limits.
+   */
+  | { status: 'rejected'; reason?: 'too-large' }
   | { status: 'progress'; type: string; received: number; total: number }
   | { status: 'complete'; result: BcUrResult }
   /** All fragments arrived but the message CRC-32 or CBOR failed. */
@@ -127,13 +130,15 @@ export class BcUrDecoder {
 
     if (!parsed.seq) {
       const cbor = decodeBytewordsMinimal(parsed.body);
-      if (!cbor || cbor.length === 0 || cbor.length > MAX_RECEIVE_MESSAGE_BYTES) return { status: 'rejected' };
+      if (!cbor || cbor.length === 0) return { status: 'rejected' };
+      if (cbor.length > MAX_RECEIVE_MESSAGE_BYTES) return { status: 'rejected', reason: 'too-large' };
       this.type = parsed.type;
       return this.finish(cbor);
     }
 
     const part = decodeUrPart(parsed.body);
     if (!part || part.seqNum !== parsed.seq.seqNum || part.seqLen !== parsed.seq.seqLen) return { status: 'rejected' };
+    if (!this.chooser && this.overLimits(part)) return { status: 'rejected', reason: 'too-large' };
     if (!this.accepts(part)) return { status: 'rejected' };
     if (!this.chooser) this.begin(parsed.type, part);
 
@@ -177,11 +182,12 @@ export class BcUrDecoder {
         part.data.length === this.fragmentLength
       );
     }
-    return (
-      part.seqLen <= MAX_FRAGMENTS &&
-      part.messageLen <= MAX_RECEIVE_MESSAGE_BYTES &&
-      part.seqLen === Math.ceil(part.messageLen / part.data.length)
-    );
+    return part.seqLen === Math.ceil(part.messageLen / part.data.length);
+  }
+
+  /** True when a first part claims more fragments or a longer message than this receiver takes. */
+  private overLimits(part: BcUrPart): boolean {
+    return part.seqLen > MAX_BCUR_FRAGMENTS || part.messageLen > MAX_RECEIVE_MESSAGE_BYTES;
   }
 
   private begin(type: string, part: BcUrPart): void {
