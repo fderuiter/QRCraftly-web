@@ -114,9 +114,9 @@ export const constructPaymentString = (data: PaymentData): string => {
 
   if (data.network === CryptoNetwork.EPC_SEPA) {
     const iban = cleanIban(data.iban || data.address || '');
-    const name = sanitizeInput(data.name || '').trim();
-    const bic = sanitizeInput(data.bic || '').trim().toUpperCase();
-    const label = sanitizeInput(data.label || '').trim();
+    const name = sanitizeInput(data.name || '').trim().slice(0, 70);
+    const bic = sanitizeInput(data.bic || '').trim().toUpperCase().slice(0, 11);
+    const label = sanitizeInput(data.label || '').trim().slice(0, 140);
     let amountStr = (data.amount || '').trim();
     if (amountStr && !amountStr.toUpperCase().startsWith('EUR')) {
       amountStr = `EUR${amountStr}`;

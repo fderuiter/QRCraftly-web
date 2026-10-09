@@ -178,6 +178,13 @@ describe('QRTool Component', () => {
     expect(canvasMocks[0]).toBeInTheDocument();
   });
 
+  it('displays the Static · Non-expiring permanence badge in the preview header', () => {
+    render(<ToastProvider><QRTool /></ToastProvider>);
+    const badge = screen.getByTestId('permanence-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('Static · Non-expiring');
+  });
+
   it('offers format, size, print, file name and Copy as SVG in the Download options (#1052)', async () => {
     render(<ToastProvider><QRTool initialConfig={{ value: 'https://www.example.com/path' }} /></ToastProvider>);
     expect(downloadButton()).toHaveClass('bg-action');
