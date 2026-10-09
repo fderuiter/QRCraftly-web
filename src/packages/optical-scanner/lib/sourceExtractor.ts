@@ -12,7 +12,7 @@ import { dispatchWorkerRequest } from './workerRunner';
 import { decodeImageDataSync, decodeRgbaCode } from './decodeSync';
 import { decodeImageAtSizes, FILE_SCAN_MESSAGE, type FileScanRequest } from './imageFile';
 import { getNativeQrDetector, type NativeQrDetector } from './nativeDetector';
-import { assertImageWithinLimits } from './imageLimits';
+import { assertImageWithinLimits, exceedsPixelLimit, IMAGE_TOO_LARGE_PIXELS_MESSAGE } from './imageLimits';
 
 /** A large photo gets the multi-pass decoder at two sizes; allow a slow phone time for that. */
 const FILE_SCAN_TIMEOUT_MS = 10_000;
@@ -21,6 +21,9 @@ let fileSequenceId = 1_000_000;
 
 const NO_CODE_IN_IMAGE = 'No QR code detected in this image. Try a clearer or higher-contrast QR code image.';
 const NOT_AN_IMAGE = 'Only images can be scanned. Use a photo or screenshot of the QR code.';
+const UNREADABLE_IMAGE = 'Failed to load image file.';
+/** Longest side, in pixels, an SVG file is drawn at before it is read. */
+const SVG_RASTER_SIZE = 1024;
 
 /** A decode and the decoder that produced it. */
 interface Decoded {
@@ -36,14 +39,14 @@ interface LoadedImage {
   close: () => void;
 }
 
-/** Loads an image with FileReader and an image element (browsers without `createImageBitmap`). */
+/** Loads an image with FileReader and an image element. */
 function loadImageElement(file: Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('Failed to load image file.'));
+      img.onerror = () => reject(new Error(UNREADABLE_IMAGE));
       img.src = typeof reader.result === 'string' ? reader.result : '';
     };
     reader.onerror = () => reject(new Error('Failed to read file.'));
@@ -51,18 +54,61 @@ function loadImageElement(file: Blob): Promise<HTMLImageElement> {
   });
 }
 
-/** Decodes the file into pixels on this thread, applying its EXIF orientation. */
+/** Whether a file is an SVG drawing, which `createImageBitmap` cannot decode (#1294). */
+function isSvg(file: Blob): boolean {
+  return file.type === 'image/svg+xml';
+}
+
+/**
+ * Draws an SVG at {@link SVG_RASTER_SIZE} on its longest side. A drawing has no pixel size of its
+ * own, so a fixed size also keeps the 40-megapixel limit (#1299).
+ */
+function rasterizeSvg(img: HTMLImageElement): LoadedImage {
+  const naturalWidth = img.naturalWidth || img.width;
+  const naturalHeight = img.naturalHeight || img.height;
+  // A drawing with no width and height of its own is drawn square.
+  const scale = naturalWidth && naturalHeight ? SVG_RASTER_SIZE / Math.max(naturalWidth, naturalHeight) : 0;
+  const width = scale ? Math.max(1, Math.round(naturalWidth * scale)) : SVG_RASTER_SIZE;
+  const height = scale ? Math.max(1, Math.round(naturalHeight * scale)) : SVG_RASTER_SIZE;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error(UNREADABLE_IMAGE);
+  // Transparent drawings are read as dark marks on white, like a printed code.
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
+  return { image: canvas, width, height, close: () => {} };
+}
+
+/** Refuses a decoded image whose header did not show it was over the pixel limit (#1299). */
+function withinPixelLimit(loaded: LoadedImage): LoadedImage {
+  if (!exceedsPixelLimit(loaded.width, loaded.height)) return loaded;
+  loaded.close();
+  throw new Error(IMAGE_TOO_LARGE_PIXELS_MESSAGE);
+}
+
+/**
+ * Decodes the file into pixels on this thread, applying its EXIF orientation. An SVG, or a file
+ * `createImageBitmap` cannot decode, goes through an image element instead.
+ */
 async function loadImage(file: Blob): Promise<LoadedImage> {
+  if (isSvg(file)) {
+    if (typeof document === 'undefined') throw new Error(UNREADABLE_IMAGE);
+    return rasterizeSvg(await loadImageElement(file));
+  }
   if (typeof createImageBitmap === 'function') {
     try {
       const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-      return { image: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close() };
-    } catch {
-      throw new Error('Failed to load image file.');
+      return withinPixelLimit({ image: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close() });
+    } catch (err) {
+      if (err instanceof Error && err.message === IMAGE_TOO_LARGE_PIXELS_MESSAGE) throw err;
+      if (typeof document === 'undefined') throw new Error(UNREADABLE_IMAGE);
     }
   }
   const img = await loadImageElement(file);
-  return { image: img, width: img.naturalWidth || img.width, height: img.naturalHeight || img.height, close: () => {} };
+  return withinPixelLimit({ image: img, width: img.naturalWidth || img.width, height: img.naturalHeight || img.height, close: () => {} });
 }
 
 /** Main-thread fallback when the worker cannot decode the file (no OffscreenCanvas, hung, crashed). */
@@ -105,6 +151,9 @@ async function detectInImageFile(detector: NativeQrDetector, file: Blob): Promis
     if (typeof HTMLImageElement !== 'undefined' && loaded.image instanceof HTMLImageElement) {
       return await detector.detect(loaded.image);
     }
+    if (typeof HTMLCanvasElement !== 'undefined' && loaded.image instanceof HTMLCanvasElement) {
+      return await detector.detect(loaded.image);
+    }
     return null;
   } finally {
     loaded.close();
@@ -120,6 +169,9 @@ async function scanImageFile(file: Blob, signal?: AbortSignal): Promise<Decoded>
   const detector = await getNativeQrDetector();
   if (detector) return { code: await detectInImageFile(detector, file), source: 'native' };
 
+  // The worker has no image element to draw an SVG with.
+  if (isSvg(file)) return { code: await decodeImageFileHere(file), source: 'qr-decode' };
+
   fileSequenceId += 1;
   const request: FileScanRequest = { type: FILE_SCAN_MESSAGE, file, sequenceId: fileSequenceId };
   const worker = dispatchWorkerRequest(request, [], {
@@ -129,6 +181,7 @@ async function scanImageFile(file: Blob, signal?: AbortSignal): Promise<Decoded>
   const result = await worker;
   if (result.code || signal?.aborted) return { code: result.code ?? null, source: result.decoder ?? 'qr-decode' };
   // No error: the worker read the image and found no code. Otherwise it could not decode it.
+  if (result.error === IMAGE_TOO_LARGE_PIXELS_MESSAGE) throw new Error(IMAGE_TOO_LARGE_PIXELS_MESSAGE);
   if (!result.error) return { code: null, source: result.decoder ?? 'qr-decode' };
   return { code: await decodeImageFileHere(file), source: 'qr-decode' };
 }

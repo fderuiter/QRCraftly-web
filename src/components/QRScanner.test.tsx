@@ -772,6 +772,76 @@ describe('QRScanner Component', () => {
       expect(await screen.findByRole('heading', { name: 'QR code found' })).toBeInTheDocument();
     });
 
+    /** Delivers a camera result with corners, which opens the result sheet after the lock animation. */
+    const decodeWithCorners = async (data: string) => {
+      const options: UseQrScannerOptions | undefined = vi.mocked(useQrScanner).mock.lastCall?.[0];
+      const corners = [
+        { x: 10, y: 10 },
+        { x: 90, y: 10 },
+        { x: 90, y: 90 },
+        { x: 10, y: 90 },
+      ] as const;
+      await act(async () => {
+        options?.onScanSuccess?.(data, { text: data, bytes: null, corners: [...corners], source: 'native', durationMs: 0 });
+      });
+    };
+    const wait = (ms: number) => act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+    });
+
+    it('drops a pending camera result when switching to Image mode (#1296)', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+      await decodeWithCorners('CAMERA');
+      fireEvent.click(screen.getByRole('radio', { name: 'Image' }));
+      await wait(1000);
+      expect(screen.queryByRole('heading', { name: 'QR code found' })).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Image' })).toHaveAttribute('aria-checked', 'true');
+      expect(mockOnScanSuccess).not.toHaveBeenCalled();
+    });
+
+    it('keeps a pasted image result over a pending camera result (#1296)', async () => {
+      decodeImagesAs('PASTED');
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+      await decodeWithCorners('CAMERA');
+      const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+      Object.defineProperty(event, 'clipboardData', { value: { files: [new File(['png'], 'shot.png', { type: 'image/png' })] } });
+      await act(async () => {
+        document.dispatchEvent(event);
+      });
+      await waitFor(() => expect(mockOnScanSuccess).toHaveBeenCalledWith('PASTED'));
+      await wait(1000);
+      expect(mockOnScanSuccess).toHaveBeenCalledTimes(1);
+      expect(mockOnScanSuccess).not.toHaveBeenCalledWith('CAMERA');
+    });
+
+    it('explains a camera that stops mid-scan and starts it again (#1297)', async () => {
+      const ends: Array<() => void> = [];
+      getUserMedia.mockImplementation(async () => {
+        const stream = await openTrack();
+        const track = stream.getTracks()[0] as unknown as FakeTrack & Pick<EventTarget, 'addEventListener' | 'removeEventListener'>;
+        const events = new EventTarget();
+        track.addEventListener = events.addEventListener.bind(events);
+        track.removeEventListener = events.removeEventListener.bind(events);
+        ends.push(() => {
+          track.readyState = 'ended';
+          events.dispatchEvent(new Event('ended'));
+        });
+        return stream;
+      });
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+      expect(liveTracks()).toBe(1);
+
+      await act(async () => ends[0]());
+      expect(await screen.findByText('Camera Stopped')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Try the camera again' }));
+      await settle();
+      expect(screen.queryByText('Camera Stopped')).not.toBeInTheDocument();
+      expect(liveTracks()).toBe(1);
+    });
+
     it('waits for a click before asking for the camera when auto start is off', async () => {
       render(<QRScanner autoStartCamera={false} />);
       await settle();

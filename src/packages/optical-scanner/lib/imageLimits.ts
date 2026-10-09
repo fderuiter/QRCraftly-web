@@ -83,7 +83,46 @@ function webpSize(bytes: Uint8Array, view: DataView): ImageSize | null {
 }
 
 /**
- * Reads the declared width and height from the start of a PNG, JPEG, GIF, WebP or BMP file.
+ * The largest image an AVIF or HEIF file declares: every `ispe` (image spatial extents) property,
+ * the primary image's and its grid tiles' alike, so the biggest one bounds the decode.
+ */
+function heifSize(bytes: Uint8Array, view: DataView): ImageSize | null {
+  let largest: ImageSize | null = null;
+  for (let at = 4; at + 16 <= bytes.length; at++) {
+    // 'ispe'
+    if (bytes[at] !== 0x69 || bytes[at + 1] !== 0x73 || bytes[at + 2] !== 0x70 || bytes[at + 3] !== 0x65) continue;
+    const size = { width: view.getUint32(at + 8), height: view.getUint32(at + 12) };
+    if (!largest || size.width * size.height > largest.width * largest.height) largest = size;
+  }
+  return largest;
+}
+
+/** The first image's size from a TIFF's first directory (tags 256 and 257). */
+function tiffSize(bytes: Uint8Array, view: DataView): ImageSize | null {
+  const little = bytes[0] === 0x49;
+  const directory = view.getUint32(4, little);
+  if (directory + 2 > bytes.length) return null;
+  const count = view.getUint16(directory, little);
+  let width: number | null = null;
+  let height: number | null = null;
+  for (let i = 0; i < count; i++) {
+    const entry = directory + 2 + i * 12;
+    if (entry + 12 > bytes.length) return null;
+    const tag = view.getUint16(entry, little);
+    if (tag !== 256 && tag !== 257) continue;
+    // SHORT (3) or LONG (4), stored in the entry itself.
+    const value = view.getUint16(entry + 2, little) === 3 ? view.getUint16(entry + 8, little) : view.getUint32(entry + 8, little);
+    if (tag === 256) width = value;
+    else height = value;
+  }
+  return width !== null && height !== null ? { width, height } : null;
+}
+
+const isJpeg = (bytes: Uint8Array) => bytes[0] === 0xff && bytes[1] === 0xd8;
+
+/**
+ * Reads the declared width and height from the start of a PNG, JPEG, GIF, WebP, BMP, AVIF, HEIC
+ * or TIFF file.
  * @param bytes - The first bytes of the file.
  * @returns The size, or null for another format or a header that is cut off.
  */
@@ -92,10 +131,20 @@ export function readImageSize(bytes: Uint8Array): ImageSize | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (bytes[0] === 0x89 && ascii(bytes, 1, 3) === 'PNG') return { width: view.getUint32(16), height: view.getUint32(20) };
   if (ascii(bytes, 0, 3) === 'GIF') return { width: view.getUint16(6, true), height: view.getUint16(8, true) };
-  if (bytes[0] === 0xff && bytes[1] === 0xd8) return jpegSize(bytes, view);
+  if (isJpeg(bytes)) return jpegSize(bytes, view);
   if (ascii(bytes, 0, 4) === 'RIFF' && ascii(bytes, 8, 4) === 'WEBP') return webpSize(bytes, view);
   if (ascii(bytes, 0, 2) === 'BM') return { width: Math.abs(view.getInt32(18, true)), height: Math.abs(view.getInt32(22, true)) };
+  if (ascii(bytes, 4, 4) === 'ftyp') return heifSize(bytes, view);
+  if (ascii(bytes, 0, 4) === 'II*\0' || ascii(bytes, 0, 4) === 'MM\0*') return tiffSize(bytes, view);
   return null;
+}
+
+/**
+ * Whether a decoded image is over the pixel limit. Formats whose size cannot be read from the
+ * header (ICO, or a header cut off) are checked with this right after decoding.
+ */
+export function exceedsPixelLimit(width: number, height: number): boolean {
+  return width * height > MAX_IMAGE_PIXELS;
 }
 
 /**
@@ -108,6 +157,11 @@ export async function assertImageWithinLimits(file: Blob): Promise<void> {
   if (typeof file.slice !== 'function') return;
   const head = file.slice(0, HEADER_BYTES);
   if (typeof head.arrayBuffer !== 'function') return;
-  const size = readImageSize(new Uint8Array(await head.arrayBuffer()));
-  if (size && size.width * size.height > MAX_IMAGE_PIXELS) throw new Error(IMAGE_TOO_LARGE_PIXELS_MESSAGE);
+  const bytes = new Uint8Array(await head.arrayBuffer());
+  let size = readImageSize(bytes);
+  // Large metadata segments can push a JPEG's frame header past the first megabyte (#1299).
+  if (!size && isJpeg(bytes) && file.size > HEADER_BYTES) {
+    size = readImageSize(new Uint8Array(await file.arrayBuffer()));
+  }
+  if (size && exceedsPixelLimit(size.width, size.height)) throw new Error(IMAGE_TOO_LARGE_PIXELS_MESSAGE);
 }
