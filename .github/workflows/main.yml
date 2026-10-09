@@ -219,8 +219,11 @@ jobs:
           name: dist
           path: dist/
 
+      # Each attempt is time-limited and retried (scripts/ci/install_playwright.sh), so a stalled
+      # apt mirror costs minutes, not the whole job.
       - name: Install Playwright Browsers
-        run: pnpm exec playwright install --with-deps
+        timeout-minutes: 13
+        run: bash scripts/ci/install_playwright.sh
 
       - name: Run Playwright tests
         env:
