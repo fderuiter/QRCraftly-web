@@ -25,11 +25,13 @@ describe('CommandPalette', () => {
 
   it('filters as you type and announces the count', async () => {
     render(<CommandPalette open onClose={() => {}} commands={commandList()} />);
-    await userEvent.type(screen.getByRole('combobox'), 'swiss');
+    const combobox = screen.getByRole('combobox');
+    await waitFor(() => expect(combobox).toHaveFocus());
+    await userEvent.type(combobox, 'swiss');
     expect(screen.getAllByRole('option')).toHaveLength(1);
     expect(screen.getByRole('status')).toHaveTextContent('1 command available');
-    await userEvent.clear(screen.getByRole('combobox'));
-    await userEvent.type(screen.getByRole('combobox'), 'zzz');
+    await userEvent.clear(combobox);
+    await userEvent.type(combobox, 'zzz');
     expect(screen.getByRole('status')).toHaveTextContent('No matching commands');
   });
 
@@ -64,6 +66,7 @@ describe('CommandPalette', () => {
   it('closes with Escape', async () => {
     const onClose = vi.fn();
     render(<CommandPalette open onClose={onClose} commands={commandList()} />);
+    await waitFor(() => expect(screen.getByRole('combobox')).toHaveFocus());
     await userEvent.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalled();
   });
