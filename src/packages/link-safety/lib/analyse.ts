@@ -57,7 +57,7 @@ const MIN_BRAND_LENGTH = 4;
  * @param host - A lower-case hostname.
  * @returns The registrable domain, its first label, and the subdomain labels.
  */
-export function splitHost(host: string): { registrable: string; label: string; subdomains: string[] } {
+function splitHost(host: string): { registrable: string; label: string; subdomains: string[] } {
   const labels = host.split('.');
   let suffixLength = 1;
   for (let length = Math.min(3, labels.length - 1); length >= 2; length--) {
@@ -81,7 +81,7 @@ export function splitHost(host: string): { registrable: string; label: string; s
  * @param label - A domain label, Unicode form.
  * @returns The skeleton readings.
  */
-export function skeletons(label: string): string[] {
+function skeletons(label: string): string[] {
   const mapped = [...label.normalize('NFKC').toLowerCase()].map((char) => CONFUSABLES[char] ?? char).join('');
   const base = mapped.replace(/rn/g, 'm').replace(/vv/g, 'w').replace(/0/g, 'o').replace(/5/g, 's');
   return [base.replace(/1/g, 'l'), base.replace(/1/g, 'i')];
