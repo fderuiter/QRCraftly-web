@@ -85,7 +85,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
           })}
         </div>
 
-        <div className="grid grid-cols-5 gap-2 sm:grid-cols-6" aria-label="Preset brand logos">
+        <div className="grid grid-cols-5 gap-2 sm:grid-cols-6" aria-label="Preset logos">
           {filteredPresets.map((preset) => {
             const isSelected = config.logoUrl === preset.dataUrl;
             return (
