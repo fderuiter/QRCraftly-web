@@ -161,9 +161,9 @@ export function SidebarContent({ toolId }: SidebarContentProps) {
                     ))}
                   </ul>
                 )}
-                {q.link && (
-                  <a href={q.link.href} className="mt-2 inline-block font-semibold text-accent underline-offset-2 hover:underline">
-                    {q.link.label}
+                {q.linksToSecurity && (
+                  <a href="/security" className="mt-2 inline-block font-semibold text-accent underline-offset-2 hover:underline">
+                    How QRCraftly keeps data in your browser
                   </a>
                 )}
               </AccordionItem>

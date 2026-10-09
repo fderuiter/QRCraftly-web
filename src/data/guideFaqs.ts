@@ -18,12 +18,12 @@
 
 import type { TypeGuide } from './typeGuides';
 
-/** One FAQ entry built from a guide section: paragraphs, a bullet list, or both, and an optional link. */
+/** One FAQ entry built from a guide section: paragraphs, a bullet list, or both, and an optional link to the security page. */
 export interface GuideFaq {
   question: string;
   paragraphs: readonly string[];
   items?: readonly string[];
-  link?: { href: string; label: string };
+  linksToSecurity?: boolean;
 }
 
 /**
@@ -40,7 +40,7 @@ export function getGuideFaqs(guide: TypeGuide): GuideFaq[] {
     {
       question: 'Where does what I type go?',
       paragraphs: [guide.privacy],
-      link: { href: '/security', label: 'How QRCraftly keeps data in your browser' },
+      linksToSecurity: true,
     },
   ];
 }
