@@ -28,6 +28,8 @@ const VIOLATION_MESSAGES: Record<string, string> = {
   EVENT_MISSING_START: 'Event start date/time is required.',
   EVENT_CHRONOLOGICAL_VIOLATION: 'Event end date/time cannot be before start date/time.',
   EVENT_INVALID_DATE_VIOLATION: 'Event start or end date/time is not a valid date.',
+  DELIMITER_VIOLATION:
+    'Part of this email code is not encoded: a "?", "&" or ";" ends a field early, or it has a field other than To, Cc, Bcc, Subject and Body.',
   SMS_PHONE_STRUCTURE_VIOLATION: 'SMS phone number contains invalid characters, letters, or line-breaks.',
 };
 
