@@ -110,6 +110,12 @@ export const drawQRInternal = (
     return;
   }
 
+  // Modules are cut out for the logo only when there is a logo image to draw there, so a
+  // logo that failed to load never leaves an empty hole in the code (#1257).
+  if (config.logoUrl && !logoImg) {
+    config = { ...config, logoUrl: null };
+  }
+
   // 1. Calculate Layout
   const layout = calculateLayout(config, displaySize, moduleCount);
   const { drawX, drawY, drawSize, cellSize, borderPx, quietPx } = layout;

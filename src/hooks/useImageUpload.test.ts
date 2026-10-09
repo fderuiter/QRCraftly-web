@@ -1,5 +1,5 @@
-import { renderHook, act } from '@testing-library/react';
-import { useImageUpload } from './useImageUpload';
+import { renderHook, act, waitFor } from '@testing-library/react';
+import { useImageUpload, UNDRAWABLE_SVG_MESSAGE } from './useImageUpload';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as security from '../utils/security';
 import * as imageResizeHelper from '../utils/imageResizeHelper';
@@ -84,6 +84,23 @@ describe('useImageUpload', () => {
     expect(spyOnMainThread).not.toHaveBeenCalled();
 
     global.FileReader = originalFileReader;
+  });
+
+  it.each([
+    ['malformed markup', '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"></svg>'],
+    ['no xmlns', '<svg><rect width="10" height="10" /></svg>'],
+  ])('rejects an SVG upload the browser cannot draw (%s) and keeps the current logo (#1257)', async (_case, svg) => {
+    const { result } = renderHook(() => useImageUpload());
+    const onSuccess = vi.fn();
+    const file = new File([svg], 'logo.svg', { type: 'image/svg+xml' });
+    const event = { target: { files: [file], value: 'logo.svg' } } as unknown as React.ChangeEvent<HTMLInputElement>;
+
+    act(() => {
+      result.current.handleUpload(event, onSuccess);
+    });
+
+    await waitFor(() => expect(result.current.error).toBe(UNDRAWABLE_SVG_MESSAGE));
+    expect(onSuccess).not.toHaveBeenCalled();
   });
 
   it('handles valid image upload off-thread on high-tier devices', async () => {
