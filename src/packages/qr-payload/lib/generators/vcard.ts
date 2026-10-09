@@ -50,12 +50,12 @@ export const unescapeMECard = (str: string | undefined): string => {
 };
 
 /**
- * Escapes a vCard 2.1 value: only `;` is escaped, and line breaks become spaces because 2.1 has
- * no `\n` escape (it would need quoted-printable).
+ * Escapes a vCard 2.1 value: `\` and `;` are escaped (not `,`), and line breaks become spaces
+ * because 2.1 has no `\n` escape (it would need quoted-printable).
  */
 const escapeVCard21 = (str: string | undefined): string => {
   if (!str) return '';
-  return str.replace(/\r\n|\r|\n/g, ' ').replace(/;/g, '\\;');
+  return str.replace(/\\/g, '\\\\').replace(/\r\n|\r|\n/g, ' ').replace(/;/g, '\\;');
 };
 
 /**

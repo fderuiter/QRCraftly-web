@@ -272,3 +272,13 @@ describe('Calendar dates (#1281, #1364)', () => {
     expect(constructEventString({ ...data, provider: CalendarProvider.YAHOO })).toContain('ST=20250701T140000Z');
   });
 });
+
+describe('vCard 2.1 escaping', () => {
+  it('escapes a backslash before a semicolon so the value round-trips', () => {
+    const base = hydrateVCardData('');
+    const org = 'x\\;y';
+    const raw = constructVCardString({ ...base, version: '2.1', firstName: 'A', lastName: 'B', organization: org });
+    expect(raw).toContain('\r\nORG:x\\\\\\;y\r\n');
+    expect(hydrateVCardData(raw).organization).toBe(org);
+  });
+});
