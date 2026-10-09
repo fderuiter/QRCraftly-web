@@ -1473,8 +1473,9 @@ describe('QRCanvas Border Rendering', () => {
     const borderCall = fillRectCalls.find(call => call[0] === 0 && call[1] === 0 && call[2] === 100 && call[3] === 100);
     expect(borderCall).toBeTruthy();
 
-    // Find the call for the inner background: 10, 10, 80, 80 (since 0.1 * 100 = 10px border on each side)
-    const innerBgCall = fillRectCalls.find(call => call[0] > 13 && call[0] < 14 && call[2] > 72 && call[2] < 73);
+    // Find the call for the inner background, quiet zone included: 10, 10, 80, 80
+    // (0.1 * 100 = 10px border on each side, with the light quiet zone inside it)
+    const innerBgCall = fillRectCalls.find(call => Math.abs(call[0] - 10) < 1e-9 && Math.abs(call[2] - 80) < 1e-9);
     expect(innerBgCall).toBeTruthy();
 
     document.createElement = originalCreateElement;
@@ -1504,7 +1505,7 @@ describe('QRCanvas Border Rendering', () => {
     const fillRectCalls = mockContext.fillRect.mock.calls;
 
     // Should NOT have inner background fill (10, 10, 80, 80)
-    const innerBgCall = fillRectCalls.find(call => call[0] > 13 && call[0] < 14 && call[2] > 72 && call[2] < 73);
+    const innerBgCall = fillRectCalls.find(call => Math.abs(call[0] - 10) < 1e-9 && Math.abs(call[2] - 80) < 1e-9);
     expect(innerBgCall).toBeUndefined();
 
     document.createElement = originalCreateElement;

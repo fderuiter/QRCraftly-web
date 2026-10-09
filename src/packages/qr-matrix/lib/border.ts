@@ -23,7 +23,7 @@ import { QRConfig } from '@/types';
  *
  * @param ctx - The canvas 2D rendering context.
  * @param config - The QR configuration object specifying border style and colors.
- * @param displaySize - The total size of the QR code canvas.
+ * @param displaySize - The size of the bordered QR box (the whole canvas unless a frame is drawn).
  * @param borderPx - The thickness of the border in pixels.
  */
 export const renderBorder = (

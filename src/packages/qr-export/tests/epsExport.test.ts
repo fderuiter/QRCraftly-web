@@ -73,4 +73,18 @@ describe('EPS Vector Export', () => {
     expect(eps).toContain('/Helvetica-Bold findfont 20 scalefont setfont');
     expect(eps).toContain('(TEST) show');
   });
+
+  it('converts SVG paths containing H, h, V, v, and Z subpath resets to PostScript', () => {
+    const sampleSvg = `<svg width="200" height="200"><path d="M 10 10 H 50 v 20 h -10 V 10 Z m 5 5 h 10" fill="#000000"/></svg>`;
+    const eps = convertSvgToEps(sampleSvg);
+
+    expect(eps).toContain('10 10 moveto');
+    expect(eps).toContain('50 10 lineto');
+    expect(eps).toContain('50 30 lineto');
+    expect(eps).toContain('40 30 lineto');
+    expect(eps).toContain('40 10 lineto');
+    expect(eps).toContain('closepath');
+    expect(eps).toContain('15 15 moveto');
+    expect(eps).toContain('25 15 lineto');
+  });
 });
