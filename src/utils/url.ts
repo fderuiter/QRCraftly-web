@@ -17,8 +17,8 @@
 */
 
 export const SafeUrlPipeline = {
-  REGEX_URL_UNSAFE_CHARS: /[\x00-\x1F\x7F-\x9F\s\u200B-\u200D\uFEFF]+/g,
-  REGEX_CONTROL_CHARS: /[\x00-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]/g,
+  REGEX_URL_UNSAFE_CHARS: /[\x00-\x1F\x7F-\x9F\s\u200B-\u200D\u2060\uFEFF]+/g,
+  REGEX_CONTROL_CHARS: /[\x00-\x1F\x7F-\x9F\u200B-\u200D\u2060\uFEFF]/g,
 
   DANGEROUS_PROTOCOLS: [
     'javascript:',
@@ -101,52 +101,43 @@ export const SafeUrlPipeline = {
     return curr;
   },
 
+  /**
+   * Schemes that run script. They are refused even with whitespace after the colon,
+   * because browsers still run `javascript: alert(1)`.
+   */
+  SCRIPT_PROTOCOLS: ['javascript:', 'vbscript:', 'jscript:', 'wscript:'],
+
+  /**
+   * Returns true when the input starts with a blocked scheme. Like a URL parser (WHATWG URL
+   * §4.4), it drops control and zero-width characters anywhere and whitespace only at the
+   * start, so prose such as "About: us" or "File: invoice.pdf" is not a scheme (#1274).
+   */
   isDangerous(url: string | undefined): boolean {
     if (!url) return false;
-    let decoded = this.decodeObfuscation(url);
-    decoded = decoded.replace(this.REGEX_URL_UNSAFE_CHARS, '').toLowerCase();
-    return this.DANGEROUS_PROTOCOLS.some(p => decoded.startsWith(p));
+    const decoded = this.decodeObfuscation(url)
+      .replace(this.REGEX_CONTROL_CHARS, '')
+      .replace(/^\s+/, '')
+      .toLowerCase();
+    if (this.SCRIPT_PROTOCOLS.some(p => decoded.startsWith(p))) return true;
+    // A data URL with a space after the colon still runs when a media type or comma follows.
+    if (/^data:\s*(?:[a-z0-9!#$&^_.+-]+\/|[;,])/.test(decoded)) return true;
+    return this.DANGEROUS_PROTOCOLS.some(p => decoded.startsWith(p) && !/^\s/.test(decoded.slice(p.length)));
   },
 
   /**
-   * Schemes accepted without a following `//`. Anything else that merely looks like a
-   * scheme (`example.com:8080/path`, `localhost:3000`) is really a host and port.
-   */
-  OPAQUE_SCHEMES: new Set([
-    'http',
-    'https',
-    'ftp',
-    'mailto',
-    'tel',
-    'sms',
-    'smsto',
-    'geo',
-    'matmsg',
-    'wifi',
-    'urn',
-    'magnet',
-    'bitcoin',
-    'ethereum',
-    'litecoin',
-    'solana',
-    'market',
-    'intent',
-  ]),
-
-  /**
-   * Returns true when the input starts with a real URI scheme: one followed by `//`,
-   * or one on the {@link OPAQUE_SCHEMES} allowlist.
+   * Returns true when the input starts with a URI scheme (RFC 3986 §3.1), with or without a
+   * following `//`. A `host:port` prefix such as `localhost:3000` or `example.com:8080/path`
+   * is not a scheme (#1276).
    */
   hasExplicitScheme(url: string): boolean {
     const match = /^([a-z][a-z0-9+.-]*):/i.exec(url);
     if (!match) return false;
-    if (url.startsWith('//', match[0].length)) return true;
-    return this.OPAQUE_SCHEMES.has(match[1].toLowerCase());
+    return !/^\d{1,5}(?:[/?#]|$)/.test(url.slice(match[0].length));
   },
 
   /**
-   * Returns the lowercase scheme of a URL that starts with a real one (see {@link hasExplicitScheme}),
-   * or null for scheme-less input such as `example.com`.
+   * Returns the lowercase scheme of a URL that starts with one (see {@link hasExplicitScheme}),
+   * or null for scheme-less input such as `example.com` or `localhost:3000`.
    */
   getScheme(url: string | undefined): string | null {
     if (!url) return null;
