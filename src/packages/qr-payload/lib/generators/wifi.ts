@@ -28,7 +28,7 @@ import { identifyProtocol } from '../protocol';
 
 const REGEX_ESCAPE_WIFI = /([\\;,":])/g;
 const REGEX_UNESCAPE_WIFI = /\\([\\;,":])/g;
-const REGEX_PROHIBITED_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]/;
+const REGEX_PROHIBITED_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\u2060\uFEFF]/;
 
 /**
  * Escapes specific special characters in a WIFI SSID or password string.

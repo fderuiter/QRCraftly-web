@@ -283,7 +283,7 @@ describe('qr-payload Package Seam', () => {
       const config = getBaseConfig();
       config.borderText = 'Border\u200BText';
       config.templateHeadline = 'Headline\uFEFF';
-      config.templateSubtext = 'Subtext\u200C';
+      config.templateSubtext = 'Subtext\u2060'; // ZWJ and ZWNJ are allowed (#1271); a word joiner is not
       const violations = validateConfig(config);
       expect(violations).toContain(
         'Border Text contains invalid control or zero-width characters'
