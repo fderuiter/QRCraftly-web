@@ -53,4 +53,13 @@ describe('ExportOptions (#1052)', () => {
     expect(suggestFilename({ type: QRType.TEXT, value: 'private note' })).toBe('text-qr-code');
     expect(suggestFilename({ type: QRType.URL, value: 'not a url' })).toBe('url-qr-code');
   });
+
+  it('renders a reassurance card saying the static code never expires', () => {
+    renderOptions();
+    const card = screen.getByTestId('export-reassurance-card');
+    expect(card).toBeInTheDocument();
+    expect(card).toHaveTextContent('Never expires');
+    expect(card).toHaveTextContent(/static code/i);
+    expect(card).toHaveTextContent(/no account, scan limit or subscription/i);
+  });
 });

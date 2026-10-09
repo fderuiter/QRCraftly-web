@@ -19,7 +19,10 @@
 import { scan } from '@/packages/optical-scanner';
 import type { ScanCorners } from '@/packages/optical-scanner';
 import type { PixelFrame, ScannabilityStatus } from '@/packages/scannability';
+import { createScannabilityEvaluator } from '@/packages/scannability';
 import { describeScan, type ScanDescription } from '@/components/scanner/describeScan';
+import { DEFAULT_CONFIG } from '@/constants';
+import type { QRConfig } from '@/types';
 
 /** Side of the square the code is redrawn into for the print simulation, in pixels. */
 const CHECK_SIZE = 512;
@@ -99,12 +102,17 @@ export async function checkQrImage(file: Blob): Promise<CheckOutcome> {
     const frame = framePixels(bitmap, scanned.corners);
     bitmap.close();
     if (frame) {
-      const [{ performScannabilityCheck }, { loadQrReader }] = await Promise.all([
-        import('@/packages/scannability/checker'),
-        import('@/packages/qr-decode'),
-      ]);
-      const result = performScannabilityCheck(await loadQrReader(), frame, frame.width, frame.height);
-      if (result.success && result.physicalReady) status = 'physical-pass';
+      const evaluator = createScannabilityEvaluator({
+        config: DEFAULT_CONFIG as QRConfig,
+      });
+      try {
+        const assessment = await evaluator.check({ imageData: frame });
+        if (assessment && assessment.status === 'physical-pass') {
+          status = 'physical-pass';
+        }
+      } finally {
+        evaluator.destroy();
+      }
     }
   } catch {
     // No canvas or bitmap support: report the screen scan only.
