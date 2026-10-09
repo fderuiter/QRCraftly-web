@@ -16,7 +16,8 @@ export type StyleScanTone = 'good' | 'check';
  * @returns `good` when contrast and pattern raise no concern, otherwise `check`.
  */
 export function styleScanTone(choice: StyleChoice): StyleScanTone {
-  const contrast = Math.min(getContrastRatio(choice.fgColor, choice.bgColor), getContrastRatio(choice.eyeColor, choice.bgColor));
+  const bg = choice.bgColor === 'transparent' ? '#ffffff' : choice.bgColor;
+  const contrast = Math.min(getContrastRatio(choice.fgColor, bg), getContrastRatio(choice.eyeColor, bg));
   return contrast >= MIN_CONTRAST_THRESHOLD && !LOW_RELIABILITY_PATTERNS.includes(choice.style) ? 'good' : 'check';
 }
 

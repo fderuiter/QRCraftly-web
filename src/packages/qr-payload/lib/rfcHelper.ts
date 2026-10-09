@@ -150,21 +150,29 @@ export interface FormattedDateTime {
  * @returns Formatted value and timezone identifier (if present). The value is empty when the
  * string is not a date.
  */
-export const formatEventDateTime = (dateString: string | undefined): FormattedDateTime => {
+export const formatEventDateTime = (
+  dateString: string | undefined,
+  timezone?: string
+): FormattedDateTime => {
   if (!dateString) return { value: '' };
 
   let cleanDateString = dateString;
-  let tzid: string | undefined;
+  let tzid: string | undefined = timezone;
 
   // Extract TZID parameter if present (e.g. "2025-01-01T12:30;TZID=America/New_York")
   const tzidMatch = cleanDateString.match(/;TZID=([^;:\s\n]+)/i);
   if (tzidMatch) {
-    tzid = tzidMatch[1];
+    if (!tzid) tzid = tzidMatch[1];
     cleanDateString = cleanDateString.replace(/;TZID=[^;:\s\n]+/i, '');
   }
 
-  const hasUTCIndicator = cleanDateString.toUpperCase().endsWith('Z');
+  const isExplicitUtc = tzid === 'UTC';
+  const hasUTCIndicator = cleanDateString.toUpperCase().endsWith('Z') || isExplicitUtc;
   const hasOffset = /[-+]\d{2}:?\d{2}$/.test(cleanDateString);
+
+  if (isExplicitUtc && !cleanDateString.toUpperCase().endsWith('Z') && !hasOffset) {
+    cleanDateString += 'Z';
+  }
 
   const date = new Date(cleanDateString);
   if (Number.isNaN(date.getTime())) {
@@ -192,7 +200,7 @@ export const formatEventDateTime = (dateString: string | undefined): FormattedDa
     formatted = `${year}${month}${day}T${hours}${minutes}${seconds}`;
   }
 
-  return { value: formatted, tzid };
+  return { value: formatted, tzid: tzid === 'UTC' ? undefined : tzid };
 };
 
 /**

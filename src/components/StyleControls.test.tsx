@@ -17,7 +17,7 @@
 */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import StyleControls from './StyleControls';
-import { DEFAULT_CONFIG } from '../constants';
+import { DEFAULT_CONFIG, PRESET_LOGOS } from '../constants';
 import { QRStyle, LogoPaddingStyle, QRErrorCorrectionLevel, QRConfig, SocialFormat, TemplateStyle } from '../types';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { expandAppearanceSections } from '../../tests/utils/expandAppearanceSections';
@@ -875,3 +875,87 @@ describe('Style Gallery section (#1059)', () => {
     expect(screen.getByRole('button', { name: /Surprise me/ })).toBeInTheDocument();
   });
 });
+
+describe('Preset Logo Gallery', () => {
+  const mockOnChange = vi.fn();
+
+  beforeEach(() => {
+    mockOnChange.mockClear();
+  });
+
+  it('renders preset category filter tabs and preset brand logos', () => {
+    render(<StyleControls config={DEFAULT_CONFIG} onChange={mockOnChange} />);
+    expandAppearanceSections();
+
+    // Check category tabs
+    expect(screen.getByRole('tab', { name: 'All' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Social' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Messaging' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Payment' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'General' })).toBeInTheDocument();
+
+    // Check preset buttons
+    expect(screen.getByRole('button', { name: 'Select Instagram logo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Select WhatsApp logo' })).toBeInTheDocument();
+  });
+
+  it('filters preset icons when clicking category tabs', async () => {
+    const user = userEvent.setup();
+    render(<StyleControls config={DEFAULT_CONFIG} onChange={mockOnChange} />);
+    expandAppearanceSections();
+
+    // Click "Messaging" tab
+    await user.click(screen.getByRole('tab', { name: 'Messaging' }));
+
+    // Messaging icons should be present
+    expect(screen.getByRole('button', { name: 'Select WhatsApp logo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Select Telegram logo' })).toBeInTheDocument();
+
+    // Social icons should be hidden
+    expect(screen.queryByRole('button', { name: 'Select Instagram logo' })).not.toBeInTheDocument();
+  });
+
+  it('selects a preset logo when clicked', async () => {
+    const user = userEvent.setup();
+    render(<StyleControls config={DEFAULT_CONFIG} onChange={mockOnChange} />);
+    expandAppearanceSections();
+
+    const instagramBtn = screen.getByRole('button', { name: 'Select Instagram logo' });
+    await user.click(instagramBtn);
+
+    expect(mockOnChange).toHaveBeenCalledWith({
+      logoUrl: expect.stringContaining('data:image/svg+xml'),
+    });
+  });
+
+  it('displays preset logo name and highlights selected preset icon when logo is active', () => {
+    // Import PRESET_LOGOS to get Instagram dataUrl
+    const instagramPreset = PRESET_LOGOS.find((p) => p.id === 'instagram');
+    const instagramConfig = { ...DEFAULT_CONFIG, logoUrl: instagramPreset!.dataUrl };
+
+    render(<StyleControls config={instagramConfig} onChange={mockOnChange} />);
+    expandAppearanceSections();
+
+    // Preset button should be pressed/selected
+    const instagramBtn = screen.getByRole('button', { name: 'Select Instagram logo' });
+    expect(instagramBtn).toHaveAttribute('aria-pressed', 'true');
+
+    // Logo card should reflect preset label
+    expect(screen.getByText('Instagram Logo')).toBeInTheDocument();
+  });
+
+  it('removes selected preset logo when Remove is clicked', async () => {
+    const user = userEvent.setup();
+    const instagramPreset = PRESET_LOGOS.find((p) => p.id === 'instagram');
+    const instagramConfig = { ...DEFAULT_CONFIG, logoUrl: instagramPreset!.dataUrl };
+
+    render(<StyleControls config={instagramConfig} onChange={mockOnChange} />);
+    expandAppearanceSections();
+
+    const removeBtn = screen.getByRole('button', { name: /Remove/i });
+    await user.click(removeBtn);
+
+    expect(mockOnChange).toHaveBeenCalledWith({ logoUrl: null });
+  });
+});
+

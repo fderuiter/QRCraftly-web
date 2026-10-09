@@ -164,6 +164,60 @@ function getSharedFluidGrid(total: number): Uint8Array {
   return sharedFluidGrid;
 }
 
+/**
+ * Builds a CanvasGradient or virtual SVG gradient over the QR code module grid bounding box
+ * when config.gradientType is active ('linear' or 'radial').
+ */
+export function createModuleGradient(
+  ctx: CanvasRenderingContext2D,
+  config: QRConfig,
+  drawX: number,
+  drawY: number,
+  drawSize: number
+): CanvasGradient | null {
+  const { gradientType, gradientColorStops, gradientAngle = 0 } = config;
+  if (!gradientType || gradientType === 'none') {
+    return null;
+  }
+
+  const stops = gradientColorStops && gradientColorStops.length > 0
+    ? gradientColorStops
+    : [{ offset: 0, color: config.fgColor }, { offset: 1, color: config.fgColor }];
+
+  const cx = drawX + drawSize / 2;
+  const cy = drawY + drawSize / 2;
+
+  let gradient: CanvasGradient;
+
+  if (gradientType === 'linear') {
+    const rad = (gradientAngle * Math.PI) / 180;
+    const half = drawSize / 2;
+    const x0 = cx - half * Math.cos(rad);
+    const y0 = cy - half * Math.sin(rad);
+    const x1 = cx + half * Math.cos(rad);
+    const y1 = cy + half * Math.sin(rad);
+
+    gradient = ctx.createLinearGradient(x0, y0, x1, y1);
+  } else if (gradientType === 'radial') {
+    const radius = (drawSize * Math.SQRT2) / 2;
+    gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+  } else {
+    return null;
+  }
+
+  if (stops.length === 1) {
+    gradient.addColorStop(0, stops[0].color);
+    gradient.addColorStop(1, stops[0].color);
+  } else {
+    for (const stop of stops) {
+      const offset = Math.max(0, Math.min(1, stop.offset));
+      gradient.addColorStop(offset, stop.color);
+    }
+  }
+
+  return gradient;
+}
+
 export const renderModules = (
   ctx: CanvasRenderingContext2D,
   modules: QRModules,
@@ -211,11 +265,16 @@ export const renderModules = (
   const threshold = options?.luminanceThreshold ?? config.luminanceThreshold ?? 0.25;
 
   // 2. Select contrast-optimized foreground colors for dark and light contrast groups
-  let fgColorDark = options?.fgColorDark || config.fgColorDark || config.fgColor;
+  const drawSize = moduleCount * cellSize;
+  const gradientFill = (!options?.fgColorDark && !config.fgColorDark && config.gradientType && config.gradientType !== 'none')
+    ? createModuleGradient(ctx, config, drawX, drawY, drawSize)
+    : null;
+
+  let fgColorDark: string | CanvasGradient = gradientFill || options?.fgColorDark || config.fgColorDark || config.fgColor;
   let fgColorLight = options?.fgColorLight || config.fgColorLight || '#ffffff';
 
-  if (!options?.fgColorDark && !config.fgColorDark) {
-    const defaultDarkLum = getLuminance(fgColorDark);
+  if (!gradientFill && !options?.fgColorDark && !config.fgColorDark) {
+    const defaultDarkLum = getLuminance(fgColorDark as string);
     if ((1.0 + 0.05) / (defaultDarkLum + 0.05) < 3.0) {
       fgColorDark = '#000000';
     }

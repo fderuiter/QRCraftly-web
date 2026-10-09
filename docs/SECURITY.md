@@ -54,7 +54,7 @@ To prevent injection of arbitrary characters or command payloads into telephone,
 
 - **General Phone Validation**: By default, general telephone input values are cleaned to remove all non-numeric and non-standard telephone symbols. Characters like semicolons and commas are stripped.
 - **SMS Multi-Recipient Isolation**: To support advanced client-side SMS campaign configurations, the SMS generator uses an isolated sanitization option that preserves semicolons and commas, while rejecting letters, other symbols, and line-break control characters.
-- **URI Delimiter Encoding**: After sanitization, `#` in a dial string is percent-encoded as `%23` (RFC 3966) so it cannot start a URI fragment and truncate the number. Mailto recipients are percent-encoded (RFC 6068, keeping `@`) so `?`, `&`, and `#` in the address cannot inject headers, and crypto wallet addresses, SEPA transfer fields, and fiat payment handles (PayPal, Venmo, Cash App) are sanitized and percent-encoded so `&` or `#` cannot inject payment parameters.
+- **URI Delimiter Encoding**: After sanitization, `#` in a dial string is percent-encoded as `%23` (RFC 3966) so it cannot start a URI fragment and truncate the number. Mailto recipients (including optional CC and BCC recipients) are percent-encoded (RFC 6068, keeping `@`) so `?`, `&`, and `#` in the address cannot inject headers, and crypto wallet addresses, SEPA transfer fields, and fiat payment handles (PayPal, Venmo, Cash App) are sanitized and percent-encoded so `&` or `#` cannot inject payment parameters.
 - **Social Handle Sanitization**: Social profile handles (`SocialPlatform` in `src/types.ts`) strip leading `@` signs and path-injection characters using `sanitizeSocialHandle` before constructing deep link URLs for Instagram, Twitter / X, TikTok, LinkedIn, YouTube, Facebook, WhatsApp, and GitHub.
 
 ## SVG Sanitization & Path Tracking
@@ -80,7 +80,7 @@ Animation configuration structures in `types.ts` are strictly statically typed t
 
 ## Playable Maze Overlay & Web Calendar Integration
 
-Maze overlay configurations in `types.ts` (e.g., `isMazeEnabled`, `isMazeBridgesEnabled`, `mazeColor`, `mazePathWidth`, `showMazeSolution`) are statically typed and strictly validated at runtime. This prevents injection or path manipulation during maze rendering. Web calendar providers (`CalendarProvider` in `types.ts`) construct direct calendar URLs for Google, Outlook, Office 365, and Yahoo, validating all parameter links with `isDangerousUrl` to prevent URI injection attacks.
+Maze overlay configurations in `types.ts` (e.g., `isMazeEnabled`, `isMazeBridgesEnabled`, `mazeColor`, `mazePathWidth`, `showMazeSolution`) are statically typed and strictly validated at runtime. This prevents injection or path manipulation during maze rendering. Web calendar providers and iCalendar event types (`EventData` and `CalendarProvider` in `types.ts`) construct direct calendar URLs and VEVENT payloads with optional explicit IANA / UTC timezones, validating all parameter links with `isDangerousUrl` to prevent URI injection attacks.
 
 ## Independent Eye Colors
 
@@ -89,6 +89,10 @@ Finder pattern color properties in `types.ts` (`eyeFrameColor` and `eyeBallColor
 ## Custom Frame Shapes and CTA Badges
 
 Custom frame shape and call-to-action (CTA) badge configurations in `types.ts` (e.g., `frameStyle`, `frameText`, `frameTextColor`, `frameBgColor`, `framePosition`, `frameIcon`) are strictly statically typed. The `frameText` field is validated via `validateConfig()` to reject control or BiDi characters, sanitized client-side without external persistence, and checked for minimum WCAG AA contrast (>= 4.5:1) in real time.
+
+## Gradient Color Controls
+
+Gradient color configurations in `types.ts` (`gradientType`, `gradientColorStops`, `gradientAngle`) are strictly statically typed and validated on the client side during canvas matrix rendering, preserving local processing with zero external script execution.
 
 ## JSON-LD Caching & Performance Security
 

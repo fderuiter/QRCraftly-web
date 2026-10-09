@@ -104,6 +104,21 @@ export enum WifiEapPhase2 {
 export type LogoPaddingStyle = 'square' | 'circle' | 'none';
 
 /**
+ * Defines the type of gradient fill applied to QR code modules.
+ */
+export type GradientType = 'none' | 'linear' | 'radial';
+
+/**
+ * Defines a single color stop along a gradient.
+ */
+export interface ColorStop {
+  /** Stop offset from 0.0 (start) to 1.0 (end). */
+  offset: number;
+  /** Color in CSS hex string format. */
+  color: string;
+}
+
+/**
  * Defines the error correction level for the QR code.
  */
 export enum QRErrorCorrectionLevel {
@@ -226,6 +241,12 @@ export interface QRConfig {
   framePosition?: FramePosition;
   /** Optional icon to display inside the frame badge. */
   frameIcon?: FrameIcon;
+  /** Type of gradient fill applied to QR code modules ('none', 'linear', or 'radial'). */
+  gradientType?: GradientType;
+  /** Sequence of color stops defining the gradient fill. */
+  gradientColorStops?: ColorStop[];
+  /** Angle in degrees for linear gradient fill (0 to 360). */
+  gradientAngle?: number;
 }
 
 /**
@@ -289,6 +310,10 @@ export interface WifiData {
 export interface EmailData {
   /** The recipient's email address. */
   email: string;
+  /** Carbon copy recipients (optional). */
+  cc?: string;
+  /** Blind carbon copy recipients (optional). */
+  bcc?: string;
   /** The subject line of the email. */
   subject: string;
   /** The body content of the email. */
@@ -364,6 +389,8 @@ export interface EventData {
   startDate: string;
   /** The event end date and time (ISO string from datetime-local input). */
   endDate: string;
+  /** Optional IANA timezone identifier (e.g. 'America/New_York', 'UTC') or local. */
+  timezone?: string;
   /** The event location. */
   location: string;
   /** The event description. */

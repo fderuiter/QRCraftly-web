@@ -24,8 +24,45 @@ describe('Email generator', () => {
   it('constructs and hydrates successfully', () => {
     const data = {
       email: 'test@example.com',
+      cc: 'cc@example.com',
+      bcc: 'bcc@example.com',
       subject: 'Hello World',
       body: 'How are you?',
+    };
+    const str = constructEmailString(data);
+    expect(str).toBe(
+      'mailto:test@example.com?cc=cc%40example.com&bcc=bcc%40example.com&subject=Hello%20World&body=How%20are%20you%3F'
+    );
+    const hydrated = hydrateEmailData(str);
+    expect(hydrated).toEqual(data);
+  });
+
+  it('omits cc and bcc when empty or whitespace only', () => {
+    const data = {
+      email: 'test@example.com',
+      cc: '   ',
+      bcc: '',
+      subject: 'Hello',
+      body: 'World',
+    };
+    const str = constructEmailString(data);
+    expect(str).toBe('mailto:test@example.com?subject=Hello&body=World');
+    expect(hydrateEmailData(str)).toEqual({
+      email: 'test@example.com',
+      cc: '',
+      bcc: '',
+      subject: 'Hello',
+      body: 'World',
+    });
+  });
+
+  it('supports comma-separated recipient lists in cc and bcc', () => {
+    const data = {
+      email: 'test@example.com',
+      cc: 'cc1@example.com, cc2@example.com',
+      bcc: 'bcc1@example.com, bcc2@example.com',
+      subject: 'Group Email',
+      body: 'Sync',
     };
     const str = constructEmailString(data);
     const hydrated = hydrateEmailData(str);
@@ -38,6 +75,8 @@ describe('Email generator', () => {
     );
     expect(hydrated).toEqual({
       email: 'test@example.com',
+      cc: '',
+      bcc: '',
       subject: 'Hello World',
       body: 'How are you?',
     });
@@ -49,6 +88,8 @@ describe('Email generator', () => {
     );
     expect(hydrated).toEqual({
       email: 'test@example.com',
+      cc: '',
+      bcc: '',
       subject: 'Subject with ; escaped semicolon',
       body: 'Hello; World; This is a trailing ; escaped',
     });
@@ -58,22 +99,26 @@ describe('Email generator', () => {
     const hydrated = hydrateEmailData('MATMSG:INVALID;;');
     expect(hydrated).toEqual({
       email: '',
+      cc: '',
+      bcc: '',
       subject: '',
       body: '',
     });
   });
 
   it('returns default for unknown format or invalid url', () => {
-    expect(hydrateEmailData('random')).toEqual({ email: '', subject: '', body: '' });
+    expect(hydrateEmailData('random')).toEqual({ email: '', cc: '', bcc: '', subject: '', body: '' });
     expect(hydrateEmailData('mailto:http://%%invalid')).toEqual({
       email: 'http://%%invalid',
+      cc: '',
+      bcc: '',
       subject: '',
       body: '',
     });
   });
 
   it('returns default for non-email schemes', () => {
-    expect(hydrateEmailData('tel:1234567890')).toEqual({ email: '', subject: '', body: '' });
+    expect(hydrateEmailData('tel:1234567890')).toEqual({ email: '', cc: '', bcc: '', subject: '', body: '' });
   });
 
   it('implements EmailContract correctly and validates emails', () => {
@@ -98,6 +143,13 @@ describe('Email generator', () => {
     expect(EmailContract.validate?.('mailto:test@example.com?subject=Hello&body=World')).toEqual(
       []
     );
+
+    // Valid mailto with cc and bcc
+    expect(
+      EmailContract.validate?.(
+        'mailto:test@example.com?cc=cc@example.com&bcc=bcc@example.com&subject=Hello&body=World'
+      )
+    ).toEqual([]);
 
     // Valid mailto with no query parameters
     expect(EmailContract.validate?.('mailto:test@example.com')).toEqual([]);

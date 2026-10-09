@@ -18,7 +18,7 @@
 
 import { Progress } from '../ui/Progress';
 import { BulkCsvDropZone } from './BulkCsvDropZone';
-import React, { useState, useEffect, useMemo, ChangeEvent } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, ChangeEvent } from 'react';
 import {
   parseCsv,
   createZip,
@@ -27,16 +27,16 @@ import {
   CsvParseError,
   MAX_BULK_CSV_ROWS,
   MAX_BULK_CSV_CHARS,
-  type CsvRow,
   type CsvTable,
   type ZipEntry,
   previewRow,
   pickColumn,
-  hasPayload,
   PAYLOAD_COLUMN_PATTERN,
   FILENAME_COLUMN_PATTERN,
   SAMPLE_CSV_TEMPLATE,
+  categorizeCsvRows,
 } from '@/packages/bulk-csv';
+import { BulkCsvPreflightSummary } from './BulkCsvPreflightSummary';
 import { BulkCsvData, QRConfig, QRType } from '@/types';
 import { Alert } from '../ui/Alert';
 import { Button } from '../ui/Button';
@@ -48,16 +48,11 @@ import { generateQRSvg, rasterizeSvgToCanvas } from '@/packages/qr-export';
 import { validateConfig, describeViolation } from '@/packages/qr-payload';
 import { analyseLink } from '@/packages/link-safety';
 import { triggerFileDownload } from '@/utils/downloadManager';
-import { FileSpreadsheet, Upload, Download, AlertTriangle, Loader2 } from 'lucide-react';
+import { FileSpreadsheet, Upload, Download, Loader2 } from 'lucide-react';
 
 export interface BulkCsvInputProps {
   data: BulkCsvData;
   onChange: (updates: Partial<BulkCsvData>) => void;
-}
-
-interface RowError {
-  rowIndex: number;
-  message: string;
 }
 
 /** A row left out of the batch because its payload failed the same checks as the single generator. */
@@ -119,8 +114,6 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   const currentConfig = useQRStoreSelector((state) => state.config);
   const { addToast } = useToast();
 
-  const [rowErrors, setRowErrors] = useState<RowError[]>([]);
-  const [showErrorModal, setShowErrorModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [completedCount, setCompletedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -139,6 +132,24 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   const exportFormat = data.exportFormat || 'png';
   const rowCount = rows.length;
   const preview = useMemo(() => previewRow(data.csvContent, payloadCol), [data.csvContent, payloadCol]);
+
+  const validateRowConfig = useCallback((cfg: QRConfig) => {
+    return validateConfig(cfg).map(describeViolation);
+  }, []);
+
+  const preflightReport = useMemo(() => {
+    if (rows.length === 0 || !payloadCol) return null;
+    return categorizeCsvRows(rows, payloadCol, currentConfig, validateRowConfig);
+  }, [rows, payloadCol, currentConfig, validateRowConfig]);
+
+  const buttonText = useMemo(() => {
+    if (isGenerating) return 'Generating Batch ZIP...';
+    if (!preflightReport || preflightReport.validCount === 0) return 'No Valid Rows to Generate';
+    if (preflightReport.emptyCount > 0 || preflightReport.unsafeCount > 0) {
+      return `Generate Batch for ${preflightReport.validCount} Valid Rows`;
+    }
+    return 'Generate Batch';
+  }, [isGenerating, preflightReport]);
 
   // Rows whose address looks disguised (a lookalike, a shortener, an IP address). Only a hint:
   // they are still generated, and the people who own the file may well mean them.
@@ -188,7 +199,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     triggerFileDownload(bytes, 'qrcraftly-sample-template.csv', 'text/csv');
   };
 
-  const startBatchGeneration = async (validRowsOnly = false) => {
+  const startBatchGeneration = async () => {
     if (!payloadCol) {
       addToast({
         type: 'error',
@@ -198,36 +209,13 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       return;
     }
 
-    const currentErrors: RowError[] = [];
-    rows.forEach((row, index) => {
-      if (!hasPayload(row, payloadCol)) {
-        currentErrors.push({
-          rowIndex: index + 1,
-          message: `Row ${index + 1}: Empty value in payload column '${payloadCol}'`,
-        });
-      }
-    });
-    if (!validRowsOnly && currentErrors.length > 0) {
-      setRowErrors(currentErrors);
-      setShowErrorModal(true);
-      return;
-    }
-
-    // Every row goes through the same validation as the single generator (script and data links,
-    // schemes outside the allowlist, hidden characters). Blocked rows are skipped and listed.
-    const skipped: SkippedRow[] = [];
-    const targetRows: CsvRow[] = [];
-    rows.forEach((row, index) => {
-      if (!hasPayload(row, payloadCol)) return;
-      const value = (row[payloadCol] ?? '').trim();
-      const violations = validateConfig({ ...currentConfig, value, type: QRType.URL });
-      if (violations.length > 0) {
-        skipped.push({ rowNumber: index + 1, reason: violations.map(describeViolation).join(' ') });
-      } else {
-        targetRows.push(row);
-      }
-    });
+    const report = preflightReport || categorizeCsvRows(rows, payloadCol, currentConfig);
+    const targetRows = report.validRows;
+    const skipped: SkippedRow[] = report.invalidDetails
+      .filter((d) => d.category === 'unsafe')
+      .map((d) => ({ rowNumber: d.rowNumber, reason: d.reason || '' }));
     setSkippedRows(skipped);
+
     if (targetRows.length === 0) {
       addToast({
         type: 'error',
@@ -240,7 +228,6 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       return;
     }
 
-    setShowErrorModal(false);
     setIsGenerating(true);
     setCompletedCount(0);
     setTotalCount(targetRows.length);
@@ -454,6 +441,8 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
             )}
           </div>
 
+          {preflightReport && <BulkCsvPreflightSummary report={preflightReport} />}
+
           <p className="text-xs text-slate-600 dark:text-slate-400" data-testid="bulk-preview-row">
             {preview
               ? `Preview: row ${preview.rowNumber} of ${preview.rowCount}. Each row becomes its own QR code in the ZIP.`
@@ -464,53 +453,16 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
             <Button
               variant="primary"
               fullWidth
-              onClick={() => startBatchGeneration(false)}
-              disabled={isGenerating || rowCount === 0}
+              onClick={() => startBatchGeneration()}
+              disabled={isGenerating || rowCount === 0 || !preflightReport || preflightReport.validCount === 0}
               className="flex items-center justify-center gap-2"
             >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Generating Batch ZIP...
-                </>
-              ) : (
-                'Generate Batch'
-              )}
+              {isGenerating && <Loader2 className="size-4 animate-spin" />}
+              {buttonText}
             </Button>
           </div>
         </div>
       )}
-
-      <Modal
-        isOpen={showErrorModal}
-        onClose={() => setShowErrorModal(false)}
-        title="CSV Row Validation Errors"
-      >
-        <div className="space-y-4 text-sm text-slate-700 dark:text-slate-300">
-          <div className="flex items-center gap-2 font-semibold text-amber-600 dark:text-amber-400">
-            <AlertTriangle className="size-5" />
-            Found {rowErrors.length} row(s) with missing payload values:
-          </div>
-          <div className="max-h-48 overflow-y-auto rounded-lg bg-slate-100 p-3 font-mono text-xs dark:bg-slate-800">
-            {rowErrors.map((err) => (
-              <p key={err.rowIndex} className="text-rose-600 dark:text-rose-400">
-                {err.message}
-              </p>
-            ))}
-          </div>
-          <p className="text-xs">
-            Would you like to skip these invalid rows and generate QR codes for the valid rows?
-          </p>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" size="sm" onClick={() => setShowErrorModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" size="sm" onClick={() => startBatchGeneration(true)}>
-              Skip Bad Rows & Continue
-            </Button>
-          </div>
-        </div>
-      </Modal>
 
       <Modal isOpen={isGenerating} onClose={() => {}} title="Generating Batch QR Codes">
         <div className="space-y-4 py-2 text-center">

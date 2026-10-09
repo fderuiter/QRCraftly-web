@@ -105,6 +105,7 @@ export const INPUT_REGISTRY: Registry = {
       title: "",
       startDate: "",
       endDate: "",
+      timezone: "",
       location: "",
       description: "",
       provider: CalendarProvider.ICAL,
@@ -117,6 +118,8 @@ export const INPUT_REGISTRY: Registry = {
     Component: EmailInput,
     initialState: {
       email: "",
+      cc: "",
+      bcc: "",
       subject: "",
       body: "",
     } as EmailData,

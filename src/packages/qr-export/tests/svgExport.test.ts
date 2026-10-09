@@ -675,4 +675,18 @@ describe('generateQRSvg', () => {
       expect(spy).toHaveBeenCalled();
     });
   });
+
+  describe('transparent background SVG export', () => {
+    it('omits background fill elements when bgColor is transparent for TemplateStyle.NONE', async () => {
+      const config: QRConfig = {
+        ...(DEFAULT_CONFIG as QRConfig),
+        bgColor: 'transparent',
+        templateStyle: TemplateStyle.NONE,
+      };
+      const svg = await generateQRSvg(config);
+      parseAndAssertValidSvg(svg);
+      // Full canvas background rect "M 0 0 L 1080 0 L 1080 1080 L 0 1080 Z" should not be rendered
+      expect(svg).not.toContain('d="M 0 0 L 1080 0 L 1080 1080 L 0 1080 Z"');
+    });
+  });
 });

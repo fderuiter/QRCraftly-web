@@ -38,8 +38,8 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
 - `UrlInput.tsx`: For `QRType.URL`. Handles URL validation and sanitization.
 - `TextInput.tsx`: For `QRType.TEXT`. Includes character counting.
 - `WifiInput.tsx`: For `QRType.WIFI`. Handles SSID, password, encryption type, hidden network flags, and (for WPA2-Enterprise) the EAP method (`E:`), phase 2 authentication (`PH2:`) and identity (`I:`) fields.
-- `EventInput.tsx`: For `QRType.EVENT`. Builds iCalendar-compatible event payloads and web calendar direct links (Google, Outlook, Office 365, Yahoo).
-- `EmailInput.tsx`: For `QRType.EMAIL`. Fields for address, subject, and body.
+- `EventInput.tsx`: For `QRType.EVENT`. Builds iCalendar-compatible event payloads (with optional IANA / UTC timezone selection) and web calendar direct links (Google, Outlook, Office 365, Yahoo).
+- `EmailInput.tsx`: For `QRType.EMAIL`. Fields for email address, CC, BCC, subject, and body.
 - `VCardInput.tsx`: For `QRType.VCARD`. Complex form for contact details supporting vCard 2.1, 3.0, 4.0 (RFC 6350), and MECard formats.
 - `PhoneInput.tsx`: For `QRType.PHONE`. Simple phone number input.
 - `SmsInput.tsx`: For `QRType.SMS`. Phone number and message body.
@@ -63,6 +63,10 @@ Frame shapes (`frameStyle`), call-to-action text (`frameText`), positions (`fram
 6.  Add its display name to `QR_TYPE_LABELS` in `src/data/qrTypeLabels.ts`. Announcements ("WiFi input loaded"), the scan result sheet and the scan toast use these labels, never raw enum values. The map is typed `Record<QRType, string>`, so `tsc` fails until the new type has a label.
 
 Input data never leaves the browser. `src/types.ts` has no telemetry or reporting schema, and new input types must not add one (see [the QRCraftly Pledge](../../../docs/PLEDGE.md)).
+
+## Gradient Color Controls
+
+`src/types.ts` defines `GradientType` and `ColorStop` interfaces for linear and radial gradient fill settings on QR code modules. Gradient configuration (`gradientType`, `gradientColorStops`, `gradientAngle`) operates purely client-side without storing user payloads.
 
 ## Brand Design Templates
 

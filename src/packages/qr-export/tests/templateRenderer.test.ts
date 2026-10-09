@@ -564,3 +564,40 @@ describe('drawWithTemplate - Standard SVG Export Precision', () => {
   });
 });
 
+describe('drawWithTemplate – transparent background', () => {
+  beforeEach(() => {
+    vi.spyOn(qrMatrix, 'drawQRInternal').mockImplementation(vi.fn());
+  });
+
+  it('skips background fillRect when bgColor is transparent for TemplateStyle.NONE', () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      bgColor: 'transparent',
+      templateStyle: TemplateStyle.NONE,
+      socialFormat: SocialFormat.SQUARE_1_1,
+    };
+    const ctx = makeMockCtx();
+    const modules = makeModules();
+
+    drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
+
+    expect(ctx.fillRect).not.toHaveBeenCalled();
+  });
+
+  it('preserves safe white backing rectangle on non-NONE templates when bgColor is transparent', () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      bgColor: 'transparent',
+      templateStyle: TemplateStyle.MINIMALIST,
+      socialFormat: SocialFormat.STORY_9_16,
+    };
+    const ctx = makeMockCtx();
+    const modules = makeModules();
+
+    drawWithTemplate(ctx, modules, config, null, null, 1080, 1920, modules.size);
+
+    // Safe zone rounded rect should be filled with #ffffff
+    expect((ctx as any)._fillStyleHistory).toContain('#ffffff');
+  });
+});
+

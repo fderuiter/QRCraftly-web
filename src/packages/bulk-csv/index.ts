@@ -40,9 +40,14 @@ export { sanitizeFileStem, allocateFileName } from './lib/fileNames';
 export {
   previewRow,
   pickColumn,
-  hasPayload,
   PAYLOAD_COLUMN_PATTERN,
   FILENAME_COLUMN_PATTERN,
   type BulkCsvPreview,
 } from './lib/preview';
 export { SAMPLE_CSV_TEMPLATE } from './lib/template';
+export {
+  categorizeCsvRows,
+  type PreflightReport,
+  type PreflightRowDetail,
+  type PreflightRowStatus,
+} from './lib/categorize';

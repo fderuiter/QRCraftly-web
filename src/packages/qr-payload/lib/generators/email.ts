@@ -41,7 +41,23 @@ const encodeMailtoRecipient = (address: string): string => {
  */
 export const constructEmailString = (data: EmailData): string => {
   if (!data) return 'mailto:?subject=&body=';
-  return `mailto:${encodeMailtoRecipient(data.email || '')}?subject=${encodeURIComponent(data.subject || '')}&body=${encodeURIComponent(data.body || '')}`;
+
+  const params: string[] = [];
+
+  const cc = data.cc?.trim();
+  if (cc) {
+    params.push(`cc=${encodeURIComponent(cc)}`);
+  }
+
+  const bcc = data.bcc?.trim();
+  if (bcc) {
+    params.push(`bcc=${encodeURIComponent(bcc)}`);
+  }
+
+  params.push(`subject=${encodeURIComponent(data.subject || '')}`);
+  params.push(`body=${encodeURIComponent(data.body || '')}`);
+
+  return `mailto:${encodeMailtoRecipient(data.email || '')}?${params.join('&')}`;
 };
 
 /**
@@ -50,6 +66,8 @@ export const constructEmailString = (data: EmailData): string => {
 export const hydrateEmailData = (raw: string): EmailData => {
   const result: EmailData = {
     email: '',
+    cc: '',
+    bcc: '',
     subject: '',
     body: '',
   };
@@ -67,6 +85,8 @@ export const hydrateEmailData = (raw: string): EmailData => {
   if (parsed.scheme === 'mailto') {
     const parsedRecipient = safeDecodeURIComponent(parsed.path);
     result.email = parsedRecipient;
+    result.cc = parsed.params.get('cc') || parsed.params.get('CC') || '';
+    result.bcc = parsed.params.get('bcc') || parsed.params.get('BCC') || '';
     result.subject = parsed.params.get('subject') || '';
     result.body = parsed.params.get('body') || '';
   }
@@ -143,7 +163,12 @@ export const EmailContract: QRGeneratorContract<EmailData> = {
             const urlParams = new URLSearchParams(query);
             urlParams.forEach((_, key) => {
               const lowerKey = key.toLowerCase();
-              if (lowerKey !== 'subject' && lowerKey !== 'body') {
+              if (
+                lowerKey !== 'subject' &&
+                lowerKey !== 'body' &&
+                lowerKey !== 'cc' &&
+                lowerKey !== 'bcc'
+              ) {
                 violations.push('DELIMITER_VIOLATION');
               }
             });

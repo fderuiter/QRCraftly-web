@@ -42,9 +42,14 @@ export function calculateScannabilityHealth(
   const warnings: string[] = [];
   const criticalWarnings: string[] = [];
 
-  const fgContrast = getContrastRatio(config.fgColor, config.bgColor);
-  const eyeFrameContrast = getContrastRatio(config.eyeFrameColor || config.eyeColor, config.bgColor);
-  const eyeBallContrast = getContrastRatio(config.eyeBallColor || config.eyeColor, config.bgColor);
+  const bgForContrast = config.bgColor === 'transparent' ? '#ffffff' : config.bgColor;
+  const effectiveFgColor = (config.gradientType && config.gradientType !== 'none' && config.gradientColorStops?.[0]?.color)
+    ? config.gradientColorStops[0].color
+    : config.fgColor;
+
+  const fgContrast = getContrastRatio(effectiveFgColor, bgForContrast);
+  const eyeFrameContrast = getContrastRatio(config.eyeFrameColor || config.eyeColor, bgForContrast);
+  const eyeBallContrast = getContrastRatio(config.eyeBallColor || config.eyeColor, bgForContrast);
   const worstContrast = Math.min(fgContrast, eyeFrameContrast, eyeBallContrast);
 
   if (worstContrast < 3.0) {

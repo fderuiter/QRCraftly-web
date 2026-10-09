@@ -205,6 +205,74 @@ describe('Event generator', () => {
     expect(str).toContain('DTEND;TZID=America/New_York:20250101T133000');
   });
 
+  describe('Timezone selection', () => {
+    it('constructs and hydrates event with explicit regional timezone property', () => {
+      const data = {
+        title: 'Team Sync',
+        startDate: '2025-06-15T09:00',
+        endDate: '2025-06-15T10:00',
+        timezone: 'America/New_York',
+        location: 'Conference Room A',
+        description: 'Quarterly review',
+      };
+      const str = constructEventString(data);
+      expect(str).toContain('DTSTART;TZID=America/New_York:20250615T090000');
+      expect(str).toContain('DTEND;TZID=America/New_York:20250615T100000');
+
+      const hydrated = hydrateEventData(str);
+      expect(hydrated).toEqual(data);
+    });
+
+    it('constructs and hydrates event with explicit UTC timezone property', () => {
+      const data = {
+        title: 'Global All-Hands',
+        startDate: '2025-06-15T14:00',
+        endDate: '2025-06-15T15:00',
+        timezone: 'UTC',
+        location: 'Online',
+        description: 'Company updates',
+      };
+      const str = constructEventString(data);
+      expect(str).toContain('DTSTART:20250615T140000Z');
+      expect(str).toContain('DTEND:20250615T150000Z');
+      expect(str).not.toContain('TZID=');
+
+      const hydrated = hydrateEventData(str);
+      expect(hydrated).toEqual(data);
+    });
+
+    it('updates UID hash when timezone is changed', () => {
+      const baseData = {
+        title: 'Conference',
+        startDate: '2025-09-01T09:00',
+        endDate: '2025-09-01T17:00',
+        location: 'Convention Center',
+        description: 'Tech summit',
+      };
+
+      const strNoTz = constructEventString(baseData, { now: new Date('2025-01-01T00:00:00Z') });
+      const strNy = constructEventString({ ...baseData, timezone: 'America/New_York' }, { now: new Date('2025-01-01T00:00:00Z') });
+      const strTokyo = constructEventString({ ...baseData, timezone: 'Asia/Tokyo' }, { now: new Date('2025-01-01T00:00:00Z') });
+
+      const extractUid = (payload: string) => payload.match(/UID:(.+)/)?.[1];
+
+      const uidNoTz = extractUid(strNoTz);
+      const uidNy = extractUid(strNy);
+      const uidTokyo = extractUid(strTokyo);
+
+      expect(uidNoTz).toBeDefined();
+      expect(uidNy).toBeDefined();
+      expect(uidTokyo).toBeDefined();
+
+      expect(uidNy).not.toBe(uidNoTz);
+      expect(uidTokyo).not.toBe(uidNy);
+
+      // Same timezone yields identical UID
+      const strNyRepeat = constructEventString({ ...baseData, timezone: 'America/New_York' }, { now: new Date('2025-01-01T00:00:00Z') });
+      expect(extractUid(strNyRepeat)).toBe(uidNy);
+    });
+  });
+
   describe('Web calendar providers', () => {
     it('constructs and hydrates Google Calendar URLs', () => {
       const data = {
