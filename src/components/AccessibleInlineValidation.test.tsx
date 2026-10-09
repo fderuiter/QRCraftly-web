@@ -94,4 +94,19 @@ describe('Accessible Inline Validation and Accessible Fields', () => {
     const errorAlert = screen.getByRole('alert');
     expect(errorAlert).toHaveTextContent('Unsafe URL scheme or malicious protocol detected.');
   });
+
+  it('Payment input displays local inline error when an invalid SEPA IBAN is input', () => {
+    const mockData = {
+      network: CryptoNetwork.EPC_SEPA,
+      address: 'DE88370400440532013000',
+      iban: 'DE88370400440532013000',
+      amount: '',
+      label: '',
+    };
+
+    render(<PaymentInput data={mockData} onChange={() => {}} />);
+
+    const errorAlert = screen.getByRole('alert');
+    expect(errorAlert).toHaveTextContent('This IBAN does not pass its checksum or format check. Double-check for typos.');
+  });
 });

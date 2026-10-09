@@ -137,21 +137,34 @@ describe('canvasHelpers', () => {
   });
 
   describe('drawRoughRect', () => {
-    it('should apply rotation and fill rect', () => {
+    it('should draw rotated path vertex commands and fill without context state saves', () => {
       drawRoughRect(ctx, 10, 10, 100, 50);
 
-      expect(ctx.save).toHaveBeenCalled();
-      expect(ctx.translate).toHaveBeenCalledWith(60, 35); // x + w/2, y + h/2
-      expect(ctx.rotate).toHaveBeenCalledWith(0.02);
-      expect(ctx.fillRect).toHaveBeenCalledWith(-50, -25, 100, 50); // -w/2, -h/2
-      expect(ctx.restore).toHaveBeenCalled();
+      expect(ctx.save).not.toHaveBeenCalled();
+      expect(ctx.translate).not.toHaveBeenCalled();
+      expect(ctx.rotate).not.toHaveBeenCalled();
+      expect(ctx.restore).not.toHaveBeenCalled();
+      expect(ctx.fillRect).not.toHaveBeenCalled();
+      expect(ctx.rect).not.toHaveBeenCalled();
+
+      expect(ctx.beginPath).toHaveBeenCalledTimes(1);
+      expect(ctx.moveTo).toHaveBeenCalledTimes(1);
+      expect(ctx.lineTo).toHaveBeenCalledTimes(3);
+      expect(ctx.closePath).toHaveBeenCalledTimes(1);
+      expect(ctx.fill).toHaveBeenCalledTimes(1);
     });
 
-    it('should use rect instead of fillRect if addToPath is true', () => {
+    it('should append rotated path vertex commands without beginPath/fill if addToPath is true', () => {
       drawRoughRect(ctx, 10, 10, 100, 50, true);
 
-      expect(ctx.fillRect).not.toHaveBeenCalled();
-      expect(ctx.rect).toHaveBeenCalledWith(-50, -25, 100, 50);
+      expect(ctx.save).not.toHaveBeenCalled();
+      expect(ctx.restore).not.toHaveBeenCalled();
+      expect(ctx.beginPath).not.toHaveBeenCalled();
+      expect(ctx.fill).not.toHaveBeenCalled();
+
+      expect(ctx.moveTo).toHaveBeenCalledTimes(1);
+      expect(ctx.lineTo).toHaveBeenCalledTimes(3);
+      expect(ctx.closePath).toHaveBeenCalledTimes(1);
     });
   });
 

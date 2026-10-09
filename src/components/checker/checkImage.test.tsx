@@ -20,10 +20,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { scan } from '@/packages/optical-scanner';
 import { checkQrImage } from './checkImage';
 
+const mockEvaluatorCheck = vi.fn();
+
 vi.mock('@/packages/optical-scanner', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/packages/optical-scanner')>()),
   scan: vi.fn(),
 }));
+
+vi.mock('@/packages/scannability', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/packages/scannability')>();
+  return {
+    ...actual,
+    createScannabilityEvaluator: vi.fn((opts) => {
+      const evaluator = actual.createScannabilityEvaluator(opts);
+      return {
+        ...evaluator,
+        check: (req?: Parameters<typeof evaluator.check>[0]) =>
+          mockEvaluatorCheck.getMockImplementation() ? mockEvaluatorCheck(req) : evaluator.check(req),
+      };
+    }),
+  };
+});
 
 const file = new Blob(['x'], { type: 'image/png' });
 const pass = (data: string) => ({ status: 'pass' as const, data, durationMs: 1, corners: null });
@@ -31,6 +48,7 @@ const pass = (data: string) => ({ status: 'pass' as const, data, durationMs: 1, 
 describe('checkQrImage (#1036)', () => {
   beforeEach(() => {
     vi.mocked(scan).mockReset();
+    mockEvaluatorCheck.mockReset();
     vi.stubGlobal('createImageBitmap', undefined);
   });
 
@@ -69,9 +87,12 @@ describe('checkQrImage (#1036)', () => {
       getImageData: vi.fn(() => frame),
       fillStyle: '',
     } as unknown as CanvasRenderingContext2D);
-    vi.doMock('@/packages/scannability/checker', () => ({
-      performScannabilityCheck: vi.fn(() => ({ success: true, physicalReady: true })),
-    }));
+    mockEvaluatorCheck.mockResolvedValue({
+      status: 'physical-pass',
+      health: { score: 100 },
+      exportRisk: { risk: 'low' },
+      workerRecoveryActive: false,
+    });
     const outcome = await checkQrImage(file);
     expect(outcome.kind === 'read' && outcome.status).toBe('physical-pass');
     // The crop is the 80 px code plus a 15% margin each side (104 px), scaled to 512: the picture
@@ -80,6 +101,25 @@ describe('checkQrImage (#1036)', () => {
     expect(dx).toBeCloseTo((2 * 512) / 104);
     expect(dy).toBeCloseTo((2 * 512) / 104);
     expect(dw).toBeCloseTo((100 * 512) / 104);
-    vi.doUnmock('@/packages/scannability/checker');
+  });
+
+  it('falls back to digital-pass when optical scannability check fails or times out', async () => {
+    vi.mocked(scan).mockResolvedValue({ ...pass('https://example.com'), corners: [{ x: 10, y: 10 }, { x: 90, y: 10 }, { x: 90, y: 90 }, { x: 10, y: 90 }] });
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: 100, height: 100, close: vi.fn() })));
+    const frame = { data: new Uint8ClampedArray(512 * 512 * 4), width: 512, height: 512 };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      getImageData: vi.fn(() => frame),
+      fillStyle: '',
+    } as unknown as CanvasRenderingContext2D);
+    mockEvaluatorCheck.mockResolvedValue({
+      status: 'fail',
+      health: { score: 0 },
+      exportRisk: { risk: 'high' },
+      workerRecoveryActive: true,
+    });
+    const outcome = await checkQrImage(file);
+    expect(outcome.kind === 'read' && outcome.status).toBe('digital-pass');
   });
 });
