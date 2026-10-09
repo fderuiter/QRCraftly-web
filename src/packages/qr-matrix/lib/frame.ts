@@ -143,9 +143,10 @@ export function renderFrame(
     // Inner QR container: a transparent background would let the card colour show through the code.
     ctx.fillStyle = !config.bgColor || config.bgColor === 'transparent' ? '#ffffff' : config.bgColor;
     ctx.beginPath();
-    const qrBoxX = Math.max(0, layout.drawX - layout.borderPx);
-    const qrBoxY = Math.max(0, layout.drawY - layout.borderPx);
-    const qrBoxSize = layout.drawSize + (layout.borderPx * 2);
+    const insetPx = layout.quietPx + layout.borderPx;
+    const qrBoxX = Math.max(0, layout.drawX - insetPx);
+    const qrBoxY = Math.max(0, layout.drawY - insetPx);
+    const qrBoxSize = layout.drawSize + (insetPx * 2);
     drawRoundRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, displaySize * 0.03);
     ctx.fill();
   }

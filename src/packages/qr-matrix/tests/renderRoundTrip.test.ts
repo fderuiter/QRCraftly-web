@@ -19,7 +19,7 @@
 
 /**
  * Real pixel round-trips for the frame, border and transparent-background paths of the
- * renderer (#1360, #1361): each case is drawn into a software canvas and decoded with our
+ * renderer (#1249, #1360, #1361): each case is drawn into a software canvas and decoded with our
  * own decoder, and the frame or badge must still be visible on top of the background.
  */
 
@@ -89,7 +89,7 @@ describe('frame and CTA badge stay visible over the background (#1361)', () => {
   });
 
   it('draws the border around the QR box only, leaving the banner visible', () => {
-    const { raster, layout } = render({
+    const { raster, layout, decoded } = render({
       frameStyle: 'banner',
       framePosition: 'bottom',
       frameBgColor: '#10b981',
@@ -98,7 +98,8 @@ describe('frame and CTA badge stay visible over the background (#1361)', () => {
       borderColor: '#1d4ed8',
     });
     expect(raster.colorAt(SIZE / 2, SIZE - SIZE * 0.05)).toEqual(FRAME_GREEN);
-    expect(raster.colorAt(SIZE / 2, layout.drawY - layout.borderPx / 2)).toEqual([0x1d, 0x4e, 0xd8]);
+    expect(raster.colorAt(SIZE / 2, layout.drawY - layout.quietPx - layout.borderPx / 2)).toEqual([0x1d, 0x4e, 0xd8]);
+    expect(decoded).toBe(VALUE);
   });
 });
 
@@ -117,4 +118,23 @@ describe('transparent background keeps the code scannable (#1360)', () => {
     const { decoded } = render({ bgColor: 'transparent', frameStyle: 'card', frameBgColor: '#000000' });
     expect(decoded).toBe(VALUE);
   });
+});
+
+describe('the border never replaces the quiet zone (#1249)', () => {
+  for (const borderStyle of ['solid', 'dashed', 'dotted', 'double'] as const) {
+    for (const borderSize of [0.01, 0.05, 0.1, 0.15]) {
+      it(`decodes the default design with a black ${borderStyle} border at ${borderSize}`, () => {
+        const { raster, layout, decoded } = render({ isBorderEnabled: true, borderStyle, borderSize, borderColor: '#000000' });
+        const { drawX, drawY, drawSize, quietPx, cellSize } = layout;
+        expect(quietPx).toBeCloseTo(4 * cellSize, 9);
+        // The middle of each side of the quiet zone is plain background.
+        const mid = drawX + drawSize / 2;
+        expect(raster.colorAt(mid, drawY - quietPx / 2)).toEqual([255, 255, 255]);
+        expect(raster.colorAt(drawX - quietPx / 2, drawY + drawSize / 2)).toEqual([255, 255, 255]);
+        expect(raster.colorAt(mid, drawY + drawSize + quietPx / 2)).toEqual([255, 255, 255]);
+        expect(raster.colorAt(drawX + drawSize + quietPx / 2, drawY + drawSize / 2)).toEqual([255, 255, 255]);
+        expect(decoded).toBe(VALUE);
+      });
+    }
+  }
 });
