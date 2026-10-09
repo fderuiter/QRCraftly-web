@@ -111,6 +111,27 @@ describe('Payment generator', () => {
       expect(hydrated.amount).toBe('');
       expect(hydrated.label).toBe('Gift');
     });
+
+    it('enforces EPC069-12 character bounds by truncating name and label', () => {
+      const longName = 'A'.repeat(100);
+      const longLabel = 'B'.repeat(200);
+      const sepaData = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: ' de89 3704 0044 0532 0130 00 ',
+        name: longName,
+        label: longLabel,
+        amount: '',
+      };
+      const str = constructPaymentString(sepaData);
+      const lines = str.split(/\r?\n/);
+
+      // IBAN stripped of spaces and uppercased
+      expect(lines[6]).toBe('DE89370400440532013000');
+      // Name truncated to 70 chars
+      expect(lines[5]).toBe('A'.repeat(70));
+      // Label truncated to 140 chars
+      expect(lines[10]).toBe('B'.repeat(140));
+    });
   });
 
   describe('PayPal payment preset', () => {

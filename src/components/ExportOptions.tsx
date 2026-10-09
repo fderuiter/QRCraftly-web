@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { Code } from 'lucide-react';
+import { Code, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/Button';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { TextField } from './ui/TextField';
@@ -158,6 +158,18 @@ export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, 
         <Code className="size-4" aria-hidden="true" />
         Copy as SVG
       </Button>
+
+      <div className="rounded-lg border border-line bg-surface-sunken p-3" data-testid="export-reassurance-card">
+        <div className="flex items-start gap-2.5">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />
+          <div className="space-y-0.5 text-xs">
+            <p className="font-semibold text-fg">Never expires</p>
+            <p className="leading-relaxed text-fg-muted">
+              This is a static code: the content is in the pattern itself, so it keeps working with no account, scan limit or subscription.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
