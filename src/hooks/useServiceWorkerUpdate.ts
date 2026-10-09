@@ -49,6 +49,10 @@ export function useServiceWorkerUpdate(options: ServiceWorkerUpdateOptions): voi
     let cancelled = false;
     let reloading = false;
     let userAccepted = false;
+    // A page that loaded without a worker is on a first install: the worker
+    // claims it on activation, and nothing it installs later in this page's
+    // life is an update the visitor needs to hear about (#1126).
+    const startedControlled = Boolean(sw.controller);
     const doReload = reload ?? (() => window.location.reload());
 
     const onControllerChange = () => {
@@ -61,9 +65,18 @@ export function useServiceWorkerUpdate(options: ServiceWorkerUpdateOptions): voi
     sw.addEventListener('controllerchange', onControllerChange);
 
     const announce = (waiting: ServiceWorker) => {
-      if (cancelled) return;
+      if (cancelled || !startedControlled) return;
       onUpdateAvailable(() => {
         userAccepted = true;
+        if (waiting.state !== 'installed') {
+          // The worker already took over on its own (a schema upgrade), so no
+          // controller change is coming: reload now.
+          if (!reloading) {
+            reloading = true;
+            doReload();
+          }
+          return;
+        }
         waiting.postMessage({ type: 'SKIP_WAITING' });
       });
     };
@@ -72,15 +85,14 @@ export function useServiceWorkerUpdate(options: ServiceWorkerUpdateOptions): voi
       .then((registration) => {
         if (cancelled) return;
         // A worker already waiting from an earlier visit.
-        if (registration.waiting && sw.controller) {
+        if (registration.waiting) {
           announce(registration.waiting);
         }
         registration.addEventListener('updatefound', () => {
           const installing = registration.installing;
           if (!installing) return;
           installing.addEventListener('statechange', () => {
-            // With no controller this is the first install, not an update.
-            if (installing.state === 'installed' && sw.controller) {
+            if (installing.state === 'installed') {
               announce(installing);
             }
           });

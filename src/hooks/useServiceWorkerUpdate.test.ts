@@ -94,4 +94,45 @@ describe('useServiceWorkerUpdate', () => {
     worker.setState('installed');
     expect(onUpdateAvailable).not.toHaveBeenCalled();
   });
+
+  it('stays quiet in a page that loaded uncontrolled, even after the first worker claims it (#1126)', async () => {
+    const registration = new FakeRegistration();
+    const container = createContainer(registration, null);
+    const onUpdateAvailable = vi.fn();
+    renderHook(() => useServiceWorkerUpdate({ onUpdateAvailable, container }));
+    await waitFor(() => expect(container.register).toHaveBeenCalled());
+    await Promise.resolve();
+
+    // The first worker activates and claims the page.
+    container.controller = {};
+    container.fireControllerChange();
+
+    // A later install in the same page's life is not an update for this visitor.
+    const worker = new FakeWorker();
+    registration.installing = worker;
+    registration.dispatchEvent(new Event('updatefound'));
+    worker.setState('installed');
+    expect(onUpdateAvailable).not.toHaveBeenCalled();
+  });
+
+  it('reloads at once when the announced worker already took over on its own', async () => {
+    const registration = new FakeRegistration();
+    const container = createContainer(registration);
+    const onUpdateAvailable = vi.fn();
+    const reload = vi.fn();
+    renderHook(() => useServiceWorkerUpdate({ onUpdateAvailable, reload, container }));
+    await waitFor(() => expect(container.register).toHaveBeenCalled());
+    await Promise.resolve();
+
+    const worker = new FakeWorker();
+    registration.installing = worker;
+    registration.dispatchEvent(new Event('updatefound'));
+    worker.setState('installed');
+    worker.setState('activated');
+
+    const applyUpdate = onUpdateAvailable.mock.calls[0][0] as () => void;
+    applyUpdate();
+    expect(worker.postMessage).not.toHaveBeenCalled();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
 });
