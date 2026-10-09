@@ -37,6 +37,41 @@ const choiceOf = (config: QRConfig, patch: Partial<QRConfig>): StyleChoice => ({
   eyeColor: patch.eyeColor ?? config.eyeColor,
 });
 
+function getThumbnailCacheId(config: QRConfig, choice: StyleChoice): string {
+  const value = config.value.trim() ? config.value : getSamplePayload(config.type);
+  const thumbConfig: QRConfig = {
+    ...config,
+    ...choice,
+    value,
+    logoUrl: null,
+    borderLogoUrl: null,
+    mosaicImageUrl: null,
+    backgroundImageUrl: null,
+    isBorderEnabled: false,
+    isMazeEnabled: false,
+    socialFormat: SocialFormat.SQUARE_1_1,
+    templateStyle: TemplateStyle.NONE,
+    animationValues: undefined,
+    isAnimating: false,
+  };
+  return JSON.stringify([thumbConfig.type, value, thumbConfig.errorCorrectionLevel, choice]);
+}
+
+function getCachedThumbnail(config: QRConfig, choice: StyleChoice): string | undefined {
+  const cacheId = getThumbnailCacheId(config, choice);
+  return thumbnailCache.get(cacheId);
+}
+
+const yieldToMain = (): Promise<void> => {
+  const scheduler = (globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+  if (typeof scheduler?.yield === 'function') {
+    return scheduler.yield();
+  }
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+};
+
 /**
  * Renders a small picture of the person's own QR code in a candidate look, as an SVG data
  * URL. It runs on this device and nothing is sent or stored. The logo, border, template and
@@ -62,13 +97,13 @@ async function renderThumbnail(config: QRConfig, choice: StyleChoice): Promise<s
     animationValues: undefined,
     isAnimating: false,
   };
-  const key = JSON.stringify([thumbConfig.type, value, thumbConfig.errorCorrectionLevel, choice]);
-  const cached = thumbnailCache.get(key);
+  const cacheId = JSON.stringify([thumbConfig.type, value, thumbConfig.errorCorrectionLevel, choice]);
+  const cached = thumbnailCache.get(cacheId);
   if (cached) return cached;
   const { generateQRSvg } = await import('@/packages/qr-export');
   const svg = await generateQRSvg(thumbConfig);
   const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  thumbnailCache.set(key, url);
+  thumbnailCache.set(cacheId, url);
   if (thumbnailCache.size > THUMBNAIL_CACHE_LIMIT) thumbnailCache.delete(thumbnailCache.keys().next().value as string);
   return url;
 }
@@ -135,19 +170,63 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
     let cancelled = false;
     const tiles = [
       ...PATTERNS.map((p) => ({ id: `pattern:${p.id}`, choice: choiceOf(settled, { style: p.id }) })),
-      ...PRESET_COLORS.map((c) => ({ id: `color:${c.label}`, choice: choiceOf(settled, { fgColor: c.fg, bgColor: c.bg, eyeColor: c.eye, eyeFrameColor: c.eye, eyeBallColor: c.eye }) })),
+      ...PRESET_COLORS.map((c) => ({
+        id: `color:${c.label}`,
+        choice: choiceOf(settled, { fgColor: c.fg, bgColor: c.bg, eyeColor: c.eye, eyeFrameColor: c.eye, eyeBallColor: c.eye }),
+      })),
     ];
+
     void (async () => {
+      // 1. Synchronously check in-memory cache before triggering render tasks
+      const batchBuffer: Record<string, string> = {};
+      const uncachedTiles: typeof tiles = [];
+
       for (const tile of tiles) {
+        const cachedUrl = getCachedThumbnail(settled, tile.choice);
+        if (cachedUrl) {
+          batchBuffer[tile.id] = cachedUrl;
+        } else {
+          uncachedTiles.push(tile);
+        }
+      }
+
+      // If any cached tiles exist, flush them in a single dispatch immediately
+      if (Object.keys(batchBuffer).length > 0) {
+        setThumbnails((prev) => ({ ...prev, ...batchBuffer }));
+      }
+
+      if (uncachedTiles.length === 0 || cancelled) return;
+
+      // 2. Process uncached tiles with cooperative frame scheduling (8ms max main-thread slice)
+      let frameStart = performance.now();
+      const MAX_FRAME_SLICE_MS = 8;
+
+      for (let i = 0; i < uncachedTiles.length; i++) {
+        if (cancelled) return;
+
+        // Yield execution to main thread if processing slice per frame exceeds 8ms
+        if (i > 0 && performance.now() - frameStart >= MAX_FRAME_SLICE_MS) {
+          await yieldToMain();
+          if (cancelled) return;
+          frameStart = performance.now();
+        }
+
+        const tile = uncachedTiles[i];
         try {
           const url = await renderThumbnail(settled, tile.choice);
           if (cancelled) return;
-          setThumbnails((prev) => (prev[tile.id] === url ? prev : { ...prev, [tile.id]: url }));
+          batchBuffer[tile.id] = url;
         } catch {
           // A tile that cannot be drawn stays empty; the controls below still work.
         }
       }
+
+      // 3. Flush accumulated thumbnail updates in a single final dispatch
+      if (!cancelled) {
+        setThumbnails((prev) => ({ ...prev, ...batchBuffer }));
+      }
     })();
+
     return () => {
       cancelled = true;
     };

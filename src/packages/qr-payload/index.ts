@@ -76,3 +76,6 @@ export { BulkCsvContract, constructBulkCsvString, hydrateBulkCsvData } from './l
 
 // Wallet address checksums (Base58Check, bech32/bech32m, EIP-55)
 export { checkCryptoAddress, type AddressCheck } from './lib/cryptoAddress';
+
+// IBAN validation (ISO 13616 mod-97)
+export { isValidIban } from './lib/iban';
