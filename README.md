@@ -65,7 +65,7 @@ Damage a QR design and watch whether a real decoder still reads it (`/arcade`). 
 
 ### Everywhere
 
-- **Works offline after one visit:** a service worker caches the homepage shell on the first visit and other pages as you open them.
+- **Works offline after one visit:** a service worker caches the homepage generator, with its encoder and workers, on the first visit, and other pages as you open them.
 - **Accessible:** keyboard navigation, screen-reader labels, visible focus and WCAG contrast checks, tested with axe in unit and end-to-end tests.
 - **Light and dark themes**, a layout that works from phones to desktops, and reduced-motion support.
 

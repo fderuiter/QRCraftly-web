@@ -5,13 +5,24 @@ import os from 'node:os';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
-const { buildSwContent, toPrecacheUrl, readRedirectSources, isRuntimeCached, selectShell, readAssetReferences } = require('../scripts/generate_sw.cjs') as {
+const {
+  buildSwContent,
+  toPrecacheUrl,
+  readRedirectSources,
+  isRuntimeCached,
+  selectShell,
+  readAssetReferences,
+  readWorkerReferences,
+  computeBuildHash,
+} = require('../scripts/generate_sw.cjs') as {
   buildSwContent: (manifest: Array<{ url: string; revision: string }>, hash: string) => string;
   toPrecacheUrl: (relativePath: string) => string;
   readRedirectSources: (redirectsFile: string) => Set<string>;
   isRuntimeCached: (relativePath: string) => boolean;
   selectShell: (files: string[], readText: (relativePath: string) => string) => Set<string>;
   readAssetReferences: (relativePath: string, source: string) => string[];
+  readWorkerReferences: (relativePath: string, source: string) => string[];
+  computeBuildHash: (manifest: Array<{ url: string; revision: string }>, readRuleFile: (name: string) => string) => string;
 };
 
 type Listener = (event: FakeEvent) => void;
@@ -398,7 +409,7 @@ describe('service worker precache manifest', () => {
     expect(toPrecacheUrl('assets/chunks/a.js')).toBe('/assets/chunks/a.js');
   });
 
-  it('leaves the lazily loaded wasm modules out of the precache', () => {
+  it('caches wasm modules outside the shell on first use', () => {
     expect(isRuntimeCached('assets/qr-decode.abc.wasm')).toBe(true);
     expect(isRuntimeCached('assets/chunks/a.js')).toBe(false);
   });
@@ -416,6 +427,69 @@ describe('service worker precache manifest', () => {
         'import{x}from"../chunks/b.js";import"./c.js";const l=()=>import("../chunks/lazy.js");export{x}'
       )
     ).toEqual(['assets/chunks/b.js', 'assets/entries/c.js']);
+  });
+
+  it('reads the workers and wasm modules a module starts, but not from HTML or other code', () => {
+    expect(
+      readWorkerReferences(
+        'assets/chunks/a.js',
+        'new Worker(new URL("/assets/worker-matrix-x.js",import.meta.url),{type:"module"});' +
+          'fetch(new URL( "/assets/static/qr-encode.y.wasm" , import.meta.url));new URL("../../../wasm/qr-encode.wasm",import.meta.url)'
+      )
+    ).toEqual(['assets/worker-matrix-x.js', 'assets/static/qr-encode.y.wasm']);
+    expect(readWorkerReferences('index.html', 'new URL("/assets/w.js",import.meta.url)')).toEqual([]);
+  });
+
+  it('precaches the workers and wasm the homepage generator starts, so it draws offline after one visit (#1262)', () => {
+    const files: Record<string, string> = {
+      'index.html': '<script src="/assets/entries/e.js"></script>',
+      'assets/entries/e.js': 'import"../chunks/m.js";',
+      'assets/chunks/m.js':
+        'new Worker(new URL("/assets/worker-matrix-1.js",import.meta.url));new URL("/assets/static/qr-encode.1.wasm",import.meta.url)',
+      'assets/worker-matrix-1.js': 'const w=new URL("/assets/qr-encode-1.wasm",self.location.href);',
+      'assets/qr-encode-1.wasm': '\0asm',
+      'assets/static/qr-encode.1.wasm': '\0asm',
+      'assets/chunks/lazy.js': 'new Worker(new URL("/assets/worker-slice-1.js",import.meta.url))',
+      'assets/worker-slice-1.js': '',
+      'assets/modem-1.wasm': '\0asm',
+    };
+    const read = vi.fn((file: string) => files[file]);
+    const shell = selectShell(Object.keys(files), read);
+    expect([...shell].sort()).toEqual(
+      [
+        'assets/chunks/m.js',
+        'assets/entries/e.js',
+        'assets/qr-encode-1.wasm',
+        'assets/static/qr-encode.1.wasm',
+        'assets/worker-matrix-1.js',
+        'index.html',
+      ].sort()
+    );
+    // WebAssembly is binary: it is precached but never parsed for references.
+    expect(read).not.toHaveBeenCalledWith('assets/qr-encode-1.wasm');
+  });
+
+  it('ships a new worker when only the host headers or redirects change (#1261)', () => {
+    const manifest = [{ url: '/', revision: 'aaaaaaaa' }];
+    const rules = (headers: string, redirects = '') => (name: string) => (name === '_headers' ? headers : redirects);
+    const base = computeBuildHash(manifest, rules('/*\n  Permissions-Policy: camera=(self)\n'));
+    expect(base).toMatch(/^[0-9a-f]{12}$/);
+    expect(computeBuildHash(manifest, rules('/*\r\n  Permissions-Policy: camera=(self)\r\n'))).toBe(base);
+    expect(computeBuildHash(manifest, rules('/*\n  Permissions-Policy: camera=()\n'))).not.toBe(base);
+    expect(computeBuildHash(manifest, rules('/*\n  Permissions-Policy: camera=(self)\n', '/old /new 301'))).not.toBe(base);
+    expect(computeBuildHash([{ url: '/', revision: 'bbbbbbbb' }], rules('/*\n  Permissions-Policy: camera=(self)\n'))).not.toBe(base);
+  });
+
+  it('generates the worker after every postbuild step that rewrites HTML or headers (#1261)', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+    const steps = pkg.scripts.postbuild.split('&&').map((step) => step.trim());
+    const position = (script: string) => steps.findIndex((step) => step.includes(script));
+    const sw = position('generate_sw.cjs');
+    expect(sw).toBeGreaterThan(-1);
+    for (const rewriter of ['defer_page_scripts.js', 'csp_hash_injector.js', 'generate_social_images.ts', 'generate_sitemap.ts', 'write_build_info.js']) {
+      expect(position(rewriter)).toBeGreaterThan(-1);
+      expect(position(rewriter)).toBeLessThan(sw);
+    }
   });
 
   it('precaches the homepage shell only, leaving other pages, lazy chunks and workers to the runtime cache (#1058)', () => {

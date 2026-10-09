@@ -17,84 +17,24 @@
 */
 
 import fs from 'node:fs';
-import http from 'node:http';
-import os from 'node:os';
 import path from 'node:path';
-import type { AddressInfo } from 'node:net';
-import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
+import { serveLocalSite, waitForController, type LocalSite } from './utils/localSite';
 
 const UPDATE_MESSAGE = 'A new version of QRCraftly is available.';
-const BUILD_DIR = path.join(process.cwd(), 'dist', 'client');
-
-const CONTENT_TYPES: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.wasm': 'application/wasm',
-  '.webmanifest': 'application/manifest+json',
-};
-
-/**
- * Serves a private copy of the built site, so a test can "deploy" by editing files without
- * touching the build the other specs use. Pages resolve the way Workers Static Assets serves
- * them: `/about` answers with `about/index.html`.
- * @param root Directory to serve.
- * @returns The server's origin and a function that stops it.
- */
-async function serveSite(root: string): Promise<{ origin: string; close: () => Promise<void> }> {
-  const server = http.createServer((request, response) => {
-    const pathname = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname);
-    const base = path.join(root, ...pathname.split('/').filter(Boolean));
-    const file = [base, `${base}.html`, path.join(base, 'index.html')].find(
-      (candidate) => candidate.startsWith(root) && fs.existsSync(candidate) && fs.statSync(candidate).isFile()
-    );
-    if (!file) {
-      response.writeHead(404, { 'Content-Type': 'text/plain' });
-      response.end('Not found');
-      return;
-    }
-    response.writeHead(200, {
-      'Content-Type': CONTENT_TYPES[path.extname(file)] ?? 'application/octet-stream',
-      'Cache-Control': 'no-cache',
-    });
-    response.end(fs.readFileSync(file));
-  });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const { port } = server.address() as AddressInfo;
-  return {
-    origin: `http://127.0.0.1:${port}`,
-    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
-  };
-}
-
-/** Waits until a service worker controls the page. */
-async function waitForController(page: Page) {
-  await page.waitForFunction(async () => {
-    await navigator.serviceWorker.ready;
-    return Boolean(navigator.serviceWorker.controller);
-  });
-}
 
 test.describe('Service worker updates', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'One engine is enough for the update flow');
   test.skip(Boolean(process.env.PLAYWRIGHT_TEST_BASE_URL), 'Needs the local build to simulate a deploy');
 
-  let siteDir: string;
-  let site: { origin: string; close: () => Promise<void> };
+  let site: LocalSite;
 
   test.beforeEach(async () => {
-    siteDir = fs.mkdtempSync(path.join(os.tmpdir(), 'qrcraftly-sw-update-'));
-    fs.cpSync(BUILD_DIR, siteDir, { recursive: true });
-    site = await serveSite(siteDir);
+    site = await serveLocalSite();
   });
 
   test.afterEach(async () => {
-    await site.close();
-    fs.rmSync(siteDir, { recursive: true, force: true });
+    await site.dispose();
   });
 
   test('a first visit shows no update prompt, and accepting an update loads the new build (#1126, #1259)', async ({ page }) => {
@@ -108,9 +48,9 @@ test.describe('Service worker updates', () => {
     await expect(page).not.toHaveTitle(/\[BUILD B\]/);
 
     // Deploy build B: a changed homepage, so a worker with a new build hash and cache.
-    const indexFile = path.join(siteDir, 'index.html');
+    const indexFile = path.join(site.dir, 'index.html');
     fs.writeFileSync(indexFile, fs.readFileSync(indexFile, 'utf8').replace('<title>', '<title>[BUILD B] '));
-    const swFile = path.join(siteDir, 'sw.js');
+    const swFile = path.join(site.dir, 'sw.js');
     const swSource = fs.readFileSync(swFile, 'utf8');
     const nextSource = swSource.replace(/(const CACHE_NAME = CACHE_PREFIX \+ ')([^']+)'/, "$1$2-b'");
     expect(nextSource).not.toBe(swSource);
