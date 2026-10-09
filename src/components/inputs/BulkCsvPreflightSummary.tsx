@@ -29,6 +29,14 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
+/** Badge text per row category. A skipped row is not always a safety problem (it may be too long, say). */
+const CATEGORY_LABELS: Readonly<Record<PreflightRowDetail['category'], string>> = {
+  valid: 'valid',
+  empty: 'empty',
+  unsafe: 'skipped',
+  caution: 'caution',
+};
+
 export interface BulkCsvPreflightSummaryProps {
   report: PreflightReport;
 }
@@ -99,11 +107,11 @@ export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = (
           </span>
         </div>
 
-        {/* Unsafe URLs */}
+        {/* Rows left out: their content fails the payload checks */}
         <div className="flex flex-col rounded-lg border border-rose-200 bg-rose-50/60 p-2.5 text-center shadow-2xs dark:border-rose-800/60 dark:bg-rose-950/30">
           <span className="flex items-center justify-center gap-1 text-xs font-medium text-rose-800 dark:text-rose-300">
             <XCircle className="size-3.5" />
-            Unsafe
+            Skipped
           </span>
           <span className="mt-1 text-lg font-bold text-rose-700 dark:text-rose-300" data-testid="count-unsafe">
             {report.unsafeCount}
@@ -175,7 +183,7 @@ export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = (
                             : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                       }`}
                     >
-                      {item.category}
+                      {CATEGORY_LABELS[item.category]}
                     </span>
                   </li>
                 ))}

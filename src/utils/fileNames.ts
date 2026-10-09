@@ -41,16 +41,44 @@ const isInvisible = (code: number): boolean =>
 /** Characters Windows forbids in names, plus both path separators. */
 const RESERVED_CHARS = /[\\/?:*"<>|]/g;
 
-/** Windows device names, which are reserved with or without an extension. */
-const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i;
+/**
+ * Windows device names, which are reserved with or without an extension. Windows also treats
+ * the superscript digits ¹ ² ³ as digits here (`COM¹`), and reserves the console names.
+ */
+const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³]|conin\$|conout\$)$/i;
+
+/** Most UTF-8 bytes in a file name on common file systems (ext4, APFS, NTFS in practice). */
+const MAX_NAME_BYTES = 255;
+
+const utf8Length = (value: string): number => new TextEncoder().encode(value).length;
+
+/**
+ * Cuts `value` to at most `maxChars` code points and `maxBytes` UTF-8 bytes, never inside a
+ * character, so no half of a surrogate pair (shown as U+FFFD) is left behind.
+ */
+function truncateName(value: string, maxChars: number, maxBytes: number): string {
+  let out = '';
+  let bytes = 0;
+  let chars = 0;
+  for (const ch of value) {
+    const size = utf8Length(ch);
+    if (chars + 1 > maxChars || bytes + size > maxBytes) break;
+    out += ch;
+    bytes += size;
+    chars += 1;
+  }
+  return out;
+}
 
 const MAX_EXTENSION_LENGTH = 16;
 
 export interface SanitizeFileNameOptions {
   /** Used when nothing usable is left. */
   fallback?: string;
-  /** Maximum length of the result, extension included. Default 200. */
+  /** Maximum length of the result in characters (code points), extension included. Default 200. */
   maxLength?: number;
+  /** Maximum length of the result in UTF-8 bytes, extension included. Default 255, the usual file system limit. */
+  maxBytes?: number;
   /** Treat the input as a bare stem: a dot is part of the name, not an extension. */
   stem?: boolean;
 }
@@ -95,11 +123,12 @@ export function revealInvisibleCharacters(value: string): string {
  * - `/ \ : * ? " < > |` become `_`, so `../` can never survive,
  * - leading dots (hidden files, `..`) and trailing dots and spaces (which Windows drops) go,
  * - a Windows device name such as `CON` or `nul.txt` gets a `_` prefix,
- * - the length is capped while the extension is kept.
+ * - the length is capped in characters and in UTF-8 bytes, on whole characters, while the
+ *   extension is kept.
  * Falls back to `fallback` when nothing usable is left.
  */
 export function sanitizeFileName(raw: string, options: SanitizeFileNameOptions = {}): string {
-  const { fallback = 'file', maxLength = 200, stem = false } = options;
+  const { fallback = 'file', maxLength = 200, maxBytes = MAX_NAME_BYTES, stem = false } = options;
 
   // Controls become `_` so a name keeps its word breaks; zero-width and bidi characters vanish.
   const spaced = Array.from(raw, (ch) => (isControl(ch.codePointAt(0) ?? 0) ? '_' : ch)).join('');
@@ -116,10 +145,15 @@ export function sanitizeFileName(raw: string, options: SanitizeFileNameOptions =
   const base = firstDot === -1 ? name : name.slice(0, firstDot);
   if (WINDOWS_RESERVED.test(base)) name = `_${name}`;
 
-  if (name.length > maxLength) {
+  if (Array.from(name).length > maxLength || utf8Length(name) > maxBytes) {
     const lastDot = stem ? -1 : name.lastIndexOf('.');
     const extension = lastDot > 0 && name.length - lastDot <= MAX_EXTENSION_LENGTH ? name.slice(lastDot) : '';
-    name = (name.slice(0, maxLength - extension.length).replace(/[.\s]+$/, '') || fallback) + extension;
+    const body = truncateName(
+      extension ? name.slice(0, lastDot) : name,
+      maxLength - Array.from(extension).length,
+      maxBytes - utf8Length(extension)
+    );
+    name = (body.replace(/[.\s]+$/, '') || fallback) + extension;
   }
 
   return name || fallback;
