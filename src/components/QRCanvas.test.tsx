@@ -1597,3 +1597,35 @@ describe('QRCanvas Border Extended Features', () => {
     });
   });
 });
+
+describe('QRCanvas matrix worker failure', () => {
+  it('encodes on the main thread when the matrix worker fails to load (#1259)', async () => {
+    const encoder = createFakeQrEncoder();
+    const workers: Array<{ onerror: ((event: Event) => void) | null; postMessage: Mock; terminate: Mock }> = [];
+    const restoreRuntime = setQrCanvasRuntime({
+      loadEncoder: () => encoder,
+      createMatrixWorker: () => {
+        const worker = { onmessage: null, onerror: null, postMessage: vi.fn(), terminate: vi.fn() };
+        workers.push(worker);
+        return worker as unknown as Worker;
+      },
+    });
+
+    try {
+      render(<QRCanvas config={{ ...DEFAULT_CONFIG, value: 'https://qrcraftly.com' }} size={100} />);
+      const worker = workers[workers.length - 1];
+      await waitFor(() => expect(worker.postMessage).toHaveBeenCalled());
+      expect(encoder.create).not.toHaveBeenCalled();
+
+      // The worker file 404s, as it does for a page from an older build.
+      act(() => {
+        worker.onerror?.(new Event('error'));
+      });
+
+      expect(worker.terminate).toHaveBeenCalled();
+      await waitFor(() => expect(encoder.create).toHaveBeenCalledWith('https://qrcraftly.com', expect.anything()));
+    } finally {
+      restoreRuntime();
+    }
+  });
+});
