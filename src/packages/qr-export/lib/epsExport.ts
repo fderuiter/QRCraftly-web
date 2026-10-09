@@ -19,6 +19,7 @@
 import { QRConfig } from '@/types';
 import { generateQRSvg } from './svgExport';
 import { type ModuleRenderOptions } from '@/packages/qr-matrix';
+import { parseSvgPath } from './pathParser';
 
 interface RgbColor {
   r: number;
@@ -75,81 +76,24 @@ function formatNum(n: number): string {
  */
 function svgPathToPostScript(d: string): string {
   const commands: string[] = [];
-  // Tokenize commands and numbers
-  const tokens = d.match(/([a-zA-Z]|-?[\d.eE]+)/g) || [];
-  
-  let idx = 0;
-  let currentCmd = '';
-  let curX = 0;
-  let curY = 0;
-
-  while (idx < tokens.length) {
-    const token = tokens[idx];
-    if (/^[a-zA-Z]$/.test(token)) {
-      currentCmd = token;
-      idx++;
-    }
-
-    if (currentCmd === 'M' || currentCmd === 'm') {
-      const x = parseFloat(tokens[idx++]);
-      const y = parseFloat(tokens[idx++]);
-      curX = currentCmd === 'm' ? curX + x : x;
-      curY = currentCmd === 'm' ? curY + y : y;
-      commands.push(`${formatNum(curX)} ${formatNum(curY)} moveto`);
-      currentCmd = currentCmd === 'M' ? 'L' : 'l'; // Subsequent pairs are implicit lineTos
-    } else if (currentCmd === 'L' || currentCmd === 'l') {
-      const x = parseFloat(tokens[idx++]);
-      const y = parseFloat(tokens[idx++]);
-      curX = currentCmd === 'l' ? curX + x : x;
-      curY = currentCmd === 'l' ? curY + y : y;
-      commands.push(`${formatNum(curX)} ${formatNum(curY)} lineto`);
-    } else if (currentCmd === 'Q' || currentCmd === 'q') {
-      const cpxRel = parseFloat(tokens[idx++]);
-      const cpyRel = parseFloat(tokens[idx++]);
-      const xRel = parseFloat(tokens[idx++]);
-      const yRel = parseFloat(tokens[idx++]);
-
-      const cpx = currentCmd === 'q' ? curX + cpxRel : cpxRel;
-      const cpy = currentCmd === 'q' ? curY + cpyRel : cpyRel;
-      const x = currentCmd === 'q' ? curX + xRel : xRel;
-      const y = currentCmd === 'q' ? curY + yRel : yRel;
-
-      // Convert quadratic Bezier to cubic Bezier
-      const cp1x = curX + (2 / 3) * (cpx - curX);
-      const cp1y = curY + (2 / 3) * (cpy - curY);
-      const cp2x = x + (2 / 3) * (cpx - x);
-      const cp2y = y + (2 / 3) * (cpy - y);
-
+  parseSvgPath(d, {
+    moveTo(x, y) {
+      commands.push(`${formatNum(x)} ${formatNum(y)} moveto`);
+    },
+    lineTo(x, y) {
+      commands.push(`${formatNum(x)} ${formatNum(y)} lineto`);
+    },
+    curveTo(cp1x, cp1y, cp2x, cp2y, x, y) {
       commands.push(`${formatNum(cp1x)} ${formatNum(cp1y)} ${formatNum(cp2x)} ${formatNum(cp2y)} ${formatNum(x)} ${formatNum(y)} curveto`);
-      curX = x;
-      curY = y;
-    } else if (currentCmd === 'C' || currentCmd === 'c') {
-      const cp1xRel = parseFloat(tokens[idx++]);
-      const cp1yRel = parseFloat(tokens[idx++]);
-      const cp2xRel = parseFloat(tokens[idx++]);
-      const cp2yRel = parseFloat(tokens[idx++]);
-      const xRel = parseFloat(tokens[idx++]);
-      const yRel = parseFloat(tokens[idx++]);
-
-      const cp1x = currentCmd === 'c' ? curX + cp1xRel : cp1xRel;
-      const cp1y = currentCmd === 'c' ? curY + cp1yRel : cp1yRel;
-      const cp2x = currentCmd === 'c' ? curX + cp2xRel : cp2xRel;
-      const cp2y = currentCmd === 'c' ? curY + cp2yRel : cp2yRel;
-      const x = currentCmd === 'c' ? curX + xRel : xRel;
-      const y = currentCmd === 'c' ? curY + yRel : yRel;
-
-      commands.push(`${formatNum(cp1x)} ${formatNum(cp1y)} ${formatNum(cp2x)} ${formatNum(cp2y)} ${formatNum(x)} ${formatNum(y)} curveto`);
-      curX = x;
-      curY = y;
-    } else if (currentCmd === 'Z' || currentCmd === 'z') {
+    },
+    closePath() {
       commands.push('closepath');
-    } else {
-      idx++;
-    }
-  }
+    },
+  });
 
   return commands.join('\n');
 }
+
 
 /**
  * Converts an SVG string into Encapsulated PostScript (.eps) format.

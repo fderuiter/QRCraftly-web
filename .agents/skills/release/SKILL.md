@@ -26,7 +26,7 @@ pnpm run release:prepare                 # creates release/vX.Y.Z with the bump 
 git push -u origin release/vX.Y.Z        # open a PR into main titled chore(release): vX.Y.Z
 ```
 
-Squash-merging the release PR starts `.github/workflows/release.yml`. It creates the annotated tag `vX.Y.Z`, publishes the GitHub Release from the changelog section, waits for production to serve `/version.json` for the new version, and smoke tests production.
+Squash-merging the release PR starts `.github/workflows/release.yml`. It verifies GitHub Release status via `gh release view`, extracts notes before tagging, creates the annotated tag `vX.Y.Z` idempotently, publishes the GitHub Release, waits for production to serve `/version.json` for the new version, and smoke tests production.
 
 ## Agents
 

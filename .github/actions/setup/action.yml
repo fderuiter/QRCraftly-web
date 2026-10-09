@@ -9,6 +9,10 @@ inputs:
     description: "Whether to install dependencies"
     required: false
     default: "true"
+  cache-playwright:
+    description: "Whether to cache Playwright browser binaries in ~/.cache/ms-playwright"
+    required: false
+    default: "false"
 outputs:
   cache-hit:
     description: "Whether the pnpm store cache was restored from an exact key match."
@@ -31,6 +35,13 @@ runs:
         node-version: ${{ inputs.node-version }}
         node-version-file: .nvmrc
         cache: pnpm
+
+    - name: Cache Playwright Browsers
+      if: ${{ inputs.cache-playwright == 'true' }}
+      uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
 
     - name: Install Dependencies
       if: ${{ inputs.install == 'true' }}
