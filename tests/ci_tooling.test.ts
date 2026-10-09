@@ -134,6 +134,26 @@ describe('setup composite action', () => {
       expect(line).not.toContain('${{');
     }
   });
+
+  it('supports cache-playwright input with actions/cache for ~/.cache/ms-playwright', () => {
+    expect(action).toContain('cache-playwright:');
+    expect(action).toContain('default: "false"');
+    expect(action).toMatch(/uses: actions\/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57/);
+    expect(action).toContain('path: ~/.cache/ms-playwright');
+    expect(action).toContain("key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}");
+  });
+});
+
+describe('playwright browser caching in workflows', () => {
+  it('enables cache-playwright in release.yml smoke-tests job', () => {
+    const release = read('.github/workflows/release.yml');
+    expect(release).toContain('cache-playwright: \'true\'');
+  });
+
+  it('enables cache-playwright in main.yml e2e and verify-staging jobs', () => {
+    const main = read('.github/workflows/main.yml');
+    expect(main).toContain('cache-playwright: \'true\'');
+  });
 });
 
 describe('scheduled dependency audit alert', () => {
