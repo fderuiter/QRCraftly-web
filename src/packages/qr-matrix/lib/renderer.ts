@@ -117,22 +117,31 @@ export const drawQRInternal = (
   // 2. Calculate Logo Metrics
   const logoMetrics = getLogoMetrics(config, moduleCount, cellSize);
 
-  // 2b. Render Frame Shape & CTA Badge (if enabled)
+  // 3. Render Backgrounds, Frame & Border, back to front, so the full-canvas
+  // background never paints over the frame or CTA badge.
+  const isBackgroundFilled = config.bgColor !== 'transparent' && !config.isLuminanceMaskingEnabled;
+  if (isBackgroundFilled) {
+    ctx.fillStyle = config.bgColor;
+    ctx.fillRect(0, 0, displaySize, displaySize);
+  }
+
   renderFrame(ctx, config, displaySize, layout);
 
-  // 3. Render Backgrounds & Border
-  const isBackgroundFilled = config.bgColor !== 'transparent' && !config.isLuminanceMaskingEnabled;
-  if (config.isBorderEnabled && config.borderSize > 0) {
-    renderBorder(ctx, config, displaySize, borderPx);
+  // The border surrounds the QR box only, which is the whole canvas when there is no frame.
+  const hasBorder = config.isBorderEnabled && config.borderSize > 0;
+  const boxX = drawX - borderPx;
+  const boxY = drawY - borderPx;
+  const boxSize = drawSize + borderPx * 2;
+  if (hasBorder) {
+    ctx.save();
+    ctx.translate(boxX, boxY);
+    renderBorder(ctx, config, boxSize, borderPx);
+    ctx.restore();
     // Fill background for QR code area
     if (isBackgroundFilled) {
       ctx.fillStyle = config.bgColor;
       ctx.fillRect(drawX, drawY, drawSize, drawSize);
     }
-  } else if (isBackgroundFilled) {
-    // Fill Full Background
-    ctx.fillStyle = config.bgColor;
-    ctx.fillRect(0, 0, displaySize, displaySize);
   }
 
   // 4. Render Modules (or the Mosaic QR tiles, which include the finder patterns)
@@ -159,7 +168,10 @@ export const drawQRInternal = (
   renderLogo(ctx, config, logoImg, displaySize, logoMetrics);
 
   // 7. Render Border Decorations
-  if (config.isBorderEnabled && config.borderSize > 0) {
-    renderBorderDecoration(ctx, config, displaySize, borderPx, borderLogoImg);
+  if (hasBorder) {
+    ctx.save();
+    ctx.translate(boxX, boxY);
+    renderBorderDecoration(ctx, config, boxSize, borderPx, borderLogoImg);
+    ctx.restore();
   }
 };

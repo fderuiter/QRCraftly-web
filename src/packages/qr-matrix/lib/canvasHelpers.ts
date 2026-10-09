@@ -325,6 +325,22 @@ export const drawEyeFrame = (
 
   const cx = x + size / 2;
   const cy = y + size / 2;
+  const inner = size - 2 * cellSize;
+
+  // A transparent hole paints nothing, so the frame is drawn as a ring (outer and inner
+  // outline in one even-odd path) and the hole stays see-through.
+  if (bgColor === 'transparent') {
+    ctx.beginPath();
+    if (style === QRStyle.MODERN || style === QRStyle.FLUID || style === QRStyle.SWISS) {
+      drawRoundRect(ctx, x, y, size, size, cellSize * 1.5);
+      drawRoundRect(ctx, x + cellSize, y + cellSize, inner, inner, cellSize * 0.8);
+    } else {
+      ctx.rect(x, y, size, size);
+      ctx.rect(x + cellSize, y + cellSize, inner, inner);
+    }
+    ctx.fill('evenodd');
+    return;
+  }
 
   const drawRoundedEyeFrame = () => {
     ctx.beginPath();
@@ -333,7 +349,7 @@ export const drawEyeFrame = (
 
     ctx.fillStyle = bgColor;
     ctx.beginPath();
-    drawRoundRect(ctx, x + cellSize, y + cellSize, size - 2 * cellSize, size - 2 * cellSize, cellSize * 0.8);
+    drawRoundRect(ctx, x + cellSize, y + cellSize, inner, inner, cellSize * 0.8);
     ctx.fill();
     ctx.fillStyle = eyeColor;
   };
