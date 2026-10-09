@@ -3,7 +3,7 @@ import { PaymentData, CryptoNetwork } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { isDangerousUrl } from "../../utils/security";
 import { FormBlock } from "../ui/FormBlock";
-import { checkCryptoAddress } from "@/packages/qr-payload";
+import { checkCryptoAddress, isValidIban } from "@/packages/qr-payload";
 
 interface PaymentInputProps {
   data: PaymentData;
@@ -31,7 +31,11 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
         isCryptoNetwork(data.network) &&
         checkCryptoAddress(data.network, currentAddress) === "invalid"
       ? "This address does not pass its built-in check: it has a typo or is not a real address. Money sent to it can be lost. You can still make the code."
-      : undefined;
+      : currentAddress &&
+          data.network === CryptoNetwork.EPC_SEPA &&
+          !isValidIban(currentAddress)
+        ? "This IBAN does not pass its checksum or format check. Double-check for typos."
+        : undefined;
 
   const getAddressConfig = () => {
     switch (data.network) {
@@ -94,7 +98,8 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
         id="payment-address"
         label={mainConfig.label}
         type="text"
-        maxLength={128}
+        // An IBAN has at most 34 characters; allow the spaces of its printed four-character groups.
+        maxLength={data.network === CryptoNetwork.EPC_SEPA ? 42 : 128}
         placeholder={mainConfig.placeholder}
         value={currentAddress}
         onChange={(e) => {
@@ -114,7 +119,7 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
             id="payment-name"
             label="Beneficiary Name"
             type="text"
-            maxLength={140}
+            maxLength={70}
             placeholder="e.g. Jane Doe"
             value={data.name || ""}
             onChange={(e) => onChange({ name: e.target.value })}
@@ -150,7 +155,7 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
             label={data.network === CryptoNetwork.EPC_SEPA ? "Remittance Information / Note" : "Label / Note"}
             contextualLabel="Optional"
             type="text"
-            maxLength={200}
+            maxLength={data.network === CryptoNetwork.EPC_SEPA ? 140 : 200}
             placeholder={data.network === CryptoNetwork.EPC_SEPA ? "e.g. Invoice 123" : "e.g. Donation"}
             value={data.label || ""}
             onChange={(e) => onChange({ label: e.target.value })}

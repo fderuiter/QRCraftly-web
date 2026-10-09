@@ -365,9 +365,12 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                 {/* Heading and status share one row; the heading never wraps and the status drops below it only when there is no room. */}
                 <div className="mb-3 flex flex-wrap items-start justify-between gap-x-3" data-testid="preview-status">
                    <h2 className="py-1 font-semibold whitespace-nowrap text-fg-soft">Live Preview</h2>
-                   <div className="flex items-start gap-2">
+                   <div className="flex flex-wrap items-center gap-2">
+                   <Badge tone="success" data-testid="permanence-badge">
+                     Static · Non-expiring
+                   </Badge>
                    {isEmpty && (
-                     <Badge id={EMPTY_STATE_ID} tone="warning" data-testid="sample-preview-badge" className="mt-1">
+                     <Badge id={EMPTY_STATE_ID} tone="warning" data-testid="sample-preview-badge">
                        Sample Preview
                      </Badge>
                    )}
