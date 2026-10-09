@@ -4,6 +4,7 @@ import { LocationData } from "../../types";
 import { TextField } from "../ui/FormFields";
 import { FormBlock } from "../ui/FormBlock";
 import { announcePolitely } from "../../utils/a11y";
+import { coordinateError } from "@/packages/qr-payload";
 
 interface LocationInputProps {
   data: LocationData;
@@ -37,9 +38,11 @@ export const LocationInput: React.FC<LocationInputProps> = ({
       (position) => {
         setIsLoading(false);
         setGeoError(null);
+        // Rounded to six decimals (about 10 cm), so `String()` never writes exponent form.
+        const plain = (degrees: number) => String(Number(degrees.toFixed(6)));
         onChange({
-          latitude: String(position.coords.latitude),
-          longitude: String(position.coords.longitude),
+          latitude: plain(position.coords.latitude),
+          longitude: plain(position.coords.longitude),
         });
         announcePolitely("Location coordinates populated");
       },
@@ -65,6 +68,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         maxLength={20}
         value={data.latitude}
         onChange={(e) => onChange({ latitude: e.target.value })}
+        error={coordinateError(data.latitude, "latitude") ?? undefined}
       />
       <TextField
         id="location-longitude"
@@ -77,6 +81,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         // (-180) versus latitude's 2 (-90), requiring one more character for the sign+digits.
         value={data.longitude}
         onChange={(e) => onChange({ longitude: e.target.value })}
+        error={coordinateError(data.longitude, "longitude") ?? undefined}
       />
       <Button
         type="button"

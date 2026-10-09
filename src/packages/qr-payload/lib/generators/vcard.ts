@@ -50,6 +50,15 @@ export const unescapeMECard = (str: string | undefined): string => {
 };
 
 /**
+ * Escapes a vCard 2.1 value: only `;` is escaped, and line breaks become spaces because 2.1 has
+ * no `\n` escape (it would need quoted-printable).
+ */
+const escapeVCard21 = (str: string | undefined): string => {
+  if (!str) return '';
+  return str.replace(/\r\n|\r|\n/g, ' ').replace(/;/g, '\\;');
+};
+
+/**
  * Hydrates VCardData from a raw string (vCard or MECard format).
  */
 export const hydrateVCardData = (raw: string): VCardData => {
@@ -125,8 +134,9 @@ export const hydrateVCardData = (raw: string): VCardData => {
   if (!/begin:vcard/i.test(raw)) return result;
 
   const properties = parseRFCProperties(raw);
+  let formattedName = '';
 
-  properties.forEach(({ key, value }) => {
+  properties.forEach(({ key, value, params }) => {
     switch (key) {
       case 'VERSION': {
         const v = value.trim();
@@ -141,15 +151,25 @@ export const hydrateVCardData = (raw: string): VCardData => {
         result.firstName = unescapeVCardEvent(nParts[1] || '');
         break;
       }
+      case 'FN':
+        formattedName = unescapeVCardEvent(value).trim();
+        break;
       case 'ORG':
-        result.organization = unescapeVCardEvent(value);
+        // ORG is structured (name;unit;unit), so `Acme;` is just "Acme".
+        result.organization = splitCompoundField(value, ';')
+          .map((unit) => unescapeVCardEvent(unit).trim())
+          .filter(Boolean)
+          .join(', ');
         break;
       case 'TITLE':
         result.title = unescapeVCardEvent(value);
         break;
-      case 'TEL':
-        result.phone = unescapeVCardEvent(value);
+      case 'TEL': {
+        const phone = unescapeVCardEvent(value);
+        // vCard 4.0 writes `TEL;VALUE=uri:tel:+1-555-0100`.
+        result.phone = /VALUE=uri/i.test(params) ? phone.replace(/^tel:/i, '') : phone;
         break;
+      }
       case 'EMAIL':
         result.email = unescapeVCardEvent(value);
         break;
@@ -166,6 +186,13 @@ export const hydrateVCardData = (raw: string): VCardData => {
       }
     }
   });
+
+  // vCard 4.0 makes N optional; take the name from FN when N gave none.
+  if (!result.firstName && !result.lastName && formattedName) {
+    const space = formattedName.lastIndexOf(' ');
+    result.firstName = space === -1 ? formattedName : formattedName.substring(0, space).trim();
+    result.lastName = space === -1 ? '' : formattedName.substring(space + 1);
+  }
 
   return result;
 };
@@ -207,42 +234,52 @@ export const constructVCardString = (data: VCardData): string => {
     if (isPopulated(street) || isPopulated(city) || isPopulated(zip) || isPopulated(country)) {
       parts.push(`ADR:,,${street},${city},,${zip},${country};`);
     }
-
     parts.push(';');
     return parts.join('');
   }
 
-  const lastName = escapeVCardEvent(data.lastName);
-  const firstName = escapeVCardEvent(data.firstName);
-  const org = escapeVCardEvent(data.organization);
-  const title = escapeVCardEvent(data.title);
-  const phone = escapeVCardEvent(data.phone);
-  const email = escapeVCardEvent(data.email);
+  // vCard 2.1 escapes only `;`, has no `\n` escape, and needs CHARSET for non-ASCII text.
+  const is21 = version === '2.1';
+  const escape = is21 ? escapeVCard21 : escapeVCardEvent;
+  const prop = (name: string, value: string): string =>
+    is21 && /[^\x00-\x7F]/.test(value) ? `${name};CHARSET=UTF-8:${value}` : `${name}:${value}`;
+
+  const lastName = escape(data.lastName);
+  const firstName = escape(data.firstName);
+  const org = escape(data.organization);
+  const title = escape(data.title);
+  const phone = escape(data.phone);
+  const email = escape(data.email);
 
   // Normalize URL first to handle spaces/protocols
   const normalizedWebsite = normalizeUrl(data.website);
   const website = normalizedWebsite;
 
-  const street = escapeVCardEvent(data.street);
-  const city = escapeVCardEvent(data.city);
-  const zip = escapeVCardEvent(data.zip);
-  const country = escapeVCardEvent(data.country);
+  const street = escape(data.street);
+  const city = escape(data.city);
+  const zip = escape(data.zip);
+  const country = escape(data.country);
+
+  // FN must not be empty (RFC 6350 §6.2.1), so a card with no name is named after its
+  // organisation, email or phone.
+  const formattedName =
+    [firstName, lastName].filter(isPopulated).join(' ') || [org, email, phone].find(isPopulated) || '';
 
   const parts: string[] = [
     'BEGIN:VCARD',
     `VERSION:${version}`,
-    `N:${lastName};${firstName};;;`,
-    `FN:${firstName} ${lastName}`,
+    prop('N', `${lastName};${firstName};;;`),
+    prop('FN', formattedName),
   ];
 
-  if (isPopulated(org)) parts.push(`ORG:${org}`);
-  if (isPopulated(title)) parts.push(`TITLE:${title}`);
-  if (isPopulated(phone)) parts.push(`TEL:${phone}`);
-  if (isPopulated(email)) parts.push(`EMAIL:${email}`);
+  if (isPopulated(org)) parts.push(prop('ORG', org));
+  if (isPopulated(title)) parts.push(prop('TITLE', title));
+  if (isPopulated(phone)) parts.push(prop('TEL', phone));
+  if (isPopulated(email)) parts.push(prop('EMAIL', email));
   if (isPopulated(website)) parts.push(`URL:${website}`);
 
   if (isPopulated(street) || isPopulated(city) || isPopulated(zip) || isPopulated(country)) {
-    parts.push(`ADR:;;${street};${city};;${zip};${country}`);
+    parts.push(prop('ADR', `;;${street};${city};;${zip};${country}`));
   }
 
   parts.push('END:VCARD');

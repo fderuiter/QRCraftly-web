@@ -63,13 +63,13 @@ export {
 export { WifiContract, constructWifiString, hydrateWifiData } from './lib/generators/wifi';
 export { EmailContract, constructEmailString, hydrateEmailData } from './lib/generators/email';
 export { VCardContract, constructVCardString, hydrateVCardData } from './lib/generators/vcard';
-export { constructPhoneString, hydratePhoneData } from './lib/generators/phone';
+export { constructPhoneString, hydratePhoneData, droppedPhoneCharacters } from './lib/generators/phone';
 export { SmsContract, constructSmsString, hydrateSmsData } from './lib/generators/sms';
 export { PaymentContract, constructPaymentString, hydratePaymentData } from './lib/generators/payment';
 export { EventContract, constructEventString, hydrateEventData } from './lib/generators/event';
 export { UrlContract, constructUrlString } from './lib/generators/url';
 export { constructTextString, hydrateTextData } from './lib/generators/text';
-export { constructLocationString, hydrateLocationData } from './lib/generators/location';
+export { constructLocationString, hydrateLocationData, coordinateError } from './lib/generators/location';
 export { MeetingContract, constructMeetingString, hydrateMeetingData } from './lib/generators/meeting';
 export { constructSocialString, hydrateSocialData } from './lib/generators/social';
 export { BulkCsvContract, constructBulkCsvString, hydrateBulkCsvData } from './lib/generators/bulkCsv';
