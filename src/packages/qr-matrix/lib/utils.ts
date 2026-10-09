@@ -23,7 +23,10 @@ export interface LayoutMetrics {
   drawY: number;
   drawSize: number;
   cellSize: number;
+  /** Thickness of the decorative border band (0 when the border is off). */
   borderPx: number;
+  /** Width of the light quiet zone between the border and the modules: always 4 modules. */
+  quietPx: number;
 }
 
 export interface LogoMetrics {
@@ -39,16 +42,10 @@ export const calculateLayout = (
   displaySize: number,
   moduleCount: number
 ): LayoutMetrics => {
-  let borderPx = 0;
+  // Outside in: border band, a light quiet zone of 4 modules, then the modules. The border
+  // never replaces the quiet zone, so a dark border cannot stop the code scanning (#1249).
   const quietZoneModules = 4;
-  const minBorderPx = (quietZoneModules * displaySize) / (moduleCount + 2 * quietZoneModules);
-
-  if (config.isBorderEnabled && config.borderSize > 0) {
-    const rawBorderPx = displaySize * config.borderSize;
-    borderPx = Math.max(rawBorderPx, minBorderPx);
-  } else {
-    borderPx = minBorderPx;
-  }
+  const borderPx = config.isBorderEnabled && config.borderSize > 0 ? displaySize * config.borderSize : 0;
 
   const hasFrame = config.frameStyle && config.frameStyle !== 'none';
   const frameMargin = hasFrame ? displaySize * 0.18 : 0;
@@ -65,24 +62,27 @@ export const calculateLayout = (
     }
   }
 
-  const drawSize = Math.min(availableWidth, availableHeight) - (borderPx * 2);
-  const cellSize = drawSize / moduleCount;
+  const boxSize = Math.min(availableWidth, availableHeight);
+  const cellSize = (boxSize - borderPx * 2) / (moduleCount + quietZoneModules * 2);
+  const quietPx = quietZoneModules * cellSize;
+  const drawSize = cellSize * moduleCount;
+  const insetPx = borderPx + quietPx;
 
-  let drawX = borderPx;
-  let drawY = borderPx;
+  let drawX = insetPx;
+  let drawY = insetPx;
 
   if (hasFrame) {
     if (position === 'bottom') {
       drawX = (displaySize - drawSize) / 2;
-      drawY = borderPx;
+      drawY = insetPx;
     } else if (position === 'top') {
       drawX = (displaySize - drawSize) / 2;
-      drawY = frameMargin + borderPx;
+      drawY = frameMargin + insetPx;
     } else if (position === 'left') {
-      drawX = frameMargin + borderPx;
+      drawX = frameMargin + insetPx;
       drawY = (displaySize - drawSize) / 2;
     } else if (position === 'right') {
-      drawX = borderPx;
+      drawX = insetPx;
       drawY = (displaySize - drawSize) / 2;
     }
   }
@@ -92,7 +92,8 @@ export const calculateLayout = (
     drawY,
     drawSize,
     cellSize,
-    borderPx
+    borderPx,
+    quietPx
   };
 };
 

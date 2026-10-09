@@ -97,7 +97,9 @@ function selectShell(files, readText) {
 }
 
 // Version 2: pages are precached by canonical URL (fix for #1086).
-const SW_SCHEMA_VERSION = 2;
+// Version 3: lookups prefer this build's cache and navigations go to the
+// network first, so visitors stuck on an older build move on at once (#1259).
+const SW_SCHEMA_VERSION = 3;
 
 /**
  * Maps a dist/client file to the URL the service worker precaches it under.
@@ -139,7 +141,9 @@ function readRedirectSources(redirectsFile) {
  * their lazily-loaded chunks. The page shows an "update available" toast
  * and posts SKIP_WAITING when the user accepts. On activate, the current
  * and the previous precache are kept, so a tab still running the previous
- * build can load its hashed chunks; older caches are deleted.
+ * build can load its hashed chunks; older caches are deleted. Only those
+ * hashed /assets/ files are ever answered from another build's cache.
+ * Navigations go to the network first and use the cache only offline.
  * @param {Array<{url: string, revision: string}>} precacheManifest Files to precache.
  * @param {string} buildHash Unique hash of this build.
  * @returns {string} Service worker JavaScript source.
@@ -162,7 +166,6 @@ const SCHEMA_KEY = '/__qrcraftly_sw_schema__';
 const SCHEMA_VERSION = ${SW_SCHEMA_VERSION};
 const RUNTIME_CACHED_EXTENSION = ${JSON.stringify(RUNTIME_CACHED_EXTENSION)};
 const PRECACHE_ASSETS = ${JSON.stringify(precacheManifest, null, 2)};
-const PRECACHED_PATHS = new Set(PRECACHE_ASSETS.map((asset) => asset.url));
 
 // Pages are precached under their canonical URL (/about, not
 // /about/index.html), because the host answers the .html path with a redirect
@@ -249,10 +252,23 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Looks in this build's cache first. Only content-hashed /assets/ files may
+// come from another build's cache: a tab still running the previous build
+// needs its chunks, and a hashed name never changes content. Pages, navigation
+// data, the manifest and icons always come from this build, because the cache
+// API searches caches oldest first and would otherwise hand back the previous
+// build's copy (#1259).
 async function matchPrecache(pathname) {
-  // caches.match searches every cache, so chunks from the previous build
-  // are still served to tabs that loaded it.
-  return caches.match(pathname, { ignoreSearch: true, ignoreVary: true });
+  const options = { ignoreSearch: true, ignoreVary: true };
+  try {
+    const own = await caches.open(CACHE_NAME);
+    const hit = await own.match(pathname, options);
+    if (hit) return hit;
+  } catch (err) {
+    // An unavailable cache falls through to the network.
+  }
+  if (!pathname.startsWith('/assets/')) return undefined;
+  return caches.match(pathname, options);
 }
 
 // Stores a good answer under a canonical key. Redirects and errors are never kept.
@@ -269,42 +285,27 @@ async function remember(key, response) {
 
 async function handleNavigation(request, url) {
   const pageUrl = toPageUrl(url.pathname);
-  if (PRECACHED_PATHS.has(pageUrl)) {
-    const cached = await matchPrecache(pageUrl);
-    // Browsers reject a redirected response for a navigation, so let the
-    // network answer (and redirect) instead.
-    if (cached && !cached.redirected) return cached;
-  }
   try {
-    // Other pages are not precached: the network answers (so the server can
-    // send the right page or a real 404) and a good answer is kept for offline.
+    // The network first, so the page always matches the assets the server has
+    // now (#1259). A good answer is kept for offline use.
     const response = await fetch(request);
     await remember(pageUrl, response);
     return response;
   } catch (err) {
     // Offline: a page seen before, else the cached shell so the app still boots.
+    // Browsers reject a redirected response for a navigation.
     const seen = await matchPrecache(pageUrl);
     if (seen && !seen.redirected) return seen;
     const shell = await matchPrecache('/');
-    if (shell) return shell;
+    if (shell && !shell.redirected) return shell;
     throw err;
   }
 }
 
 async function handleRequest(request, url) {
-  const cached = await matchPrecache(url.pathname);
-  if (cached) return cached;
-  if (url.pathname.startsWith('/assets/')) {
-    // Chunks, workers and the scanner's WebAssembly reader are not precached, so they are
-    // kept the first time they load. Their file names carry a content hash, so a cached
-    // copy is never stale.
-    const response = await fetch(request);
-    await remember(url.pathname, response);
-    return response;
-  }
   if (url.pathname.endsWith('.pageContext.json')) {
-    // Client-side navigation data: the network first, so it is never stale, and the last
-    // good copy when offline. Never a substitute from another route.
+    // Client-side navigation data: the network first, so it is never stale (#1260), and the
+    // last good copy when offline. Never a substitute from another route.
     try {
       const response = await fetch(request);
       await remember(url.pathname, response);
@@ -314,6 +315,16 @@ async function handleRequest(request, url) {
       if (seen) return seen;
       throw err;
     }
+  }
+  const cached = await matchPrecache(url.pathname);
+  if (cached) return cached;
+  if (url.pathname.startsWith('/assets/')) {
+    // Chunks, workers and the scanner's WebAssembly reader are not precached, so they are
+    // kept the first time they load. Their file names carry a content hash, so a cached
+    // copy is never stale.
+    const response = await fetch(request);
+    await remember(url.pathname, response);
+    return response;
   }
   return fetch(request);
 }

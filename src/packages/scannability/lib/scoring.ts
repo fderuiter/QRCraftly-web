@@ -43,11 +43,12 @@ export function calculateScannabilityHealth(
   const criticalWarnings: string[] = [];
 
   const bgForContrast = config.bgColor === 'transparent' ? '#ffffff' : config.bgColor;
-  const effectiveFgColor = (config.gradientType && config.gradientType !== 'none' && config.gradientColorStops?.[0]?.color)
-    ? config.gradientColorStops[0].color
-    : config.fgColor;
+  // A gradient is only as scannable as its weakest stop, so every stop is checked.
+  const moduleColors = (config.gradientType && config.gradientType !== 'none' && config.gradientColorStops?.length)
+    ? config.gradientColorStops.map((stop) => stop.color)
+    : [config.fgColor];
 
-  const fgContrast = getContrastRatio(effectiveFgColor, bgForContrast);
+  const fgContrast = Math.min(...moduleColors.map((color) => getContrastRatio(color, bgForContrast)));
   const eyeFrameContrast = getContrastRatio(config.eyeFrameColor || config.eyeColor, bgForContrast);
   const eyeBallContrast = getContrastRatio(config.eyeBallColor || config.eyeColor, bgForContrast);
   const worstContrast = Math.min(fgContrast, eyeFrameContrast, eyeBallContrast);

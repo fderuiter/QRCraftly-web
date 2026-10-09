@@ -1473,8 +1473,9 @@ describe('QRCanvas Border Rendering', () => {
     const borderCall = fillRectCalls.find(call => call[0] === 0 && call[1] === 0 && call[2] === 100 && call[3] === 100);
     expect(borderCall).toBeTruthy();
 
-    // Find the call for the inner background: 10, 10, 80, 80 (since 0.1 * 100 = 10px border on each side)
-    const innerBgCall = fillRectCalls.find(call => call[0] > 13 && call[0] < 14 && call[2] > 72 && call[2] < 73);
+    // Find the call for the inner background, quiet zone included: 10, 10, 80, 80
+    // (0.1 * 100 = 10px border on each side, with the light quiet zone inside it)
+    const innerBgCall = fillRectCalls.find(call => Math.abs(call[0] - 10) < 1e-9 && Math.abs(call[2] - 80) < 1e-9);
     expect(innerBgCall).toBeTruthy();
 
     document.createElement = originalCreateElement;
@@ -1504,7 +1505,7 @@ describe('QRCanvas Border Rendering', () => {
     const fillRectCalls = mockContext.fillRect.mock.calls;
 
     // Should NOT have inner background fill (10, 10, 80, 80)
-    const innerBgCall = fillRectCalls.find(call => call[0] > 13 && call[0] < 14 && call[2] > 72 && call[2] < 73);
+    const innerBgCall = fillRectCalls.find(call => Math.abs(call[0] - 10) < 1e-9 && Math.abs(call[2] - 80) < 1e-9);
     expect(innerBgCall).toBeUndefined();
 
     document.createElement = originalCreateElement;
@@ -1595,5 +1596,37 @@ describe('QRCanvas Border Extended Features', () => {
     await waitFor(() => {
       expect(mockContext.drawImage).toHaveBeenCalled();
     });
+  });
+});
+
+describe('QRCanvas matrix worker failure', () => {
+  it('encodes on the main thread when the matrix worker fails to load (#1259)', async () => {
+    const encoder = createFakeQrEncoder();
+    const workers: Array<{ onerror: ((event: Event) => void) | null; postMessage: Mock; terminate: Mock }> = [];
+    const restoreRuntime = setQrCanvasRuntime({
+      loadEncoder: () => encoder,
+      createMatrixWorker: () => {
+        const worker = { onmessage: null, onerror: null, postMessage: vi.fn(), terminate: vi.fn() };
+        workers.push(worker);
+        return worker as unknown as Worker;
+      },
+    });
+
+    try {
+      render(<QRCanvas config={{ ...DEFAULT_CONFIG, value: 'https://qrcraftly.com' }} size={100} />);
+      const worker = workers[workers.length - 1];
+      await waitFor(() => expect(worker.postMessage).toHaveBeenCalled());
+      expect(encoder.create).not.toHaveBeenCalled();
+
+      // The worker file 404s, as it does for a page from an older build.
+      act(() => {
+        worker.onerror?.(new Event('error'));
+      });
+
+      expect(worker.terminate).toHaveBeenCalled();
+      await waitFor(() => expect(encoder.create).toHaveBeenCalledWith('https://qrcraftly.com', expect.anything()));
+    } finally {
+      restoreRuntime();
+    }
   });
 });
