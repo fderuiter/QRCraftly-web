@@ -135,6 +135,14 @@ describe('generated service worker runtime', () => {
     expect(sw.self.skipWaiting).toHaveBeenCalledTimes(1);
   });
 
+  it('takes over at once from a worker that serves pages cache-first from any build (#1259)', async () => {
+    const meta = await caches.api.open('qrcraftly-meta');
+    await meta.put('/__qrcraftly_sw_schema__', new Response(JSON.stringify(2)));
+    const sw = loadWorker({ caches, hasActiveWorker: true });
+    await sw.dispatch('install');
+    expect(sw.self.skipWaiting).toHaveBeenCalledTimes(1);
+  });
+
   it('waits as usual when the active worker already uses canonical page URLs', async () => {
     const first = loadWorker({ caches });
     await first.dispatch('install');
@@ -185,14 +193,75 @@ describe('generated service worker runtime', () => {
     expect(await sw.fetchEvent('/api/anything', 'navigate')).toBeUndefined();
   });
 
-  it('serves precached pages from the cache', async () => {
-    const sw = loadWorker({ caches });
+  it('asks the network first for every page and serves precached pages offline (#1259)', async () => {
+    let online = true;
+    const fetchImpl = vi.fn(async (req: unknown) => {
+      if (!online) throw new TypeError('Failed to fetch');
+      return `fetched:${(req as { url: string }).url}`;
+    });
+    const sw = loadWorker({ caches, fetchImpl });
     await sw.dispatch('install');
+    expect(await sw.fetchEvent('/', 'navigate')).toBe(`fetched:${ORIGIN}/`);
+    expect(await sw.fetchEvent('/about', 'navigate')).toBe(`fetched:${ORIGIN}/about`);
+
+    online = false;
     expect(await sw.fetchEvent('/about', 'navigate')).toBe('network:/about');
     expect(await sw.fetchEvent('/about/', 'navigate')).toBe('network:/about');
     expect(await sw.fetchEvent('/about/index.html', 'navigate')).toBe('network:/about');
     expect(await sw.fetchEvent('/', 'navigate')).toBe('network:/');
     expect(await sw.fetchEvent('/index.html', 'navigate')).toBe('network:/');
+  });
+
+  it("answers from this build's cache even when the previous build's cache was created first (#1259)", async () => {
+    caches = createCacheStorage({
+      'qrcraftly-precache-old': {
+        '/': 'old:/',
+        '/index.pageContext.json': 'old:data',
+        '/manifest.json': 'old:manifest',
+        '/assets/old-chunk.js': 'old:chunk',
+      },
+    });
+    const meta = await caches.api.open('qrcraftly-meta');
+    await meta.put('/__qrcraftly_cache_history__', new Response(JSON.stringify(['qrcraftly-precache-old'])));
+    const sw = loadWorker({
+      caches,
+      manifest: [
+        { url: '/', revision: 'a' },
+        { url: '/index.pageContext.json', revision: 'b' },
+        { url: '/manifest.json', revision: 'c' },
+      ],
+      fetchImpl: async () => {
+        throw new TypeError('Failed to fetch');
+      },
+    });
+    await sw.dispatch('install');
+    await sw.dispatch('activate');
+
+    expect(await sw.fetchEvent('/', 'navigate')).toBe('network:/');
+    expect(await sw.fetchEvent('/index.pageContext.json')).toBe('network:/index.pageContext.json');
+    expect(await sw.fetchEvent('/manifest.json')).toBe('network:/manifest.json');
+    // A tab still running the previous build can load its hashed chunk.
+    expect(await sw.fetchEvent('/assets/old-chunk.js')).toBe('old:chunk');
+  });
+
+  it("never serves a page or the manifest from another build's cache (#1259)", async () => {
+    caches = createCacheStorage({
+      'qrcraftly-precache-old': { '/manifest.json': 'old:manifest', '/arcade': 'old:arcade' },
+    });
+    let online = true;
+    const sw = loadWorker({
+      caches,
+      manifest: [{ url: '/', revision: 'a' }],
+      fetchImpl: async (req: unknown) => {
+        if (!online) throw new TypeError('Failed to fetch');
+        return `fetched:${(req as { url: string }).url}`;
+      },
+    });
+    await sw.dispatch('install');
+    expect(await sw.fetchEvent('/manifest.json')).toBe(`fetched:${ORIGIN}/manifest.json`);
+    online = false;
+    // Offline, an unseen page gets this build's shell, not the old build's copy.
+    expect(await sw.fetchEvent('/arcade', 'navigate')).toBe('network:/');
   });
 
   it('never answers a navigation with a redirected response (#1086)', async () => {
@@ -226,7 +295,21 @@ describe('generated service worker runtime', () => {
     expect(await sw.fetchEvent('/unknown/index.pageContext.json')).toBe(
       `fetched:${ORIGIN}/unknown/index.pageContext.json`
     );
-    expect(await sw.fetchEvent('/index.pageContext.json')).toBe('network:/index.pageContext.json');
+  });
+
+  it('asks the network for navigation data it already holds, so it is never stale (#1260)', async () => {
+    let body = 'first';
+    const fetchImpl = vi.fn(async () => {
+      const current = body;
+      return { ok: true, body: current, clone: () => `kept:${current}` };
+    });
+    const sw = loadWorker({ caches, fetchImpl });
+    await sw.dispatch('install');
+    await sw.fetchEvent('/arcade/index.pageContext.json');
+    body = 'second';
+    expect(await sw.fetchEvent('/arcade/index.pageContext.json')).toMatchObject({ body: 'second' });
+    expect(await sw.fetchEvent('/index.pageContext.json')).toMatchObject({ body: 'second' });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
   it('caches a wasm module on first use and serves it from the cache afterwards (ADR 0033)', async () => {

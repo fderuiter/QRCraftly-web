@@ -84,8 +84,8 @@ describe('Sms generator', () => {
         number: '+15550000000;+15551111111,123',
       };
       const str = constructPhoneString(phoneData);
-      // Semicolons and commas are stripped, only whitelisted phone symbols remain
-      expect(str).toBe('tel:+15550000000+15551111111123');
+      // Semicolons are stripped; a comma is a dial pause, so it is kept (#1277)
+      expect(str).toBe('tel:+15550000000+15551111111,123');
     });
   });
 

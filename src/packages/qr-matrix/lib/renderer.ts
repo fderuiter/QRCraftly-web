@@ -112,27 +112,36 @@ export const drawQRInternal = (
 
   // 1. Calculate Layout
   const layout = calculateLayout(config, displaySize, moduleCount);
-  const { drawX, drawY, drawSize, cellSize, borderPx } = layout;
+  const { drawX, drawY, drawSize, cellSize, borderPx, quietPx } = layout;
 
   // 2. Calculate Logo Metrics
   const logoMetrics = getLogoMetrics(config, moduleCount, cellSize);
 
-  // 2b. Render Frame Shape & CTA Badge (if enabled)
-  renderFrame(ctx, config, displaySize, layout);
-
-  // 3. Render Backgrounds & Border
+  // 3. Render Backgrounds, Frame & Border, back to front, so the full-canvas
+  // background never paints over the frame or CTA badge.
   const isBackgroundFilled = config.bgColor !== 'transparent' && !config.isLuminanceMaskingEnabled;
-  if (config.isBorderEnabled && config.borderSize > 0) {
-    renderBorder(ctx, config, displaySize, borderPx);
-    // Fill background for QR code area
-    if (isBackgroundFilled) {
-      ctx.fillStyle = config.bgColor;
-      ctx.fillRect(drawX, drawY, drawSize, drawSize);
-    }
-  } else if (isBackgroundFilled) {
-    // Fill Full Background
+  if (isBackgroundFilled) {
     ctx.fillStyle = config.bgColor;
     ctx.fillRect(0, 0, displaySize, displaySize);
+  }
+
+  renderFrame(ctx, config, displaySize, layout);
+
+  // The border surrounds the QR box only, which is the whole canvas when there is no frame.
+  const hasBorder = config.isBorderEnabled && config.borderSize > 0;
+  const boxX = drawX - quietPx - borderPx;
+  const boxY = drawY - quietPx - borderPx;
+  const boxSize = drawSize + (quietPx + borderPx) * 2;
+  if (hasBorder) {
+    ctx.save();
+    ctx.translate(boxX, boxY);
+    renderBorder(ctx, config, boxSize, borderPx);
+    ctx.restore();
+    // Fill the background over the quiet zone and the modules, inside the border band
+    if (isBackgroundFilled) {
+      ctx.fillStyle = config.bgColor;
+      ctx.fillRect(drawX - quietPx, drawY - quietPx, drawSize + quietPx * 2, drawSize + quietPx * 2);
+    }
   }
 
   // 4. Render Modules (or the Mosaic QR tiles, which include the finder patterns)
@@ -159,7 +168,10 @@ export const drawQRInternal = (
   renderLogo(ctx, config, logoImg, displaySize, logoMetrics);
 
   // 7. Render Border Decorations
-  if (config.isBorderEnabled && config.borderSize > 0) {
-    renderBorderDecoration(ctx, config, displaySize, borderPx, borderLogoImg);
+  if (hasBorder) {
+    ctx.save();
+    ctx.translate(boxX, boxY);
+    renderBorderDecoration(ctx, config, boxSize, borderPx, borderLogoImg);
+    ctx.restore();
   }
 };

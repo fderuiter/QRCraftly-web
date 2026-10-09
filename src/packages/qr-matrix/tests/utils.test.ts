@@ -30,40 +30,45 @@ import { QRConfig, QRErrorCorrectionLevel } from '@/types';
 
 describe('QR Renderer Utils', () => {
   describe('calculateLayout', () => {
-    it('calculates layout without border', () => {
+    const expectLayout = (actual: ReturnType<typeof calculateLayout>, expected: ReturnType<typeof calculateLayout>) => {
+      for (const key of Object.keys(expected) as Array<keyof typeof expected>) {
+        expect(actual[key], key).toBeCloseTo(expected[key], 9);
+      }
+    };
+
+    it('calculates layout without border: a 4-module quiet zone on each side', () => {
       const config = { ...DEFAULT_CONFIG, isBorderEnabled: false };
-      const result = calculateLayout(config, 100, 25);
-      expect(result).toEqual({
-        drawX: 12.121212121212121,
-        drawY: 12.121212121212121,
-        drawSize: 75.75757575757575,
-        cellSize: 3.03030303030303,
-        borderPx: 12.121212121212121
+      expectLayout(calculateLayout(config, 100, 25), {
+        drawX: 400 / 33,
+        drawY: 400 / 33,
+        drawSize: 2500 / 33,
+        cellSize: 100 / 33,
+        borderPx: 0,
+        quietPx: 400 / 33,
       });
     });
 
-    it('calculates layout with border', () => {
+    it('puts the border band outside the quiet zone (#1249)', () => {
       const config = { ...DEFAULT_CONFIG, isBorderEnabled: true, borderSize: 0.1 };
-      const result = calculateLayout(config, 100, 20);
-      expect(result).toEqual({
-        drawX: 14.285714285714286,
-        drawY: 14.285714285714286,
-        drawSize: 71.42857142857143,
-        cellSize: 3.5714285714285716,
-        borderPx: 14.285714285714286
+      // 100 px = 2 x 10 px border + (20 + 8) modules of 80/28 px
+      const cell = 80 / 28;
+      expectLayout(calculateLayout(config, 100, 20), {
+        drawX: 10 + 4 * cell,
+        drawY: 10 + 4 * cell,
+        drawSize: 20 * cell,
+        cellSize: cell,
+        borderPx: 10,
+        quietPx: 4 * cell,
       });
     });
 
-    it('calculates layout with border when borderPx >= minBorderPx', () => {
+    it('keeps a full quiet zone however thick the border is', () => {
       const config = { ...DEFAULT_CONFIG, isBorderEnabled: true, borderSize: 0.3 };
       const result = calculateLayout(config, 100, 20);
-      expect(result).toEqual({
-        drawX: 30,
-        drawY: 30,
-        drawSize: 40,
-        cellSize: 2,
-        borderPx: 30
-      });
+      expect(result.borderPx).toBeCloseTo(30, 9);
+      expect(result.quietPx).toBeCloseTo(4 * result.cellSize, 9);
+      expect(result.drawX).toBeCloseTo(30 + 4 * result.cellSize, 9);
+      expect(result.drawSize + 2 * (result.quietPx + result.borderPx)).toBeCloseTo(100, 9);
     });
   });
 

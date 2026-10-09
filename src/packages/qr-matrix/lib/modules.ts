@@ -297,13 +297,16 @@ export const renderModules = (
   const group1Cols = new Int16Array(total);
   let group1Count = 0;
 
+  // A transparent background is placed on light media, so it groups like white.
+  const flatBgLum = config.bgColor && config.bgColor !== 'transparent' ? getLuminance(config.bgColor) : 1.0;
+
   for (let r = 0; r < moduleCount; r++) {
     for (let c = 0; c < moduleCount; c++) {
       if (modules.get(r, c)) {
         if (isCoveredByLogo(r, c)) continue;
 
         const idx = r * moduleCount + c;
-        const bgLum = cellLuminance ? cellLuminance[idx] : (config.bgColor ? getLuminance(config.bgColor) : 1.0);
+        const bgLum = cellLuminance ? cellLuminance[idx] : flatBgLum;
 
         if (bgLum >= threshold) {
           group0Rows[group0Count] = r;

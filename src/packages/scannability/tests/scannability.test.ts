@@ -83,6 +83,22 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       expect(health.criticalWarnings).not.toContain('critical-contrast');
     });
 
+    it('flags a gradient whose end stop fades into the background (#1365)', () => {
+      const config: QRConfig = {
+        ...getBaseConfig(),
+        fgColor: '#000000',
+        bgColor: '#ffffff',
+        eyeColor: '#000000',
+        gradientType: 'linear',
+        gradientColorStops: [
+          { offset: 0, color: '#000000' },
+          { offset: 1, color: '#ffffff' },
+        ],
+      };
+      const health = calculateScannabilityHealth(config);
+      expect(health.criticalWarnings).toContain('critical-contrast');
+    });
+
     it('deducts score when localized contrast violations occur', () => {
       const config = getBaseConfig();
       const health = calculateScannabilityHealth(config, { violations: 4, minContrast: 2.2 });

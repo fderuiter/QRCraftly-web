@@ -33,8 +33,19 @@ import {
  * @returns The encoded recipient for the mailto path.
  */
 const encodeMailtoRecipient = (address: string): string => {
-  return encodeURIComponent(address.trim()).replace(/%40/g, '@').replace(/%2B/gi, '+');
+  return address
+    .split(',')
+    .map((recipient) => recipient.trim())
+    .filter(Boolean)
+    .map((recipient) => encodeURIComponent(recipient).replace(/%40/g, '@').replace(/%2B/gi, '+'))
+    .join(',');
 };
+
+/** RFC 6068 §5: line breaks in a mailto body are written as CRLF (`%0D%0A`). */
+const toCrlf = (text: string): string => text.replace(/\r\n|\r|\n/g, '\r\n');
+
+/** Mail headers QRCraftly writes or reads; anything else in a mailto query is refused. */
+const MAILTO_HEADERS = new Set(['to', 'cc', 'bcc', 'subject', 'body']);
 
 /**
  * Constructs the mailto string for Email QR code.
@@ -55,7 +66,7 @@ export const constructEmailString = (data: EmailData): string => {
   }
 
   params.push(`subject=${encodeURIComponent(data.subject || '')}`);
-  params.push(`body=${encodeURIComponent(data.body || '')}`);
+  params.push(`body=${encodeURIComponent(toCrlf(data.body || ''))}`);
 
   return `mailto:${encodeMailtoRecipient(data.email || '')}?${params.join('&')}`;
 };
@@ -83,12 +94,17 @@ export const hydrateEmailData = (raw: string): EmailData => {
   }
 
   if (parsed.scheme === 'mailto') {
-    const parsedRecipient = safeDecodeURIComponent(parsed.path);
-    result.email = parsedRecipient;
-    result.cc = parsed.params.get('cc') || parsed.params.get('CC') || '';
-    result.bcc = parsed.params.get('bcc') || parsed.params.get('BCC') || '';
+    // Header names are case-insensitive and `to=` adds recipients (RFC 6068 §2), so both are
+    // folded into the To field.
+    result.email = [safeDecodeURIComponent(parsed.path), parsed.params.get('to') || '']
+      .flatMap((list) => list.split(','))
+      .map((recipient) => recipient.trim())
+      .filter(Boolean)
+      .join(',');
+    result.cc = parsed.params.get('cc') || '';
+    result.bcc = parsed.params.get('bcc') || '';
     result.subject = parsed.params.get('subject') || '';
-    result.body = parsed.params.get('body') || '';
+    result.body = (parsed.params.get('body') || '').replace(/\r\n?/g, '\n');
   }
 
   return result;
@@ -123,10 +139,17 @@ export const EmailContract: QRGeneratorContract<EmailData> = {
     }
 
     // Validate email address (mailto recipients are percent-encoded, RFC 6068)
-    const recipient =
-      parsed.scheme === 'mailto' ? safeDecodeURIComponent(parsed.path) : parsed.path;
-    if (!recipient || !CONTAINMENT_PROFILES.EMAIL.test(recipient)) {
+    const recipients =
+      parsed.scheme === 'mailto' ? hydrateEmailData(trimmed).email.split(',') : [parsed.path];
+    if (!recipients.some(Boolean) || recipients.some((recipient) => !CONTAINMENT_PROFILES.EMAIL.test(recipient))) {
       violations.push('EMAIL_STRUCTURE_VIOLATION');
+    }
+    if (parsed.scheme === 'mailto') {
+      const { cc, bcc } = hydrateEmailData(trimmed);
+      const copies = [cc, bcc].flatMap((list) => (list || '').split(',')).map((address) => address.trim()).filter(Boolean);
+      if (copies.some((address) => !CONTAINMENT_PROFILES.EMAIL.test(address))) {
+        violations.push('EMAIL_STRUCTURE_VIOLATION');
+      }
     }
 
     // Deep metadata delimiter validation
@@ -158,24 +181,15 @@ export const EmailContract: QRGeneratorContract<EmailData> = {
         if (query.includes('?')) {
           violations.push('DELIMITER_VIOLATION');
         } else {
-          // If query parameters have keys other than subject or body, or empty keys, it indicates unescaped '&' or malformed parameters
-          try {
-            const urlParams = new URLSearchParams(query);
-            urlParams.forEach((_, key) => {
-              const lowerKey = key.toLowerCase();
-              if (
-                lowerKey !== 'subject' &&
-                lowerKey !== 'body' &&
-                lowerKey !== 'cc' &&
-                lowerKey !== 'bcc'
-              ) {
-                violations.push('DELIMITER_VIOLATION');
-              }
-            });
-            if (query.startsWith('&') || query.endsWith('&') || query.includes('&&')) {
-              violations.push('DELIMITER_VIOLATION');
-            }
-          } catch (_e) {
+          // A header other than to, cc, bcc, subject or body, or an empty one, means an `&` in a
+          // value was not encoded.
+          const pairs = query.split('&');
+          const unknownHeader = pairs.some((pair) => {
+            const eq = pair.indexOf('=');
+            const header = safeDecodeURIComponent(eq === -1 ? pair : pair.substring(0, eq)).toLowerCase();
+            return !MAILTO_HEADERS.has(header);
+          });
+          if (unknownHeader) {
             violations.push('DELIMITER_VIOLATION');
           }
         }
