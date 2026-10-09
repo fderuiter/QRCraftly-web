@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
 # Installs Playwright's system libraries and browsers in CI, each under a time limit with retries.
 # The browsers come from ~/.cache/ms-playwright when the setup action restored it. The system
 # libraries always come from apt (WebKit and Firefox need packages the runner image lacks), and an
 # apt mirror can stall: on 2026-10-09 it took 26m45s instead of about a minute and ran E2E out of time.
 # Usage: install_playwright.sh [browser ...]   (no browser installs all of them)
-set -euo pipefail
 
 ATTEMPTS="${PLAYWRIGHT_INSTALL_ATTEMPTS:-3}"
 ATTEMPT_SECONDS="${PLAYWRIGHT_INSTALL_ATTEMPT_SECONDS:-240}"
