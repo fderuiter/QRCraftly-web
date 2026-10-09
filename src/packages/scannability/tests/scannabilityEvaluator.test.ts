@@ -568,19 +568,66 @@ describe('Scannability Health Evaluator (headless)', () => {
       expect(h.status()).toBe('fail');
     });
 
-    it('drops frames while the worker is busy and slower than a display frame', async () => {
+    it('holds only the newest frame while the worker is busy and slower than a display frame', async () => {
       const h = createHarness();
       void h.evaluator.check({ imageBitmap: new FakeBitmap() });
       h.clock.skip(50);
       h.worker().reply({ success: true, physicalReady: true });
 
-      void h.evaluator.check({ imageBitmap: new FakeBitmap() });
-      const dropped = new FakeBitmap();
-      const answer = h.evaluator.check({ imageBitmap: dropped });
+      const inFlight = h.evaluator.check({ imageBitmap: new FakeBitmap() });
+      const older = new FakeBitmap();
+      const olderAnswer = h.evaluator.check({ imageBitmap: older });
+      const newest = new FakeBitmap();
+      const newestAnswer = h.evaluator.check({ imageBitmap: newest });
 
+      // Only the in-flight frame is posted; the older held frame is released at once.
       expect(h.worker().posted).toHaveLength(2);
-      expect(dropped.close).toHaveBeenCalledTimes(1);
-      await expect(answer).resolves.toBeNull();
+      expect(older.close).toHaveBeenCalledTimes(1);
+      expect(newest.close).not.toHaveBeenCalled();
+      await expect(olderAnswer).resolves.toBeNull();
+
+      // The in-flight answer describes an older design: it is not published, and the held frame goes out.
+      h.worker().reply({ success: false, physicalReady: false, error: 'NOT_FOUND' });
+      await expect(inFlight).resolves.toBeNull();
+      expect(h.status()).toBe('checking');
+      expect(h.onFail).not.toHaveBeenCalled();
+      expect(h.worker().posted).toHaveLength(3);
+      expect(h.worker().posted[2].transfer).toContain(newest);
+
+      h.worker().reply({ success: true, physicalReady: true });
+      await expect(newestAnswer).resolves.toMatchObject({ status: 'physical-pass' });
+    });
+
+    it('never publishes a verdict for an earlier design after quick edits (#1250)', async () => {
+      const h = createHarness();
+      const configA = { ...DEFAULT_CONFIG, fgColor: '#111111' };
+      const configB = { ...DEFAULT_CONFIG, fgColor: '#222222' };
+      const configC = { ...DEFAULT_CONFIG, fgColor: '#333333' };
+
+      // 1. Design A: the worker answers after 120 ms.
+      h.evaluator.setConfig(configA);
+      void h.evaluator.check({ imageData: frameOf() });
+      h.clock.skip(120);
+      h.worker().reply({ success: true, physicalReady: true });
+
+      // 2. Design B is posted and stays in flight.
+      h.evaluator.setConfig(configB);
+      void h.evaluator.check({ imageData: frameOf() });
+
+      // 3. 40 ms later, design C arrives while B is still running.
+      h.clock.skip(40);
+      h.evaluator.setConfig(configC);
+      const answerC = h.evaluator.check({ imageData: frameOf() });
+      expect(h.status()).toBe('checking');
+
+      // 4. The worker answers B with a pass: that verdict must not be shown for C.
+      h.worker().reply({ success: true, physicalReady: true });
+      expect(h.status()).toBe('checking');
+      expect(h.worker().posted).toHaveLength(3);
+
+      h.worker().reply({ success: false, physicalReady: false, error: 'NOT_FOUND' });
+      expect(h.status()).toBe('fail');
+      await expect(answerC).resolves.toMatchObject({ status: 'fail' });
     });
 
     it('never leaks a bitmap across 1,000 rapid checks', () => {
@@ -591,6 +638,8 @@ describe('Scannability Health Evaluator (headless)', () => {
         bitmaps.push(bitmap);
         void h.evaluator.check({ imageBitmap: bitmap });
       }
+      // The newest frame may be held for later; destroying the evaluator releases it.
+      h.evaluator.destroy();
       const transferred = h.worker().posted.length;
       const closed = bitmaps.filter((b) => b.close.mock.calls.length > 0).length;
       expect(transferred + closed).toBe(1000);

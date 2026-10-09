@@ -112,7 +112,7 @@ export const drawQRInternal = (
 
   // 1. Calculate Layout
   const layout = calculateLayout(config, displaySize, moduleCount);
-  const { drawX, drawY, drawSize, cellSize, borderPx } = layout;
+  const { drawX, drawY, drawSize, cellSize, borderPx, quietPx } = layout;
 
   // 2. Calculate Logo Metrics
   const logoMetrics = getLogoMetrics(config, moduleCount, cellSize);
@@ -129,18 +129,18 @@ export const drawQRInternal = (
 
   // The border surrounds the QR box only, which is the whole canvas when there is no frame.
   const hasBorder = config.isBorderEnabled && config.borderSize > 0;
-  const boxX = drawX - borderPx;
-  const boxY = drawY - borderPx;
-  const boxSize = drawSize + borderPx * 2;
+  const boxX = drawX - quietPx - borderPx;
+  const boxY = drawY - quietPx - borderPx;
+  const boxSize = drawSize + (quietPx + borderPx) * 2;
   if (hasBorder) {
     ctx.save();
     ctx.translate(boxX, boxY);
     renderBorder(ctx, config, boxSize, borderPx);
     ctx.restore();
-    // Fill background for QR code area
+    // Fill the background over the quiet zone and the modules, inside the border band
     if (isBackgroundFilled) {
       ctx.fillStyle = config.bgColor;
-      ctx.fillRect(drawX, drawY, drawSize, drawSize);
+      ctx.fillRect(drawX - quietPx, drawY - quietPx, drawSize + quietPx * 2, drawSize + quietPx * 2);
     }
   }
 

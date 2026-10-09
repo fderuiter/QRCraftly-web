@@ -259,6 +259,9 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
   let watchdog: { handle: number; seq: number } | null = null;
   let flight: Flight | null = null;
   let retiring: { owner: ScannabilityWorkerHandle; handle: number } | null = null;
+  // The newest check dropped by backpressure. It runs as soon as the in-flight check ends, in
+  // place of that check's (now outdated) verdict, so the latest design is always checked (#1250).
+  let trailing: { request: ScannabilityCheckRequest; resolve: (assessment: ScannabilityAssessment | null) => void } | null = null;
 
   // --- answer bookkeeping ----------------------------------------------------
 
@@ -295,6 +298,28 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
       pending.delete(pendingSeq);
       resolve(pendingSeq === seq && answered ? assessment : null);
     }
+  }
+
+  /** Releases the waiting trailing check, if any, and resolves its caller with null. */
+  function releaseTrailing() {
+    if (!trailing) return;
+    const { request, resolve } = trailing;
+    trailing = null;
+    releaseImageHandle(request.imageBitmap);
+    resolve(null);
+  }
+
+  /**
+   * Starts the waiting trailing check, if any. The in-flight request then resolves with null
+   * and its verdict is never published, because it describes an older design.
+   * @returns Whether a trailing check started.
+   */
+  function runTrailing(): boolean {
+    if (!trailing || destroyed) return false;
+    const { request, resolve } = trailing;
+    trailing = null;
+    check(request).then(resolve, () => resolve(null));
+    return true;
   }
 
   function reportFailure(errorType: string) {
@@ -459,6 +484,12 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
     dropWorker();
     endFlight(sequence);
     clearWatchdog();
+    if (trailing) {
+      update({ recovery: true });
+      reportFailure('WORKER_ERROR');
+      runTrailing();
+      return;
+    }
     update({ status: 'fail', recovery: true });
     reportFailure('WORKER_ERROR');
     settle(sequence, true);
@@ -488,6 +519,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
     if ('dropped' in data && data.dropped) {
       busy = false;
       startedAt = null;
+      if (runTrailing()) return;
       if (configId === String(sequence)) conclude(sequence, 'idle');
       return;
     }
@@ -496,6 +528,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
     if (configId !== String(sequence)) {
       busy = false;
       startedAt = null;
+      runTrailing();
       return;
     }
 
@@ -524,6 +557,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
     }
     endFlight(sequence);
     consecutiveTimeouts = 0;
+    if (runTrailing()) return;
     applyResult(sequence, data, true);
   }
 
@@ -535,6 +569,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
     consecutiveTimeouts += 1;
     update({ recovery: true });
     if (consecutiveTimeouts > 1) dropWorker();
+    if (runTrailing()) return;
 
     const current = flight && flight.seq === seq ? flight : null;
     const pixels = (current && pixelsFromRequest(current.request)) || readCanvasPixels();
@@ -678,10 +713,13 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
 
     const owner = getWorker();
 
-    // Backpressure: drop frames while the worker is busy and running slower than a display frame.
+    // Backpressure: while the worker is busy and running slower than a display frame, hold only
+    // the newest check (releasing any older held one) and run it when the in-flight check ends.
     if (owner && busy && lastLatency > BACKPRESSURE_LATENCY_MS) {
-      releaseImageHandle(imageBitmap);
-      return Promise.resolve(null);
+      releaseTrailing();
+      return new Promise<ScannabilityAssessment | null>((resolve) => {
+        trailing = { request, resolve };
+      });
     }
 
     sequence += 1;
@@ -750,6 +788,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
       busy = false;
       startedAt = null;
       flight = null;
+      releaseTrailing();
       listeners.clear();
       settle(Number.POSITIVE_INFINITY, false);
     },
