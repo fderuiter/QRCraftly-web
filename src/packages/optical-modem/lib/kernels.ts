@@ -29,6 +29,13 @@
 import { WasmModuleError, checkStatus, compileWasmBytes, compileWasmUrl, instantiateWasm, type WasmInstance } from '@/packages/wasm-runtime';
 import type { GridGeometry, RgbaImage } from './layout';
 
+/**
+ * Bytes of the CRC-32 tag after each block's data, inside the Reed-Solomon codeword. It covers the
+ * session, the frame sequence, the block's index and its data, so a wrong repair or a block read
+ * under the wrong identity is refused (ADR 0043). Must match `TAG_BYTES` in `crates/modem/src/codec.rs`.
+ */
+export const BLOCK_TAG_BYTES = 4;
+
 /** Slots of the `io` block, in doubles. Must match `crates/modem/src/lib.rs`. */
 const IO_FIDUCIALS = 0;
 const IO_CORES = 8;
@@ -71,6 +78,8 @@ export interface BlockDecode {
   blocksOk: number;
   erasures: number;
   corrected: number;
+  /** Blocks whose tag refused the code's first repair. */
+  refused: number;
 }
 
 /** The fitted cross-talk model as the module returns it: 9 + 3 + 9 + 3 + 1 numbers. */
@@ -244,7 +253,7 @@ export class ModemKernels {
   }
 
   /**
-   * Decodes the receiver's grid: de-interleaves, de-whitens and repairs every block.
+   * Decodes the receiver's grid: de-interleaves, de-whitens, repairs every block and checks its tag.
    * @param bits - Bits per cell.
    * @param shape - Grid and inner code.
    * @param session - Session id.
@@ -261,9 +270,9 @@ export class ModemKernels {
   ): BlockDecode {
     checkStatus(this.rxDecode(this.rx, bits, shape.cols, shape.rows, shape.packetBytes, shape.parity, session, seq, threshold ?? -1), 'modem_rx_decode');
     const io = this.io();
-    const blocks = Math.floor(Math.floor((shape.cols * (shape.rows - 18) * bits) / 8) / (shape.packetBytes + shape.parity));
+    const blocks = Math.floor(Math.floor((shape.cols * (shape.rows - 18) * bits) / 8) / (shape.packetBytes + BLOCK_TAG_BYTES + shape.parity));
     const out = this.output(blocks + blocks * shape.packetBytes);
-    return { ok: out.subarray(0, blocks), data: out.subarray(blocks), blocksOk: io[IO_OUT], erasures: io[IO_OUT + 1], corrected: io[IO_OUT + 2] };
+    return { ok: out.subarray(0, blocks), data: out.subarray(blocks), blocksOk: io[IO_OUT], erasures: io[IO_OUT + 1], corrected: io[IO_OUT + 2], refused: io[IO_OUT + 3] };
   }
 
   /**
