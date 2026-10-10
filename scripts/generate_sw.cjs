@@ -27,12 +27,13 @@ function computeHash(filePath) {
   return hashSum.digest('hex').substring(0, 8);
 }
 
-// Files cached on first use instead of precached: our WebAssembly modules (ADR 0033), such as
-// the scanner's qr-decode reader, are only needed by visitors who use the tool that loads them.
+// WebAssembly modules (ADR 0033) outside the shell, such as the file-transfer modem, are only
+// needed by visitors who use the tool that loads them, so the worker caches them on first use.
+// The ones the homepage generator needs (the encoder, the scannability reader) are in the shell.
 const RUNTIME_CACHED_EXTENSION = '.wasm';
 
 /**
- * Whether a dist/client file is cached on first use rather than precached.
+ * Whether a dist/client file outside the shell is cached by the worker on first use.
  * @param {string} relativePath POSIX path relative to dist/client.
  * @returns {boolean} True for the lazily loaded WebAssembly modules.
  */
@@ -40,9 +41,10 @@ function isRuntimeCached(relativePath) {
   return relativePath.endsWith(RUNTIME_CACHED_EXTENSION);
 }
 
-// What a first visit precaches (#1058): the homepage shell and the assets it loads, so the app
-// boots offline after one visit. Every other page, chunk and worker is cached the first time it
-// is requested, so a visitor on mobile data does not download the whole site in the background.
+// What a first visit precaches (#1058): the homepage shell, the assets it loads and the workers
+// and WebAssembly modules those start, so the generator draws a code offline after one visit
+// (#1262). Every other page, chunk and worker is cached the first time it is requested, so a
+// visitor on mobile data does not download the whole site in the background.
 const SHELL_PAGE = 'index.html';
 const SHELL_EXTRAS = [
   'index.pageContext.json',
@@ -75,9 +77,28 @@ function readAssetReferences(relativePath, source) {
 }
 
 /**
+ * Reads the workers and WebAssembly modules a built module starts, written by Vite as
+ * `new URL("/assets/...", import.meta.url)` (or `self.location.href` inside a worker). They load
+ * after startup, so the first-load budget leaves them out, but a page that starts them cannot
+ * work offline without them.
+ * @param {string} relativePath POSIX path relative to dist/client.
+ * @param {string} source File contents.
+ * @returns {string[]} POSIX paths relative to dist/client.
+ */
+function readWorkerReferences(relativePath, source) {
+  if (!relativePath.endsWith('.js')) return [];
+  const found = [];
+  for (const match of source.matchAll(/new URL\(\s*["']\/(assets\/[^"'?#]+\.(?:js|wasm))["']\s*,\s*(?:import\.meta\.url|self\.location\.href)/g)) {
+    found.push(match[1]);
+  }
+  return found;
+}
+
+/**
  * Picks the files a first visit precaches: the homepage, everything it loads at startup (found
- * by following static imports), and the install files. Lazily imported chunks, workers, other
- * pages and developer-only routes are left to the runtime cache.
+ * by following static imports), the workers and WebAssembly modules those files start, and the
+ * install files. Lazily imported chunks, other pages and developer-only routes are left to the
+ * runtime cache.
  * @param {string[]} files POSIX paths relative to dist/client that exist in the build.
  * @param {(relativePath: string) => string} readText Reads a built text file.
  * @returns {Set<string>} The shell, as POSIX paths relative to dist/client.
@@ -90,7 +111,10 @@ function selectShell(files, readText) {
     const next = queue.pop();
     if (!available.has(next) || shell.has(next)) continue;
     shell.add(next);
-    for (const ref of readAssetReferences(next, readText(next))) queue.push(ref);
+    if (next.endsWith('.wasm')) continue;
+    const source = readText(next);
+    for (const ref of readAssetReferences(next, source)) queue.push(ref);
+    for (const ref of readWorkerReferences(next, source)) queue.push(ref);
   }
   for (const extra of SHELL_EXTRAS) if (available.has(extra)) shell.add(extra);
   return shell;
@@ -354,6 +378,21 @@ self.addEventListener('fetch', (event) => {
 `;
 }
 
+// Host rule files whose contents change how precached responses are served.
+const HOST_RULE_FILES = ['_headers', '_redirects'];
+
+/**
+ * Hashes the precache manifest together with the host rule files.
+ * @param {{url: string, revision: string}[]} precacheManifest Precached URLs and revisions.
+ * @param {(name: string) => string} readRuleFile Reads a host rule file from dist/client, or '' when missing.
+ * @returns {string} 12 hex characters.
+ */
+function computeBuildHash(precacheManifest, readRuleFile) {
+  const hash = crypto.createHash('sha256').update(JSON.stringify(precacheManifest));
+  for (const name of HOST_RULE_FILES) hash.update('\0' + name + '\0' + readRuleFile(name).replace(/\r\n/g, '\n'));
+  return hash.digest('hex').substring(0, 12);
+}
+
 function generateSW() {
   if (!fs.existsSync(DIST_DIR)) {
     console.error('dist/client directory does not exist. Run build first.');
@@ -368,7 +407,7 @@ function generateSW() {
 
   allFiles.forEach(file => {
     const relativePath = path.relative(DIST_DIR, file).replace(/\\/g, '/');
-    if (!shell.has(relativePath) || isRuntimeCached(relativePath)) return;
+    if (!shell.has(relativePath)) return;
 
     const hash = computeHash(file);
     // Standardize URL to start with a forward slash
@@ -381,9 +420,14 @@ function generateSW() {
     });
   });
 
-  // Calculate a unique build hash from the files
-  const manifestString = JSON.stringify(precacheManifest);
-  const buildHash = crypto.createHash('sha256').update(manifestString).digest('hex').substring(0, 12);
+  // The build hash covers the shell files and the host's rules for them, so a deploy that only
+  // changes headers (a CSP or Permissions-Policy fix) or redirects still ships a new worker and
+  // replaces the cached homepage (#1261). This runs last in postbuild, after every step that
+  // rewrites HTML or _headers.
+  const buildHash = computeBuildHash(precacheManifest, (name) => {
+    const file = path.join(DIST_DIR, name);
+    return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  });
 
   const swContent = buildSwContent(precacheManifest, buildHash);
   fs.writeFileSync(OUTPUT_FILE, swContent, 'utf8');
@@ -394,4 +438,4 @@ if (require.main === module) {
   generateSW();
 }
 
-module.exports = { buildSwContent, toPrecacheUrl, readRedirectSources, isRuntimeCached, selectShell, readAssetReferences };
+module.exports = { buildSwContent, toPrecacheUrl, readRedirectSources, isRuntimeCached, selectShell, readAssetReferences, readWorkerReferences, computeBuildHash };

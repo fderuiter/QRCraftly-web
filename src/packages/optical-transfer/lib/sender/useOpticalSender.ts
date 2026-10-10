@@ -684,11 +684,15 @@ export function useOpticalSender({
     endSteering();
     const initial = profileRef.current ?? 'balanced';
     const controller = createSpeedController({ sessionId, initial });
+    // This link's own camera. It becomes the shared webcam only once the link is listening, so a
+    // grant that arrives after a restart stops its own stream, never the newer transfer's (#1293).
+    let webcam: { stream: MediaStream; video: HTMLVideoElement } | null = null;
     const releaseCamera = () => {
-      const webcam = webcamRef.current;
-      webcamRef.current = null;
-      webcam?.stream.getTracks().forEach((track) => track.stop());
-      if (webcam) webcam.video.srcObject = null;
+      const mine = webcam;
+      webcam = null;
+      if (mine && webcamRef.current === mine) webcamRef.current = null;
+      mine?.stream.getTracks().forEach((track) => track.stop());
+      if (mine) mine.video.srcObject = null;
     };
     const requestCamera = async (): Promise<CameraPermission> => {
       const open = requestWebcamRef.current;
@@ -703,7 +707,7 @@ export function useOpticalSender({
       video.muted = true;
       video.playsInline = true;
       video.srcObject = stream;
-      webcamRef.current = { stream, video };
+      webcam = { stream, video };
       try {
         await video.play();
       } catch {
@@ -719,6 +723,7 @@ export function useOpticalSender({
       if (linkRef.current !== link) return;
       setSteerState(state);
       if (state.status !== 'listening') return;
+      webcamRef.current = webcam;
       const reader = createTileReader({
         getVideo: () => webcamRef.current?.video ?? null,
         poolSize: 1,

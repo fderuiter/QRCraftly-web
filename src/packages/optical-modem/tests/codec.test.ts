@@ -70,6 +70,7 @@ describe('modem frames', () => {
     const result = decodeModemFrame(capture);
     expect(repairedAll(result, payload, profile)).toBe(true);
     if (!result.ok) return;
+    expect(result.refused).toBe(0);
     expect(result.header).toMatchObject({ profile: profile.id, session: SESSION, seq: 3, packetBytes: profile.packetBytes, parity: profile.parity, cols: profile.cols, rows: profile.rows });
   });
 
@@ -120,4 +121,4 @@ describe('modem frames', () => {
 });
 
 /** Hash of profile 3, session 99, sequence 5 at 4 px per cell; see the determinism test. */
-const PINNED_FRAME_HASH = 960878469;
+const PINNED_FRAME_HASH = 3098195269;

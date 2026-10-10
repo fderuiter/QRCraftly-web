@@ -26,8 +26,8 @@ const { getGuide } = await import('../src/data/guides');
 const { execBinary } = await import('./utils/execHelper.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
-const DIST_DIR = path.resolve(__dirname, '../dist/client');
-const OUTPUT_FILE = process.env.SITEMAP_OUTPUT_PATH || path.join(DIST_DIR, 'sitemap.xml');
+// Tests point both at temp folders so they never touch a real build (SITEMAP_DIST_DIR, SITEMAP_OUTPUT_PATH).
+const DIST_DIR = process.env.SITEMAP_DIST_DIR ? path.resolve(process.env.SITEMAP_DIST_DIR) : path.resolve(__dirname, '../dist/client');
 
 
 function findHtmlFiles(dir: string, fileList: string[] = []): string[] {
@@ -195,13 +195,17 @@ export function getLastModified(cleanPath: string): string | null {
   }
 }
 
-export function generateSitemap() {
-  if (!fs.existsSync(DIST_DIR)) {
-    console.warn(`[Sitemap] Directory ${DIST_DIR} does not exist. Creating output directory.`);
-    fs.mkdirSync(DIST_DIR, { recursive: true });
+export function generateSitemap({
+  distDir = DIST_DIR,
+  outputFile = process.env.SITEMAP_OUTPUT_PATH || path.join(distDir, 'sitemap.xml'),
+}: { distDir?: string; outputFile?: string } = {}) {
+  const outputDir = path.dirname(outputFile);
+  if (!fs.existsSync(outputDir)) {
+    console.warn(`[Sitemap] Directory ${outputDir} does not exist. Creating output directory.`);
+    fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  const htmlRoutes = getPreRenderedHtmlRoutes(DIST_DIR);
+  const htmlRoutes = getPreRenderedHtmlRoutes(distDir);
   const registryRoutes = getRegistryRoutes();
   const allCandidates = [...htmlRoutes, ...registryRoutes];
 
@@ -252,8 +256,8 @@ export function generateSitemap() {
 ${urls.join('\n')}
 </urlset>`;
 
-  fs.writeFileSync(OUTPUT_FILE, sitemapXml, 'utf8');
-  console.log(`[Sitemap] Generated ${OUTPUT_FILE} with ${urls.length} URLs.`);
+  fs.writeFileSync(outputFile, sitemapXml, 'utf8');
+  console.log(`[Sitemap] Generated ${outputFile} with ${urls.length} URLs.`);
 }
 
 // Only execute if run directly

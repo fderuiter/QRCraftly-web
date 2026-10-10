@@ -141,11 +141,35 @@ export const splitCompoundField = (str: string, delimiter: string = ';'): string
 export interface FormattedDateTime {
   value: string;
   tzid?: string;
+  /** True when the value is an RFC 5545 DATE (an all-day event), not a DATE-TIME. */
+  isDate?: boolean;
 }
+
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+/** True when the numbers name a real calendar date and clock time. */
+const isRealDateTime = (y: number, mo: number, d: number, h = 0, mi = 0, s = 0): boolean => {
+  const t = new Date(Date.UTC(y, mo - 1, d, h, mi, s));
+  return (
+    t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d &&
+    t.getUTCHours() === h && t.getUTCMinutes() === mi && t.getUTCSeconds() === s
+  );
+};
+
+/** Formats an instant as an RFC 5545 UTC DATE-TIME (`20250101T120000Z`). */
+const formatUtcDateTime = (date: Date): string =>
+  `${date.getUTCFullYear()}${pad2(date.getUTCMonth() + 1)}${pad2(date.getUTCDate())}T${pad2(date.getUTCHours())}${pad2(date.getUTCMinutes())}${pad2(date.getUTCSeconds())}Z`;
+
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+// eslint-disable-next-line security/detect-unsafe-regex -- linear: anchored, fixed-width digit groups, one optional seconds group.
+const WALL_CLOCK = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
 
 /**
  * Formats an ISO datetime string (from datetime-local) into iCalendar local datetime.
- * Handles UTC indicators ('Z') and timezone offsets properly.
+ * Handles UTC indicators ('Z') and timezone offsets properly. A date with no time
+ * (`2025-12-25`) becomes an RFC 5545 DATE. A wall-clock time with no offset is reformatted
+ * digit for digit, never through the browser's time zone, so a time in the browser's DST gap
+ * does not move (#1281).
  * @param dateString - The raw ISO date-time string.
  * @returns Formatted value and timezone identifier (if present). The value is empty when the
  * string is not a date.
@@ -156,7 +180,7 @@ export const formatEventDateTime = (
 ): FormattedDateTime => {
   if (!dateString) return { value: '' };
 
-  let cleanDateString = dateString;
+  let cleanDateString = dateString.trim();
   let tzid: string | undefined = timezone;
 
   // Extract TZID parameter if present (e.g. "2025-01-01T12:30;TZID=America/New_York")
@@ -166,41 +190,108 @@ export const formatEventDateTime = (
     cleanDateString = cleanDateString.replace(/;TZID=[^;:\s\n]+/i, '');
   }
 
-  const isExplicitUtc = tzid === 'UTC';
-  const hasUTCIndicator = cleanDateString.toUpperCase().endsWith('Z') || isExplicitUtc;
-  const hasOffset = /[-+]\d{2}:?\d{2}$/.test(cleanDateString);
-
-  if (isExplicitUtc && !cleanDateString.toUpperCase().endsWith('Z') && !hasOffset) {
-    cleanDateString += 'Z';
+  const dateOnly = DATE_ONLY.exec(cleanDateString);
+  if (dateOnly) {
+    const [, y, mo, d] = dateOnly;
+    if (!isRealDateTime(Number(y), Number(mo), Number(d))) return { value: '' };
+    return { value: `${y}${mo}${d}`, isDate: true };
   }
 
+  const isExplicitUtc = tzid === 'UTC';
+  const wall = WALL_CLOCK.exec(cleanDateString);
+  if (wall) {
+    const [, y, mo, d, h, mi, sec = '00'] = wall;
+    if (!isRealDateTime(Number(y), Number(mo), Number(d), Number(h), Number(mi), Number(sec))) {
+      return { value: '' };
+    }
+    const value = `${y}${mo}${d}T${h}${mi}${sec}`;
+    return isExplicitUtc ? { value: `${value}Z` } : { value, tzid };
+  }
+
+  const hasOffset = /(?:Z|[-+]\d{2}:?\d{2})$/i.test(cleanDateString);
   const date = new Date(cleanDateString);
-  if (Number.isNaN(date.getTime())) {
+  if (!hasOffset || Number.isNaN(date.getTime())) {
     // Never emit the raw string: it would reach DTSTART/DTEND unescaped, so a newline in it
     // could add properties to the event (#1160). `EventContract.validate` reports the bad date.
     return { value: '' };
   }
 
-  let formatted = '';
-  if (hasUTCIndicator || hasOffset) {
-    const year = String(date.getUTCFullYear());
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-    formatted = `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
-  } else {
-    const year = String(date.getFullYear());
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    formatted = `${year}${month}${day}T${hours}${minutes}${seconds}`;
-  }
+  return { value: formatUtcDateTime(date) };
+};
 
-  return { value: formatted, tzid: tzid === 'UTC' ? undefined : tzid };
+/** The wall-clock fields of an instant in an IANA time zone. Throws on an unknown zone. */
+const wallClockParts = (instant: number, timeZone: string): number[] => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(new Date(instant));
+  const get = (type: string): number => Number(parts.find((part) => part.type === type)?.value);
+  return [get('year'), get('month'), get('day'), get('hour'), get('minute'), get('second')];
+};
+
+/** How far a zone's wall clock is ahead of UTC at an instant, in milliseconds. */
+const zoneOffset = (instant: number, timeZone: string): number => {
+  const [y, mo, d, h, mi, s] = wallClockParts(instant, timeZone);
+  return Date.UTC(y, mo - 1, d, h, mi, s) - instant;
+};
+
+/**
+ * Converts a wall-clock DATE-TIME in an IANA zone to UTC, so an event can be written without a
+ * VTIMEZONE block (RFC 5545 §3.2.19 requires one for every TZID).
+ * @param value - A floating DATE-TIME such as `20250310T090000`.
+ * @param timeZone - The IANA zone, such as `America/New_York`.
+ * @returns The UTC DATE-TIME (`20250310T130000Z`), or `null` for an unknown zone.
+ */
+export const wallClockToUtc = (value: string, timeZone: string): string | null => {
+  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})$/.exec(value);
+  if (!match) return null;
+  const [y, mo, d, h, mi, s] = match.slice(1).map(Number);
+  const wall = Date.UTC(y, mo - 1, d, h, mi, s);
+  try {
+    // Two passes settle the offset on the far side of a DST change.
+    const first = wall - zoneOffset(wall, timeZone);
+    return formatUtcDateTime(new Date(wall - zoneOffset(first, timeZone)));
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Shows a UTC DATE-TIME as wall-clock time in an IANA zone, for a datetime-local field.
+ * @param value - A UTC DATE-TIME such as `20250310T130000Z`.
+ * @param timeZone - The IANA zone.
+ * @returns `YYYY-MM-DDTHH:MM`, or `null` for an unknown zone or a value that is not UTC.
+ */
+export const utcToWallClock = (value: string, timeZone: string): string | null => {
+  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/i.exec(value);
+  if (!match) return null;
+  const [y, mo, d, h, mi, s] = match.slice(1).map(Number);
+  try {
+    const [wy, wmo, wd, wh, wmi] = wallClockParts(Date.UTC(y, mo - 1, d, h, mi, s), timeZone);
+    return `${wy}-${pad2(wmo)}-${pad2(wd)}T${pad2(wh)}:${pad2(wmi)}`;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Moves an RFC 5545 DATE (`20251225`) by whole days. All-day DTEND is exclusive, so the form's
+ * last day is one day before it.
+ * @param value - The DATE value, or a `YYYY-MM-DD` date.
+ * @param days - Days to add (negative to go back).
+ * @returns The moved date as `YYYY-MM-DD`, or an empty string for a value that is not a date.
+ */
+export const shiftDate = (value: string, days: number): string => {
+  const match = /^(\d{4})-?(\d{2})-?(\d{2})$/.exec(value);
+  if (!match) return '';
+  const t = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + days));
+  return `${t.getUTCFullYear()}-${pad2(t.getUTCMonth() + 1)}-${pad2(t.getUTCDate())}`;
 };
 
 /**
@@ -218,6 +309,11 @@ export const parseEventDateTime = (value: string, keyParams?: string): string =>
     if (tzidMatch) {
       tzid = tzidMatch[1];
     }
+  }
+
+  const date = /^(\d{4})(\d{2})(\d{2})$/.exec(value);
+  if (date) {
+    return `${date[1]}-${date[2]}-${date[3]}`;
   }
 
   const match = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?/i);
@@ -251,9 +347,11 @@ export function parseRFCProperties(raw: string): RFCProperty[] {
     if (splitIndex <= 0) continue;
 
     const fullKey = line.substring(0, splitIndex);
-    const key = fullKey.split(';')[0].toUpperCase();
+    const name = fullKey.split(';')[0];
+    // Drop a property group (`item1.EMAIL`, as Apple Contacts writes it, RFC 6350 §3.3).
+    const key = name.replace(/^[A-Za-z0-9-]+\./, '').toUpperCase();
     const value = line.substring(splitIndex + 1);
-    const params = fullKey.substring(key.length);
+    const params = fullKey.substring(name.length);
 
     properties.push({ key, value, params });
   }

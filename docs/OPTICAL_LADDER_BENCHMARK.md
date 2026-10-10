@@ -8,22 +8,22 @@ Three simulated receivers. A receiver is a channel preset and the number of came
 
 | Receiver | Channel | Frame width (px) | P2: cell size, blocks repaired | P3: cell size, blocks repaired | P4: cell size, blocks repaired | Cap |
 | -------- | ------- | ---------------- | ------------------------------ | ------------------------------ | ------------------------------ | --- |
-| Basic    | typical | 440              | 4.2 px, 100%                   | 3.7 px, 18%                    | 2.8 px, 0%                     | P2  |
+| Basic    | typical | 440              | 4.2 px, 100%                   | 3.7 px, 13%                    | 2.8 px, 0%                     | P2  |
 | Good     | typical | 520              | 5.0 px, 100%                   | 4.3 px, 100%                   | 3.3 px, 0%                     | P3  |
-| Best     | studio  | 640              | 6.2 px, 100%                   | 5.3 px, 100%                   | 4.0 px, 94%                    | P4  |
+| Best     | studio  | 640              | 6.2 px, 100%                   | 5.3 px, 100%                   | 4.0 px, 85%                    | P4  |
 
 ## Transfers
 
-A 60 KB file through the outer code, droplets of 16 bytes (the largest size that divides every profile's block, so a block of any profile carries whole droplets), one camera frame per frame sent at 30 fps. The ladder cycle is P4 P3 P2 P4 P0 P1 P4 P3 P4 P2 P3 P4; P0 and P1 are QR rungs that this modem-only receiver cannot use, so 17% of the ladder's airtime is lost to it in this bench. With feedback, the receiver reports a lock after holding the same profile for a second and the sender switches 30 frames later; it then sends only that profile and a beacon one frame in 16. "Steady" is the data rate of repaired blocks (before the outer code) from the lock to the end, against the oracle's.
+A 60 KB file through the outer code, droplets of 16 bytes (the largest size that divides every profile's block, so a block of any profile carries whole droplets), one camera frame per frame sent at 30 fps. The ladder cycle is P4 P3 P2 P4 P0 P1 P4 P3 P4 P2 P3 P4; P0 and P1 are QR rungs that this modem-only receiver cannot use, so 17% of the ladder's airtime is lost to it in this bench. With feedback, the receiver reports a lock after holding the same profile for a second and the sender switches 30 frames later; it then sends only that profile and a beacon one frame in 16. "Steady" is the data rate of repaired blocks (before the outer code) from the lock to the end, against the oracle's. "Refused by tag" counts blocks whose first repair the inner code accepted but whose identity-bound tag ([ADR 0043](adr/0043-optical-modem-block-tag.md)) did not match, so without the tag they would have reached the outer code wrong; "wrong accepts" counts blocks returned as repaired whose bytes differ from those sent, and must be zero.
 
-| Receiver | Sender                          | File complete | Frames | Seconds | File goodput KB/s | Of the oracle | Locked      | Steady data rate |
-| -------- | ------------------------------- | ------------- | ------ | ------- | ----------------- | ------------- | ----------- | ---------------- |
-| Basic    | only P2 (oracle)                | yes           | 125    | 4.2     | 14.4              | 100%          | -           | 14.4 KB/s, 100%  |
-| Basic    | interleaved ladder, one way     | yes           | 430    | 14.3    | 4.2               | 29%           | -           | 4.3 KB/s, 30%    |
-| Basic    | ladder, then locked by feedback | yes           | 197    | 6.6     | 9.1               | 63%           | P2 at 3.0 s | 13.5 KB/s, 94%   |
-| Good     | only P3 (oracle)                | yes           | 49     | 1.6     | 36.7              | 100%          | -           | 37.4 KB/s, 100%  |
-| Good     | interleaved ladder, one way     | yes           | 164    | 5.5     | 11.0              | 30%           | -           | 12.0 KB/s, 32%   |
-| Good     | ladder, then locked by feedback | yes           | 114    | 3.8     | 15.8              | 43%           | P3 at 3.0 s | 34.4 KB/s, 92%   |
-| Best     | only P4 (oracle)                | yes           | 33     | 1.1     | 54.5              | 100%          | -           | 79.8 KB/s, 100%  |
-| Best     | interleaved ladder, one way     | yes           | 57     | 1.9     | 31.6              | 58%           | -           | 44.7 KB/s, 56%   |
-| Best     | ladder, then locked by feedback | yes           | 57     | 1.9     | 31.6              | 58%           | never       | -                |
+| Receiver | Sender                          | File complete | Frames | Seconds | File goodput KB/s | Of the oracle | Locked      | Steady data rate | Refused by tag | Wrong accepts |
+| -------- | ------------------------------- | ------------- | ------ | ------- | ----------------- | ------------- | ----------- | ---------------- | -------------- | ------------- |
+| Basic    | only P2 (oracle)                | yes           | 125    | 4.2     | 14.4              | 100%          | -           | 14.4 KB/s, 100%  | 0              | 0             |
+| Basic    | interleaved ladder, one way     | yes           | 482    | 16.1    | 3.7               | 26%           | -           | 3.8 KB/s, 26%    | 77             | 0             |
+| Basic    | ladder, then locked by feedback | yes           | 203    | 6.8     | 8.9               | 62%           | P2 at 3.0 s | 13.5 KB/s, 94%   | 19             | 0             |
+| Good     | only P3 (oracle)                | yes           | 49     | 1.6     | 36.7              | 100%          | -           | 37.4 KB/s, 100%  | 0              | 0             |
+| Good     | interleaved ladder, one way     | yes           | 167    | 5.6     | 10.8              | 29%           | -           | 11.8 KB/s, 32%   | 34             | 0             |
+| Good     | ladder, then locked by feedback | yes           | 116    | 3.9     | 15.5              | 42%           | P3 at 3.0 s | 34.7 KB/s, 93%   | 17             | 0             |
+| Best     | only P4 (oracle)                | yes           | 34     | 1.1     | 52.9              | 100%          | -           | 74.5 KB/s, 100%  | 0              | 0             |
+| Best     | interleaved ladder, one way     | yes           | 60     | 2.0     | 30.0              | 57%           | -           | 42.7 KB/s, 57%   | 0              | 0             |
+| Best     | ladder, then locked by feedback | yes           | 60     | 2.0     | 30.0              | 57%           | never       | -                | 0              | 0             |

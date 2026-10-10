@@ -109,6 +109,23 @@ describe('wallet-compatible sending (#1149)', () => {
     expect(encoded.calls).toEqual([]);
   });
 
+  it('refuses a file that needs more fragments than a receiver accepts (#1302)', async () => {
+    // Reliable frames carry 19-byte fragments, so 2 MB is about 110,000 of them, over the 65,536 a receiver takes.
+    const size = 2_000_000;
+    const options = senderOptions();
+    const { result } = renderHook(() => useOpticalSender(options));
+    act(() => {
+      result.current.setSelectedFile(new File([new Uint8Array(size)], 'big.bin', { type: 'application/octet-stream' }));
+      result.current.setDensity('reliable');
+      result.current.setWalletCompat(true);
+    });
+    act(() => result.current.startTransfer());
+    await waitFor(() => expect(result.current.handshakeError).toMatch(/too large for wallet-compatible mode/));
+    expect(result.current.isTransferring).toBe(false);
+    expect(options.renderFrame).not.toHaveBeenCalled();
+    expect(encoded.calls).toEqual([]);
+  }, 20_000);
+
   it('refuses to start when the first frame would not scan', async () => {
     const { result } = renderHook(() => useOpticalSender(senderOptions({ verifyFrame: vi.fn(async () => false) })));
     act(() => {

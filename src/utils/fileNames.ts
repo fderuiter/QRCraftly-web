@@ -129,6 +129,14 @@ export function sanitizeFileName(raw: string, options: SanitizeFileNameOptions =
 const RISKY_EXTENSIONS: ReadonlySet<string> = new Set([
   'exe', 'msi', 'bat', 'cmd', 'com', 'scr', 'ps1', 'vbs', 'js', 'jse', 'wsf', 'hta', 'lnk', 'apk', 'appx',
   'dmg', 'pkg', 'app', 'jar', 'html', 'htm', 'svg', 'xhtml', 'docm', 'xlsm', 'pptm', 'iso', 'img',
+  // Windows programs, scripts, shortcuts, installers and disk images (#1305).
+  'vbe', 'pif', 'cpl', 'msc', 'reg', 'msp', 'scf', 'ws', 'wsh', 'chm', 'url', 'library-ms',
+  'settingcontent-ms', 'application', 'appref-ms', 'msix', 'msixbundle', 'appxbundle', 'ps1xml',
+  'psm1', 'psd1', 'vhd', 'vhdx', 'jnlp',
+  // Active web documents and Office formats that carry macros.
+  'mht', 'mhtml', 'xht', 'shtml', 'dotm', 'xltm', 'xlam', 'potm', 'ppsm', 'ppam',
+  // Unix and macOS scripts and launchers.
+  'sh', 'command', 'desktop', 'py',
 ]);
 
 /** MIME types that are active content whatever the extension says. */

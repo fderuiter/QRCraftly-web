@@ -144,7 +144,9 @@ export function validatePayload(raw: string, type?: QRType): string[] {
   const effectiveType = type || identifyProtocol(raw) || QRType.TEXT;
 
   // Use stateless non-global regex to prevent lastIndex state leakage across validation calls
-  if (CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(raw)) {
+  const hiddenChars =
+    effectiveType === QRType.WIFI ? CONTAINMENT_PROFILES.STRICT_NO_CONTROL : CONTAINMENT_PROFILES.TEXT_NO_CONTROL;
+  if (hiddenChars.test(raw)) {
     violations.push('Payload contains invalid control or zero-width characters');
   }
 

@@ -387,4 +387,18 @@ describe('LocationInput component', () => {
       });
     });
   });
+
+  describe('Coordinate errors (#1270)', () => {
+    it('explains a value that is not a coordinate', () => {
+      renderLocationInput({ latitude: '12abc', longitude: '74.0060 W' });
+      expect(screen.getByLabelText('Latitude')).toHaveAttribute('aria-invalid', 'true');
+      expect(screen.getByText(/Latitude must be a number in degrees/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Longitude')).toHaveAttribute('aria-invalid', 'false');
+    });
+
+    it('accepts a decimal comma without an error', () => {
+      renderLocationInput({ latitude: '52,52', longitude: '13,405' });
+      expect(screen.queryByText(/must be/)).not.toBeInTheDocument();
+    });
+  });
 });

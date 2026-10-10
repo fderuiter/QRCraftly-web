@@ -3,6 +3,7 @@ import { SmsData } from "../../types";
 import { TextField, TextAreaField } from "../ui/FormFields";
 import { CONTAINER_SPACING_CLASSES } from "../ui/styles";
 import { FieldNotes, hintsId } from "./FieldHints";
+import { droppedPhoneCharacters } from "@/packages/qr-payload";
 
 /** Notes about the number field: a code that texts several people, or a short paid number. */
 export function smsNumberNotes(number: string): string[] {
@@ -10,6 +11,10 @@ export function smsNumberNotes(number: string): string[] {
   const notes: string[] = [];
   if (numbers.length > 1) notes.push(`Anyone who scans this will text ${numbers.length} numbers at once.`);
   if (numbers.some((entry) => /^\d{3,6}$/.test(entry))) notes.push("A short number like this can be a paid service, and scanners may be charged.");
+  const dropped = droppedPhoneCharacters(number, true);
+  if (dropped.length > 0) {
+    notes.push(`The code leaves out ${dropped.map((ch) => `"${ch}"`).join(", ")}, so only the digits are texted. Text messages cannot reach an extension.`);
+  }
   return notes;
 }
 
