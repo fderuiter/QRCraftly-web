@@ -169,19 +169,11 @@ describe('canvasHelpers', () => {
   });
 
   describe('drawScribble', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-      // Mock random to be deterministic
-      vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    });
+    const vertices = () => [...ctx.moveTo.mock.calls, ...ctx.lineTo.mock.calls] as [number, number][];
 
-    afterEach(() => {
-      vi.restoreAllMocks();
-      vi.useRealTimers();
-    });
-
-    it('should draw a scribble path deterministically', () => {
-      drawScribble(ctx, 10, 10, 100);
+    it('should draw a scribble path from the given generator', () => {
+      const random = vi.fn(() => 0.5);
+      drawScribble(ctx, 10, 10, 100, random);
 
       expect(ctx.save).toHaveBeenCalled();
       expect(ctx.translate).toHaveBeenCalledWith(60, 60); // x + s/2, y + s/2
@@ -191,10 +183,40 @@ describe('canvasHelpers', () => {
       // Loop runs 8 times. i=0 moveTo, else lineTo.
       expect(ctx.moveTo).toHaveBeenCalledTimes(1);
       expect(ctx.lineTo).toHaveBeenCalledTimes(7);
+      expect(random).toHaveBeenCalledTimes(8);
 
       expect(ctx.closePath).toHaveBeenCalled();
       expect(ctx.fill).toHaveBeenCalled();
       expect(ctx.restore).toHaveBeenCalled();
+    });
+
+    it('takes every vertex from the generator, never from Math.random (#1397)', () => {
+      const spy = vi.spyOn(Math, 'random');
+      const sequence = () => {
+        let i = 0;
+        return () => (i++ * 0.37) % 1;
+      };
+      drawScribble(ctx, 0, 0, 30, sequence());
+      const first = vertices();
+      ctx.moveTo.mockClear();
+      ctx.lineTo.mockClear();
+      drawScribble(ctx, 0, 0, 30, sequence());
+      expect(vertices()).toEqual(first);
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('keeps every vertex out of the light ring around the pupil (#1397)', () => {
+      for (const value of [0, 0.5, 0.999999]) {
+        ctx.moveTo.mockClear();
+        ctx.lineTo.mockClear();
+        drawScribble(ctx, 0, 0, 100, () => value);
+        for (const [px, py] of vertices()) {
+          const dist = Math.hypot(px, py);
+          expect(dist).toBeGreaterThanOrEqual(45 - 1e-9);
+          expect(dist).toBeLessThanOrEqual(57.5 + 1e-9);
+        }
+      }
     });
   });
 

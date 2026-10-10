@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 import { QRStyle } from '@/types';
+import { seedRandom } from './prng';
 
 /**
  * Clamps the corner radius so it doesn't exceed half of the width or height,
@@ -210,17 +211,28 @@ export const drawRoughRect = (ctx: CanvasRenderingContext2D, x: number, y: numbe
  * @param x The top-left x coordinate.
  * @param y The top-left y coordinate.
  * @param s The size of the bounding box.
+ * @param random A seeded generator in [0, 1) for the outline, so the shape is the same on every
+ * render and export (#1397). Never pass `Math.random`.
  */
-export const drawScribble = (ctx: CanvasRenderingContext2D, x: number, y: number, s: number) => {
+export const drawScribble = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  s: number,
+  random: () => number
+) => {
   ctx.save();
   ctx.translate(x + s / 2, y + s / 2);
   ctx.rotate(0.1);
-  // Draw a rough polygon that fills most of the space
+  // Draw a rough polygon around the 3x3 pupil. Every vertex stays between 0.45s and 0.575s from
+  // the centre (1.35 to 1.725 modules), so the outline never reaches far into the light ring
+  // around the pupil, which a scanner needs to find the eye. The old 0.44s to 0.67s range
+  // broke decoding for some shapes (#1397).
   ctx.beginPath();
-  const r = s / 1.8; // Radius to cover square corners
+  const r = s / 2;
   for (let i = 0; i < 8; i++) {
     const angle = i * (Math.PI * 2) / 8;
-    const dist = r * (0.8 + Math.random() * 0.4);
+    const dist = r * (0.9 + random() * 0.25);
     const px = Math.cos(angle) * dist;
     const py = Math.sin(angle) * dist;
     if (i === 0) ctx.moveTo(px, py);
@@ -433,6 +445,8 @@ export const drawEyeFrame = (
  * @param style Style theme.
  * @param eyeColor Eye color.
  * @param bgColor Background color to clear/punch holes.
+ * @param eyeId Which finder this is ('top-left', 'top-right' or 'bottom-left'). It seeds the
+ * Grunge scribble, so each eye has its own shape that never changes between renders.
  */
 export const drawEyeball = (
   ctx: CanvasRenderingContext2D,
@@ -442,7 +456,8 @@ export const drawEyeball = (
   cellSize: number,
   style: QRStyle,
   eyeColor: string,
-  bgColor: string
+  bgColor: string,
+  eyeId = 'top-left'
 ) => {
   ctx.fillStyle = eyeColor;
 
@@ -485,7 +500,7 @@ export const drawEyeball = (
       break;
 
     case QRStyle.GRUNGE:
-      drawScribble(ctx, x + 2 * cellSize, y + 2 * cellSize, 3 * cellSize);
+      drawScribble(ctx, x + 2 * cellSize, y + 2 * cellSize, 3 * cellSize, seedRandom(`grunge-eye-${eyeId}`));
       break;
 
     case QRStyle.STARBURST:

@@ -157,3 +157,12 @@ describe('every pattern reads with the default settings (#1278)', () => {
     });
   }
 });
+
+describe('Grunge draws the same picture every time (#1397)', () => {
+  it('gives identical pixels for two renders of the same settings', () => {
+    const first = render({ style: QRStyle.GRUNGE });
+    const second = render({ style: QRStyle.GRUNGE });
+    expect(Buffer.from(second.raster.data).equals(Buffer.from(first.raster.data))).toBe(true);
+    expect(first.decoded).toBe(VALUE);
+  });
+});
