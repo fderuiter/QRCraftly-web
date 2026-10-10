@@ -22,6 +22,7 @@ release/vX.Y.Z    ──release PR (chore(release): vX.Y.Z)──►  main ─�
 | `vX.Y.Z` tags                            | Release workflow          | Created on the release commit when the release PR merges. Protected from being moved or deleted.                |
 | `.github/workflows/main.yml`             | GitHub Actions            | Quality gate. The `CI` job aggregates every quality job. After each push to `main`, it smoke tests production.  |
 | `.github/workflows/release.yml`          | GitHub Actions            | Tags a new `package.json` version, publishes the GitHub Release, and smoke tests production for that version.   |
+| `.github/workflows/release-preview.yml`  | GitHub Actions            | Weekly read-only preview of the next version and changelog. Opens no PR and creates no tag.                     |
 
 ## Environments
 
@@ -44,11 +45,11 @@ GitHub Actions holds no Cloudflare credentials and never deploys. Workers Builds
 
 Prefer fewer, larger PRs that each carry a complete, tested change, over many small ones. Every merge deploys to production, so each PR should be something you would ship on its own.
 
-1. Branch from `main` with a standard prefix: `feat/`, `fix/`, `docs/`, `refactor/`, `chore/`, `agent/`.
+1. Branch from `main` with a standard prefix: `feat/`, `fix/`, `docs/`, `refactor/`, `chore/`, `agent/`. A Claude session works on the `claude/` branch it is given.
 2. Open a PR into `main`. Give it a [Conventional Commit](https://www.conventionalcommits.org/) title, such as `fix(scanner): handle empty frames`. The `PR Title` check enforces this.
 3. Check the change on the branch preview URL, and wait for every required check to pass: `CI`, `PR Title` and `Workers Builds: qrcraftly`. If `main` moved, update the branch and let the checks run again. Nothing merges on a red or stale PR, admins included.
 4. Turn on **auto-merge (squash)** once the PR is ready, or merge with **Squash and merge** yourself. The PR title becomes the commit subject on `main`, which is what the changelog and version bump are built from.
-5. Cloudflare deploys it to production. The `Verify Production Deployment` job waits until production serves the new commit and runs the smoke tests against it.
+5. Cloudflare deploys it to production. The `Verify Production Deployment` job in `main.yml` is the post-merge check: it waits up to 15 minutes for `/version.json` on `https://qrcraftly.fpderuiter.workers.dev/` to report the merged commit, fails with an error annotation and the last response's status, headers and body start if it does not, and otherwise runs the smoke tests against it. Nobody needs to check the deploy by hand; a red `Verify Production Deployment` run on `main` is the signal.
 
 ### Auto-merge
 
@@ -69,6 +70,12 @@ Auto-merge lets a PR merge itself the moment it is green, so nobody has to come 
 | anything else (`fix`, `perf`, `refactor`, `docs`, `chore`, `ci`, `build`, `test`) | patch (`0.0.X`) |
 
 While the version is `0.x`, breaking changes still bump the major version. Pass `--bump=minor` to `release:prepare` to stay on `0.x`.
+
+## Release cadence
+
+Release whenever `main` has user-visible changes (`feat`, `fix` or breaking) since the last tag, at most once a week, and right after any security fix. Release PRs still wait for the maintainer.
+
+The **Release Preview** workflow (`.github/workflows/release-preview.yml`) shows whether one is due. Every Monday at 08:00 UTC, and on demand from **Actions → Release Preview → Run workflow**, it runs `pnpm run release:dry-run` on `main` and writes the next version, the commit count, whether a release is due and the changelog section it would add to the run summary. It has only `contents: read`: it changes no file, opens no PR and creates no tag.
 
 ## Cutting a release
 
@@ -95,7 +102,7 @@ A release names what is already running in production: it bumps the version, wri
    - extracts release notes from `CHANGELOG.md` before creating or pushing tags, preventing orphaned tags if note extraction fails
    - creates the annotated tag `vX.Y.Z` idempotently and pushes it to origin
    - publishes or updates the GitHub Release with the extracted release notes
-   - waits until both production URLs serve the new `/version.json`, then runs the smoke tests against each
+   - waits until both production URLs serve the new `/version.json` (15 minutes for workers.dev, 30 for `qrcraftly.com`), then runs the smoke tests against each. Both legs are required and neither is retried automatically, so a stale production fails the release.
 
 If the workflow failed for an external reason (for example, network issues during release publishing or production deployment timeouts), rerun it from **Actions → Release → Run workflow** (or re-run the failed workflow run). When retried, the workflow detects if the Git tag was already pushed while the GitHub Release remains unpublished, extracts notes, updates tags idempotently, and publishes the GitHub Release automatically without requiring manual tag deletion or Git intervention. Rerunning is safe.
 
@@ -116,8 +123,10 @@ Someone changed `package.json` `version` by hand. Revert that change, or run `pn
 **A tag has the wrong version.**
 Tags are protected. As an admin, delete the GitHub Release and the tag (`git push origin :refs/tags/vX.Y.Z`), fix the version with a new release PR, and let the workflow tag it again. Don't reuse a version that was already published; release the next patch instead.
 
-**The Release workflow timed out waiting for production.**
-Check the `Workers Builds: qrcraftly` check on the release commit. A failed Cloudflare build leaves production on the previous version. Fix it with a PR; the next successful deploy serves the release.
+**The Release workflow or `Verify Production Deployment` timed out waiting for production.**
+Check the `Workers Builds: qrcraftly` check on the commit. A failed Cloudflare build leaves production on the previous version. Fix it with a PR; the next successful deploy serves the release.
+
+If the build succeeded, read the end of the wait step's log. `scripts/ci/wait_for_deploy.sh` prints the last response: its HTTP status, the `cf-cache-status`, `age`, `date`, `server`, `cf-ray` and `content-type` headers, and the first 512 bytes of the body (or curl's error when no response came back). An old `version.json` with `cf-cache-status: HIT` points at a cache; a `403` or an HTML body points at a security rule or challenge on the zone (see #1394). `/version.json` is served with `Cache-Control: no-store` (`public/_headers`), so no cache should keep an old copy.
 
 ## One-time repository setup
 

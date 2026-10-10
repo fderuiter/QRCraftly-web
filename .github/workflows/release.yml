@@ -117,7 +117,8 @@ jobs:
     needs: publish
     if: needs.publish.outputs.published == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Covers the 30-minute wait on qrcraftly.com plus the smoke tests.
+    timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
@@ -135,10 +136,15 @@ jobs:
         with:
           cache-playwright: 'true'
 
+      # Both legs are required. qrcraftly.com gets 30 minutes instead of 15 (#1217, #1394), and on a
+      # timeout the script prints the last response's status, headers and body start, so a failure
+      # says whether the custom domain served a cached copy, an error or a challenge page. There is
+      # no blind retry: a stale production must fail the release.
       - name: Wait for production to serve this release
         env:
           BASE_URL: ${{ matrix.base_url }}
           EXPECTED_VERSION: ${{ needs.publish.outputs.version }}
+          TIMEOUT_SECONDS: ${{ matrix.base_url == 'https://qrcraftly.com' && '1800' || '900' }}
         run: bash scripts/ci/wait_for_deploy.sh
 
       - name: Run Smoke Tests

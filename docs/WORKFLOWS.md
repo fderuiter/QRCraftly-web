@@ -9,7 +9,7 @@ This document outlines the standard Git branching strategy, contribution workflo
 QRCraftly is **trunk-based**. `main` is the only long-lived branch (see [ADR 0020](./adr/0020-trunk-based-releases-on-main.md)):
 
 ```
-[ feat/*, fix/*, agent/*, release/* ]
+[ feat/*, fix/*, agent/*, claude/*, release/* ]
              │
              ▼ (Pull Request, squash merge, CI + PR Title + Workers Builds required)
           [ main ]  (Trunk and Production Branch)
@@ -37,6 +37,7 @@ All working branches created by human developers or autonomous AI agents must ad
 | `refactor/` | Refactoring   | Code restructuring preserving existing behavior          | `refactor/pure-service-signal-bus` |
 | `chore/`    | Maintenance   | Tooling, dependency updates, or CI pipeline tweaks       | `chore/update-wrangler-assets`     |
 | `agent/`    | Agent Tasks   | Scoped autonomous tasks initiated by AI agents           | `agent/harden-worker-watchdog`     |
+| `claude/`   | Agent Tasks   | The branch a Claude session is given; keep its name      | `claude/scanner-retry-a1b2c3`      |
 
 ---
 
@@ -92,7 +93,7 @@ Reviewers and agents can verify changes live in an edge environment before appro
 
 ### Step 6: Merge into `main`
 
-Once `CI`, `PR Title` and `Workers Builds: qrcraftly` pass and reviews are complete, merge with **Squash and merge**. Cloudflare deploys the merge to production, and the `Verify Production Deployment` job tests production once it serves the new commit. It runs the E2E tests tagged `@prod` against the deployed site: the page loads, the CSP holds, an SVG downloads, the scanner reads with its self-hosted decoder, and file transfers complete in both formats (#1228). Tag a test `@prod` only when it is read-only and needs nothing but the site itself.
+Once `CI`, `PR Title` and `Workers Builds: qrcraftly` pass and reviews are complete, merge with **Squash and merge**. Cloudflare deploys the merge to production, and the `Verify Production Deployment` job in `main.yml` is the post-merge production check: it waits up to 15 minutes for `/version.json` on `https://qrcraftly.fpderuiter.workers.dev/` to report the merged commit (`scripts/ci/wait_for_deploy.sh`). If production does not pick the commit up, the job fails with an error annotation and prints the last response's HTTP status, its caching and routing headers (`cf-cache-status`, `age`, `date`, `server`, `cf-ray`, `content-type`) and the start of its body. Once production serves the commit, the job tests it. It runs the E2E tests tagged `@prod` against the deployed site: the page loads, the CSP holds, an SVG downloads, the scanner reads with its self-hosted decoder, and file transfers complete in both formats (#1228). Tag a test `@prod` only when it is read-only and needs nothing but the site itself.
 
 ---
 
@@ -103,6 +104,8 @@ Releases, versioning, tags, environments and rollback are documented in one plac
 1. `pnpm run release:prepare` opens a `release/vX.Y.Z` branch with the version bump and changelog. Open it as a PR into `main`.
 2. Merging that PR makes the `Release` workflow tag `vX.Y.Z`, publish the GitHub Release, and smoke test production.
 3. To roll back, roll back the Cloudflare deployment, then fix forward with a PR.
+
+Every Monday at 08:00 UTC the `Release Preview` workflow (`.github/workflows/release-preview.yml`, also runnable from **Actions → Release Preview → Run workflow**) runs `pnpm run release:dry-run` and writes the next version, whether a release is due and the changelog it would add to the run summary. It only has `contents: read`: it opens no PR and creates no tag.
 
 | Environment    | Branch     | Active Domain                                                          | Access & Indexing                       |
 | -------------- | ---------- | ---------------------------------------------------------------------- | --------------------------------------- |
