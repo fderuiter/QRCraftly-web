@@ -106,6 +106,9 @@ const LAYER_WINDOW_FRAMES = 30;
 /** How often the feedback code is repainted: the back channel's simulation assumes 4 a second. */
 const FEEDBACK_REFRESH_MS = 250;
 
+/** Shown once when a wallet-style stream claims more than this receiver takes. */
+const BCUR_TOO_LARGE = 'A wallet-style stream is in view, but it is too large for this receiver, so it is ignored.';
+
 const FILE_RECEIVED_MESSAGE = 'File completely received & offline binary reconstruction triggered!';
 
 /**
@@ -150,6 +153,12 @@ export function useOpticalReceiver({
   const rateTrackerRef = useRef(new FountainRateTracker());
 
   const workerRef = useRef<Worker | null>(null);
+  /** Bumped whenever the worker stops (Clear, a reset), so a completion still being checked is dropped (#1304). */
+  const workerRunRef = useRef(0);
+  /** True once the Prism stream in view has a manifest or progress: a wallet code must not end it (#1300). */
+  const prismActiveRef = useRef(false);
+  /** Whether the person was told a wallet-style stream is over the limits, so it is said once (#1302). */
+  const reportedBcurTooLargeRef = useRef(false);
   /** The last session received, so a fresh worker ignores its frames. */
   const finishedSessionRef = useRef<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -296,6 +305,7 @@ export function useOpticalReceiver({
 
   const handleWorkerComplete = useCallback(async (message: ReassemblyWorkerMessage) => {
     const { buffer, handshake: workerHandshake, session, files } = message;
+    const run = workerRunRef.current;
     if (session) finishedSessionRef.current = session;
     setNeedsKey(false);
     setSwitchOffer(null);
@@ -327,6 +337,8 @@ export function useOpticalReceiver({
       if (activeHandshake?.sha256) {
         await assertIntegrity(reassembled, activeHandshake.sha256);
       }
+      // Clear was pressed while the file was checked: the receiver is already waiting for the next one.
+      if (run !== workerRunRef.current) return;
 
       setReceiverSuccess(true);
       setReceiverError(null);
@@ -337,10 +349,12 @@ export function useOpticalReceiver({
         deliverFile(reassembled, activeHandshake);
       }
     } catch (err) {
-      failReassembly(err);
+      if (run === workerRunRef.current) failReassembly(err);
     } finally {
-      setCompilationStatus(null);
-      setIsVerifying(false);
+      if (run === workerRunRef.current) {
+        setCompilationStatus(null);
+        setIsVerifying(false);
+      }
     }
   }, [stopStream, deliverFile, failReassembly, assertIntegrity]);
 
@@ -357,14 +371,18 @@ export function useOpticalReceiver({
 
         if (type === 'MANIFEST' && message.manifest) {
           lastProgressRef.current ??= performance.now();
+          prismActiveRef.current = true;
           setReceiverError(null);
           setManifest(message.manifest);
           setNeedsKey(Boolean(message.needsKey));
+          // A transfer that still waits for its key has not been opened by any earlier code (#1303).
+          if (message.needsKey) setKeyAccepted(null);
         } else if (type === 'KEY_STATUS') {
           setKeyAccepted(Boolean(message.accepted));
         } else if (type === 'SWITCH_OFFER' && message.offer) {
           setSwitchOffer(message.offer);
         } else if (type === 'PROGRESS') {
+          prismActiveRef.current = true;
           if ((rank ?? 0) > lastRankRef.current) {
             lastRankRef.current = rank ?? 0;
             lastProgressRef.current = performance.now();
@@ -397,6 +415,8 @@ export function useOpticalReceiver({
   }, [handleWorkerComplete, resetAfterWorkerError]);
 
   const terminateWorker = useCallback(() => {
+    workerRunRef.current += 1;
+    prismActiveRef.current = false;
     if (workerRef.current) {
       try {
         workerRef.current.postMessage({ type: 'CLEAR' });
@@ -487,6 +507,7 @@ export function useOpticalReceiver({
     setBcur(null);
     setBcurProgress(null);
     bcurDecoderRef.current?.reset();
+    reportedBcurTooLargeRef.current = false;
     rateTrackerRef.current.reset();
     setHandshake(null);
     handshakeRef.current = null;
@@ -529,9 +550,15 @@ export function useOpticalReceiver({
     if (/^ur:/i.test(decodedText)) {
       void (bcurLoadingRef.current ??= import('../../bcur').then(({ BcUrDecoder: Decoder }) => new Decoder())).then((decoder) => {
         bcurDecoderRef.current = decoder;
+        // A Prism transfer in progress is not ended by a wallet code that happens to be in view (#1300).
+        if (prismActiveRef.current) return;
         const outcome = decoder.ingest(decodedText);
         if (outcome.status === 'progress') {
           setBcurProgress({ received: outcome.received, total: outcome.total });
+        } else if (outcome.status === 'rejected' && outcome.reason === 'too-large') {
+          if (reportedBcurTooLargeRef.current) return;
+          reportedBcurTooLargeRef.current = true;
+          setReceiverError(BCUR_TOO_LARGE);
         } else if (outcome.status === 'complete') {
           // Stop any Prism decode an earlier frame started, and drop its error.
           terminateWorker();

@@ -168,10 +168,18 @@ export class PrismReceiver {
 
   /**
    * Sets the key code secret. From now on only a private transfer made with it is accepted; a plain
-   * transfer in progress is dropped, because the person asked for a private one.
+   * transfer in progress is dropped, because the person asked for a private one. A session the
+   * current key already opened keeps that key: a key code for another transfer is reported and
+   * ignored (#1303).
    * @param secret - The bytes the key code stands for.
+   * @returns False when the key was ignored because it does not open the opened session.
    */
-  public setKey(secret: Uint8Array): void {
+  public setKey(secret: Uint8Array): boolean {
+    const opened = this.session?.keys ? this.session : null;
+    if (opened && !this.opens(secret, opened)) {
+      this.rejection = 'That key code is for another transfer, so it was ignored. This transfer goes on.';
+      return false;
+    }
     this.secret = secret;
     this.reportedWrongKey = null;
     this.reportedPlain = false;
@@ -186,6 +194,13 @@ export class PrismReceiver {
     for (const [id, candidate] of [...this.candidates]) {
       if (!isPrivate(candidate.manifest) || !this.verifyKey(candidate)) this.candidates.delete(id);
     }
+    return true;
+  }
+
+  /** Whether a key code secret opens a private session. */
+  private opens(secret: Uint8Array, session: Session): boolean {
+    const keys = deriveKeys(secret, session.manifest.salt);
+    return bytesToHex(privateSessionId(keys, session.manifestBytes)) === session.id;
   }
 
   /** Forgets the key code. */
@@ -201,8 +216,7 @@ export class PrismReceiver {
    */
   private verifyKey(session: Session): boolean {
     if (!this.secret) return false;
-    const keys = deriveKeys(this.secret, session.manifest.salt);
-    if (bytesToHex(privateSessionId(keys, session.manifestBytes)) !== session.id) {
+    if (!this.opens(this.secret, session)) {
       if (this.session === session) this.dropSession();
       if (this.reportedWrongKey !== session.id) {
         this.reportedWrongKey = session.id;
@@ -210,7 +224,7 @@ export class PrismReceiver {
       }
       return false;
     }
-    session.keys = keys;
+    session.keys = deriveKeys(this.secret, session.manifest.salt);
     session.info = { ...session.info };
     if (this.session === session) this.announcement = session.info;
     return true;
@@ -404,8 +418,12 @@ export class PrismReceiver {
     this.finished = id;
   }
 
-  /** Clears the stream's state. The finished session stays ignored, and so does the key code. */
-  public reset(): void {
+  /**
+   * Clears the stream's state. The finished session stays ignored.
+   * @param keepKey - Keep the key code, e.g. after a failed finalize, so the same transfer can
+   *   still open once it is read again (#1303). Otherwise the key code is forgotten.
+   */
+  public reset(keepKey = false): void {
     this.decoder.reset();
     this.fec = null;
     this.reportedNoFec = false;
@@ -417,7 +435,7 @@ export class PrismReceiver {
     this.offer = null;
     this.rejection = null;
     this.largeCandidate = null;
-    this.secret = null;
+    if (!keepKey) this.secret = null;
     this.reportedWrongKey = null;
     this.reportedPlain = false;
   }
