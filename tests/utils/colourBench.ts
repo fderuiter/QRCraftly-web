@@ -27,7 +27,8 @@
  * through a 3x3 matrix, scales them with a white balance that can shift mid-transfer, subsamples
  * colour over 2x2 pixels, and adds per-pixel and per-8x8-block noise as a JPEG-like stand-in (it is not
  * a JPEG codec). It is sharp, level and in sync with the display. Decode times are this machine's, one
- * thread; goodput is on the simulated camera clock and so assumes the decoder keeps up with the camera.
+ * thread. By default goodput is on the simulated camera clock and so assumes the decoder keeps up; with
+ * `deadline` the receiver runs on the camera's clock and drops the frames it was too busy to take (#1241).
  */
 import { qrReader } from '../fixtures/qrReader';
 import { qrEncoder as QRCode } from '../fixtures/qrEncoder';
@@ -46,6 +47,7 @@ import {
   createSymbolDedup,
   loadCrossTalkKernels,
   qrModuleCount,
+  tileRectsFromBeacon,
   type ColourFallbackReason,
   type ColourState,
   type DecodedCode,
@@ -54,8 +56,10 @@ import {
   type Rect,
   type Rgb,
   type RgbaImage,
+  type TileCrop,
   type TileLayout,
 } from '../../src/packages/optical-transfer/index';
+import type { QrPoint } from '../../src/packages/qr-decode';
 import { createRandom } from './scannerCorpus';
 import { boundingBox } from './tileBench';
 
@@ -102,7 +106,7 @@ export const CLEAN_CHANNEL: CameraChannel = {
  * A mild phone: each channel sees 12 to 22% of the others. Such a channel reads with no
  * correction at all (see the benchmark report), so this is where colour needs the fit least.
  */
-export const MILD_CHANNEL: CameraChannel = {
+const MILD_CHANNEL: CameraChannel = {
   matrix: [
     [0.8, 0.14, 0.06],
     [0.12, 0.76, 0.12],
@@ -277,13 +281,59 @@ function readCode(pixels: Uint8ClampedArray, width: number, height: number): Dec
   return result ? { text: result.text, rect: boundingBox(result.corners, 0, 0), version: result.version } : null;
 }
 
+/** Where a tracked code is expected in a crop: its box in the crop's pixels and its version. */
+interface Expected {
+  rect: Rect;
+  version: number;
+}
+
+/** Our reader's fast path (#1178): samples the grid at the expected box, no search. */
+function readTrackedCode(pixels: Uint8ClampedArray, width: number, height: number, expected: Expected): DecodedCode | null {
+  const { x, y, width: w, height: h } = expected.rect;
+  const corners: [QrPoint, QrPoint, QrPoint, QrPoint] = [
+    { x, y },
+    { x: x + w, y },
+    { x: x + w, y: y + h },
+    { x, y: y + h },
+  ];
+  const [result] = qrReader.readTracked(pixels, width, height, [{ corners, version: expected.version, level: 'L' }]);
+  return result ? { text: result.text, rect: boundingBox(result.corners, 0, 0), version: result.version } : null;
+}
+
 /** The decoders the Colour receiver is given: our reader on a channel plane, and on a whole frame. */
 export const qrDecoders = {
   decodePlane: (plane: GreyPlane): DecodedCode | null => readCode(plane.data, plane.width, plane.height),
   decodeImage: (image: RgbaImage): DecodedCode | null => readCode(image.data, image.width, image.height),
 };
 
-/** The monochrome Fast receiver the Colour profile is measured against: tracked crops, then the beacon. */
+/** How a tracked crop is read: a full read searches it, a tracked read samples the expected box first. */
+export type ReadPath = 'full' | 'tracked';
+
+/** Times every crop decode and counts the tracked reads that fell back to a search. */
+class CropReader {
+  public readonly timings: number[] = [];
+  public fallbacks = 0;
+
+  constructor(private readonly path: ReadPath) {}
+
+  public read(pixels: Uint8ClampedArray, width: number, height: number, expected?: Expected): DecodedCode | null {
+    const began = performance.now();
+    let hit: DecodedCode | null = null;
+    if (this.path === 'tracked' && expected) {
+      hit = readTrackedCode(pixels, width, height, expected);
+      if (!hit) this.fallbacks += 1;
+    }
+    // No box yet (the first read after a beacon), or the box missed: search the crop.
+    hit ??= readCode(pixels, width, height);
+    this.timings.push(performance.now() - began);
+    return hit;
+  }
+}
+
+/**
+ * The monochrome Fast receiver the Colour profile is measured against, with the same start-up: it
+ * waits for a beacon, places the tiles from it, then reads tracked crops and falls back to the beacon.
+ */
 class MonoReceiver {
   public readonly prism = new PrismReceiver();
   public decodes = 0;
@@ -292,41 +342,50 @@ class MonoReceiver {
 
   constructor(
     private readonly layout: TileLayout,
-    private readonly screen: SimScreen
+    private readonly beaconVersion: number,
+    private readonly reader: CropReader
   ) {
     this.tracker = new TileTracker({ layout });
   }
 
   public processFrame(image: RgbaImage): void {
     const plan = this.tracker.plan(image);
-    if (plan.kind === 'search') {
-      // The mono receiver is told where the tiles are, so it pays no search: a favourable baseline.
-      this.tracker.reportSearch(tileCodeRects(this.layout, this.screen));
-      return;
-    }
-    let any = false;
-    const results = plan.crops.map((crop) => {
+    if (plan.kind === 'crops' && this.readTiles(image, plan.crops)) return;
+    const beacon = readCode(image.data, image.width, image.height);
+    if (!beacon) return;
+    this.take(beacon.text);
+    if (beacon.version === this.beaconVersion) this.tracker.reportSearch(tileRectsFromBeacon(beacon.rect, this.beaconVersion, this.layout));
+  }
+
+  private readTiles(image: RgbaImage, crops: readonly TileCrop[]): boolean {
+    const positions = this.tracker.positions;
+    const results = crops.map((crop) => {
       const { x, y, width, height } = crop.rect;
       const data = new Uint8ClampedArray(width * height * 4);
       for (let row = 0; row < height; row++) data.set(image.data.subarray(((y + row) * image.width + x) * 4, ((y + row) * image.width + x + width) * 4), row * width * 4);
+      const code = positions.get(crop.tile);
+      const expected = code ? { rect: { x: code.x - x, y: code.y - y, width: code.width, height: code.height }, version: this.layout.version } : undefined;
       this.decodes += 1;
-      const hit = readCode(data, width, height);
-      if (hit) {
-        any = true;
-        this.take(hit.text);
-      }
+      const hit = this.reader.read(data, width, height, expected);
+      if (hit) this.take(hit.text);
       return { tile: crop.tile, ok: hit !== null, rect: hit ? { x: hit.rect.x + x, y: hit.rect.y + y, width: hit.rect.width, height: hit.rect.height } : undefined };
     });
     this.tracker.reportCrops(results);
-    if (any) return;
-    const beacon = readCode(image.data, image.width, image.height);
-    if (beacon) this.take(beacon.text);
+    return results.some((result) => result.ok);
   }
 
   private take(text: string): void {
     if (this.dedup.accept(text)) this.prism.ingest(text);
   }
 }
+
+const percentile = (values: readonly number[], p: number): number => {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))];
+};
+
+const round1 = (value: number): number => Number(value.toFixed(1));
 
 export type ColourRunMode = 'colour' | 'mono';
 
@@ -345,6 +404,14 @@ export interface ColourRunOptions {
   decodePlane?: (plane: GreyPlane) => DecodedCode | null;
   /** Beacons without a colour read after which the Colour receiver gives colour up. */
   fallbackBeacons?: number;
+  /** How tracked crops are read (default full reads). */
+  readPath?: ReadPath;
+  /**
+   * Run the receiver on the camera's clock: a frame that arrives while the decoder is busy is dropped,
+   * and the decoder takes the newest frame when it is free. Off, every frame is decoded however long it
+   * takes (unlimited catch-up), as the first colour bench did.
+   */
+  deadline?: boolean;
 }
 
 export interface ColourRunResult {
@@ -355,7 +422,7 @@ export interface ColourRunResult {
   seconds: number;
   /** File bytes over simulated seconds, in KB/s (1 KB = 1000 bytes), start-up included. */
   goodputKBps: number;
-  /** Camera frames before the first tile was read (Colour waits for a beacon; mono does not). */
+  /** Camera frames before the first tile was read (both wait for a beacon). */
   startFrames: number;
   state: ColourState | 'mono-profile';
   /** Why the Colour receiver gave colour up, and what it told the person. */
@@ -365,8 +432,20 @@ export interface ColourRunResult {
   tileDecodes: number;
   /** Individual code decodes tried on tiles and beacons. */
   decodes: number;
-  /** Real decode and correction time per simulated camera frame, in milliseconds, on this machine. */
+  /** Real decode and correction time per decoded camera frame, in milliseconds, on this machine. */
   decodeMsPerFrame: number;
+  /** Camera frames the receiver decoded, and those it dropped because it was still busy. */
+  framesDecoded: number;
+  framesDropped: number;
+  /** Real seconds of decoding, on this machine, one thread. */
+  realSeconds: number;
+  /** Real cost of one plane (Colour) or crop (mono) decode, in milliseconds: median and 95th percentile. */
+  planeMsP50: number;
+  planeMsP95: number;
+  /** Of the time per decoded frame, the part spent in plane or crop decodes; the rest is the channel split and correction, and the beacon reads. */
+  planeMsPerFrame: number;
+  /** Tracked reads that missed and searched the crop instead. */
+  trackedFallbacks: number;
   /** Decodes per second the receiver needs to keep up with the camera at its frame rate. */
   decodesPerSecond: number;
   fits: number;
@@ -398,33 +477,48 @@ export async function runColourTransfer(options: ColourRunOptions): Promise<Colo
   const layout = (colourSender ?? monoSender)?.layout;
   if (!layout) throw new Error('No sender.');
   const beaconVersion = COLOUR_PROFILE.base.beaconVersion;
-  const colour = colourSender
-    ? new ColourReceiver({ layout, beaconVersion, decodeImage: qrDecoders.decodeImage, decodePlane: options.decodePlane ?? qrDecoders.decodePlane, fallbackBeacons: options.fallbackBeacons })
-    : null;
-  const mono = monoSender ? new MonoReceiver(layout, screen) : null;
+  const reader = new CropReader(options.readPath ?? 'full');
+  const decodePlane = options.decodePlane ?? ((plane: GreyPlane, expected?: Expected) => reader.read(plane.data, plane.width, plane.height, expected));
+  const colour = colourSender ? new ColourReceiver({ layout, beaconVersion, decodeImage: qrDecoders.decodeImage, decodePlane, fallbackBeacons: options.fallbackBeacons }) : null;
+  const mono = monoSender ? new MonoReceiver(layout, beaconVersion, reader) : null;
   const receiver = colour ?? mono;
   if (!receiver) throw new Error('No receiver.');
 
+  const period = 1000 / fps;
   let decodeMs = 0;
-  let frames = 0;
+  let frame = 0;
+  let decoded = 0;
+  let dropped = 0;
+  // The decoder's own clock, in ms of camera time, when it is on the camera's clock.
+  let clock = 0;
   let startFrames = 0;
   let started = false;
-  while (!receiver.prism.isComplete && frames < limit) {
+  while (!receiver.prism.isComplete && frame < limit) {
     const shown: ScreenFrame = colourSender
-      ? colourSender.frame(frames)
+      ? colourSender.frame(frame)
       : (() => {
-          const frame = monoSender?.frame(frames);
-          if (!frame) throw new Error('No frame.');
-          return frame.kind === 'beacon' ? { kind: 'beacon' as const, text: frame.texts[0] } : { kind: 'dense' as const, tiles: frame.texts.map((text) => [text, text, text] as const) };
+          const sent = monoSender?.frame(frame);
+          if (!sent) throw new Error('No frame.');
+          return sent.kind === 'beacon' ? { kind: 'beacon' as const, text: sent.texts[0] } : { kind: 'dense' as const, tiles: sent.texts.map((text) => [text, text, text] as const) };
         })();
-    const seen = capture(renderScreen(shown, layout, beaconVersion, screen), options.channel, frames, noise);
+    const seen = capture(renderScreen(shown, layout, beaconVersion, screen), options.channel, frame, noise);
     const began = performance.now();
     receiver.processFrame(seen);
-    decodeMs += performance.now() - began;
-    frames += 1;
+    const cost = performance.now() - began;
+    decodeMs += cost;
+    decoded += 1;
     if (!started && (receiver.prism.snapshot()?.dropletsReceived ?? 0) > 0) {
       started = true;
-      startFrames = frames;
+      startFrames = frame + 1;
+    }
+    if (options.deadline) {
+      // Free at `clock`, the decoder takes the newest frame the camera has delivered, or waits for the next.
+      clock = Math.max(clock, frame * period) + cost;
+      const next = Math.max(frame + 1, Math.floor(clock / period));
+      dropped += next - frame - 1;
+      frame = next;
+    } else {
+      frame += 1;
     }
   }
 
@@ -436,11 +530,12 @@ export async function runColourTransfer(options: ColourRunOptions): Promise<Colo
   const stats = colour?.stats;
   const planeDecodes = stats?.colourDecodes ?? mono?.decodes ?? 0;
   const decodes = planeDecodes + (stats?.beaconReads ?? 0);
-  const seconds = frames / fps;
+  // On the camera's clock the transfer ends when the last decode finishes; otherwise at the last frame.
+  const seconds = options.deadline ? clock / 1000 : frame / fps;
   return {
     complete: receiver.prism.isComplete,
     verified,
-    cameraFrames: frames,
+    cameraFrames: frame,
     seconds,
     goodputKBps: verified ? Number((options.bytes / 1000 / seconds).toFixed(1)) : 0,
     startFrames,
@@ -449,8 +544,15 @@ export async function runColourTransfer(options: ColourRunOptions): Promise<Colo
     hint: colour?.hint ?? null,
     tileDecodes: planeDecodes,
     decodes,
-    decodeMsPerFrame: Number((decodeMs / Math.max(1, frames)).toFixed(1)),
-    decodesPerSecond: Math.round((planeDecodes / Math.max(1, frames)) * fps),
+    decodeMsPerFrame: round1(decodeMs / Math.max(1, decoded)),
+    decodesPerSecond: Math.round((planeDecodes / Math.max(1, decoded)) * fps),
+    framesDecoded: decoded,
+    framesDropped: dropped,
+    realSeconds: Number((decodeMs / 1000).toFixed(2)),
+    planeMsP50: Number(percentile(reader.timings, 50).toFixed(2)),
+    planeMsP95: Number(percentile(reader.timings, 95).toFixed(2)),
+    planeMsPerFrame: round1(reader.timings.reduce((sum, ms) => sum + ms, 0) / Math.max(1, decoded)),
+    trackedFallbacks: reader.fallbacks,
     fits: stats?.fits ?? 0,
     driftRefits: stats?.driftRefits ?? 0,
     rescales: stats?.rescales ?? 0,

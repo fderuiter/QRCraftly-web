@@ -120,7 +120,7 @@ The headline metric is verified goodput on uncompressed random files, with acqui
 
 **Status: CURRENT, Measured-code and Measured-sim.**
 
-- The colour layer's 220.6 KB/s ([TRANSFER_BENCHMARK.md](../TRANSFER_BENCHMARK.md)) runs on a simulated camera clock and assumes decoding keeps up. The stored numbers predate the in-house decoder, and the bench fixture decodes each plane with a full `qrReader.read`, not the tracked `readTracked` fast path ([`tests/utils/colourBench.ts`](../../tests/utils/colourBench.ts)), so it says nothing about tracked-path speed.
+- The colour layer's 220.6 KB/s ([TRANSFER_BENCHMARK.md](../TRANSFER_BENCHMARK.md#colour-layer-1147-1241)) holds only when the decoder is assumed to keep up with the camera. On the camera's clock, one desktop thread, dropping the frames the decoder is too busy for, the harsh camera gives 144.2 KB/s with tracked reads and 100.8 KB/s with full reads (#1241). Plane decodes take about 9.5 ms of the 64.8 ms per frame; the rest is the channel split and correction and the beacon reads. None of it is a phone measurement.
 - The modem ladder bench ([`scripts/bench_optical_ladder.ts`](../../scripts/bench_optical_ladder.ts)) uses the old LT `FountainEncoder` with 16-byte droplets, not the new outer code with the larger symbols a high-throughput modem would use. Outer symbol size, inner block size and profile geometry need choosing separately and benchmarking together.
 - The new outer code's p99 figures at K = 8,192 rest on 30 trials ([ADR 0037](../adr/0037-prism-outer-code-lt-over-ldpc-precode.md)); report sample size and uncertainty with any tail figure.
 - The modem's GPU path reads back synchronously, so shader time alone is not a full-path timing.
