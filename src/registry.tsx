@@ -11,11 +11,11 @@ const ContentControl = () => {
   const type = useQRStoreSelector(state => state.config.type);
   const value = useQRStoreSelector(state => state.config.value);
   const config = React.useMemo(() => ({ type, value }), [type, value]);
-  const { updateConfig } = store;
+  const { updateConfig, setContentRefused } = store;
   return (
     <section>
       <SectionHeading eyebrow="Content" className="mb-4" />
-      <InputPanel config={config} onChange={updateConfig} />
+      <InputPanel config={config} onChange={updateConfig} onRefusedChange={setContentRefused} />
     </section>
   );
 };

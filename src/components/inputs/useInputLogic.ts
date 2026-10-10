@@ -75,11 +75,14 @@ export function clearRetainedInputStates(): void {
  * It maintains the state for each input type so that data is preserved when switching types.
  * @param config - The current QR configuration.
  * @param onChange - Callback to update the configuration.
+ * @param onRefusedChange - Told whether the form now holds a value it refuses to encode. The
+ *   config keeps the last accepted content meanwhile, so the preview must not show it (#1279).
  * @returns An object containing the component to render and its props.
  */
 export function useInputLogic(
   config: Pick<QRConfig, 'type' | 'value'>,
   onChange: (updates: Partial<QRConfig>) => void,
+  onRefusedChange?: (refused: boolean) => void,
 ): { InputComponent: ElementType | null; inputProps: { data: InputDataMap[keyof InputDataMap]; onChange: (updates: Partial<InputDataMap[keyof InputDataMap]>) => void } | Record<string, never>; flush: () => void } {
   // Initialize state for all types from registry or volatile retained cache
   const [inputStates, setInputStates] = useState<InputDataMap>(() => {
@@ -109,6 +112,10 @@ export function useInputLogic(
   useEffect(() => {
     latestInputStates.current = inputStates;
   }, [inputStates]);
+  const onRefusedChangeRef = useRef(onRefusedChange);
+  useEffect(() => {
+    onRefusedChangeRef.current = onRefusedChange;
+  }, [onRefusedChange]);
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The debounced write waiting in timeoutRef, so flush() can apply it immediately.
@@ -126,6 +133,10 @@ export function useInputLogic(
     prevTypeRef.current = config.type;
 
     const currentLocalState = latestInputStates.current[config.type];
+    if (prevType !== config.type) {
+      // A form kept from an earlier visit to this type may still hold a refused value.
+      onRefusedChangeRef.current?.(!isInputDataValid(config.type, currentLocalState));
+    }
     const currentConstructed = entry.constructFn ? entry.constructFn(currentLocalState as never) : '';
 
     if (currentConstructed !== config.value) {
@@ -162,6 +173,8 @@ export function useInputLogic(
         });
       };
 
+      // The form now shows the new content, which was never refused.
+      onRefusedChangeRef.current?.(false);
       if (entry.hydrateFn && entry.canHydrateFn(config.value)) {
         try {
           const hydrated = entry.hydrateFn(config.value);
@@ -210,12 +223,16 @@ export function useInputLogic(
       pendingCommitRef.current = null;
       const entry = INPUT_REGISTRY[type];
       if (entry) {
-        if (isInputDataValid(type, newData)) {
+        const valid = isInputDataValid(type, newData);
+        if (valid) {
           // We know entry matches type K, so constructFn handles newData (InputDataMap[K])
           // Using `never` as cast because TS struggles with correlating `entry` (Registry[K])
           // and `newData` (InputDataMap[K]) inside this generic context without more verbose typing.
           onChange({ value: entry.constructFn(newData as never) });
         }
+        // A refused value is not written, so the store keeps the last accepted content; the
+        // flag stops the preview and exports using it until the field is fixed (#1279).
+        onRefusedChangeRef.current?.(!valid);
       }
     };
     // A first edit after a quiet spell goes straight to the preview, in the same render as the

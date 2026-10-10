@@ -89,8 +89,9 @@ describe('VCard generator', () => {
       zip: '',
       country: '',
     };
-    const str = constructVCardString(data);
-    expect(str).toContain('N:;;;;');
+    // An empty card builds no code, so the generator shows its sample (#1272).
+    expect(constructVCardString(data)).toBe('');
+    expect(constructVCardString({ ...data, phone: '+1 555 0100' })).toContain('N:;;;;');
   });
 
   it('normalizes newlines, preserves tabs, and preserves control characters', () => {

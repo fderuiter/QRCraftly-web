@@ -252,6 +252,8 @@ export const constructPaymentString = (data: PaymentData): string => {
 
   // Sanitize address to prevent parameter injection
   const safeAddress = encodeAddress(sanitizeInput(data.address || ''));
+  // BIP-21 and EIP-681 need an address: without one there is no code (#1272).
+  if (!safeAddress.trim()) return '';
   let paymentString = `${data.network}:${safeAddress}`;
   const params: string[] = [];
 

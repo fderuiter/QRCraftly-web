@@ -269,7 +269,8 @@ export const constructEventString = (
   data: EventData,
   options: EventConstructOptions = {}
 ): string => {
-  if (!data) return '';
+  // Nothing typed yet: no code, so the generator shows its sample state (#1272).
+  if (!data || ![data.title, data.startDate, data.location, data.description].some((field) => field?.trim())) return '';
 
   const provider = (data.provider || CalendarProvider.ICAL).toLowerCase();
   if (data.allDay) return constructAllDayEvent(data, provider, options);

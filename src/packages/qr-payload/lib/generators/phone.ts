@@ -53,13 +53,15 @@ export const droppedPhoneCharacters = (input: string, allowSeparators = false): 
 
 /**
  * Constructs the tel string for Phone QR code. An extension is written as RFC 3966 `;ext=`, and
- * `,` pauses are kept.
+ * `,` pauses are kept. A number with no digits gives `''` (RFC 3966 §3 needs digits), so the
+ * generator shows its sample state instead of an empty `tel:` code (#1272).
  */
 export const constructPhoneString = (data: PhoneData): string => {
-  if (!data) return 'tel:';
+  if (!data) return '';
   const { number, extension } = splitPhoneExtension(data.number || '');
   // `;` would start a URI parameter here, so only the `,` pause survives from the preserve set.
   const cleanNumber = cleanPhoneNumber(number, true).replace(/;/g, '');
+  if (!/\d/.test(cleanNumber)) return '';
   const ext = extension && cleanNumber ? `;ext=${extension}` : '';
   // nosemgrep: enforce-cleanphonenumber
   return `tel:${encodeDialString(cleanNumber)}${ext}`;

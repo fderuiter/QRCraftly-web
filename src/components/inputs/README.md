@@ -8,7 +8,8 @@ Each input component follows a consistent pattern:
 
 1.  **Strict Props**: Takes a `data` object (specific to the type, e.g., `WifiData`) and an `onChange` handler.
 2.  **Stateless (Mostly)**: Typically delegates state management to the parent (`InputPanel`) via `useInputLogic` and the centralized registry, though some may handle purely UI-local state (like toggling password visibility or geolocation loading).
-3.  **Shared Styles**: Uses the shared form fields (`src/components/ui/FormFields.tsx`, `FormBlock`) and style constants from `src/components/ui/styles.ts` to ensure visual consistency.
+3.  **Empty and refused content**: A payload constructor returns `''` until a field it needs is filled (a digit in a phone number, a network name, any email or event field, any contact field), so an empty form shows the sample preview with exports off instead of encoding a skeleton such as `tel:` or `BEGIN:VCARD…END:VCARD` (#1272). A value the form refuses (for example a zero-width character in a WiFi password) is never written to the store; `InputPanel` reports it through `onRefusedChange` instead, and the generator then blanks the preview and turns every export off, the mockup download included, until the field is fixed (#1279).
+4.  **Shared Styles**: Uses the shared form fields (`src/components/ui/FormFields.tsx`, `FormBlock`) and style constants from `src/components/ui/styles.ts` to ensure visual consistency.
 
 ### Example Structure
 
