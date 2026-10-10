@@ -64,7 +64,7 @@ Under the URL, Meeting, vCard website and Event location and description fields,
 
 ### Bulk CSV
 
-Bulk generation is limited to 500 rows and 2 MiB. Every row goes through the same payload checks as the single generator (`validateConfig`), and `generateQRSvg` refuses a rejected payload as a last guard. Blocked rows are skipped and listed on screen, and rows whose address looks disguised are listed as a hint but still generated. File names are sanitised (`sanitizeFileName`: control, zero-width and bidirectional characters removed, `\ / ? : * " < > |` replaced, leading dots dropped, Windows reserved names prefixed, 100 characters max), the ZIP name too, and the ZIP writer refuses absolute paths, backslashes, `..` segments and duplicates.
+Bulk generation is limited to 500 rows and 2 MiB. Each cell is read as a link (normalised exactly like the single Link generator) or, if the person picks Plain text, encoded as typed. That string (`encodeBulkCell`) is what the preview shows, what goes through the single generator's payload checks (`validateConfig`, with the Link or Text rules), and what the ZIP encodes; `generateQRSvg` refuses a rejected payload as a last guard. Rows that fail the checks, or that are too long for a QR code, are skipped and listed on screen with their spreadsheet row number, and rows whose address looks disguised are listed as a hint but still generated. File names are sanitised (`sanitizeFileName`: control, zero-width and bidirectional characters removed, `\ / ? : * " < > |` replaced, leading dots dropped, Windows reserved names prefixed, including `COM¹` and `CONIN$`, at most 100 characters and 200 UTF-8 bytes, cut on whole characters), the ZIP name too. The ZIP writer refuses absolute paths, drive letters, backslashes, `.`, `..` and empty segments, names over 65,535 bytes, and duplicates, compared as the UTF-8 bytes it writes.
 
 ## Scanning codes
 
@@ -96,7 +96,7 @@ Decoded content is rendered as text, never as HTML. Handing a scanned code to th
 
 ### Camera and images
 
-Camera results need two agreeing reads. Images are decoded off the main thread, and a file over 50 MB or declaring more than 40 megapixels is refused before decoding (`assertImageWithinLimits` reads the size from the header, so a small file that declares billions of pixels is caught).
+Camera results need two agreeing reads. Images are decoded off the main thread, and a file over 50 MB or declaring more than 40 megapixels is refused before decoding (`assertImageWithinLimits` reads the size from the header of PNG, JPEG, GIF, WebP, BMP, AVIF, HEIC and TIFF files, so a small file that declares billions of pixels is caught). Other formats are checked as soon as they are decoded, and SVG files are drawn at a fixed 1024 px.
 
 ## Receiving files over the camera
 

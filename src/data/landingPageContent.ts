@@ -54,47 +54,32 @@ export const landingPageContent: Record<string, LandingCopy> = {
         answer:
           'Adding a mosaic image sets error correction to H, the highest level, which leaves the most room for print damage and for a small logo. You can change it under Advanced, but lowering it makes the code less forgiving.',
       },
-      {
-        question: 'How big should I print an image QR code?',
-        answer:
-          'Larger than a plain code. As a rule, print at least 3 cm (about 1.2 in) square for close-up reading and bigger for posters or anything read from a distance, because the picture lowers the contrast between modules. Test the printed copy with two phones.',
-      },
-      {
-        question: 'Is my image uploaded anywhere?',
-        answer:
-          'No. The picture is decoded by your browser, kept in memory while the page is open and never sent to a server. Closing the tab forgets it. See the security page for how this is built.',
-      },
     ],
     guide: {
       intro:
-        'Make a QR code out of your own picture: a logo, a product shot or a pattern spread across the whole code. There is no AI and no upload, because the image is tiled into the code in your browser. It is free, with no sign-up and no ads.',
+        'Make a QR code out of your own picture, such as a logo or a product photo. There is no AI and no upload: your image is blended into the code in your browser.',
       scanned: [
-        'A phone sees an ordinary QR code. Each module is still dark or still light, just painted in a colour from your picture, so the camera app opens the link exactly as it would for a plain black and white code.',
-        'That is the trick behind a mosaic code. The standard matrix is kept bit for bit, and each module is pushed only as far towards dark or light as a scanner needs. Nothing about the data is changed to draw the picture, which is why the error correction stays available for damage.',
-        'Because it is recoloured rather than redrawn, the same method works for any content: a link, Wi-Fi details or a contact card.',
+        'A phone sees an ordinary QR code. Every module is still dark or light, just painted in a colour from your picture, so the camera reads it like a black and white code.',
+        'The data is not changed to draw the picture, so error correction is still there to cover scuffs and glare. It works with any content: a link, Wi-Fi details or a contact card.',
       ],
       useCases: [
-        'A brand code for packaging, where the product picture is the code.',
-        'A poster or flyer that looks designed instead of stamped.',
-        'A gift card, wedding invitation or event ticket with a photo woven in.',
-        'A menu or shop-window code that matches the artwork around it.',
-        'Business cards and stickers where a plain black square looks out of place.',
+        'Packaging where the product photo is the code.',
+        'A poster, flyer or invitation that looks designed rather than stamped.',
+        'A shop window or menu code that matches the artwork around it.',
       ],
       printing: [
-        'Print larger than you would a plain code, at least 3 cm (about 1.2 in), and larger still for anything read from across a room.',
-        'Choose a picture with clear light and dark areas. A flat, mid-grey picture gives the code less to work with.',
-        'Keep the blank border around the code. The quiet zone is part of what makes it readable.',
-        'Print a test copy, scan it with an iPhone and an Android phone, and only then run the full batch.',
-        'Use Tiles for codes people scan from a distance, and Halftone when the picture matters more.',
+        'Print bigger than a plain code: at least 3 cm (1.2 in), more for anything read from across a room.',
+        'Pictures with clear light and dark areas work best. Flat, mid-grey pictures give the code less to work with.',
+        'Use Tiles for codes scanned from a distance and Halftone when the picture matters more.',
       ],
       checks: [
-        'Wait for the scan badge to say “Scans reliably”. “Fragile” means it scans on screen but may not survive print or a bad camera.',
-        'If the code is fragile, raise the Mosaic contrast first. That is the quickest fix and costs the least picture detail.',
-        'Look at the code from arm’s length. If the picture is hard to make out, the modules are still doing their job, but a simpler image will read better.',
-        'Do not shrink the exported file inside a design tool. Scale it up or export a larger size instead.',
+        'Wait for the scan badge to say “Scans reliably”. “Fragile” means it may fail in print or on a poor camera.',
+        'If it is fragile, raise the Mosaic contrast first.',
+        'Do not shrink the downloaded file in a design tool; download a larger size instead.',
+        'Print a test copy and scan it with an iPhone and an Android phone before printing a batch.',
       ],
       privacy:
-        'The picture is read by your browser, reduced to one colour per module and discarded when you close the tab. It is never uploaded, and it is not stored: saved style templates leave the image out on purpose.',
+        'Your picture is read by your browser, reduced to one colour per module and forgotten when you close the tab. It is never uploaded, and saved style templates leave it out.',
     },
   },
   'qr-code-with-logo': {
@@ -120,11 +105,6 @@ export const landingPageContent: Record<string, LandingCopy> = {
           'Smaller than you expect. Keep it to a modest square in the centre and never cover the three corner squares. The scan badge tells you when you have gone too far, and a printed test is the final answer.',
       },
       {
-        question: 'Is my logo uploaded?',
-        answer:
-          'No. The logo is read by your browser and drawn into the code on your device. It is not sent to a server, and saved style templates do not keep uploaded images.',
-      },
-      {
         question: 'Can I use an SVG or transparent PNG?',
         answer:
           'Yes. A transparent PNG or a square image on a white background looks cleanest. Very detailed logos shrink poorly, so a simple mark works better than a full wordmark.',
@@ -132,33 +112,29 @@ export const landingPageContent: Record<string, LandingCopy> = {
     ],
     guide: {
       intro:
-        'Put your logo in the middle of a QR code and keep it scannable. High error correction is already set for you, and the generator warns you if the logo gets too big. It is free, with no sign-up and no ads, and your logo never leaves your browser.',
+        'Put your logo in the middle of a QR code and keep it scannable. This page turns on high error correction for you, and the scan badge warns you if the logo gets too big.',
       scanned: [
-        'A phone treats the code like any other. The logo sits over the middle of the pattern, and the scanner fills in the hidden modules from the error correction data that every QR code carries.',
-        'That repair budget is finite. Level H can restore roughly 30% of the code in ideal conditions, but the same budget also has to cover scuffs, glare and printing flaws, which is why a smaller logo is the safer choice.',
-        'The three corner squares and the quiet border are never covered, because scanners use them to find and align the code.',
+        'A phone treats it like any other code. The logo covers part of the pattern, and the scanner rebuilds the hidden part from the error correction data every QR code carries.',
+        'That repair budget is limited. Level H can recover up to about 30% of the code, and the same budget has to cover scuffs and glare, so a smaller logo is safer.',
       ],
       useCases: [
-        'A brand code on packaging, receipts and delivery boxes.',
-        'A business card or flyer where the code carries your mark.',
-        'A restaurant table card or shop window sign.',
-        'An event badge or sponsor board.',
-        'A product manual or label that points to support pages.',
+        'Packaging, receipts and delivery boxes.',
+        'Business cards and flyers.',
+        'Table cards, shop windows and event badges.',
       ],
       printing: [
-        'Print at least 2.5 cm (about 1 in) square when there is a logo, and larger for anything read from a distance.',
-        'Use dark modules on a light background. Reversed or low-contrast colours leave less margin for the logo.',
-        'Keep the logo simple. Thin lines and tiny text turn to mush at small sizes.',
-        'Print a test copy and scan it with an iPhone and an Android phone before ordering a batch.',
+        'Print at least 2.5 cm (1 in) wide, more for anything read from a distance.',
+        'Simple logos survive small sizes better than detailed ones or tiny text.',
+        'Keep dark modules on a light background; low contrast leaves less room for the logo.',
       ],
       checks: [
-        'Watch the scan badge while you resize the logo. Stop as soon as it leaves “Scans reliably”.',
-        'Check that the logo does not touch the corner squares.',
-        'Confirm the logo is legible at the size you will print it.',
-        'Keep error correction on H. Lowering it with a logo in place is the most common reason a code fails.',
+        'Watch the scan badge while you resize the logo, and stop when it leaves “Scans reliably”.',
+        'Keep the logo off the three corner squares.',
+        'Leave error correction on H. Lowering it with a logo in place is the most common reason a code fails.',
+        'Scan a printed test copy with an iPhone and an Android phone.',
       ],
       privacy:
-        'Your link and your logo are processed in your browser only. The logo is held in memory while the page is open, and QRCraftly never uploads or stores it.',
+        'Your link and logo are processed in your browser. The logo stays in memory while the page is open, and QRCraftly never uploads or stores it. Saved style templates leave it out.',
     },
   },
   'google-review-qr-code': {
@@ -179,11 +155,6 @@ export const landingPageContent: Record<string, LandingCopy> = {
           'In your Google Business Profile, open the option to share your review form (the name changes, but it is usually “Ask for reviews” or “Get more reviews”) and copy the link. You can also search for your business on Google Maps and use the share option on its listing, but the review link from your profile opens the form directly.',
       },
       {
-        question: 'Does QRCraftly talk to Google to make this code?',
-        answer:
-          'No. The code simply contains the link you paste in. QRCraftly never calls a Google API, and nothing you type leaves your browser.',
-      },
-      {
         question: 'Will the code expire?',
         answer:
           'The code never expires, because it is a static code that contains the link itself. It will stop working only if Google changes or removes the link behind it, so re-test it from time to time.',
@@ -196,33 +167,28 @@ export const landingPageContent: Record<string, LandingCopy> = {
     ],
     guide: {
       intro:
-        'Turn your Google review link into a QR code that customers scan to leave a review in a couple of taps. Paste the link, style the code and download it. It is free, with no sign-up and no ads, and nothing you enter is sent anywhere.',
+        'Turn your Google review link into a QR code. Customers scan it and land on the form to leave you a review.',
       scanned: [
-        'The phone’s camera reads the code and offers to open the review link. If the customer is signed in to Google, the review form opens straight away. If not, Google asks them to sign in first.',
-        'On some phones the Google Maps app takes over the link and shows the review screen there. Either way, the customer lands on the form you copied from your profile.',
-        'Because the code holds only the link, it works for as long as that link does.',
+        'The phone opens the review link. Customers who are signed in to Google see the review form straight away; others are asked to sign in first. On some phones the Google Maps app opens it instead.',
+        'The code holds only the link, so it works for as long as Google keeps that link working.',
       ],
       useCases: [
-        'A counter card or receipt sticker in a shop, café or salon.',
+        'A counter card or receipt sticker.',
         'A table tent in a restaurant.',
-        'A leave-behind card after a service call, clinic visit or repair.',
-        'A van door, window sign or business card for tradespeople.',
-        'A follow-up email or invoice footer.',
+        'A card left behind after a repair or appointment.',
       ],
       printing: [
-        'Add a short line beside the code, such as “Tell us how we did”, so people know what it is for.',
-        'Print at least 2.5 cm (about 1 in) square and place it where people wait, not where they hurry past.',
-        'Put it at eye or counter height. Codes on floors and high shelves are rarely scanned.',
-        'Test the printed code with a phone that is not logged in as the business owner.',
+        'Add a short line beside the code, such as “Tell us how we did”.',
+        'Put it where people wait, at eye or counter height.',
       ],
       checks: [
-        'Open the link in a private window first. If it does not show the review form, the code will not either.',
-        'Make sure it is your review link, not the link to your website or your map listing.',
-        'Re-test the code every few months in case Google changes the link format.',
-        'Never offer discounts or gifts in return for reviews. Google’s policies forbid it, so check them before you run a campaign.',
+        'Open the link in a private browser window first. If the review form does not appear, the code will not show it either.',
+        'Make sure it is the review link, not your website or map listing.',
+        'Re-test the code every few months in case Google changes its links.',
+        'Do not offer rewards for reviews. Google’s policies forbid it.',
       ],
       privacy:
-        'The link is placed into the code in your browser. QRCraftly never contacts Google about it and never adds tracking, so it cannot tell who scans the code or how often.',
+        'The link is put into the code in your browser. QRCraftly never contacts Google and adds no tracking, so it cannot tell who scans your code.',
     },
   },
   'menu-qr-code': {
@@ -260,33 +226,28 @@ export const landingPageContent: Record<string, LandingCopy> = {
     ],
     guide: {
       intro:
-        'Make a menu QR code for tables, windows and takeaway bags that never expires. Link it to a menu you host, download it and print it. It is free, with no sign-up, no monthly fee and no ads, and your link stays in your browser.',
+        'Make a QR code for a menu you already host online. Put it on tables, windows and takeaway bags. It has no monthly fee and does not expire.',
       scanned: [
-        'Diners point their phone camera at the code and tap the link that appears. The menu opens in their browser, so there is no app to install.',
-        'The code holds your menu’s web address itself. Nothing runs between the scan and your page, which is why the code cannot expire or be switched off by a provider.',
-        'The page behind it is yours to keep up. Update the menu there and every printed code follows.',
+        'Diners scan the code and the menu opens in their browser. There is no app to install.',
+        'The code holds your menu’s address and nothing sits in between, so no provider can switch it off. Update the menu at that address and every printed code shows the new version.',
       ],
       useCases: [
-        'Table tents, coasters and menu holders.',
-        'A window or door sign for passers-by.',
-        'Takeaway bags, boxes and delivery flyers.',
-        'A bar, market stall or food truck counter.',
-        'A hotel room card for room service or the breakfast menu.',
+        'Table tents and coasters.',
+        'A window or door sign.',
+        'Takeaway bags and delivery flyers.',
       ],
       printing: [
-        'Print at least 3 cm (about 1.2 in) square on tables, and larger on windows and walls.',
+        'Print at least 3 cm (1.2 in) wide on tables, bigger on windows and walls.',
         'Use a matte finish. Glossy table tents reflect lights and make scanning hard.',
-        'Laminate or use a wipeable holder, and keep the code clear of stains and curved edges.',
-        'Add a short line such as “Scan for today’s menu”, and keep a few printed menus for people without a phone.',
+        'Keep a few paper menus for people without a phone.',
       ],
       checks: [
-        'Make sure the menu loads quickly on mobile data, not just on your restaurant Wi-Fi.',
-        'Keep the link stable. Do not rename the file or move the page after you print.',
-        'Check that prices, allergen notes and opening times are up to date at the address.',
-        'Scan the printed code in the dim light of the dining room and not only at your desk.',
+        'Check the menu loads quickly on mobile data, not only on your Wi-Fi.',
+        'Keep the address the same. Do not rename the file or move the page after you print.',
+        'Scan the printed code in the dining room’s actual light.',
       ],
       privacy:
-        'Your menu link is placed into the code in your browser and never sent to QRCraftly. There is no tracking, so we cannot see who scans your code, and neither can anyone else through us.',
+        'Your menu link is put into the code in your browser and never sent to QRCraftly. There is no tracking, so we cannot see who scans your code.',
     },
   },
   'instagram-qr-code': {
@@ -323,30 +284,23 @@ export const landingPageContent: Record<string, LandingCopy> = {
     ],
     guide: {
       intro:
-        'Turn your Instagram username into a QR code that opens your profile. Type your handle, style the code and download it for a flyer, a shop window or a business card. It is free, with no sign-up and no ads, and nothing is uploaded.',
+        'Make a QR code that opens your Instagram profile. Type your username, style the code and download it for a flyer, shop window or business card.',
       scanned: [
-        'The camera app reads the code and offers to open the link. On a phone with Instagram installed, the profile opens in the app. Otherwise it opens in the browser, where the visitor can follow from the web page.',
-        'The code carries your profile’s web address and nothing else, so scanning it needs no account on QRCraftly and gives us no information about who scanned.',
-        'Visitors who are not logged in to Instagram may be asked to sign in before they can follow you.',
+        'The phone opens your profile in the Instagram app if it is installed, otherwise in the browser. People who are not signed in may be asked to log in before they can follow you.',
       ],
       useCases: [
-        'A market stall, pop-up or shop counter.',
-        'Business cards, packaging inserts and product stickers.',
-        'A wedding, party or event sign that points guests to a hashtag profile.',
-        'Posters and flyers for a band, gallery or club.',
-        'A slide at the end of a talk or a creator’s video.',
+        'A market stall or shop counter.',
+        'Business cards, packaging and stickers.',
+        'Posters for a band, gallery or event.',
       ],
       printing: [
-        'Print at least 2.5 cm (about 1 in) square, and larger for posters.',
-        'Add “@yourname” in text beside the code, so people who cannot scan can still find you.',
-        'Use dark modules on a light background. Brand colours are fine if the scan badge stays green.',
-        'Test the printed code with a phone that is not logged in as you.',
+        'Print at least 2.5 cm (1 in) wide, bigger for posters.',
+        'Print “@yourname” beside the code for people who cannot scan.',
       ],
       checks: [
         'Check the spelling of your username. One wrong letter sends people to a stranger.',
-        'Make sure the account is public, or visitors will see only a request-to-follow screen.',
-        'Re-make the code if you rename your account.',
-        'Scan the printed copy once, in the place where it will hang.',
+        'If the account is private, visitors only see a follow request screen.',
+        'Make a new code if you rename the account.',
       ],
       privacy:
         'Your username is turned into a link in your browser. QRCraftly does not contact Instagram, does not log what you type and adds no tracking to the code.',
@@ -379,41 +333,30 @@ export const landingPageContent: Record<string, LandingCopy> = {
         answer:
           'The link opens a WhatsApp web page that offers to install the app or continue in the browser. Anyone without WhatsApp cannot chat with you through it.',
       },
-      {
-        question: 'Is the number sent to QRCraftly?',
-        answer:
-          'No. The number is put into the code in your browser and goes nowhere else. Anyone who scans the code can read it, so only use a number you are happy to share.',
-      },
     ],
     guide: {
       intro:
-        'Make a QR code that opens a WhatsApp chat with you. Add your number to a wa.me link, style the code and download it for a shop sign or a business card. It is free, with no sign-up and no ads, and your number never leaves your browser.',
+        'Make a QR code that opens a WhatsApp chat with you. Add your number to the wa.me link, style the code and download it.',
       scanned: [
-        'The phone camera reads the code and offers to open the link. WhatsApp then starts a chat with your number, with your pre-typed message in the box if you added one.',
-        'The person still has to press send, so nobody is messaged by accident.',
-        'On a computer, the link opens WhatsApp Web or the desktop app if they are installed.',
+        'WhatsApp opens a chat with your number, with your message already typed if you added one. Nothing is sent until the person presses send.',
+        'On a computer, the link opens WhatsApp Web or the desktop app.',
       ],
       useCases: [
-        'A shop, salon or clinic sign for bookings and questions.',
-        'A flyer or classified ad for a rental, a second-hand sale or a service.',
-        'A delivery or repair van, where phone numbers are hard to read.',
-        'A market stall or event table for quick orders.',
-        'Business cards and invoices for freelancers.',
+        'A shop or salon sign for bookings and questions.',
+        'A flyer or listing for something you are selling.',
+        'Business cards and invoices.',
       ],
       printing: [
-        'Print at least 2.5 cm (about 1 in) square, and larger for signs.',
-        'Write a line beside the code, such as “Chat with us on WhatsApp”.',
-        'Keep your number out of the printed text if you want to avoid cold calls, but remember that the code itself contains it.',
-        'Test the printed code on a phone that has never chatted with you.',
+        'Print at least 2.5 cm (1 in) wide, bigger for signs.',
+        'Add a line such as “Chat with us on WhatsApp”.',
       ],
       checks: [
-        'Type the number in international format, digits only, and test it. A missing country code opens the wrong chat or none at all.',
-        'Use a number that you will keep. The code cannot follow you to a new one.',
-        'Consider a separate business number. Anyone who scans can see your number.',
-        'If you add a message, keep it short and neutral.',
+        'Use the international format, digits only, and test it. A missing country code opens the wrong chat or none.',
+        'Use a number you will keep; the code cannot follow you to a new one.',
+        'Anyone who scans can see your number, so consider a separate business number.',
       ],
       privacy:
-        'The number is placed into the code in your browser. QRCraftly never sees it, never contacts WhatsApp and adds no tracking, but anyone who scans the code can read the number inside it.',
+        'The number is put into the code in your browser. QRCraftly never sees it, never contacts WhatsApp and adds no tracking. Anyone who scans the code can read the number.',
     },
   },
   'pdf-qr-code': {
@@ -451,33 +394,27 @@ export const landingPageContent: Record<string, LandingCopy> = {
     ],
     guide: {
       intro:
-        'Make a QR code that opens a PDF at its web link. QRCraftly does not host files, so put the PDF online first, paste its link and download the code. It is free, with no sign-up and no ads, and the link never leaves your browser.',
+        'Make a QR code that opens a PDF from its web link. QRCraftly does not host files, so put the PDF online first, then paste its link.',
       scanned: [
-        'The phone camera reads the web link and opens it in the browser, which shows the PDF or offers to download it, depending on the phone and the host.',
-        'The code contains only the address, not the file. That keeps the code small and easy to scan, and it means you can replace the PDF later without changing the code.',
-        'If the address stops working, the code stops working with it, so keep the file where you control it.',
+        'The phone opens the link in its browser, which shows the PDF or offers to download it.',
+        'The code holds only the address, not the file. Replace the PDF at the same address and the code shows the new version; move it and the code breaks.',
       ],
       useCases: [
-        'A brochure, catalogue or price list on a stand or at a trade show.',
-        'A product manual or safety sheet on a label.',
-        'A menu, timetable or event programme.',
-        'A CV or portfolio on a business card.',
-        'A form, worksheet or handout in a classroom or clinic.',
+        'A brochure or price list at a trade show.',
+        'A manual or safety sheet on a product label.',
+        'A handout in a classroom or clinic.',
       ],
       printing: [
-        'Print at least 2.5 cm (about 1 in) square, and larger for posters.',
-        'Name what the code opens, for example “Scan for the full catalogue (PDF)”.',
-        'Keep the PDF small, since many people will open it on mobile data.',
-        'Put the code on flat, uncluttered paper rather than across a fold.',
+        'Say what the code opens, such as “Scan for the full catalogue (PDF)”.',
+        'Keep the PDF small, because many people will open it on mobile data.',
       ],
       checks: [
-        'Open the link in a private window. If it asks you to sign in, the sharing setting is wrong.',
-        'Make sure the PDF is readable on a small screen without pinching.',
-        'Use a permanent address. Links that contain a date or a version number are likely to break.',
-        'Check the PDF holds nothing you do not want public, because anyone with the code can open it.',
+        'Open the link in a private browser window. If it asks you to sign in, fix the sharing setting.',
+        'Use a permanent address. Links with a date or version number in them tend to break.',
+        'Anyone with the code can open the PDF, so check it holds nothing private.',
       ],
       privacy:
-        'The link is placed into the code in your browser. QRCraftly does not see the link or the file, and it adds no tracking, so we cannot tell who scans the code. Where you host the PDF is up to you, and that host sees the downloads.',
+        'The link is put into the code in your browser. QRCraftly never sees the link or the file and adds no tracking. Your file host does see the downloads.',
     },
   },
   'qr-code-checker': {

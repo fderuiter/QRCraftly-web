@@ -17,7 +17,7 @@ export const copy: ToolCopy = {
         },
         {
           "name": "Download QR Code",
-          "text": "Save your custom QR code as a PNG, JPEG or WebP image, or as an SVG vector file."
+          "text": "Save it as a PNG, JPEG or WebP image, or as an SVG, EPS or PDF file for print."
         }
       ]
     },
@@ -41,7 +41,7 @@ export const copy: ToolCopy = {
     {
       question: 'Which file formats can I download?',
       answer:
-        'You can download PNG, JPEG and WebP images for screens and printing, or SVG vector files that stay sharp at any size.',
+        'PNG, JPEG and WebP images for screens, and SVG, EPS and PDF vector files that stay sharp at any print size.',
     },
     staysInBrowser('the link I enter'),
   ],

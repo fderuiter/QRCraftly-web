@@ -130,16 +130,23 @@ export const PROTOCOL_PREFIXES = {
  * Formal containment profiles for validating structured text and emails.
  */
 export const CONTAINMENT_PROFILES = {
-  URL: /^(?:https?|ftp):\/\/[^\s\x00-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]+$/i,
-  EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-  PLAIN_TEXT: /^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]*$/,
-  // General check for zero-width and control characters in text fields (allowing \t, \n, \r)
-  STRICT_NO_CONTROL: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]/,
+  URL: /^(?:https?|ftp):\/\/[^\s\x00-\x1F\x7F-\x9F\u200B-\u200D\u2060\uFEFF]+$/i,
+  // The HTML "valid e-mail address" grammar (RFC 5322 atext local part, so O'Brien works), with at
+  // least two domain labels (IDN A-labels such as xn--p1ai included) or an IPv4 address literal (#1273).
+  // eslint-disable-next-line security/detect-unsafe-regex -- linear: each label is bounded and must start after a dot.
+  EMAIL: /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+|\[(?:\d{1,3}\.){3}\d{1,3}\])$/,
+  PLAIN_TEXT: /^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B\u2060\uFEFF]*$/,
+  // Control and hidden zero-width characters in text fields (allowing \t, \n, \r). Zero-width
+  // joiner and non-joiner (U+200C, U+200D) are allowed: emoji sequences and Persian need them (#1271).
+  TEXT_NO_CONTROL: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B\u2060\uFEFF]/,
+  // Wi-Fi names and passwords are not prose, so every zero-width character is refused there:
+  // a joiner would make a network name that looks like another one.
+  STRICT_NO_CONTROL: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\u2060\uFEFF]/,
   // Text-direction controls (U+061C, U+200E/F, U+202A-202E, U+2066-2069). Real right-to-left text
   // never needs them, but they let `gpj.exe` read as `exe.jpg`. Refused where they are never
   // needed (Wi-Fi, phone, SMS, border and template text) and neutralised on display in the scanner.
   BIDI_CONTROL: /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/,
-  PRESERVE_FORMAT_CONTROL: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]/,
+  PRESERVE_FORMAT_CONTROL: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B\u2060\uFEFF]/,
 };
 
 export interface ParsedProtocol {

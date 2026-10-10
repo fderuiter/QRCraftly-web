@@ -11,7 +11,7 @@ import {
   type ScanRegion,
 } from './contracts';
 import { AdaptiveFrameScheduler, DEFAULT_WATCHDOG_TIMEOUT_MS } from './scheduler';
-import { cameraStrategyFor, decodeCameraCode } from './decodeSync';
+import { CAMERA_STRATEGY_COUNT, cameraStrategyFor, decodeCameraCode } from './decodeSync';
 import { systemClock, type ScannerClock } from './clock';
 import { getNativeQrDetector } from './nativeDetector';
 import { createResultGate, DEFAULT_REPEAT_HOLD_MS } from './resultGate';
@@ -269,6 +269,8 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
   const { getSource } = config;
   const gate = createResultGate({
     confirmations: config.confirmations ?? 2,
+    // A code read by one strategy only is read once per rotation, however slow the decodes (#1292).
+    windowMisses: CAMERA_STRATEGY_COUNT - 1,
     holdMs: config.repeatHoldMs ?? DEFAULT_REPEAT_HOLD_MS,
   });
 
@@ -303,7 +305,10 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
       if (!gate.offer(data, scan.source, clock.now())) return;
       emit((e) => e.onScanSuccess?.(data, scan));
     },
-    onScanFail: (error) => emit((e) => e.onScanFail?.(error ?? undefined)),
+    onScanFail: (error) => {
+      gate.miss();
+      emit((e) => e.onScanFail?.(error ?? undefined));
+    },
     onWatchdogTriggered: () => recoverWorker(),
   });
 

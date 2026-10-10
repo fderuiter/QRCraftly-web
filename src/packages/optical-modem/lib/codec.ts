@@ -20,7 +20,7 @@ import { constellationShape } from './constellation';
 import { acquireFrame, drawFrame, type AcquireFailure } from './frame';
 import { MODEM_VERSION, type FrameHeader } from './header';
 import { kernelUniforms, type KernelUniforms, type SampledGrid } from './kernel';
-import { modemKernels } from './kernels';
+import { BLOCK_TAG_BYTES, modemKernels } from './kernels';
 import { BAND_ROWS, type GridGeometry, type RgbaImage } from './layout';
 import { MODEM_GEOMETRIES, type ModemProfile } from './profile';
 
@@ -31,7 +31,7 @@ export interface FrameCapacity {
   bitsPerCell: number;
   /** Whole bytes the grid holds. */
   streamBytes: number;
-  /** Bytes in one inner code block: data plus check bytes. */
+  /** Bytes in one inner code block: data, its identity tag and check bytes. */
   blockBytes: number;
   /** Inner code blocks in one frame. */
   blocks: number;
@@ -50,8 +50,8 @@ export type FrameShape = Pick<ModemProfile, 'constellation' | 'cols' | 'rows' | 
  */
 export function frameCapacity(shape: FrameShape): FrameCapacity {
   const { bitsPerCell } = constellationShape(shape.constellation);
-  const blockBytes = shape.packetBytes + shape.parity;
-  if (shape.packetBytes < 1 || shape.parity < 0 || blockBytes > 255) throw new Error('A block is 1 to 255 bytes, data and check bytes together');
+  const blockBytes = shape.packetBytes + BLOCK_TAG_BYTES + shape.parity;
+  if (shape.packetBytes < 1 || shape.parity < 0 || blockBytes > 255) throw new Error('A block is at most 255 bytes, data, tag and check bytes together');
   const dataCells = shape.cols * (shape.rows - 2 * BAND_ROWS);
   const streamBytes = Math.floor((dataCells * bitsPerCell) / 8);
   const blocks = Math.floor(streamBytes / blockBytes);
@@ -60,7 +60,7 @@ export function frameCapacity(shape: FrameShape): FrameCapacity {
 }
 
 /**
- * Encodes one frame. Each block is a Reed-Solomon codeword; bytes of different blocks alternate
+ * Encodes one frame. Each block is its data and identity tag in a Reed-Solomon codeword; bytes of different blocks alternate
  * across the grid, so a stripe lost to a screen refresh or a smudge costs every block a few bytes
  * rather than one block all of its bytes. The stream is whitened so long runs of one colour do not
  * occur. The coding runs in the modem module.
@@ -123,6 +123,11 @@ export type DecodedFrame =
       erasures: number;
       /** Bytes the code repaired, over the blocks it could decode. */
       corrected: number;
+      /**
+       * Blocks whose first repair the code accepted but whose tag did not match: without the tag
+       * they would have reached the outer code wrong. Each was retried with fewer erasures.
+       */
+      refused: number;
     }
   | { ok: false; reason: DecodeFailure };
 
@@ -130,7 +135,8 @@ export type DecodedFrame =
  * Reads a captured frame: finds it, reads its header, classifies the cells against the live
  * calibration patches, and decodes every block. A frame whose header is damaged or whose blocks
  * fail gives no data for those blocks; the outer code asks for more. Each block spends at most
- * all its check bytes on erasures, the least sure bytes first; if that fails, half, then none.
+ * all its check bytes on erasures, the least sure bytes first; if that fails, half, then none. A
+ * repair counts only when the block's tag matches its data, session, frame sequence and index.
  * @param image - The captured image.
  * @param options - Geometries to try and how to use confidence.
  * @returns The decoded blocks or why the frame was unreadable.
@@ -169,5 +175,5 @@ export function decodeModemFrame(image: RgbaImage, options: DecodeOptions = {}):
   for (let b = 0; b < capacity.blocks; b++) {
     blocks.push(decoded.ok[b] ? decoded.data.slice(b * header.packetBytes, (b + 1) * header.packetBytes) : null);
   }
-  return { ok: true, header, blocks, blocksOk: decoded.blocksOk, erasures: decoded.erasures, corrected: decoded.corrected };
+  return { ok: true, header, blocks, blocksOk: decoded.blocksOk, erasures: decoded.erasures, corrected: decoded.corrected, refused: decoded.refused };
 }

@@ -43,7 +43,7 @@ Please use the [GitHub Security Advisory](https://github.com/fderuiter/QRCraftly
   - Data leaks (e.g., data being sent to a server).
   - XSS vulnerabilities.
   - Improper configuration of the client-side generator (including vCard 2.1, 3.0, 4.0, and MECard formats).
-  - Bulk CSV processing, custom PNG export resolution settings, & batch ZIP generation privacy boundary violations.
+  - Bulk CSV processing (including the link or plain text content type), custom PNG export resolution settings, & batch ZIP generation privacy boundary violations.
 - **Out of Scope:**
   - Physical security of the user's device.
   - Browser-level vulnerabilities.
@@ -102,7 +102,7 @@ Structured data is rendered by the server-only Head at prerender time ([ADR 0034
 
 To prevent DOM-based Cross-Site Scripting (DOM-XSS) via dynamic anchors and `href` bindings of user-controlled URLs, we enforce strict URL sanitization:
 
-- **Link scheme check (`isDangerousUrl`)**: Every dynamic value destined for an anchor `href`, `window.open`, `location` or `navigate()` call must pass `isDangerousUrl`, which refuses `javascript:`, `data:`, `vbscript:` and the other blocked schemes after decoding obfuscation. Semgrep enforces this (`require-isdangerousurl` in `semgrep.yml`, with fixtures in `tests/semgrep/`). The older `sanitizeHref` helper is gone: it would have let a protocol-relative `//host` address through and nothing used it.
+- **Link scheme check (`isDangerousUrl`)**: Every dynamic value destined for an anchor `href`, `window.open`, `location` or `navigate()` call must pass `isDangerousUrl`, which refuses `javascript:`, `data:`, `vbscript:` and the other blocked schemes after decoding obfuscation. Like a URL parser, it drops control and zero-width characters anywhere and whitespace only at the start, so `java\tscript:` is refused but prose such as `About: us` or `File: invoice.pdf` is not a scheme. Script schemes are refused even with a space after the colon. Semgrep enforces this (`require-isdangerousurl` in `semgrep.yml`, with fixtures in `tests/semgrep/`). The older `sanitizeHref` helper is gone: it would have let a protocol-relative `//host` address through and nothing used it.
 - **HTML Meta-Character Escaping (`escapeHtml`)**: In addition to scheme enforcement, values rendered as text nodes or embedded inside anchor tag `href` links are escaped. This safely converts characters like `&`, `<`, `>`, `"`, and `'` into their respective HTML entity equivalents (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`), entirely neutralizing DOM reinterpretation risks and ensuring robust DOM-XSS protection.
 
 ## No Server API

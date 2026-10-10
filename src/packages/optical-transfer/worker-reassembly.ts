@@ -85,9 +85,9 @@ function post(message: Record<string, unknown>, transfer: Transferable[] = []): 
   self.postMessage(message, { transfer });
 }
 
-function resetWorkerState(): void {
+function resetWorkerState(keepKey = false): void {
   // Reset rather than drop the reassembler: it remembers the finished session and ignores its frames.
-  reassembler?.reset();
+  reassembler?.reset(keepKey);
   finalizing = false;
 }
 
@@ -117,6 +117,7 @@ function postNotices(active: FountainReassembler): void {
 async function finishIfComplete(active: FountainReassembler): Promise<void> {
   if (finalizing || !active.isComplete) return;
   finalizing = true;
+  let failed = false;
   try {
     const { files } = await active.finalize();
     const copies = files.map(({ data, header }) => ({
@@ -138,9 +139,11 @@ async function finishIfComplete(active: FountainReassembler): Promise<void> {
       transfer
     );
   } catch (err: unknown) {
+    failed = true;
     post({ type: 'ERROR', error: err instanceof Error ? err.message : 'Reassembly failed', isFountain: true });
   } finally {
-    resetWorkerState();
+    // After a failed finalize the key stays, so the honest stream can still open (#1303).
+    resetWorkerState(failed);
   }
 }
 
@@ -150,8 +153,8 @@ async function handleKey(active: FountainReassembler, secret: Uint8Array | null)
     post({ type: 'KEY_STATUS', accepted: false });
     return;
   }
-  active.setKey(secret);
-  post({ type: 'KEY_STATUS', accepted: true });
+  const accepted = active.setKey(secret);
+  post({ type: 'KEY_STATUS', accepted });
   postNotices(active);
   // The transfer may have finished while it waited for its key.
   await finishIfComplete(active);

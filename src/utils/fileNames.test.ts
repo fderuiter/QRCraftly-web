@@ -130,6 +130,19 @@ describe('analyseReceivedFile (#1155)', () => {
     expect(analyseReceivedFile(name, 'application/octet-stream').risky).toBe(true);
   });
 
+  it.each([
+    'setup.vbe', 'setup.pif', 'a.cpl', 'a.msc', 'a.reg', 'a.msp', 'a.scf', 'a.ws', 'a.wsh', 'a.chm', 'a.url',
+    'a.library-ms', 'a.settingcontent-ms', 'a.application', 'a.appref-ms', 'a.msix', 'a.msixbundle', 'a.appxbundle',
+    'a.ps1xml', 'a.psm1', 'a.psd1', 'a.vhd', 'a.vhdx', 'a.jnlp', 'a.mht', 'a.mhtml', 'a.xht', 'a.shtml', 'a.dotm',
+    'a.xltm', 'a.xlam', 'a.potm', 'a.ppsm', 'a.ppam', 'install.sh', 'a.command', 'a.desktop', 'a.py',
+  ])('flags %s as risky, like the types it sits next to (#1305)', (name) => {
+    expect(analyseReceivedFile(name, 'application/octet-stream').risky).toBe(true);
+  });
+
+  it.each(['a.pdf', 'a.png', 'a.txt', 'a.csv', 'a.zip'])('leaves %s unflagged', (name) => {
+    expect(analyseReceivedFile(name, 'application/octet-stream').risky).toBe(false);
+  });
+
   it('flags active MIME types whatever the extension says', () => {
     expect(analyseReceivedFile('notes.dat', 'text/html').risky).toBe(true);
     expect(analyseReceivedFile('notes.dat', 'image/svg+xml; charset=utf-8').risky).toBe(true);

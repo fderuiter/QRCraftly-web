@@ -154,6 +154,20 @@ describe('createZip', () => {
     expect(() => createZip([{ name: '../evil.png', data: '' }])).toThrow(/Unsafe/);
     expect(() => createZip([{ name: 'a\\b.png', data: '' }])).toThrow(/Unsafe/);
   });
+
+  it('rejects drive letters, `.` and empty segments, and over-long names (#1288)', () => {
+    // Built from parts: a drive letter is exactly what this ZIP writer must refuse.
+    expect(() => createZip([{ name: ['C:', 'x.png'].join('/'), data: '' }])).toThrow(/Unsafe/);
+    expect(() => createZip([{ name: 'a/./b.png', data: '' }])).toThrow(/Unsafe/);
+    expect(() => createZip([{ name: 'dir//x.png', data: '' }])).toThrow(/Unsafe/);
+    expect(() => createZip([{ name: `${'a'.repeat(70000)}.txt`, data: 'hello' }])).toThrow(/65535 UTF-8 bytes/);
+    expect(() => createZip([{ name: 'folder/', data: '' }])).not.toThrow();
+  });
+
+  it('treats names that encode to the same bytes as duplicates (#1288)', () => {
+    // Two different lone surrogates both become U+FFFD when written as UTF-8.
+    expect(() => createZip([{ name: 'x\uD83C.png', data: '' }, { name: 'x\uD83D.png', data: '' }])).toThrow(/Duplicate/);
+  });
 });
 
 describe('file name helpers', () => {
@@ -168,6 +182,38 @@ describe('file name helpers', () => {
     expect(sanitizeFileStem('   ')).toBe('qr_code');
     expect(sanitizeFileStem('...', 'row_3')).toBe('row_3');
     expect(sanitizeFileStem('x'.repeat(300))).toHaveLength(100);
+  });
+
+  it('keeps every entry name within 255 UTF-8 bytes (#1288)', () => {
+    const name = allocateFileName(sanitizeFileStem('日'.repeat(300)), 'png', new Set());
+    expect(new TextEncoder().encode(name).length).toBeLessThanOrEqual(255);
+    const many = new Set<string>();
+    const stem = sanitizeFileStem('🎉'.repeat(300));
+    for (let i = 0; i < 500; i++) allocateFileName(stem, 'png', many);
+    for (const used of many) expect(new TextEncoder().encode(used).length).toBeLessThanOrEqual(255);
+  });
+
+  it('never cuts a character in half, so rows cannot collide in the archive (#1288)', () => {
+    const a = sanitizeFileStem(`x${'🎉'.repeat(50)}`);
+    const b = sanitizeFileStem(`x${'🎉'.repeat(49)}😀`);
+    const isLoneSurrogate = (ch: string) => ch.length === 1 && /[\uD800-\uDFFF]/.test(ch);
+    expect(Array.from(a).some(isLoneSurrogate)).toBe(false);
+    expect(Array.from(b).some(isLoneSurrogate)).toBe(false);
+    const used = new Set<string>();
+    const names = [allocateFileName(a, 'png', used), allocateFileName(b, 'png', used)];
+    expect(() => createZip(names.map((name) => ({ name, data: '' })))).not.toThrow();
+  });
+
+  it('prefixes Windows device names written with superscript digits (#1288)', () => {
+    expect(sanitizeFileStem('COM¹')).toBe('_COM¹');
+    expect(sanitizeFileStem('lpt³')).toBe('_lpt³');
+    expect(sanitizeFileStem('CONIN$')).toBe('_CONIN$');
+  });
+
+  it('treats NFC and NFD spellings of a name as the same file', () => {
+    const used = new Set<string>();
+    expect(allocateFileName('Caf\u00e9', 'png', used)).toBe('Caf\u00e9.png');
+    expect(allocateFileName('Cafe\u0301', 'png', used)).toBe('Cafe\u0301_2.png');
   });
 
   it('allocates unique names case-insensitively', () => {

@@ -1,4 +1,5 @@
-import { readFileSync, existsSync, writeFileSync, unlinkSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { describe, it, expect } from 'vitest';
@@ -73,18 +74,17 @@ describe('Search Engine Indexing Prevention & Hybrid Sitemap Generation', () => 
   });
 
   it('should generate a sitemap merging pre-rendered pages and client-rendered registry routes without duplicates', () => {
-    const distDir = join(__dirname, '../dist/client');
+    // A temp folder stands in for dist/client, so the test never writes into a real build.
+    const distDir = mkdtempSync(join(tmpdir(), 'sitemap-indexing-'));
     const sitemapPath = join(distDir, 'sitemap.xml');
-
-    if (!existsSync(distDir)) {
-      mkdirSync(distDir, { recursive: true });
+    let sitemapXml: string;
+    try {
+      generateSitemap({ distDir, outputFile: sitemapPath });
+      expect(existsSync(sitemapPath)).toBe(true);
+      sitemapXml = readFileSync(sitemapPath, 'utf8');
+    } finally {
+      rmSync(distDir, { recursive: true, force: true });
     }
-
-    // Run sitemap generator
-    generateSitemap();
-
-    expect(existsSync(sitemapPath)).toBe(true);
-    const sitemapXml = readFileSync(sitemapPath, 'utf8');
 
     // 1. Valid XML declaration and root tag
     expect(sitemapXml).toMatch(/^<\?xml version="1\.0" encoding="UTF-8"\?>/);

@@ -20,12 +20,13 @@ import { previewRow } from '@/packages/bulk-csv';
 import { BulkCsvData, QRType, QRGeneratorContract } from '@/types';
 
 /**
- * Constructs the live preview payload: the first row's value in the payload column,
- * not the whole CSV, which would overflow a QR code (#1110). Empty when no row has one.
+ * Constructs the live preview payload: the first row's value in the payload column, encoded
+ * exactly as its code in the ZIP is, not the whole CSV, which would overflow a QR code (#1110).
+ * Empty when no row has one.
  */
 export const constructBulkCsvString = (data: BulkCsvData): string => {
   if (!data) return '';
-  return previewRow(data.csvContent || '', data.payloadColumn || '')?.payload ?? '';
+  return previewRow(data.csvContent || '', data.payloadColumn || '', data.contentType ?? 'link')?.payload ?? '';
 };
 
 /**
@@ -37,6 +38,7 @@ export const hydrateBulkCsvData = (raw: string): BulkCsvData => {
     payloadColumn: '',
     filenameColumn: '',
     exportFormat: 'png',
+    contentType: 'link',
     exportResolution: 1000,
   };
 };

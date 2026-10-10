@@ -45,6 +45,8 @@ const FLAG_UTF8 = 0x0800;
 const METHOD_STORE = 0;
 const MAX_ENTRIES = 0xffff;
 const MAX_UINT32 = 0xffffffff;
+/** The name length field is 16 bits. */
+const MAX_NAME_BYTES = 0xffff;
 
 /** Packs a date into MS-DOS time and date words (2-second resolution, 1980 to 2107). */
 function toDosDateTime(date: Date): { time: number; date: number } {
@@ -57,7 +59,16 @@ function toDosDateTime(date: Date): { time: number; date: number } {
 
 function assertSafeName(name: string): void {
   if (name.length === 0) throw new Error('ZIP entry names must not be empty.');
-  if (name.startsWith('/') || name.includes('\\') || name.split('/').some((part) => part === '..')) {
+  const parts = name.split('/');
+  // A trailing `/` marks a folder entry, so only the last segment may be empty.
+  const emptyInside = parts.slice(0, -1).some((part) => part === '');
+  if (
+    name.startsWith('/') ||
+    name.includes('\\') ||
+    /^[a-z]:/i.test(name) ||
+    emptyInside ||
+    parts.some((part) => part === '..' || part === '.')
+  ) {
     throw new Error(`Unsafe ZIP entry name: ${name}`);
   }
 }
@@ -74,14 +85,21 @@ export function createZip(entries: readonly ZipEntry[], options: CreateZipOption
     throw new Error(`A ZIP archive without ZIP64 holds at most ${MAX_ENTRIES} entries.`);
   }
   const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
   const dos = toDosDateTime(options.date ?? new Date());
   const seen = new Set<string>();
 
   const prepared = entries.map((entry) => {
     assertSafeName(entry.name);
-    if (seen.has(entry.name)) throw new Error(`Duplicate ZIP entry name: ${entry.name}`);
-    seen.add(entry.name);
     const nameBytes = encoder.encode(entry.name);
+    if (nameBytes.length > MAX_NAME_BYTES) {
+      throw new Error(`ZIP entry names are limited to ${MAX_NAME_BYTES} UTF-8 bytes.`);
+    }
+    // Compare what is written: a lone surrogate encodes as U+FFFD, so two different strings
+    // can end up as the same name in the archive.
+    const key = decoder.decode(nameBytes);
+    if (seen.has(key)) throw new Error(`Duplicate ZIP entry name: ${entry.name}`);
+    seen.add(key);
     const data = typeof entry.data === 'string' ? encoder.encode(entry.data) : entry.data;
     return { nameBytes, data, crc: crc32(data) };
   });

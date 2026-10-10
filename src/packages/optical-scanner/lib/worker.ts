@@ -11,6 +11,7 @@ import {
   type ScanRegion,
 } from './contracts';
 import { decodeImageAtSizes, FILE_SCAN_MESSAGE, FILE_SCAN_UNREADABLE, FILE_SCAN_UNSUPPORTED } from './imageFile';
+import { exceedsPixelLimit, IMAGE_TOO_LARGE_PIXELS_MESSAGE } from './imageLimits';
 import { createStaleFrameGuard } from './frameGuard';
 
 const yieldToEventLoop = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -83,6 +84,8 @@ async function scanImageFile(file: unknown, sequenceId: number): Promise<void> {
     let bitmap: ImageBitmap | null = null;
     try {
       bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      // A format whose header did not give its size is checked once decoded (#1299).
+      if (exceedsPixelLimit(bitmap.width, bitmap.height)) throw new Error(IMAGE_TOO_LARGE_PIXELS_MESSAGE);
       const reader = await loadQrReader();
       const code = await decodeImageAtSizes(
         bitmap,
@@ -92,8 +95,9 @@ async function scanImageFile(file: unknown, sequenceId: number): Promise<void> {
         (data, width, height) => decodeRgbaCode(reader, data, width, height)
       );
       response = { status: code ? 'pass' : 'fail', sequenceId, ...codeFields(code, 'qr-decode') };
-    } catch {
-      response = { status: 'fail', sequenceId, error: FILE_SCAN_UNREADABLE };
+    } catch (err) {
+      const tooLarge = err instanceof Error && err.message === IMAGE_TOO_LARGE_PIXELS_MESSAGE;
+      response = { status: 'fail', sequenceId, error: tooLarge ? IMAGE_TOO_LARGE_PIXELS_MESSAGE : FILE_SCAN_UNREADABLE };
     } finally {
       bitmap?.close();
     }

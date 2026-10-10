@@ -403,8 +403,9 @@ pub unsafe extern "C" fn modem_rx_sample(
 
 /// Decodes every block of a frame from the grid. `threshold` below 0
 /// decodes hard. `output` gets a flag per block, then each block's data
-/// (zero for a block that failed); `io[72..75]` get the blocks repaired, the
-/// erasures used and the bytes repaired.
+/// (zero for a block that failed); `io[72..76]` get the blocks repaired, the
+/// erasures used, the bytes repaired and the blocks whose tag refused the
+/// code's first repair.
 ///
 /// # Safety
 /// As [`modem_rx_free`].
@@ -453,6 +454,7 @@ pub unsafe extern "C" fn modem_rx_decode(
     rx.io[IO_OUT] = decoded.blocks_ok as f64;
     rx.io[IO_OUT + 1] = decoded.erasures as f64;
     rx.io[IO_OUT + 2] = decoded.corrected as f64;
+    rx.io[IO_OUT + 3] = decoded.refused as f64;
     STATUS_OK
 }
 
