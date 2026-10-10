@@ -535,6 +535,11 @@ export interface BulkCsvData {
   filenameColumn: string;
   /** Output file format ('png' or 'svg'). */
   exportFormat: 'png' | 'svg';
+  /**
+   * How payload cells are read: 'link' normalises each cell like the Link generator, 'text'
+   * encodes it as typed. Defaults to 'link'.
+   */
+  contentType?: 'link' | 'text';
   /** PNG export resolution in pixels (e.g. 500, 1000, 2000, 3000). Defaults to 1000. */
   exportResolution?: number;
   /** Original file name. */

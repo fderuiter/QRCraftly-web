@@ -19,8 +19,9 @@
 import { DEFAULT_CONFIG } from '@/constants';
 import { type CsvRow } from './csv';
 import { hasPayload } from './preview';
+import { bulkValidationType, encodeBulkCell, type BulkContentType } from './payload';
 import { analyseLink, type LinkFinding } from '@/packages/link-safety';
-import { QRConfig, QRType } from '@/types';
+import { QRConfig } from '@/types';
 import {
   isDangerousUrl,
   REGEX_STRICT_CONTROL_CHARS,
@@ -30,13 +31,13 @@ import {
 export type PreflightRowStatus = 'valid' | 'empty' | 'unsafe' | 'caution';
 
 export interface PreflightRowDetail {
-  /** 1-based data row index (ignoring header). */
+  /** Data row number as a spreadsheet shows it (blank lines counted, the header not). */
   rowNumber: number;
   /** Primary status category for this row. */
   category: PreflightRowStatus;
   /** Human-readable explanation if row is empty, unsafe, or has caution warning. */
   reason?: string;
-  /** Raw or trimmed string value from payload column. */
+  /** The string the row encodes (see `encodeBulkCell`), or the raw cell for an empty row. */
   payload?: string;
 }
 
@@ -47,7 +48,7 @@ export interface PreflightReport {
   validCount: number;
   /** Number of rows missing a value in the payload column. */
   emptyCount: number;
-  /** Number of rows failing URL safety checks. */
+  /** Number of rows whose content fails the payload checks, so they are left out. */
   unsafeCount: number;
   /** Number of rows with link caution warnings (e.g. lookalikes, shorteners, IP addresses). */
   cautionCount: number;
@@ -59,6 +60,16 @@ export interface PreflightReport {
   validRows: CsvRow[];
   /** 0-based indices in original rows array corresponding to validRows. */
   validRowIndices: number[];
+  /** The encoded payload of each entry in validRows, in the same order. */
+  validPayloads: string[];
+}
+
+/** Options for {@link categorizeCsvRows}. */
+export interface CategorizeOptions {
+  /** Whether cells are links or plain text. Defaults to links. */
+  contentType?: BulkContentType;
+  /** Spreadsheet row number of each row (`CsvTable.rowNumbers`). Defaults to the position + 1. */
+  rowNumbers?: readonly number[];
 }
 
 function defaultValidateConfig(config: QRConfig): string[] {
@@ -91,14 +102,19 @@ function defaultValidateConfig(config: QRConfig): string[] {
  * @param payloadColumn Header name of the column containing QR payloads.
  * @param config Active QR configuration.
  * @param customValidator Optional custom validator function for QR configuration.
+ * @param options Content type and spreadsheet row numbers.
  * @returns PreflightReport with detailed categorization metrics and row issues.
  */
 export function categorizeCsvRows(
   rows: CsvRow[],
   payloadColumn: string,
   config?: Partial<QRConfig>,
-  customValidator?: (config: QRConfig) => string[]
+  customValidator?: (config: QRConfig) => string[],
+  options: CategorizeOptions = {}
 ): PreflightReport {
+  const { contentType = 'link', rowNumbers } = options;
+  const validationType = bulkValidationType(contentType);
+  const validPayloads: string[] = [];
   const details: PreflightRowDetail[] = [];
   const invalidDetails: PreflightRowDetail[] = [];
   const validRows: CsvRow[] = [];
@@ -120,6 +136,7 @@ export function categorizeCsvRows(
       invalidDetails: [],
       validRows: [],
       validRowIndices: [],
+      validPayloads: [],
     };
   }
 
@@ -127,7 +144,7 @@ export function categorizeCsvRows(
     ...DEFAULT_CONFIG,
     ...config,
     value: '',
-    type: QRType.URL,
+    type: validationType,
   };
 
   const validateFn = customValidator ?? defaultValidateConfig;
@@ -135,9 +152,8 @@ export function categorizeCsvRows(
   const analyseCache = new Map<string, LinkFinding[]>();
 
   rows.forEach((row, index) => {
-    const rowNumber = index + 1;
+    const rowNumber = rowNumbers?.[index] ?? index + 1;
     const rawValue = row[payloadColumn] ?? '';
-    const trimmedValue = rawValue.trim();
 
     // 1. Missing payload check
     if (!hasPayload(row, payloadColumn)) {
@@ -153,15 +169,11 @@ export function categorizeCsvRows(
       return;
     }
 
-    // 2. URL safety check
+    // 2. The same payload checks as the single generator, on the string that will be encoded.
+    const trimmedValue = encodeBulkCell(rawValue, contentType);
     let violations = validateCache.get(trimmedValue);
     if (!violations) {
-      const rowConfig: QRConfig = {
-        ...baseConfig,
-        value: trimmedValue,
-        type: QRType.URL,
-      };
-      violations = validateFn(rowConfig);
+      violations = validateFn({ ...baseConfig, value: trimmedValue });
       validateCache.set(trimmedValue, violations);
     }
 
@@ -201,6 +213,7 @@ export function categorizeCsvRows(
       invalidDetails.push(detail);
       validRows.push(row);
       validRowIndices.push(index);
+      validPayloads.push(trimmedValue);
       return;
     }
 
@@ -214,6 +227,7 @@ export function categorizeCsvRows(
     details.push(detail);
     validRows.push(row);
     validRowIndices.push(index);
+    validPayloads.push(trimmedValue);
   });
 
   return {
@@ -226,5 +240,6 @@ export function categorizeCsvRows(
     invalidDetails,
     validRows,
     validRowIndices,
+    validPayloads,
   };
 }
