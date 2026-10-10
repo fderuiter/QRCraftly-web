@@ -28,7 +28,6 @@ export interface PathCommandVisitor {
  * with absolute coordinates for each standard path command.
  */
 export function parseSvgPath(d: string, handler: PathCommandVisitor): void {
-  // eslint-disable-next-line security/detect-unsafe-regex
   const tokens = d.match(/([a-zA-Z]|-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)/g) || [];
 
   let idx = 0;

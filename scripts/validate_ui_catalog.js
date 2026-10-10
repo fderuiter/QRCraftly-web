@@ -1,4 +1,4 @@
-import { execFileSync } from 'child_process';
+import { execBinary } from './utils/execHelper.js';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -485,7 +485,7 @@ function runValidator() {
           const target = process.env.GITHUB_BASE_REF ? `origin/${process.env.GITHUB_BASE_REF}` : 'origin/main';
           console.log(`[UI Catalog Sync] CI Context detected. Querying diff against target ${target}...`);
           try {
-            stdout = execFileSync('git', ['diff', '--name-only', `${target}...HEAD`], { encoding: 'utf8', cwd: repoRoot });
+            stdout = execBinary('git', ['diff', '--name-only', `${target}...HEAD`], { cwd: repoRoot });
           } catch (err) {
             console.error(`❌ [UI Catalog Sync] Target branch comparison failed: ${err.message}`);
             process.exit(1);
@@ -501,7 +501,7 @@ function runValidator() {
         } else {
           // Local/dev: check uncommitted staged and unstaged files
           try {
-            stdout = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8', cwd: repoRoot });
+            stdout = execBinary('git', ['status', '--porcelain'], { cwd: repoRoot });
             if (stdout.trim()) {
               modifiedFiles = parseGitStatus(stdout);
             }

@@ -161,7 +161,6 @@ const formatUtcDateTime = (date: Date): string =>
   `${date.getUTCFullYear()}${pad2(date.getUTCMonth() + 1)}${pad2(date.getUTCDate())}T${pad2(date.getUTCHours())}${pad2(date.getUTCMinutes())}${pad2(date.getUTCSeconds())}Z`;
 
 const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
-// eslint-disable-next-line security/detect-unsafe-regex -- linear: anchored, fixed-width digit groups, one optional seconds group.
 const WALL_CLOCK = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
 
 /**

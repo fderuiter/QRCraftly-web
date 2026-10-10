@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execBinary } from './utils/execHelper.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -8,7 +8,7 @@ const repoRoot = path.resolve(__dirname, '..');
 
 try {
   console.log('Running code duplication checks using locally installed jscpd...');
-  execSync('pnpm jscpd src --config .jscpd.json', {
+  execBinary('pnpm', ['jscpd', 'src', '--config', '.jscpd.json'], {
     cwd: repoRoot,
     stdio: 'inherit'
   });

@@ -1,4 +1,4 @@
-import { execFileSync } from 'child_process';
+import { execBinary } from './utils/execHelper.js';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -187,7 +187,7 @@ export function parseGitDiff(stdout) {
 export function runAuditor(options = {}) {
   const env = options.env || process.env;
   const argv = options.argv || process.argv;
-  const customExecSync = options.execSync || execFileSync;
+  const customExecSync = options.execSync || execBinary;
   const customExistsSync = options.existsSync || fs.existsSync;
   const exit = options.exit || process.exit;
 

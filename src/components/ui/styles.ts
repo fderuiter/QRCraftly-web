@@ -22,7 +22,6 @@ const TEXT_ALIGN_PATTERN = /^text-(left|center|right|justify|start|end)$/;
 const TEXT_WRAP_PATTERN = /^text-(wrap|nowrap|balance|pretty)$/;
 const TEXT_OVERFLOW_PATTERN = /^text-(ellipsis|clip)$/;
 const FONT_FAMILY_PATTERN = /^font-(sans|serif|mono|display)$/;
-// eslint-disable-next-line security/detect-unsafe-regex -- linear: anchored, and each optional group starts with a literal '-'.
 const BORDER_WIDTH_PATTERN = /^border(-[xytrbl])?(-(\d+|\[[^\]]+\]))?$/;
 const BORDER_STYLE_PATTERN = /^border-(solid|dashed|dotted|double|hidden|none)$/;
 

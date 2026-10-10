@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { syncUICatalog, syncAll } from '../scripts/sync_docs.js';
 import { validateCatalog } from '../scripts/validate_ui_catalog.js';
+import { execBinary } from './utils/execHelper';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -191,7 +192,6 @@ publish-approved: true
 
   describe('validate_ui_catalog.js --fix integration', () => {
     it('automatically repairs missing catalog entries when --fix is provided', async () => {
-      const { execFileSync } = await import('child_process');
       // Create a component missing from the real catalog
       const dummyComponentPath = path.join(defaultRepoRoot, 'src/components/ui/TempSyncTestComp.tsx');
       try {
@@ -202,7 +202,7 @@ publish-approved: true
         let failed = false;
         let stderr = '';
         try {
-          execFileSync('node', ['scripts/validate_ui_catalog.js', 'src/components/ui/TempSyncTestComp.tsx'], {
+          execBinary('node', ['scripts/validate_ui_catalog.js', 'src/components/ui/TempSyncTestComp.tsx'], {
             cwd: defaultRepoRoot,
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe'],
@@ -218,7 +218,7 @@ publish-approved: true
         expect(stderr).toContain("UI component 'TempSyncTestComp.tsx' is missing from the catalog");
 
         // Running validate_ui_catalog with --fix should scaffold the entry and succeed
-        const fixOutput = execFileSync(
+        const fixOutput = execBinary(
           'node',
           ['scripts/validate_ui_catalog.js', '--fix', 'src/components/ui/TempSyncTestComp.tsx'],
           {

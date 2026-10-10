@@ -3,8 +3,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { spawnSync } from 'child_process';
-import { resolveBash } from './utils/execHelper.js';
+import { resolveBash, spawnBinary } from './utils/execHelper.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,7 +82,7 @@ function main() {
   const bashBinary = resolveBash();
   const relativeScriptPath = path.relative(repoRoot, scriptPath).replace(/\\/g, '/');
 
-  const result = spawnSync(bashBinary, [relativeScriptPath, ...args.slice(1)], {
+  const result = spawnBinary(bashBinary, [relativeScriptPath, ...args.slice(1)], {
     cwd: repoRoot,
     stdio: 'inherit',
     env: process.env,

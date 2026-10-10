@@ -38,23 +38,23 @@ Each replacement moves through these stages in order. The scorecard below record
 
 ### Other replacements
 
-| Package                                    | Replacement                                  | Stage    |
-| ------------------------------------------ | -------------------------------------------- | -------- |
-| `tj-actions/changed-files`                 | `scripts/ci/changed_files.js` (#1183)        | Removed  |
-| `dawidd6/action-send-mail`                 | `scripts/ci/audit_issue.js` (#1184)          | Removed  |
-| `davelosert/vitest-coverage-report-action` | our own coverage summary (#1185)             | Contract |
-| `vitest-axe`                               | our own matcher on axe-core (#1186)          | Contract |
-| `@testing-library/jest-dom`                | our own DOM matchers (#1188)                 | Contract |
-| `@ngraveio/bc-ur`                          | frozen vectors (#1181)                       | Removed  |
-| `tsx`                                      | Node's own type stripping (#1189)            | Contract |
-| `husky`, `lint-staged`                     | our own hooks and staged-file runner (#1190) | Contract |
-| `marked`                                   | our own Markdown parser (#1191)              | Contract |
-| `globals`                                  | a small Node list (#1192)                    | Contract |
-| `eslint-plugin-security`                   | ESLint core and our own rules (#1193)        | Contract |
-| `eslint-plugin-tailwindcss`                | our own rule on Tailwind's API (#1194)       | Contract |
-| `jscpd`                                    | our own duplicate-code checker (#1195)       | Contract |
-| `dependency-cruiser`                       | our own package-boundary checker (#1196)     | Contract |
-| `@vitejs/plugin-react`                     | Vite's esbuild JSX (#1197)                   | Contract |
+| Package                                    | Replacement                                                                 | Stage    |
+| ------------------------------------------ | --------------------------------------------------------------------------- | -------- |
+| `tj-actions/changed-files`                 | `scripts/ci/changed_files.js` (#1183)                                       | Removed  |
+| `dawidd6/action-send-mail`                 | `scripts/ci/audit_issue.js` (#1184)                                         | Removed  |
+| `davelosert/vitest-coverage-report-action` | `scripts/ci/coverage_summary.js` (#1185)                                    | Removed  |
+| `vitest-axe`                               | `tests/utils/axe.ts` on axe-core (#1186)                                    | Removed  |
+| `@testing-library/jest-dom`                | our own DOM matchers (#1188)                                                | Contract |
+| `@ngraveio/bc-ur`                          | frozen vectors (#1181)                                                      | Removed  |
+| `tsx`                                      | Node's own type stripping (#1189)                                           | Contract |
+| `husky`, `lint-staged`                     | our own hooks and staged-file runner (#1190)                                | Contract |
+| `marked`                                   | our own Markdown parser (#1191)                                             | Contract |
+| `globals`                                  | `eslint/node-globals.js` (#1192); ESLint itself still pulls in `globals` 14 | Removed  |
+| `eslint-plugin-security`                   | ESLint core and our own rules in `eslint/rules/` (#1193)                    | Removed  |
+| `eslint-plugin-tailwindcss`                | our own rule on Tailwind's API (#1194)                                      | Contract |
+| `jscpd`                                    | our own duplicate-code checker (#1195)                                      | Contract |
+| `dependency-cruiser`                       | our own package-boundary checker (#1196)                                    | Contract |
+| `@vitejs/plugin-react`                     | Vite's esbuild JSX (#1197); Babel stays for `eslint-plugin-react-hooks`     | Removed  |
 
 ### Kept
 
