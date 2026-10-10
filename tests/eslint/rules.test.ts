@@ -81,7 +81,7 @@ describe('qrcraftly/exec-through-helper', () => {
     valid: [
       { code: 'import { execBinary } from "./utils/execHelper.js";', filename: 'scripts/x.js' },
       { code: 'import { execFileSync } from "child_process";', filename: '/repo/scripts/utils/execHelper.js' },
-      { code: 'import { execFileSync } from "node:child_process";', filename: 'C:\\repo\\tests\\utils\\execHelper.ts' },
+      { code: 'import { execFileSync } from "node:child_process";', filename: 'repo\\tests\\utils\\execHelper.ts' },
       { code: 'import fs from "node:fs";', filename: 'scripts/x.js' },
     ],
     invalid: [
