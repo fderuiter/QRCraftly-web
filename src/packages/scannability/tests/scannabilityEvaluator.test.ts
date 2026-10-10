@@ -681,6 +681,70 @@ describe('Scannability Health Evaluator (headless)', () => {
       await expect(answerC).resolves.toMatchObject({ status: 'fail' });
     });
 
+    it('shows checking, not the earlier verdict, as soon as the design changes (#1250)', async () => {
+      const h = createHarness();
+      void h.evaluator.check({ imageData: frameOf() });
+      h.worker().reply({ success: true, physicalReady: true });
+      expect(h.status()).toBe('physical-pass');
+
+      const next = { ...DEFAULT_CONFIG, fgColor: '#eeeeee' };
+      h.evaluator.setConfig(next);
+      expect(h.status()).toBe('checking');
+
+      const answer = h.evaluator.check({ imageData: frameOf() });
+      h.worker().reply({ success: false, physicalReady: false, error: 'NOT_FOUND' });
+      await expect(answer).resolves.toMatchObject({ status: 'fail' });
+      expect(h.status()).toBe('fail');
+    });
+
+    it('never publishes an in-flight answer for the design shown before a change (#1250)', async () => {
+      const h = createHarness();
+      const inFlight = h.evaluator.check({ imageData: frameOf() });
+      h.evaluator.setConfig({ ...DEFAULT_CONFIG, fgColor: '#eeeeee' });
+
+      // The answer describes the earlier design, and no check for the new one has arrived yet.
+      h.worker().reply({ success: true, physicalReady: true });
+      await expect(inFlight).resolves.toBeNull();
+      expect(h.status()).toBe('checking');
+    });
+
+    it('checks the canvas itself when no check follows a design change (#1250)', async () => {
+      const h = createHarness();
+      void h.evaluator.check({ imageData: frameOf() });
+      h.worker().reply({ success: true, physicalReady: true });
+      const before = h.worker().posted.length;
+
+      h.evaluator.setConfig({ ...DEFAULT_CONFIG, fgColor: '#eeeeee' });
+      h.clock.advance(999);
+      expect(h.worker().posted).toHaveLength(before);
+      h.clock.advance(1);
+      h.clock.advance(100);
+      await h.flush();
+      expect(h.worker().posted).toHaveLength(before + 1);
+
+      h.worker().reply({ success: true, physicalReady: false });
+      expect(h.status()).toBe('digital-pass');
+    });
+
+    it('does not run the canvas check when the caller checks the new design in time', () => {
+      const h = createHarness();
+      void h.evaluator.check({ imageData: frameOf() });
+      h.worker().reply({ success: true, physicalReady: true });
+
+      h.evaluator.setConfig({ ...DEFAULT_CONFIG, fgColor: '#eeeeee' });
+      void h.evaluator.check({ imageData: frameOf() });
+      const posted = h.worker().posted.length;
+      h.clock.advance(2000);
+      expect(h.worker().posted).toHaveLength(posted);
+    });
+
+    it('keeps an idle evaluator idle when the design changes', () => {
+      const h = createHarness();
+      h.evaluator.setConfig({ ...DEFAULT_CONFIG, fgColor: '#eeeeee' });
+      expect(h.status()).toBe('idle');
+      expect(h.clock.pendingCount).toBe(0);
+    });
+
     it('never leaks a bitmap across 1,000 rapid checks', () => {
       const h = createHarness();
       const bitmaps: FakeBitmap[] = [];
