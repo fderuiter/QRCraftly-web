@@ -148,3 +148,12 @@ describe('a logo that failed to load leaves no hole (#1257)', () => {
     expect(withMissingLogo.decoded).toBe(VALUE);
   });
 });
+
+describe('every pattern reads with the default settings (#1278)', () => {
+  for (const style of Object.values(QRStyle)) {
+    it(`decodes ${style} at the default error correction`, () => {
+      const { decoded } = render({ style, errorCorrectionLevel: DEFAULT_CONFIG.errorCorrectionLevel });
+      expect(decoded).toBe(VALUE);
+    });
+  }
+});
