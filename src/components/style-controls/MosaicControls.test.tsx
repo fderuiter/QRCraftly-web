@@ -1,7 +1,7 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { MosaicControls } from './MosaicControls';
 import { DEFAULT_CONFIG } from '../../constants';
 import { QRConfig, QRErrorCorrectionLevel } from '../../types';

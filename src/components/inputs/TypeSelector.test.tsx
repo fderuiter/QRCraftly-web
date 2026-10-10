@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
-import { axe } from "vitest-axe";
+import { axe } from "../../../tests/utils/axe";
 import { TypeSelector } from "./TypeSelector";
 import { QRType } from "../../types";
 import { QR_TYPE_ROUTES } from "../../data/navigation";

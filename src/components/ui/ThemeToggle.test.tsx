@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { ThemeToggle, getThemeToggleLabel } from './ThemeToggle';
 import { ThemeProvider } from '@/context/ThemeContext';
 

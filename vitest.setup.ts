@@ -17,23 +17,15 @@
 */
 
 import '@testing-library/jest-dom';
-import 'vitest-axe/extend-expect';
 import { terminateScannerWorker } from './src/packages/optical-scanner/scheduler';
-import * as matchers from 'vitest-axe/matchers';
+import { toHaveNoViolations } from './tests/utils/axe';
 import { vi, afterEach, expect } from 'vitest';
 import { InThreadWorker, assertStructuredCloneable } from './tests/utils/inThreadWorker';
 import { qrEncoder } from './tests/fixtures/qrEncoder';
 import { setQrCanvasRuntime } from './src/utils/qrCanvasRuntime';
 
 
-declare module 'vitest' {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  export interface Assertion<T = any> extends matchers.AxeMatchers {}
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  export interface AsymmetricMatchersContaining extends matchers.AxeMatchers {}
-}
-
-expect.extend(matchers);
+expect.extend({ toHaveNoViolations });
 
 function createMemoryStorage(): Storage {
   let store: Record<string, string> = {};

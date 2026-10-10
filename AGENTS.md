@@ -54,7 +54,7 @@ See `docs/agents/docs-maintenance.md`.
 ## Quality & Development Standards
 
 - **TypeScript**: Strict typing across all files. Proactively avoid `any` or loose type assertions (`as`).
-- **Accessibility (a11y)**: Validate WCAG 2.1 SC 1.4.11 contrast compliance for UI states and generated QR codes. Test components with `vitest-axe` and screen-reader accessible labels.
+- **Accessibility (a11y)**: Validate WCAG 2.1 SC 1.4.11 contrast compliance for UI states and generated QR codes. Test components with the axe helper in `tests/utils/axe.ts` (`expect(await axe(container)).toHaveNoViolations()`) and screen-reader accessible labels.
 - **Tailwind Formatting**: Run `pnpm run format:classes` to enforce standardized utility class ordering.
 - **Git Guardrails**: Husky v9 and lint-staged enforce pre-commit validation (formatting, typechecking, duplication audits, and tests) before every commit. Read `docs/adr/0010-husky-and-lint-staged-git-guardrails.md`.
 - **Test Concurrency & File Isolation**: Tests interacting with build artifacts or script outputs (e.g. sitemaps) must isolate output paths via environment variables (such as `SITEMAP_OUTPUT_PATH` and `SITEMAP_DIST_DIR`) to avoid race conditions and file collisions during parallel Vitest executions; they never write into or delete the real `dist/`. Tests that run git in a temp repository first remove inherited `GIT_*` variables, which a git hook would otherwise point at the real repository.

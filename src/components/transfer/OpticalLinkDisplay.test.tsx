@@ -18,7 +18,7 @@
 
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import type { LinkState } from '@/packages/optical-modem';
 import { ANNOUNCE_GAP_MS, OpticalLinkDisplay } from './OpticalLinkDisplay';
 

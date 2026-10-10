@@ -5,7 +5,7 @@ import React from 'react';
 import { QRScanner, clearScanHistory } from './QRScanner';
 import { useQrScanner, type UseQrScannerOptions } from '@/packages/optical-scanner/client';
 import { fakeQrRead } from '../../tests/utils/fakeQrRead';
-import { axe } from 'vitest-axe';
+import { axe } from '../../tests/utils/axe';
 
 // The real hook and Camera Session run against a fake camera; the spy only records the options
 // so a test can deliver a decoded code.

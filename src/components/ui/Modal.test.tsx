@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { describe, it, expect, vi } from 'vitest';
 import { Modal } from './Modal';
 

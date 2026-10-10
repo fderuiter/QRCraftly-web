@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../tests/utils/axe';
 import { auxiliaryRegistry } from '@/data/contentRegistry';
 import { guides, readingMinutes } from '@/data/guides';
 import { generateGuideIndexSchema, generateGuideSchema } from '@/utils/schemaGenerator';

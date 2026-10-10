@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { describe, expect, it, vi } from 'vitest';
 import StyleGallery from './StyleGallery';
 import { QRProvider, useQRStore, useQRStoreSelector } from '../../context/QRContext';

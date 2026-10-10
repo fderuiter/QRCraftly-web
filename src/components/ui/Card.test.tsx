@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { describe, it, expect } from 'vitest';
 import { Card } from './Card';
 

@@ -25,7 +25,7 @@ import { renderToString } from 'react-dom/server';
 import { contentRegistry } from '@/data/contentRegistry';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { pageCopy } from '../../tests/utils/pageCopy';
-import { axe } from 'vitest-axe';
+import { axe } from '../../tests/utils/axe';
 import { withPageContent } from '../../tests/utils/pageContent';
 
 const qrRead = vi.hoisted(() => vi.fn());

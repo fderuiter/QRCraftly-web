@@ -18,7 +18,7 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../tests/utils/axe';
 import { QRChecker } from './QRChecker';
 import { checkQrImage } from '@/components/checker/checkImage';
 import { describeScan } from '@/components/scanner/describeScan';
