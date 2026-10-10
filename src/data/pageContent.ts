@@ -39,6 +39,7 @@ import { getGuide } from './guides';
 import { LANDING_GALLERIES, LANDING_PAGE_IDS, type LandingGalleryImage } from './landingPages';
 import { landingPageContent, type LandingCopy } from './landingPageContent';
 import { getExampleImage, getRelatedTypePages, TYPE_PAGE_TYPES, type RelatedPage } from './relatedPages';
+import { getGuideFaqs, guideFaqAnswer } from './guideFaqs';
 import { typeGuides, type TypeGuide } from './typeGuides';
 import { generateGuideIndexSchema, generateGuideSchema, generateSchema } from '../utils/schemaGenerator';
 import { resolveDomainForPath, type JsonLdObject } from '../utils/metadataEngine';
@@ -123,5 +124,18 @@ export function getPageSchema(urlPathname: string): JsonLdObject | undefined {
   if (!tool || !SCHEMA_PAGE_IDS.has(id)) return undefined;
   const landing = landingPageContent[id];
   const copy: ToolCopy = pageCopy[id] ?? (landing ? { howTo: landing.howTo, faqs: landing.faqs } : {});
-  return generateSchema({ ...tool, ...copy }, domain, urlPathname);
+  return generateSchema({ ...tool, ...copy, faqs: getPageFaqs(id, copy) }, domain, urlPathname);
+}
+
+/**
+ * Lists every question a page shows in its FAQ: its own, then the ones made from its guide.
+ * @param id - Registry key of the page.
+ * @param copy - The page's own how-to and FAQs.
+ * @returns The questions and plain-text answers, or undefined when there are none.
+ */
+function getPageFaqs(id: string, copy: ToolCopy): ToolCopy['faqs'] {
+  const guide = typeGuides[id];
+  const fromGuide = guide ? getGuideFaqs(guide).map((faq) => ({ question: faq.question, answer: guideFaqAnswer(faq) })) : [];
+  const faqs = [...(copy.faqs ?? []), ...fromGuide];
+  return faqs.length > 0 ? faqs : copy.faqs;
 }
