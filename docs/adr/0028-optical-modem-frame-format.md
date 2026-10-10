@@ -27,14 +27,14 @@ One id byte: bits 0 to 2 are log2 of the symbol count (1 to 4), bit 3 marks the 
 
 ### Inner code
 
-Reed-Solomon over GF(256) with polynomial `0x11d`, with errors and erasures. Blocks are 160 bytes in the provisional profiles. Within a frame:
+Reed-Solomon over GF(256) with polynomial `0x11d`, with errors and erasures. Blocks are 164 bytes in the provisional profiles. Within a frame:
 
-- the data is cut into blocks and each block gets its check bytes;
+- the data is cut into blocks, each block gets a 4-byte tag bound to its identity ([ADR 0043](0043-optical-modem-block-tag.md)) and then its check bytes;
 - bytes of different blocks alternate across the grid (byte `i` of block `b` sits at stream position `i * blocks + b`), so a stripe lost to a screen refresh or a reflection costs every block a few bytes instead of one block all of them;
 - the stream is XOR-ed with a pseudo-random sequence seeded by session and frame sequence, so large areas never settle on one colour;
 - the stream is cut into `log2(symbols)` bits per cell.
 
-The receiver turns each cell into a symbol and a confidence (how far the best colour is ahead of the runner-up, 0 to 255). A byte is **unsure** when a cell it touches has a confidence under 32. For each block, the least sure bytes are given to the code as erasures, up to all the check bytes; if that fails, half, then none. A block that decodes is exact; a block that does not decode is dropped and the outer code asks for more.
+The receiver turns each cell into a symbol and a confidence (how far the best colour is ahead of the runner-up, 0 to 255). A byte is **unsure** when a cell it touches has a confidence under 32. For each block, the least sure bytes are given to the code as erasures, up to all the check bytes; if that fails, half, then none. A repair counts only when the block's tag matches; a block with no matching repair is dropped and the outer code asks for more.
 
 Each decoded block is the payload of one rateless droplet of the outer code (the same fountain code the QR transfer uses). The block's position in the stream is `seq * blocks + index`, which is what the outer layer uses as the droplet number, so the outer pipeline is unchanged.
 
@@ -58,16 +58,16 @@ Profiles 2 to 4 are provisional. Profile numbers 0 and 1 are reserved for the QR
 | -------- | --------- | ------------------- | -------------------- | -------------- | -------------------------------------------------- |
 | 2 Steady | 4, OKLab  | 104 x 58 (104 x 40) | 80 + 80              | 480 B          | 3.5 camera px                                      |
 | 3 Fast   | 8, OKLab  | 120 x 67 (120 x 49) | 96 + 64              | 1248 B         | 4 camera px                                        |
-| 4 Rapid  | 16, OKLab | 160 x 90 (160 x 72) | 80 + 80              | 2880 B         | 5 camera px                                        |
+| 4 Rapid  | 16, OKLab | 160 x 90 (160 x 72) | 80 + 80              | 2800 B         | 5 camera px                                        |
 
-At 30 camera frames per second, one fresh frame per camera frame and no tears, the data rates are 14, 37 and 86 KB/s before the outer code's overhead. Through the outer code, in the simulator, a 48 KB file arrives at about 11, 37 and 72 KB/s. These are simulator figures at a stated cell size, not device results, and they assume a clean frame every camera frame, which the probe has yet to confirm. The check-byte sweep in the benchmark chose the splits: profile 3 loses only data when it carries more check bytes, while profiles 2 and 4 needed 80 to repair every block at their stressed cell size.
+At 30 camera frames per second, one fresh frame per camera frame and no tears, the data rates are 14, 37 and 84 KB/s before the outer code's overhead. Through the outer code, in the simulator, a 48 KB file arrives at about 12, 37 and 69 KB/s. Each block also carries a 4-byte tag ([ADR 0043](0043-optical-modem-block-tag.md)), which the block column leaves out. These are simulator figures at a stated cell size, not device results, and they assume a clean frame every camera frame, which the probe has yet to confirm. The check-byte sweep in the benchmark chose the splits: profile 3 loses only data when it carries more check bytes, while profiles 2 and 4 needed 80 to repair every block at their stressed cell size.
 
 ### Versioning
 
 - **The header is the contract.** Its first byte is the magic number, its second the version and profile. The header codeword layout (42 bytes, 18 message bytes) never changes within a major format version. A receiver that reads a header whose version it does not know stops and says so (`unsupported-version`); it does not guess at the grid.
 - **Adding a profile does not change the version.** Frame size, constellation and the inner code are all in the header, so a receiver reads any frame whose constellation it knows and whose block fits a Reed-Solomon codeword. A new profile is a new number and a new row in the table; old receivers read it if they know its constellation, and otherwise report `unknown-constellation`.
 - **Adding a constellation** takes an id nobody uses. The id format has room for 8 sizes, each in two designs.
-- **Changing the header, the fiducials or the calibration strip, or adding another inner code,** is a new version. Receivers meeting it report it and offer the QR mode, which the ladder always keeps.
+- **Changing the header, the fiducials or the calibration strip, or adding another inner code,** is a new version. The block tag of [ADR 0043](0043-optical-modem-block-tag.md) was added within version 1, before any receiver of data frames had shipped. Receivers meeting it report it and offer the QR mode, which the ladder always keeps.
 - **The flags byte** is written as zero and ignored on read in this version. A later version can use its bits for optional features, such as a second inner code, because a receiver that does not know a bit still reads the rest.
 
 ## Determinism

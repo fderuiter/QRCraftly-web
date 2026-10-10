@@ -24,7 +24,7 @@
  */
 
 /** SHA-256 of {@link runModemBattery}'s output for the committed `src/wasm/modem.wasm`. */
-export const MODEM_BATTERY_SHA256 = '616312365282ccb72b2592a84e717488bdee9f4b8ebc5dcf73296d6c62050f57';
+export const MODEM_BATTERY_SHA256 = 'f7de7e2c261209183d1c276462b01b801199bd61fbbfcd30e284f329672192f8';
 
 /**
  * Runs every kernel family once on seeded inputs: the constellations, the Reed-Solomon code, a

@@ -260,3 +260,22 @@ describe('Frame estimates', () => {
     expect(fec.frames).toBeLessThan(lt.frames);
   });
 });
+
+describe('an empty file (#1301)', () => {
+  it.each([
+    ['LT', undefined],
+    ['the outer code', 'fec'],
+  ] as const)('arrives verified when sent plain with %s', async (_name, code) => {
+    const fecModule = code ? module : undefined;
+    const { stream, outerCode } = await createPrismSession(new Uint8Array(0), { fileName: 'empty.txt', ...options, mimeType: 'text/plain', fecModule });
+    expect(outerCode).toBe(code ?? 'lt');
+    const receiver = fecReceiver();
+    for (let index = 0; index < stream.k * 4 + 64 && !receiver.isComplete; index++) receiver.ingest(stream.frameText(index));
+    expect(receiver.isComplete).toBe(true);
+    const { files } = await receiver.finalize();
+    expect(files).toHaveLength(1);
+    expect(files[0].data).toHaveLength(0);
+    expect(files[0].header).toMatchObject({ fileName: 'empty.txt', fileSize: 0, mimeType: 'text/plain' });
+    expect(await sha256Hex(files[0].data)).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+  });
+});

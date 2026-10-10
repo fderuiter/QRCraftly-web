@@ -401,6 +401,41 @@ describe('Camera Scanner Engine (headless)', () => {
       expect(h.events.onScanSuccess).toHaveBeenCalledWith('REAL', expect.objectContaining({ text: 'REAL' }));
     });
 
+    it.each([250, 600, 1500])(
+      'confirms a code only the centre pass reads within 5 s at %i ms per decode (#1292)',
+      async (latencyMs) => {
+        const h = createHarness({ confirmations: 2, repeatHoldMs: 3000 });
+        h.engine.start();
+        // The rotation is centre, frame, centre, inverted: odd frames read the code, even ones miss.
+        for (let frame = 1; h.clock.now() < 5000 && h.events.onScanSuccess.mock.calls.length === 0; frame++) {
+          await h.answerNextFrame(latencyMs, frame % 2 === 1 ? { status: 'pass', decodedData: 'SMALL' } : { status: 'fail' });
+        }
+        expect(h.events.onScanSuccess).toHaveBeenCalledWith('SMALL', expect.objectContaining({ text: 'SMALL' }));
+        expect(h.clock.now()).toBeLessThanOrEqual(5000);
+      }
+    );
+
+    it('confirms a code only one pass in four reads, however slow the decodes (#1292)', async () => {
+      const h = createHarness({ confirmations: 2, repeatHoldMs: 3000 });
+      h.engine.start();
+      for (let frame = 1; frame <= 6; frame++) {
+        await h.answerNextFrame(1500, frame % 4 === 2 ? { status: 'pass', decodedData: 'WIDE' } : { status: 'fail' });
+      }
+      expect(h.events.onScanSuccess).toHaveBeenCalledTimes(1);
+    });
+
+    it('never lets two different codes confirm each other, or a code seen a rotation ago', async () => {
+      const h = createHarness({ confirmations: 2, repeatHoldMs: 3000 });
+      h.engine.start();
+      for (const decodedData of ['A', 'B', 'A', 'B', 'A']) {
+        await h.answerNextFrame(1500, { status: 'pass', decodedData });
+      }
+      // A read, then four misses: more than one full rotation of the strategies.
+      for (let miss = 0; miss < 4; miss++) await h.answerNextFrame(1500, { status: 'fail' });
+      await h.answerNextFrame(1500, { status: 'pass', decodedData: 'A' });
+      expect(h.events.onScanSuccess).not.toHaveBeenCalled();
+    });
+
     it('emits a payload that stays in view once per hold period in continuous scanning', async () => {
       const h = createHarness({ confirmations: 2, repeatHoldMs: 3000 });
       h.engine.start();

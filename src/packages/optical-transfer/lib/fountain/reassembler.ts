@@ -97,9 +97,10 @@ export class FountainReassembler {
   /**
    * Sets the key code secret of a private transfer.
    * @param secret The bytes the key code stands for.
+   * @returns False when the key was ignored because it does not open the transfer already opened.
    */
-  public setKey(secret: Uint8Array): void {
-    this.prism.setKey(secret);
+  public setKey(secret: Uint8Array): boolean {
+    return this.prism.setKey(secret);
   }
 
   /**
@@ -160,9 +161,10 @@ export class FountainReassembler {
 
   /**
    * Clears all state for a new stream. The finished session is kept, so its frames stay ignored.
+   * @param keepKey Keep the key code (after a failed finalize); otherwise it is forgotten.
    */
-  public reset(): void {
-    this.prism.reset();
+  public reset(keepKey = false): void {
+    this.prism.reset(keepKey);
   }
 }
 

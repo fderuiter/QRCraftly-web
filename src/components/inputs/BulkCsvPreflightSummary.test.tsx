@@ -34,6 +34,7 @@ describe('BulkCsvPreflightSummary Component', () => {
       invalidDetails: [],
       validRows: [],
       validRowIndices: [],
+      validPayloads: [],
     };
 
     render(<BulkCsvPreflightSummary report={report} />);
@@ -62,6 +63,7 @@ describe('BulkCsvPreflightSummary Component', () => {
       ],
       validRows: [],
       validRowIndices: [],
+      validPayloads: [],
     };
 
     render(<BulkCsvPreflightSummary report={report} />);

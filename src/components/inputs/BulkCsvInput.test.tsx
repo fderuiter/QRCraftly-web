@@ -21,8 +21,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BulkCsvInput } from './BulkCsvInput';
 import { LazyBulkCsvInput } from './LazyBulkCsvInput';
-import { BulkCsvData } from '@/types';
+import { BulkCsvData, SocialFormat } from '@/types';
 import { QRProvider } from '@/context/QRContext';
+import { ToastProvider } from '../ui/Toast';
 import * as downloadManager from '@/utils/downloadManager';
 import * as qrExport from '@/packages/qr-export';
 import { MAX_BULK_CSV_ROWS, SAMPLE_CSV_TEMPLATE } from '@/packages/bulk-csv';
@@ -59,6 +60,19 @@ HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/png;base64,iVBOR
 
 function renderWithProvider(ui: React.ReactElement) {
   return render(<QRProvider>{ui}</QRProvider>);
+}
+
+function renderWithToasts(ui: React.ReactElement) {
+  return render(
+    <ToastProvider>
+      <QRProvider>{ui}</QRProvider>
+    </ToastProvider>
+  );
+}
+
+/** The payload each generated code was asked to encode, in call order. */
+function encodedValues(spy: { mock: { calls: unknown[][] } }): string[] {
+  return spy.mock.calls.map((call) => (call[0] as { value: string }).value);
 }
 
 describe('BulkCsvInput Component', () => {
@@ -374,7 +388,7 @@ describe('BulkCsvInput Component', () => {
 
     renderWithProvider(<BulkCsvInput data={data} onChange={onChange} />);
 
-    const resSelect = screen.getByLabelText('PNG Resolution') as HTMLSelectElement;
+    const resSelect = screen.getByLabelText('PNG Width') as HTMLSelectElement;
     expect(resSelect).toBeInTheDocument();
     expect(resSelect.value).toBe('1000');
 
@@ -391,7 +405,7 @@ describe('BulkCsvInput Component', () => {
 
     renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
 
-    expect(screen.queryByLabelText('PNG Resolution')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('PNG Width')).not.toBeInTheDocument();
   });
 
   it('passes configured resolution to rasterizeSvgToCanvas during PNG batch generation', async () => {
@@ -418,5 +432,176 @@ describe('BulkCsvInput Component', () => {
     });
 
     rasterizeSpy.mockRestore();
+  });
+
+  it('keeps the design shape for Story and Portrait PNGs (#1289)', async () => {
+    const rasterizeSpy = vi.spyOn(qrExport, 'rasterizeSvgToCanvas');
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent: 'URL,Name\nhttps://example.com/1,Code1',
+      exportResolution: 1080,
+    };
+    render(
+      <QRProvider initialConfig={{ socialFormat: SocialFormat.STORY_9_16 }}>
+        <BulkCsvInput data={data} onChange={vi.fn()} />
+      </QRProvider>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
+    await waitFor(() => expect(rasterizeSpy).toHaveBeenCalledWith(expect.any(String), 1080, 1920));
+    rasterizeSpy.mockRestore();
+  });
+
+  it('encodes links exactly as the single Link generator does, spaces included (#1285)', async () => {
+    const svgSpy = vi.spyOn(qrExport, 'generateQRSvg');
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent: 'URL,Name\nhttps://example.com/ok,A\nhttps://example.com/my file.pdf,B\nexample.com,C',
+      exportFormat: 'svg',
+    };
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
+    await waitFor(() => expect(downloadManager.triggerFileDownload).toHaveBeenCalled());
+    expect(zipEntryNames(downloadedZip())).toEqual(['A.svg', 'B.svg', 'C.svg']);
+    expect(encodedValues(svgSpy)).toEqual([
+      'https://example.com/ok',
+      'https://example.com/my%20file.pdf',
+      'https://example.com/',
+    ]);
+    svgSpy.mockRestore();
+  });
+
+  it('encodes plain text as typed in Text mode (#1285)', async () => {
+    const svgSpy = vi.spyOn(qrExport, 'generateQRSvg');
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent: 'qr,Name\n"BEGIN:VCARD\nFN:Jane Doe\nEND:VCARD",Jane\nOrder no. 5,Order\njohn.doe@example.com,John',
+      exportFormat: 'svg',
+      contentType: 'text',
+    };
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+    expect((screen.getByLabelText('Content Type') as HTMLSelectElement).value).toBe('text');
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
+    await waitFor(() => expect(downloadManager.triggerFileDownload).toHaveBeenCalled());
+    expect(encodedValues(svgSpy)).toEqual(['BEGIN:VCARD\nFN:Jane Doe\nEND:VCARD', 'Order no. 5', 'john.doe@example.com']);
+    svgSpy.mockRestore();
+  });
+
+  it('switches the content type', () => {
+    const onChange = vi.fn();
+    renderWithProvider(<BulkCsvInput data={{ ...initialData, csvContent: 'URL\nhttps://example.com' }} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText('Content Type'), { target: { value: 'text' } });
+    expect(onChange).toHaveBeenCalledWith({ contentType: 'text' });
+  });
+
+  it('says beside the preview when the previewed row is left out (#1285)', () => {
+    const data: BulkCsvData = { ...initialData, csvContent: 'URL,Name\njavascript:alert(1),A\nhttps://example.com,B' };
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+    expect(screen.getByTestId('bulk-preview-row')).toHaveTextContent(/Preview: row 1\..*This row is left out of the ZIP: /);
+  });
+
+  it('skips a row too long for a QR code and zips the rest (#1286)', async () => {
+    const long = `https://example.com/${'a'.repeat(3000)}`;
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent: `URL,Name\nhttps://example.com/1,One\n${long},Two\nhttps://example.com/3,Three`,
+      exportFormat: 'svg',
+    };
+    renderWithToasts(<BulkCsvInput data={data} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
+    await waitFor(() => expect(downloadManager.triggerFileDownload).toHaveBeenCalled());
+    expect(zipEntryNames(downloadedZip())).toEqual(['One.svg', 'Three.svg']);
+    const list = await screen.findByTestId('bulk-skipped-rows');
+    expect(list).toHaveTextContent(/Row 2: Too long for a QR code at error correction level/);
+    expect(await screen.findByText(/Downloaded a ZIP with 2 QR codes\. 1 row was left out\./)).toBeInTheDocument();
+  });
+
+  it('reads semicolon-separated files (#1287)', async () => {
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent: 'URL;Name\nhttps://example.com/1;Code1\nhttps://example.com/2;Code2',
+      exportFormat: 'svg',
+    };
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+    expect(screen.getByText(/2 rows found • 2 columns detected • semicolon-separated/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
+    await waitFor(() => expect(downloadManager.triggerFileDownload).toHaveBeenCalled());
+    expect(zipEntryNames(downloadedZip())).toEqual(['Code1.svg', 'Code2.svg']);
+  });
+
+  it('reads an uploaded UTF-16 tab-delimited file, as Excel saves "Unicode Text" (#1287)', async () => {
+    const text = 'URL\tName\r\nhttps://example.com/1\tCode1\r\n';
+    const bytes = new Uint8Array(2 + text.length * 2);
+    bytes.set([0xff, 0xfe]);
+    for (let i = 0; i < text.length; i++) bytes[2 + i * 2] = text.charCodeAt(i);
+    const onChange = vi.fn();
+    renderWithProvider(<BulkCsvInput data={initialData} onChange={onChange} />);
+    const file = new File([bytes], 'export.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByLabelText('Upload CSV or TXT file'), { target: { files: [file] } });
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith({ csvContent: text, fileName: 'export.txt' }));
+  });
+
+  it('cancels a running batch: no ZIP, and a notice (#1290)', async () => {
+    const lines = Array.from({ length: 30 }, (_, i) => `https://example.com/${i},N${i}`);
+    const data: BulkCsvData = { ...initialData, csvContent: `URL,Name\n${lines.join('\n')}`, exportFormat: 'svg' };
+    renderWithToasts(<BulkCsvInput data={data} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByText('Batch cancelled. No ZIP was made.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument());
+    expect(downloadManager.triggerFileDownload).not.toHaveBeenCalled();
+  });
+
+  it('stops the batch when the page is left (#1290)', async () => {
+    const svgSpy = vi.spyOn(qrExport, 'generateQRSvg');
+    const lines = Array.from({ length: 30 }, (_, i) => `https://example.com/${i},N${i}`);
+    const data: BulkCsvData = { ...initialData, csvContent: `URL,Name\n${lines.join('\n')}`, exportFormat: 'svg' };
+    const { unmount } = renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
+    await waitFor(() => expect(svgSpy).toHaveBeenCalled());
+    unmount();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(downloadManager.triggerFileDownload).not.toHaveBeenCalled();
+    expect(svgSpy.mock.calls.length).toBeLessThan(30);
+    svgSpy.mockRestore();
+  });
+
+  it('clears the skipped-rows list when another file is loaded (#1291)', async () => {
+    const one: BulkCsvData = { ...initialData, csvContent: 'URL,Name\nhttps://example.com/1,A\njavascript:alert(1),B', exportFormat: 'svg' };
+    const { rerender } = renderWithProvider(<BulkCsvInput data={one} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Generate Batch/ }));
+    expect(await screen.findByTestId('bulk-skipped-rows')).toBeInTheDocument();
+    const two: BulkCsvData = { ...one, csvContent: 'URL,Name\nhttps://example.com/2,C', fileName: 'two.csv' };
+    rerender(
+      <QRProvider>
+        <BulkCsvInput data={two} onChange={vi.fn()} />
+      </QRProvider>
+    );
+    await waitFor(() => expect(screen.queryByTestId('bulk-skipped-rows')).not.toBeInTheDocument());
+  });
+
+  it('reports spreadsheet row numbers and names fallback files after them (#1291)', async () => {
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent: 'URL,Name\njavascript:alert(1),Bad\n\nhttps://example.com/3,',
+      exportFormat: 'svg',
+    };
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Generate Batch/ }));
+    await waitFor(() => expect(downloadManager.triggerFileDownload).toHaveBeenCalled());
+    expect(zipEntryNames(downloadedZip())).toEqual(['qr_3.svg']);
+    expect(await screen.findByTestId('bulk-skipped-rows')).toHaveTextContent('Row 1:');
+  });
+
+  it('renders a CSV whose header is __proto__ (#1291)', () => {
+    const data: BulkCsvData = { ...initialData, csvContent: '__proto__\nhttps://example.com/1' };
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+    expect(screen.getByText('1 rows found • 1 columns detected')).toBeInTheDocument();
+    expect(screen.getByTestId('count-valid')).toHaveTextContent('1');
+  });
+
+  it('does not pick a URL column as the file name column (#1291)', async () => {
+    const onChange = vi.fn();
+    renderWithProvider(<BulkCsvInput data={{ ...initialData, csvContent: 'Video URL,Title\nhttps://example.com,Intro' }} onChange={onChange} />);
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith({ payloadColumn: 'Video URL', filenameColumn: 'Title' }));
   });
 });

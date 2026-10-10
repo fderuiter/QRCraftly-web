@@ -74,4 +74,33 @@ describe('categorizeCsvRows Engine', () => {
     expect(report.totalRows).toBe(500);
     expect(duration).toBeLessThan(50);
   });
+
+  it('checks the string that is encoded, not the raw cell (#1285)', () => {
+    const rows: CsvRow[] = [{ URL: 'https://example.com/my file.pdf' }, { URL: 'example.com' }];
+    const seen: string[] = [];
+    const report = categorizeCsvRows(rows, 'URL', {}, (cfg) => {
+      seen.push(`${cfg.type}:${cfg.value}`);
+      return [];
+    });
+    expect(seen).toEqual(['URL:https://example.com/my%20file.pdf', 'URL:https://example.com/']);
+    expect(report.validPayloads).toEqual(['https://example.com/my%20file.pdf', 'https://example.com/']);
+  });
+
+  it('checks plain text as Text and keeps it as typed', () => {
+    const vcard = 'BEGIN:VCARD\nFN:Jane Doe\nEND:VCARD';
+    const seen: string[] = [];
+    const report = categorizeCsvRows([{ qr: `  ${vcard}  ` }], 'qr', {}, (cfg) => {
+      seen.push(cfg.type);
+      return [];
+    }, { contentType: 'text' });
+    expect(seen).toEqual(['TEXT']);
+    expect(report.validPayloads).toEqual([vcard]);
+  });
+
+  it('reports the spreadsheet row numbers it is given (#1291)', () => {
+    const report = categorizeCsvRows([{ URL: 'https://example.com' }, { URL: 'javascript:alert(1)' }], 'URL', {}, undefined, {
+      rowNumbers: [1, 4],
+    });
+    expect(report.invalidDetails.map((d) => d.rowNumber)).toEqual([4]);
+  });
 });
