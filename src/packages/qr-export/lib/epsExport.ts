@@ -19,297 +19,173 @@
 import { QRConfig } from '@/types';
 import { generateQRSvg } from './svgExport';
 import { type ModuleRenderOptions } from '@/packages/qr-matrix';
-import { parseSvgPath } from './pathParser';
+import {
+  formatMatrix,
+  formatNum,
+  formatRgb,
+  literalString,
+  pathOperators,
+  readSvgScene,
+  shadingDictionary,
+  type SceneElement,
+  type SceneImage,
+  type ScenePath,
+  type SceneText,
+} from './vectorScene';
+import { alphaToMask, decodeSceneImages, deflate, MissingImageError, type RasterImage, type VectorExportOptions } from './vectorImages';
 
-interface RgbColor {
-  r: number;
-  g: number;
-  b: number;
-}
+const PS_PATH = { move: 'moveto', line: 'lineto', curve: 'curveto', close: 'closepath' };
 
-function parseColor(colorStr: string): RgbColor | null {
-  if (!colorStr || colorStr === 'none' || colorStr === 'transparent') {
-    return null;
-  }
-  let c = colorStr.trim().toLowerCase();
-
-  // Hex format #rgb or #rrggbb
-  if (c.startsWith('#')) {
-    c = c.substring(1);
-    if (c.length === 3) {
-      const r = parseInt(c[0] + c[0], 16) / 255;
-      const g = parseInt(c[1] + c[1], 16) / 255;
-      const b = parseInt(c[2] + c[2], 16) / 255;
-      return { r, g, b };
-    }
-    if (c.length >= 6) {
-      const r = parseInt(c.substring(0, 2), 16) / 255;
-      const g = parseInt(c.substring(2, 4), 16) / 255;
-      const b = parseInt(c.substring(4, 6), 16) / 255;
-      return { r, g, b };
-    }
-  }
-
-  // rgb(r, g, b) or rgba(r, g, b, a)
-  const rgbMatch = c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-  if (rgbMatch) {
-    return {
-      r: parseInt(rgbMatch[1], 10) / 255,
-      g: parseInt(rgbMatch[2], 10) / 255,
-      b: parseInt(rgbMatch[3], 10) / 255,
-    };
-  }
-
-  // Named colors
-  if (c === 'black') return { r: 0, g: 0, b: 0 };
-  if (c === 'white') return { r: 1, g: 1, b: 1 };
-
-  return { r: 0, g: 0, b: 0 };
-}
-
-function formatNum(n: number): string {
-  return parseFloat(n.toFixed(3)).toString();
-}
+/** Bytes per PostScript string (the language caps strings at 65,535). */
+const STRING_BYTES = 32000;
 
 /**
- * Converts an SVG path `d` attribute string to PostScript path commands.
+ * Re-encodes Helvetica to Latin-1 so accented text prints as typed (#1362). Codes 39, 45 and 96
+ * follow WinAnsi (PDF) rather than ISOLatin1Encoding's quoteright, minus and quoteleft.
  */
-function svgPathToPostScript(d: string): string {
-  const commands: string[] = [];
-  parseSvgPath(d, {
-    moveTo(x, y) {
-      commands.push(`${formatNum(x)} ${formatNum(y)} moveto`);
-    },
-    lineTo(x, y) {
-      commands.push(`${formatNum(x)} ${formatNum(y)} lineto`);
-    },
-    curveTo(cp1x, cp1y, cp2x, cp2y, x, y) {
-      commands.push(`${formatNum(cp1x)} ${formatNum(cp1y)} ${formatNum(cp2x)} ${formatNum(cp2y)} ${formatNum(x)} ${formatNum(y)} curveto`);
-    },
-    closePath() {
-      commands.push('closepath');
-    },
-  });
+const FONT_PROLOG = ['Helvetica', 'Helvetica-Bold'].map(
+  (name) =>
+    `/${name} findfont dup length dict begin { 1 index /FID ne { def } { pop pop } ifelse } forall /Encoding ISOLatin1Encoding 256 array copy dup 45 /hyphen put dup 39 /quotesingle put dup 96 /grave put def currentdict end /QR${name} exch definefont pop`
+);
 
-  return commands.join('\n');
+const hex = (bytes: Uint8Array): string => {
+  const lines: string[] = [];
+  for (let i = 0; i < bytes.length; i += 32) {
+    lines.push(Array.from(bytes.subarray(i, i + 32), (b) => b.toString(16).padStart(2, '0')).join(''));
+  }
+  return lines.join('\n');
+};
+
+/** Image data as an array of hex strings and a procedure that hands them out in turn. */
+async function dataSource(name: string, bytes: Uint8Array, out: string[]): Promise<string> {
+  const packed = await deflate(bytes);
+  const data = packed ?? bytes;
+  out.push(`/${name}D [`);
+  for (let i = 0; i < data.length; i += STRING_BYTES) out.push(`<${hex(data.subarray(i, i + STRING_BYTES))}>`);
+  out.push(`] def`, `/${name}I 0 def`);
+  out.push(`/${name}P { ${name}I ${name}D length lt { ${name}D ${name}I get /${name}I ${name}I 1 add def } { () } ifelse } bind def`);
+  return packed ? `${name}P /FlateDecode filter` : `${name}P`;
 }
 
+function clipAndTransform(el: SceneElement, out: string[]): void {
+  for (const clip of el.clips) {
+    out.push('newpath', clip.map(([x, y], i) => `${formatNum(x)} ${formatNum(y)} ${i === 0 ? 'moveto' : 'lineto'}`).join('\n'), 'closepath clip');
+  }
+  out.push('newpath');
+  if (el.matrix) out.push(`[${formatMatrix(el.matrix)}] concat`);
+}
 
-/**
- * Converts an SVG string into Encapsulated PostScript (.eps) format.
- */
-export function convertSvgToEps(svgString: string): string {
-  let width = 1080;
-  let height = 1080;
-  let title = 'QR Code';
+function drawPath(el: ScenePath, out: string[]): void {
+  const path = pathOperators(el.d, PS_PATH);
+  if (el.fill && 'color' in el.fill) {
+    out.push('newpath', path, `${formatRgb(el.fill.color)} setrgbcolor`, el.evenOdd ? 'eofill' : 'fill');
+  } else if (el.fill) {
+    out.push('gsave', 'newpath', path, el.evenOdd ? 'eoclip' : 'clip', 'newpath');
+    if (el.fill.gradient.transform) out.push(`[${formatMatrix(el.fill.gradient.transform)}] concat`);
+    out.push(`${shadingDictionary(el.fill.gradient)} shfill`, 'grestore');
+  }
+  if (el.stroke) {
+    out.push('newpath', path, `${formatRgb(el.stroke.color)} setrgbcolor`, `${formatNum(el.stroke.width)} setlinewidth`);
+    if (el.stroke.dash.length > 0) out.push(`[${el.stroke.dash.map(formatNum).join(' ')}] 0 setdash`);
+    out.push('stroke');
+  }
+}
 
-  // Parse SVG document using DOMParser if available, or regex fallback
-  if (typeof DOMParser !== 'undefined') {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgString, 'image/svg+xml');
-    const svgEl = doc.querySelector('svg');
-    if (svgEl) {
-      const wAttr = svgEl.getAttribute('width');
-      const hAttr = svgEl.getAttribute('height');
-      const vbAttr = svgEl.getAttribute('viewBox');
+function drawText(el: SceneText, out: string[]): void {
+  const text = literalString(el.codes);
+  // Back to y-up for the glyphs; the baseline sits on y.
+  out.push(`${formatNum(el.x)} ${formatNum(el.y)} translate 1 -1 scale`);
+  out.push(`/QR${el.bold ? 'Helvetica-Bold' : 'Helvetica'} findfont ${formatNum(el.fontSize)} scalefont setfont`);
+  out.push(`${formatRgb(el.color)} setrgbcolor`);
+  if (el.textLength) out.push(`${formatNum(el.textLength)} ${text} stringwidth pop div 1 scale`);
+  const shift = el.anchor === 'middle' ? ' 2 div neg' : el.anchor === 'end' ? ' neg' : null;
+  out.push(shift ? `${text} stringwidth pop${shift} 0 moveto ${text} show` : `0 0 moveto ${text} show`);
+}
 
-      if (wAttr) width = parseFloat(wAttr);
-      if (hAttr) height = parseFloat(hAttr);
-
-      if ((!width || !height) && vbAttr) {
-        const parts = vbAttr.split(/[\s,]+/).map(parseFloat);
-        if (parts.length === 4) {
-          width = parts[2];
-          height = parts[3];
-        }
-      }
-
-      const titleEl = doc.querySelector('title');
-      if (titleEl && titleEl.textContent) {
-        title = titleEl.textContent;
-      }
-    }
+async function drawImage(el: SceneImage, image: RasterImage, id: number, out: string[]): Promise<void> {
+  const name = `qrImg${id}`;
+  const data = await dataSource(name, image.rgb, out);
+  const mask = image.alpha ? await dataSource(`${name}M`, alphaToMask(image, image.alpha), out) : null;
+  out.push('gsave');
+  clipAndTransform(el, out);
+  // Unit square to the image box; the first row lands at the top (smaller y).
+  out.push(`${formatNum(el.x)} ${formatNum(el.y)} translate ${formatNum(el.width)} ${formatNum(el.height)} scale`);
+  out.push('/DeviceRGB setcolorspace', `/${name}I 0 def`);
+  const size = `/Width ${image.width} /Height ${image.height} /ImageMatrix [${image.width} 0 0 ${image.height} 0 0]`;
+  const dataDict = `<< /ImageType 1 ${size} /BitsPerComponent 8 /Decode [0 1 0 1 0 1] /DataSource ${data} >>`;
+  if (mask) {
+    // Masked image: mask samples of 1 are painted, 0 left clear.
+    out.push(`/${name}MI 0 def`);
+    out.push(
+      `<< /ImageType 3 /InterleaveType 3 /DataDict ${dataDict} /MaskDict << /ImageType 1 ${size} /BitsPerComponent 1 /Decode [1 0] /DataSource ${mask} >> >> image`
+    );
   } else {
-    const wMatch = svgString.match(/width="([\d.]+)"/);
-    const hMatch = svgString.match(/height="([\d.]+)"/);
-    if (wMatch) width = parseFloat(wMatch[1]);
-    if (hMatch) height = parseFloat(hMatch[1]);
+    out.push(`${dataDict} image`);
+  }
+  out.push('grestore');
+}
+
+/**
+ * Converts the export SVG into Encapsulated PostScript. Paths, gradients and text stay
+ * vector; logos are embedded as images, with transparency as a hard mask.
+ * @param svgString - SVG built by `generateQRSvg`.
+ * @param options - Image decoder override.
+ * @returns The EPS file text (ASCII).
+ * @throws {MissingImageError} When a logo cannot be decoded, rather than leave it out.
+ */
+export async function convertSvgToEps(svgString: string, options: VectorExportOptions = {}): Promise<string> {
+  const scene = readSvgScene(svgString);
+  const images = await decodeSceneImages(scene, options.decodeImage);
+
+  const body: string[] = [];
+  let imageCount = 0;
+  let needsLevel3 = false;
+  for (const el of scene.elements) {
+    if (el.kind === 'image') {
+      const image = images.get(el.href);
+      if (!image) throw new MissingImageError();
+      needsLevel3 = true;
+      await drawImage(el, image, ++imageCount, body);
+      continue;
+    }
+    if (el.kind === 'path' && el.fill && 'gradient' in el.fill) needsLevel3 = true;
+    body.push('gsave');
+    clipAndTransform(el, body);
+    if (el.kind === 'path') drawPath(el, body);
+    else drawText(el, body);
+    body.push('grestore');
   }
 
-  const psLines: string[] = [
-    `%!PS-Adobe-3.0 EPSF-3.0`,
+  const { width, height } = scene;
+  const header = [
+    '%!PS-Adobe-3.0 EPSF-3.0',
     `%%BoundingBox: 0 0 ${Math.ceil(width)} ${Math.ceil(height)}`,
-    `%%HiResBoundingBox: 0.00 0.00 ${formatNum(width)} ${formatNum(height)}`,
-    `%%Title: ${title.replace(/[^\x20-\x7E]/g, '')}`,
-    `%%Creator: QRCraftly`,
-    `%%Pages: 1`,
-    `%%EndComments`,
-    `%%Page: 1 1`,
-    `gsave`,
-    `0 ${formatNum(height)} translate 1 -1 scale`, // Match SVG top-left coordinate origin
+    `%%HiResBoundingBox: 0 0 ${formatNum(width)} ${formatNum(height)}`,
+    `%%Title: ${scene.title.replace(/[^\x20-\x7E]/g, '')}`,
+    '%%Creator: QRCraftly',
+    // Smooth shading (shfill) and Flate-compressed images are LanguageLevel 3 features.
+    ...(needsLevel3 ? ['%%LanguageLevel: 3'] : []),
+    '%%Pages: 1',
+    '%%EndComments',
+    '%%BeginProlog',
+    ...FONT_PROLOG,
+    '%%EndProlog',
+    '%%Page: 1 1',
+    `${8 + imageCount * 8} dict begin`,
+    'gsave',
+    // Match SVG's top-left origin.
+    `0 ${formatNum(height)} translate 1 -1 scale`,
   ];
-
-  // Parse defs for gradients (if any)
-  const gradientMap = new Map<string, { type: 'linear' | 'radial'; x1: number; y1: number; x2: number; y2: number; stops: Array<{ offset: number; color: RgbColor }> }>();
-
-  if (typeof DOMParser !== 'undefined') {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgString, 'image/svg+xml');
-
-    doc.querySelectorAll('linearGradient, radialGradient').forEach((grad) => {
-      const id = grad.getAttribute('id');
-      if (!id) return;
-
-      const stops: Array<{ offset: number; color: RgbColor }> = [];
-      grad.querySelectorAll('stop').forEach((stop) => {
-        const offAttr = stop.getAttribute('offset') || '0%';
-        const off = offAttr.endsWith('%') ? parseFloat(offAttr) / 100 : parseFloat(offAttr);
-        const colAttr = stop.getAttribute('stop-color') || '#000000';
-        const color = parseColor(colAttr) || { r: 0, g: 0, b: 0 };
-        stops.push({ offset: off, color });
-      });
-
-      if (grad.tagName === 'linearGradient') {
-        const x1 = parseFloat(grad.getAttribute('x1') || '0');
-        const y1 = parseFloat(grad.getAttribute('y1') || '0');
-        const x2 = parseFloat(grad.getAttribute('x2') || '100');
-        const y2 = parseFloat(grad.getAttribute('y2') || '100');
-        gradientMap.set(id, { type: 'linear', x1, y1, x2, y2, stops });
-      } else {
-        const cx = parseFloat(grad.getAttribute('cx') || '50');
-        const cy = parseFloat(grad.getAttribute('cy') || '50');
-        const r = parseFloat(grad.getAttribute('r') || '50');
-        gradientMap.set(id, { type: 'radial', x1: cx, y1: cy, x2: cx + r, y2: cy, stops });
-      }
-    });
-
-    // Traverse vector elements
-    const elements = doc.querySelectorAll('path, text, image');
-    elements.forEach((el) => {
-      if (el.tagName === 'path') {
-        const d = el.getAttribute('d');
-        if (!d) return;
-
-        const fillAttr = el.getAttribute('fill') || 'none';
-        const strokeAttr = el.getAttribute('stroke') || 'none';
-        const fillRule = el.getAttribute('fill-rule');
-        const strokeWidth = parseFloat(el.getAttribute('stroke-width') || '1');
-        const strokeDash = el.getAttribute('stroke-dasharray');
-
-        psLines.push('newpath');
-        psLines.push(svgPathToPostScript(d));
-
-        if (fillAttr.startsWith('url(#')) {
-          const gradId = fillAttr.replace(/^url\(#/, '').replace(/\)$/, '');
-          const gradInfo = gradientMap.get(gradId);
-          if (gradInfo && gradInfo.stops.length >= 2) {
-            const c0 = gradInfo.stops[0].color;
-            const c1 = gradInfo.stops[gradInfo.stops.length - 1].color;
-            psLines.push('gsave');
-            psLines.push(fillRule === 'evenodd' ? 'eoclip' : 'clip');
-            psLines.push('newpath');
-            psLines.push(`<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [${formatNum(gradInfo.x1)} ${formatNum(gradInfo.y1)} ${formatNum(gradInfo.x2)} ${formatNum(gradInfo.y2)}] /Function << /FunctionType 2 /Domain [0 1] /C0 [${formatNum(c0.r)} ${formatNum(c0.g)} ${formatNum(c0.b)}] /C1 [${formatNum(c1.r)} ${formatNum(c1.g)} ${formatNum(c1.b)}] /N 1.0 >> /Extend [true true] >> shfill`);
-            psLines.push('grestore');
-          } else {
-            psLines.push('0 0 0 setrgbcolor');
-            psLines.push(fillRule === 'evenodd' ? 'eofill' : 'fill');
-          }
-        } else {
-          const fillColor = parseColor(fillAttr);
-          if (fillColor) {
-            psLines.push(`${formatNum(fillColor.r)} ${formatNum(fillColor.g)} ${formatNum(fillColor.b)} setrgbcolor`);
-            psLines.push(fillRule === 'evenodd' ? 'eofill' : 'fill');
-          }
-        }
-
-        const strokeColor = parseColor(strokeAttr);
-        if (strokeColor) {
-          psLines.push(`${formatNum(strokeColor.r)} ${formatNum(strokeColor.g)} ${formatNum(strokeColor.b)} setrgbcolor`);
-          psLines.push(`${formatNum(strokeWidth)} setlinewidth`);
-          if (strokeDash) {
-            const dashArr = strokeDash.split(/[\s,]+/).map(parseFloat).filter((n) => !isNaN(n));
-            if (dashArr.length > 0) {
-              psLines.push(`[${dashArr.map(formatNum).join(' ')}] 0 setdash`);
-            }
-          }
-          psLines.push('stroke');
-        }
-      } else if (el.tagName === 'text') {
-        const textContent = el.textContent || '';
-        if (!textContent) return;
-
-        const x = parseFloat(el.getAttribute('x') || '0');
-        const y = parseFloat(el.getAttribute('y') || '0');
-        const fillAttr = el.getAttribute('fill') || '#000000';
-        const fontAttr = el.getAttribute('font') || '16px sans-serif';
-        const anchor = el.getAttribute('text-anchor') || 'start';
-
-        const sizeMatch = fontAttr.match(/(\d+)px/);
-        const fontSize = sizeMatch ? parseInt(sizeMatch[1], 10) : 16;
-        const isBold = fontAttr.includes('bold');
-        const fontName = isBold ? '/Helvetica-Bold' : '/Helvetica';
-
-        const fillColor = parseColor(fillAttr) || { r: 0, g: 0, b: 0 };
-        const safeText = textContent.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-
-        psLines.push('gsave');
-        psLines.push(`${formatNum(x)} ${formatNum(y)} translate 1 -1 scale`);
-        psLines.push(`${fontName} findfont ${fontSize} scalefont setfont`);
-        psLines.push(`${formatNum(fillColor.r)} ${formatNum(fillColor.g)} ${formatNum(fillColor.b)} setrgbcolor`);
-
-        if (anchor === 'middle') {
-          psLines.push(`(${safeText}) stringwidth pop 2 div neg 0 moveto (${safeText}) show`);
-        } else if (anchor === 'end') {
-          psLines.push(`(${safeText}) stringwidth pop neg 0 moveto (${safeText}) show`);
-        } else {
-          psLines.push(`0 0 moveto (${safeText}) show`);
-        }
-        psLines.push('grestore');
-      }
-    });
-  } else {
-    // Regex fallback for non-DOM environments
-    const pathRegex = /<path\s+[^>]*d="([^"]+)"[^>]*>/g;
-    let match: RegExpExecArray | null;
-    while ((match = pathRegex.exec(svgString)) !== null) {
-      const pathTag = match[0];
-      const d = match[1];
-
-      const fillMatch = pathTag.match(/fill="([^"]+)"/);
-      const strokeMatch = pathTag.match(/stroke="([^"]+)"/);
-      const fillRuleMatch = pathTag.match(/fill-rule="([^"]+)"/);
-
-      psLines.push('newpath');
-      psLines.push(svgPathToPostScript(d));
-
-      const fillColor = parseColor(fillMatch ? fillMatch[1] : '#000000');
-      if (fillColor) {
-        psLines.push(`${formatNum(fillColor.r)} ${formatNum(fillColor.g)} ${formatNum(fillColor.b)} setrgbcolor`);
-        psLines.push(fillRuleMatch && fillRuleMatch[1] === 'evenodd' ? 'eofill' : 'fill');
-      }
-
-      const strokeColor = parseColor(strokeMatch ? strokeMatch[1] : 'none');
-      if (strokeColor) {
-        psLines.push(`${formatNum(strokeColor.r)} ${formatNum(strokeColor.g)} ${formatNum(strokeColor.b)} setrgbcolor`);
-        psLines.push('stroke');
-      }
-    }
-  }
-
-  psLines.push('grestore');
-  psLines.push('showpage');
-  psLines.push('%%EOF');
-
-  return psLines.join('\n');
+  return [...header, ...body, 'grestore', 'end', 'showpage', '%%Trailer', '%%EOF', ''].join('\n');
 }
 
 /**
- * Generates an Encapsulated PostScript (.eps) file string for a given QR configuration.
+ * Generates an Encapsulated PostScript (.eps) file for a QR configuration.
  */
 export async function generateQREps(
   config: QRConfig,
-  options?: { onLogoOmitted?: () => void; renderOptions?: ModuleRenderOptions; skipPayloadValidation?: boolean }
+  options?: { onLogoOmitted?: () => void; renderOptions?: ModuleRenderOptions; skipPayloadValidation?: boolean } & VectorExportOptions
 ): Promise<string> {
   const svg = await generateQRSvg(config, options);
-  return convertSvgToEps(svg);
+  return convertSvgToEps(svg, options);
 }
