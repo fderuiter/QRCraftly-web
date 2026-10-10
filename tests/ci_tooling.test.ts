@@ -235,3 +235,15 @@ describe('CI builds the app once', () => {
     expect(local.webServer).toMatchObject({ command: 'pnpm run build && pnpm run preview' });
   });
 });
+
+describe('post-merge production check (#1217)', () => {
+  it('waits for workers.dev to serve the merged commit after every push to main', () => {
+    const job = jobBlock('verify-staging');
+    expect(job).toContain('name: Verify Production Deployment');
+    expect(job).toContain("if: github.event_name == 'push' && github.ref == 'refs/heads/main'");
+    expect(job).toContain('BASE_URL: "https://qrcraftly.fpderuiter.workers.dev"');
+    expect(job).toContain('EXPECTED_COMMIT: ${{ github.sha }}');
+    expect(job).toContain('run: bash scripts/ci/wait_for_deploy.sh');
+    expect(job).not.toContain('continue-on-error');
+  });
+});

@@ -45,3 +45,21 @@ describe('Release Workflow Structural Invariants Audit', () => {
     expect(tagStep).toContain('git push origin "refs/tags/$RELEASE_TAG"');
   });
 });
+
+describe('Release smoke test legs (#1217, #1394)', () => {
+  const content = fs.readFileSync(path.resolve(process.cwd(), '.github/workflows/release.yml'), 'utf8');
+  const smoke = content.slice(content.indexOf('  smoke-tests:'));
+
+  it('keeps both production URLs as required legs, without a blind retry', () => {
+    expect(smoke).toContain('- https://qrcraftly.fpderuiter.workers.dev');
+    expect(smoke).toContain('- https://qrcraftly.com');
+    expect(smoke).not.toContain('continue-on-error');
+    expect(smoke).toContain('fail-fast: false');
+  });
+
+  it('gives qrcraftly.com a 30-minute wait and the job room for it', () => {
+    expect(smoke).toContain("TIMEOUT_SECONDS: ${{ matrix.base_url == 'https://qrcraftly.com' && '1800' || '900' }}");
+    const jobMinutes = Number(/timeout-minutes:\s*(\d+)/.exec(smoke)?.[1]);
+    expect(jobMinutes).toBeGreaterThan(30);
+  });
+});

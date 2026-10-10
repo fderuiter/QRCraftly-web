@@ -216,7 +216,7 @@ Before every commit, our own pre-commit hook (`.githooks/pre-commit`) formats an
 ## Contributing
 
 1. **Read the guardrails.** [AGENTS.md](AGENTS.md) holds the invariants: client-side only, the storage allowlist, reuse of shared UI components, semantic design tokens, hardened workflows and in-house first. Use the vocabulary in [CONTEXT.md](CONTEXT.md), and check [docs/adr](docs/adr/) before changing a settled decision.
-2. **Branch from `main`** with a prefix: `feat/`, `fix/`, `docs/`, `refactor/`, `chore/` or `agent/`. `main` is the only long-lived branch ([ADR 0020](docs/adr/0020-trunk-based-releases-on-main.md)).
+2. **Branch from `main`** with a prefix: `feat/`, `fix/`, `docs/`, `refactor/`, `chore/` or `agent/` (a Claude session keeps the `claude/` branch it is given). `main` is the only long-lived branch ([ADR 0020](docs/adr/0020-trunk-based-releases-on-main.md)).
 3. **Reuse before you build.** Check [UI_CATALOG.md](docs/public/UI_CATALOG.md) before adding a visual element; sliders, buttons and colour pickers have shared components, and colour maths lives in `src/utils/colorUtils.ts`.
 4. **Keep docs in step.** Run `pnpm run docs:sync` after changing shared UI or a public doc, and record a new architectural decision as an ADR ([docs-maintenance.md](docs/agents/docs-maintenance.md)).
 5. **Check locally:** `pnpm run lint` and `pnpm exec vitest run`; add `pnpm build` and `pnpm test:e2e` when you touch the build, routing, rendering or input flows.

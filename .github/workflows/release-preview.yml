@@ -1,0 +1,37 @@
+name: Release Preview
+
+# Shows each week whether a release is due (#1217). It runs `pnpm run release:dry-run` on main and
+# writes the next version and the changelog it would add to the run summary. It only reads: it
+# changes no file, opens no pull request and creates no tag. Cutting the release stays a person's
+# call (see RELEASING.md).
+
+on:
+  schedule:
+    - cron: '0 8 * * 1' # Mondays at 08:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    name: Preview the Next Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Full history and tags: the dry run counts the commits since the latest tag.
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+
+      - name: Write the release preview to the run summary
+        run: bash scripts/ci/release_preview.sh

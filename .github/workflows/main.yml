@@ -437,8 +437,10 @@ jobs:
             fi
           done
 
-  # Cloudflare Workers Builds deploys every push to main to production on its own.
-  # Wait until production serves this commit, then smoke test it.
+  # Post-merge production check (#1217). Cloudflare Workers Builds deploys every push to
+  # main to production on its own; this job waits until /version.json on workers.dev reports
+  # the merged commit and fails with an error annotation (plus the last response's status,
+  # headers and body start) if production does not pick it up, then smoke tests it.
   verify-staging:
     name: Verify Production Deployment
     needs: [ci]
@@ -454,7 +456,7 @@ jobs:
         with:
           cache-playwright: 'true'
 
-      - name: Wait for staging to serve this commit
+      - name: Wait for production to serve this commit
         env:
           BASE_URL: "https://qrcraftly.fpderuiter.workers.dev"
           EXPECTED_COMMIT: ${{ github.sha }}

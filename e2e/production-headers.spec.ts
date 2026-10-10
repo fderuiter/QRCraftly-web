@@ -159,7 +159,10 @@ test.describe('Production headers and deployment integrity (#1353)', { tag: '@pr
   });
 
   test('serves the build it reports, with the shell the service worker precaches unchanged', async ({ request }) => {
-    const info = (await (await fetchRaw(request, '/version.json')).json()) as { commit?: string; version?: string };
+    const versionResponse = await fetchRaw(request, '/version.json');
+    // The deploy checks poll this file, so no cache may hold an old copy (#1217).
+    expect(versionResponse.headers()['cache-control'], '/version.json Cache-Control').toBe('no-store');
+    const info = (await versionResponse.json()) as { commit?: string; version?: string };
     expect(info.version).toMatch(/^\d+\.\d+\.\d+/);
     if (process.env.EXPECTED_COMMIT) expect(info.commit).toBe(process.env.EXPECTED_COMMIT);
     if (process.env.EXPECTED_VERSION) expect(info.version).toBe(process.env.EXPECTED_VERSION);

@@ -5,6 +5,10 @@
   Permissions-Policy: camera=(self), microphone=(), geolocation=(self), payment=()
   Strict-Transport-Security: max-age=63072000; includeSubDomains
 
+# The deploy checks poll this to see which build is live, so no cache may keep an old copy (#1217).
+/version.json
+  Cache-Control: no-store
+
 # Preview and workers.dev copies of the site are never indexed; qrcraftly.com is the canonical host.
 https://:subdomain.fpderuiter.workers.dev/*
   X-Robots-Tag: noindex
