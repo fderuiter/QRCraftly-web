@@ -5,6 +5,7 @@ import { getContrastRatio } from '../../utils/colorUtils';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { ToggleSwitch } from '../ui/ToggleSwitch';
 import { ContrastBadge, ContrastBanner } from './ContrastWarning';
 
 interface ColorControlsProps {
@@ -12,9 +13,30 @@ interface ColorControlsProps {
   onChange: (updates: Partial<QRConfig>) => void;
 }
 
-export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }) => {
+/** The background colour, with a switch for a transparent background. */
+const BackgroundColorField: React.FC<ColorControlsProps> = ({ config, onChange }) => {
   const isTransparent = config.bgColor === 'transparent';
-  const displayBgColor = isTransparent ? '#ffffff' : config.bgColor;
+  return (
+    <div className="space-y-2">
+      <ColorInput
+        id="bg-color"
+        label="Background"
+        value={isTransparent ? '#ffffff' : config.bgColor}
+        onChange={(val) => onChange({ bgColor: val })}
+        disabled={isTransparent}
+      />
+      <ToggleSwitch
+        id="transparent-bg"
+        label="Transparent Background"
+        checked={isTransparent}
+        onChange={(checked) => onChange({ bgColor: checked ? 'transparent' : '#ffffff' })}
+        labelClassName="text-xs font-medium text-fg-muted"
+      />
+    </div>
+  );
+};
+
+export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }) => {
 
   const activeGradientType: GradientType = config.gradientType || 'none';
   const colorStops = (config.gradientColorStops && config.gradientColorStops.length > 0)
@@ -130,25 +152,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
             value={config.fgColor}
             onChange={(val) => onChange({ fgColor: val })}
           />
-          <div>
-            <ColorInput
-              id="bg-color"
-              label="Background"
-              value={displayBgColor}
-              onChange={(val) => onChange({ bgColor: val })}
-              disabled={isTransparent}
-            />
-            <label htmlFor="transparent-bg" className="mt-1 flex min-h-6 cursor-pointer items-center gap-2 text-xs font-medium text-fg-muted">
-              <input
-                id="transparent-bg"
-                type="checkbox"
-                checked={isTransparent}
-                onChange={(e) => onChange({ bgColor: e.target.checked ? 'transparent' : '#ffffff' })}
-                className="rounded border-line-strong text-accent focus:ring-focus"
-              />
-              <span>Transparent Background</span>
-            </label>
-          </div>
+          <BackgroundColorField config={config} onChange={onChange} />
           <ColorInput
             id="eye-frame-color"
             label="Eye Frame"
@@ -202,25 +206,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
               />
             </div>
           )}
-          <div>
-            <ColorInput
-              id="bg-color"
-              label="Background"
-              value={displayBgColor}
-              onChange={(val) => onChange({ bgColor: val })}
-              disabled={isTransparent}
-            />
-            <label htmlFor="transparent-bg" className="mt-1 flex min-h-6 cursor-pointer items-center gap-2 text-xs font-medium text-fg-muted">
-              <input
-                id="transparent-bg"
-                type="checkbox"
-                checked={isTransparent}
-                onChange={(e) => onChange({ bgColor: e.target.checked ? 'transparent' : '#ffffff' })}
-                className="rounded border-line-strong text-accent focus:ring-focus"
-              />
-              <span>Transparent Background</span>
-            </label>
-          </div>
+          <BackgroundColorField config={config} onChange={onChange} />
           <ColorInput
             id="eye-frame-color"
             label="Eye Frame"

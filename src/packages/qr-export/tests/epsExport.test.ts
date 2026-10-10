@@ -29,7 +29,7 @@ if (typeof globalThis.DOMParser === 'undefined') {
   globalThis.Node = dom.window.Node;
 }
 
-import { generateQREps, convertSvgToEps, PayloadRejectedError } from '../index';
+import { generateQREps, convertSvgToEps, MissingImageError, PayloadRejectedError } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
 import { QRType } from '@/types';
 
@@ -61,22 +61,22 @@ describe('EPS Vector Export', () => {
     ).rejects.toBeInstanceOf(PayloadRejectedError);
   });
 
-  it('convertSvgToEps converts SVG paths and text to EPS commands', () => {
+  it('convertSvgToEps converts SVG paths and text to EPS commands', async () => {
     const sampleSvg = `<svg width="500" height="500"><path d="M 10 10 L 100 10 L 100 100 Z" fill="#ff0000"/><text x="50" y="200" fill="#000000" font="bold 20px sans-serif" text-anchor="middle">TEST</text></svg>`;
-    const eps = convertSvgToEps(sampleSvg);
+    const eps = await convertSvgToEps(sampleSvg);
 
     expect(eps).toContain('%!PS-Adobe-3.0 EPSF-3.0');
     expect(eps).toContain('%%BoundingBox: 0 0 500 500');
     expect(eps).toContain('10 10 moveto');
     expect(eps).toContain('100 10 lineto');
     expect(eps).toContain('1 0 0 setrgbcolor');
-    expect(eps).toContain('/Helvetica-Bold findfont 20 scalefont setfont');
+    expect(eps).toContain('/QRHelvetica-Bold findfont 20 scalefont setfont');
     expect(eps).toContain('(TEST) show');
   });
 
-  it('converts SVG paths containing H, h, V, v, and Z subpath resets to PostScript', () => {
+  it('converts SVG paths containing H, h, V, v, and Z subpath resets to PostScript', async () => {
     const sampleSvg = `<svg width="200" height="200"><path d="M 10 10 H 50 v 20 h -10 V 10 Z m 5 5 h 10" fill="#000000"/></svg>`;
-    const eps = convertSvgToEps(sampleSvg);
+    const eps = await convertSvgToEps(sampleSvg);
 
     expect(eps).toContain('10 10 moveto');
     expect(eps).toContain('50 10 lineto');
@@ -87,4 +87,43 @@ describe('EPS Vector Export', () => {
     expect(eps).toContain('15 15 moveto');
     expect(eps).toContain('25 15 lineto');
   });
+
+  describe('fidelity (#1362)', () => {
+    const logoSvg = `<svg width="100" height="100"><path d="M 0 0 L 100 0 L 100 100 L 0 100 Z" fill="#ff0000"/><image href="data:image/png;base64,AA==" x="10" y="10" width="80" height="80"/></svg>`;
+
+    it('re-encodes Helvetica to Latin-1 and escapes accented text', async () => {
+      const eps = await convertSvgToEps(`<svg width="200" height="50"><text x="0" y="20" font="12px sans-serif">Café-1</text></svg>`);
+      expect(eps).toContain('/Encoding ISOLatin1Encoding 256 array copy dup 45 /hyphen put');
+      expect(eps).toContain('(Caf\\351-1) show');
+      expect(eps).not.toContain('%%LanguageLevel');
+    });
+
+    it('declares LanguageLevel 3 for gradients and keeps every stop of a radial gradient', async () => {
+      const svg = `<svg width="100" height="100"><defs><radialGradient id="g" cx="50" cy="50" r="40" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#ff0000"/><stop offset="50%" stop-color="#00ff00"/><stop offset="100%" stop-color="#0000ff"/></radialGradient></defs><path d="M 0 0 L 100 0 L 100 100 Z" fill="url(#g)"/></svg>`;
+      const eps = await convertSvgToEps(svg);
+      expect(eps).toContain('%%LanguageLevel: 3');
+      expect(eps).toContain('/ShadingType 3');
+      expect(eps).toContain('/Coords [50 50 0 50 50 40]');
+      expect(eps).toContain('/Bounds [0.5]');
+    });
+
+    it('embeds a transparent logo as a masked image', async () => {
+      const decode = async (_href: string, width: number, height: number) => {
+        const data = new Uint8ClampedArray(width * height * 4).fill(255);
+        data[3] = 0;
+        return { width, height, data };
+      };
+      const eps = await convertSvgToEps(logoSvg, { decodeImage: decode });
+      expect(eps).toContain('/ImageType 3 /InterleaveType 3');
+      expect(eps).toContain('10 10 translate 80 80 scale');
+      expect(eps).toContain('%%LanguageLevel: 3');
+    });
+
+    it('refuses the export instead of dropping a logo it cannot decode', async () => {
+      await expect(convertSvgToEps(logoSvg, { decodeImage: () => Promise.reject(new Error('broken')) })).rejects.toBeInstanceOf(
+        MissingImageError
+      );
+    });
+  });
 });
+

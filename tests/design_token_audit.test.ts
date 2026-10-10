@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { auditDesignTokens } from '../scripts/design_token_audit.js';
+import { auditDesignTokens, LEGACY_PALETTE_FILES } from '../scripts/design_token_audit.js';
 
 describe('design token audit', () => {
   it('rejects raw palette colours in UI primitives', () => {
@@ -19,8 +19,15 @@ describe('design token audit', () => {
     ).toEqual([]);
   });
 
-  it('allows palette colours outside src/components/ui for now', () => {
-    expect(auditDesignTokens([{ file: 'src/pages/about/+Page.tsx', source: '<p className="text-slate-600" />' }])).toEqual([]);
+  it('rejects raw palette colours anywhere in src (#1366)', () => {
+    const errors = auditDesignTokens([{ file: 'src/pages/about/+Page.tsx', source: '<p className="text-slate-600" />' }]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('text-slate-600');
+  });
+
+  it('allows palette colours only in files on the legacy list', () => {
+    const [legacy] = LEGACY_PALETTE_FILES;
+    expect(auditDesignTokens([{ file: legacy, source: '<p className="text-slate-600" />' }])).toEqual([]);
   });
 
   it('rejects arbitrary colour and size values anywhere in src', () => {

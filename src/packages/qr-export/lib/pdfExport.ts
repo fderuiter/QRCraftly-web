@@ -19,360 +19,226 @@
 import { QRConfig } from '@/types';
 import { generateQRSvg } from './svgExport';
 import { type ModuleRenderOptions } from '@/packages/qr-matrix';
-import { parseSvgPath } from './pathParser';
+import {
+  formatMatrix,
+  formatNum,
+  formatRgb,
+  literalString,
+  pathOperators,
+  readSvgScene,
+  shadingDictionary,
+  textWidth,
+  type SceneElement,
+  type SceneGradient,
+  type ScenePath,
+  type SceneText,
+} from './vectorScene';
+import { decodeSceneImages, deflate, MissingImageError, type RasterImage, type VectorExportOptions } from './vectorImages';
 
-interface RgbColor {
-  r: number;
-  g: number;
-  b: number;
+const PDF_PATH = { move: 'm', line: 'l', curve: 'c', close: 'h' };
+
+/** PDF text string: UTF-16BE with a byte-order mark, as hex. */
+const textString = (text: string): string =>
+  `<FEFF${Array.from(text, (ch) => {
+    const code = ch.codePointAt(0) ?? 0x3f;
+    if (code <= 0xffff) return code.toString(16).padStart(4, '0');
+    const v = code - 0x10000;
+    return ((0xd800 + (v >> 10)).toString(16) + (0xdc00 + (v & 0x3ff)).toString(16)).padStart(8, '0');
+  }).join('')}>`.toUpperCase();
+
+class Resources {
+  readonly shadings = new Map<SceneGradient, string>();
+  readonly images = new Map<string, string>();
+
+  shading(gradient: SceneGradient): string {
+    let name = this.shadings.get(gradient);
+    if (!name) {
+      name = `Sh${this.shadings.size + 1}`;
+      this.shadings.set(gradient, name);
+    }
+    return name;
+  }
+
+  image(href: string): string {
+    let name = this.images.get(href);
+    if (!name) {
+      name = `Im${this.images.size + 1}`;
+      this.images.set(href, name);
+    }
+    return name;
+  }
 }
 
-function parseColor(colorStr: string): RgbColor | null {
-  if (!colorStr || colorStr === 'none' || colorStr === 'transparent') {
-    return null;
+function drawPath(el: ScenePath, res: Resources, out: string[]): void {
+  const path = pathOperators(el.d, PDF_PATH);
+  if (el.fill && 'color' in el.fill) {
+    out.push(`${formatRgb(el.fill.color)} rg`, path, el.evenOdd ? 'f*' : 'f');
+  } else if (el.fill) {
+    out.push('q', path, el.evenOdd ? 'W* n' : 'W n');
+    if (el.fill.gradient.transform) out.push(`${formatMatrix(el.fill.gradient.transform)} cm`);
+    out.push(`/${res.shading(el.fill.gradient)} sh`, 'Q');
   }
-  let c = colorStr.trim().toLowerCase();
-
-  if (c.startsWith('#')) {
-    c = c.substring(1);
-    if (c.length === 3) {
-      const r = parseInt(c[0] + c[0], 16) / 255;
-      const g = parseInt(c[1] + c[1], 16) / 255;
-      const b = parseInt(c[2] + c[2], 16) / 255;
-      return { r, g, b };
-    }
-    if (c.length >= 6) {
-      const r = parseInt(c.substring(0, 2), 16) / 255;
-      const g = parseInt(c.substring(2, 4), 16) / 255;
-      const b = parseInt(c.substring(4, 6), 16) / 255;
-      return { r, g, b };
-    }
+  if (el.stroke) {
+    out.push(`${formatRgb(el.stroke.color)} RG`, `${formatNum(el.stroke.width)} w`);
+    if (el.stroke.dash.length > 0) out.push(`[${el.stroke.dash.map(formatNum).join(' ')}] 0 d`);
+    out.push(path, 'S');
   }
-
-  const rgbMatch = c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-  if (rgbMatch) {
-    return {
-      r: parseInt(rgbMatch[1], 10) / 255,
-      g: parseInt(rgbMatch[2], 10) / 255,
-      b: parseInt(rgbMatch[3], 10) / 255,
-    };
-  }
-
-  if (c === 'black') return { r: 0, g: 0, b: 0 };
-  if (c === 'white') return { r: 1, g: 1, b: 1 };
-
-  return { r: 0, g: 0, b: 0 };
 }
 
-function formatNum(n: number): string {
-  return parseFloat(n.toFixed(3)).toString();
+function drawText(el: SceneText, out: string[]): void {
+  const natural = textWidth(el.codes, el.fontSize, el.bold);
+  const width = el.textLength ?? natural;
+  const x = el.anchor === 'middle' ? el.x - width / 2 : el.anchor === 'end' ? el.x - width : el.x;
+  out.push('BT', `/${el.bold ? 'F2' : 'F1'} ${formatNum(el.fontSize)} Tf`, `${formatRgb(el.color)} rg`);
+  if (el.textLength && natural > 0) out.push(`${formatNum((el.textLength / natural) * 100)} Tz`);
+  // The page is flipped to SVG's y-down space, so the text matrix flips the glyphs back.
+  out.push(`1 0 0 -1 ${formatNum(x)} ${formatNum(el.y)} Tm`, `${literalString(el.codes)} Tj`, 'ET');
+}
+
+function drawElement(el: SceneElement, res: Resources, images: ReadonlyMap<string, RasterImage>, out: string[]): void {
+  out.push('q');
+  for (const clip of el.clips) {
+    out.push(clip.map(([x, y], i) => `${formatNum(x)} ${formatNum(y)} ${i === 0 ? 'm' : 'l'}`).join('\n'), 'h W n');
+  }
+  if (el.matrix) out.push(`${formatMatrix(el.matrix)} cm`);
+  if (el.kind === 'path') drawPath(el, res, out);
+  else if (el.kind === 'text') drawText(el, out);
+  else {
+    if (!images.has(el.href)) throw new MissingImageError();
+    // The unit square's top edge (y = 1) holds the image's first row.
+    out.push(`${formatNum(el.width)} 0 0 ${formatNum(-el.height)} ${formatNum(el.x)} ${formatNum(el.y + el.height)} cm`);
+    out.push(`/${res.image(el.href)} Do`);
+  }
+  out.push('Q');
+}
+
+/** Collects PDF objects and writes them with a byte-exact cross-reference table. */
+class PdfWriter {
+  private readonly chunks: Uint8Array[] = [];
+  private length = 0;
+  private readonly offsets: number[] = [];
+  private readonly encoder = new TextEncoder();
+
+  write(data: string | Uint8Array): void {
+    const bytes = typeof data === 'string' ? this.encoder.encode(data) : data;
+    this.chunks.push(bytes);
+    this.length += bytes.length;
+  }
+
+  /** Reserves the next object number. */
+  reserve(): number {
+    this.offsets.push(-1);
+    return this.offsets.length;
+  }
+
+  object(id: number, dict: string, stream?: Uint8Array): void {
+    this.offsets[id - 1] = this.length;
+    if (!stream) {
+      this.write(`${id} 0 obj\n${dict}\nendobj\n`);
+      return;
+    }
+    this.write(`${id} 0 obj\n${dict.replace(/>>$/, `/Length ${stream.length} >>`)}\nstream\n`);
+    this.write(stream);
+    this.write('\nendstream\nendobj\n');
+  }
+
+  finish(root: number, info: number): Uint8Array<ArrayBuffer> {
+    const start = this.length;
+    const entries = this.offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+    this.write(`xref\n0 ${this.offsets.length + 1}\n0000000000 65535 f \n${entries}`);
+    this.write(`trailer\n<< /Size ${this.offsets.length + 1} /Root ${root} 0 R /Info ${info} 0 R >>\nstartxref\n${start}\n%%EOF\n`);
+    const out = new Uint8Array(this.length);
+    let at = 0;
+    for (const chunk of this.chunks) {
+      out.set(chunk, at);
+      at += chunk.length;
+    }
+    return out;
+  }
+}
+
+async function imageObjects(pdf: PdfWriter, image: RasterImage): Promise<number> {
+  const base = `/Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /BitsPerComponent 8`;
+  let smask = '';
+  if (image.alpha) {
+    const alphaId = pdf.reserve();
+    const packed = await deflate(image.alpha);
+    pdf.object(alphaId, `<< ${base} /ColorSpace /DeviceGray${packed ? ' /Filter /FlateDecode' : ''} >>`, packed ?? image.alpha);
+    smask = ` /SMask ${alphaId} 0 R`;
+  }
+  const id = pdf.reserve();
+  const packed = await deflate(image.rgb);
+  pdf.object(id, `<< ${base} /ColorSpace /DeviceRGB${smask}${packed ? ' /Filter /FlateDecode' : ''} >>`, packed ?? image.rgb);
+  return id;
 }
 
 /**
- * Converts an SVG path `d` attribute string to PDF path operators.
+ * Converts the export SVG into a one-page vector PDF. Paths, gradients and text stay vector;
+ * logos are embedded as images with their transparency.
+ * @param svgString - SVG built by `generateQRSvg`.
+ * @param options - Image decoder override.
+ * @returns The PDF file bytes.
+ * @throws {MissingImageError} When a logo cannot be decoded, rather than leave it out.
  */
-function svgPathToPdf(d: string): string {
-  const commands: string[] = [];
-  parseSvgPath(d, {
-    moveTo(x, y) {
-      commands.push(`${formatNum(x)} ${formatNum(y)} m`);
-    },
-    lineTo(x, y) {
-      commands.push(`${formatNum(x)} ${formatNum(y)} l`);
-    },
-    curveTo(cp1x, cp1y, cp2x, cp2y, x, y) {
-      commands.push(`${formatNum(cp1x)} ${formatNum(cp1y)} ${formatNum(cp2x)} ${formatNum(cp2y)} ${formatNum(x)} ${formatNum(y)} c`);
-    },
-    closePath() {
-      commands.push('h');
-    },
-  });
+export async function convertSvgToPdf(svgString: string, options: VectorExportOptions = {}): Promise<Uint8Array<ArrayBuffer>> {
+  const scene = readSvgScene(svgString);
+  const images = await decodeSceneImages(scene, options.decodeImage);
 
-  return commands.join('\n');
-}
+  const res = new Resources();
+  const ops: string[] = [`1 0 0 -1 0 ${formatNum(scene.height)} cm`];
+  for (const el of scene.elements) drawElement(el, res, images, ops);
+  const content = new TextEncoder().encode(ops.join('\n'));
 
+  const pdf = new PdfWriter();
+  // The comment line of high bytes marks the file as binary for transfer tools.
+  pdf.write('%PDF-1.4\n%');
+  pdf.write(new Uint8Array([0xe2, 0xe3, 0xcf, 0xd3, 0x0a]));
 
-/**
- * Converts an SVG XML payload string to a valid vector PDF document byte array (Uint8Array).
- */
-export function convertSvgToPdf(svgString: string): Uint8Array {
-  let width = 1080;
-  let height = 1080;
+  const catalog = pdf.reserve();
+  const pages = pdf.reserve();
+  const page = pdf.reserve();
+  const contents = pdf.reserve();
+  const info = pdf.reserve();
 
-  if (typeof DOMParser !== 'undefined') {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgString, 'image/svg+xml');
-    const svgEl = doc.querySelector('svg');
-    if (svgEl) {
-      const wAttr = svgEl.getAttribute('width');
-      const hAttr = svgEl.getAttribute('height');
-      const vbAttr = svgEl.getAttribute('viewBox');
-
-      if (wAttr) width = parseFloat(wAttr);
-      if (hAttr) height = parseFloat(hAttr);
-
-      if ((!width || !height) && vbAttr) {
-        const parts = vbAttr.split(/[\s,]+/).map(parseFloat);
-        if (parts.length === 4) {
-          width = parts[2];
-          height = parts[3];
-        }
-      }
-    }
-  } else {
-    const wMatch = svgString.match(/width="([\d.]+)"/);
-    const hMatch = svgString.match(/height="([\d.]+)"/);
-    if (wMatch) width = parseFloat(wMatch[1]);
-    if (hMatch) height = parseFloat(hMatch[1]);
+  const shadingRefs: string[] = [];
+  for (const [gradient, name] of res.shadings) {
+    const id = pdf.reserve();
+    pdf.object(id, shadingDictionary(gradient));
+    shadingRefs.push(`/${name} ${id} 0 R`);
+  }
+  const imageRefs: string[] = [];
+  for (const [href, name] of res.images) {
+    const image = images.get(href);
+    if (image) imageRefs.push(`/${name} ${await imageObjects(pdf, image)} 0 R`);
   }
 
-  const streamLines: string[] = [
-    'q',
-    `1 0 0 -1 0 ${formatNum(height)} cm`, // Match SVG top-left coordinate origin
-  ];
+  const font = (base: string) => `<< /Type /Font /Subtype /Type1 /BaseFont /${base} /Encoding /WinAnsiEncoding >>`;
+  const resources = [
+    `/Font << /F1 ${font('Helvetica')} /F2 ${font('Helvetica-Bold')} >>`,
+    shadingRefs.length ? `/Shading << ${shadingRefs.join(' ')} >>` : '',
+    imageRefs.length ? `/XObject << ${imageRefs.join(' ')} >>` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
-  // Parse defs for gradients (if any)
-  const gradientMap = new Map<string, { type: 'linear' | 'radial'; x1: number; y1: number; x2: number; y2: number; stops: Array<{ offset: number; color: RgbColor }> }>();
-  const shadingObjIds: Map<string, number> = new Map();
-  let nextObjId = 6;
-
-  if (typeof DOMParser !== 'undefined') {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgString, 'image/svg+xml');
-
-    doc.querySelectorAll('linearGradient, radialGradient').forEach((grad) => {
-      const id = grad.getAttribute('id');
-      if (!id) return;
-
-      const stops: Array<{ offset: number; color: RgbColor }> = [];
-      grad.querySelectorAll('stop').forEach((stop) => {
-        const offAttr = stop.getAttribute('offset') || '0%';
-        const off = offAttr.endsWith('%') ? parseFloat(offAttr) / 100 : parseFloat(offAttr);
-        const colAttr = stop.getAttribute('stop-color') || '#000000';
-        const color = parseColor(colAttr) || { r: 0, g: 0, b: 0 };
-        stops.push({ offset: off, color });
-      });
-
-      if (grad.tagName === 'linearGradient') {
-        const x1 = parseFloat(grad.getAttribute('x1') || '0');
-        const y1 = parseFloat(grad.getAttribute('y1') || '0');
-        const x2 = parseFloat(grad.getAttribute('x2') || '100');
-        const y2 = parseFloat(grad.getAttribute('y2') || '100');
-        gradientMap.set(id, { type: 'linear', x1, y1, x2, y2, stops });
-        shadingObjIds.set(id, nextObjId++);
-      } else {
-        const cx = parseFloat(grad.getAttribute('cx') || '50');
-        const cy = parseFloat(grad.getAttribute('cy') || '50');
-        const r = parseFloat(grad.getAttribute('r') || '50');
-        gradientMap.set(id, { type: 'radial', x1: cx, y1: cy, x2: cx + r, y2: cy, stops });
-        shadingObjIds.set(id, nextObjId++);
-      }
-    });
-
-    doc.querySelectorAll('path, text').forEach((el) => {
-      if (el.tagName === 'path') {
-        const d = el.getAttribute('d');
-        if (!d) return;
-
-        const fillAttr = el.getAttribute('fill') || 'none';
-        const strokeAttr = el.getAttribute('stroke') || 'none';
-        const fillColor = fillAttr.startsWith('url(#') ? null : parseColor(fillAttr);
-        const strokeColor = parseColor(strokeAttr);
-        const fillRule = el.getAttribute('fill-rule');
-        const strokeWidth = parseFloat(el.getAttribute('stroke-width') || '1');
-        const strokeDash = el.getAttribute('stroke-dasharray');
-
-        const pdfPath = svgPathToPdf(d);
-
-        if (fillAttr.startsWith('url(#')) {
-          const gradId = fillAttr.replace(/^url\(#/, '').replace(/\)$/, '');
-          const shId = shadingObjIds.get(gradId);
-          if (shId) {
-            streamLines.push('q');
-            streamLines.push(pdfPath);
-            streamLines.push(fillRule === 'evenodd' ? 'W* n' : 'W n');
-            streamLines.push(`/Sh${shId} sh`);
-            streamLines.push('Q');
-          } else {
-            const fallbackColor = parseColor(fillAttr) || { r: 0, g: 0, b: 0 };
-            streamLines.push(`${formatNum(fallbackColor.r)} ${formatNum(fallbackColor.g)} ${formatNum(fallbackColor.b)} rg`);
-            streamLines.push(pdfPath);
-            streamLines.push(fillRule === 'evenodd' ? 'f*' : 'f');
-          }
-        } else if (fillColor) {
-          streamLines.push(`${formatNum(fillColor.r)} ${formatNum(fillColor.g)} ${formatNum(fillColor.b)} rg`);
-          streamLines.push(pdfPath);
-          streamLines.push(fillRule === 'evenodd' ? 'f*' : 'f');
-        }
-
-        if (strokeColor) {
-          streamLines.push(`${formatNum(strokeColor.r)} ${formatNum(strokeColor.g)} ${formatNum(strokeColor.b)} RG`);
-          streamLines.push(`${formatNum(strokeWidth)} w`);
-          if (strokeDash) {
-            const dashArr = strokeDash.split(/[\s,]+/).map(parseFloat).filter((n) => !isNaN(n));
-            if (dashArr.length > 0) {
-              streamLines.push(`[${dashArr.map(formatNum).join(' ')}] 0 d`);
-            }
-          }
-          if (!fillColor && !fillAttr.startsWith('url(#')) {
-            streamLines.push(pdfPath);
-          }
-          streamLines.push('S');
-        }
-      } else if (el.tagName === 'text') {
-        const textContent = el.textContent || '';
-        if (!textContent) return;
-
-        const x = parseFloat(el.getAttribute('x') || '0');
-        const y = parseFloat(el.getAttribute('y') || '0');
-        const fillAttr = el.getAttribute('fill') || '#000000';
-        const fontAttr = el.getAttribute('font') || '16px sans-serif';
-        const anchor = el.getAttribute('text-anchor') || 'start';
-
-        const sizeMatch = fontAttr.match(/(\d+)px/);
-        const fontSize = sizeMatch ? parseInt(sizeMatch[1], 10) : 16;
-        const isBold = fontAttr.includes('bold');
-        const fontRef = isBold ? '/F2' : '/F1';
-
-        const fillColor = parseColor(fillAttr) || { r: 0, g: 0, b: 0 };
-        const safeText = textContent.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-
-        let adjX = x;
-        const estWidth = textContent.length * fontSize * 0.55;
-        if (anchor === 'middle') adjX = x - estWidth / 2;
-        if (anchor === 'end') adjX = x - estWidth;
-
-        streamLines.push('q');
-        streamLines.push('BT');
-        streamLines.push(`${fontRef} ${fontSize} Tf`);
-        streamLines.push(`${formatNum(fillColor.r)} ${formatNum(fillColor.g)} ${formatNum(fillColor.b)} rg`);
-        streamLines.push(`1 0 0 -1 ${formatNum(adjX)} ${formatNum(y)} Tm`);
-        streamLines.push(`(${safeText}) Tj`);
-        streamLines.push('ET');
-        streamLines.push('Q');
-      }
-    });
-  } else {
-    // Regex fallback
-    const pathRegex = /<path\s+[^>]*d="([^"]+)"[^>]*>/g;
-    let match: RegExpExecArray | null;
-    while ((match = pathRegex.exec(svgString)) !== null) {
-      const pathTag = match[0];
-      const d = match[1];
-
-      const fillMatch = pathTag.match(/fill="([^"]+)"/);
-      const strokeMatch = pathTag.match(/stroke="([^"]+)"/);
-      const fillRuleMatch = pathTag.match(/fill-rule="([^"]+)"/);
-
-      const pdfPath = svgPathToPdf(d);
-      const fillColor = parseColor(fillMatch ? fillMatch[1] : '#000000');
-      if (fillColor) {
-        streamLines.push(`${formatNum(fillColor.r)} ${formatNum(fillColor.g)} ${formatNum(fillColor.b)} rg`);
-        streamLines.push(pdfPath);
-        streamLines.push(fillRuleMatch && fillRuleMatch[1] === 'evenodd' ? 'f*' : 'f');
-      }
-
-      const strokeColor = parseColor(strokeMatch ? strokeMatch[1] : 'none');
-      if (strokeColor) {
-        streamLines.push(`${formatNum(strokeColor.r)} ${formatNum(strokeColor.g)} ${formatNum(strokeColor.b)} RG`);
-        streamLines.push(pdfPath);
-        streamLines.push('S');
-      }
-    }
-  }
-
-  streamLines.push('Q');
-  const streamData = streamLines.join('\n');
-
-  // Build PDF structure and cross-reference table
-  const pdfParts: string[] = [];
-  const offsets: number[] = [0];
-
-  function appendPart(str: string) {
-    pdfParts.push(str);
-  }
-
-  const header = '%PDF-1.4\n%\xFF\xFF\xFF\xFF\n';
-  appendPart(header);
-
-  let currentOffset = header.length;
-
-  // Obj 1: Catalog
-  offsets.push(currentOffset);
-  const obj1 = '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n';
-  appendPart(obj1);
-  currentOffset += obj1.length;
-
-  // Obj 2: Pages
-  offsets.push(currentOffset);
-  const obj2 = '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n';
-  appendPart(obj2);
-  currentOffset += obj2.length;
-
-  // Obj 3: Page
-  offsets.push(currentOffset);
-  const obj3 = `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${formatNum(width)} ${formatNum(height)}] /Resources 4 0 R /Contents 5 0 R >>\nendobj\n`;
-  appendPart(obj3);
-  currentOffset += obj3.length;
-
-  // Obj 4: Resources
-  offsets.push(currentOffset);
-  let shRes = '';
-  shadingObjIds.forEach((id) => {
-    shRes += `/Sh${id} ${id} 0 R `;
-  });
-
-  const obj4 = `4 0 obj\n<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> >> ${shRes ? `/Shading << ${shRes}>>` : ''} >>\nendobj\n`;
-  appendPart(obj4);
-  currentOffset += obj4.length;
-
-  // Obj 5: Contents Stream
-  offsets.push(currentOffset);
-  const obj5Header = `5 0 obj\n<< /Length ${streamData.length} >>\nstream\n`;
-  const obj5Footer = '\nendstream\nendobj\n';
-  const obj5 = obj5Header + streamData + obj5Footer;
-  appendPart(obj5);
-  currentOffset += obj5.length;
-
-  // Obj 6+: Shading Objects
-  shadingObjIds.forEach((id, gradId) => {
-    const gradInfo = gradientMap.get(gradId);
-    if (!gradInfo) return;
-
-    const c0 = gradInfo.stops[0]?.color || { r: 0, g: 0, b: 0 };
-    const c1 = gradInfo.stops[gradInfo.stops.length - 1]?.color || { r: 1, g: 1, b: 1 };
-
-    offsets.push(currentOffset);
-    const shObj = `${id} 0 obj\n<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [${formatNum(gradInfo.x1)} ${formatNum(gradInfo.y1)} ${formatNum(gradInfo.x2)} ${formatNum(gradInfo.y2)}] /Function << /FunctionType 2 /Domain [0 1] /C0 [${formatNum(c0.r)} ${formatNum(c0.g)} ${formatNum(c0.b)}] /C1 [${formatNum(c1.r)} ${formatNum(c1.g)} ${formatNum(c1.b)}] /N 1.0 >> /Extend [true true] >>\nendobj\n`;
-    appendPart(shObj);
-    currentOffset += shObj.length;
-  });
-
-  const startXref = currentOffset;
-  const totalObjs = offsets.length;
-
-  let xref = `xref\n0 ${totalObjs}\n0000000000 65535 f \n`;
-  for (let i = 1; i < totalObjs; i++) {
-    const offStr = offsets[i].toString().padStart(10, '0');
-    xref += `${offStr} 00000 n \n`;
-  }
-
-  const trailer = `trailer\n<< /Size ${totalObjs} /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF\n`;
-  appendPart(xref);
-  appendPart(trailer);
-
-  const fullPdfStr = pdfParts.join('');
-  const encoder = new TextEncoder();
-  return encoder.encode(fullPdfStr);
+  pdf.object(catalog, `<< /Type /Catalog /Pages ${pages} 0 R >>`);
+  pdf.object(pages, `<< /Type /Pages /Kids [${page} 0 R] /Count 1 >>`);
+  pdf.object(
+    page,
+    `<< /Type /Page /Parent ${pages} 0 R /MediaBox [0 0 ${formatNum(scene.width)} ${formatNum(scene.height)}] /Resources << ${resources} >> /Contents ${contents} 0 R >>`
+  );
+  pdf.object(contents, '<< >>', content);
+  pdf.object(info, `<< /Title ${textString(scene.title)} /Producer (QRCraftly) >>`);
+  return pdf.finish(catalog, info);
 }
 
 /**
- * Generates a Vector PDF byte array (Uint8Array) for a given QR configuration.
+ * Generates a vector PDF for a QR configuration.
  */
 export async function generateQRPdf(
   config: QRConfig,
-  options?: { onLogoOmitted?: () => void; renderOptions?: ModuleRenderOptions; skipPayloadValidation?: boolean }
-): Promise<Uint8Array> {
+  options?: { onLogoOmitted?: () => void; renderOptions?: ModuleRenderOptions; skipPayloadValidation?: boolean } & VectorExportOptions
+): Promise<Uint8Array<ArrayBuffer>> {
   const svg = await generateQRSvg(config, options);
-  return convertSvgToPdf(svg);
+  return convertSvgToPdf(svg, options);
 }

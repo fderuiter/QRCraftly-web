@@ -1,5 +1,11 @@
 packages:
   - '.'
+# Supply chain (#1351, docs/SECURITY.md): only the packages below may run install scripts, a
+# package with an unlisted install script fails the install, and a version must be a day old
+# before it can be resolved. CI installs with --frozen-lockfile.
+strictDepBuilds: true
+minimumReleaseAge: 1440
+
 allowBuilds:
   esbuild: true
   sharp: false

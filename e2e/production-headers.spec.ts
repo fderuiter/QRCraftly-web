@@ -136,6 +136,19 @@ test.describe('Production headers and deployment integrity (#1353)', { tag: '@pr
     expectGlobalHeaders(trailing, '/about/ redirect');
   });
 
+  test('the browser applies the Permissions-Policy the features need', async ({ page }) => {
+    // The header must leave the scanner its camera and the Location form its position, and turn
+    // the rest off, as the browser reads it on the live site (not only as text in _headers).
+    await page.goto('/');
+    const allowed = await page.evaluate(() => {
+      const policy = (document as Document & { featurePolicy?: { allowsFeature: (feature: string) => boolean } }).featurePolicy;
+      if (!policy) return null;
+      return Object.fromEntries(['camera', 'geolocation', 'microphone', 'payment'].map((feature) => [feature, policy.allowsFeature(feature)]));
+    });
+    test.skip(allowed === null, 'This browser does not expose document.featurePolicy');
+    expect(allowed).toEqual({ camera: true, geolocation: true, microphone: false, payment: false });
+  });
+
   test('only preview hosts ask search engines not to index them', async ({ request, baseURL }) => {
     const robots = (await fetchRaw(request, '/')).headers()['x-robots-tag'];
     if (new URL(baseURL ?? '').hostname.endsWith('.workers.dev')) {

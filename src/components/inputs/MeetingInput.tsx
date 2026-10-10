@@ -61,7 +61,7 @@ export const MeetingInput: React.FC<MeetingInputProps> = ({
       {!violation && <LinkHints fieldId="meeting-url" address={data.url} />}
 
       {data.url && parsed.service !== "unknown" && (
-        <div className="space-y-1 rounded-lg border border-line bg-slate-50 p-3 text-xs dark:bg-slate-800/60">
+        <div className="space-y-1 rounded-lg border border-line bg-surface-sunken p-3 text-xs">
           {serviceLabel && (
             <p className="font-semibold text-accent">
               {serviceLabel} link detected

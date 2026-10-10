@@ -147,7 +147,7 @@ export const BorderControls: React.FC<BorderControlsProps> = ({ config, onChange
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {config.borderLogoUrl ? (
-                  <img src={config.borderLogoUrl} alt="Secondary Brand Graphic" width={32} height={32} className="size-8 rounded border border-slate-200 bg-white object-contain" />
+                  <img src={config.borderLogoUrl} alt="Secondary Brand Graphic" width={32} height={32} className="size-8 rounded border border-line bg-surface-raised object-contain" />
                 ) : (
                   <span className="text-xs text-fg-muted italic">No secondary logo</span>
                 )}
