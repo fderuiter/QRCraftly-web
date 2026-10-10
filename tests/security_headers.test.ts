@@ -87,3 +87,10 @@ describe('public/_headers security headers', () => {
     expect(readGlobalHeaders().has('x-robots-tag')).toBe(false);
   });
 });
+
+describe('public/_headers caching', () => {
+  it('never lets a cache serve a stale /version.json, which the deploy checks poll (#1217)', () => {
+    const content = fs.readFileSync(HEADERS_PATH, 'utf8');
+    expect(content).toMatch(/^\/version\.json\r?\n\s+Cache-Control: no-store$/m);
+  });
+});
