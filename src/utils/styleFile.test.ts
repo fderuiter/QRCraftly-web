@@ -51,4 +51,14 @@ describe('style file', () => {
   it('refuses a file that is too large', () => {
     expect(parseStyleFile(' '.repeat(MAX_STYLE_FILE_BYTES + 1)).ok).toBe(false);
   });
+
+  it('keeps a transparent background and the eye colours (#1366)', () => {
+    const parsed = parseStyleFile(serializeStyle(config({ bgColor: 'transparent', eyeFrameColor: '#123456', eyeBallColor: '#654321' })));
+    expect(parsed.ok && parsed.style).toEqual(expect.objectContaining({ bgColor: 'transparent', eyeFrameColor: '#123456', eyeBallColor: '#654321' }));
+  });
+
+  it('accepts transparent only for the background', () => {
+    const parsed = parseStyleFile(JSON.stringify({ format: STYLE_FILE_FORMAT, version: 1, style: { bgColor: 'transparent', fgColor: 'transparent' } }));
+    expect(parsed.ok && parsed.style).toEqual({ bgColor: 'transparent' });
+  });
 });

@@ -19,5 +19,5 @@
 /** Standard downloadable sample CSV template for bulk QR code generation. */
 export const SAMPLE_CSV_TEMPLATE = `url,filename
 https://qrcraftly.com,qrcraftly-website
-https://qrcraftly.com/pages/wifi-qr-code,wifi-qr-generator
+https://qrcraftly.com/wifi-qr-code,wifi-qr-generator
 https://qrcraftly.com/bulk-csv-qr-code,bulk-csv-generator`;

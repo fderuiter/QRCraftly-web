@@ -24,6 +24,23 @@ export {
 } from './lib/svgExport';
 export { generateQREps, convertSvgToEps } from './lib/epsExport';
 export { generateQRPdf, convertSvgToPdf } from './lib/pdfExport';
+export {
+  formatNum,
+  parseColor,
+  parseTransform,
+  readSvgScene,
+  shadingDictionary,
+  textWidth,
+  toLatin1Codes,
+} from './lib/vectorScene';
+export {
+  alphaToMask,
+  decodeSceneImages,
+  MissingImageError,
+  splitAlpha,
+  type ImageDecoder,
+  type VectorExportOptions,
+} from './lib/vectorImages';
 export { SvgContext } from './lib/svgContext';
 export { drawWithTemplate, SOCIAL_DIMENSIONS } from './lib/templateRenderer';
 export { renderQRRaster } from './lib/rasterExport';

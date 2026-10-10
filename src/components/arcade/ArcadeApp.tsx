@@ -98,7 +98,7 @@ export function ArcadeApp() {
     <div className="mx-auto w-full max-w-360 px-4 py-6 sm:px-6 lg:py-8">
       <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex items-start gap-3">
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-teal-700 text-white" aria-hidden="true">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-action text-on-action" aria-hidden="true">
             <Gamepad2 className="size-7" />
           </span>
           <div>

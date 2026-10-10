@@ -105,7 +105,7 @@ describe('ColorControls', () => {
     const bgInput = screen.getByLabelText('Background');
     expect(bgInput).not.toBeDisabled();
 
-    const checkbox = screen.getByRole('checkbox', { name: /transparent background/i });
+    const checkbox = screen.getByRole('switch', { name: /transparent background/i });
     expect(checkbox).not.toBeChecked();
 
     fireEvent.click(checkbox);
@@ -119,7 +119,7 @@ describe('ColorControls', () => {
     const bgInput = screen.getByLabelText('Background');
     expect(bgInput).toBeDisabled();
 
-    const checkbox = screen.getByRole('checkbox', { name: /transparent background/i });
+    const checkbox = screen.getByRole('switch', { name: /transparent background/i });
     expect(checkbox).toBeChecked();
 
     fireEvent.click(checkbox);

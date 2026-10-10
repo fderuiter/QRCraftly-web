@@ -19,7 +19,7 @@ import { normalizeHex } from './colorUtils';
 
 type FieldRule =
   | { kind: 'enum'; values: readonly string[] }
-  | { kind: 'color' }
+  | { kind: 'color'; allowTransparent?: boolean }
   | { kind: 'number'; min: number; max: number }
   | { kind: 'boolean' }
   | { kind: 'colorStops' };
@@ -34,7 +34,8 @@ const enumOf = (values: readonly string[]): FieldRule => ({ kind: 'enum', values
 const STYLE_FIELDS: Partial<Record<keyof QRConfig, FieldRule>> = {
   style: enumOf(Object.values(QRStyle)),
   fgColor: { kind: 'color' },
-  bgColor: { kind: 'color' },
+  // The background may be transparent (the Transparent Background switch).
+  bgColor: { kind: 'color', allowTransparent: true },
   eyeColor: { kind: 'color' },
   gradientType: enumOf(['none', 'linear', 'radial'] satisfies GradientType[]),
   gradientColorStops: { kind: 'colorStops' },
@@ -92,6 +93,7 @@ function cleanValue(rule: FieldRule, value: unknown): string | number | boolean 
     case 'enum':
       return typeof value === 'string' && rule.values.includes(value) ? value : undefined;
     case 'color':
+      if (rule.allowTransparent && value === 'transparent') return value;
       return typeof value === 'string' ? (normalizeHex(value) ?? undefined) : undefined;
     case 'number':
       return typeof value === 'number' && Number.isFinite(value) && value >= rule.min && value <= rule.max ? value : undefined;

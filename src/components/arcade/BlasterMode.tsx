@@ -511,10 +511,10 @@ export function BlasterMode({ target, encoder, settings, announce }: ModeProps) 
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={durability.percent}
-              className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
+              className="h-2.5 w-full overflow-hidden rounded-full bg-line"
             >
               <div
-                className={`h-full rounded-full ${durabilityTone === 'healthy' ? 'bg-teal-600' : durabilityTone === 'warning' ? 'bg-amber-500' : 'bg-rose-600'}`}
+                className={`h-full rounded-full ${durabilityTone === 'healthy' ? 'bg-accent' : durabilityTone === 'warning' ? 'bg-warning' : 'bg-danger'}`}
                 style={{ width: `${durability.percent}%` }}
               />
             </div>

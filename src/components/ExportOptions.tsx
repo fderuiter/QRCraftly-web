@@ -37,8 +37,8 @@ export const FORMAT_LABELS: Record<DownloadFormat, string> = {
 const FORMAT_HINTS: Record<DownloadFormat, string> = {
   png: 'Sharp image that works everywhere.',
   svg: 'Vector: scales to any size, best for print and design tools.',
-  eps: 'EPS vector file for professional prepress and commercial print design workflows.',
-  pdf: 'Portable vector PDF document for cross-platform vector design workflows.',
+  eps: 'Vector EPS for print shops and older design tools. Logos are embedded as images.',
+  pdf: 'Vector PDF for printing and sharing. Logos are embedded as images.',
   jpeg: 'Smallest image, with no transparency.',
   webp: 'Small and sharp, for websites.',
 };

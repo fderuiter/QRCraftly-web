@@ -34,6 +34,8 @@ const SCANNABILITY_WATCHDOG_MS = 1500;
 const BACKPRESSURE_LATENCY_MS = 16.6;
 /** Idle-callback timeout for canvas capture and main-thread checks. */
 const IDLE_TIMEOUT_MS = 100;
+/** How long after a design change the evaluator waits for the caller's check before checking the canvas itself. */
+const RECHECK_AFTER_CHANGE_MS = 1000;
 
 /**
  * Injectable time source. Production uses `systemScannabilityClock`; headless tests step a fake.
@@ -262,6 +264,11 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
   // The newest check dropped by backpressure. It runs as soon as the in-flight check ends, in
   // place of that check's (now outdated) verdict, so the latest design is always checked (#1250).
   let trailing: { request: ScannabilityCheckRequest; resolve: (assessment: ScannabilityAssessment | null) => void } | null = null;
+  // Requests up to this sequence were posted for a design that has since changed: their answers
+  // are never published as the verdict for the design on screen (#1250).
+  let staleThrough = 0;
+  // Checks the canvas if no check arrives for the new design after a change.
+  let recheck: number | null = null;
 
   // --- answer bookkeeping ----------------------------------------------------
 
@@ -332,8 +339,23 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
 
   const isCurrent = (seq: number) => !destroyed && seq === sequence;
 
+  /**
+   * Ends a request posted before the design changed without publishing its verdict.
+   * @returns Whether the request was outdated.
+   */
+  function dropIfOutdated(seq: number): boolean {
+    if (seq > staleThrough) return false;
+    endFlight(seq);
+    settle(seq, false);
+    return true;
+  }
+
   function applyResult(seq: number, result: ScannabilityResult, workerHealthy: boolean) {
     if (!isCurrent(seq)) return;
+    if (dropIfOutdated(seq)) {
+      if (workerHealthy) update({ recovery: false });
+      return;
+    }
     update({
       status: toStatus(result),
       localMetrics:
@@ -348,7 +370,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
 
   /** Ends the current request without a verdict of its own (`idle`) or with a bare failure. */
   function conclude(seq: number, outcome: 'idle' | 'fail') {
-    if (!isCurrent(seq)) return;
+    if (!isCurrent(seq) || dropIfOutdated(seq)) return;
     endFlight(seq);
     update({ status: outcome });
     settle(seq, outcome === 'fail');
@@ -361,6 +383,20 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
       clock.clearTimeout(watchdog.handle);
       watchdog = null;
     }
+  }
+
+  function clearRecheck() {
+    if (recheck === null) return;
+    clock.clearTimeout(recheck);
+    recheck = null;
+  }
+
+  function armRecheck() {
+    clearRecheck();
+    recheck = clock.setTimeout(() => {
+      recheck = null;
+      if (!destroyed) void check();
+    }, RECHECK_AFTER_CHANGE_MS);
   }
 
   function armWatchdog(seq: number) {
@@ -505,6 +541,11 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
       runTrailing();
       return;
     }
+    if (dropIfOutdated(sequence)) {
+      update({ recovery: true });
+      reportFailure('WORKER_ERROR');
+      return;
+    }
     update({ status: 'fail', recovery: true });
     reportFailure('WORKER_ERROR');
     settle(sequence, true);
@@ -520,7 +561,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
       console.error('Worker response validation failed:', data);
       endFlight(sequence);
       clearWatchdog();
-      update({ status: 'fail' });
+      if (!dropIfOutdated(sequence)) update({ status: 'fail' });
       reportFailure('VALIDATION_ERROR');
       settle(sequence, true);
       return;
@@ -727,6 +768,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
       releaseImageHandle(imageBitmap);
       return Promise.resolve(null);
     }
+    clearRecheck();
 
     const owner = getWorker();
 
@@ -803,7 +845,19 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
     setConfig(next) {
       if (next === config) return;
       config = next;
-      if (!destroyed) publish();
+      if (destroyed) return;
+      // Every request posted so far describes the previous design (#1250).
+      staleThrough = sequence;
+      releaseTrailing();
+      if (status === 'idle') {
+        publish();
+        return;
+      }
+      // Show "checking" until the new design has its own verdict, and check the canvas if the
+      // caller sends no check for it.
+      if (status === 'checking') publish();
+      else update({ status: 'checking' });
+      armRecheck();
     },
     getAssessment: () => assessment,
     subscribe(listener) {
@@ -816,6 +870,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
       if (destroyed) return;
       destroyed = true;
       clearWatchdog();
+      clearRecheck();
       retireWorker();
       busy = false;
       startedAt = null;

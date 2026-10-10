@@ -138,6 +138,8 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   const [skippedRows, setSkippedRows] = useState<SkippedRow[]>([]);
   // The running batch checks this after every row, so Cancel or leaving the page stops it.
   const runRef = useRef<{ cancelled: boolean; unmounted: boolean } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const chooseFile = () => fileInputRef.current?.click();
 
   const outcome = useMemo(() => parseContent(data.csvContent), [data.csvContent]);
   const columns = useMemo(() => outcome.table?.headers ?? [], [outcome]);
@@ -367,28 +369,25 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     if (runRef.current) runRef.current.cancelled = true;
   };
 
-  const fileInput = (label: string) => (
-    <input
-      type="file"
-      aria-label={label}
-      accept=".csv, .txt, text/csv, text/plain"
-      className="sr-only"
-      onChange={handleFileUpload}
-    />
-  );
-
   return (
     <div className="space-y-6">
+      {/* One picker for both buttons; it stays out of the tab order, so focus lands on a visible button. */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        aria-label={data.csvContent ? 'Change CSV or TXT file' : 'Upload CSV or TXT file'}
+        accept=".csv, .txt, text/csv, text/plain"
+        className="sr-only"
+        tabIndex={-1}
+        onChange={handleFileUpload}
+      />
       {!data.csvContent ? (
         <BulkCsvDropZone>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-            <label className="cursor-pointer">
-              <span className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-800 focus:ring-2 focus:ring-teal-500 focus:outline-hidden">
-                <Upload className="size-4" />
-                Choose File
-              </span>
-              {fileInput('Upload CSV or TXT file')}
-            </label>
+            <Button type="button" variant="primary" size="md" onClick={chooseFile} className="flex items-center gap-2">
+              <Upload className="size-4" aria-hidden="true" />
+              Choose File
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -402,24 +401,23 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
           </div>
         </BulkCsvDropZone>
       ) : (
-        <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-800">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-700">
+        <div className="space-y-4 rounded-xl border border-line bg-surface p-5 shadow-xs">
+          <div className="flex items-center justify-between border-b border-line-subtle pb-3">
             <div className="flex items-center gap-3">
-              <FileSpreadsheet className="size-5 text-teal-600 dark:text-teal-400" />
+              <FileSpreadsheet className="size-5 text-accent" aria-hidden="true" />
               <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-white">
+                <p className="text-sm font-medium text-fg">
                   {data.fileName || 'Uploaded CSV'}
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-fg-muted">
                   {rowCount} rows found • {columns.length} columns detected
                   {delimiterName && ` • ${delimiterName}-separated`}
                 </p>
               </div>
             </div>
-            <label className="cursor-pointer text-xs font-medium text-teal-700 hover:underline dark:text-teal-400">
+            <Button type="button" variant="ghost" size="sm" onClick={chooseFile}>
               Change File
-              {fileInput('Change CSV or TXT file')}
-            </label>
+            </Button>
           </div>
 
           {skippedRows.length > 0 && (
@@ -539,7 +537,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
           {preflightReport && <BulkCsvPreflightSummary report={preflightReport} />}
 
-          <p className="text-xs text-slate-600 dark:text-slate-400" data-testid="bulk-preview-row">
+          <p className="text-xs text-fg-muted" data-testid="bulk-preview-row">
             {preview
               ? `Preview: row ${preview.rowNumber}. Each row becomes its own QR code in the ZIP.`
               : 'No row has a value in the payload column, so there is nothing to preview.'}
@@ -564,17 +562,17 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       <Modal isOpen={isGenerating} onClose={cancelBatch} closeLabel="Cancel batch" title="Generating Batch QR Codes">
         <div className="space-y-4 py-2 text-center">
           <div className="flex justify-center">
-            <Loader2 className="size-10 animate-spin text-teal-600 dark:text-teal-400" />
+            <Loader2 className="size-10 animate-spin text-accent" />
           </div>
           <p
-            className="text-base font-semibold text-slate-900 dark:text-white"
+            className="text-base font-semibold text-fg"
             id="batch-progress-status"
             aria-live="polite"
           >
             {completedCount} of {totalCount} QR codes generated
           </p>
           {skippedRows.length > 0 && (
-            <p className="text-xs text-amber-700 dark:text-amber-400">
+            <p className="text-xs text-warning">
               {plural(skippedRows.length, 'row', 'rows')} left out. The list stays on screen when this finishes.
             </p>
           )}
