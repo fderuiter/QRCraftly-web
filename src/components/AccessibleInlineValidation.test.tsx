@@ -104,9 +104,32 @@ describe('Accessible Inline Validation and Accessible Fields', () => {
       label: '',
     };
 
-    render(<PaymentInput data={mockData} onChange={() => {}} />);
+    render(<PaymentInput data={{ ...mockData, name: 'Jane Doe' }} onChange={() => {}} />);
 
     const errorAlert = screen.getByRole('alert');
     expect(errorAlert).toHaveTextContent('This IBAN does not pass its checksum or format check. Double-check for typos.');
+  });
+
+  it('Payment input explains an amount the network cannot carry (#1283)', () => {
+    const mockData = {
+      network: CryptoNetwork.BITCOIN,
+      address: 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq',
+      amount: '0.123456789',
+      label: '',
+    };
+    render(<PaymentInput data={mockData} onChange={() => {}} />);
+    expect(screen.getByText('This amount can have at most 8 decimal places.')).toBeInTheDocument();
+  });
+
+  it('Payment input asks for the SEPA beneficiary name (#1367)', () => {
+    const mockData = {
+      network: CryptoNetwork.EPC_SEPA,
+      address: 'DE89370400440532013000',
+      iban: 'DE89370400440532013000',
+      amount: '',
+      label: '',
+    };
+    render(<PaymentInput data={mockData} onChange={() => {}} />);
+    expect(screen.getByText("A SEPA transfer code needs the beneficiary's name.")).toBeInTheDocument();
   });
 });

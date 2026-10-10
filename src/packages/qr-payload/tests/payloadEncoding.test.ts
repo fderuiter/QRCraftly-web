@@ -249,7 +249,8 @@ describe('#974 case 6: Ethereum uses EIP-681 value= in wei', () => {
     });
     expect(payload).not.toContain('amount=');
     if (value === null) {
-      expect(payload).toBe(`ethereum:${address}`);
+      // An amount wei cannot carry is refused rather than silently dropped (#1283).
+      expect(payload).toBe('');
       return;
     }
     expect(payload).toBe(`ethereum:${address}?value=${value}`);
