@@ -175,6 +175,17 @@ const SAFE_ELEMENTS = new Set([
 ]);
 
 /**
+ * Whether a decoded binary string starts with a PNG, JPEG, GIF or WebP file signature.
+ * @param bytes - The decoded payload, one character per byte.
+ */
+const hasRasterSignature = (bytes: string): boolean =>
+  bytes.startsWith('\x89PNG\r\n\x1a\n') ||
+  bytes.startsWith('\xff\xd8\xff') ||
+  bytes.startsWith('GIF87a') ||
+  bytes.startsWith('GIF89a') ||
+  (bytes.startsWith('RIFF') && bytes.slice(8, 12) === 'WEBP');
+
+/**
  * Validates data URIs to ensure they use safe image MIME-types and contain no active payloads.
  */
 const isSafeDataUri = (uri: string): boolean => {
@@ -229,11 +240,10 @@ const isSafeDataUri = (uri: string): boolean => {
     }
   }
 
-  let uriDecodedRaw = '';
-  try {
-    uriDecodedRaw = decodeURIComponent(payload);
-  } catch {
-    uriDecodedRaw = payload;
+  // A base64 raster image is checked by its file signature, not by text patterns: random base64
+  // can spell "onload" by chance, which used to drop well-formed logos from SVG exports (#1257).
+  if (isBase64 && mimeType !== 'image/svg+xml' && decodedPayload !== payload) {
+    return hasRasterSignature(decodedPayload);
   }
 
   const DANGEROUS_PATTERNS = [
@@ -246,7 +256,8 @@ const isSafeDataUri = (uri: string): boolean => {
     'xml-stylesheet'
   ];
 
-  const checks = [payload, decodedPayload, uriDecodedRaw];
+  // Text checks run on the decoded content, plus the raw text when it was not base64.
+  const checks = isBase64 ? [decodedPayload] : [payload, decodedPayload];
   for (const content of checks) {
     const lowerContent = content.toLowerCase();
     for (const pattern of DANGEROUS_PATTERNS) {

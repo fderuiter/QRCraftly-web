@@ -1,7 +1,7 @@
 import { validateConfig } from '@/packages/qr-payload';
 import type { QRConfig } from '@/types';
 import { buildMatrix } from './lib/buildMatrix';
-import { loadQrEncoder } from './lib/encoder';
+import { loadQrEncoder, QrEncodeError } from './lib/encoder';
 
 // Start loading the encoder with the worker, so the first code does not wait on it.
 // A failed load is retried by the next request.
@@ -79,6 +79,8 @@ self.onmessage = async (e: MessageEvent<{ config: QRConfig; sequenceId: number }
         status: 'error',
         sequenceId,
         error: (error instanceof Error && error.message) || 'MATRIX_GENERATION_FAILED',
+        // Lets the preview say the content is too long for the error-correction level (#1251).
+        ...(error instanceof QrEncodeError ? { kind: error.kind } : {}),
       });
     }
   }

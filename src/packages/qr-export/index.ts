@@ -26,4 +26,5 @@ export { generateQREps, convertSvgToEps } from './lib/epsExport';
 export { generateQRPdf, convertSvgToPdf } from './lib/pdfExport';
 export { SvgContext } from './lib/svgContext';
 export { drawWithTemplate, SOCIAL_DIMENSIONS } from './lib/templateRenderer';
+export { renderQRRaster } from './lib/rasterExport';
 export { parseSvgPath, type PathCommandVisitor } from './lib/pathParser';

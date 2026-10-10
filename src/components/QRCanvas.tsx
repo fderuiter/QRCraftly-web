@@ -33,9 +33,10 @@ import {
   assertMazeWorkerResponse,
   type MazeData,
 } from '@/packages/qr-matrix/maze';
-import { buildMatrix, type QrEncoder } from '@/packages/qr-matrix';
+import { buildMatrix, QrEncodeError, type QrEncoder } from '@/packages/qr-matrix';
 import { getQrCanvasRuntime } from '../utils/qrCanvasRuntime';
 import { motionAllowed } from '../hooks/usePresence';
+import { tooLongMessage, type PreviewFailure } from '../utils/previewFailure';
 
 /** Length of the preview crossfade in ms (#1054). */
 const CROSSFADE_MS = 150;
@@ -107,6 +108,8 @@ interface QRCanvasProps {
   className?: string;
   /** Optional callback fired when rendering is complete. */
   onRendered?: (info: { moduleCount: number; virtualImageData?: ImageData; virtualImageBitmap?: ImageBitmap }) => void;
+  /** Optional callback fired when the preview cannot draw a code, with the reason (#1251). */
+  onRenderFailed?: (reason: PreviewFailure) => void;
   /** Sequence of string values representing animated QR frames. If omitted, falls back to config.animationValues. */
   animationValues?: string[];
   /** Flag specifying if the visual animation loop is currently active. If omitted, falls back to config.isAnimating. */
@@ -134,6 +137,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
   size = 1024,
   className,
   onRendered,
+  onRenderFailed,
   animationValues,
   isAnimating,
   animationFps
@@ -196,6 +200,9 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
   }, [activeIsAnimating]);
 
   const onRenderedRef = useRef(onRendered);
+  const onRenderFailedRef = useRef(onRenderFailed);
+  // Set when the content does not fit the chosen error-correction level, so the preview can say so.
+  const [isTooLong, setIsTooLong] = useState(false);
   const sizeRef = useRef(size);
   const virtualRenderTimerRef = useRef<{ cancel: () => void } | null>(null);
 
@@ -215,6 +222,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     logoImgRef.current = logoImg;
     borderLogoImgRef.current = borderLogoImg;
     onRenderedRef.current = onRendered;
+    onRenderFailedRef.current = onRenderFailed;
     sizeRef.current = size;
   });
 
@@ -229,7 +237,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     Promise.resolve(getQrCanvasRuntime().loadEncoder()).then((QRCode) => {
       if (!isMounted) return;
       try {
-        const cached = activeAnimationValues.map((val) => {
+        const cached = activeAnimationValues.map((val, index) => {
           try {
             const modules = buildMatrix(
               { type: config.type, value: val, errorCorrectionLevel: config.errorCorrectionLevel },
@@ -237,7 +245,8 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
             );
             return { value: val, modules };
           } catch (e) {
-            console.warn("QR precompute failed for value:", val, e);
+            // Log the frame position and error kind only, never the frame content (#1268).
+            console.warn(`QR precompute failed for frame ${index + 1}:`, e instanceof Error ? e.name : typeof e);
             return null;
           }
         }).filter((frame): frame is { value: string; modules: QRModules } => frame !== null);
@@ -681,16 +690,21 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
           if (violations.length > 0) {
             lastModulesRef.current = null;
             clearCanvasAndResize();
+            onRenderFailedRef.current?.('blocked');
             return;
           }
 
           const modules = buildMatrix(currentConfig, QRCode);
           lastModulesRef.current = modules;
+          setIsTooLong(false);
           paintMatrix(modules);
         } catch (e) {
-          console.warn("QR generation failed:", e);
+          console.warn("QR generation failed:", e instanceof Error ? e.name : typeof e);
           lastModulesRef.current = null;
           clearCanvasAndResize();
+          const tooLong = e instanceof QrEncodeError && e.kind === 'too-long';
+          setIsTooLong(tooLong);
+          onRenderFailedRef.current?.(tooLong ? 'too-long' : 'failed');
         }
       };
 
@@ -713,7 +727,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
         return;
       }
       worker.onmessage = (e) => {
-        const { status, sequenceId, size, matrix } = e.data;
+        const { status, sequenceId, size, matrix, kind } = e.data;
         if (sequenceId !== sequenceIdRef.current) {
           return;
         }
@@ -726,10 +740,14 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
             }
           };
           lastModulesRef.current = modules;
+          setIsTooLong(false);
           paintMatrix(modules);
         } else {
           lastModulesRef.current = null;
           clearCanvasAndResize();
+          const reason: PreviewFailure = status === 'validationFailed' ? 'blocked' : kind === 'too-long' ? 'too-long' : 'failed';
+          setIsTooLong(reason === 'too-long');
+          onRenderFailedRef.current?.(reason);
         }
       };
       worker.onerror = (e) => {
@@ -853,6 +871,32 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
             </div>
             <p className="mt-2 max-w-xs text-xs text-fg-muted">
               Please correct the input above to safely resume QR code generation.
+            </p>
+          </Alert>
+        </div>
+        <canvas
+          ref={handleRef}
+          style={{ display: 'none' }}
+          role="img"
+          aria-label={ariaLabel}
+        />
+      </div>
+    );
+  }
+
+  if (isTooLong && !activeIsAnimating) {
+    return (
+      <div className={`relative ${containerClasses} w-full`}>
+        <div className="absolute inset-0">
+          <Alert
+            variant="error"
+            title="Too much content"
+            role="status"
+            aria-live="polite"
+            className="flex size-full flex-col items-center justify-center gap-3 overflow-y-auto rounded-3xl border-2 border-dashed border-rose-300 bg-rose-50 p-6 text-center dark:border-rose-800 dark:bg-rose-950/25"
+          >
+            <p className="mt-2 max-w-xs text-sm font-medium text-danger">
+              {tooLongMessage(config.errorCorrectionLevel)}
             </p>
           </Alert>
         </div>

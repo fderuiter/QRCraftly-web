@@ -219,12 +219,26 @@ describe('Security Utils', () => {
       });
 
       it('removes external resource requests from href and xlink:href', () => {
-          const raw = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><image href="https://example.com/malicious.png" xlink:href="http://attacker.com/evil.png" /><image href="data:image/png;base64,abc" xlink:href="#local-ref" /></svg>`;
+          const raw = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><image href="https://example.com/malicious.png" xlink:href="http://attacker.com/evil.png" /><image href="data:image/png;base64,iVBORw0KGgo=" xlink:href="#local-ref" /></svg>`;
           const cleaned = sanitizeSvg(raw);
           expect(cleaned).not.toContain('https://example.com/malicious.png');
           expect(cleaned).not.toContain('http://attacker.com/evil.png');
-          expect(cleaned).toContain('data:image/png;base64,abc');
+          expect(cleaned).toContain('data:image/png;base64,iVBORw0KGgo=');
           expect(cleaned).toContain('#local-ref');
+      });
+
+      it('keeps a base64 raster logo whose encoding happens to spell OnLoad (#1257)', () => {
+          // The PNG signature plus one byte is 9 bytes, so the base64 that follows lines up exactly.
+          const base64 = btoa('\x89PNG\r\n\x1a\n\0' + atob('OnLoadAA'));
+          expect(base64).toContain('OnLoadAA');
+          const raw = `<svg xmlns="http://www.w3.org/2000/svg"><image href="data:image/png;base64,${base64}" /></svg>`;
+          expect(sanitizeSvg(raw)).toContain(`data:image/png;base64,${base64}`);
+      });
+
+      it('drops a raster data URI whose bytes are not that image type', () => {
+          const base64 = btoa('<svg onload="alert(1)"></svg>');
+          const raw = `<svg xmlns="http://www.w3.org/2000/svg"><image href="data:image/png;base64,${base64}" /></svg>`;
+          expect(sanitizeSvg(raw)).not.toContain(base64);
       });
 
       it('sanitizes inline styles and style elements for external resource requests', () => {
