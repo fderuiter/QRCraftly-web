@@ -395,13 +395,14 @@ function buildStream(
 /**
  * Builds a sender session for one file: compresses it, writes the manifest and returns the frame
  * stream. A private session carries the file as a one-file bundle so its name stays inside the
- * encrypted part.
+ * encrypted part. So does an empty file: a single-file stream needs at least one byte to send, and
+ * the bundle's index gives it one (#1301).
  * @param bytes - The original file bytes.
  * @param options - File metadata and density.
  * @returns The stream, its manifest and the chosen symbol size; the key code when private.
  */
 export async function createPrismSession(bytes: Uint8Array, options: PrismSessionOptions): Promise<PrismSession> {
-  if (options.private) {
+  if (options.private || bytes.length === 0) {
     return createPrismBundleSession([{ path: options.fileName || 'file', mimeType: options.mimeType, data: bytes }], options);
   }
   const sha256 = options.sha256 ?? (await sha256Hex(bytes));

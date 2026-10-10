@@ -38,6 +38,10 @@ export function walletFragmentLength(errorCorrectionLevel: StreamErrorCorrection
   return Math.max(1, Math.floor((ALPHANUMERIC_CAPACITY[errorCorrectionLevel][version - 1] - UR_PART_OVERHEAD_CHARS) / 2));
 }
 
+/** Shown when a file needs more BC-UR fragments than a receiver accepts. */
+const WALLET_TOO_LARGE =
+  'This file is too large for wallet-compatible mode at this density. Choose a faster density, or turn wallet-compatible mode off.';
+
 /** A wallet-compatible stream: real BCR-2024-001 `ur:bytes` parts, one per frame. */
 export interface WalletStream {
   /** Parts a receiver needs at the least; the first this many frames are the pure fragments. */
@@ -58,8 +62,10 @@ export interface WalletStream {
 export async function openWalletStream(bytes: Uint8Array, density: TransferDensity): Promise<WalletStream> {
   const { errorCorrectionLevel, maxVersion } = TRANSFER_DENSITY_PROFILES[density];
   // The codec loads only when someone sends in this mode.
-  const [{ BcUrEncoder }, qr] = await Promise.all([import('../../bcur'), loadQrEncoder()]);
+  const [{ BcUrEncoder, MAX_BCUR_FRAGMENTS }, qr] = await Promise.all([import('../../bcur'), loadQrEncoder()]);
   const encoder = BcUrEncoder.forBytes(bytes, walletFragmentLength(errorCorrectionLevel, maxVersion));
+  // A receiver refuses a stream of more fragments than this, so it would never finish (#1302).
+  if (encoder.fragmentCount > MAX_BCUR_FRAGMENTS) throw new Error(WALLET_TOO_LARGE);
   let shown = 0;
   return {
     fragmentCount: encoder.fragmentCount,

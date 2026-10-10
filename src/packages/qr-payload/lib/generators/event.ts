@@ -440,44 +440,32 @@ export const EventContract: QRGeneratorContract<EventData> = {
     const decodedDesc = SafeUrlPipeline.decodeObfuscation(data.description || '');
     const decodedLoc = SafeUrlPipeline.decodeObfuscation(data.location || '');
 
-    // Strip control characters to align with SafeUrlPipeline's treatment of control chars inside URLs.
-    const cleanDesc = decodedDesc.replace(SafeUrlPipeline.REGEX_CONTROL_CHARS, '');
-    const cleanLoc = decodedLoc.replace(SafeUrlPipeline.REGEX_CONTROL_CHARS, '');
+    // Line breaks separate words; other control characters are dropped, as a URL parser does.
+    const clean = (text: string) =>
+      text.replace(/[\r\n]+/g, ' ').replace(SafeUrlPipeline.REGEX_CONTROL_CHARS, '');
 
+    // Every scheme-like word, with the rest of the text after it, so `isDangerousUrl` sees what
+    // follows the colon ("About: us" is prose, "javascript: alert(1)" is not). A colon inside
+    // an http(s) link's path ("/wiki/File:Map.png") is part of that link, not a new scheme (#1274).
     const extractUris = (text: string): string[] => {
       const uris: string[] = [];
-      const tokens = text.split(/\s+/);
-
-      for (const token of tokens) {
-        if (!token) continue;
-
-        let searchIndex = 0;
-        while (true) {
-          const colonIndex = token.indexOf(':', searchIndex);
-          if (colonIndex === -1) break;
-
-          let startOfScheme = colonIndex;
-          while (startOfScheme > searchIndex) {
-            const char = token[startOfScheme - 1];
-            if (/[a-zA-Z0-9+.-]/.test(char)) {
-              startOfScheme--;
-            } else {
-              break;
-            }
-          }
-
-          if (startOfScheme < colonIndex && /[a-zA-Z]/.test(token[startOfScheme])) {
-            const uri = token.substring(startOfScheme);
-            uris.push(uri);
-          }
-
-          searchIndex = colonIndex + 1;
+      const schemePattern = /[a-zA-Z][a-zA-Z0-9+.-]*:/g;
+      let insideLinkUntil = -1;
+      for (const match of text.matchAll(schemePattern)) {
+        const start = match.index;
+        if (start < insideLinkUntil) continue;
+        const rest = text.slice(start);
+        if (/^https?:\/\//i.test(rest)) {
+          const end = rest.search(/\s/);
+          insideLinkUntil = end === -1 ? text.length : start + end;
+          continue;
         }
+        uris.push(rest);
       }
       return uris;
     };
 
-    const urls = [...extractUris(cleanDesc), ...extractUris(cleanLoc)];
+    const urls = [...extractUris(clean(decodedDesc)), ...extractUris(clean(decodedLoc))];
 
     for (const u of urls) {
       if (isDangerousUrl(u)) {

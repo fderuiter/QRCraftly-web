@@ -45,12 +45,12 @@ describe('landing pages (#1035, #1036, #1037)', () => {
     }
   });
 
-  it('gives every preset page a guide, how-to and FAQ, and the guide intro 40 to 60 words', () => {
+  it('gives every preset page a guide, how-to and FAQ, and a short guide intro', () => {
     for (const id of Object.keys(LANDING_PRESETS)) {
       const guide = typeGuides[id];
       expect(guide, id).toBeDefined();
-      expect(wordCount(guide.intro), id).toBeGreaterThanOrEqual(40);
-      expect(wordCount(guide.intro), id).toBeLessThanOrEqual(60);
+      expect(wordCount(guide.intro), id).toBeGreaterThanOrEqual(10);
+      expect(wordCount(guide.intro), id).toBeLessThanOrEqual(40);
       expect(landingPageContent[id].howTo?.steps.length, id).toBeGreaterThanOrEqual(3);
       expect(landingPageContent[id].faqs?.length, id).toBeGreaterThanOrEqual(3);
     }

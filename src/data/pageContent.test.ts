@@ -23,6 +23,7 @@ import { guides } from './guides';
 import { landingPageContent } from './landingPageContent';
 import { LANDING_PAGE_IDS } from './landingPages';
 import { TYPE_PAGE_TYPES } from './relatedPages';
+import { getGuideFaqs, guideFaqAnswer } from './guideFaqs';
 import { typeGuides } from './typeGuides';
 import { generateGuideSchema, generateSchema } from '../utils/schemaGenerator';
 import { resolveDomainForPath } from '../utils/metadataEngine';
@@ -30,18 +31,24 @@ import { pageCopy } from '../../tests/utils/pageCopy';
 
 const pathOf = (id: string) => (id === 'index' ? '/' : `/${id}`);
 
+/** The FAQ entries a page's guide adds to its structured data, in page order. */
+const guideFaqs = (id: string) =>
+  typeGuides[id] ? getGuideFaqs(typeGuides[id]).map((faq) => ({ question: faq.question, answer: guideFaqAnswer(faq) })) : [];
+
 describe('getPageSchema (#1058)', () => {
   const ownCopyIds = [...Object.keys(TYPE_PAGE_TYPES), 'qr-code-scanner', 'about', 'arcade', 'file-transfer', 'free-forever', 'security'];
 
   it.each(ownCopyIds)('builds the same schema %s rendered in the browser before', (id) => {
     const path = pathOf(id);
-    expect(getPageSchema(path)).toEqual(generateSchema({ ...contentRegistry[id], ...pageCopy(id) }, resolveDomainForPath(path), path));
+    const copy = pageCopy(id);
+    const faqs = [...(copy.faqs ?? []), ...guideFaqs(id)];
+    expect(getPageSchema(path)).toEqual(generateSchema({ ...contentRegistry[id], ...copy, faqs: faqs.length > 0 ? faqs : copy.faqs }, resolveDomainForPath(path), path));
   });
 
   it.each([...LANDING_PAGE_IDS])('builds the landing schema of %s from its how-to and FAQs', (id) => {
     const path = pathOf(id);
     const { howTo, faqs } = landingPageContent[id];
-    expect(getPageSchema(path)).toEqual(generateSchema({ ...contentRegistry[id], howTo, faqs }, resolveDomainForPath(path), path));
+    expect(getPageSchema(path)).toEqual(generateSchema({ ...contentRegistry[id], howTo, faqs: [...faqs, ...guideFaqs(id)] }, resolveDomainForPath(path), path));
   });
 
   it.each(guides.map((guide) => guide.slug))('builds the article schema of the %s guide', (slug) => {

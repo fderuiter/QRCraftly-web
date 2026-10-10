@@ -115,3 +115,18 @@ test.describe('Mobile action bar and mini preview (#1051)', () => {
     expect(position).toBe('relative');
   });
 });
+
+test.describe('Text codes keep line breaks (#1269)', () => {
+  test('pressing Enter in the Text box is kept after the edit is saved', async ({ page }) => {
+    await gotoHydrated(page, '/text-qr-code/');
+    const content = page.locator('#text-content');
+    await content.click();
+    await content.pressSequentially('Line one');
+    await content.press('Enter');
+    await content.pressSequentially('Line two');
+    await content.press('Tab');
+    // Wait past the input debounce so the stored value has come back to the field.
+    await page.waitForTimeout(800);
+    await expect(content).toHaveValue('Line one\nLine two');
+  });
+});

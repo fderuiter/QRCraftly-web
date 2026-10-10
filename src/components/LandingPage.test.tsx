@@ -75,7 +75,7 @@ describe('landing pages that preset the generator (#1035, #1037)', () => {
     for (const image of images) expect(image.getAttribute('alt')?.length).toBeGreaterThan(20);
     expect(screen.getByRole('heading', { name: 'How to Make an Image QR Code' })).toBeInTheDocument();
     expect(screen.getByText('Is this an AI QR code?')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Privacy: where your data goes' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: 'Where does what I type go?' })).toBeInTheDocument();
   });
 
   it('links each landing page to the next ones and has accurate metadata', () => {

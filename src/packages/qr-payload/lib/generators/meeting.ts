@@ -18,20 +18,23 @@
 
 import { MeetingData, QRType, QRGeneratorContract } from '@/types';
 import { validateUrlAndInject } from '@/utils/security';
+import { normalizeUrl, shouldNormalizeUrl } from '@/utils/url';
 import { identifyProtocol, CONTAINMENT_PROFILES } from '../protocol';
 
 /**
  * Constructs the QR code string for a virtual meeting link.
  *
- * The encoded value is the sanitized meeting URL itself.
+ * The encoded value is the meeting URL itself. A link pasted without a scheme
+ * (`zoom.us/j/123`) gets `https://`, as the Website type does, so scanners open it (#1280).
  * The calling component may separately parse the URL to display meeting details.
  *
  * @param data - The meeting data containing the URL.
- * @returns The meeting URL string, or an empty string if the URL is empty or dangerous.
+ * @returns The meeting URL string, or an empty string if the URL is empty.
  */
 export const constructMeetingString = (data: MeetingData): string => {
   if (!data || !data.url) return '';
-  return data.url.trim();
+  const url = data.url.trim();
+  return shouldNormalizeUrl(url) ? normalizeUrl(url) : url;
 };
 
 /**

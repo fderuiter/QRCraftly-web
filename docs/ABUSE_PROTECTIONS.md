@@ -96,7 +96,7 @@ Decoded content is rendered as text, never as HTML. Handing a scanned code to th
 
 ### Camera and images
 
-Camera results need two agreeing reads. Images are decoded off the main thread, and a file over 50 MB or declaring more than 40 megapixels is refused before decoding (`assertImageWithinLimits` reads the size from the header, so a small file that declares billions of pixels is caught).
+Camera results need two agreeing reads. Images are decoded off the main thread, and a file over 50 MB or declaring more than 40 megapixels is refused before decoding (`assertImageWithinLimits` reads the size from the header of PNG, JPEG, GIF, WebP, BMP, AVIF, HEIC and TIFF files, so a small file that declares billions of pixels is caught). Other formats are checked as soon as they are decoded, and SVG files are drawn at a fixed 1024 px.
 
 ## Receiving files over the camera
 

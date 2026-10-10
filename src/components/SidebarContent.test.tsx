@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { SidebarContent, getAboutHeading } from './SidebarContent';
 import { contentRegistry } from '@/data/contentRegistry';
+import { getGuideFaqs } from '@/data/guideFaqs';
 import { typeGuides } from '@/data/typeGuides';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { pageCopy } from '../../tests/utils/pageCopy';
@@ -50,7 +51,7 @@ describe('SidebarContent FAQs and intro', () => {
 
   it.each(generatorIds)('renders its own FAQ answers as text for %s, even while collapsed', (toolId) => {
     const faqs = pageCopy(toolId).faqs ?? [];
-    expect(faqs.length).toBeGreaterThanOrEqual(4);
+    expect(faqs.length).toBeGreaterThanOrEqual(1);
     const { container } = renderSidebar(toolId);
     // Answers must be in the rendered HTML so crawlers that do not run JS can read them.
     for (const faq of faqs) {
@@ -62,7 +63,7 @@ describe('SidebarContent FAQs and intro', () => {
     const indexQuestions = new Set((pageCopy('index').faqs ?? []).map((f) => f.question));
     for (const toolId of generatorIds.filter((id) => id !== 'index')) {
       const own = (pageCopy(toolId).faqs ?? []).filter((f) => !indexQuestions.has(f.question));
-      expect(own.length, toolId).toBeGreaterThanOrEqual(2);
+      expect(own.length, toolId).toBeGreaterThanOrEqual(1);
     }
   });
 
@@ -97,27 +98,26 @@ describe('Generator page template (#1029)', () => {
   ];
   const words = (text: string) => text.trim().split(/\s+/).length;
 
-  it.each(typePages)('%s carries 600 to 1,000 words under the template headings', (toolId) => {
+  it.each(typePages)('%s keeps its background reading short and inside the FAQ (#1354)', (toolId) => {
     const { container } = renderSidebar(toolId);
     const total = words(container.textContent ?? '');
-    expect(total).toBeGreaterThanOrEqual(600);
-    expect(total).toBeLessThanOrEqual(1000);
-    for (const name of [
-      'What happens when someone scans it',
-      'Use cases',
-      'Tips for printing and sharing',
-      'Privacy: where your data goes',
-      'Frequently Asked Questions',
-      'More QR code types',
-    ]) {
+    expect(total).toBeGreaterThanOrEqual(250);
+    expect(total).toBeLessThanOrEqual(650);
+    for (const name of ['Frequently Asked Questions', 'More QR code types']) {
       expect(screen.getByRole('heading', { level: 2, name })).toBeInTheDocument();
+    }
+    // No long-form sections between the how-to and the FAQ any more.
+    expect(screen.queryByRole('heading', { level: 2, name: /What happens when someone scans it|Use cases|Privacy/ })).not.toBeInTheDocument();
+    for (const faq of getGuideFaqs(typeGuides[toolId])) {
+      expect(screen.getByRole('heading', { level: 3, name: faq.question })).toBeInTheDocument();
+      for (const text of [...faq.paragraphs, ...(faq.items ?? [])]) expect(container.textContent).toContain(text);
     }
   });
 
-  it.each(typePages)('%s has a 40 to 60 word intro, a template title and a description of at most 155 characters', (toolId) => {
+  it.each(typePages)('%s has a short intro, a template title and a description of at most 155 characters', (toolId) => {
     const entry = contentRegistry[toolId];
-    expect(words(typeGuides[toolId].intro)).toBeGreaterThanOrEqual(40);
-    expect(words(typeGuides[toolId].intro)).toBeLessThanOrEqual(60);
+    expect(words(typeGuides[toolId].intro)).toBeGreaterThanOrEqual(10);
+    expect(words(typeGuides[toolId].intro)).toBeLessThanOrEqual(40);
     expect(entry.seoTitle).toMatch(/^Free .+ QR Code Generator: No Sign-up, Never Expires \| QRCraftly$/);
     expect(entry.description.length).toBeLessThanOrEqual(155);
   });
