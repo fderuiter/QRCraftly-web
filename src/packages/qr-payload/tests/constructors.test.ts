@@ -271,8 +271,8 @@ describe('QR Helpers', () => {
             label: ''
         };
         const result = constructPaymentString(data);
-        expect(result).toContain('amount=1%26label%3Dhacked');
-        expect(result).not.toContain('&label=hacked'); // Should not be interpreted as a raw param
+        // Not a plain decimal, so the code is refused instead of carrying the extra parameter (#1283)
+        expect(result).toBe('');
     });
 
     it('returns raw address for custom network', () => {
@@ -547,7 +547,8 @@ describe('QR Helpers Sad Paths', () => {
         subject: '',
         body: ''
       };
-      expect(constructEmailString(data)).toBe('mailto:?subject=&body=');
+      // Nothing typed: no code, so the generator shows its sample (#1272).
+      expect(constructEmailString(data)).toBe('');
     });
   });
 
@@ -590,8 +591,8 @@ describe('QR Helpers Sad Paths', () => {
         label: 'Donation'
       };
       const result = constructPaymentString(data);
-      // Should encode the ampersand
-      expect(result).toContain('amount=0.1%26label%3DHacked');
+      // Not a plain decimal, so the code is refused instead of carrying the extra parameter (#1283)
+      expect(result).toBe('');
     });
   });
 
@@ -625,7 +626,8 @@ describe('QR Helpers Sad Paths', () => {
         number: ''
       };
       const result = constructPhoneString(data);
-      expect(result).toBe('tel:');
+      // RFC 3966 needs digits: no number, no code (#1272).
+      expect(result).toBe('');
     });
   });
 });

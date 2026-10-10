@@ -16,9 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { RefObject, useCallback, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { QRConfig, TemplateStyle, SocialFormat } from '../types';
-import { generateQRSvg, validateSvgScannability } from '@/packages/qr-export';
+import { generateQRSvg, PayloadRejectedError, renderQRRaster, validateSvgScannability } from '@/packages/qr-export';
+import { QrEncodeError } from '@/packages/qr-matrix';
+import { describeViolation } from '@/packages/qr-payload';
+import { previewFailureMessage, tooLongMessage } from '../utils/previewFailure';
 import { useCapabilities } from './useCapabilities';
 import { ExportOptions } from '../utils/exportRiskPolicy';
 import { isDangerousUrl } from '../utils/security';
@@ -42,6 +45,35 @@ const toError = (err: unknown): Error => {
 };
 
 export type { ExportOptions };
+
+/** `Error.name` of an export refused because the code failed the scan check; it can be retried with `allowUnsafe`. */
+export const SCAN_VALIDATION_ERROR = 'ScanValidationError';
+
+/** The error an export returns when the finished image failed the scan check. */
+const scanValidationFailed = (): Error => {
+  const error = new Error('This QR code might fail to scan.');
+  error.name = SCAN_VALIDATION_ERROR;
+  return error;
+};
+
+/**
+ * Turns an export failure into an error whose message can be shown to people: validation
+ * codes and encoder errors become plain sentences instead of raw codes (#1255).
+ */
+const describeExportError = (err: unknown, config: QRConfig): Error => {
+  if (err instanceof PayloadRejectedError) {
+    return new Error(err.violations.map(describeViolation).join(' '));
+  }
+  if (err instanceof QrEncodeError) {
+    return new Error(
+      err.kind === 'too-long' ? tooLongMessage(config.errorCorrectionLevel) : previewFailureMessage('failed', config.errorCorrectionLevel)
+    );
+  }
+  return toError(err);
+};
+
+/** Raster width used when the caller does not ask for a size. */
+const DEFAULT_EXPORT_WIDTH = 1024;
 
 /** Shown when an export is refused because the content is a script or data link. */
 export const BLOCKED_EXPORT_MESSAGE = "This code contains a script or data link and can't be exported.";
@@ -78,7 +110,7 @@ function warmScannabilityCheck(): () => void {
 
 /** Export choices from the Download options, on top of the safety-gate options. */
 export interface AssetOptions extends ExportOptions {
-  /** Width in pixels of a raster export; defaults to the preview canvas width. */
+  /** Width in pixels of a raster export; defaults to 1024. */
   size?: number;
   /** File name without extension; defaults to `<type>-qr-code-qrcraftly-<date>`. */
   filename?: string;
@@ -88,45 +120,27 @@ export interface AssetOptions extends ExportOptions {
 export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'svg' | 'eps' | 'pdf' | 'clipboard' | 'share' | 'svg-copy';
 
 /**
- * Prepares the canvas for export: resizes to `size` pixels wide if requested,
- * and flattens transparent background to solid white (`#ffffff`) for JPEG exports.
- * Upscaling keeps module edges crisp (no smoothing); downscaling smooths.
- * @param canvas - The preview canvas.
+ * Draws the code for `config` at `size` pixels wide for a raster export. It renders from the
+ * configuration rather than copying the preview, so the file always matches the current content
+ * (#1252) and is drawn at full resolution (#1256). JPEG has no transparency, so it is flattened
+ * onto white (`#ffffff`).
+ * @param config - The configuration to draw.
  * @param format - Export format ('jpeg', 'png', 'webp', etc.).
  * @param size - Target width in pixels.
- * @returns The canvas prepared for export.
+ * @returns The canvas to export.
  */
-function prepareExportCanvas(
-  canvas: HTMLCanvasElement,
-  format?: string,
-  size?: number
-): HTMLCanvasElement {
-  if (!canvas.width) return canvas;
-
-  const isJpeg = format === 'jpeg' || format === 'jpg';
-  const hasSizeChange = Boolean(size && size !== canvas.width);
-
-  if (!isJpeg && !hasSizeChange) {
-    return canvas;
-  }
+async function renderExportCanvas(config: QRConfig, format: string, size?: number): Promise<HTMLCanvasElement> {
+  const canvas = await renderQRRaster(config, size || DEFAULT_EXPORT_WIDTH);
+  if (format !== 'jpeg' && format !== 'jpg') return canvas;
 
   const out = document.createElement('canvas');
-  const targetWidth = size || canvas.width;
-  const targetHeight = size ? Math.round((size * canvas.height) / canvas.width) : canvas.height;
-  out.width = targetWidth;
-  out.height = targetHeight;
-
+  out.width = canvas.width;
+  out.height = canvas.height;
   const ctx = out.getContext('2d');
   if (!ctx) return canvas;
-
-  ctx.imageSmoothingEnabled = size ? size < canvas.width : false;
-
-  if (isJpeg) {
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, out.width, out.height);
-  }
-
-  ctx.drawImage(canvas, 0, 0, out.width, out.height);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(canvas, 0, 0);
   return out;
 }
 
@@ -165,20 +179,16 @@ export interface UseQRDownloadReturn {
   /** Shares QR code image via Web Share API. */
   handleShare: (options?: AssetOptions) => Promise<ExportStatus>;
   /** Copies QR code image to system clipboard. */
-  handleCopy: (options?: ExportOptions) => Promise<ExportStatus>;
+  handleCopy: (options?: AssetOptions) => Promise<ExportStatus>;
 }
 
 /**
  * Hook to handle downloading, sharing, and copying of the QR code.
  * Extracts this logic from the main component to reduce cognitive load.
- * @param qrRef - Reference to the container element containing the canvas.
- * @param config - Current QR configuration (used for filename generation).
+ * @param config - Current QR configuration; raster and vector files are drawn from it.
  * @returns Object containing download and share handlers.
  */
-export function useQRDownload(
-  qrRef: RefObject<HTMLDivElement | null>,
-  config: QRConfig
-): UseQRDownloadReturn {
+export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
   const { canSaveFilePicker, canShare } = useCapabilities();
 
   useEffect(() => warmScannabilityCheck(), []);
@@ -203,6 +213,27 @@ export function useQRDownload(
       return false;
     }
   }, [config.templateStyle, config.socialFormat]);
+
+  /**
+   * Draws the export image and runs the scan check unless `allowUnsafe` is set.
+   * @returns The canvas, or a failed status with a readable error.
+   */
+  const prepareRaster = useCallback(async (
+    format: ExportFormat,
+    renderFormat: 'png' | 'jpeg' | 'webp',
+    options?: AssetOptions
+  ): Promise<{ canvas: HTMLCanvasElement } | { status: ExportStatus }> => {
+    let canvas: HTMLCanvasElement;
+    try {
+      canvas = await renderExportCanvas(config, renderFormat, options?.size);
+    } catch (err) {
+      return { status: { success: false, format, error: describeExportError(err, config) } };
+    }
+    if (!options?.allowUnsafe && !(await validateScannability(canvas))) {
+      return { status: { success: false, format, error: scanValidationFailed() } };
+    }
+    return { canvas };
+  }, [config, validateScannability]);
 
   /**
    * Helper function to normalize file extensions.
@@ -235,29 +266,23 @@ export function useQRDownload(
   const downloadToDevice = useCallback(async (format: 'png' | 'jpeg' | 'webp', options?: AssetOptions): Promise<ExportStatus> => {
     const blocked = blockedExport(config, format);
     if (blocked) return blocked;
-    const canvas = qrRef.current?.querySelector('canvas');
-    if (canvas) {
-      const exportCanvas = prepareExportCanvas(canvas, format, options?.size);
-      if (!options?.allowUnsafe && !(await validateScannability(exportCanvas))) {
-        return { success: false, format, error: new Error('SCAN_VALIDATION_FAILED') };
-      }
-      try {
-        const url = exportCanvas.toDataURL(`image/${format}`);
-        const link = document.createElement('a');
-        const ext = getExtension(format);
-        link.download = getFilename(ext, options?.filename);
-        // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
-        link.href = url;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        return { success: true, format };
-      } catch (err) {
-        return { success: false, format, error: toError(err) };
-      }
+    const prepared = await prepareRaster(format, format, options);
+    if ('status' in prepared) return prepared.status;
+    try {
+      const url = prepared.canvas.toDataURL(`image/${format}`);
+      const link = document.createElement('a');
+      const ext = getExtension(format);
+      link.download = getFilename(ext, options?.filename);
+      // nosemgrep: require-isdangerousurl -- a data URL drawn from our own canvas, never user text
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return { success: true, format };
+    } catch (err) {
+      return { success: false, format, error: toError(err) };
     }
-    return { success: false, format, error: new Error('Canvas not found') };
-  }, [qrRef, config, getFilename, validateScannability]);
+  }, [config, getFilename, prepareRaster]);
 
   /**
    * Handles saving the QR code image, attempting to use the File System Access API
@@ -268,14 +293,9 @@ export function useQRDownload(
   const handleSaveAs = useCallback(async (format: 'png' | 'jpeg' | 'webp', options?: AssetOptions): Promise<ExportStatus> => {
     const blocked = blockedExport(config, format);
     if (blocked) return blocked;
-    const canvas = qrRef.current?.querySelector('canvas');
-    if (!canvas) return { success: false, format, error: new Error('Canvas not found') };
-
-    const exportCanvas = prepareExportCanvas(canvas, format, options?.size);
-
-    if (!options?.allowUnsafe && !(await validateScannability(exportCanvas))) {
-      return { success: false, format, error: new Error('SCAN_VALIDATION_FAILED') };
-    }
+    const prepared = await prepareRaster(format, format, options);
+    if ('status' in prepared) return prepared.status;
+    const exportCanvas = prepared.canvas;
 
     // Check if the browser supports the File System Access API (e.g., Chrome, Edge Desktop)
     if (canSaveFilePicker) {
@@ -308,30 +328,26 @@ export function useQRDownload(
         }
 
         console.warn('File System Access API failed, falling back to standard download:', err);
-        return downloadToDevice(format, options);
+        // The image already passed the scan check (or the person chose to export anyway).
+        return downloadToDevice(format, { ...options, allowUnsafe: true });
       }
     } else {
       // Fallback for browsers that don't support showSaveFilePicker (Safari, Firefox, Mobile)
       return downloadToDevice(format, options);
     }
-  }, [qrRef, config, getFilename, downloadToDevice, canSaveFilePicker, validateScannability]);
+  }, [config, getFilename, downloadToDevice, canSaveFilePicker, prepareRaster]);
 
   /**
    * Copies the QR code image directly to the clipboard.
    * @param options - Optional export options (e.g. allowUnsafe to bypass scannability pre-flight checks).
    * @returns A boolean indicating if the copy operation was successful.
    */
-  const handleCopy = useCallback(async (options?: ExportOptions): Promise<ExportStatus> => {
+  const handleCopy = useCallback(async (options?: AssetOptions): Promise<ExportStatus> => {
     const blocked = blockedExport(config, 'clipboard');
     if (blocked) return blocked;
-    const canvas = qrRef.current?.querySelector('canvas');
-    if (!canvas) return { success: false, format: 'clipboard', error: new Error('Canvas not found') };
-
-    const exportCanvas = prepareExportCanvas(canvas, 'png');
-
-    if (!options?.allowUnsafe && !(await validateScannability(exportCanvas))) {
-      return { success: false, format: 'clipboard', error: new Error('SCAN_VALIDATION_FAILED') };
-    }
+    const prepared = await prepareRaster('clipboard', 'png', options);
+    if ('status' in prepared) return prepared.status;
+    const exportCanvas = prepared.canvas;
 
     try {
       const blob = await new Promise<Blob | null>((resolve) => exportCanvas.toBlob(resolve, 'image/png'));
@@ -349,7 +365,7 @@ export function useQRDownload(
       console.warn('Failed to copy to clipboard:', err);
       return { success: false, format: 'clipboard', error: toError(err) };
     }
-  }, [qrRef, config, validateScannability]);
+  }, [config, prepareRaster]);
 
   /**
    * Uses the Web Share API to share the QR code image directly to other apps.
@@ -359,14 +375,9 @@ export function useQRDownload(
   const handleShare = useCallback(async (options?: AssetOptions): Promise<ExportStatus> => {
     const blocked = blockedExport(config, 'share');
     if (blocked) return blocked;
-    const canvas = qrRef.current?.querySelector('canvas');
-    if (!canvas) return { success: false, format: 'share', error: new Error('Canvas not found') };
-
-    const exportCanvas = prepareExportCanvas(canvas, 'png', options?.size);
-
-    if (!options?.allowUnsafe && !(await validateScannability(exportCanvas))) {
-      return { success: false, format: 'share', error: new Error('SCAN_VALIDATION_FAILED') };
-    }
+    const prepared = await prepareRaster('share', 'png', options);
+    if ('status' in prepared) return prepared.status;
+    const exportCanvas = prepared.canvas;
 
     return new Promise<ExportStatus>((resolve) => {
       exportCanvas.toBlob(async (blob) => {
@@ -391,12 +402,12 @@ export function useQRDownload(
           }
         } else {
           // Fallback for devices that don't support sharing files
-          const fallbackRes = await downloadToDevice('png', options);
+          const fallbackRes = await downloadToDevice('png', { ...options, allowUnsafe: true });
           resolve({ ...fallbackRes, format: 'share', fallbackTriggered: true });
         }
       }, 'image/png');
     });
-  }, [qrRef, config, downloadToDevice, canShare, validateScannability, getFilename]);
+  }, [config, downloadToDevice, canShare, prepareRaster, getFilename]);
 
   /**
    * Generates a vector SVG file from the current QR configuration and triggers
@@ -421,7 +432,7 @@ export function useQRDownload(
     if (blocked) return blocked;
     try {
       const built = await buildSvg(options);
-      if (!built) return { success: false, format: 'svg', error: new Error('SCAN_VALIDATION_FAILED') };
+      if (!built) return { success: false, format: 'svg', error: scanValidationFailed() };
 
       const blob = new Blob([built.svg], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(blob);
@@ -435,8 +446,8 @@ export function useQRDownload(
       URL.revokeObjectURL(url);
       return { success: true, format: 'svg', logoOmitted: built.logoOmitted };
     } catch (err) {
-      console.warn('SVG export failed:', err);
-      return { success: false, format: 'svg', error: toError(err) };
+      console.warn('SVG export failed:', err instanceof Error ? err.name : typeof err);
+      return { success: false, format: 'svg', error: describeExportError(err, config) };
     }
   }, [buildSvg, getFilename, config]);
 
@@ -445,7 +456,7 @@ export function useQRDownload(
     if (blocked) return blocked;
     try {
       const built = await buildSvg(options);
-      if (!built) return { success: false, format: 'eps', error: new Error('SCAN_VALIDATION_FAILED') };
+      if (!built) return { success: false, format: 'eps', error: scanValidationFailed() };
 
       const { convertSvgToEps } = await import('@/packages/qr-export');
       const epsStr = convertSvgToEps(built.svg);
@@ -462,8 +473,8 @@ export function useQRDownload(
       URL.revokeObjectURL(url);
       return { success: true, format: 'eps', logoOmitted: built.logoOmitted };
     } catch (err) {
-      console.warn('EPS export failed:', err);
-      return { success: false, format: 'eps', error: toError(err) };
+      console.warn('EPS export failed:', err instanceof Error ? err.name : typeof err);
+      return { success: false, format: 'eps', error: describeExportError(err, config) };
     }
   }, [buildSvg, getFilename, config]);
 
@@ -472,7 +483,7 @@ export function useQRDownload(
     if (blocked) return blocked;
     try {
       const built = await buildSvg(options);
-      if (!built) return { success: false, format: 'pdf', error: new Error('SCAN_VALIDATION_FAILED') };
+      if (!built) return { success: false, format: 'pdf', error: scanValidationFailed() };
 
       const { convertSvgToPdf } = await import('@/packages/qr-export');
       const pdfBytes = convertSvgToPdf(built.svg);
@@ -489,8 +500,8 @@ export function useQRDownload(
       URL.revokeObjectURL(url);
       return { success: true, format: 'pdf', logoOmitted: built.logoOmitted };
     } catch (err) {
-      console.warn('PDF export failed:', err);
-      return { success: false, format: 'pdf', error: toError(err) };
+      console.warn('PDF export failed:', err instanceof Error ? err.name : typeof err);
+      return { success: false, format: 'pdf', error: describeExportError(err, config) };
     }
   }, [buildSvg, getFilename, config]);
 
@@ -501,13 +512,13 @@ export function useQRDownload(
   const handleCopySvg = useCallback(async (options?: AssetOptions): Promise<ExportStatus> => {
     try {
       const built = await buildSvg(options);
-      if (!built) return { success: false, format: 'svg-copy', error: new Error('SCAN_VALIDATION_FAILED') };
+      if (!built) return { success: false, format: 'svg-copy', error: scanValidationFailed() };
       await navigator.clipboard.writeText(built.svg);
       return { success: true, format: 'svg-copy', logoOmitted: built.logoOmitted };
     } catch (err) {
-      return { success: false, format: 'svg-copy', error: toError(err) };
+      return { success: false, format: 'svg-copy', error: describeExportError(err, config) };
     }
-  }, [buildSvg]);
+  }, [buildSvg, config]);
 
   /**
    * Unified QR export engine seam that coordinates all asset exports.

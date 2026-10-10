@@ -460,6 +460,21 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
     }
   }
 
+  /**
+   * Converts a bitmap to pixels on the main thread and closes it.
+   * @param bitmap - Bitmap the evaluator owns.
+   * @returns Its pixels, or null when it cannot be drawn.
+   */
+  function convertBitmap(bitmap: ImageBitmap): PixelFrame | null {
+    try {
+      return bitmap.width > 0 && bitmap.height > 0 ? frames.bitmapToPixels(bitmap) : null;
+    } catch {
+      return null;
+    } finally {
+      releaseImageHandle(bitmap);
+    }
+  }
+
   function pixelsFromRequest(request: ScannabilityCheckRequest): PixelFrame | null {
     const { imageData, imageBitmap } = request;
     // A transferred buffer is detached (byteLength 0) and a transferred bitmap reports 0x0.
@@ -537,7 +552,9 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
     if ('retryWithImageData' in data && data.retryWithImageData) {
       // Worker Degradation Cache: this worker cannot draw bitmaps, so send pixels from now on.
       offscreenDegraded = true;
-      const pixels = readCanvasPixels();
+      // Resend the request's own frame (the worker hands its bitmap back); the preview canvas
+      // is only a fallback for a worker that did not.
+      const pixels = ('imageBitmap' in data && data.imageBitmap ? convertBitmap(data.imageBitmap) : null) ?? readCanvasPixels();
       if (!pixels) {
         conclude(sequence, 'fail');
         return;
@@ -743,6 +760,21 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
     startedAt = clock.now();
     // Armed before capture so a stalled canvas capture is caught too.
     armWatchdog(seq);
+
+    if (imageBitmap && offscreenDegraded) {
+      // This worker cannot draw bitmaps: convert the caller's frame here and post it once.
+      const pixels = convertBitmap(imageBitmap);
+      if (!pixels) {
+        conclude(seq, 'fail');
+        return answer;
+      }
+      try {
+        post(owner, seq, current.moduleCount, pixels, pixels);
+      } catch (err) {
+        dispatchFailed(seq, err);
+      }
+      return answer;
+    }
 
     if (imageBitmap) {
       try {

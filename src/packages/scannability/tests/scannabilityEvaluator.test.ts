@@ -546,6 +546,57 @@ describe('Scannability Health Evaluator (headless)', () => {
       expect(h.worker().last.imageData).toBeDefined();
     });
 
+    it('retries with the frame the worker hands back instead of the preview canvas', () => {
+      const h = createHarness();
+      h.setCanvas(new FakeCanvas(3072, 5461));
+      void h.evaluator.check({ imageBitmap: new FakeBitmap(512, 512), moduleCount: 25 });
+      const returned = new FakeBitmap(512, 512);
+      h.worker().reply({ retryWithImageData: true, imageBitmap: returned });
+
+      expect(h.worker().last).toMatchObject({
+        moduleCount: 25,
+        width: 512,
+        height: 512,
+        imageData: expect.objectContaining({ width: 512, height: 512 }),
+      });
+      expect(returned.close).toHaveBeenCalledTimes(1);
+      expect(h.frames.readPixels).not.toHaveBeenCalled();
+    });
+
+    it('converts later caller bitmaps on the main thread and posts them once after a degraded retry', () => {
+      const h = createHarness();
+      h.setCanvas(new FakeCanvas(3072, 5461));
+      void h.evaluator.check({ imageBitmap: new FakeBitmap(512, 512) });
+      h.worker().reply({ retryWithImageData: true, imageBitmap: new FakeBitmap(512, 512) });
+      h.worker().reply({ success: true, physicalReady: true });
+
+      for (let i = 0; i < 3; i++) {
+        const before = h.worker().posted.length;
+        const bitmap = new FakeBitmap(512, 512);
+        void h.evaluator.check({ imageBitmap: bitmap });
+        expect(h.worker().posted.length).toBe(before + 1);
+        expect(h.worker().last.imageBitmap).toBeUndefined();
+        expect(h.worker().last.imageData).toMatchObject({ width: 512, height: 512 });
+        expect(bitmap.close).toHaveBeenCalledTimes(1);
+        h.worker().reply({ success: true, physicalReady: true });
+      }
+      expect(h.frames.readPixels).not.toHaveBeenCalled();
+    });
+
+    it('fails a degraded check whose bitmap cannot be converted, and closes it', () => {
+      const h = createHarness();
+      void h.evaluator.check({ imageBitmap: new FakeBitmap() });
+      h.worker().reply({ retryWithImageData: true });
+      h.worker().reply({ success: true, physicalReady: true });
+      const before = h.worker().posted.length;
+
+      const empty = new FakeBitmap(0, 0);
+      void h.evaluator.check({ imageBitmap: empty });
+      expect(h.worker().posted.length).toBe(before);
+      expect(empty.close).toHaveBeenCalledTimes(1);
+      expect(h.status()).toBe('fail');
+    });
+
     it('falls back to a synchronous pixel read when bitmap capture fails', async () => {
       const h = createHarness();
       h.setCaptureMode('reject');

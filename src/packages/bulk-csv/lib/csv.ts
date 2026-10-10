@@ -35,11 +35,18 @@ export interface CsvTable {
   totalRows: number;
   /** True when `totalRows` exceeds the rows kept. */
   truncated: boolean;
+  /**
+   * For each kept row, its 1-based data row number as a spreadsheet shows it: blank lines are
+   * counted, the header is not. Use it in messages so "Row 4" is row 4 in Excel too.
+   */
+  rowNumbers: number[];
+  /** The field delimiter used: the one passed in, or the one detected from the header row. */
+  delimiter: string;
 }
 
 /** Options for {@link parseCsv}. */
 export interface ParseCsvOptions {
-  /** Field delimiter. Defaults to `,`. */
+  /** Field delimiter. Detected from the header row when omitted (see {@link detectDelimiter}). */
   delimiter?: string;
   /** Maximum data rows to keep. Defaults to {@link MAX_BULK_CSV_ROWS}. */
   maxRows?: number;
@@ -121,6 +128,65 @@ function tokenize(text: string, delimiter: string, onRecord: (fields: string[]) 
   if (field.length > 0 || fields.length > 0) endRecord();
 }
 
+/** Delimiters {@link detectDelimiter} chooses between, in order of preference on a tie. */
+const DELIMITER_CANDIDATES = [',', ';', '\t'] as const;
+
+/**
+ * Picks the field delimiter from the first non-blank record: whichever of comma, semicolon
+ * and tab appears most often outside quotes. Excel saves "CSV" with semicolons in locales
+ * that use a decimal comma, and "Text (Tab delimited)" with tabs. Defaults to a comma.
+ * @param text CSV text.
+ * @returns `,`, `;` or a tab.
+ */
+export function detectDelimiter(text: string): string {
+  const counts = new Map<string, number>(DELIMITER_CANDIDATES.map((d) => [d, 0]));
+  let inQuotes = false;
+  let sawContent = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === QUOTE) {
+      inQuotes = !inQuotes;
+      sawContent = true;
+    } else if (!inQuotes && (ch === '\n' || ch === '\r')) {
+      if (sawContent) break;
+    } else if (!inQuotes) {
+      const count = counts.get(ch);
+      if (count !== undefined) counts.set(ch, count + 1);
+      else if (ch.trim() !== '') sawContent = true;
+    }
+  }
+  let best: string = DELIMITER_CANDIDATES[0];
+  for (const candidate of DELIMITER_CANDIDATES) {
+    if ((counts.get(candidate) ?? 0) > (counts.get(best) ?? 0)) best = candidate;
+  }
+  return best;
+}
+
+/**
+ * Decodes the bytes of an uploaded CSV or TXT file. UTF-16 is used when the file starts with a
+ * UTF-16 byte order mark (Excel's "Unicode Text"), or when it has none but every other byte of
+ * its start is zero; anything else is read as UTF-8.
+ * @param bytes File contents.
+ * @returns The decoded text, without a byte order mark.
+ */
+export function decodeCsvBytes(bytes: Uint8Array): string {
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes);
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(bytes);
+  const sample = bytes.subarray(0, Math.min(bytes.length, 512) & ~1);
+  if (sample.length >= 4) {
+    let evenZeros = 0;
+    let oddZeros = 0;
+    for (let i = 0; i < sample.length; i += 2) {
+      if (sample[i] === 0) evenZeros += 1;
+      if (sample[i + 1] === 0) oddZeros += 1;
+    }
+    const pairs = sample.length / 2;
+    if (oddZeros === pairs && evenZeros === 0) return new TextDecoder('utf-16le').decode(bytes);
+    if (evenZeros === pairs && oddZeros === 0) return new TextDecoder('utf-16be').decode(bytes);
+  }
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
 function isBlankRecord(fields: string[]): boolean {
   return fields.every((f) => f.trim() === '');
 }
@@ -141,27 +207,32 @@ function normalizeHeaders(raw: string[]): string[] {
 }
 
 /**
- * Parses CSV text whose first non-blank record is the header row. A UTF-8 byte
- * order mark is stripped and blank lines are skipped. Only the first `maxRows`
+ * Parses CSV text whose first non-blank record is the header row. A byte order mark is
+ * stripped, blank lines are skipped, and the delimiter is detected unless one is given. Only the first `maxRows`
  * data rows are kept so memory stays bounded; the rest are only counted.
  * @throws {CsvParseError} on an unterminated quoted field or input over {@link MAX_BULK_CSV_CHARS}.
  */
 export function parseCsv(text: string, options: ParseCsvOptions = {}): CsvTable {
-  const delimiter = options.delimiter ?? ',';
+  if (text.length > MAX_BULK_CSV_CHARS) {
+    throw new CsvParseError(`The CSV is too large (limit ${MAX_BULK_CSV_CHARS} characters).`);
+  }
+  const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  const delimiter = options.delimiter ?? detectDelimiter(source);
   const maxRows = Math.max(0, options.maxRows ?? MAX_BULK_CSV_ROWS);
   if (delimiter.length !== 1 || delimiter === QUOTE || delimiter === '\r' || delimiter === '\n') {
     throw new CsvParseError('The delimiter must be a single character other than a quote or line break.');
   }
-  if (text.length > MAX_BULK_CSV_CHARS) {
-    throw new CsvParseError(`The CSV is too large (limit ${MAX_BULK_CSV_CHARS} characters).`);
-  }
 
-  const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   let headers: string[] | null = null;
   const rows: CsvRow[] = [];
   let totalRows = 0;
 
+  const rowNumbers: number[] = [];
+  // Records after the header, blank ones included, so numbers match the spreadsheet's rows.
+  let recordsAfterHeader = 0;
+
   tokenize(source, delimiter, (fields) => {
+    if (headers !== null) recordsAfterHeader += 1;
     if (isBlankRecord(fields)) return;
     if (headers === null) {
       headers = normalizeHeaders(fields);
@@ -169,12 +240,14 @@ export function parseCsv(text: string, options: ParseCsvOptions = {}): CsvTable 
     }
     totalRows += 1;
     if (rows.length >= maxRows) return;
-    const row: CsvRow = {};
+    // No prototype, so a header such as `__proto__` or `constructor` is an ordinary column.
+    const row: CsvRow = Object.create(null);
     headers.forEach((header, index) => {
       row[header] = fields[index] ?? '';
     });
     rows.push(row);
+    rowNumbers.push(recordsAfterHeader);
   });
 
-  return { headers: headers ?? [], rows, totalRows, truncated: totalRows > rows.length };
+  return { headers: headers ?? [], rows, totalRows, truncated: totalRows > rows.length, rowNumbers, delimiter };
 }

@@ -8,7 +8,8 @@ Each input component follows a consistent pattern:
 
 1.  **Strict Props**: Takes a `data` object (specific to the type, e.g., `WifiData`) and an `onChange` handler.
 2.  **Stateless (Mostly)**: Typically delegates state management to the parent (`InputPanel`) via `useInputLogic` and the centralized registry, though some may handle purely UI-local state (like toggling password visibility or geolocation loading).
-3.  **Shared Styles**: Uses the shared form fields (`src/components/ui/FormFields.tsx`, `FormBlock`) and style constants from `src/components/ui/styles.ts` to ensure visual consistency.
+3.  **Empty and refused content**: A payload constructor returns `''` until a field it needs is filled (a digit in a phone number, a network name, any email or event field, any contact field), so an empty form shows the sample preview with exports off instead of encoding a skeleton such as `tel:` or `BEGIN:VCARD…END:VCARD` (#1272). A value the form refuses (for example a zero-width character in a WiFi password) is never written to the store; `InputPanel` reports it through `onRefusedChange` instead, and the generator then blanks the preview and turns every export off, the mockup download included, until the field is fixed (#1279).
+4.  **Shared Styles**: Uses the shared form fields (`src/components/ui/FormFields.tsx`, `FormBlock`) and style constants from `src/components/ui/styles.ts` to ensure visual consistency.
 
 ### Example Structure
 
@@ -47,7 +48,7 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
 - `LocationInput.tsx`: For `QRType.LOCATION`. Collects latitude and longitude with support for browser geolocation APIs.
 - `MeetingInput.tsx`: For `QRType.MEETING`. Handles online meeting links for Zoom, Microsoft Teams, and Google Meet, with automatic parsing.
 - `SocialInput.tsx`: For `QRType.SOCIAL`. Configures social media platform username and handle details for Instagram, Twitter / X, TikTok, LinkedIn, YouTube, Facebook, WhatsApp, and GitHub.
-- `BulkCsvInput.tsx`: For `QRType.BULK_CSV`. Client-side main-thread CSV parsing and ZIP generation through `@/packages/bulk-csv` (no third-party libraries). The registry loads it through `LazyBulkCsvInput.tsx` so the code is fetched only on the Bulk CSV type. Supports column mapping, PNG/SVG format selection, customizable PNG export resolution (500px, 1000px, 2000px, 3000px), a 500-row batch limit, malformed CSV error handling, progress tracking, and zero network calls.
+- `BulkCsvInput.tsx`: For `QRType.BULK_CSV`. Client-side main-thread CSV parsing and ZIP generation through `@/packages/bulk-csv` (no third-party libraries). The registry loads it through `LazyBulkCsvInput.tsx` so the code is fetched only on the Bulk CSV type. Supports column mapping (whole-word header matching), a content type (`contentType`: links normalised like the Link generator, or plain text encoded as typed; the preview, the checks and the ZIP use the same string), comma, semicolon and tab delimiters, UTF-8 and UTF-16 files, PNG/SVG format selection, a PNG width (500px, 1000px, 2000px, 3000px) whose height follows the social format, a 500-row batch limit, per-row skipping of rows that fail the checks or are too long, spreadsheet row numbers in messages, malformed CSV error handling, progress tracking with Cancel, and zero network calls.
 
 ## Frame Controls & Call-to-Action Badges
 

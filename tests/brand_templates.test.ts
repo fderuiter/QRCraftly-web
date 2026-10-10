@@ -13,12 +13,15 @@ import {
   validateTemplateJson,
   applyTemplateToConfig,
   extractStyleConfig,
+  addImportedTemplate,
+  isTemplateStorageAvailable,
+  TEMPLATE_STORAGE_ERROR,
 } from '../src/utils/brandTemplateManager';
 
 describe('Brand Template Gallery & Persistence System', () => {
   beforeEach(() => {
-    localStorage.clear();
     vi.restoreAllMocks();
+    localStorage.clear();
   });
 
   describe('Pre-built Templates Data', () => {
@@ -241,6 +244,84 @@ describe('Brand Template Gallery & Persistence System', () => {
       expect(validateTemplateJson({}).valid).toBe(false);
       expect(validateTemplateJson({ name: '' }).valid).toBe(false);
       expect(validateTemplateJson({ name: 'Valid Name', config: null }).valid).toBe(false);
+    });
+  });
+
+  describe('Import validation drops what the generator cannot use', () => {
+    const wrap = (config: Record<string, unknown>) => ({ name: 'Hand edited', config });
+
+    it('drops non-string colours, unknown enum values, out-of-range numbers and unknown keys', () => {
+      const validation = validateTemplateJson(
+        wrap({
+          fgColor: 0,
+          socialFormat: 'square',
+          borderStyle: 'groove',
+          logoSize: 3,
+          futureSetting: true,
+          bgColor: '#FFFFFF',
+          value: 'https://example.com',
+        })
+      );
+      expect(validation.valid).toBe(true);
+      expect(validation.template?.config).toEqual({ bgColor: '#ffffff' });
+      // Four invalid values and one unknown key; the content field is dropped without counting.
+      expect(validation.skipped).toBe(5);
+    });
+
+    it('keeps valid mosaic, eye and maze settings', () => {
+      const validation = validateTemplateJson(
+        wrap({ mosaicMode: 'halftone', mosaicContrast: 0.4, eyeFrameColor: '#112233', eyeBallColor: '#445566', mazePathWidth: 0.3 })
+      );
+      expect(validation.skipped).toBe(0);
+      expect(validation.template?.config).toEqual({
+        mosaicMode: 'halftone',
+        mosaicContrast: 0.4,
+        eyeFrameColor: '#112233',
+        eyeBallColor: '#445566',
+        mazePathWidth: 0.3,
+      });
+    });
+
+    it('round-trips a saved template through export and import unchanged', () => {
+      const saved = saveCustomTemplate('Round trip', undefined, { ...DEFAULT_CONFIG, fgColor: '#123456' });
+      const validation = validateTemplateJson({ type: 'qrcraftly-brand-template', template: saved.template });
+      expect(validation.skipped).toBe(0);
+      expect(validation.template?.config.fgColor).toBe('#123456');
+    });
+  });
+
+  describe('Blocked or full site storage', () => {
+    const blockStorage = () =>
+      vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+        throw new DOMException('The operation is insecure.', 'SecurityError');
+      });
+
+    it('reads no templates and refuses to save without throwing when storage is blocked', () => {
+      blockStorage();
+      expect(isTemplateStorageAvailable()).toBe(false);
+      expect(getStoredTemplates()).toEqual([]);
+      expect(saveCustomTemplate('Blocked', undefined, DEFAULT_CONFIG)).toEqual({ success: false, error: TEMPLATE_STORAGE_ERROR });
+      expect(deleteCustomTemplate('anything')).toBe(false);
+    });
+
+    it('reports a storage error when an import cannot be written', () => {
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new DOMException('Quota exceeded', 'QuotaExceededError');
+      });
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const validation = validateTemplateJson({ name: 'Imported', config: { fgColor: '#000000' } });
+      expect(validation.template).toBeDefined();
+      if (!validation.template) return;
+      expect(addImportedTemplate(validation.template)).toEqual({ success: false, error: TEMPLATE_STORAGE_ERROR });
+    });
+
+    it('adds an imported template to the front of the stored list', () => {
+      saveCustomTemplate('Existing', undefined, DEFAULT_CONFIG);
+      const validation = validateTemplateJson({ name: 'Imported', config: { fgColor: '#000000' } });
+      if (!validation.template) throw new Error('expected a template');
+      const result = addImportedTemplate(validation.template);
+      expect(result.success).toBe(true);
+      expect(getStoredTemplates().map(t => t.name)).toEqual(['Imported', 'Existing']);
     });
   });
 });

@@ -43,3 +43,9 @@ declare module 'virtual:shipped-packages' {
   const packages: readonly import('../scripts/vite/thirdPartyLicenses').ShippedPackageSummary[];
   export default packages;
 }
+
+/** The public docs rendered on the /security page, compiled at build time (see `scripts/vite/docsManifest.ts`). */
+declare module 'virtual:docs-manifest' {
+  const docs: readonly { id: string; filename: string; title: string; html: string }[];
+  export default docs;
+}

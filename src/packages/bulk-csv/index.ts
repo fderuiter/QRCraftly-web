@@ -28,6 +28,8 @@
 
 export {
   parseCsv,
+  detectDelimiter,
+  decodeCsvBytes,
   CsvParseError,
   MAX_BULK_CSV_ROWS,
   MAX_BULK_CSV_CHARS,
@@ -40,13 +42,15 @@ export { sanitizeFileStem, allocateFileName } from './lib/fileNames';
 export {
   previewRow,
   pickColumn,
-  PAYLOAD_COLUMN_PATTERN,
-  FILENAME_COLUMN_PATTERN,
+  PAYLOAD_COLUMN_WORDS,
+  FILENAME_COLUMN_WORDS,
   type BulkCsvPreview,
 } from './lib/preview';
+export { encodeBulkCell, type BulkContentType } from './lib/payload';
 export { SAMPLE_CSV_TEMPLATE } from './lib/template';
 export {
   categorizeCsvRows,
+  type CategorizeOptions,
   type PreflightReport,
   type PreflightRowDetail,
   type PreflightRowStatus,

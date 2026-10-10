@@ -233,6 +233,7 @@ describe('InputPanel Component', () => {
   it('updates WiFi Hidden Network toggle', () => {
       renderPanel({ type: QRType.WIFI });
 
+      fireEvent.change(screen.getByLabelText('Network Name (SSID)'), { target: { value: 'HomeNet' } });
       const hiddenCheckbox = screen.getByLabelText('Hidden Network');
 
       // Toggle ON
@@ -574,8 +575,8 @@ describe('InputPanel Edge Cases', () => {
     fireEvent.change(phoneInput, { target: { value: ' : ' } });
     act(() => { vi.advanceTimersByTime(100); });
 
-    // Should result in empty tel: prefix
-    expect(mockOnChange).toHaveBeenCalledWith({ value: 'tel:' });
+    // No digits, no code: the generator shows its sample instead of an empty tel: (#1272)
+    expect(mockOnChange).toHaveBeenLastCalledWith({ value: '' });
   });
 
   it('handles colons in SMS message correctly', () => {
@@ -596,6 +597,9 @@ describe('InputPanel Edge Cases', () => {
 
   it('escapes special characters in WPA2-EAP Identity', () => {
     renderPanel({ type: QRType.WIFI });
+
+    fireEvent.change(screen.getByLabelText('Network Name (SSID)'), { target: { value: 'Corp' } });
+    act(() => { vi.advanceTimersByTime(100); });
 
     // Switch to WPA2-EAP
     const encryptionSelect = screen.getByLabelText('Encryption');

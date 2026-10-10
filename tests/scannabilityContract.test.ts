@@ -176,6 +176,11 @@ describe('sharedContract runtime assertion logic', () => {
       expect(() => assertWorkerResponse(retry)).not.toThrow();
     });
 
+    it('accepts a retry that hands the bitmap back and rejects a malformed one', () => {
+      expect(isWorkerResponse({ configId: 'r', retryWithImageData: true, imageBitmap: { width: 1, height: 1 } })).toBe(true);
+      expect(isWorkerResponse({ configId: 'r', retryWithImageData: true, imageBitmap: 'bitmap' })).toBe(false);
+    });
+
     it('should validate with optional fields as undefined or null', () => {
       const validUndefined = {
         success: true,

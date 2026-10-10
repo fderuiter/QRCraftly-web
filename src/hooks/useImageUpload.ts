@@ -44,6 +44,25 @@ const isFileReaderMocked = (): boolean => {
   return false;
 };
 
+/** Shown when an uploaded SVG cannot be drawn as an image. */
+export const UNDRAWABLE_SVG_MESSAGE = "This SVG can't be drawn. Check that it is a complete SVG file with an xmlns attribute, or upload a PNG instead.";
+
+/**
+ * Whether sanitised SVG markup can be drawn as an image: browsers only draw a well-formed
+ * document whose root is an `<svg>` in the SVG namespace (#1257).
+ * @param svg - Sanitised SVG markup.
+ */
+const isDrawableSvg = (svg: string): boolean => {
+  if (!svg.trim()) return false;
+  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  const root = doc.documentElement;
+  return (
+    doc.getElementsByTagName('parsererror').length === 0 &&
+    root.localName === 'svg' &&
+    root.namespaceURI === 'http://www.w3.org/2000/svg'
+  );
+};
+
 /**
  * Hook to handle image uploading and validation.
  * Used for logo and border logo uploads to keep components DRY.
@@ -67,6 +86,11 @@ export function useImageUpload(): UseImageUploadReturn {
         reader.onload = (event) => {
           const rawSvg = event.target?.result as string;
           const sanitizedSvg = sanitizeSvg(rawSvg);
+          if (!isDrawableSvg(sanitizedSvg)) {
+            // Keep the current logo rather than cutting a hole for an image that never draws.
+            setError(UNDRAWABLE_SVG_MESSAGE);
+            return;
+          }
           const base64 = btoa(unescape(encodeURIComponent(sanitizedSvg)));
           const dataUrl = `data:image/svg+xml;base64,${base64}`;
           onSuccess(dataUrl);

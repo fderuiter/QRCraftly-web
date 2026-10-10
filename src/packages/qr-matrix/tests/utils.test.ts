@@ -20,6 +20,7 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateLayout,
   getLogoMetrics,
+  MIN_LOGO_BACKING_PADDING,
   getIsCoveredByLogo,
   getAlignmentPatternCenters,
   isAlignmentPatternZone,
@@ -118,6 +119,19 @@ describe('QR Renderer Utils', () => {
       const metrics = getLogoMetrics(config, moduleCount, cellSize);
       expect(metrics.cutoutModuleSize).toBeCloseTo(7.35);
       expect(metrics.effectivePaddingModules).toBeLessThan(1);
+    });
+
+    it('keeps a visible gap for Square and Circle backings with a padding of 0 (#1355)', () => {
+      for (const logoPaddingStyle of ['square', 'circle'] as const) {
+        const zero = getLogoMetrics({ ...DEFAULT_CONFIG, logoUrl: 'logo', logoPadding: 0, logoPaddingStyle }, moduleCount, cellSize);
+        const half = getLogoMetrics({ ...DEFAULT_CONFIG, logoUrl: 'logo', logoPadding: MIN_LOGO_BACKING_PADDING, logoPaddingStyle }, moduleCount, cellSize);
+        expect(zero.effectivePaddingModules).toBeGreaterThan(0);
+        expect(zero).toEqual(half);
+        const two = getLogoMetrics({ ...DEFAULT_CONFIG, logoUrl: 'logo', logoPadding: 2, logoPaddingStyle }, moduleCount, cellSize);
+        expect(two.effectivePaddingModules).toBeGreaterThan(half.effectivePaddingModules);
+      }
+      const none = getLogoMetrics({ ...DEFAULT_CONFIG, logoUrl: 'logo', logoPadding: 2, logoPaddingStyle: 'none' }, moduleCount, cellSize);
+      expect(none.effectivePaddingModules).toBe(0);
     });
 
     it('defaults to 0.50 safe area ratio for invalid error correction levels', () => {

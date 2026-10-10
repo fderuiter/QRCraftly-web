@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CloudCog, CloudUpload, Cookie, MonitorSmartphone, ShieldCheck } from 'lucide-react';
 import { SanitizedHtml } from '@/components/ui/SanitizedHtml';
-import docsManifest from '../../data/docs_manifest.json';
+import docsManifest from 'virtual:docs-manifest';
 import { AccordionItem } from '@/components/ui/Accordion';
 import { ButtonLink } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';

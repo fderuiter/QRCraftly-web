@@ -95,9 +95,20 @@ describe('Event generator', () => {
     expect(str).not.toContain('NaN');
   });
 
-  it('handles undefined fields during escaping', () => {
+  it('builds no code when nothing is typed (#1272)', () => {
     const data = {
       title: undefined as unknown as string,
+      startDate: undefined as unknown as string,
+      endDate: undefined as unknown as string,
+      location: '  ',
+      description: undefined as unknown as string,
+    };
+    expect(constructEventString(data)).toBe('');
+  });
+
+  it('handles undefined fields during escaping', () => {
+    const data = {
+      title: 'Standup',
       startDate: undefined as unknown as string,
       endDate: undefined as unknown as string,
       location: undefined as unknown as string,
@@ -107,7 +118,7 @@ describe('Event generator', () => {
     // Empty properties are omitted (RFC 5545); UID and DTSTAMP are always present
     expect(str).toContain('UID:');
     expect(str).toContain('DTSTAMP:');
-    expect(str).not.toContain('SUMMARY:');
+    expect(str).toContain('SUMMARY:Standup');
     expect(str).not.toContain('DTSTART');
     expect(str).not.toContain('DTEND');
     expect(str).not.toContain('LOCATION:');

@@ -61,6 +61,8 @@ interface InputPanelProps {
   config: Pick<QRConfig, 'type' | 'value'>;
   /** Callback to update the configuration. */
   onChange: (updates: Partial<QRConfig>) => void;
+  /** Told whether the form holds a value it refuses to encode (#1279). */
+  onRefusedChange?: (refused: boolean) => void;
 }
 
 /**
@@ -70,10 +72,11 @@ interface InputPanelProps {
  * @param props - The component props.
  * @param props.config - The current QR code configuration state.
  * @param props.onChange - Callback function to update the configuration.
+ * @param props.onRefusedChange - Told whether the form holds a value it refuses to encode.
  * @returns The InputPanel component.
  */
-const InputPanel: React.FC<InputPanelProps> = ({ config, onChange }) => {
-  const { InputComponent, inputProps, flush } = useInputLogic(config, onChange);
+const InputPanel: React.FC<InputPanelProps> = ({ config, onChange, onRefusedChange }) => {
+  const { InputComponent, inputProps, flush } = useInputLogic(config, onChange, onRefusedChange);
   const containerRef = useDynamicFocus<HTMLDivElement>([config.type]);
   const [announcement, setAnnouncement] = useState('');
   const [scannerActive, setScannerActive] = useState(false);

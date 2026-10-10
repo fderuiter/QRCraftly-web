@@ -138,3 +138,22 @@ describe('the border never replaces the quiet zone (#1249)', () => {
     }
   }
 });
+
+describe('a logo that failed to load leaves no hole (#1257)', () => {
+  it('draws every module when logoUrl is set but there is no image', () => {
+    const plain = render({});
+    const withMissingLogo = render({ logoUrl: 'data:image/svg+xml;base64,AAAA', logoSize: 0.25 });
+    const differing = withMissingLogo.raster.data.filter((value, i) => value !== plain.raster.data[i]).length;
+    expect(differing).toBe(0);
+    expect(withMissingLogo.decoded).toBe(VALUE);
+  });
+});
+
+describe('every pattern reads with the default settings (#1278)', () => {
+  for (const style of Object.values(QRStyle)) {
+    it(`decodes ${style} at the default error correction`, () => {
+      const { decoded } = render({ style, errorCorrectionLevel: DEFAULT_CONFIG.errorCorrectionLevel });
+      expect(decoded).toBe(VALUE);
+    });
+  }
+});

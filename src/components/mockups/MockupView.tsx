@@ -46,6 +46,16 @@ interface MockupViewProps {
   moduleCount: number;
   /** The scene to show. */
   view: Exclude<PreviewView, 'flat'>;
+  /**
+   * Id of the note saying why exports are off (nothing to encode, or a refused field); the
+   * download button is marked unavailable and described by it (#1253).
+   */
+  exportsOffReason?: string;
+  /**
+   * Runs the download through the generator's export checks (empty or refused content, scan
+   * safety), the same as its main Download (#1253).
+   */
+  guardExport?: (run: () => Promise<void>) => void;
 }
 
 /** Device orientation permission call that iOS Safari adds to the event constructor. */
@@ -63,9 +73,11 @@ type OrientationPermission = { requestPermission?: () => Promise<'granted' | 'de
  * @param props.config - The QR configuration.
  * @param props.moduleCount - Modules per side of the matrix.
  * @param props.view - Which scene to show.
+ * @param props.exportsOffReason - Id of the note saying why exports are off, if they are.
+ * @param props.guardExport - Runs the download through the generator's export checks.
  * @returns The mockup view.
  */
-export default function MockupView({ sourceRef, renderKey, config, moduleCount, view }: MockupViewProps) {
+export default function MockupView({ sourceRef, renderKey, config, moduleCount, view, exportsOffReason, guardExport }: MockupViewProps) {
   const scene = MOCKUP_SCENES.find((candidate) => candidate.id === view) ?? MOCKUP_SCENES[0];
   const [widthCm, setWidthCm] = useState(scene.defaultCm);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
@@ -247,7 +259,14 @@ export default function MockupView({ sourceRef, renderKey, config, moduleCount, 
             <FlaskConical className="size-4" aria-hidden="true" />
             Test real-world conditions
           </Button>
-          <Button variant="secondary" onClick={exportPng} loading={exporting} disabled={!qrUrl}>
+          <Button
+            variant="secondary"
+            onClick={() => (guardExport ? guardExport(exportPng) : void exportPng())}
+            loading={exporting}
+            disabled={!qrUrl}
+            aria-disabled={exportsOffReason ? 'true' : undefined}
+            aria-describedby={exportsOffReason}
+          >
             <Download className="size-4" aria-hidden="true" />
             Download mockup PNG
           </Button>

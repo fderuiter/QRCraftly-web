@@ -1,11 +1,15 @@
-import { BrandTemplate, BrandTemplateExportPayload, QRConfig, QRStyle, QRErrorCorrectionLevel } from '../types';
-import { normalizeHex } from './colorUtils';
+import { BrandTemplate, BrandTemplateExportPayload, QRConfig } from '../types';
+import { isStyleField, pickStyle } from './styleFields';
 
 /** Approved storage key for user-saved brand templates. */
 export const BRAND_TEMPLATES_STORAGE_KEY = 'qrcraftly:brand-templates';
 
 /** Maximum allowed custom templates in browser persistent storage. */
 export const MAX_CUSTOM_TEMPLATES = 50;
+
+/** Shown when the browser blocks or fills site storage, so templates cannot be kept. */
+export const TEMPLATE_STORAGE_ERROR =
+  'Your browser is blocking or has filled site storage, so templates cannot be saved here.';
 
 /**
  * Fields that carry QR content, user input text or user-uploaded images.
@@ -65,17 +69,36 @@ export function applyTemplateToConfig(
 }
 
 /**
+ * Returns the browser's local storage, or null when there is none or the browser blocks it.
+ * With site data blocked, merely reading `window.localStorage` throws `SecurityError`.
+ * @returns The storage object, or null.
+ */
+function templateStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reports whether custom templates can be read and saved in this browser.
+ * @returns False when site storage is unavailable or blocked.
+ */
+export function isTemplateStorageAvailable(): boolean {
+  return templateStorage() !== null;
+}
+
+/**
  * Loads user-saved custom brand templates from browser local storage.
- * @returns Array of custom BrandTemplates.
+ * @returns Array of custom BrandTemplates; empty when storage is unavailable.
  */
 export function getStoredTemplates(): BrandTemplate[] {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return [];
-  }
   try {
-    const raw = localStorage.getItem('qrcraftly:brand-templates');
+    const raw = templateStorage()?.getItem(BRAND_TEMPLATES_STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(item => item && typeof item === 'object' && typeof item.id === 'string' && typeof item.name === 'string');
   } catch {
@@ -86,13 +109,17 @@ export function getStoredTemplates(): BrandTemplate[] {
 /**
  * Saves custom brand templates array to local storage.
  * @param templates - Array of templates.
+ * @returns True when the templates were stored.
  */
-function setStoredTemplates(templates: BrandTemplate[]): void {
-  if (typeof window === 'undefined' || !window.localStorage) return;
+function setStoredTemplates(templates: BrandTemplate[]): boolean {
+  const storage = templateStorage();
+  if (!storage) return false;
   try {
-    localStorage.setItem('qrcraftly:brand-templates', JSON.stringify(templates));
+    storage.setItem(BRAND_TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
+    return true;
   } catch (err) {
     console.error('Failed to save brand templates to localStorage:', err);
+    return false;
   }
 }
 
@@ -139,8 +166,9 @@ export function saveCustomTemplate(
     config: styleConfig,
   };
 
-  const updated = [newTemplate, ...existing];
-  setStoredTemplates(updated);
+  if (!setStoredTemplates([newTemplate, ...existing])) {
+    return { success: false, error: TEMPLATE_STORAGE_ERROR };
+  }
 
   return { success: true, template: newTemplate };
 }
@@ -176,7 +204,9 @@ export function updateCustomTemplate(
   target.updatedAt = new Date().toISOString();
 
   existing[index] = target;
-  setStoredTemplates(existing);
+  if (!setStoredTemplates(existing)) {
+    return { success: false, error: TEMPLATE_STORAGE_ERROR };
+  }
 
   return { success: true, template: target };
 }
@@ -190,19 +220,40 @@ export function deleteCustomTemplate(id: string): boolean {
   const existing = getStoredTemplates();
   const filtered = existing.filter(t => t.id !== id);
   if (filtered.length === existing.length) return false;
-  setStoredTemplates(filtered);
-  return true;
+  return setStoredTemplates(filtered);
+}
+
+/**
+ * Adds an imported template to the front of the stored templates.
+ * @param template - Template returned by `validateTemplateJson`.
+ * @returns The updated list, or an error when the quota is reached or storage fails.
+ */
+export function addImportedTemplate(
+  template: BrandTemplate
+): { success: true; templates: BrandTemplate[] } | { success: false; error: string } {
+  const existing = getStoredTemplates();
+  if (existing.length >= MAX_CUSTOM_TEMPLATES) {
+    return { success: false, error: `Storage quota reached (${MAX_CUSTOM_TEMPLATES} templates max).` };
+  }
+  const templates = [template, ...existing];
+  if (!setStoredTemplates(templates)) {
+    return { success: false, error: TEMPLATE_STORAGE_ERROR };
+  }
+  return { success: true, templates };
 }
 
 /**
  * Validates an imported JSON object against the strict BrandTemplate schema.
- * Prevents dynamic injection and ensures color/enum validity.
+ * Config values go through the same style rules as style files: content fields, unknown keys
+ * and values outside the rules are dropped, so a hand-edited or newer file cannot break the
+ * generator.
  * @param data - Raw parsed JSON data.
- * @returns Validation result with cleaned BrandTemplate or error message.
+ * @returns Validation result with cleaned BrandTemplate (and how many settings were dropped)
+ * or error message.
  */
 export function validateTemplateJson(
   data: unknown
-): { valid: boolean; template?: BrandTemplate; error?: string } {
+): { valid: boolean; template?: BrandTemplate; error?: string; skipped?: number } {
   if (!data || typeof data !== 'object') {
     return { valid: false, error: 'Invalid file: JSON root must be an object.' };
   }
@@ -230,47 +281,12 @@ export function validateTemplateJson(
     return { valid: false, error: 'Invalid template: Missing or invalid visual config object.' };
   }
 
-  const validConfig: Partial<QRConfig> = {};
-  const validStyles = Object.values(QRStyle) as string[];
-  const validEcl = Object.values(QRErrorCorrectionLevel) as string[];
-
-  // Sanitize and validate visual properties inside rawConfig
-  const keys = Object.keys(rawConfig as object) as (keyof QRConfig)[];
-  for (const key of keys) {
-    // Strictly block non-style payload content fields
-    if (CONTENT_FIELDS.has(key)) continue;
-
-    const val = (rawConfig as Record<string, unknown>)[key];
-    if (val === undefined || val === null) continue;
-
-    // Validate color strings if key end with 'Color'
-    if (typeof key === 'string' && key.toLowerCase().endsWith('color') && typeof val === 'string') {
-      const normalized = normalizeHex(val);
-      if (normalized) {
-        (validConfig as Record<string, unknown>)[key] = normalized;
-      }
-      continue;
-    }
-
-    if (key === 'style' && typeof val === 'string') {
-      if (validStyles.includes(val)) {
-        validConfig.style = val as QRStyle;
-      }
-      continue;
-    }
-
-    if (key === 'errorCorrectionLevel' && typeof val === 'string') {
-      if (validEcl.includes(val)) {
-        validConfig.errorCorrectionLevel = val as QRErrorCorrectionLevel;
-      }
-      continue;
-    }
-
-    // Allow booleans and numbers for valid style fields
-    if (typeof val === 'boolean' || typeof val === 'number' || typeof val === 'string') {
-      (validConfig as Record<string, unknown>)[key] = val;
-    }
-  }
+  // Content fields are dropped silently; other keys must pass the style rules or are skipped.
+  const configObj = rawConfig as Record<string, unknown>;
+  const { style: validConfig, skipped: invalid } = pickStyle(configObj);
+  const unknown = Object.keys(configObj).filter(
+    key => !CONTENT_FIELDS.has(key as keyof QRConfig) && !isStyleField(key)
+  ).length;
 
   const now = new Date().toISOString();
   const cleanedTemplate: BrandTemplate = {
@@ -283,7 +299,7 @@ export function validateTemplateJson(
     config: validConfig,
   };
 
-  return { valid: true, template: cleanedTemplate };
+  return { valid: true, template: cleanedTemplate, skipped: invalid + unknown };
 }
 
 /**

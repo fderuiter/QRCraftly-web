@@ -24,6 +24,7 @@ import vike from 'vike/plugin';
 import type { Plugin } from 'vite';
 import type { Connect } from 'vite';
 import { shippedPackages } from './scripts/vite/thirdPartyLicenses';
+import { docsManifest } from './scripts/vite/docsManifest';
 import { foundryDefines } from './scripts/utils/rustWorkspace.js';
 
 /**
@@ -87,6 +88,7 @@ export default defineConfig(() => {
         react(),
         vike(),
         redirectsFile(),
+        docsManifest(),
         licenses.plugin,
       ],
       esbuild: {

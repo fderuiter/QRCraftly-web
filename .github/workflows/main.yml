@@ -460,4 +460,5 @@ jobs:
       - name: Run Playwright Smoke Tests on Production
         env:
           PLAYWRIGHT_TEST_BASE_URL: "https://qrcraftly.fpderuiter.workers.dev"
+          EXPECTED_COMMIT: ${{ github.sha }}
         run: bash scripts/ci/run_smoke_tests.sh

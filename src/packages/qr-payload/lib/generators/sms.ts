@@ -21,11 +21,13 @@ import { parseProtocol, identifyProtocol, encodeDialString, safeDecodeURICompone
 import { cleanPhoneNumber } from '@/utils/security';
 
 /**
- * Constructs the smsto string for SMS QR code.
+ * Constructs the smsto string for SMS QR code. With no recipient it gives `''` (RFC 5724 §2.2),
+ * so the generator shows its sample state instead of an `sms:?body=` code (#1272).
  */
 export const constructSmsString = (data: SmsData): string => {
-  if (!data) return 'sms:?body=';
+  if (!data) return '';
   const cleanNumber = cleanPhoneNumber(data.number || '', true);
+  if (!/\d/.test(cleanNumber)) return '';
   const encodedBody = encodeURIComponent(data.message || '');
   return `sms:${encodeDialString(cleanNumber)}?body=${encodedBody}`;
 };

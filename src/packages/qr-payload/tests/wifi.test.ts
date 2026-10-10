@@ -79,16 +79,22 @@ describe('Wifi generator', () => {
     expect(hydrated.encryption).toBe(WifiEncryption.WPA);
   });
 
+  it('builds no code without a network name (#1272)', () => {
+    for (const ssid of ['', '   ', undefined as unknown as string]) {
+      expect(constructWifiString({ ssid, password: 'secret', encryption: WifiEncryption.WPA, hidden: false })).toBe('');
+    }
+  });
+
   it('handles edge cases in escaping with undefined fields', () => {
     const data = {
-      ssid: undefined as unknown as string,
+      ssid: 'Office',
       password: undefined as unknown as string,
       encryption: WifiEncryption.WPA2_EAP,
       hidden: false,
       eapIdentity: undefined as unknown as string,
     };
     const str = constructWifiString(data);
-    expect(str).toContain('S:;');
+    expect(str).toContain('S:Office;');
     expect(str).toContain('P:;');
     expect(str).toContain('I:;');
   });

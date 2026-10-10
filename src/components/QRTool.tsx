@@ -30,7 +30,8 @@ import { ExportOptions as DownloadOptions, FORMAT_LABELS, clampSize, type Downlo
 import { usePopoverDismiss } from '@/hooks/usePopoverDismiss';
 import { Modal } from './ui/Modal';
 import { useLeadingDebounce } from '@/hooks/useDebounce';
-import { useQRDownload, BLOCKED_EXPORT_MESSAGE, ExportStatus, AssetOptions, type ExportFormat } from '@/hooks/useQRDownload';
+import { useQRDownload, BLOCKED_EXPORT_MESSAGE, SCAN_VALIDATION_ERROR, ExportStatus, AssetOptions, type ExportFormat } from '@/hooks/useQRDownload';
+import { previewFailureMessage, type PreviewFailure } from '@/utils/previewFailure';
 import { getExportRiskPolicy } from '@/utils/exportRiskPolicy';
 import { isDangerousUrl } from '@/utils/security';
 import { useToast } from './ui/Toast';
@@ -82,6 +83,8 @@ const STAGE_SIZE_CLASSES: Record<SocialFormat, string> = {
 };
 /** Id of the empty-preview explanation referenced by disabled export buttons. */
 const EMPTY_STATE_ID = 'qr-empty-state';
+/** Id of the explanation shown while a content field holds a refused value (#1279). */
+const REFUSED_STATE_ID = 'qr-refused-state';
 /** Message shown when there is nothing to export yet. */
 export const EMPTY_CONTENT_MESSAGE = 'Enter content to generate a QR code.';
 
@@ -130,7 +133,6 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   
   const [showSafetyGate, setShowSafetyGate] = useState(false);
   const [gateAction, setGateAction] = useState<(() => void | Promise<void>) | null>(null);
-  const qrRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [previewView, setPreviewView] = useState<PreviewView>('flat');
   const moduleCount = useQRStoreSelector(s => s.moduleCount);
@@ -140,12 +142,18 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   const copyButtonRef = useRef<HTMLButtonElement>(null);
   const shareButtonRef = useRef<HTMLButtonElement>(null);
   const isEmpty = !config.value || !config.value.trim();
+  // A field holds a value the form refused, so the config still has the previous content: draw
+  // nothing rather than a code that no longer matches the form (#1279).
+  const contentRefused = useQRStoreSelector(s => s.contentRefused);
   const samplePayload = useMemo(() => getSamplePayload(config.type), [config.type]);
-  const effectiveConfig = useMemo(() => (
-    isEmpty ? { ...config, value: samplePayload } : config
-  ), [config, isEmpty, samplePayload]);
+  const effectiveConfig = useMemo(() => {
+    if (contentRefused) return { ...config, value: '' };
+    return isEmpty ? { ...config, value: samplePayload } : config;
+  }, [config, contentRefused, isEmpty, samplePayload]);
+  // Why every export is off, as the id of the note that says so; undefined while exports work.
+  const exportsOffReason = contentRefused ? REFUSED_STATE_ID : isEmpty ? EMPTY_STATE_ID : undefined;
 
-  const { exportAsset: runExport } = useQRDownload(qrRef, effectiveConfig);
+  const { exportAsset: runExport } = useQRDownload(effectiveConfig);
   // Which export is encoding right now; its button shows a loading state until it finishes.
   const [busyExport, setBusyExport] = useState<ExportFormat | null>(null);
   const exportAsset = useCallback(async (format: ExportFormat, options?: AssetOptions) => {
@@ -189,9 +197,14 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   // Scannability
   const { status: rawScannabilityStatus, checkScannability, health: rawHealth, workerRecoveryActive } = useScannability(canvasRef, effectiveConfig);
 
-  // In sample fallback mode, report 'idle' status so stale/verified badges are suppressed
-  const scannabilityStatus = isEmpty ? 'idle' : rawScannabilityStatus;
-  const health = isEmpty ? undefined : rawHealth;
+  // Why the preview has no code to show (blocked or too much content), if it has none (#1251).
+  const [previewFailure, setPreviewFailure] = useState<PreviewFailure | null>(null);
+
+  // In sample fallback mode, or when the preview could not draw a code, report 'idle' status so
+  // no verdict is shown for a code that does not exist (#1251).
+  const noVerdict = isEmpty || contentRefused || previewFailure !== null;
+  const scannabilityStatus = noVerdict ? 'idle' : rawScannabilityStatus;
+  const health = noVerdict ? undefined : rawHealth;
 
   const handleFix = useCallback((fix: ScanFix) => {
     if (fix === 'raise-error-correction') {
@@ -225,6 +238,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
 
   
   const handleRendered = useCallback((info: { moduleCount: number, virtualImageData?: ImageData, virtualImageBitmap?: ImageBitmap } = { moduleCount: 0 }) => {
+    setPreviewFailure(null);
     if (info.moduleCount) setModuleCount(info.moduleCount);
     if (info.virtualImageBitmap) {
       checkScannability(undefined, info.virtualImageBitmap, info.moduleCount);
@@ -266,10 +280,18 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   }, [addToast]);
 
   const exportWith = (target: ExportFormat, buttonRef: React.RefObject<HTMLButtonElement | null>, message: string) => {
-    executeWithSafetyGate(async (options) => {
+    const run = async (options?: AssetOptions) => {
       const result = await exportAsset(target, { ...options, size: clampSize(size), filename });
+      if (result.error?.name === SCAN_VALIDATION_ERROR && !options?.allowUnsafe) {
+        // The finished image failed the scan check: offer the same choice as the pre-flight gate
+        // instead of a raw error (#1255).
+        setGateAction(() => () => run({ ...options, allowUnsafe: true }));
+        setShowSafetyGate(true);
+        return;
+      }
       handleExportResult(result, buttonRef, message);
-    });
+    };
+    executeWithSafetyGate(run);
   };
 
   const onDownload = () => {
@@ -292,7 +314,11 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
     },
   };
 
-  const notifyEmpty = () => {
+  const notifyExportsOff = () => {
+    if (contentRefused) {
+      addToast({ type: 'error', message: previewFailureMessage('blocked', config.errorCorrectionLevel), duration: 6000 });
+      return;
+    }
     addToast({
       type: 'info',
       message: `${EMPTY_CONTENT_MESSAGE} Exports are available once there is something to encode.`,
@@ -301,8 +327,13 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   };
 
   const executeWithSafetyGate = (action: (options?: AssetOptions) => void | Promise<void>) => {
-    if (isEmpty) {
-      notifyEmpty();
+    if (exportsOffReason) {
+      notifyExportsOff();
+      return;
+    }
+    if (previewFailure) {
+      // There is no code to export: say why, with no "Export Anyway" (#1251).
+      addToast({ type: 'error', message: previewFailureMessage(previewFailure, config.errorCorrectionLevel), duration: 6000 });
       return;
     }
     if (isDangerousUrl(config.value)) {
@@ -369,9 +400,14 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                    <Badge tone="success" data-testid="permanence-badge">
                      Static · Non-expiring
                    </Badge>
-                   {isEmpty && (
+                   {exportsOffReason === EMPTY_STATE_ID && (
                      <Badge id={EMPTY_STATE_ID} tone="warning" data-testid="sample-preview-badge">
                        Sample Preview
+                     </Badge>
+                   )}
+                   {exportsOffReason === REFUSED_STATE_ID && (
+                     <Badge id={REFUSED_STATE_ID} tone="danger" data-testid="refused-content-badge">
+                       Fix the highlighted field
                      </Badge>
                    )}
                    <ScannabilityIndicator
@@ -393,9 +429,9 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                 )}
 
                 {/* Preview stage: the QR is the largest thing on the page. */}
-                <div ref={qrRef} className="mb-4 flex justify-center rounded-xl bg-surface-sunken p-3 md:p-2" data-testid="qr-stage">
+                <div className="mb-4 flex justify-center rounded-xl bg-surface-sunken p-3 md:p-2" data-testid="qr-stage">
                    {/* Pass debounced config to QRCanvas to prevent heavy rendering on every keystroke */}
-                   <QRCanvas ref={canvasRef} onRendered={handleRendered} config={debouncedConfig} className={`rounded-lg shadow-raised ${STAGE_SIZE_CLASSES[debouncedConfig.socialFormat] ?? STAGE_SIZE_CLASSES[SocialFormat.SQUARE_1_1]}`} />
+                   <QRCanvas ref={canvasRef} onRendered={handleRendered} onRenderFailed={setPreviewFailure} config={debouncedConfig} className={`rounded-lg shadow-raised ${STAGE_SIZE_CLASSES[debouncedConfig.socialFormat] ?? STAGE_SIZE_CLASSES[SocialFormat.SQUARE_1_1]}`} />
                 </div>
 
                 {/* One export row. Below md it docks to the bottom of the screen as a sticky action bar. */}
@@ -412,13 +448,13 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                    />
                    <Button
                       ref={downloadButtonRef}
-                      variant={!isEmpty && getExportRiskPolicy({ status: scannabilityStatus, health }) === 'unsafe' ? 'error' : 'primary'}
+                      variant={!exportsOffReason && getExportRiskPolicy({ status: scannabilityStatus, health }) === 'unsafe' ? 'error' : 'primary'}
                       size="bar"
                       className="flex-1"
                       loading={busyExport === format}
-                      aria-disabled={isEmpty ? 'true' : undefined}
-                      aria-describedby={isEmpty ? EMPTY_STATE_ID : undefined}
-                      onClick={isEmpty ? notifyEmpty : onDownload}
+                      aria-disabled={exportsOffReason ? 'true' : undefined}
+                      aria-describedby={exportsOffReason}
+                      onClick={exportsOffReason ? notifyExportsOff : onDownload}
                    >
                       {done && done.format === format ? (
                         <>
@@ -469,8 +505,8 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                         onClick={onCopy}
                         loading={busyExport === 'clipboard'}
                         aria-label={copied ? "Copied" : "Copy QR code to clipboard"}
-                        aria-disabled={isEmpty ? 'true' : undefined}
-                        aria-describedby={isEmpty ? EMPTY_STATE_ID : undefined}
+                        aria-disabled={exportsOffReason ? 'true' : undefined}
+                        aria-describedby={exportsOffReason}
                      >
                         {copied ? <Check className="size-5 text-success motion-safe:animate-pop-in" aria-hidden="true" /> : <Copy className="size-5" aria-hidden="true" />}
                      </Button>
@@ -486,8 +522,8 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                           onClick={onShare}
                           loading={busyExport === 'share'}
                           aria-label={done?.format === 'share' ? 'Shared' : 'Share QR code'}
-                          aria-disabled={isEmpty ? 'true' : undefined}
-                          aria-describedby={isEmpty ? EMPTY_STATE_ID : undefined}
+                          aria-disabled={exportsOffReason ? 'true' : undefined}
+                          aria-describedby={exportsOffReason}
                        >
                           <Share2 className="size-5" aria-hidden="true" />
                        </Button>
@@ -508,13 +544,13 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                    />
                    {previewView !== 'flat' && (
                       <Suspense fallback={<Skeleton className="aspect-4/3 w-full rounded-xl" />}>
-                         <MockupView sourceRef={canvasRef} renderKey={debouncedConfig} config={effectiveConfig} moduleCount={moduleCount} view={previewView} />
+                         <MockupView sourceRef={canvasRef} renderKey={debouncedConfig} config={effectiveConfig} moduleCount={moduleCount} view={previewView} exportsOffReason={exportsOffReason} guardExport={(run) => executeWithSafetyGate(() => run())} />
                       </Suspense>
                    )}
                 </div>
 
                 {/* Tertiary: playful side feature, after the export row. */}
-                {!isEmpty && <StressTestButton />}
+                {!exportsOffReason && <StressTestButton />}
              </Card>
         }
       />

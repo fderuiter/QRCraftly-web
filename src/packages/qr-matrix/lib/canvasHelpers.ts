@@ -397,10 +397,13 @@ export const drawEyeFrame = (
       drawSquareEyeFrame();
       ctx.fillStyle = bgColor;
       const gap = cellSize * 0.5;
-      ctx.fillRect(cx - gap / 2, y, gap, cellSize * 1.1); // Top cut
-      ctx.fillRect(cx - gap / 2, y + size - cellSize * 1.1, gap, cellSize * 1.1); // Bottom cut
-      ctx.fillRect(x, cy - gap / 2, cellSize * 1.1, gap); // Left cut
-      ctx.fillRect(x + size - cellSize * 1.1, cy - gap / 2, cellSize * 1.1, gap); // Right cut
+      // Pin notches bite into the outer edge only. A cut through the whole ring breaks the
+      // 1:1:3:1:1 finder run on the centre row and column, and decoders cannot find the code (#1278).
+      const notch = cellSize * 0.35;
+      ctx.fillRect(cx - gap / 2, y, gap, notch); // Top notch
+      ctx.fillRect(cx - gap / 2, y + size - notch, gap, notch); // Bottom notch
+      ctx.fillRect(x, cy - gap / 2, notch, gap); // Left notch
+      ctx.fillRect(x + size - notch, cy - gap / 2, notch, gap); // Right notch
       ctx.fillStyle = eyeColor;
       break;
 

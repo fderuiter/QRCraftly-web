@@ -17,7 +17,7 @@
 */
 
 import { render, screen, waitFor, act } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach, afterEach, type Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach, onTestFinished, type Mock } from 'vitest';
 import QRCanvas from './QRCanvas';
 import { DEFAULT_CONFIG } from '../constants';
 import {
@@ -31,6 +31,7 @@ import {
 import { createFakeQrEncoder, useCanvasEncoder } from '../../tests/fixtures/fakeQrEncoder';
 import { qrEncoder } from '../../tests/fixtures/qrEncoder';
 import { setQrCanvasRuntime } from '../utils/qrCanvasRuntime';
+import { QrEncodeError } from '@/packages/qr-matrix';
 import React from 'react';
 
 const QRCode = createFakeQrEncoder();
@@ -379,10 +380,38 @@ describe('QRCanvas Component', () => {
       render(<QRCanvas config={DEFAULT_CONFIG} />);
 
       await waitFor(() => {
-          expect(consoleSpy).toHaveBeenCalledWith("QR generation failed:", expect.any(Error));
+          expect(consoleSpy).toHaveBeenCalledWith("QR generation failed:", "Error");
       });
 
       consoleSpy.mockRestore();
+  });
+
+  it('says the content is too long instead of drawing a blank code (#1251)', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      // Every attempt fails, as it would for real content that does not fit.
+      (QRCode.create as unknown as Mock).mockImplementation(() => {
+          throw new QrEncodeError('too-long', 'Data too long');
+      });
+      const onRenderFailed = vi.fn();
+
+      render(<QRCanvas config={{ ...DEFAULT_CONFIG, errorCorrectionLevel: QRErrorCorrectionLevel.H }} onRenderFailed={onRenderFailed} />);
+
+      expect(await screen.findByText(/Too much content/)).toBeInTheDocument();
+      expect(screen.getByText(/too long for one QR code at High error correction/)).toBeInTheDocument();
+      expect(onRenderFailed).toHaveBeenCalledWith('too-long');
+  });
+
+  it('reports other encoder failures without the too-long message (#1251)', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (QRCode.create as unknown as Mock).mockImplementationOnce(() => {
+          throw new Error('Generation failed');
+      });
+      const onRenderFailed = vi.fn();
+
+      render(<QRCanvas config={DEFAULT_CONFIG} onRenderFailed={onRenderFailed} />);
+
+      await waitFor(() => expect(onRenderFailed).toHaveBeenCalledWith('failed'));
+      expect(screen.queryByText(/Too much content/)).not.toBeInTheDocument();
   });
 
   it('does not render if value is empty', async () => {
@@ -1097,7 +1126,7 @@ describe('QRCanvas Circuit Style Eye Bracket Bug', () => {
   });
 
   
-  it('verifies that the bracket cuts in Circuit style are deep enough (fixed)', async () => {
+  it('keeps the Circuit finder notches shallower than the finder ring (#1278)', async () => {
      const config = { ...DEFAULT_CONFIG, style: QRStyle.CIRCUIT, value: 'test', eyeColor: '#000000', bgColor: '#ffffff' };
      const size = 100;
      render(<QRCanvas config={config} size={size} />);
@@ -1107,32 +1136,19 @@ describe('QRCanvas Circuit Style Eye Bracket Bug', () => {
      });
 
      const moduleCount = 21;
-     const displaySize = size; // 100
-     const minBorderPx = (4 * displaySize) / (moduleCount + 8);
-     const cellSize = (displaySize - 2 * minBorderPx) / moduleCount;
+     const minBorderPx = (4 * size) / (moduleCount + 8);
+     const cellSize = (size - 2 * minBorderPx) / moduleCount;
 
-     // The implementation draws the cuts using fillRect with bgColor
-     // We are looking for the calls to fillRect that make the cuts
-     // The fix sets depth to cellSize * 1.1
-
-     // Top cut: ctx.fillRect(cx - gap/2, y, gap, cellSize * 1.1);
-
-     const calls = mockContext.fillRect.mock.calls;
-
-     // Look for the Top Cut
-     // It should have height = cellSize * 1.1
-     const topCutCall = calls.find((args: any[]) => {
-         const [_dx, _dy, _dw, dh] = args;
-         // Check dimensions
-         const heightMatch = Math.abs(dh - (cellSize * 1.1)) < 0.01;
-         return heightMatch;
-     });
-
-     // Expect to find the cut call
-     expect(topCutCall).toBeDefined();
-
-     // Confirm the depth is correct
-     expect(topCutCall[3]).toBeCloseTo(cellSize * 1.1, 0.001);
+     // Each finder gets four notches of width 0.5 and depth 0.35 modules. A cut through the
+     // whole one-module ring breaks the finder run on the centre row and column.
+     const calls = mockContext.fillRect.mock.calls as number[][];
+     const notches = calls.filter(([, , w, h]) =>
+       (Math.abs(w - cellSize * 0.5) < 0.01 && Math.abs(h - cellSize * 0.35) < 0.01) ||
+       (Math.abs(h - cellSize * 0.5) < 0.01 && Math.abs(w - cellSize * 0.35) < 0.01)
+     );
+     expect(notches.length).toBeGreaterThanOrEqual(12);
+     const throughRing = calls.filter(([, , w, h]) => Math.abs(Math.max(w, h) - cellSize * 1.1) < 0.01);
+     expect(throughRing).toHaveLength(0);
   });
 });
 
@@ -1390,6 +1406,36 @@ describe('QRCanvas Animation Loop', () => {
       unmount();
     });
     expect(window.cancelAnimationFrame).toHaveBeenCalled();
+  });
+
+  it('logs the failing frame position but never its content (#1268)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const privateFrame = 'private-frame-payload';
+    const restoreCreate = (QRCode.create as unknown as Mock).getMockImplementation();
+    onTestFinished(() => {
+      if (restoreCreate) (QRCode.create as unknown as Mock).mockImplementation(restoreCreate);
+    });
+    (QRCode.create as unknown as Mock).mockImplementation((value: string) => {
+      if (value === privateFrame) throw new Error(`Cannot encode ${privateFrame}`);
+      return qrEncoder.create(value, { errorCorrectionLevel: QRErrorCorrectionLevel.M });
+    });
+    const config = {
+      ...DEFAULT_CONFIG,
+      type: QRType.TEXT,
+      value: 'plain text',
+      animationValues: ['frame_one', privateFrame],
+      isAnimating: true,
+      animationFps: 30,
+    };
+
+    await act(async () => {
+      render(<QRCanvas config={config} />);
+    });
+
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledWith('QR precompute failed for frame 2:', 'Error');
+    });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(privateFrame);
   });
 
   it('normalizes URL frames before encoding, like the static canvas and SVG export', async () => {

@@ -3,7 +3,7 @@ import { PaymentData, CryptoNetwork } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { isDangerousUrl } from "../../utils/security";
 import { FormBlock } from "../ui/FormBlock";
-import { checkCryptoAddress, isValidIban } from "@/packages/qr-payload";
+import { checkCryptoAddress, isValidIban, paymentAmountError } from "@/packages/qr-payload";
 
 interface PaymentInputProps {
   data: PaymentData;
@@ -123,6 +123,8 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
             placeholder="e.g. Jane Doe"
             value={data.name || ""}
             onChange={(e) => onChange({ name: e.target.value })}
+            required
+            error={!(data.name || "").trim() && currentAddress ? "A SEPA transfer code needs the beneficiary's name." : undefined}
           />
           <TextField
             id="payment-bic"
@@ -145,10 +147,12 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
             contextualLabel="Optional"
             type="number"
             step="any"
+            min="0"
             max="999999999"
             placeholder="0.00"
             value={data.amount || ""}
             onChange={(e) => onChange({ amount: e.target.value })}
+            error={paymentAmountError(data.amount, data.network) ?? undefined}
           />
           <TextField
             id="payment-label"
