@@ -7,7 +7,7 @@
     "node": "^22.22.2 || >=24.15.0",
     "pnpm": ">=11.1.3"
   },
-  "version": "0.11.0",
+  "version": "0.12.0",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "homepage": "https://qrcraftly.com",
@@ -26,7 +26,7 @@
     "dev": "vite",
     "prebuild": "node scripts/storage_privacy_ast_auditor.js",
     "build": "vite build && pnpm run postbuild",
-    "postbuild": "node scripts/write_build_info.js && node scripts/bundle_ast_audit.js && tsx scripts/generate_sitemap.ts && tsx scripts/generate_social_images.ts && node scripts/defer_page_scripts.js && node scripts/csp_hash_injector.js && node scripts/generate_sw.cjs && node scripts/generate_lhci_manifest.js",
+    "postbuild": "node scripts/write_build_info.js && node scripts/bundle_ast_audit.js && tsx scripts/generate_sitemap.ts && tsx scripts/generate_social_images.ts && node scripts/defer_page_scripts.js && node scripts/csp_hash_injector.js && node scripts/generate_sw.cjs && node scripts/emitted_asset_audit.js && node scripts/generate_lhci_manifest.js",
     "preview": "vite preview",
     "test": "vitest",
     "test:e2e": "playwright test",

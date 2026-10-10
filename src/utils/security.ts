@@ -188,6 +188,13 @@ const hasRasterSignature = (bytes: string): boolean =>
 /**
  * Validates data URIs to ensure they use safe image MIME-types and contain no active payloads.
  */
+/**
+ * Whether CSS can load something without `url()`: `@import` and `image-set()` take a bare string,
+ * and `expression()` and `javascript:` are legacy script hooks. Such styles are dropped whole.
+ * @param css - A style block or attribute.
+ */
+const hasUnsafeCss = (css: string): boolean => /@import|image-set\s*\(|expression\s*\(|javascript:/i.test(css);
+
 const isSafeDataUri = (uri: string): boolean => {
   const trimmed = uri.trim();
   if (!trimmed.toLowerCase().startsWith('data:')) {
@@ -305,7 +312,7 @@ export const sanitizeSvg = (svgText: string): string => {
         // 2. Zero-tolerance style block discard
         if (tagName === 'style') {
           const styleContent = element.textContent || '';
-          if (styleContent.toLowerCase().includes('@import')) {
+          if (hasUnsafeCss(styleContent)) {
             if (element.parentNode) {
               element.parentNode.removeChild(element);
             } else {
@@ -326,7 +333,7 @@ export const sanitizeSvg = (svgText: string): string => {
           // 4. Zero-tolerance style attribute discard
           else if (attrName === 'style') {
             const styleVal = attr.value;
-            if (styleVal.toLowerCase().includes('@import')) {
+            if (hasUnsafeCss(styleVal)) {
               element.removeAttribute(attr.name);
             } else {
               // Otherwise, sanitize allowed urls (like url(#...)) and nested data URIs
@@ -346,8 +353,9 @@ export const sanitizeSvg = (svgText: string): string => {
               element.setAttribute(attr.name, cleanStyle);
             }
           }
-          // 5. Remove/neutralize external resource requests in href / xlink:href
-          else if (attrName === 'href' || attrName === 'xlink:href') {
+          // 5. Remove/neutralize external resource requests in href / xlink:href. The local
+          // name catches the XLink attribute under any prefix (`<image foo:href>`).
+          else if (attrName === 'href' || attr.localName.toLowerCase() === 'href') {
             const val = attr.value.trim();
             const isLocalOrEmpty = val.startsWith('#') || val === '';
             const isSafeData = val.toLowerCase().startsWith('data:') && isSafeDataUri(val);
