@@ -17,14 +17,16 @@ export function GuideLinks() {
       </h2>
       <ul className="list-none space-y-2 text-sm">
         {guides.map((guide) => {
-          if (isDangerousUrl(guide.href)) return null;
-          return (
-            <li key={guide.id}>
-              <a href={guide.href} className="font-semibold text-accent underline-offset-2 hover:underline">
-                {guide.name}
-              </a>
-            </li>
-          );
+          if (!isDangerousUrl(guide.href)) {
+            return (
+              <li key={guide.id}>
+                <a href={guide.href} className="font-semibold text-accent underline-offset-2 hover:underline">
+                  {guide.name}
+                </a>
+              </li>
+            );
+          }
+          return null;
         })}
       </ul>
     </section>
