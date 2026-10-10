@@ -36,7 +36,7 @@ export function validateConfig(config: QRConfig): string[] {
 
   // 1. Mandatory validation step for rendering sinks (borders, templates)
   const checkTextSink = (str: string | undefined, field: string) => {
-    if (str && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(str)) {
+    if (str && CONTAINMENT_PROFILES.TEXT_NO_CONTROL.test(str)) {
       violations.push(`${field} contains invalid control or zero-width characters`);
     } else if (str && CONTAINMENT_PROFILES.BIDI_CONTROL.test(str)) {
       violations.push(`${field} contains hidden text-direction characters`);
@@ -59,6 +59,7 @@ export function validateConfig(config: QRConfig): string[] {
 
 /**
  * Sanitizes all text-based fields inside a QR configuration by stripping control characters.
+ * Design text loses every control character; the payload keeps tabs and line breaks.
  *
  * @param config - The original QR configuration object.
  * @returns A sanitized clone of the QR configuration.
@@ -72,11 +73,9 @@ export function sanitizeConfig(config: QRConfig): QRConfig {
   if (clean.frameText) clean.frameText = stripText(clean.frameText);
   if (clean.value) {
     const type = clean.type || identifyProtocol(clean.value);
-    if (type === QRType.VCARD || type === QRType.EVENT) {
-      clean.value = clean.value.replace(REGEX_PRESERVE_FORMAT_CONTROL_CHARS, '');
-    } else {
-      clean.value = clean.value.replace(REGEX_STRICT_CONTROL_CHARS, '');
-    }
+    // Tabs and line breaks are content for every type (a multi-line Text code, #1269), matching
+    // what validatePayload accepts; every other C0 and C1 control is removed.
+    clean.value = clean.value.replace(REGEX_PRESERVE_FORMAT_CONTROL_CHARS, '');
     if (type === QRType.WIFI || type === QRType.PHONE || type === QRType.SMS) {
       clean.value = clean.value.replace(REGEX_BIDI_CONTROL_CHARS, '');
     }

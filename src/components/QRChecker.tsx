@@ -31,9 +31,10 @@ interface QRCheckerProps {
   editLabel?: string;
 }
 
-// The first picture in a file list, a drop or the clipboard.
-const firstImage = (files: FileList | readonly File[] | undefined | null): File | undefined =>
-  [...(files ?? [])].find((file) => file.type.startsWith('image/'));
+/** Files with no type (some pickers and file managers) are tried anyway, as the scanner does. */
+const mayBeImage = (file: File): boolean => file.type === '' || file.type.startsWith('image/');
+
+const NOT_AN_IMAGE = 'Please choose an image, such as a photo or screenshot of the QR code.';
 
 /**
  * Checks a picture of any QR code (#1036): choose, drop or paste an image and get what the code
@@ -62,21 +63,42 @@ export const QRChecker: React.FC<QRCheckerProps> = ({ onEdit, editLabel = 'Open 
     try {
       const next = await checkQrImage(file);
       if (request !== requestRef.current) return;
-      if (next.kind === 'unreadable') setError(next.message);
-      else setOutcome(next);
+      if (next.kind === 'unreadable') {
+        // The result on screen belongs to the previous picture, so it makes way for the reason.
+        setOutcome(null);
+        setError(next.message);
+      } else setOutcome(next);
     } catch {
-      if (request === requestRef.current) setError('This picture could not be read. Try a different file.');
+      if (request === requestRef.current) {
+        setOutcome(null);
+        setError('This picture could not be read. Try a different file.');
+      }
     } finally {
       if (request === requestRef.current) setWorking(false);
     }
   };
 
+  /** Checks the first picture among the files, or says why nothing was checked (#1298). */
+  const checkFiles = (files: FileList | readonly File[] | undefined | null) => {
+    const list = [...(files ?? [])];
+    if (list.length === 0) return;
+    const image = list.find(mayBeImage);
+    if (image) {
+      void check(image);
+      return;
+    }
+    requestRef.current += 1;
+    setWorking(false);
+    setError(NOT_AN_IMAGE);
+  };
+  const checkFilesRef = useRef(checkFiles);
+  useEffect(() => {
+    checkFilesRef.current = checkFiles;
+  });
+
   // Ctrl/Cmd+V pastes a screenshot while the checker is on the page.
   useEffect(() => {
-    const onPaste = (event: ClipboardEvent) => {
-      const image = firstImage(event.clipboardData?.files);
-      if (image) void check(image);
-    };
+    const onPaste = (event: ClipboardEvent) => checkFilesRef.current(event.clipboardData?.files);
     document.addEventListener('paste', onPaste);
     return () => document.removeEventListener('paste', onPaste);
   }, []);
@@ -86,9 +108,26 @@ export const QRChecker: React.FC<QRCheckerProps> = ({ onEdit, editLabel = 'Open 
     setError(null);
   };
 
+  const feedback = (
+    <>
+      {working && (
+        <p role="status" className="flex items-center gap-2 text-sm font-medium text-fg-soft">
+          <RefreshCw className="size-4 text-accent motion-safe:animate-spin" aria-hidden="true" />
+          Checking...
+        </p>
+      )}
+      {error && (
+        <p id={errorId} role="alert" className="max-w-sm rounded-lg bg-danger-soft px-3 py-2 text-sm font-semibold text-danger">
+          {error}
+        </p>
+      )}
+    </>
+  );
+
   if (outcome?.kind === 'read') {
     return (
       <div className="flex flex-col gap-4" data-testid="qr-checker">
+        {feedback}
         <div className="rounded-xl border border-line bg-surface p-4">
           <h2 className="mb-2 text-lg font-semibold text-fg">Scan check</h2>
           {outcome.status ? (
@@ -124,8 +163,7 @@ export const QRChecker: React.FC<QRCheckerProps> = ({ onEdit, editLabel = 'Open 
       onDrop={(event) => {
         event.preventDefault();
         setDragging(false);
-        const image = firstImage(event.dataTransfer.files);
-        if (image) void check(image);
+        checkFiles(event.dataTransfer.files);
       }}
       className={`flex flex-col items-center gap-3 rounded-xl border-2 border-dashed p-8 text-center ${
         dragging ? 'border-accent bg-accent-soft' : 'border-line bg-surface-sunken'
@@ -138,8 +176,7 @@ export const QRChecker: React.FC<QRCheckerProps> = ({ onEdit, editLabel = 'Open 
         ref={fileInputRef}
         aria-label="Choose a picture of a QR code"
         onChange={(event) => {
-          const image = firstImage(event.target.files);
-          if (image) void check(image);
+          checkFiles(event.target.files);
           event.target.value = '';
         }}
       />
@@ -154,17 +191,7 @@ export const QRChecker: React.FC<QRCheckerProps> = ({ onEdit, editLabel = 'Open 
         <Upload className="size-4" aria-hidden="true" />
         Choose picture
       </Button>
-      {working && (
-        <p role="status" className="flex items-center gap-2 text-sm font-medium text-fg-soft">
-          <RefreshCw className="size-4 text-accent motion-safe:animate-spin" aria-hidden="true" />
-          Checking...
-        </p>
-      )}
-      {error && (
-        <p id={errorId} role="alert" className="max-w-sm rounded-lg bg-danger-soft px-3 py-2 text-sm font-semibold text-danger">
-          {error}
-        </p>
-      )}
+      {feedback}
     </section>
   );
 };
