@@ -182,7 +182,9 @@ function resolveImport(specifier, containingFile, options, cache, isAliased) {
       const prefix = key.replace(/\*$/, '');
       if (!bare.startsWith(prefix) || targets.length === 0) continue;
       const base = options.pathsBasePath ?? options.baseUrl ?? '.';
-      candidate = path.resolve(String(base), targets[0].replace('*', bare.slice(prefix.length)));
+      // tsconfig allows one `*` per target; a function keeps `$` in the specifier literal.
+      const rest = bare.slice(prefix.length);
+      candidate = path.resolve(String(base), targets[0].replaceAll('*', () => rest));
       break;
     }
   }
