@@ -159,8 +159,8 @@ export default function Page() {
   return (
     <>
       <ArticleLayout
-        title="Security & Privacy Transparency Hub"
-        lead="What QRCraftly does with your data, in plain words, and the full policies behind it."
+        title="Security & Privacy"
+        lead="What happens to your data, what our host can see, and how to check it yourself."
         sections={SECTIONS}
       >
         <section id="summary" aria-labelledby="summary-title" className="mb-10 scroll-mt-6">
@@ -193,13 +193,13 @@ export default function Page() {
             Found a security problem? Report it privately through GitHub&apos;s security advisories so it can be fixed before it is public.
           </p>
           <ButtonLink
-            href="https://github.com/fderuiter/QRCraftly/security/advisories/new"
+            href="https://github.com/fderuiter/QRCraftly-web/security/advisories/new"
             target="_blank"
             rel="noopener noreferrer"
             variant="primary"
           >
             <ShieldCheck className="size-5" aria-hidden="true" />
-            Secure Disclosure Portal
+            Report a vulnerability on GitHub
           </ButtonLink>
         </section>
 

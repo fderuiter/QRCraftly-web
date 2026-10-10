@@ -1,3 +1,3 @@
 export default {
-    imageAlt: 'Security & Privacy Transparency Hub'
+    imageAlt: 'Security and privacy at QRCraftly'
 }

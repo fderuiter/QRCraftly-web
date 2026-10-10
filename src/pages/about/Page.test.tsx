@@ -26,7 +26,7 @@ describe('About Page', () => {
     render(<Page />);
 
     expect(screen.getByRole('heading', { level: 1, name: /About QRCraftly/i })).toBeInTheDocument();
-    expect(screen.getByText(/privacy-focused QR code generator/i)).toBeInTheDocument();
+    expect(screen.getByText(/A QR code generator that runs in your browser/i)).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'How it works' })).toBeInTheDocument();
     // Site navigation and the footer come from the app shell, never from the page.
     expect(screen.queryByRole('navigation', { name: /Primary navigation/i })).not.toBeInTheDocument();
@@ -56,8 +56,8 @@ describe('About Page', () => {
 
   it('does not repeat copy, uses one accent and has no axe violations', async () => {
     const { container } = render(<Page />);
-    expect(screen.getAllByText(/QRCraftly is completely free to use/i)).toHaveLength(1);
-    expect(screen.getAllByText(/We believe in transparency/i)).toHaveLength(1);
+    expect(screen.getAllByText(/It costs nothing and needs no account/i)).toHaveLength(1);
+    expect(screen.getAllByText(/check the claims on this site against it/i)).toHaveLength(1);
     expect(container.innerHTML).not.toMatch(/indigo|amber|rose|text-center|(?:bg|text|border)-(?:slate|teal)-\d/);
     expect(await axe(container)).toHaveNoViolations();
   });

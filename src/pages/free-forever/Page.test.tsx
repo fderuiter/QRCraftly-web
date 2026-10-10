@@ -47,7 +47,7 @@ describe('Free Forever (pledge) Page', () => {
 
   it('links the AGPL source code', () => {
     render(<Page />);
-    expect(screen.getByRole('link', { name: /source code on GitHub/i })).toHaveAttribute('href', 'https://github.com/fderuiter/QRCraftly');
+    expect(screen.getByRole('link', { name: /source code on GitHub/i })).toHaveAttribute('href', 'https://github.com/fderuiter/QRCraftly-web');
   });
 
   it('has no donation or ad links', () => {

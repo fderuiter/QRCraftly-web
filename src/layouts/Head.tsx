@@ -22,6 +22,7 @@ import { JsonLdScript } from '@/components/ui/JsonLdScript';
 import { resolveDomainForPath, resolvePublicUrl, resolveImageUrl, compileBreadcrumbSchema, getSanitizedPath, type JsonLdObject } from '@/utils/metadataEngine';
 import { getLegacyRedirect, getMetadataForPath } from '@/data/contentRegistry';
 import { getPageSchema } from '@/data/pageContent';
+import { getShareImageSize } from '@/data/shareImageSize';
 import { THEME_INIT_SCRIPT } from '@/utils/theme';
 
 /**
@@ -69,6 +70,7 @@ export default function HeadDefault() {
   // Allows pages to override the default OG image via config.image
   const imageConfig = getString(config?.image, pageContext, '') || pathMetadata.image;
   const imageUrl = resolveImageUrl(imageConfig, pageContext.urlPathname);
+  const imageSize = getShareImageSize(imageUrl);
 
   const imageAlt = config?.imageAlt || pathMetadata.imageAlt || "QRCraftly QR Code Example";
 
@@ -86,7 +88,7 @@ export default function HeadDefault() {
       "slogan": "Free. Secure. Open Source.",
       "foundingDate": "2025",
       "sameAs": [
-        "https://github.com/fderuiter/QRCraftly"
+        "https://github.com/fderuiter/QRCraftly-web"
       ]
     }
   ];
@@ -175,8 +177,8 @@ export default function HeadDefault() {
       <meta property="og:description" content={description} />
       <meta property="og:image" content={imageUrl} />
       <meta property="og:image:type" content="image/png" />
-      <meta property="og:image:width" content="1280" />
-      <meta property="og:image:height" content="720" />
+      {imageSize && <meta property="og:image:width" content={String(imageSize.width)} />}
+      {imageSize && <meta property="og:image:height" content={String(imageSize.height)} />}
       <meta property="og:image:alt" content={imageAlt} />
 
       {/* Social Signals (Twitter) */}

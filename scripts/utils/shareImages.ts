@@ -25,9 +25,9 @@ export interface ModuleGrid {
   get(row: number, col: number): boolean;
 }
 
-/** Share image size: the 1.91:1 card that Open Graph and X crop to. */
-export const SHARE_IMAGE_WIDTH = 1200;
-export const SHARE_IMAGE_HEIGHT = 630;
+import { SHARE_IMAGE_HEIGHT, SHARE_IMAGE_WIDTH } from '../../src/data/shareImageSize';
+
+export { SHARE_IMAGE_HEIGHT, SHARE_IMAGE_WIDTH };
 
 const PALETTE: Rgb[] = [
   [15, 23, 42], // 0 background, slate 900

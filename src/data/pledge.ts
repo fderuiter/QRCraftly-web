@@ -50,7 +50,7 @@ export const PLEDGE_PROMISES: readonly PledgePromise[] = [
   },
   {
     title: 'Completely free',
-    text: 'Every feature, for everyone, with no account, no sign-up and no limits.',
+    text: 'Every feature, for everyone, with no account, no sign-up and no paid tier.',
   },
 ];
 

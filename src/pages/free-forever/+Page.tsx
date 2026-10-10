@@ -18,6 +18,7 @@
 
 
 import { Eyebrow } from '@/components/ui/SectionHeading';
+import { GuideLinks } from '@/components/GuideLinks';
 import { Ban, EyeOff, Laptop, Gift } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -128,12 +129,14 @@ export default function Page() {
               privacy details
             </a>{' '}
             or the{' '}
-            <a href="https://github.com/fderuiter/QRCraftly" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline hover:text-accent-strong">
+            <a href="https://github.com/fderuiter/QRCraftly-web" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline hover:text-accent-strong">
               source code on GitHub
             </a>
             .
           </p>
         </section>
+
+        <GuideLinks />
       </div>
     </>
   );

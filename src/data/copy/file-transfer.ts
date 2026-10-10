@@ -3,23 +3,23 @@ import type { ToolCopy } from './types';
 /** The how-to steps and FAQs of the file-transfer page. */
 export const copy: ToolCopy = {
   howTo: {
-      "name": "How to Transfer Files via Animated QR Codes",
-      "description": "Share files sequentially through QR code animations.",
-      "steps": [
-        {
-          "name": "Select File",
-          "text": "Select any file or use the high-load simulation button."
-        },
-        {
-          "name": "Set Pacing",
-          "text": "Adjust the speed and chunk size to fit your receiving camera."
-        },
-        {
-          "name": "Scan Animation",
-          "text": "Scan the animated QR code stream sequentially with the receiver device."
-        }
-      ]
-    },
+    name: 'How to Send a File with Animated QR Codes',
+    description: 'Send a file from one screen to another device’s camera, with no network between them.',
+    steps: [
+      {
+        name: 'Choose a file',
+        text: 'Choose or drop the file, or a folder, you want to send.',
+      },
+      {
+        name: 'Open the receiver',
+        text: 'On the other device, open the receive page and point its camera at the animated code.',
+      },
+      {
+        name: 'Set the speed',
+        text: 'Start slow, and raise the transfer speed if the receiver keeps up.',
+      },
+    ],
+  },
   faqs: [
     {
       question: 'Is the animated QR stream a problem for people sensitive to flashing light?',

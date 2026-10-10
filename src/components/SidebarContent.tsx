@@ -5,6 +5,7 @@ import { usePageContent } from '@/data/PageContentContext';
 import { getGuideFaqs } from '@/data/guideFaqs';
 import { isDangerousUrl } from '@/utils/security';
 import { Breadcrumbs } from './Breadcrumbs';
+import { GuideLinks } from './GuideLinks';
 import { SectionHeading } from './ui/SectionHeading';
 import { Accordion, AccordionItem } from './ui/Accordion';
 
@@ -171,6 +172,8 @@ export function SidebarContent({ toolId }: SidebarContentProps) {
           </Accordion>
         </section>
       )}
+
+      <GuideLinks />
 
       {related.length > 0 && (
         <section className="mb-10" aria-labelledby="related-types-heading">
