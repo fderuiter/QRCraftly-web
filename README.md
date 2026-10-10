@@ -203,7 +203,7 @@ Core features live in deep modules under `src/packages/`. App code imports a pac
 - **Policy audits:** dependency licences and the allowlist, no third-party Rust crates, code-to-doc pairing, the storage allowlist, platform-independent paths and static SVG paths.
 - **Docs:** links, anchors, ADR numbering and the UI catalog.
 - **Code:** TypeScript, dependency-cruiser boundaries, ESLint (including jsx-a11y and security rules), Knip for dead code, Prettier and a duplication limit.
-- **Design:** WCAG contrast of UI colours, and a design-token audit that rejects raw palette colours in shared UI and arbitrary colour or size values anywhere.
+- **Design:** WCAG contrast of UI colours, and a design-token audit that rejects raw palette colours and arbitrary colour or size values anywhere in `src/`.
 
 CI also runs the unit tests with coverage, the end-to-end tests, the build with its post-build security scripts (bundle AST audit, CSP hashing), a reproducibility check of the committed WebAssembly, a dependency audit and Lighthouse. Size budgets, checked by `pnpm run check-bundle-size`:
 

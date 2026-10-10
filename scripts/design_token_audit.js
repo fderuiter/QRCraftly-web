@@ -1,7 +1,8 @@
 // Design token guardrail (#1045). Fails when:
-//  1. a shared UI primitive in src/components/ui/ uses a raw palette colour
-//     (`bg-slate-800`, `text-teal-700`, `border-white` ...) instead of a semantic token
-//     from src/layouts/index.css (`bg-surface`, `text-accent`, `border-line` ...);
+//  1. a file in src/ uses a raw palette colour (`bg-slate-800`, `text-teal-700`,
+//     `border-white` ...) instead of a semantic token from src/layouts/index.css
+//     (`bg-surface`, `text-accent`, `border-line` ...), unless it is on the legacy list
+//     below (#1366);
 //  2. any file in src/ uses an arbitrary colour or size value (`text-[11px]`,
 //     `bg-[#0a0f1d]`, `border-[3px]`) instead of a scale step or token.
 import fs from 'fs';
@@ -25,8 +26,19 @@ const ARBITRARY_VALUE_CLASS = new RegExp(
   'g'
 );
 
-/** Directory, relative to the repo root, whose primitives may only use semantic tokens. */
-const UI_DIR = 'src/components/ui';
+/**
+ * Files that still use raw palette colours (#1366). The list only shrinks: move a file to
+ * tokens, then take it off. New files never join it.
+ */
+export const LEGACY_PALETTE_FILES = new Set([
+  'src/components/QRCanvas.tsx',
+  // Draws over the live camera picture, which is never themed.
+  'src/components/QRScanner.tsx',
+  'src/components/ToolWorkspaceLayout.tsx',
+  'src/components/TransferModeSwitcher.tsx',
+  'src/pages/file-transfer/receive/+Page.tsx',
+  'src/pages/free-forever/+Page.tsx',
+]);
 
 /**
  * Lists source files below a directory, as POSIX paths relative to the repo root.
@@ -80,7 +92,7 @@ function findAll(source, pattern) {
 export function auditDesignTokens(files) {
   const errors = [];
   for (const { file, source } of files) {
-    if (file.startsWith(`${UI_DIR}/`)) {
+    if (file.startsWith('src/') && !LEGACY_PALETTE_FILES.has(file)) {
       for (const hit of findAll(source, RAW_PALETTE_CLASS)) {
         errors.push(
           `${file}:${hit.line} uses raw palette colour "${hit.value}". Fix: use a semantic token from src/layouts/index.css (for example bg-surface, text-fg-muted, border-line, bg-action, text-danger).`

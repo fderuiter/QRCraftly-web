@@ -20,19 +20,19 @@ import { Eyebrow } from '@/components/ui/SectionHeading';
 import React from 'react';
 import { ShieldAlert, ShieldCheck, ScanLine, AlertTriangle } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
-import { DamageAnalysis, FailureCause, healthTone, HealthTone } from '@/packages/arcade';
+import { DamageAnalysis, FALLBACK_PAYLOAD, FailureCause, healthTone, HealthTone } from '@/packages/arcade';
 import type { EmpiricalState } from '@/packages/arcade/client';
 
 const BAR_CLASSES: Record<HealthTone, string> = {
-  healthy: 'bg-emerald-600 dark:bg-emerald-500',
-  warning: 'bg-amber-500 dark:bg-amber-400',
-  critical: 'bg-rose-600 motion-safe:animate-pulse dark:bg-rose-500',
+  healthy: 'bg-success',
+  warning: 'bg-warning',
+  critical: 'bg-danger motion-safe:animate-pulse',
 };
 
 const BADGE_CLASSES: Record<HealthTone, string> = {
-  healthy: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
-  warning: 'bg-amber-50 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300',
-  critical: 'bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300',
+  healthy: 'bg-success-soft text-success',
+  warning: 'bg-warning-soft text-warning',
+  critical: 'bg-danger-soft text-danger',
 };
 
 /** Headline for each failure cause. */
@@ -99,7 +99,7 @@ export function ScanHud({ analysis, empirical, isNative, usedFallback }: ScanHud
           aria-valuemax={100}
           aria-valuenow={analysis.healthPercent}
           aria-valuetext={`${analysis.healthPercent}% error correction budget remaining`}
-          className="h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
+          className="h-3 w-full overflow-hidden rounded-full bg-line"
         >
           <div className={`h-full rounded-full transition-[width] duration-150 ${BAR_CLASSES[tone]}`} data-tone={tone} style={{ width: `${analysis.healthPercent}%` }} />
         </div>
@@ -118,13 +118,13 @@ export function ScanHud({ analysis, empirical, isNative, usedFallback }: ScanHud
           </div>
           <div className="col-span-2">
             <dt>Finder patterns</dt>
-            <dd className={`font-bold ${analysis.isFinderOffline ? 'text-rose-700 dark:text-rose-300' : 'text-fg'}`}>
+            <dd className={`font-bold ${analysis.isFinderOffline ? 'text-danger' : 'text-fg'}`}>
               {analysis.isFinderOffline ? 'Finder Subsystem Offline' : 'Aligned'} ({finderPercent}% worst damage, limit 20%)
             </dd>
           </div>
         </dl>
         {analysis.failure && (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs font-semibold text-danger">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span>
               Subsystem failure: {FAILURE_TITLES[analysis.failure]}
@@ -132,7 +132,7 @@ export function ScanHud({ analysis, empirical, isNative, usedFallback }: ScanHud
           </p>
         )}
         {!analysis.failure && tone === 'critical' && (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span>Damage is close to the correction limit.</span>
           </p>
@@ -148,14 +148,14 @@ export function ScanHud({ analysis, empirical, isNative, usedFallback }: ScanHud
         <div className="mt-3 rounded-lg border border-line bg-surface p-3">
           <Eyebrow>Live readout</Eyebrow>
           <p className="truncate font-mono text-xs font-semibold text-fg" data-testid="arcade-readout">
-            {empirical.status === 'scannable' && empirical.decoded ? empirical.decoded : <span className="text-rose-700 italic dark:text-rose-300">[No data decoded]</span>}
+            {empirical.status === 'scannable' && empirical.decoded ? empirical.decoded : <span className="text-danger italic">[No data decoded]</span>}
           </p>
         </div>
         {usedFallback && (
-          <p className="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200" data-testid="arcade-hud-fallback-badge">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+          <p className="mt-2 flex items-start gap-2 rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning" data-testid="arcade-hud-fallback-badge">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span>
-              Scanner reads fallback default address <code className="font-mono font-semibold">https://qrcraftly.com</code> because input payload failed to encode.
+              Scanner reads fallback default address <code className="font-mono font-semibold">{FALLBACK_PAYLOAD}</code> because input payload failed to encode.
             </span>
           </p>
         )}
@@ -170,7 +170,7 @@ export function ScanHud({ analysis, empirical, isNative, usedFallback }: ScanHud
 function EmpiricalBadge({ state }: { state: EmpiricalState }) {
   if (state.status === 'scannable') {
     return (
-      <p className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-black tracking-widest text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300" data-status="scannable">
+      <p className="flex items-center gap-2 rounded-lg border border-success-line bg-success-soft px-3 py-2 text-sm font-black tracking-widest text-success" data-status="scannable">
         <ShieldCheck className="size-5 motion-safe:animate-pulse" aria-hidden="true" />
         SCANNABLE
       </p>
@@ -178,7 +178,7 @@ function EmpiricalBadge({ state }: { state: EmpiricalState }) {
   }
   if (state.status === 'corrupted') {
     return (
-      <p className="flex items-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-black tracking-widest text-rose-800 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300" data-status="corrupted">
+      <p className="flex items-center gap-2 rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-sm font-black tracking-widest text-danger" data-status="corrupted">
         <ShieldAlert className="size-5 motion-safe:animate-pulse" aria-hidden="true" />
         CORRUPTED / UNREADABLE
       </p>

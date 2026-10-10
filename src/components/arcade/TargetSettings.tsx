@@ -25,12 +25,12 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { ColorInput } from '@/components/ui/ColorInput';
 import { RangeInput } from '@/components/ui/RangeInput';
 import { getStyleAdaptiveMazePathWidth } from '@/packages/qr-matrix/maze';
-import { ECC_LEVELS, ECC_RECOVERY, EccLevel } from '@/packages/arcade';
+import { ECC_LEVELS, ECC_RECOVERY, EccLevel, FALLBACK_PAYLOAD } from '@/packages/arcade';
 import type { ArcadeTarget } from '@/packages/arcade/handoff';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 
 const PRESETS: readonly { label: string; value: string }[] = [
-  { label: 'QRCraftly', value: 'https://qrcraftly.com' },
+  { label: 'QRCraftly', value: FALLBACK_PAYLOAD },
   { label: 'Secret text', value: 'PROMO_CODE_BLASTED_SURVIVAL' },
   { label: 'Arcade mode', value: 'ARCADE_SANDBOX_STATION_ALPHA' },
   { label: 'WiFi hotspot', value: 'WIFI:S:DurabilityTest;T:WPA;P:SuperSecure123;;' },
@@ -72,15 +72,15 @@ export function TargetSettings({ target, onChange, onResetToGenerator, hasGenera
       />
       {usedFallback && (
         <div
-          className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          className="rounded-lg border border-warning-line bg-warning-soft p-3 text-xs text-warning"
           data-testid="arcade-fallback-callout"
         >
           <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <div>
               <p className="font-semibold">Fallback payload active</p>
               <p className="mt-0.5">
-                The target payload could not be encoded. Encoding default payload <code className="font-mono font-semibold">https://qrcraftly.com</code> instead.
+                The target payload could not be encoded. Encoding default payload <code className="font-mono font-semibold">{FALLBACK_PAYLOAD}</code> instead.
               </p>
             </div>
           </div>

@@ -276,12 +276,7 @@ describe('StyleControls Component', () => {
       render(<StyleControls config={DEFAULT_CONFIG} onChange={mockOnChange} />);
       expandAppearanceSections();
 
-      // Find the border switch. It's an input with role="switch" in the "Border" section.
-      // We can find it by associating with the section or just find the first switch if it's the only one,
-      // but there might be others.
-      // The label has className="sr-only peer".
-
-      const borderCheckbox = screen.getAllByRole('switch')[0]; // Assuming it's the first one, or refine selector
+      const borderCheckbox = screen.getByRole('switch', { name: 'Enable Border' });
       await user.click(borderCheckbox);
 
       expect(mockOnChange).toHaveBeenCalledWith({ isBorderEnabled: !DEFAULT_CONFIG.isBorderEnabled });
