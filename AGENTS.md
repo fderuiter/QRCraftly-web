@@ -64,7 +64,7 @@ See `docs/agents/docs-maintenance.md`.
 Before declaring any implementation task complete, verify your changes:
 
 1. **Standard Code Changes**: Run and ensure passing:
-   - `pnpm run lint` (runs dependency license compliance, the Rust no-dependency check, the git lineage (code-to-doc pairing) audit, AST storage checks, the path invariance audit, UI catalog validation, markdown audits, static SVG path tracking, TypeScript type-checking, dependency-cruiser package boundaries, ESLint, Knip, contrast checks, the design token audit, Prettier, and duplication checks)
+   - `pnpm run lint` (runs dependency license compliance, the Rust no-dependency check, the git lineage (code-to-doc pairing) audit, AST storage checks, the path invariance audit, UI catalog validation, markdown audits, static SVG path tracking, TypeScript type-checking, the package-boundary check (`scripts/check_boundaries.js`), ESLint, Knip, contrast checks, the design token audit, Prettier, and duplication checks)
    - `pnpm test` (Vitest test suite)
 2. **Build, Routing, or Core Generator Changes**: In addition to standard checks, run:
    - `pnpm build` (verifies SSG pre-rendering, the bundle AST audit, and postbuild security scripts; the gzipped bundle size budget is a separate CI step, `pnpm run check-bundle-size`)

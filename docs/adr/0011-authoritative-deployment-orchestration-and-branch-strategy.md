@@ -29,7 +29,7 @@ We establish a clear division of responsibility between **GitHub Actions** and *
 1. **GitHub Actions as the Authoritative Quality Gatekeeper**:
    - GitHub Actions is the mandatory, unyielding gatekeeper for code quality and security.
    - All pull requests targeting `dev` or `main` must pass the full verification matrix before merge permissions are granted:
-     - Static validation (`pnpm run lint`): AST storage privacy auditor, UI catalog auditor, markdown compliance, TypeScript typecheck, depcruise boundary validation, ESLint, Knip, and code duplication checks.
+     - Static validation (`pnpm run lint`): AST storage privacy auditor, UI catalog auditor, markdown compliance, TypeScript typecheck, package boundary validation, ESLint, Knip, and code duplication checks.
      - ShellCheck static analysis and secret scanning.
      - Vitest unit tests with strict coverage thresholds (`pnpm test`).
      - Playwright cross-browser end-to-end tests (`pnpm run test:e2e`).

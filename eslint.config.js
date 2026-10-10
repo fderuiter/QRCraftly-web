@@ -49,8 +49,7 @@ export default tseslint.config(
       ".agents/**",
       // Agent worktrees are copies of the repository, not part of it.
       ".claude/**",
-      ".jules/**",
-      ".dependency-cruiser.cjs"
+      ".jules/**"
     ]
   },
   js.configs.recommended,

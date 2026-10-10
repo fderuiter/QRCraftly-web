@@ -75,7 +75,7 @@ Push your branch to GitHub and open a pull request targeting the **`main`** bran
 GitHub Actions triggers the consolidated CI pipeline on the PR:
 
 1. `setup`: Node.js 22.22.2 (from `.nvmrc`; `package.json` `engines` requires `^22.22.2 || >=24.15.0`), pnpm 11.1.3 toolchain verification.
-2. `static-validation`: Storage privacy AST audit, UI catalog checks, markdown audit, TypeScript compiler (`tsc --noEmit`), depcruise module boundaries, ESLint, Knip, contrast checks, Prettier, code duplication check, ShellCheck, secret scanner, and Semgrep.
+2. `static-validation`: Storage privacy AST audit, UI catalog checks, markdown audit, TypeScript compiler (`tsc --noEmit`), package boundaries (`scripts/check_boundaries.js`), ESLint, Knip, contrast checks, Prettier, code duplication check, ShellCheck, secret scanner, and Semgrep.
 3. `test`: Vitest unit tests with strict coverage thresholds (`scripts/ci/coverage_thresholds.json`). `scripts/ci/coverage_summary.js` writes the totals, and on pull requests each changed file's uncovered lines, to the run's summary page.
 4. `build`: Production build verification and bundle size budgets. Uploads `dist` as a short-lived artifact.
 5. `wasm-reproducible`: `cargo fmt`, Clippy and the Rust tests, then rebuilds the WebAssembly modules and checks they match the committed `src/wasm/*.wasm` files.

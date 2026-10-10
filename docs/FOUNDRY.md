@@ -53,7 +53,7 @@ Each replacement moves through these stages in order. The scorecard below record
 | `eslint-plugin-security`                   | ESLint core and our own rules in `eslint/rules/` (#1193)                    | Removed  |
 | `eslint-plugin-tailwindcss`                | our own rule on Tailwind's API (#1194)                                      | Contract |
 | `jscpd`                                    | `scripts/check-duplication.js` (#1195)                                      | Removed  |
-| `dependency-cruiser`                       | our own package-boundary checker (#1196)                                    | Contract |
+| `dependency-cruiser`                       | `scripts/check_boundaries.js` (#1196)                                       | Removed  |
 | `@vitejs/plugin-react`                     | Vite's esbuild JSX (#1197); Babel stays for `eslint-plugin-react-hooks`     | Removed  |
 
 ### Kept

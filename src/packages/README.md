@@ -29,7 +29,7 @@ Run boundary verification at any time:
 pnpm run lint:boundaries
 ```
 
-Boundary checks run automatically during `pnpm run lint` and CI.
+Boundary checks run automatically during `pnpm run lint` and CI. The check is our own `scripts/check_boundaries.js` (#1196): it builds the import graph of `src/` with the TypeScript compiler (resolving the `@/` alias through `tsconfig.json`) and checks it against the rules in `scripts/boundaries.config.js`. Besides the four rules above, those rules keep a package's `tests/` folder private, keep packages out of the app's React layers, make one package reach another only through the `@/packages/<name>` alias, and keep page content on the server. Each violation prints `file:line`, the rule, why it exists and a `Fix:` hint; `--json` prints the same as JSON. Adding a rule is adding one object to the config. Type-only imports count, except where a rule allows them (`page-content-stays-on-server`, and cycles that run through `import type`).
 
 ## Registered Packages
 
