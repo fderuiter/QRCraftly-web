@@ -40,6 +40,11 @@ export type QRState = {
    * error correction level changes.
    */
   isScannabilityFallbackActive: boolean;
+  /**
+   * Whether the content form holds a value it refuses to encode. The config then keeps the last
+   * accepted content, so the preview and exports must not use it until the field is fixed (#1279).
+   */
+  contentRefused: boolean;
   /** Whether an appearance change can be undone. */
   canUndo: boolean;
   /** Whether an undone appearance change can be redone. */
@@ -81,6 +86,8 @@ export interface QRStore {
   setModuleCount: (count: number) => void;
   /** Sets the scannability fallback flag. */
   setScannabilityFallbackActive: (active: boolean) => void;
+  /** Records whether the content form holds a refused value. */
+  setContentRefused: (refused: boolean) => void;
   /** Emits a typed signal. */
   emitSignal: <N extends SignalName>(name: N, detail: SignalPayloads[N]) => void;
   /** Registers a typed signal callback; returns an unregister function. */
@@ -178,6 +185,7 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
     },
     moduleCount: 0,
     isScannabilityFallbackActive: false,
+    contentRefused: false,
     canUndo: false,
     canRedo: false,
   };
@@ -272,6 +280,11 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
     setScannabilityFallbackActive: (active) => {
       if (state.isScannabilityFallbackActive !== active) {
         setState({ ...state, isScannabilityFallbackActive: active });
+      }
+    },
+    setContentRefused: (refused) => {
+      if (state.contentRefused !== refused) {
+        setState({ ...state, contentRefused: refused });
       }
     },
     setModuleCount: (count) => {

@@ -547,7 +547,8 @@ describe('QR Helpers Sad Paths', () => {
         subject: '',
         body: ''
       };
-      expect(constructEmailString(data)).toBe('mailto:?subject=&body=');
+      // Nothing typed: no code, so the generator shows its sample (#1272).
+      expect(constructEmailString(data)).toBe('');
     });
   });
 
@@ -625,7 +626,8 @@ describe('QR Helpers Sad Paths', () => {
         number: ''
       };
       const result = constructPhoneString(data);
-      expect(result).toBe('tel:');
+      // RFC 3966 needs digits: no number, no code (#1272).
+      expect(result).toBe('');
     });
   });
 });

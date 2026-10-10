@@ -51,7 +51,8 @@ const MAILTO_HEADERS = new Set(['to', 'cc', 'bcc', 'subject', 'body']);
  * Constructs the mailto string for Email QR code.
  */
 export const constructEmailString = (data: EmailData): string => {
-  if (!data) return 'mailto:?subject=&body=';
+  // Nothing typed yet: no code, so the generator shows its sample state (#1272).
+  if (!data || ![data.email, data.cc, data.bcc, data.subject, data.body].some((field) => field?.trim())) return '';
 
   const params: string[] = [];
 

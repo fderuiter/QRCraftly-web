@@ -50,9 +50,12 @@ const NO_SECTIONS: readonly string[] = [];
  * It sets up the QRTool with the correct type. Head renders the page's structured data.
  */
 export const QRTypePage: React.FC<QRTypePageProps> = ({ type, title, toolId, copy, presetConfig, openSections = NO_SECTIONS }) => {
+  // Only the link generator starts with an example link; every other type starts empty, so its
+  // preview shows the type's sample with exports off until something is typed (#1272).
   const config = {
     ...DEFAULT_CONFIG,
     type,
+    value: type === QRType.URL ? DEFAULT_CONFIG.value : '',
   };
 
   return (

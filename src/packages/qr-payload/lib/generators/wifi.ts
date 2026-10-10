@@ -151,8 +151,12 @@ export const hydrateWifiData = (raw: string): WifiData => {
   return result;
 };
 
+/**
+ * Constructs the `WIFI:` string. A blank network name gives `''` (the `S:` field is required),
+ * so the generator shows its sample state instead of a code that joins nothing (#1272).
+ */
 export const constructWifiString = (data: WifiData): string => {
-  if (!data) return '';
+  if (!data || !data.ssid?.trim()) return '';
 
   // Validate encryption type to prevent injection
   const encryption = Object.values(WifiEncryption).includes(data.encryption)

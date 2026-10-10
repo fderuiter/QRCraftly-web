@@ -199,11 +199,15 @@ export const hydrateVCardData = (raw: string): VCardData => {
 
 const isPopulated = (str: string | undefined): boolean => Boolean(str && str.trim().length > 0);
 
+/** The fields a visitor types; a card with none of them filled in is empty. */
+const CARD_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country'] as const satisfies readonly (keyof VCardData)[];
+
 /**
  * Constructs the contact payload string (vCard 2.1, 3.0, 4.0, or MECard).
  */
 export const constructVCardString = (data: VCardData): string => {
-  if (!data) return '';
+  // An empty card gives no code, so the generator shows its sample state (#1272).
+  if (!data || !CARD_FIELDS.some((field) => isPopulated(data[field]))) return '';
   const version = data.version || '3.0';
 
   if (version === 'mecard') {
