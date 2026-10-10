@@ -12,6 +12,27 @@ vi.mock('@/utils/colorUtils', async (importOriginal) => {
   return { ...actual, getLuminanceFromRgb: vi.fn(actual.getLuminanceFromRgb) };
 });
 
+/** Gives the worker a minimal OffscreenCanvas (Node has none) so bitmap extraction succeeds. */
+function stubOffscreenCanvas() {
+  vi.stubGlobal(
+    'OffscreenCanvas',
+    class {
+      constructor(public width: number, public height: number) {}
+      getContext() {
+        return {
+          clearRect: () => {},
+          drawImage: () => {},
+          getImageData: (_x: number, _y: number, w: number, h: number) => ({
+            data: new Uint8ClampedArray(w * h * 4),
+            width: w,
+            height: h,
+          }),
+        };
+      }
+    },
+  );
+}
+
 describe('scannabilityWorker', () => {
   let workerHandler: WorkerModuleUnderTest['handle'];
   let worker: WorkerModuleUnderTest;
@@ -317,6 +338,8 @@ describe('scannabilityWorker', () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
     qrRead.mockReturnValue([fakeQrRead('https://safe.com')]);
+    // Extraction must succeed, or the worker hands the second bitmap back instead of closing it.
+    stubOffscreenCanvas();
 
     const closeSpy1 = vi.fn();
     const closeSpy2 = vi.fn();
@@ -342,29 +365,14 @@ describe('scannabilityWorker', () => {
 
     expect(closeSpy1).toHaveBeenCalledTimes(1);
     expect(closeSpy2).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
   });
 
   it('releases transferred image handle when context extraction or processing throws an exception', async () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
     // Node has no OffscreenCanvas; give the worker a minimal one so extraction succeeds and processing throws.
-    vi.stubGlobal(
-      'OffscreenCanvas',
-      class {
-        constructor(public width: number, public height: number) {}
-        getContext() {
-          return {
-            clearRect: () => {},
-            drawImage: () => {},
-            getImageData: (_x: number, _y: number, w: number, h: number) => ({
-              data: new Uint8ClampedArray(w * h * 4),
-              width: w,
-              height: h,
-            }),
-          };
-        }
-      },
-    );
+    stubOffscreenCanvas();
 
     const closeSpy = vi.fn();
     const req = {
@@ -402,20 +410,26 @@ describe('scannabilityWorker', () => {
     delete (globalThis as { OffscreenCanvas?: typeof OffscreenCanvas }).OffscreenCanvas;
 
     const closeSpy = vi.fn();
+    const bitmap = { width: 10, height: 10, close: closeSpy };
     await workerHandler({
       data: {
-        imageBitmap: { width: 10, height: 10, close: closeSpy },
+        imageBitmap: bitmap,
         width: 10,
         height: 10,
         configId: 'needs-image-data',
         },
     } as MessageEvent);
 
-    expect(closeSpy).toHaveBeenCalledTimes(1);
-    expect(postMessageSpy).toHaveBeenCalledWith({
-      configId: 'needs-image-data',
-      retryWithImageData: true,
-    });
+    // The bitmap goes back to the main thread (transferred, not closed) so it can resend the same frame.
+    expect(closeSpy).not.toHaveBeenCalled();
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      {
+        configId: 'needs-image-data',
+        retryWithImageData: true,
+        imageBitmap: bitmap,
+      },
+      [bitmap]
+    );
     globalThis.OffscreenCanvas = originalOffscreenCanvas;
   });
 

@@ -77,4 +77,18 @@ describe('BrandTemplateGallery Component', () => {
 
     expect(screen.getByText('Classic Slate')).toBeInTheDocument();
   });
+
+  it('stays usable with a note when the browser blocks site storage', () => {
+    const getter = vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('The operation is insecure.', 'SecurityError');
+    });
+    try {
+      render(<BrandTemplateGallery config={DEFAULT_CONFIG} onChange={mockOnChange} />);
+      expect(screen.getByText('Classic Slate')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('tab', { name: /my templates/i }));
+      expect(screen.getByText('Custom templates are unavailable.')).toBeInTheDocument();
+    } finally {
+      getter.mockRestore();
+    }
+  });
 });
