@@ -33,10 +33,9 @@ describe('CI Modular Shell Scripts Validation', () => {
     const files = fs.readdirSync(ciScriptsDir).filter(f => f.endsWith('.sh'));
     expect(files.length).toBeGreaterThan(0);
 
-    // Relative to the repository root, so no absolute path reaches the command line.
-    const scriptPaths = files.map(f => `scripts/ci/${f}`);
+    // bash expands the glob, so no file name read by this test reaches a command line.
     try {
-      execFile('shellcheck', scriptPaths, { cwd: repoRoot });
+      execFile('bash', ['-c', 'shellcheck scripts/ci/*.sh'], { cwd: repoRoot });
     } catch (err: any) {
       const stdout = err.stdout ? err.stdout.toString() : '';
       const stderr = err.stderr ? err.stderr.toString() : '';
