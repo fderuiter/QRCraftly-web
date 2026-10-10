@@ -58,7 +58,7 @@ Please use the [GitHub Security Advisory](https://github.com/fderuiter/QRCraftly
   - Data leaks (e.g., data being sent to a server).
   - XSS vulnerabilities.
   - Improper configuration of the client-side generator (including vCard 2.1, 3.0, 4.0, and MECard formats).
-  - Bulk CSV processing, custom PNG export resolution settings, & batch ZIP generation privacy boundary violations.
+  - Bulk CSV processing (including the link or plain text content type), custom PNG export resolution settings, & batch ZIP generation privacy boundary violations.
 - **Out of Scope:**
   - Physical security of the user's device.
   - Browser-level vulnerabilities.
@@ -81,7 +81,7 @@ To prevent custom SVG logo uploads and native vector exports from exposing users
 - **Runtime SVG Sanitization**: Uploaded logos and border images are processed entirely within the client browser to maintain offline privacy. The runtime parser enforces a zero-trust strict safe-element allowlist and zero-tolerance styling:
   - Discards any elements not present on a strict safe-element allowlist (such as `<foreignObject>`, `<embed>`, `<object>`, `<script>`, etc.).
   - Discards `<style>` blocks and element `style` attributes entirely if they contain any `@import` reference.
-  - Limits nested data URIs to safe image MIME-types and strips any with active payload markers or script references. This is validated by an optimized, localized helper function within the security utility to ensure clean code and prevent unused export overhead.
+  - Limits nested data URIs to safe image MIME-types and strips any with active payload markers or script references. A base64 PNG, JPEG, GIF or WebP must start with that format's file signature and is not searched for text, because random base64 can spell `onload` by chance. SVG data and plain-text data are searched for script markers after decoding. This is validated by an optimized, localized helper function within the security utility to ensure clean code and prevent unused export overhead.
   - Strips all inline event handlers (attributes starting with `on`).
   - Neutralizes any remote or dangerous resource requests inside style blocks, style attributes, or `href`/`xlink:href` references while preserving standard layout paths, responsive viewBox attributes, linear gradients, and clip paths.
 

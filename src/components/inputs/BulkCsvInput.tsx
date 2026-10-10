@@ -18,9 +18,10 @@
 
 import { Progress } from '../ui/Progress';
 import { BulkCsvDropZone } from './BulkCsvDropZone';
-import React, { useState, useEffect, useMemo, useCallback, ChangeEvent } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, ChangeEvent } from 'react';
 import {
   parseCsv,
+  decodeCsvBytes,
   createZip,
   sanitizeFileStem,
   allocateFileName,
@@ -31,10 +32,11 @@ import {
   type ZipEntry,
   previewRow,
   pickColumn,
-  PAYLOAD_COLUMN_PATTERN,
-  FILENAME_COLUMN_PATTERN,
+  PAYLOAD_COLUMN_WORDS,
+  FILENAME_COLUMN_WORDS,
   SAMPLE_CSV_TEMPLATE,
   categorizeCsvRows,
+  type BulkContentType,
 } from '@/packages/bulk-csv';
 import { BulkCsvPreflightSummary } from './BulkCsvPreflightSummary';
 import { BulkCsvData, QRConfig, QRType } from '@/types';
@@ -44,9 +46,9 @@ import { Modal } from '../ui/Modal';
 import { SelectField } from '../ui/FormFields';
 import { useToast } from '../ui/Toast';
 import { useQRStoreSelector } from '@/context/QRContext';
-import { generateQRSvg, rasterizeSvgToCanvas } from '@/packages/qr-export';
+import { generateQRSvg, rasterizeSvgToCanvas, SOCIAL_DIMENSIONS } from '@/packages/qr-export';
+import { QrEncodeError } from '@/packages/qr-matrix';
 import { validateConfig, describeViolation } from '@/packages/qr-payload';
-import { analyseLink } from '@/packages/link-safety';
 import { triggerFileDownload } from '@/utils/downloadManager';
 import { FileSpreadsheet, Upload, Download, Loader2 } from 'lucide-react';
 
@@ -55,9 +57,9 @@ export interface BulkCsvInputProps {
   onChange: (updates: Partial<BulkCsvData>) => void;
 }
 
-/** A row left out of the batch because its payload failed the same checks as the single generator. */
+/** A row left out of the batch: its payload failed the single generator's checks, or it could not be drawn. */
 interface SkippedRow {
-  /** 1-based data row number (the header is not counted). */
+  /** Data row number as a spreadsheet shows it (blank lines counted, the header not). */
   rowNumber: number;
   reason: string;
 }
@@ -68,9 +70,13 @@ const LARGE_BATCH_WARNING_ROWS = 100;
 type ParseOutcome = { table: CsvTable; error: null } | { table: null; error: string };
 
 const EMPTY_OUTCOME: ParseOutcome = {
-  table: { headers: [], rows: [], totalRows: 0, truncated: false },
+  table: { headers: [], rows: [], totalRows: 0, truncated: false, rowNumbers: [], delimiter: ',' },
   error: null,
 };
+
+const DELIMITER_NAMES: Readonly<Record<string, string>> = { ';': 'semicolon', '\t': 'tab' };
+
+const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`;
 
 function parseContent(csvContent: string): ParseOutcome {
   if (!csvContent) return EMPTY_OUTCOME;
@@ -84,6 +90,18 @@ function parseContent(csvContent: string): ParseOutcome {
 
 function isExportFormat(value: string): value is BulkCsvData['exportFormat'] {
   return value === 'png' || value === 'svg';
+}
+
+function isContentType(value: string): value is BulkContentType {
+  return value === 'link' || value === 'text';
+}
+
+/** Plain-language reason a row that passed the checks still could not be turned into an image. */
+function describeRowFailure(err: unknown, errorCorrectionLevel: string): string {
+  if (err instanceof QrEncodeError && err.kind === 'too-long') {
+    return `Too long for a QR code at error correction level ${errorCorrectionLevel}. Shorten it, or pick a lower level in Appearance.`;
+  }
+  return 'This row could not be drawn as a QR code.';
 }
 
 /**
@@ -118,20 +136,28 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   const [completedCount, setCompletedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [skippedRows, setSkippedRows] = useState<SkippedRow[]>([]);
+  // The running batch checks this after every row, so Cancel or leaving the page stops it.
+  const runRef = useRef<{ cancelled: boolean; unmounted: boolean } | null>(null);
 
   const outcome = useMemo(() => parseContent(data.csvContent), [data.csvContent]);
   const columns = useMemo(() => outcome.table?.headers ?? [], [outcome]);
   const rows = useMemo(() => outcome.table?.rows ?? [], [outcome]);
+  const rowNumbers = useMemo(() => outcome.table?.rowNumbers ?? [], [outcome]);
+  const delimiterName = DELIMITER_NAMES[outcome.table?.delimiter ?? ','];
 
   const payloadCol = columns.includes(data.payloadColumn)
     ? data.payloadColumn
-    : pickColumn(columns, PAYLOAD_COLUMN_PATTERN);
+    : pickColumn(columns, PAYLOAD_COLUMN_WORDS);
   const filenameCol = columns.includes(data.filenameColumn)
     ? data.filenameColumn
-    : pickColumn(columns, FILENAME_COLUMN_PATTERN);
+    : pickColumn(columns, FILENAME_COLUMN_WORDS, payloadCol);
   const exportFormat = data.exportFormat || 'png';
+  const contentType: BulkContentType = data.contentType ?? 'link';
   const rowCount = rows.length;
-  const preview = useMemo(() => previewRow(data.csvContent, payloadCol), [data.csvContent, payloadCol]);
+  const preview = useMemo(
+    () => previewRow(data.csvContent, payloadCol, contentType),
+    [data.csvContent, payloadCol, contentType]
+  );
 
   const validateRowConfig = useCallback((cfg: QRConfig) => {
     return validateConfig(cfg).map(describeViolation);
@@ -139,8 +165,14 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
   const preflightReport = useMemo(() => {
     if (rows.length === 0 || !payloadCol) return null;
-    return categorizeCsvRows(rows, payloadCol, currentConfig, validateRowConfig);
-  }, [rows, payloadCol, currentConfig, validateRowConfig]);
+    return categorizeCsvRows(rows, payloadCol, currentConfig, validateRowConfig, { contentType, rowNumbers });
+  }, [rows, payloadCol, currentConfig, validateRowConfig, contentType, rowNumbers]);
+
+  // The preview row is left out of the ZIP: say so beside the preview, with the same reason.
+  const previewProblem = useMemo(() => {
+    if (!preview || !preflightReport) return null;
+    return preflightReport.invalidDetails.find((d) => d.rowNumber === preview.rowNumber && d.category === 'unsafe') ?? null;
+  }, [preview, preflightReport]);
 
   const buttonText = useMemo(() => {
     if (isGenerating) return 'Generating Batch ZIP...';
@@ -153,13 +185,26 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
   // Rows whose address looks disguised (a lookalike, a shortener, an IP address). Only a hint:
   // they are still generated, and the people who own the file may well mean them.
-  const unusualRows = useMemo(() => {
-    if (!payloadCol) return [];
-    return rows.flatMap((row, index) => {
-      const cautions = analyseLink((row[payloadCol] ?? '').trim()).filter((finding) => finding.severity === 'caution');
-      return cautions.length > 0 ? [{ rowNumber: index + 1, message: cautions.map((finding) => finding.message).join(' ') }] : [];
-    });
-  }, [rows, payloadCol]);
+  const unusualRows = useMemo(
+    () =>
+      (preflightReport?.invalidDetails ?? [])
+        .filter((d) => d.category === 'caution')
+        .map((d) => ({ rowNumber: d.rowNumber, message: d.reason ?? '' })),
+    [preflightReport]
+  );
+
+  // A skipped-rows list belongs to the file and settings it was made from.
+  useEffect(() => {
+    setSkippedRows([]);
+  }, [data.csvContent, payloadCol, contentType]);
+
+  // Leaving the page stops a running batch, so no ZIP downloads on another page.
+  useEffect(
+    () => () => {
+      if (runRef.current) Object.assign(runRef.current, { cancelled: true, unmounted: true });
+    },
+    []
+  );
 
   // Store the detected column defaults so the selection survives re-renders.
   useEffect(() => {
@@ -186,7 +231,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     }
 
     try {
-      const content = await file.text();
+      const content = decodeCsvBytes(new Uint8Array(await file.arrayBuffer()));
       onChange({ csvContent: content, fileName: file.name });
       addToast({ type: 'success', message: `Successfully loaded ${file.name}`, duration: 3000 });
     } catch {
@@ -209,7 +254,8 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       return;
     }
 
-    const report = preflightReport || categorizeCsvRows(rows, payloadCol, currentConfig);
+    const report =
+      preflightReport || categorizeCsvRows(rows, payloadCol, currentConfig, validateRowConfig, { contentType, rowNumbers });
     const targetRows = report.validRows;
     const skipped: SkippedRow[] = report.invalidDetails
       .filter((d) => d.category === 'unsafe')
@@ -221,16 +267,23 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
         type: 'error',
         message:
           skipped.length > 0
-            ? 'Every row was blocked by the safety checks, so no ZIP was made.'
+            ? 'None of the rows can be used, so no ZIP was made. The list says why.'
             : 'No valid rows found to generate QR codes.',
         duration: 5000,
       });
       return;
     }
 
+    const run = { cancelled: false, unmounted: false };
+    runRef.current = run;
     setIsGenerating(true);
     setCompletedCount(0);
     setTotalCount(targetRows.length);
+
+    // PNGs keep the design's shape: the chosen resolution is the width, the height follows the format.
+    const format = SOCIAL_DIMENSIONS[currentConfig.socialFormat] ?? { width: 1, height: 1 };
+    const pngWidth = data.exportResolution || 1000;
+    const pngHeight = Math.round((pngWidth * format.height) / format.width);
 
     try {
       const entries: ZipEntry[] = [];
@@ -238,26 +291,48 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
       for (let i = 0; i < targetRows.length; i++) {
         const row = targetRows[i];
-        const stem = sanitizeFileStem(row[filenameCol] ?? '', `qr_${i + 1}`);
-        const name = allocateFileName(stem, exportFormat, usedNames);
+        const rowNumber = rowNumbers[report.validRowIndices[i]] ?? report.validRowIndices[i] + 1;
+        // The checked, previewed string, encoded as is (the Text type adds no further rewriting).
         const rowConfig: QRConfig = {
           ...currentConfig,
-          value: (row[payloadCol] ?? '').trim(),
-          type: QRType.URL,
+          value: report.validPayloads[i],
+          type: QRType.TEXT,
         };
 
-        const svgString = await generateQRSvg(rowConfig);
-        if (exportFormat === 'svg') {
-          entries.push({ name, data: svgString });
-        } else {
-          const exportResolution = data.exportResolution || 1000;
-          const canvas = await rasterizeSvgToCanvas(svgString, exportResolution, exportResolution);
-          entries.push({ name, data: await canvasToPngBytes(canvas) });
+        try {
+          const svgString = await generateQRSvg(rowConfig);
+          let entryData: ZipEntry['data'] = svgString;
+          if (exportFormat === 'png') {
+            const canvas = await rasterizeSvgToCanvas(svgString, pngWidth, pngHeight);
+            entryData = await canvasToPngBytes(canvas);
+          }
+          const stem = sanitizeFileStem(row[filenameCol] ?? '', `qr_${rowNumber}`);
+          entries.push({ name: allocateFileName(stem, exportFormat, usedNames), data: entryData });
+        } catch (err) {
+          // One row that cannot be drawn (too long, an image that never loads) costs that row only.
+          skipped.push({ rowNumber, reason: describeRowFailure(err, currentConfig.errorCorrectionLevel) });
+          setSkippedRows([...skipped]);
         }
 
+        if (run.cancelled) break;
         setCompletedCount(i + 1);
         // Yield to the main thread so the progress dialog can repaint.
         await new Promise((resolve) => setTimeout(resolve, 0));
+        if (run.cancelled) break;
+      }
+
+      if (run.cancelled) {
+        if (!run.unmounted) addToast({ type: 'info', message: 'Batch cancelled. No ZIP was made.', duration: 4000 });
+        return;
+      }
+
+      if (entries.length === 0) {
+        addToast({
+          type: 'error',
+          message: 'None of the rows could be drawn as QR codes, so no ZIP was made. The list says why.',
+          duration: 5000,
+        });
+        return;
       }
 
       const zipFileName = data.fileName
@@ -269,8 +344,8 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
         type: 'success',
         message:
           skipped.length > 0
-            ? `Downloaded a ZIP with ${targetRows.length} QR codes. ${skipped.length} unsafe ${skipped.length === 1 ? 'row was' : 'rows were'} skipped.`
-            : `Generated and downloaded ZIP with ${targetRows.length} QR codes!`,
+            ? `Downloaded a ZIP with ${plural(entries.length, 'QR code', 'QR codes')}. ${plural(skipped.length, 'row was', 'rows were')} left out.`
+            : `Generated and downloaded ZIP with ${plural(entries.length, 'QR code', 'QR codes')}!`,
         duration: 5000,
       });
     } catch (err) {
@@ -281,8 +356,15 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
         duration: 5000,
       });
     } finally {
-      setIsGenerating(false);
+      if (runRef.current === run) {
+        runRef.current = null;
+        setIsGenerating(false);
+      }
     }
+  };
+
+  const cancelBatch = () => {
+    if (runRef.current) runRef.current.cancelled = true;
   };
 
   const fileInput = (label: string) => (
@@ -330,6 +412,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   {rowCount} rows found • {columns.length} columns detected
+                  {delimiterName && ` • ${delimiterName}-separated`}
                 </p>
               </div>
             </div>
@@ -341,7 +424,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
           {skippedRows.length > 0 && (
             <Alert variant="warning" title={`${skippedRows.length} ${skippedRows.length === 1 ? 'row was' : 'rows were'} skipped`}>
-              <p>These rows were left out of the ZIP because their content failed the safety checks:</p>
+              <p>These rows were left out of the ZIP:</p>
               <ul className="mt-2 max-h-40 list-disc space-y-1 overflow-y-auto pl-5 text-xs" data-testid="bulk-skipped-rows">
                 {skippedRows.map((row) => (
                   <li key={row.rowNumber}>
@@ -386,7 +469,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
             </Alert>
           )}
 
-          <div className={`grid gap-4 ${exportFormat === 'png' ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
+          <div className="grid gap-4 sm:grid-cols-2">
             <SelectField
               id="bulk-payload-column"
               label="Payload Column (QR Content)"
@@ -414,6 +497,19 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
             </SelectField>
 
             <SelectField
+              id="bulk-content-type"
+              label="Content Type"
+              value={contentType}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (isContentType(value)) onChange({ contentType: value });
+              }}
+            >
+              <option value="link">Links (web addresses)</option>
+              <option value="text">Plain text (exactly as typed)</option>
+            </SelectField>
+
+            <SelectField
               id="bulk-export-format"
               label="Image Format"
               value={exportFormat}
@@ -429,7 +525,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
             {exportFormat === 'png' && (
               <SelectField
                 id="bulk-export-resolution"
-                label="PNG Resolution"
+                label="PNG Width"
                 value={String(data.exportResolution || 1000)}
                 onChange={(e) => onChange({ exportResolution: Number(e.target.value) })}
               >
@@ -445,8 +541,9 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
           <p className="text-xs text-slate-600 dark:text-slate-400" data-testid="bulk-preview-row">
             {preview
-              ? `Preview: row ${preview.rowNumber} of ${preview.rowCount}. Each row becomes its own QR code in the ZIP.`
+              ? `Preview: row ${preview.rowNumber}. Each row becomes its own QR code in the ZIP.`
               : 'No row has a value in the payload column, so there is nothing to preview.'}
+            {previewProblem && ` This row is left out of the ZIP: ${previewProblem.reason}`}
           </p>
 
           <div className="pt-2">
@@ -464,7 +561,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
         </div>
       )}
 
-      <Modal isOpen={isGenerating} onClose={() => {}} title="Generating Batch QR Codes">
+      <Modal isOpen={isGenerating} onClose={cancelBatch} closeLabel="Cancel batch" title="Generating Batch QR Codes">
         <div className="space-y-4 py-2 text-center">
           <div className="flex justify-center">
             <Loader2 className="size-10 animate-spin text-teal-600 dark:text-teal-400" />
@@ -478,10 +575,13 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
           </p>
           {skippedRows.length > 0 && (
             <p className="text-xs text-amber-700 dark:text-amber-400">
-              {skippedRows.length} unsafe {skippedRows.length === 1 ? 'row' : 'rows'} skipped. The list stays on screen when this finishes.
+              {plural(skippedRows.length, 'row', 'rows')} left out. The list stays on screen when this finishes.
             </p>
           )}
           <Progress labelledBy="batch-progress-status" value={completedCount} max={totalCount} />
+          <Button type="button" variant="outline" size="md" onClick={cancelBatch}>
+            Cancel
+          </Button>
         </div>
       </Modal>
     </div>

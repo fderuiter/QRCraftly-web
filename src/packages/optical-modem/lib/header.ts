@@ -37,7 +37,7 @@ export interface FrameHeader {
   constellation: number;
   /** Data bytes in each inner code block. */
   packetBytes: number;
-  /** Check bytes in each inner code block (0 to 254 - packetBytes), so a receiver needs no table to read a frame. */
+  /** Check bytes in each inner code block (0 to 251 - packetBytes, after the data and its 4-byte tag), so a receiver needs no table to read a frame. */
   parity: number;
   /** Reserved for later versions; written as 0. */
   flags: number;

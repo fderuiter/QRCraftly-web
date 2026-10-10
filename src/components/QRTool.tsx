@@ -30,7 +30,8 @@ import { ExportOptions as DownloadOptions, FORMAT_LABELS, clampSize, type Downlo
 import { usePopoverDismiss } from '@/hooks/usePopoverDismiss';
 import { Modal } from './ui/Modal';
 import { useLeadingDebounce } from '@/hooks/useDebounce';
-import { useQRDownload, BLOCKED_EXPORT_MESSAGE, ExportStatus, AssetOptions, type ExportFormat } from '@/hooks/useQRDownload';
+import { useQRDownload, BLOCKED_EXPORT_MESSAGE, SCAN_VALIDATION_ERROR, ExportStatus, AssetOptions, type ExportFormat } from '@/hooks/useQRDownload';
+import { previewFailureMessage, type PreviewFailure } from '@/utils/previewFailure';
 import { getExportRiskPolicy } from '@/utils/exportRiskPolicy';
 import { isDangerousUrl } from '@/utils/security';
 import { useToast } from './ui/Toast';
@@ -130,7 +131,6 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   
   const [showSafetyGate, setShowSafetyGate] = useState(false);
   const [gateAction, setGateAction] = useState<(() => void | Promise<void>) | null>(null);
-  const qrRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [previewView, setPreviewView] = useState<PreviewView>('flat');
   const moduleCount = useQRStoreSelector(s => s.moduleCount);
@@ -145,7 +145,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
     isEmpty ? { ...config, value: samplePayload } : config
   ), [config, isEmpty, samplePayload]);
 
-  const { exportAsset: runExport } = useQRDownload(qrRef, effectiveConfig);
+  const { exportAsset: runExport } = useQRDownload(effectiveConfig);
   // Which export is encoding right now; its button shows a loading state until it finishes.
   const [busyExport, setBusyExport] = useState<ExportFormat | null>(null);
   const exportAsset = useCallback(async (format: ExportFormat, options?: AssetOptions) => {
@@ -189,9 +189,14 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   // Scannability
   const { status: rawScannabilityStatus, checkScannability, health: rawHealth, workerRecoveryActive } = useScannability(canvasRef, effectiveConfig);
 
-  // In sample fallback mode, report 'idle' status so stale/verified badges are suppressed
-  const scannabilityStatus = isEmpty ? 'idle' : rawScannabilityStatus;
-  const health = isEmpty ? undefined : rawHealth;
+  // Why the preview has no code to show (blocked or too much content), if it has none (#1251).
+  const [previewFailure, setPreviewFailure] = useState<PreviewFailure | null>(null);
+
+  // In sample fallback mode, or when the preview could not draw a code, report 'idle' status so
+  // no verdict is shown for a code that does not exist (#1251).
+  const noVerdict = isEmpty || previewFailure !== null;
+  const scannabilityStatus = noVerdict ? 'idle' : rawScannabilityStatus;
+  const health = noVerdict ? undefined : rawHealth;
 
   const handleFix = useCallback((fix: ScanFix) => {
     if (fix === 'raise-error-correction') {
@@ -225,6 +230,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
 
   
   const handleRendered = useCallback((info: { moduleCount: number, virtualImageData?: ImageData, virtualImageBitmap?: ImageBitmap } = { moduleCount: 0 }) => {
+    setPreviewFailure(null);
     if (info.moduleCount) setModuleCount(info.moduleCount);
     if (info.virtualImageBitmap) {
       checkScannability(undefined, info.virtualImageBitmap, info.moduleCount);
@@ -266,10 +272,18 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   }, [addToast]);
 
   const exportWith = (target: ExportFormat, buttonRef: React.RefObject<HTMLButtonElement | null>, message: string) => {
-    executeWithSafetyGate(async (options) => {
+    const run = async (options?: AssetOptions) => {
       const result = await exportAsset(target, { ...options, size: clampSize(size), filename });
+      if (result.error?.name === SCAN_VALIDATION_ERROR && !options?.allowUnsafe) {
+        // The finished image failed the scan check: offer the same choice as the pre-flight gate
+        // instead of a raw error (#1255).
+        setGateAction(() => () => run({ ...options, allowUnsafe: true }));
+        setShowSafetyGate(true);
+        return;
+      }
       handleExportResult(result, buttonRef, message);
-    });
+    };
+    executeWithSafetyGate(run);
   };
 
   const onDownload = () => {
@@ -303,6 +317,11 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   const executeWithSafetyGate = (action: (options?: AssetOptions) => void | Promise<void>) => {
     if (isEmpty) {
       notifyEmpty();
+      return;
+    }
+    if (previewFailure) {
+      // There is no code to export: say why, with no "Export Anyway" (#1251).
+      addToast({ type: 'error', message: previewFailureMessage(previewFailure, config.errorCorrectionLevel), duration: 6000 });
       return;
     }
     if (isDangerousUrl(config.value)) {
@@ -393,9 +412,9 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                 )}
 
                 {/* Preview stage: the QR is the largest thing on the page. */}
-                <div ref={qrRef} className="mb-4 flex justify-center rounded-xl bg-surface-sunken p-3 md:p-2" data-testid="qr-stage">
+                <div className="mb-4 flex justify-center rounded-xl bg-surface-sunken p-3 md:p-2" data-testid="qr-stage">
                    {/* Pass debounced config to QRCanvas to prevent heavy rendering on every keystroke */}
-                   <QRCanvas ref={canvasRef} onRendered={handleRendered} config={debouncedConfig} className={`rounded-lg shadow-raised ${STAGE_SIZE_CLASSES[debouncedConfig.socialFormat] ?? STAGE_SIZE_CLASSES[SocialFormat.SQUARE_1_1]}`} />
+                   <QRCanvas ref={canvasRef} onRendered={handleRendered} onRenderFailed={setPreviewFailure} config={debouncedConfig} className={`rounded-lg shadow-raised ${STAGE_SIZE_CLASSES[debouncedConfig.socialFormat] ?? STAGE_SIZE_CLASSES[SocialFormat.SQUARE_1_1]}`} />
                 </div>
 
                 {/* One export row. Below md it docks to the bottom of the screen as a sticky action bar. */}

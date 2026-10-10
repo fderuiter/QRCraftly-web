@@ -102,6 +102,8 @@ export type CameraDecodeStrategy = 'centre' | 'frame' | 'inverted';
 
 /** The rotation: the centre crop every other frame, the whole frame and an inverted pass in between. */
 const CAMERA_STRATEGIES: readonly CameraDecodeStrategy[] = ['centre', 'frame', 'centre', 'inverted'];
+/** How many camera frames one rotation of the strategies takes. */
+export const CAMERA_STRATEGY_COUNT = CAMERA_STRATEGIES.length;
 /** Longest edge of the whole-frame passes. */
 const FRAME_PASS_MAX_DIMENSION = 800;
 /**

@@ -39,6 +39,11 @@ const CAMERA_PROBLEMS: Record<CameraProblemStatus, { title: string; body: string
     body: 'This camera cannot stream at a size the scanner can use. Try another camera, or scan a photo or screenshot.',
     retry: true,
   },
+  stopped: {
+    title: 'Camera Stopped',
+    body: 'The camera stopped, perhaps because it was unplugged or another app took it. Try it again, or scan a photo or screenshot.',
+    retry: true,
+  },
   error: { title: 'Camera Unavailable', body: 'You can still scan a QR code from a photo or screenshot.', retry: true },
 };
 
@@ -255,9 +260,20 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
       // Freeze the frame and lock the reticle onto the code before the result opens.
       videoRef.current?.pause();
       setLock(found.corners);
-      lockTimerRef.current = window.setTimeout(() => showResult(data), prefersReducedMotion() ? 0 : LOCK_MS);
+      lockTimerRef.current = window.setTimeout(() => {
+        lockTimerRef.current = null;
+        showResult(data);
+      }, prefersReducedMotion() ? 0 : LOCK_MS);
     },
   });
+
+  /** Drops a camera result that is still waiting to open, so it cannot cover image mode (#1296). */
+  const cancelPendingLock = () => {
+    if (lockTimerRef.current === null) return;
+    window.clearTimeout(lockTimerRef.current);
+    lockTimerRef.current = null;
+    setLock(null);
+  };
 
   const cameraRunning = mode === 'webcam' && cameraWanted && result === null;
 
@@ -293,6 +309,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
 
   // Client-side QR decoding using the unified deep module scanFile method.
   const processFile = async (file: File) => {
+    cancelPendingLock();
     cancelFileScan();
     const controller = new AbortController();
     fileAbortControllerRef.current = controller;
@@ -324,6 +341,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
 
   /** Scans an image that arrived by paste or drop, showing image mode so errors are visible. */
   const scanImage = (file: File | undefined) => {
+    cancelPendingLock();
     setMode('file');
     setResult(null);
     if (!file || !file.type.startsWith('image/')) {
@@ -350,6 +368,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
   }, []);
 
   const pasteFromClipboard = async () => {
+    cancelPendingLock();
     setMode('file');
     setResult(null);
     setFileError(null);
@@ -369,6 +388,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
   };
 
   const switchMode = (next: 'webcam' | 'file') => {
+    cancelPendingLock();
     cancelFileScan();
     setMode(next);
     setResult(null);

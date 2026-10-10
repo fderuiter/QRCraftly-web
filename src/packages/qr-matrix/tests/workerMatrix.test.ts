@@ -144,6 +144,22 @@ describe('Matrix Worker', () => {
       status: 'error',
       sequenceId: 5,
       error: expect.any(String),
+      kind: 'invalid',
     });
+  });
+
+  it('tells the preview when the content is too long for one code (#1251)', async () => {
+    const postMessageSpy = vi.fn();
+    scope.postMessage = postMessageSpy;
+
+    await workerHandler({
+      data: {
+        config: createDummyConfig('x'.repeat(4000)),
+        sequenceId: 6,
+      },
+    } as MessageEvent);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(postMessageSpy).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', sequenceId: 6, kind: 'too-long' }));
   });
 });

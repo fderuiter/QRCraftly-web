@@ -30,11 +30,17 @@ import { withPageContent } from '../../tests/utils/pageContent';
 
 const qrRead = vi.hoisted(() => vi.fn());
 vi.mock('@/packages/qr-decode', () => ({ loadQrReader: () => Promise.resolve({ read: qrRead }) }));
+// Raster exports draw their own canvas from the config; a small stub keeps the tests fast.
+const renderQRRaster = vi.hoisted(() => vi.fn());
+vi.mock('@/packages/qr-export', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/packages/qr-export')>()),
+  renderQRRaster,
+}));
 
 // Mock QRCanvas because it uses canvas which is hard to test in jsdom,
 // and we want to test App logic not the library
 vi.mock('./QRCanvas', () => ({
-  default: ({ onRendered }: { onRendered?: (info: any) => void }) => {
+  default: ({ onRendered, onRenderFailed }: { onRendered?: (info: any) => void; onRenderFailed?: (reason: string) => void }) => {
     return (
       <div data-testid="qr-canvas-mock">
         <canvas data-testid="mock-canvas" />
@@ -43,6 +49,7 @@ vi.mock('./QRCanvas', () => ({
           data-testid="mock-trigger-rendered"
           onClick={() => onRendered?.({ moduleCount: 25, virtualImageData: new ImageData(new Uint8ClampedArray(40000), 100, 100) })}
         />
+        <button type="button" data-testid="mock-trigger-too-long" onClick={() => onRenderFailed?.('too-long')} />
       </div>
     );
   }
@@ -75,6 +82,13 @@ describe('QRTool Component', () => {
 
   beforeEach(() => {
     qrRead.mockReturnValue([fakeQrRead('https://qrcraftly.com')]);
+    renderQRRaster.mockReset();
+    renderQRRaster.mockImplementation(async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 100;
+      canvas.height = 100;
+      return canvas;
+    });
 
     // Mock URL.createObjectURL and URL.revokeObjectURL
     global.URL.createObjectURL = vi.fn(() => 'mock-url');
@@ -222,28 +236,14 @@ describe('QRTool Component', () => {
     expect(screen.queryByRole('group', { name: 'Download options' })).not.toBeInTheDocument();
     expect(document.activeElement).toBe(options);
     downloadAs('PNG');
+    // Let the export finish so its download does not land in the next test.
+    expect(await screen.findByRole('button', { name: 'Downloaded' })).toBeInTheDocument();
   });
 
   it('exports a PNG at the selected pixel size with the chosen file name, and confirms on the button (#1052)', async () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click');
     const appendSpy = vi.spyOn(document.body, 'appendChild');
-    const drawImage = vi.fn();
     render(<ToastProvider><QRTool initialConfig={{ value: 'https://example.com' }} /></ToastProvider>);
-    // Canvases created from now on are the scaled export copies.
-    const createElement = document.createElement.bind(document);
-    vi.spyOn(document, 'createElement').mockImplementation((tag: string, options?: ElementCreationOptions) => {
-      const el = createElement(tag, options);
-      if (tag === 'canvas') {
-        Object.defineProperty(el, 'getContext', {
-          value: () => ({
-            drawImage,
-            imageSmoothingEnabled: true,
-            getImageData: () => ({ data: new Uint8ClampedArray(40000), width: 100, height: 100 }),
-          }),
-        });
-      }
-      return el;
-    });
     fireEvent.click(screen.getByRole('button', { name: 'Download options' }));
     const options = within(screen.getByRole('group', { name: 'Download options' }));
     fireEvent.click(options.getByRole('radio', { name: 'PNG' }));
@@ -253,15 +253,41 @@ describe('QRTool Component', () => {
     fireEvent.click(downloadButton());
 
     await waitFor(() => expect(clickSpy).toHaveBeenCalled());
-    const scaled = drawImage.mock.calls[0];
-    // drawImage(source, x, y, width, height): the copy is 4096 px wide.
-    expect(scaled[3]).toBe(4096);
+    // The file is drawn from the current content at 4096 px, not copied from the preview (#1252, #1256).
+    expect(renderQRRaster).toHaveBeenCalledWith(expect.objectContaining({ value: 'https://example.com' }), 4096);
     const link = appendSpy.mock.calls.map((c) => c[0]).find((n): n is HTMLAnchorElement => n instanceof HTMLAnchorElement);
     expect(link?.download).toBe('my-code.png');
     expect(await screen.findByRole('button', { name: 'Downloaded' })).toBeInTheDocument();
     expect(exportStatus()).toBe('PNG downloaded');
     // No success toast.
     expect(screen.queryByText(/exported successfully/)).not.toBeInTheDocument();
+  });
+
+  it('refuses to export when the preview has no code because the content is too long (#1251)', async () => {
+    render(<ToastProvider><QRTool initialConfig={{ value: 'https://example.com' }} /></ToastProvider>);
+    fireEvent.click(screen.getByTestId('mock-trigger-too-long'));
+
+    fireEvent.click(downloadButton());
+
+    expect(await screen.findByText(/too long for one QR code/)).toBeInTheDocument();
+    expect(screen.queryByText('Scan Safety Warning')).not.toBeInTheDocument();
+    expect(renderQRRaster).not.toHaveBeenCalled();
+  });
+
+  it('offers Export Anyway when the finished image fails the scan check, without a raw error code (#1255)', async () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click');
+    render(<ToastProvider><QRTool initialConfig={{ value: 'https://example.com' }} /></ToastProvider>);
+    qrRead.mockReturnValue([]);
+
+    downloadAs('PNG');
+
+    expect(await screen.findByText('Scan Safety Warning')).toBeInTheDocument();
+    expect(clickSpy).not.toHaveBeenCalled();
+    expect(screen.queryByText(/SCAN_VALIDATION_FAILED|ScanValidationError/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export Anyway' }));
+    await waitFor(() => expect(clickSpy).toHaveBeenCalled());
+    await waitFor(() => expect(exportStatus()).toBe('PNG downloaded'));
   });
 
   it.each(['PNG', 'JPEG', 'WebP', 'SVG'] as const)('waits until an unsafe %s export is started before showing the safety warning', (format) => {

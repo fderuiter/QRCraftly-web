@@ -17,16 +17,20 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { previewRow, pickColumn, PAYLOAD_COLUMN_PATTERN, FILENAME_COLUMN_PATTERN } from '../index';
+import { previewRow, pickColumn, PAYLOAD_COLUMN_WORDS, FILENAME_COLUMN_WORDS } from '../index';
 
 describe('previewRow', () => {
   it('returns the first row that has a payload, with its position', () => {
     const csv = 'url,name\n,Empty\nhttps://a.example,A\nhttps://b.example,B';
-    expect(previewRow(csv, 'url')).toEqual({ payload: 'https://a.example', rowNumber: 2, rowCount: 3 });
+    expect(previewRow(csv, 'url')).toEqual({ payload: 'https://a.example/', rowNumber: 2, rowCount: 3 });
   });
 
   it('uses the detected payload column when the chosen one is missing', () => {
-    expect(previewRow('title,qr\nHello,  WIFI:S:x;;  ', 'nope')?.payload).toBe('WIFI:S:x;;');
+    expect(previewRow('title,qr\nHello,  WIFI:S:x;;  ', 'nope', 'text')?.payload).toBe('WIFI:S:x;;');
+  });
+
+  it('numbers the row as a spreadsheet does, counting blank lines (#1291)', () => {
+    expect(previewRow('url\n\n\nhttps://a.example', 'url')?.rowNumber).toBe(3);
   });
 
   it('returns null when there is nothing to preview', () => {
@@ -38,9 +42,22 @@ describe('previewRow', () => {
 
 describe('pickColumn', () => {
   it('prefers a matching header, then the first column', () => {
-    expect(pickColumn(['id', 'link'], PAYLOAD_COLUMN_PATTERN)).toBe('link');
-    expect(pickColumn(['code', 'value'], PAYLOAD_COLUMN_PATTERN)).toBe('code');
-    expect(pickColumn(['url', 'label'], FILENAME_COLUMN_PATTERN)).toBe('label');
-    expect(pickColumn([], PAYLOAD_COLUMN_PATTERN)).toBe('');
+    expect(pickColumn(['id', 'link'], PAYLOAD_COLUMN_WORDS)).toBe('link');
+    expect(pickColumn(['code', 'value'], PAYLOAD_COLUMN_WORDS)).toBe('code');
+    expect(pickColumn(['url', 'label'], FILENAME_COLUMN_WORDS)).toBe('label');
+    expect(pickColumn([], PAYLOAD_COLUMN_WORDS)).toBe('');
+  });
+
+  it('matches whole words, not substrings (#1291)', () => {
+    expect(pickColumn(['Video URL', 'Title'], PAYLOAD_COLUMN_WORDS)).toBe('Video URL');
+    expect(pickColumn(['Video URL', 'Title'], FILENAME_COLUMN_WORDS, 'Video URL')).toBe('Title');
+    expect(pickColumn(['Name', 'Metadata', 'URL'], PAYLOAD_COLUMN_WORDS)).toBe('URL');
+    expect(pickColumn(['Guide link', 'Name'], FILENAME_COLUMN_WORDS, 'Guide link')).toBe('Name');
+    expect(pickColumn(['product_id', 'landingPageUrl'], PAYLOAD_COLUMN_WORDS)).toBe('landingPageUrl');
+  });
+
+  it('never picks the excluded column while another one exists', () => {
+    expect(pickColumn(['Product', 'Landing page'], FILENAME_COLUMN_WORDS, 'Product')).toBe('Landing page');
+    expect(pickColumn(['url'], FILENAME_COLUMN_WORDS, 'url')).toBe('url');
   });
 });

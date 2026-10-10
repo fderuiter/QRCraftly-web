@@ -65,7 +65,7 @@ export { EmailContract, constructEmailString, hydrateEmailData } from './lib/gen
 export { VCardContract, constructVCardString, hydrateVCardData } from './lib/generators/vcard';
 export { constructPhoneString, hydratePhoneData, droppedPhoneCharacters } from './lib/generators/phone';
 export { SmsContract, constructSmsString, hydrateSmsData } from './lib/generators/sms';
-export { PaymentContract, constructPaymentString, hydratePaymentData } from './lib/generators/payment';
+export { PaymentContract, constructPaymentString, hydratePaymentData, paymentAmountError } from './lib/generators/payment';
 export { EventContract, constructEventString, hydrateEventData } from './lib/generators/event';
 export { UrlContract, constructUrlString } from './lib/generators/url';
 export { constructTextString, hydrateTextData } from './lib/generators/text';

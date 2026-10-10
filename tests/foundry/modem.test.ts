@@ -23,11 +23,17 @@
  *
  * `tests/fixtures/modem-golden.json.gz` holds what those kernels returned for every input in
  * `modemCorpus.ts`, recorded once before they were removed: 3,000 Reed-Solomon cases (a quarter
- * of them past the code's bound), 400 homographies, every constellation id, the simulation corpus
- * (27 frames of the three profiles in the three channels, at easy and hard camera cell sizes, with
- * a thinner code, turned and torn captures; each decoded hard, soft and with a high erasure
- * threshold), 13 probe runs, 200 mutual informations, 300 cross-talk fits, 50 channel splits and a
- * calibrator run. Each output is kept whole or as an FNV-1a hash.
+ * of them past the code's bound), 400 homographies, every constellation id, 13 probe runs, 200
+ * mutual informations, 300 cross-talk fits, 50 channel splits and a calibrator run. Each output is
+ * kept whole or as an FNV-1a hash.
+ *
+ * The simulation corpus (27 frames of the three profiles in the three channels, at easy and hard
+ * camera cell sizes, with a thinner code, turned and torn captures) is no longer compared with a
+ * recording: since every block carries an identity-bound tag (#1240, ADR 0043), the module draws
+ * different frames from the ones `codec.ts` drew, and the recorded frames were dropped from the
+ * fixture. The corpus still runs, decoded hard, soft and with a high erasure threshold, and every
+ * block the module returns must be the block that was sent. The probe runs exercise the same
+ * fiducial search and sampling against the recording.
  *
  * Tolerance: none. The integer kernels (Reed-Solomon, the codec, fiducial search, sampling,
  * classification) must match bit for bit, and so must the floating-point ones (homography,
@@ -40,7 +46,7 @@
  * `rs.ts` accepted some corrections the bound rules out, and all of them were wrong. The module
  * uses the shared decoder in `crates/core`, which refuses them. Within the bound every one of the
  * 2,250 cases is identical; past it the module agrees with `rs.ts` or refuses a wrong answer
- * `rs.ts` gave, never the other way round. The counts are pinned below.
+ * `rs.ts` gave, never the other way round. The count is pinned below.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -58,9 +64,7 @@ import {
   getConstellation,
   loadOpticalModem,
   probeSequence,
-  runReferenceKernel,
   simulateCapture,
-  type DecodedFrame,
   type ProbeReport,
   type RgbaImage,
 } from '@/packages/optical-modem';
@@ -91,8 +95,12 @@ import {
  * miscorrection. The module never decodes a case `rs.ts` refused.
  */
 const KNOWN_REFUSED_MISCORRECTIONS = 22;
-/** Blocks of the simulation corpus `rs.ts` repaired into wrong bytes for the same reason: the module refuses them, or refuses that answer and repairs the block right with fewer erasures. */
-const KNOWN_FRAME_BLOCK_CHANGES: BlockChanges = { refused: 3, repaired: 1 };
+/**
+ * Over the simulation corpus decoded hard, soft and with a high erasure threshold: the blocks of the
+ * readable frames, those repaired, and those whose tag refused the code's first repair (each of
+ * which the decoder without the tag passed on wrong).
+ */
+const KNOWN_FRAME_TOTALS = { blocks: 1440, blocksOk: 779, refused: 249 };
 
 const FIXTURE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/modem-golden.json.gz');
 
@@ -100,16 +108,6 @@ interface Golden {
   rs: Array<[string, [number, string] | null]>;
   homography: Array<number[] | null>;
   constellations: Record<string, { symbols: number[][]; minDistance: number } | null>;
-  frames: Array<{
-    sent: string;
-    capture: string;
-    fiducials: { points: number[][]; coreAreas: number[] } | null;
-    acquire: string | { homography: number[]; palette: number[] };
-    grid: string[] | null;
-    hard: unknown;
-    soft: unknown;
-    soft96: unknown;
-  }>;
   probe: Array<{ index: number; seen: Array<number | null>; report: unknown }>;
   mutualInformation: number[];
   crosstalk: { fits: unknown[]; splits: string[][]; calibration: unknown };
@@ -120,92 +118,14 @@ const golden = JSON.parse(zlib.gunzipSync(fs.readFileSync(FIXTURE)).toString('ut
 /** Values as the fixture stores them: NaN and infinities become null, typed arrays plain arrays. */
 const json = (value: unknown): unknown => JSON.parse(JSON.stringify(value) ?? 'null');
 
-const IO_FIDUCIALS = 0;
-const IO_CORES = 8;
-const IO_HOMOGRAPHY = 12;
-const IO_PALETTE = 21;
 const IO_OUT = 72;
 const IO_IN = 128;
-const ACQUIRE_FAILURES = ['no-fiducials', 'no-header', 'low-contrast', 'unsupported-version', 'unknown-constellation'];
 
 let raw: WasmInstance;
 let rx: number;
 const io = (): Float64Array => new Float64Array(raw.memory.buffer, raw.fn('modem_rx_io')(rx), 256);
 const input = (length: number): Uint8Array => new Uint8Array(raw.memory.buffer, raw.fn('modem_rx_input')(rx, length), length);
 const output = (length: number): Uint8Array => new Uint8Array(raw.memory.buffer, raw.fn('modem_rx_output')(rx), length).slice();
-
-function summary(d: DecodedFrame): unknown {
-  return d.ok ? { header: d.header, blocks: d.blocks.map((b) => (b ? fnv1a(b) : null)), blocksOk: d.blocksOk, erasures: d.erasures, corrected: d.corrected } : { reason: d.reason };
-}
-
-/** The module's own fiducial search and header read, through its raw exports. */
-function acquire(image: RgbaImage, geometries: readonly { cols: number; rows: number }[]): { fiducials: unknown; acquire: unknown } {
-  const ptr = raw.fn('modem_rx_image')(rx, image.width, image.height);
-  new Uint8Array(raw.memory.buffer, ptr, image.data.length).set(image.data);
-  geometries.forEach((g, i) => io().set([g.cols, g.rows], IO_IN + 2 * i));
-  const status = raw.fn('modem_rx_acquire')(rx, geometries.length);
-  const block = io();
-  const fiducials =
-    block[IO_CORES] < 0
-      ? null
-      : { points: [0, 1, 2, 3].map((i) => [block[IO_FIDUCIALS + 2 * i], block[IO_FIDUCIALS + 2 * i + 1]]), coreAreas: Array.from(block.subarray(IO_CORES, IO_CORES + 4)) };
-  if (status !== 0) return { fiducials, acquire: ACQUIRE_FAILURES[status - 1] };
-  const header = new Uint8Array(raw.memory.buffer, raw.fn('modem_rx_header')(rx), 18);
-  const symbols = 1 << (header[2] & 7);
-  return { fiducials, acquire: { homography: Array.from(block.subarray(IO_HOMOGRAPHY, IO_HOMOGRAPHY + 9)), palette: Array.from(block.subarray(IO_PALETTE, IO_PALETTE + symbols * 3)) } };
-}
-
-interface DecodeSummary {
-  reason?: string;
-  header?: unknown;
-  blocks?: Array<string | null>;
-  blocksOk?: number;
-  erasures?: number;
-  corrected?: number;
-}
-
-/** Blocks where the module's decode differs from the recorded one, by what the module did instead. */
-interface BlockChanges {
-  /** `rs.ts` gave wrong bytes; the module gives none. */
-  refused: number;
-  /** `rs.ts` gave wrong bytes at its first erasure budget; the module refused those and repaired the block right with a smaller one. */
-  repaired: number;
-}
-
-/**
- * Compares a frame decode with the recorded one. They must be the same, except where `rs.ts`
- * repaired a block into the wrong bytes past the code's bound: there the module gives no bytes or
- * the right ones. The erasures and corrections then differ by what was spent on that block.
- * @param got - The module's decode.
- * @param want - The recorded decode.
- * @param payload - What was sent.
- * @param packetBytes - Data bytes per block.
- * @param label - For failure messages.
- * @param changes - Tally of the differences, updated in place.
- */
-function compareDecode(got: DecodeSummary, want: DecodeSummary, payload: Uint8Array, packetBytes: number, label: string, changes: BlockChanges): void {
-  if (JSON.stringify(got) === JSON.stringify(want)) return;
-  expect(got.reason, label).toBeUndefined();
-  expect(got.header, label).toEqual(want.header);
-  const gotBlocks = got.blocks ?? [];
-  const wantBlocks = want.blocks ?? [];
-  expect(gotBlocks.length, label).toBe(wantBlocks.length);
-  let refused = 0;
-  wantBlocks.forEach((block, b) => {
-    if (gotBlocks[b] === block) return;
-    const right = fnv1a(payload.subarray(b * packetBytes, (b + 1) * packetBytes));
-    expect(block, `${label} block ${b}: rs.ts gave bytes`).not.toBeNull();
-    expect(block, `${label} block ${b}: rs.ts was wrong`).not.toBe(right);
-    if (gotBlocks[b] === null) {
-      refused++;
-      changes.refused++;
-    } else {
-      expect(gotBlocks[b], `${label} block ${b}`).toBe(right);
-      changes.repaired++;
-    }
-  });
-  expect(got.blocksOk, label).toBe((want.blocksOk ?? 0) - refused);
-}
 
 function reportOf(report: ProbeReport): unknown {
   const strip = <T extends { pattern: { index: number } }>(list: T[]): unknown[] => list.map((r) => ({ ...r, pattern: r.pattern.index }));
@@ -271,17 +191,11 @@ describe('optical modem module against the TypeScript kernels it replaced (#1198
 
   // One test per profile and per probe run: under CI's coverage instrumentation the simulated
   // captures are slow, and a single test over the whole corpus ran past its timeout.
-  const frameChanges: BlockChanges = { refused: 0, repaired: 0 };
-  const frameCorpus = frameSpecs().map((spec, i) => ({ spec, i }));
-
-  it('has a recorded result for every frame of the simulation corpus', () => {
-    expect(golden.frames).toHaveLength(frameCorpus.length);
-  });
-
-  it.each([0, 1, 2])('encodes, finds, samples and decodes profile %i of the simulation corpus as codec.ts, locate.ts and sample.ts did', (profile) => {
-    const changes = frameChanges;
-    frameCorpus.filter(({ spec }) => spec.profile === profile).forEach(({ spec, i }) => {
-      const want = golden.frames[i];
+  const frameTotals = { blocks: 0, blocksOk: 0, refused: 0 };
+  const frameCorpus = frameSpecs();
+  it.each([0, 1, 2])('decodes profile %i of the simulation corpus without a wrong block', (profile) => {
+    frameCorpus.forEach((spec, i) => {
+      if (spec.profile !== profile) return;
       const base = MODEM_PROFILES[spec.profile];
       const shape = { ...base, parity: base.parity - spec.parityShift, packetBytes: base.packetBytes + spec.parityShift };
       const capacity = frameCapacity(shape);
@@ -290,27 +204,21 @@ describe('optical modem module against the TypeScript kernels it replaced (#1198
       const next = spec.torn ? encodeModemFrame(shape, framePayload(capacity.payloadBytes, spec.seed + 1000), CORPUS_SESSION, spec.seed + 1, 4) : undefined;
       const capture = rotate(simulateCapture(sent, spec.preset, { pixelsPerCell: spec.pixelsPerCell, cellPitch: 4, seed: spec.seed, next }), spec.turns);
       const geometries = spec.turns ? MODEM_PROFILES : [shape];
-      const found = acquire(capture, geometries);
-      let grid: string[] | null = null;
-      if (typeof found.acquire === 'object' && found.acquire) {
-        const { homography, palette } = found.acquire as { homography: number[]; palette: number[] };
-        const g = runReferenceKernel(capture, { cols: shape.cols, dataRows: shape.rows - 18, rowOffset: 9, homography: Float32Array.from(homography), palette: Int32Array.from(palette) });
-        grid = [fnv1a(g.symbols), fnv1a(g.confidence), fnv1a(g.means)];
+      for (const options of [{ geometries, soft: false }, { geometries }, { geometries, threshold: 96 }]) {
+        const decoded = decodeModemFrame(capture, options);
+        if (!decoded.ok) continue;
+        frameTotals.blocks += decoded.blocks.length;
+        frameTotals.blocksOk += decoded.blocksOk;
+        frameTotals.refused += decoded.refused;
+        decoded.blocks.forEach((block, b) => {
+          if (block) expect(fnv1a(block), `frame ${i} block ${b}`).toBe(fnv1a(payload.subarray(b * shape.packetBytes, (b + 1) * shape.packetBytes)));
+        });
       }
-      const got = { sent: fnv1a(sent.data), capture: fnv1a(capture.data), ...found, grid };
-      const { hard, soft, soft96, ...rest } = want;
-      expect(json(got), `frame ${i}`).toEqual(rest);
-      const decodes: Array<[string, DecodeSummary, unknown]> = [
-        ['hard', summary(decodeModemFrame(capture, { geometries, soft: false })), hard],
-        ['soft', summary(decodeModemFrame(capture, { geometries })), soft],
-        ['soft96', summary(decodeModemFrame(capture, { geometries, threshold: 96 })), soft96],
-      ];
-      for (const [label, decoded, recorded] of decodes) compareDecode(json(decoded) as DecodeSummary, recorded as DecodeSummary, payload, shape.packetBytes, `frame ${i} ${label}`, changes);
     });
   }, 120_000);
 
-  it('changes only the pinned blocks where rs.ts returned wrong bytes', () => {
-    expect(frameChanges).toEqual(KNOWN_FRAME_BLOCK_CHANGES);
+  it('repairs and refuses the pinned number of blocks over the simulation corpus', () => {
+    expect(frameTotals).toEqual(KNOWN_FRAME_TOTALS);
   });
 
   const probeCorpus = probeSpecs().map((spec, i) => ({ spec, i }));

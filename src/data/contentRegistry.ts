@@ -154,9 +154,9 @@ export const contentRegistry: Record<string, ToolContent> = {
     "image": "/og/email-qr-code.png",
     "imageAlt": "Preview of the Email QR Code Generator tool",
     "features": [
-      "Generate Pre-filled Emails",
-      "Secure Client-Side",
-      "Custom Design"
+      "Opens a ready-to-send email",
+      "Subject, message, CC and BCC",
+      "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.UtilitiesApplication,
@@ -173,9 +173,9 @@ export const contentRegistry: Record<string, ToolContent> = {
     "image": "/og/event-qr-code.png",
     "imageAlt": "Preview of the Event QR Code Generator tool",
     "features": [
-      "Generate Calendar Event QR",
-      "Secure Client-Side",
-      "Custom Design"
+      "Adds the event to a calendar",
+      "Time zones and calendar links",
+      "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.UtilitiesApplication,
@@ -189,15 +189,14 @@ export const contentRegistry: Record<string, ToolContent> = {
     "description": "Make free QR codes that never expire. No sign-up, no ads, no tracking: every code is made in your browser. Add colours, logos and image mosaics.",
     "seoTitle": "Free QR Code Generator: No Sign-up, Never Expires | QRCraftly",
     "heading": "Free QR Code Generator",
-    "intro": "QRCraftly makes static QR codes that work forever: no trial that switches your printed codes off, no account, no watermark and no ads. Everything is generated in your browser, so your links, Wi-Fi passwords and contact details never reach our servers. Style your code with colours, shapes, a logo or your own image, and check that it scans before you download it.",
+    "intro": "QRCraftly makes static QR codes that keep working: no trial, no account, no watermark and no ads. Codes are made in your browser, so what you type never reaches our servers.",
     "image": "/og/index.png",
     "imageAlt": "Preview of the QRCraftly Free QR Code Generator",
     "features": [
-      "Custom QR Codes",
-      "WiFi QR Codes",
-      "vCard",
-      "Secure Client-Side Generation",
-      "Artistic Styles"
+      "Links, Wi-Fi, contacts, events and more",
+      "Colours, shapes, logos and image mosaics",
+      "Scan check before you download",
+      "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.UtilitiesApplication,
@@ -214,9 +213,9 @@ export const contentRegistry: Record<string, ToolContent> = {
     "image": "/og/location-qr-code.png",
     "imageAlt": "Preview of the Location QR Code Generator tool",
     "features": [
-      "Generate Location QR",
-      "Secure Client-Side",
-      "Custom Design"
+      "Opens a place in a maps app",
+      "Latitude and longitude",
+      "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.UtilitiesApplication,
@@ -233,9 +232,9 @@ export const contentRegistry: Record<string, ToolContent> = {
     "image": "/og/meeting-qr-code.png",
     "imageAlt": "Preview of the Meeting QR Code Generator tool",
     "features": [
-      "Generate Virtual Meeting QR",
-      "Zoom/Teams/Meet Support",
-      "Secure Client-Side"
+      "Opens your online meeting",
+      "Zoom, Teams and Google Meet links",
+      "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.UtilitiesApplication,
@@ -246,15 +245,16 @@ export const contentRegistry: Record<string, ToolContent> = {
     "id": "payment-qr-code",
     "name": "Payment QR Code Generator",
     "url": getPublicDomain() + "/payment-qr-code",
-    "description": "Make a crypto payment QR code in seconds. Bitcoin, Ethereum, Solana and Litecoin. Free forever, no ads, no sign-up, and your address stays in your browser.",
-    "seoTitle": "Free Crypto Payment QR Code Generator: No Sign-up, Never Expires | QRCraftly",
-    "heading": "Free Crypto Payment QR Code Generator",
+    "description": "Make a payment QR code for crypto, SEPA bank transfers, PayPal, Venmo or Cash App. Free, no ads, no sign-up, and nothing leaves your browser.",
+    "seoTitle": "Free Payment QR Code Generator: No Sign-up, Never Expires | QRCraftly",
+    "heading": "Free Payment QR Code Generator",
     "image": "/og/payment-qr-code.png",
     "imageAlt": "Preview of the Payment QR Code Generator tool",
     "features": [
-      "Generate Crypto Payment QR",
-      "Bitcoin/Ethereum Support",
-      "Secure Client-Side"
+      "Crypto payment requests",
+      "SEPA bank transfers (EPC QR)",
+      "PayPal, Venmo and Cash App links",
+      "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.BusinessApplication,
@@ -271,9 +271,8 @@ export const contentRegistry: Record<string, ToolContent> = {
     "image": "/og/phone-qr-code.png",
     "imageAlt": "Preview of the Phone QR Code Generator tool",
     "features": [
-      "Generate Click-to-Call QR",
-      "Secure Client-Side",
-      "Custom Design"
+      "Opens the dialler with your number",
+      "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.UtilitiesApplication,
@@ -290,9 +289,8 @@ export const contentRegistry: Record<string, ToolContent> = {
     "image": "/og/sms-qr-code.png",
     "imageAlt": "Preview of the SMS QR Code Generator tool",
     "features": [
-      "Generate Pre-filled SMS",
-      "Secure Client-Side",
-      "Custom Design"
+      "Opens a text message ready to send",
+      "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.UtilitiesApplication,
@@ -303,15 +301,15 @@ export const contentRegistry: Record<string, ToolContent> = {
     "id": "social-qr-code",
     "name": "Social QR Code Generator",
     "url": getPublicDomain() + "/social-qr-code",
-    "description": "Make a social media QR code in seconds. Opens your Instagram, X or TikTok profile. Free forever, no ads, no sign-up, and your handle stays in your browser.",
+    "description": "Make a social media QR code that opens your Instagram, X, TikTok, LinkedIn or other profile. Free, no ads, no sign-up, nothing uploaded.",
     "seoTitle": "Free Social Media QR Code Generator: No Sign-up, Never Expires | QRCraftly",
     "heading": "Free Social Media QR Code Generator",
     "image": "/og/social-qr-code.png",
     "imageAlt": "Preview of the Social QR Code Generator tool",
     "features": [
-      "Generate Social Profile QR",
-      "Instagram/Twitter/TikTok Links",
-      "Secure Client-Side"
+      "Opens your profile",
+      "Instagram, X, TikTok, LinkedIn, YouTube, Facebook, WhatsApp and GitHub",
+      "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.SocialNetworkingApplication,
@@ -322,14 +320,14 @@ export const contentRegistry: Record<string, ToolContent> = {
     "id": "bulk-csv-qr-code",
     "name": "Bulk CSV Batch QR Code Generator",
     "url": getPublicDomain() + "/bulk-csv-qr-code",
-    "description": "Generate bulk batch QR codes from CSV or TXT files directly in your browser. Download as ZIP archive.",
+    "description": "Make one QR code for each row of a CSV or TXT file, in your browser, and download them all as a ZIP.",
     "seoTitle": "Free Bulk CSV Batch QR Code Generator | Privacy First - QRCraftly",
     "image": "/og/bulk-csv-qr-code.png",
     "imageAlt": "Preview of Bulk CSV Batch QR Code Generator tool",
     "features": [
-      "Batch CSV QR Generation",
-      "ZIP Package Download",
-      "Zero Network Privacy"
+      "One QR code per row of a CSV or TXT file",
+      "Download them all as a ZIP",
+      "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.UtilitiesApplication,
@@ -346,9 +344,9 @@ export const contentRegistry: Record<string, ToolContent> = {
     "image": "/og/text-qr-code.png",
     "imageAlt": "Preview of the Text QR Code Generator tool",
     "features": [
-      "Convert Text to QR",
-      "Secure Client-Side",
-      "Custom Design"
+      "Shows your text when scanned",
+      "Works offline",
+      "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.UtilitiesApplication,
@@ -365,9 +363,9 @@ export const contentRegistry: Record<string, ToolContent> = {
     "image": "/og/vcard-qr-code.png",
     "imageAlt": "Preview of the vCard QR Code Generator tool",
     "features": [
-      "Generate vCard Contact QR",
-      "Secure Client-Side",
-      "Custom Design"
+      "Saves your contact with one scan",
+      "vCard 2.1, 3.0, 4.0 and MECARD",
+      "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.BusinessApplication,
@@ -384,9 +382,9 @@ export const contentRegistry: Record<string, ToolContent> = {
     "image": "/og/wifi-qr-code.png",
     "imageAlt": "Preview of the WiFi QR Code Generator tool",
     "features": [
-      "Generate WiFi Access QR Codes",
-      "WPA/WPA2 Support",
-      "Hidden SSID Support"
+      "Guests join your Wi-Fi by scanning",
+      "WPA, WEP, Enterprise and open networks",
+      "Hidden networks"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
     "schemaCategory": SchemaCategory.UtilitiesApplication,

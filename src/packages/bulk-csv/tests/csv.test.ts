@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { parseCsv, CsvParseError, MAX_BULK_CSV_ROWS, MAX_BULK_CSV_CHARS } from '../index';
+import { parseCsv, CsvParseError, MAX_BULK_CSV_ROWS, MAX_BULK_CSV_CHARS, detectDelimiter, decodeCsvBytes } from '../index';
 
 describe('parseCsv', () => {
   it('maps data rows to the header row', () => {
@@ -88,9 +88,9 @@ describe('parseCsv', () => {
   });
 
   it('returns an empty table for empty or blank input', () => {
-    expect(parseCsv('')).toEqual({ headers: [], rows: [], totalRows: 0, truncated: false });
-    expect(parseCsv('\r\n\r\n')).toEqual({ headers: [], rows: [], totalRows: 0, truncated: false });
-    expect(parseCsv('only,headers')).toEqual({ headers: ['only', 'headers'], rows: [], totalRows: 0, truncated: false });
+    expect(parseCsv('')).toEqual({ headers: [], rows: [], totalRows: 0, truncated: false, rowNumbers: [], delimiter: ',' });
+    expect(parseCsv('\r\n\r\n')).toEqual({ headers: [], rows: [], totalRows: 0, truncated: false, rowNumbers: [], delimiter: ',' });
+    expect(parseCsv('only,headers')).toEqual({ headers: ['only', 'headers'], rows: [], totalRows: 0, truncated: false, rowNumbers: [], delimiter: ',' });
   });
 
   it('throws CsvParseError on an unterminated quoted field with its line number', () => {
@@ -119,5 +119,79 @@ describe('parseCsv', () => {
     expect(table.rows).toHaveLength(MAX_BULK_CSV_ROWS);
     expect(table.totalRows).toBe(MAX_BULK_CSV_ROWS + 3);
     expect(table.truncated).toBe(true);
+  });
+});
+
+describe('delimiter detection (#1287)', () => {
+  it('reads semicolon and tab separated files', () => {
+    const expected = [
+      { URL: 'https://example.com/1', Name: 'Code1' },
+      { URL: 'https://example.com/2', Name: 'Code2' },
+    ];
+    const semi = parseCsv('URL;Name\nhttps://example.com/1;Code1\nhttps://example.com/2;Code2');
+    expect(semi.delimiter).toBe(';');
+    expect(semi.rows).toEqual(expected);
+    const tab = parseCsv('URL\tName\nhttps://example.com/1\tCode1\nhttps://example.com/2\tCode2');
+    expect(tab.delimiter).toBe('\t');
+    expect(tab.rows).toEqual(expected);
+  });
+
+  it('counts only delimiters outside quotes in the header, and prefers a comma on a tie', () => {
+    expect(detectDelimiter('"a;b;c",d\n1;2;3;4;5,6')).toBe(',');
+    expect(detectDelimiter('a\nb')).toBe(',');
+    expect(detectDelimiter('\n\nurl;name\n')).toBe(';');
+    expect(detectDelimiter('a,b;c\n')).toBe(',');
+  });
+
+  it('keeps an explicit delimiter', () => {
+    expect(parseCsv('a;b,c\n1;2,3', { delimiter: ',' }).headers).toEqual(['a;b', 'c']);
+  });
+});
+
+describe('row numbers and odd headers (#1291)', () => {
+  it('numbers rows as a spreadsheet does, counting blank lines', () => {
+    const table = parseCsv('URL,Name\nhttps://example.com/1,A\n\n\njavascript:alert(1),B');
+    expect(table.rowNumbers).toEqual([1, 4]);
+  });
+
+  it('counts a quoted multi-line field as one row', () => {
+    expect(parseCsv('a,b\n"x\ny",1\nz,2').rowNumbers).toEqual([1, 2]);
+  });
+
+  it('treats __proto__ and constructor as ordinary columns', () => {
+    const table = parseCsv('__proto__,constructor\nhttps://example.com/1,x');
+    expect(table.rows[0].__proto__).toBe('https://example.com/1');
+    expect(table.rows[0].constructor).toBe('x');
+    expect(Object.keys(table.rows[0])).toEqual(['__proto__', 'constructor']);
+  });
+});
+
+describe('decodeCsvBytes (#1287)', () => {
+  const utf16le = (text: string, bom: boolean) => {
+    const out = new Uint8Array((bom ? 2 : 0) + text.length * 2);
+    if (bom) out.set([0xff, 0xfe]);
+    for (let i = 0; i < text.length; i++) {
+      out[(bom ? 2 : 0) + i * 2] = text.charCodeAt(i) & 0xff;
+      out[(bom ? 2 : 0) + i * 2 + 1] = text.charCodeAt(i) >> 8;
+    }
+    return out;
+  };
+  const text = 'URL\tName\r\nhttps://example.com/1\tCode1\r\n';
+
+  it('decodes UTF-16 with a byte order mark, as Excel saves "Unicode Text"', () => {
+    const decoded = decodeCsvBytes(utf16le(text, true));
+    expect(decoded).toBe(text);
+    expect(parseCsv(decoded).rows).toEqual([{ URL: 'https://example.com/1', Name: 'Code1' }]);
+    const be = new Uint8Array([0xfe, 0xff, 0x00, 0x61, 0x00, 0x2c, 0x00, 0x62]);
+    expect(decodeCsvBytes(be)).toBe('a,b');
+  });
+
+  it('decodes UTF-16LE without a byte order mark', () => {
+    expect(decodeCsvBytes(utf16le(text, false))).toBe(text);
+  });
+
+  it('reads anything else as UTF-8', () => {
+    expect(decodeCsvBytes(new TextEncoder().encode('naam,stad\nZoë,Zürich'))).toBe('naam,stad\nZoë,Zürich');
+    expect(decodeCsvBytes(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]))).toBe('a');
   });
 });
