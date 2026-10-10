@@ -1,6 +1,7 @@
 import { type QRConfig, type QRModules, QRStyle } from '@/types';
 import { getLogoMetrics, getIsCoveredByLogo, isAlignmentPatternZone } from './utils';
 import { renderModules } from './modules';
+import { seedRandom } from './prng';
 import {
   drawRoundRect,
   drawRoughRect,
@@ -78,24 +79,6 @@ export function isBridgeCell(r: number, c: number, size: number): boolean {
   if (r === size - 4 && c === 8) return true;
 
   return false;
-}
-
-/**
- * Deterministic seed-based pseudo-random number generator (Mulberry32).
- * Ensures that the generated maze is stable for a given QR code payload.
- */
-function seedRandom(seedStr: string) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < seedStr.length; i++) {
-    h = Math.imul(h ^ seedStr.charCodeAt(i), 16777619);
-  }
-  let seed = h >>> 0;
-  return function () {
-    let t = (seed += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 /**

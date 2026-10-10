@@ -54,7 +54,7 @@ export const renderEyes = (
     }
   }
 
-  const drawEyePattern = (r: number, c: number) => {
+  const drawEyePattern = (r: number, c: number, eyeId: string) => {
     const x = drawX + c * cellSize;
     const y = drawY + r * cellSize;
     const size = 7 * cellSize;
@@ -104,13 +104,14 @@ export const renderEyes = (
       cellSize,
       config.style,
       ballColor,
-      holeColor
+      holeColor,
+      eyeId
     );
   };
 
   // Draw Eyes (Last to ensure they overlap nicely if needed)
-  drawEyePattern(0, 0);
-  drawEyePattern(0, moduleCount - 7);
-  drawEyePattern(moduleCount - 7, 0);
+  drawEyePattern(0, 0, 'top-left');
+  drawEyePattern(0, moduleCount - 7, 'top-right');
+  drawEyePattern(moduleCount - 7, 0, 'bottom-left');
 };
 
