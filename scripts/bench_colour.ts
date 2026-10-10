@@ -187,7 +187,7 @@ function render(rows: Row[], fallback: ColourRunResult, correction: Array<Array<
     ''
   );
   parts.push(
-    `Decode cost. On the harsh camera with tracked reads, Colour spends ${colour.onClock.decodeMsPerFrame} ms of real time per decoded frame (${colour.onClock.planeMsPerFrame} ms of it in plane decodes) against ${mono.onClock.decodeMsPerFrame} ms for mono, with a budget of ${budget} ms. A receiver that cannot finish a frame in time drops the next ones, and the fountain code makes up for them with later frames, so goodput falls rather than the transfer failing. The phone numbers depend on how fast the channel split, the correction and the reads run in a browser worker there, and how many workers share the crops, which this bench does not measure.`,
+    `Decode cost. On the harsh camera with tracked reads, Colour spends ${colour.onClock.decodeMsPerFrame} ms of real time per decoded frame (${colour.onClock.planeMsPerFrame} ms of it in plane decodes) against ${mono.onClock.decodeMsPerFrame} ms for mono, with a budget of ${budget} ms. The plane decodes are no longer the cost: the other ${(colour.onClock.decodeMsPerFrame - colour.onClock.planeMsPerFrame).toFixed(1)} ms is the channel split and correction and the beacon reads, so that is what to speed up next. A receiver that cannot finish a frame in time drops the next ones, and the fountain code makes up for them with later frames, so goodput falls rather than the transfer failing. The phone numbers depend on how fast the channel split, the correction and the reads run in a browser worker there, and how many workers share the crops, which this bench does not measure.`,
     ''
   );
   parts.push(
