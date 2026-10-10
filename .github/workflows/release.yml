@@ -144,4 +144,5 @@ jobs:
       - name: Run Smoke Tests
         env:
           PLAYWRIGHT_TEST_BASE_URL: ${{ matrix.base_url }}
+          EXPECTED_VERSION: ${{ needs.publish.outputs.version }}
         run: bash scripts/ci/run_smoke_tests.sh

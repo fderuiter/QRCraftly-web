@@ -29,6 +29,21 @@ In the generated `_headers` file, only the global `/*` rule sets `Content-Securi
 
 `public/_headers` sends `Permissions-Policy: camera=(self), microphone=(), geolocation=(self), payment=()`. The camera is available to the site itself for the optical scanner, and to no embedded or cross-origin frame. Geolocation is limited to the site itself, for "Use Current Location" on the Location QR type. The microphone and payment are disabled, since no feature uses them. An empty allowlist `()` turns a feature off for the site itself too, so never use `()` for a feature the app calls. `tests/security_headers.test.ts` checks these values.
 
+## Production Headers & Deployment Integrity
+
+The headers in `public/_headers` only matter if the host sends them, so the Verify Production Deployment job checks the live site after every merge to `main`, and the Release workflow checks `qrcraftly.com` after every release (`e2e/production-headers.spec.ts`, [#1353](https://github.com/fderuiter/QRCraftly-web/issues/1353)). Over plain HTTP, without a browser that could bypass the CSP, it checks:
+
+- every page, the 404 page, `sw.js`, `manifest.json` and both kinds of redirect (a retired route from `_redirects` and a dropped trailing slash) carry each header in the `/*` block of `public/_headers` with the same value;
+- every page sends a Content Security Policy with `default-src 'self'`, `object-src 'none'`, no `'unsafe-inline'` or `'unsafe-eval'` scripts and no third-party origin, identical to the page's own `<meta http-equiv>` policy;
+- only `*.workers.dev` hosts send `X-Robots-Tag: noindex`;
+- `/version.json` reports the commit (or release) being verified, and every file the service worker precaches is still served byte for byte: its SHA-256 must match the revision `sw.js` was built with.
+
+`sw.js` is generated after every build step that rewrites HTML or `_headers`, and its build hash covers `_headers` and `_redirects` ([#1261](https://github.com/fderuiter/QRCraftly-web/issues/1261)), so a header-only fix still installs a new service worker and replaces returning visitors' cached homepage.
+
+**Drift.** A failure in that job means production is not serving what `main` built: a header missing or changed by a dashboard rule (Transform Rules, Page Rules, a custom domain setting), a file changed after the build, or a deployment that did not come from Workers Builds. The failure lists every header or file that differs. To check by hand, compare `curl -sI https://qrcraftly.com/` with `public/_headers` and the `commit` in `https://qrcraftly.com/version.json` with `main`.
+
+**Recovery.** First stop the cause: remove the dashboard rule, or find who deployed and with which token. Then put production back on a known build: roll back to the previous version in the Cloudflare dashboard (Workers & Pages, `qrcraftly`, Deployments) or with `wrangler rollback`, or merge a revert PR so Workers Builds redeploys `main`. Re-run the Verify Production Deployment job to confirm. These steps need Cloudflare access, so they are the owner's to take.
+
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability or a privacy leak, please report it immediately.
