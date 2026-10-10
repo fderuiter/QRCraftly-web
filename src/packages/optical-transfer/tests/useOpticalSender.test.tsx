@@ -418,6 +418,55 @@ describe('useOpticalSender', () => {
       act(() => result.current.startTransfer());
       await waitFor(() => expect(result.current.steerState).toEqual({ status: 'one-way', reason: 'unavailable' }));
     });
+
+    // A transfer restarted while the camera prompt is open must not leave either camera on (#1293).
+    it.each(['together', 'newest first', 'oldest first'] as const)('stops both webcams after Stop when the grants arrive %s', async (order) => {
+      const webcams = [fakeWebcam(), fakeWebcam()];
+      const grants: Array<() => void> = [];
+      const requestWebcam = vi.fn(
+        () =>
+          new Promise<MediaStream>((resolve) => {
+            const webcam = webcams[grants.length];
+            grants.push(() => resolve(webcam.stream));
+          })
+      );
+      const { result, unmount } = await startSteered(requestWebcam);
+      act(() => result.current.startTransfer());
+      await waitFor(() => expect(requestWebcam).toHaveBeenCalledTimes(1));
+      act(() => result.current.startTransfer());
+      await waitFor(() => expect(requestWebcam).toHaveBeenCalledTimes(2));
+
+      const [oldest, newest] = grants;
+      const flush = () => act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      if (order === 'together') {
+        oldest();
+        newest();
+        await flush();
+      } else if (order === 'newest first') {
+        newest();
+        await flush();
+        oldest();
+        await flush();
+      } else {
+        oldest();
+        await flush();
+        newest();
+        await flush();
+      }
+
+      // The newest transfer steers with its own camera; the stale grant is stopped at once.
+      await waitFor(() => expect(result.current.steerState).toEqual({ status: 'listening' }));
+      expect(webcams[0].track.readyState).toBe('ended');
+      expect(webcams[1].track.readyState).toBe('live');
+
+      act(() => result.current.stopTransfer());
+      unmount();
+      expect(webcams.map((webcam) => webcam.track.readyState)).toEqual(['ended', 'ended']);
+      expect(webcams[0].track.stop).toHaveBeenCalledTimes(1);
+      expect(webcams[1].track.stop).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('triggers the self-healing watch loop when frame generation is stalled for 100ms', async () => {

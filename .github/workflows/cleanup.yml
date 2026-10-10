@@ -43,28 +43,47 @@ jobs:
 
             // Branches backing an open PR stay, whatever their merge state.
             const openPulls = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', per_page: 100 });
-            const withOpenPr = new Set(openPulls.filter((pr) => pr.head.repo && pr.head.repo.full_name === `${owner}/${repo}`).map((pr) => pr.head.ref));
+            const sameRepo = (pr) => pr.head.repo && pr.head.repo.full_name === `${owner}/${repo}`;
+            const withOpenPr = new Set(openPulls.filter(sameRepo).map((pr) => pr.head.ref));
+
+            // main takes squash merges only, so a merged branch's own commits never reach it and
+            // compareCommits reports it as diverged. A branch counts as merged when a merged PR
+            // came from it and the branch still points at that PR's last commit.
+            const closedPulls = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'closed', per_page: 100 });
+            const mergedHeads = new Map();
+            for (const pr of closedPulls) {
+              if (!pr.merged_at || !sameRepo(pr)) continue;
+              const shas = mergedHeads.get(pr.head.ref) || new Map();
+              shas.set(pr.head.sha, new Date(pr.merged_at).getTime());
+              mergedHeads.set(pr.head.ref, shas);
+            }
 
             for (const branch of branches) {
               if (longLived.has(branch.name) || withOpenPr.has(branch.name)) continue;
 
               try {
-                // Feature branches merge into the default branch (main), so a branch whose head
-                // is already contained in it is merged.
-                const { data: compare } = await github.rest.repos.compareCommits({
-                  owner,
-                  repo,
-                  base: defaultBranch,
-                  head: branch.name
-                });
+                // Leave anything that changed in the last week.
+                const mergedAt = mergedHeads.get(branch.name)?.get(branch.commit.sha);
+                if (mergedAt !== undefined) {
+                  if (Date.now() - mergedAt < minAgeMs) continue;
+                } else {
+                  // No merged PR: the branch is merged only if its head is already in main
+                  // (identical or behind), which also covers a branch with no commits of its own.
+                  const { data: compare } = await github.rest.repos.compareCommits({
+                    owner,
+                    repo,
+                    base: defaultBranch,
+                    head: branch.name
+                  });
 
-                if (compare.status !== 'identical' && compare.status !== 'behind') continue;
+                  if (compare.status !== 'identical' && compare.status !== 'behind') continue;
 
-                // A branch cut moments ago has no commits of its own yet and also looks merged;
-                // leave anything whose head commit is younger than a week.
-                const { data: head } = await github.rest.repos.getCommit({ owner, repo, ref: branch.commit.sha });
-                const committedAt = new Date(head.commit.committer.date).getTime();
-                if (Date.now() - committedAt < minAgeMs) continue;
+                  // A branch cut moments ago has no commits of its own yet and also looks merged;
+                  // leave anything whose head commit is younger than a week.
+                  const { data: head } = await github.rest.repos.getCommit({ owner, repo, ref: branch.commit.sha });
+                  const committedAt = new Date(head.commit.committer.date).getTime();
+                  if (Date.now() - committedAt < minAgeMs) continue;
+                }
 
                 console.log(`Deleting merged branch: ${branch.name}`);
                 await github.rest.git.deleteRef({

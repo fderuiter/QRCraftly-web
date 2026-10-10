@@ -15,6 +15,12 @@ function write(cwd: string, file: string, content: string): void {
   fs.writeFileSync(full, content, 'utf8');
 }
 
+// Inside a git hook (a commit from a worktree runs the unit suite), git exports GIT_DIR,
+// GIT_INDEX_FILE and friends. Left in place, every git call below, and the script's own,
+// would act on the repository being committed to instead of the temp repos (#1229).
+const inheritedGitEnv = Object.keys(process.env).filter((key) => key.startsWith('GIT_'));
+const savedGitEnv = new Map(inheritedGitEnv.map((key) => [key, process.env[key]]));
+
 describe('scripts/ci/changed_files.js', () => {
   let tmp: string;
   let origin: string;
@@ -22,6 +28,8 @@ describe('scripts/ci/changed_files.js', () => {
   let baseSha: string;
 
   beforeAll(() => {
+    for (const key of inheritedGitEnv) delete process.env[key];
+
     tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'changed-files-'));
     origin = path.join(tmp, 'origin');
     repo = path.join(tmp, 'repo');
@@ -55,6 +63,7 @@ describe('scripts/ci/changed_files.js', () => {
 
   afterAll(() => {
     fs.rmSync(tmp, { recursive: true, force: true });
+    for (const [key, value] of savedGitEnv) process.env[key] = value;
   });
 
   const expectedChanges = ['dir/with space.txt', 'edit.txt', 'new-name.txt'];
