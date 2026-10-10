@@ -98,55 +98,55 @@ A row with no clean frames was not readable in this channel: the fiducials or th
 
 ## Codec: blocks repaired and goodput
 
-Each row encodes frames of one profile (Reed-Solomon blocks, interleaved and whitened), captures them through the simulated channel and decodes them. "Readable" is how many frames had their fiducials and header read. "Hard" has the code find every wrong byte; "soft" marks bytes carried by a cell with confidence under 32 (of 255) as erasures. Goodput is the data bytes in repaired blocks times 30 frames per second, in kilobytes (1000 bytes) per second, and assumes every camera frame is a fresh, untorn frame (the probe measures how many really are). It counts data only, before the outer code's overhead.
+Each row encodes frames of one profile (Reed-Solomon blocks, interleaved and whitened), captures them through the simulated channel and decodes them. "Readable" is how many frames had their fiducials and header read. "Hard" has the code find every wrong byte; "soft" marks bytes carried by a cell with confidence under 32 (of 255) as erasures. Goodput is the data bytes in repaired blocks times 30 frames per second, in kilobytes (1000 bytes) per second, and assumes every camera frame is a fresh, untorn frame (the probe measures how many really are). It counts data only, before the outer code's overhead. Every block carries a CRC-32 tag over its session, frame sequence, index and data ([ADR 0043](adr/0043-optical-modem-block-tag.md)). "Refused by tag" counts blocks, hard and soft together, whose first repair the code accepted but whose tag did not match: without the tag they would have reached the outer code wrong. "Wrong accepts" counts blocks returned as repaired whose bytes differ from the bytes sent; it must be zero.
 
-| Profile   | Channel | Camera px per cell | Readable | Blocks repaired, hard | Blocks repaired, soft | Goodput KB/s (of full frame) |
-| --------- | ------- | ------------------ | -------- | --------------------- | --------------------- | ---------------------------- |
-| P2 Steady | studio  | 6.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
-| P2 Steady | studio  | 5.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
-| P2 Steady | studio  | 4.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
-| P2 Steady | studio  | 3.5                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
-| P2 Steady | studio  | 3.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
-| P2 Steady | typical | 6.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
-| P2 Steady | typical | 5.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
-| P2 Steady | typical | 4.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
-| P2 Steady | typical | 3.5                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
-| P2 Steady | typical | 3.0                | 3/3      | 0%                    | 0%                    | 0.0 of 14.4                  |
-| P2 Steady | poor    | 6.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
-| P2 Steady | poor    | 5.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 |
-| P2 Steady | poor    | 4.0                | 3/3      | 0%                    | 0%                    | 0.0 of 14.4                  |
-| P2 Steady | poor    | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 14.4                  |
-| P2 Steady | poor    | 3.0                | 0/3      | 0%                    | 0%                    | 0.0 of 14.4                  |
-| P3 Fast   | studio  | 6.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
-| P3 Fast   | studio  | 5.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
-| P3 Fast   | studio  | 4.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
-| P3 Fast   | studio  | 3.5                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
-| P3 Fast   | studio  | 3.0                | 3/3      | 8%                    | 10%                   | 3.8 of 37.4                  |
-| P3 Fast   | typical | 6.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
-| P3 Fast   | typical | 5.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
-| P3 Fast   | typical | 4.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
-| P3 Fast   | typical | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  |
-| P3 Fast   | typical | 3.0                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  |
-| P3 Fast   | poor    | 6.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 |
-| P3 Fast   | poor    | 5.0                | 3/3      | 95%                   | 100%                  | 37.4 of 37.4                 |
-| P3 Fast   | poor    | 4.0                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  |
-| P3 Fast   | poor    | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  |
-| P3 Fast   | poor    | 3.0                | 0/3      | 0%                    | 0%                    | 0.0 of 37.4                  |
-| P4 Rapid  | studio  | 6.0                | 3/3      | 100%                  | 100%                  | 86.4 of 86.4                 |
-| P4 Rapid  | studio  | 5.0                | 3/3      | 100%                  | 100%                  | 86.4 of 86.4                 |
-| P4 Rapid  | studio  | 4.0                | 3/3      | 84%                   | 94%                   | 81.6 of 86.4                 |
-| P4 Rapid  | studio  | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
-| P4 Rapid  | studio  | 3.0                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
-| P4 Rapid  | typical | 6.0                | 3/3      | 100%                  | 100%                  | 86.4 of 86.4                 |
-| P4 Rapid  | typical | 5.0                | 3/3      | 100%                  | 100%                  | 86.4 of 86.4                 |
-| P4 Rapid  | typical | 4.0                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
-| P4 Rapid  | typical | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
-| P4 Rapid  | typical | 3.0                | 2/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
-| P4 Rapid  | poor    | 6.0                | 3/3      | 31%                   | 42%                   | 36.0 of 86.4                 |
-| P4 Rapid  | poor    | 5.0                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
-| P4 Rapid  | poor    | 4.0                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
-| P4 Rapid  | poor    | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
-| P4 Rapid  | poor    | 3.0                | 0/3      | 0%                    | 0%                    | 0.0 of 86.4                  |
+| Profile   | Channel | Camera px per cell | Readable | Blocks repaired, hard | Blocks repaired, soft | Goodput KB/s (of full frame) | Refused by tag | Wrong accepts |
+| --------- | ------- | ------------------ | -------- | --------------------- | --------------------- | ---------------------------- | -------------- | ------------- |
+| P2 Steady | studio  | 6.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 | 0              | 0             |
+| P2 Steady | studio  | 5.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 | 0              | 0             |
+| P2 Steady | studio  | 4.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 | 0              | 0             |
+| P2 Steady | studio  | 3.5                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 | 0              | 0             |
+| P2 Steady | studio  | 3.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 | 0              | 0             |
+| P2 Steady | typical | 6.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 | 0              | 0             |
+| P2 Steady | typical | 5.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 | 0              | 0             |
+| P2 Steady | typical | 4.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 | 0              | 0             |
+| P2 Steady | typical | 3.5                | 3/3      | 89%                   | 100%                  | 14.4 of 14.4                 | 0              | 0             |
+| P2 Steady | typical | 3.0                | 3/3      | 0%                    | 0%                    | 0.0 of 14.4                  | 4              | 0             |
+| P2 Steady | poor    | 6.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 | 0              | 0             |
+| P2 Steady | poor    | 5.0                | 3/3      | 100%                  | 100%                  | 14.4 of 14.4                 | 0              | 0             |
+| P2 Steady | poor    | 4.0                | 3/3      | 0%                    | 0%                    | 0.0 of 14.4                  | 0              | 0             |
+| P2 Steady | poor    | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 14.4                  | 4              | 0             |
+| P2 Steady | poor    | 3.0                | 0/3      | 0%                    | 0%                    | 0.0 of 14.4                  | 0              | 0             |
+| P3 Fast   | studio  | 6.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 | 0              | 0             |
+| P3 Fast   | studio  | 5.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 | 0              | 0             |
+| P3 Fast   | studio  | 4.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 | 0              | 0             |
+| P3 Fast   | studio  | 3.5                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 | 0              | 0             |
+| P3 Fast   | studio  | 3.0                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  | 0              | 0             |
+| P3 Fast   | typical | 6.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 | 0              | 0             |
+| P3 Fast   | typical | 5.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 | 0              | 0             |
+| P3 Fast   | typical | 4.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 | 0              | 0             |
+| P3 Fast   | typical | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  | 25             | 0             |
+| P3 Fast   | typical | 3.0                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  | 39             | 0             |
+| P3 Fast   | poor    | 6.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 | 0              | 0             |
+| P3 Fast   | poor    | 5.0                | 3/3      | 100%                  | 100%                  | 37.4 of 37.4                 | 0              | 0             |
+| P3 Fast   | poor    | 4.0                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  | 39             | 0             |
+| P3 Fast   | poor    | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 37.4                  | 39             | 0             |
+| P3 Fast   | poor    | 3.0                | 0/3      | 0%                    | 0%                    | 0.0 of 37.4                  | 0              | 0             |
+| P4 Rapid  | studio  | 6.0                | 3/3      | 100%                  | 100%                  | 84.0 of 84.0                 | 0              | 0             |
+| P4 Rapid  | studio  | 5.0                | 3/3      | 100%                  | 100%                  | 84.0 of 84.0                 | 0              | 0             |
+| P4 Rapid  | studio  | 4.0                | 3/3      | 87%                   | 95%                   | 80.0 of 84.0                 | 0              | 0             |
+| P4 Rapid  | studio  | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 84.0                  | 0              | 0             |
+| P4 Rapid  | studio  | 3.0                | 3/3      | 0%                    | 0%                    | 0.0 of 84.0                  | 0              | 0             |
+| P4 Rapid  | typical | 6.0                | 3/3      | 100%                  | 100%                  | 84.0 of 84.0                 | 0              | 0             |
+| P4 Rapid  | typical | 5.0                | 3/3      | 97%                   | 98%                   | 82.4 of 84.0                 | 0              | 0             |
+| P4 Rapid  | typical | 4.0                | 3/3      | 0%                    | 0%                    | 0.0 of 84.0                  | 0              | 0             |
+| P4 Rapid  | typical | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 84.0                  | 1              | 0             |
+| P4 Rapid  | typical | 3.0                | 2/3      | 0%                    | 0%                    | 0.0 of 84.0                  | 2              | 0             |
+| P4 Rapid  | poor    | 6.0                | 3/3      | 19%                   | 33%                   | 28.0 of 84.0                 | 0              | 0             |
+| P4 Rapid  | poor    | 5.0                | 3/3      | 0%                    | 0%                    | 0.0 of 84.0                  | 0              | 0             |
+| P4 Rapid  | poor    | 4.0                | 3/3      | 0%                    | 0%                    | 0.0 of 84.0                  | 0              | 0             |
+| P4 Rapid  | poor    | 3.5                | 3/3      | 0%                    | 0%                    | 0.0 of 84.0                  | 1              | 0             |
+| P4 Rapid  | poor    | 3.0                | 0/3      | 0%                    | 0%                    | 0.0 of 84.0                  | 0              | 0             |
 
 ### Soft versus hard decoding
 
@@ -154,12 +154,12 @@ Share of blocks repaired in the typical channel at the stated pixels per cell, f
 
 | Profile   | Check bytes | Camera px per cell | hard | soft < 16 | soft < 32 | soft < 40 | soft < 64 | soft < 96 | soft < 128 |
 | --------- | ----------- | ------------------ | ---- | --------- | --------- | --------- | --------- | --------- | ---------- |
-| P2 Steady | 80          | 3.5                | 100% | 100%      | 100%      | 100%      | 67%       | 17%       | 17%        |
-| P2 Steady | 64          | 3.5                | 63%  | 67%       | 67%       | 67%       | 13%       | 7%        | 7%         |
-| P3 Fast   | 64          | 4.0                | 100% | 100%      | 100%      | 100%      | 74%       | 2%        | 2%         |
-| P3 Fast   | 48          | 4.0                | 89%  | 91%       | 91%       | 86%       | 3%        | 2%        | 2%         |
-| P4 Rapid  | 80          | 5.0                | 99%  | 100%      | 100%      | 100%      | 100%      | 100%      | 14%        |
-| P4 Rapid  | 64          | 5.0                | 72%  | 78%       | 78%       | 77%       | 78%       | 51%       | 0%         |
+| P2 Steady | 80          | 3.5                | 87%  | 93%       | 100%      | 97%       | 97%       | 97%       | 97%        |
+| P2 Steady | 64          | 3.5                | 53%  | 57%       | 57%       | 57%       | 57%       | 57%       | 57%        |
+| P3 Fast   | 64          | 4.0                | 98%  | 100%      | 100%      | 100%      | 100%      | 100%      | 100%       |
+| P3 Fast   | 48          | 4.0                | 86%  | 88%       | 89%       | 89%       | 89%       | 89%       | 89%        |
+| P4 Rapid  | 80          | 5.0                | 96%  | 98%       | 98%       | 98%       | 98%       | 98%       | 98%        |
+| P4 Rapid  | 64          | 5.0                | 58%  | 62%       | 62%       | 65%       | 63%       | 63%       | 63%        |
 
 ### Check bytes per block
 
@@ -169,29 +169,29 @@ Blocks of 160 bytes with a varying split between data and check bytes, soft deco
 | --------- | ----------- | ---------- | --------------- | ------------ |
 | P2 Steady | 16          | 144        | 0%              | 0.0          |
 | P2 Steady | 32          | 128        | 0%              | 0.0          |
-| P2 Steady | 48          | 112        | 22%             | 4.5          |
-| P2 Steady | 64          | 96         | 61%             | 10.6         |
+| P2 Steady | 48          | 112        | 17%             | 3.4          |
+| P2 Steady | 64          | 96         | 44%             | 7.7          |
 | P2 Steady | 80          | 80         | 100%            | 14.4         |
 | P2 Steady | 96          | 64         | 100%            | 11.5         |
 | P3 Fast   | 16          | 144        | 0%              | 0.0          |
-| P3 Fast   | 32          | 128        | 15%             | 7.7          |
-| P3 Fast   | 48          | 112        | 90%             | 39.2         |
+| P3 Fast   | 32          | 128        | 21%             | 10.2         |
+| P3 Fast   | 48          | 112        | 85%             | 37.0         |
 | P3 Fast   | 64          | 96         | 100%            | 37.4         |
 | P3 Fast   | 80          | 80         | 100%            | 31.2         |
 | P3 Fast   | 96          | 64         | 100%            | 25.0         |
 | P4 Rapid  | 16          | 144        | 0%              | 0.0          |
 | P4 Rapid  | 32          | 128        | 0%              | 0.0          |
-| P4 Rapid  | 48          | 112        | 17%             | 20.2         |
-| P4 Rapid  | 64          | 96         | 75%             | 77.8         |
-| P4 Rapid  | 80          | 80         | 100%            | 86.4         |
-| P4 Rapid  | 96          | 64         | 100%            | 69.1         |
+| P4 Rapid  | 48          | 112        | 11%             | 13.4         |
+| P4 Rapid  | 64          | 96         | 63%             | 63.4         |
+| P4 Rapid  | 80          | 80         | 98%             | 82.4         |
+| P4 Rapid  | 96          | 64         | 100%            | 67.2         |
 
 ## End to end: a file through the outer code
 
-A 48 KB file, split into droplets by the rateless outer code (the same one the QR transfer uses), one droplet per inner block, through the typical channel. Frames are counted until the file is complete and its checksum matches; the time assumes one frame per camera frame at 30 fps. The file goodput includes the outer code's overhead.
+A 48 KB file, split into droplets by the rateless outer code (the same one the QR transfer uses), one droplet per inner block, through the typical channel. Frames are counted until the file is complete and its checksum matches; the time assumes one frame per camera frame at 30 fps. The file goodput includes the outer code's overhead. "Refused by tag" and "Wrong accepts" are counted as in the codec table, over the blocks of the whole transfer.
 
-| Profile   | Camera px per cell | File complete | Frames | Seconds | File goodput KB/s |
-| --------- | ------------------ | ------------- | ------ | ------- | ----------------- |
-| P2 Steady | 3.5                | yes           | 127    | 4.2     | 11.3              |
-| P3 Fast   | 4.0                | yes           | 39     | 1.3     | 36.9              |
-| P4 Rapid  | 5.0                | yes           | 20     | 0.7     | 72.0              |
+| Profile   | Camera px per cell | File complete | Frames | Seconds | File goodput KB/s | Refused by tag | Wrong accepts |
+| --------- | ------------------ | ------------- | ------ | ------- | ----------------- | -------------- | ------------- |
+| P2 Steady | 3.5                | yes           | 120    | 4.0     | 12.0              | 0              | 0             |
+| P3 Fast   | 4.0                | yes           | 39     | 1.3     | 36.9              | 0              | 0             |
+| P4 Rapid  | 5.0                | yes           | 21     | 0.7     | 68.6              | 0              | 0             |
