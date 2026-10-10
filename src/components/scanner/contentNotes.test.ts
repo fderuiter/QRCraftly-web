@@ -86,6 +86,29 @@ describe('scan summaries for codes that are not links (#1158)', () => {
     expect(scan.displayText).toContain('H:true');
   });
 
+  it('hides the Wi-Fi password whatever order the fields come in (#1295)', () => {
+    const permutations = <T,>(items: T[]): T[][] =>
+      items.length <= 1 ? [items] : items.flatMap((item, i) => permutations([...items.slice(0, i), ...items.slice(i + 1)]).map((rest) => [item, ...rest]));
+    for (const password of ['hunter2', 's3cr\\;Et9', 'Zq\\;\\;Xw']) {
+      const pieces = password.split('\\;').filter(Boolean);
+      for (const order of permutations(['S:Home', 'T:WPA', `P:${password}`, 'H:true'])) {
+        const scan = describeScan(`WIFI:${order.join(';')};;`);
+        expect(scan.hasSecret).toBe(true);
+        for (const text of [scan.displayText, scan.shareText]) {
+          for (const piece of pieces) expect(text).not.toContain(piece);
+          expect(text).toContain('S:Home');
+          expect(text).toContain('H:true');
+        }
+      }
+    }
+  });
+
+  it('masks the real Wi-Fi password, not a look-alike escaped inside the network name', () => {
+    const scan = describeScan('WIFI:S:Cafe\\;P:decoy;T:WPA;P:hunter2;;');
+    expect(scan.displayText).not.toContain('hunter2');
+    expect(scan.displayText).toContain('S:Cafe\\;P:decoy');
+  });
+
   it('hides an authenticator secret and warns', () => {
     const scan = describeScan('otpauth://totp/Acme:ada@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Acme');
     expect(scan.typeLabel).toBe('Authenticator key');

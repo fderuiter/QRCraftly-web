@@ -117,6 +117,15 @@ describe('image file scanning in the worker', () => {
     expect(response).toMatchObject({ status: 'fail', sequenceId: 10, error: 'FILE_SCAN_UNREADABLE' });
   });
 
+  it('refuses a decoded image over 40 megapixels whose header gave no size, without drawing it (#1299)', async () => {
+    const close = vi.fn();
+    bitmap = { width: 8000, height: 6000, data: new Uint8ClampedArray(0), close };
+    const response = await postAndWait(worker, { type: 'scan-file', file: new Blob(['ico']), sequenceId: 12 });
+    expect(response).toMatchObject({ status: 'fail', sequenceId: 12, error: expect.stringContaining('40 megapixels') });
+    expect(FakeOffscreenCanvas.drawn).toEqual([]);
+    expect(close).toHaveBeenCalled();
+  });
+
   it('asks the main thread to decode when the worker has no OffscreenCanvas', async () => {
     vi.stubGlobal('OffscreenCanvas', undefined);
     const response = await postAndWait(worker, { type: 'scan-file', file: new Blob(['png']), sequenceId: 11 });
