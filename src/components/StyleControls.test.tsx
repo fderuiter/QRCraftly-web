@@ -209,6 +209,22 @@ describe('StyleControls Component', () => {
       expect(mockOnChange).toHaveBeenCalledWith({ logoPaddingStyle: 'none' });
   });
 
+  it('explains each logo backing and starts the padding at the smallest visible gap (#1355)', () => {
+      const logoConfig = { ...DEFAULT_CONFIG, logoUrl: 'data:image/png;base64,fake', logoPaddingStyle: 'square' as LogoPaddingStyle, logoPadding: 0 };
+      const { rerender } = render(<StyleControls config={logoConfig} onChange={mockOnChange} />);
+      expandAppearanceSections();
+
+      expect(screen.getByText(/A square of the backing colour sits behind the logo/)).toBeInTheDocument();
+      const padding = screen.getByLabelText('Padding');
+      expect(padding).toHaveAttribute('min', '0.5');
+      expect(padding).toHaveValue('0.5');
+      expect(screen.getByRole('radio', { name: 'Set logo border style to None' })).toHaveAttribute('aria-describedby', 'logo-border-style-hint');
+
+      rerender(<StyleControls config={{ ...logoConfig, logoPaddingStyle: 'none' }} onChange={mockOnChange} />);
+      expect(screen.getByText('The logo sits straight on the code, with no backing or gap.')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Padding')).not.toBeInTheDocument();
+  });
+
   it('updates logo sliders and colors', () => {
       const logoConfig = { ...DEFAULT_CONFIG, logoUrl: 'data:image/png;base64,fake', logoPaddingStyle: 'square' as LogoPaddingStyle };
       render(<StyleControls config={logoConfig} onChange={mockOnChange} />);
