@@ -13,6 +13,7 @@ describe('mergeClasses utility', () => {
 
   it('should merge classes and deduplicate raw non-conflicting ones', () => {
     expect(mergeClasses('relative border px-4', 'relative shadow')).toContain('relative');
+    // eslint-disable-next-line qrcraftly/tailwind-classes -- the duplicate is the input under test
     expect(mergeClasses('relative relative')).toBe('relative');
   });
 

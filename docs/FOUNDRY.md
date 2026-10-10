@@ -38,23 +38,23 @@ Each replacement moves through these stages in order. The scorecard below record
 
 ### Other replacements
 
-| Package                                    | Replacement                                                                 | Stage    |
-| ------------------------------------------ | --------------------------------------------------------------------------- | -------- |
-| `tj-actions/changed-files`                 | `scripts/ci/changed_files.js` (#1183)                                       | Removed  |
-| `dawidd6/action-send-mail`                 | `scripts/ci/audit_issue.js` (#1184)                                         | Removed  |
-| `davelosert/vitest-coverage-report-action` | `scripts/ci/coverage_summary.js` (#1185)                                    | Removed  |
-| `vitest-axe`                               | `tests/utils/axe.ts` on axe-core (#1186)                                    | Removed  |
-| `@testing-library/jest-dom`                | `tests/utils/domMatchers.ts` (#1188)                                        | Removed  |
-| `@ngraveio/bc-ur`                          | frozen vectors (#1181)                                                      | Removed  |
-| `tsx`                                      | Node's own type stripping (#1189)                                           | Removed  |
-| `husky`, `lint-staged`                     | our own hooks and staged-file runner (#1190)                                | Removed  |
-| `marked`                                   | `scripts/utils/markdown/` (#1191)                                           | Removed  |
-| `globals`                                  | `eslint/node-globals.js` (#1192); ESLint itself still pulls in `globals` 14 | Removed  |
-| `eslint-plugin-security`                   | ESLint core and our own rules in `eslint/rules/` (#1193)                    | Removed  |
-| `eslint-plugin-tailwindcss`                | our own rule on Tailwind's API (#1194)                                      | Contract |
-| `jscpd`                                    | `scripts/check-duplication.js` (#1195)                                      | Removed  |
-| `dependency-cruiser`                       | `scripts/check_boundaries.js` (#1196)                                       | Removed  |
-| `@vitejs/plugin-react`                     | Vite's esbuild JSX (#1197); Babel stays for `eslint-plugin-react-hooks`     | Removed  |
+| Package                                    | Replacement                                                                 | Stage   |
+| ------------------------------------------ | --------------------------------------------------------------------------- | ------- |
+| `tj-actions/changed-files`                 | `scripts/ci/changed_files.js` (#1183)                                       | Removed |
+| `dawidd6/action-send-mail`                 | `scripts/ci/audit_issue.js` (#1184)                                         | Removed |
+| `davelosert/vitest-coverage-report-action` | `scripts/ci/coverage_summary.js` (#1185)                                    | Removed |
+| `vitest-axe`                               | `tests/utils/axe.ts` on axe-core (#1186)                                    | Removed |
+| `@testing-library/jest-dom`                | `tests/utils/domMatchers.ts` (#1188)                                        | Removed |
+| `@ngraveio/bc-ur`                          | frozen vectors (#1181)                                                      | Removed |
+| `tsx`                                      | Node's own type stripping (#1189)                                           | Removed |
+| `husky`, `lint-staged`                     | our own hooks and staged-file runner (#1190)                                | Removed |
+| `marked`                                   | `scripts/utils/markdown/` (#1191)                                           | Removed |
+| `globals`                                  | `eslint/node-globals.js` (#1192); ESLint itself still pulls in `globals` 14 | Removed |
+| `eslint-plugin-security`                   | ESLint core and our own rules in `eslint/rules/` (#1193)                    | Removed |
+| `eslint-plugin-tailwindcss`                | `eslint/rules/tailwind-classes.js` (#1194)                                  | Removed |
+| `jscpd`                                    | `scripts/check-duplication.js` (#1195)                                      | Removed |
+| `dependency-cruiser`                       | `scripts/check_boundaries.js` (#1196)                                       | Removed |
+| `@vitejs/plugin-react`                     | Vite's esbuild JSX (#1197); Babel stays for `eslint-plugin-react-hooks`     | Removed |
 
 ### Kept
 

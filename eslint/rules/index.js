@@ -6,8 +6,12 @@
  * - `no-non-literal-regexp`: `RegExp` built from a value that is not a literal;
  * - `no-bidi-characters`: Unicode bidi controls in source (Trojan Source, CVE-2021-42574);
  * - `exec-through-helper`: `child_process` used outside the exec helpers AGENTS.md names.
+ *
+ * `tailwind-classes` checks Tailwind class order, duplicates, contradictions, shorthands and
+ * needless arbitrary values (ADR 0046, #1194); it replaces `eslint-plugin-tailwindcss`.
  */
 import { findUnsafeRegex } from './regexAnalysis.js';
+import tailwindClasses from './tailwind-classes.js';
 
 /** The only modules allowed to import `child_process`. */
 export const EXEC_HELPERS = ['scripts/utils/execHelper.js', 'tests/utils/execHelper.ts'];
@@ -179,5 +183,6 @@ export default {
     'no-non-literal-regexp': noNonLiteralRegexp,
     'no-bidi-characters': noBidiCharacters,
     'exec-through-helper': execThroughHelper,
+    'tailwind-classes': tailwindClasses,
   },
 };
