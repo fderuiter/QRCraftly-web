@@ -35,14 +35,15 @@ export interface SanitizedHtmlProps {
 }
 
 /**
- * A dedicated, centralized component for rendering generic dynamic HTML content.
- * This isolates the usage of raw dynamic HTML attributes to a single component.
+ * Renders HTML that the build produced from the repository's own Markdown (the /security page's
+ * docs). It does not sanitize: never pass it user input, scanned text or anything read at run
+ * time from outside the build. `tests/xss_sink_inventory.test.ts` keeps it to that one page.
  * @param props - The component props.
- * @param props.html - The raw HTML string.
+ * @param props.html - Build-time HTML.
  * @param props.className - CSS class name for styling.
  * @param props.id - Optional id of the wrapper element.
  * @param props.as - The tag name for the wrapper element.
- * @returns The rendered HTML wrapper element with sanitized contents.
+ * @returns The wrapper element holding the HTML.
  */
 export const SanitizedHtml: React.FC<SanitizedHtmlProps> = ({
   html,

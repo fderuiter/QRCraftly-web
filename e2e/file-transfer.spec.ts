@@ -148,6 +148,25 @@ test.describe('Optical file transfer', () => {
       await expectDownloadedCopy(receiver, file);
     });
 
+    test('the file and its name never leave the device (#1352)', async ({ page: receiver, context, baseURL }) => {
+      const secret = `QRCRAFTLY-SECRET-${randomBytes(6).toString('hex')}`;
+      const requests: string[] = [];
+      context.on('request', (request) => requests.push(`${request.method()} ${request.url()}`));
+      await installSyntheticCamera(context);
+      const sender = await context.newPage();
+      const file = { name: `${secret}.txt`, mimeType: 'text/plain', buffer: Buffer.from(`${secret}\n`.repeat(40)) };
+
+      await openSender(sender, file);
+      await openReceiver(receiver);
+      await relayUntilComplete(sender, receiver);
+      await expectDownloadedCopy(receiver, file);
+
+      // Only reads of the site's own files, and nothing that carries the file's name or bytes.
+      const origin = new URL(baseURL ?? '').origin;
+      expect(requests.filter((request) => !request.startsWith(`GET ${origin}/`) && !/^GET (data|blob):/.test(request))).toEqual([]);
+      expect(requests.filter((request) => decodeURIComponent(request).includes(secret))).toEqual([]);
+    });
+
     test('sends with the new outer code when it is chosen under Advanced (#1141)', { tag: '@prod' }, async ({ page: receiver, context }) => {
       await installSyntheticCamera(context);
       const sender = await context.newPage();
