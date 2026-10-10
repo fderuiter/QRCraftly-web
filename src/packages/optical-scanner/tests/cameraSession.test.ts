@@ -14,6 +14,10 @@ interface FakeTrack {
   live: boolean;
   /** Every advanced constraint the session applied, in order. */
   applied: Array<Record<string, unknown>>;
+  /** The camera ends on its own (unplugged, revoked): the track fires `ended`. */
+  end: () => void;
+  /** The stream fires `inactive`. */
+  deactivate: () => void;
 }
 
 /** What a granted fake camera reports through the Image Capture API. */
@@ -35,10 +39,22 @@ function createFakeCamera() {
       requests.push({
         constraints: constraints ?? {},
         grant: (spec = {}) => {
-          const track: FakeTrack = { live: true, applied: [] };
+          const trackEvents = new EventTarget();
+          const streamEvents = new EventTarget();
+          const track: FakeTrack = {
+            live: true,
+            applied: [],
+            end: () => {
+              track.live = false;
+              trackEvents.dispatchEvent(new Event('ended'));
+            },
+            deactivate: () => streamEvents.dispatchEvent(new Event('inactive')),
+          };
           tracks.push(track);
           const settings: Record<string, unknown> = { ...spec.settings };
           const mediaTrack = {
+            addEventListener: trackEvents.addEventListener.bind(trackEvents),
+            removeEventListener: trackEvents.removeEventListener.bind(trackEvents),
             stop: () => {
               track.live = false;
             },
@@ -49,8 +65,10 @@ function createFakeCamera() {
               Object.assign(settings, ...advanced);
             },
           };
-          const stream: Pick<MediaStream, 'getTracks'> = {
+          const stream: Pick<MediaStream, 'getTracks' | 'addEventListener' | 'removeEventListener'> = {
             getTracks: () => [mediaTrack as unknown as MediaStreamTrack],
+            addEventListener: streamEvents.addEventListener.bind(streamEvents),
+            removeEventListener: streamEvents.removeEventListener.bind(streamEvents),
           };
           resolve(stream as MediaStream);
         },
@@ -231,6 +249,40 @@ describe('createCameraSession', () => {
 
     session.stop();
     expect(session.getState().status).toBe(status);
+  });
+
+  it.each([
+    ['the track ends', (track: FakeTrack) => track.end()],
+    ['the stream goes inactive', (track: FakeTrack) => track.deactivate()],
+  ])('reports a camera that stops on its own when %s, and can start again (#1297)', async (_case, stopCamera) => {
+    const session = create();
+    const started = session.start();
+    camera.requests[0].grant();
+    await started;
+
+    stopCamera(camera.tracks[0]);
+    const state = session.getState();
+    expect(state.status).toBe('stopped');
+    expect('error' in state && state.error.message).toMatch(/camera stopped/i);
+    expect(loop.stop).toHaveBeenCalled();
+    expect(video.srcObject).toBeNull();
+    expect(camera.live()).toBe(0);
+
+    const restarted = session.start();
+    camera.requests[1].grant();
+    await restarted;
+    expect(session.getState().status).toBe('streaming');
+  });
+
+  it('ignores the end of a camera it has already released', async () => {
+    const session = create();
+    const started = session.start();
+    camera.requests[0].grant();
+    await started;
+    session.stop();
+    camera.tracks[0].end();
+    camera.tracks[0].deactivate();
+    expect(session.getState()).toEqual({ status: 'idle' });
   });
 
   it('retries after a refusal', async () => {

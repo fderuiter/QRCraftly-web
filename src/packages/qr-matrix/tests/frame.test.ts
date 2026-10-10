@@ -33,7 +33,7 @@ describe('Frame Matrix & Layout Rendering', () => {
     const framedLayout = calculateLayout(framedConfig, 512, 29);
 
     expect(framedLayout.drawSize).toBeLessThan(normalLayout.drawSize);
-    expect(framedLayout.borderPx).toBeGreaterThan(0);
+    expect(framedLayout.quietPx).toBeCloseTo(4 * framedLayout.cellSize, 9);
   });
 
   it('renders frame shapes onto canvas context without error', () => {

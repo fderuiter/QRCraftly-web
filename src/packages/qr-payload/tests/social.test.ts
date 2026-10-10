@@ -84,9 +84,9 @@ describe('Social generator', () => {
     expect(hydrated.platform).toBe(SocialPlatform.WHATSAPP);
     expect(hydrated.handle).toBe('15551234567');
 
+    // The Social form builds wa.me links, so a whatsapp.com link is not one it can rebuild.
     const hydratedCom = hydrateSocialData('https://whatsapp.com/15551234567');
-    expect(hydratedCom.platform).toBe(SocialPlatform.WHATSAPP);
-    expect(hydratedCom.handle).toBe('15551234567');
+    expect(hydratedCom.handle).toBe('');
   });
 
   it('hydrates github', () => {

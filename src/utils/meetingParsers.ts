@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { normalizeUrl, shouldNormalizeUrl } from './url';
+
 /**
  * Parsed meeting information extracted from a meeting URL.
  */
@@ -96,11 +98,13 @@ const parseMeetUrl = (url: string): ParsedMeeting | null => {
  * Uses hostname comparison to prevent spoofed URLs (e.g. evil.com/teams.microsoft.com)
  * from being incorrectly classified as legitimate meeting links.
  *
- * @param url - The raw meeting invite URL.
+ * @param input - The raw meeting invite URL.
  * @returns A `ParsedMeeting` object with detected service, meeting ID, and passcode.
  */
-export const parseMeetingUrl = (url: string): ParsedMeeting => {
-  if (!url) return { service: 'unknown' };
+export const parseMeetingUrl = (input: string): ParsedMeeting => {
+  if (!input) return { service: 'unknown' };
+  // A link pasted without a scheme is encoded with https:// (#1280), so read it the same way.
+  const url = shouldNormalizeUrl(input) ? normalizeUrl(input) : input;
 
   let hostname: string;
   try {

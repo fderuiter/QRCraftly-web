@@ -12,7 +12,8 @@
  * - `stop()` stops every track, detaches the element and stops the loop.
  *
  * The session also releases the camera while the page is hidden and re-acquires it when the page
- * is shown again, so the camera light never stays on in a background tab.
+ * is shown again, so the camera light never stays on in a background tab. A camera that ends on
+ * its own (unplugged, revoked, taken by another app) moves the session to `stopped` (#1297).
  *
  * Capture quality and controls (#1100): the session asks for 1080p at up to 30 fps from the rear
  * camera, stepping down to 720p and then to any size if the camera cannot do that, turns on
@@ -53,10 +54,11 @@ export type CameraSessionState =
   | { status: 'unavailable'; error: Error }
   | { status: 'busy'; error: Error }
   | { status: 'unsupported'; error: Error }
+  | { status: 'stopped'; error: Error }
   | { status: 'error'; error: Error };
 
 /** The camera states that carry an error, and so explain themselves in the UI. */
-export type CameraProblemStatus = 'denied' | 'unavailable' | 'busy' | 'unsupported' | 'error';
+export type CameraProblemStatus = 'denied' | 'unavailable' | 'busy' | 'unsupported' | 'stopped' | 'error';
 
 /** The parts of `HTMLVideoElement` the session drives. */
 export interface CameraVideoElement {
@@ -290,6 +292,8 @@ export function createCameraSession(config: CameraSessionConfig): CameraSession 
   let destroyed = false;
   let track: (MediaStreamTrack & ControllableTrack) | null = null;
   let torchOn = false;
+  /** Removes the listeners that notice the camera ending on its own. */
+  let unwatchEnd: (() => void) | null = null;
 
   const setState = (next: CameraSessionState) => {
     if (next === state) return;
@@ -300,6 +304,8 @@ export function createCameraSession(config: CameraSessionConfig): CameraSession 
   function release(): void {
     generation += 1;
     pending = null;
+    unwatchEnd?.();
+    unwatchEnd = null;
     config.loop.stop();
     if (torchOn) void applyAdvanced(track, { torch: false });
     torchOn = false;
@@ -356,6 +362,7 @@ export function createCameraSession(config: CameraSessionConfig): CameraSession 
     if (capabilitiesOf(track).focusMode?.includes('continuous')) {
       void applyAdvanced(track, { focusMode: 'continuous' });
     }
+    unwatchEnd = watchEnd(acquired, track, ticket);
     video.srcObject = acquired;
     try {
       const playing = video.play();
@@ -366,6 +373,27 @@ export function createCameraSession(config: CameraSessionConfig): CameraSession 
     setState({ status: 'streaming', camera: describeTrack(track, torchOn) });
     // The engine skips frames until the element has data (readyState >= HAVE_CURRENT_DATA).
     config.loop.start();
+  }
+
+  /**
+   * Notices the camera ending without `stop()`: the device was unplugged, the browser or system
+   * revoked access, or another app took it. The frame loop would otherwise sit on a frozen frame.
+   */
+  function watchEnd(acquired: MediaStream, videoTrack: MediaStreamTrack | null, ticket: number): () => void {
+    const onEnd = () => {
+      if (ticket !== generation || destroyed) return;
+      release();
+      setState({
+        status: 'stopped',
+        error: new Error('The camera stopped. It may have been unplugged, or another app may be using it.'),
+      });
+    };
+    videoTrack?.addEventListener?.('ended', onEnd);
+    acquired.addEventListener?.('inactive', onEnd);
+    return () => {
+      videoTrack?.removeEventListener?.('ended', onEnd);
+      acquired.removeEventListener?.('inactive', onEnd);
+    };
   }
 
   /** Re-reads the camera after a control changed it. */

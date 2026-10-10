@@ -16,10 +16,24 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRType, SocialPlatform } from '@/types';
+import { CalendarProvider, QRType, SocialPlatform } from '@/types';
 import { splitCompoundField } from './rfcHelper';
 
-export const SOCIAL_DOMAINS: Record<string, SocialPlatform> = {
+/**
+ * Matches a `geo:` URI the Location form can show in full: two coordinates and nothing else.
+ * Altitude, `;u=`, `;crs=` and `?q=` searches have no field, so such codes stay Text (#1282).
+ */
+// eslint-disable-next-line security/detect-unsafe-regex -- linear: anchored, bounded digit groups separated by a fixed comma.
+export const PLAIN_GEO_URI = /^geo:([-+]?\d{1,3}(?:\.\d+)?),([-+]?\d{1,3}(?:\.\d+)?)$/i;
+
+/** A profile URL the Social form can rebuild exactly: a platform and a handle. */
+export interface SocialProfile {
+  platform: SocialPlatform;
+  handle: string;
+}
+
+/** Hosts whose profile URLs the Social form builds, after `www.`, `m.` or `mobile.` is removed. */
+const PROFILE_HOSTS: Record<string, SocialPlatform> = {
   'instagram.com': SocialPlatform.INSTAGRAM,
   'x.com': SocialPlatform.TWITTER,
   'twitter.com': SocialPlatform.TWITTER,
@@ -27,9 +41,82 @@ export const SOCIAL_DOMAINS: Record<string, SocialPlatform> = {
   'linkedin.com': SocialPlatform.LINKEDIN,
   'youtube.com': SocialPlatform.YOUTUBE,
   'facebook.com': SocialPlatform.FACEBOOK,
-  'whatsapp.com': SocialPlatform.WHATSAPP,
   'wa.me': SocialPlatform.WHATSAPP,
   'github.com': SocialPlatform.GITHUB,
+};
+
+/** First path segments that are pages of the site, not someone's handle. */
+const RESERVED_SEGMENTS: Partial<Record<SocialPlatform, ReadonlySet<string>>> = {
+  [SocialPlatform.INSTAGRAM]: new Set(['p', 'reel', 'reels', 'tv', 'stories', 'explore', 'accounts', 'direct']),
+  [SocialPlatform.TWITTER]: new Set(['i', 'intent', 'home', 'search', 'hashtag', 'share', 'explore', 'settings', 'messages', 'notifications', 'compose', 'login']),
+  [SocialPlatform.FACEBOOK]: new Set(['share', 'sharer', 'sharer.php', 'groups', 'events', 'watch', 'photo.php', 'story.php', 'profile.php', 'pages', 'marketplace', 'gaming', 'login']),
+  [SocialPlatform.GITHUB]: new Set(['orgs', 'settings', 'marketplace', 'explore', 'topics', 'sponsors', 'features', 'login', 'about', 'pricing', 'enterprise']),
+};
+
+const HANDLE_PATTERN = /^[A-Za-z0-9_.-]+$/;
+
+/**
+ * Reads a social profile link that the Social form can rebuild without losing anything. Posts,
+ * share links, searches, short-link hosts and links with a query or fragment are not profiles,
+ * so they return `null` and stay Website codes (#1282).
+ * @param parsed - The parsed `http`/`https` URL.
+ * @returns The platform and handle, or `null`.
+ */
+export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null => {
+  if (parsed.scheme !== 'http' && parsed.scheme !== 'https') return null;
+  if (parsed.params.size > 0 || parsed.path.includes('#')) return null;
+
+  const [rawHost, ...rest] = parsed.path.split('/');
+  const host = rawHost.toLowerCase().replace(/^(?:www|m|mobile)\./, '');
+  const platform = PROFILE_HOSTS[host];
+  if (!platform) return null;
+
+  // One trailing slash is fine; empty segments elsewhere are not.
+  const segments = rest.length > 0 && rest[rest.length - 1] === '' ? rest.slice(0, -1) : rest;
+  if (segments.some((segment) => segment === '')) return null;
+
+  let handle: string | undefined;
+  switch (platform) {
+    case SocialPlatform.LINKEDIN:
+      if (segments.length === 2 && segments[0] === 'in') handle = segments[1];
+      break;
+    case SocialPlatform.TIKTOK:
+    case SocialPlatform.YOUTUBE:
+      if (segments.length === 1 && segments[0].startsWith('@')) handle = segments[0].substring(1);
+      break;
+    case SocialPlatform.WHATSAPP:
+      if (segments.length === 1 && /^\d+$/.test(segments[0])) handle = segments[0];
+      break;
+    default:
+      if (segments.length === 1 && !RESERVED_SEGMENTS[platform]?.has(segments[0].toLowerCase())) {
+        handle = segments[0];
+      }
+  }
+
+  return handle && HANDLE_PATTERN.test(handle) ? { platform, handle } : null;
+};
+
+/**
+ * Reads which web calendar an add-event link is for. Only links that open a new-event form count:
+ * a mailbox, a calendar view or any other page of those sites stays a Website code (#1363).
+ * @param parsed - The parsed `http`/`https` URL.
+ * @returns The calendar provider, or `null`.
+ */
+export const calendarLinkProvider = (parsed: ParsedProtocol): CalendarProvider | null => {
+  if (parsed.scheme !== 'http' && parsed.scheme !== 'https') return null;
+  const slash = parsed.path.indexOf('/');
+  const host = (slash === -1 ? parsed.path : parsed.path.substring(0, slash)).toLowerCase().replace(/^www\./, '');
+  const route = slash === -1 ? '' : parsed.path.substring(slash);
+
+  if ((host === 'calendar.google.com' || host === 'google.com') && /^\/calendar\/(?:render|event)\b/.test(route)) {
+    return parsed.params.get('action')?.toUpperCase() === 'TEMPLATE' ? CalendarProvider.GOOGLE : null;
+  }
+  if (/^\/calendar\/\d+\/deeplink\/compose\b/.test(route)) {
+    if (host === 'outlook.live.com') return CalendarProvider.OUTLOOK;
+    if (host === 'outlook.office.com' || host === 'outlook.office365.com') return CalendarProvider.OFFICE365;
+  }
+  if (host === 'calendar.yahoo.com' && parsed.params.get('v') === '60') return CalendarProvider.YAHOO;
+  return null;
 };
 
 export const PROTOCOL_PREFIXES = {
@@ -43,16 +130,23 @@ export const PROTOCOL_PREFIXES = {
  * Formal containment profiles for validating structured text and emails.
  */
 export const CONTAINMENT_PROFILES = {
-  URL: /^(?:https?|ftp):\/\/[^\s\x00-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]+$/i,
-  EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-  PLAIN_TEXT: /^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]*$/,
-  // General check for zero-width and control characters in text fields (allowing \t, \n, \r)
-  STRICT_NO_CONTROL: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]/,
+  URL: /^(?:https?|ftp):\/\/[^\s\x00-\x1F\x7F-\x9F\u200B-\u200D\u2060\uFEFF]+$/i,
+  // The HTML "valid e-mail address" grammar (RFC 5322 atext local part, so O'Brien works), with at
+  // least two domain labels (IDN A-labels such as xn--p1ai included) or an IPv4 address literal (#1273).
+  // eslint-disable-next-line security/detect-unsafe-regex -- linear: each label is bounded and must start after a dot.
+  EMAIL: /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+|\[(?:\d{1,3}\.){3}\d{1,3}\])$/,
+  PLAIN_TEXT: /^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B\u2060\uFEFF]*$/,
+  // Control and hidden zero-width characters in text fields (allowing \t, \n, \r). Zero-width
+  // joiner and non-joiner (U+200C, U+200D) are allowed: emoji sequences and Persian need them (#1271).
+  TEXT_NO_CONTROL: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B\u2060\uFEFF]/,
+  // Wi-Fi names and passwords are not prose, so every zero-width character is refused there:
+  // a joiner would make a network name that looks like another one.
+  STRICT_NO_CONTROL: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\u2060\uFEFF]/,
   // Text-direction controls (U+061C, U+200E/F, U+202A-202E, U+2066-2069). Real right-to-left text
   // never needs them, but they let `gpj.exe` read as `exe.jpg`. Refused where they are never
   // needed (Wi-Fi, phone, SMS, border and template text) and neutralised on display in the scanner.
   BIDI_CONTROL: /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/,
-  PRESERVE_FORMAT_CONTROL: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B-\u200D\uFEFF]/,
+  PRESERVE_FORMAT_CONTROL: /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B\u2060\uFEFF]/,
 };
 
 export interface ParsedProtocol {
@@ -93,6 +187,30 @@ export const safeDecodeURIComponent = (value: string): string => {
   } catch {
     return value;
   }
+};
+
+/**
+ * Schemes whose query uses RFC 3986 percent-encoding (RFC 6068 mailto, RFC 5724 sms), where `+`
+ * is a literal plus and header names are case-insensitive. Web URLs keep form decoding.
+ */
+const URI_QUERY_SCHEMES = new Set(['mailto', 'sms', 'smsto']);
+
+/**
+ * Parses a mailto or sms query into a map keyed by lower-case header name. A `+` stays a plus
+ * (`C++` is not `C  `), and the first value of a repeated header wins.
+ * @param query - The text after `?`.
+ * @returns The decoded headers.
+ */
+export const parseUriQuery = (query: string): Map<string, string> => {
+  const params = new Map<string, string>();
+  for (const pair of query.split('&')) {
+    if (!pair) continue;
+    const eq = pair.indexOf('=');
+    const header = safeDecodeURIComponent(eq === -1 ? pair : pair.substring(0, eq)).toLowerCase();
+    const value = eq === -1 ? '' : safeDecodeURIComponent(pair.substring(eq + 1));
+    if (header && !params.has(header)) params.set(header, value);
+  }
+  return params;
 };
 
 /**
@@ -220,7 +338,9 @@ export const parseProtocol = (raw: string): ParsedProtocol | null => {
     }
 
     const params = new Map<string, string>();
-    if (query) {
+    if (query && URI_QUERY_SCHEMES.has(scheme)) {
+      parseUriQuery(query).forEach((value, key) => params.set(key, value));
+    } else if (query) {
       try {
         const urlParams = new URLSearchParams(query);
         urlParams.forEach((value, key) => {
@@ -253,7 +373,7 @@ export const identifyProtocol = (raw: string): QRType | null => {
   if (!trimmed) return null;
 
   const lower = trimmed.toLowerCase();
-  if (lower.startsWith('geo:')) return QRType.LOCATION;
+  if (lower.startsWith('geo:')) return PLAIN_GEO_URI.test(trimmed) ? QRType.LOCATION : QRType.TEXT;
   if (lower.startsWith('wifi:')) return QRType.WIFI;
   if (/begin:vcard/i.test(trimmed) || /^mecard:/i.test(trimmed)) return QRType.VCARD;
   if (/begin:v(event|calendar)/i.test(trimmed)) return QRType.EVENT;
@@ -271,7 +391,6 @@ export const identifyProtocol = (raw: string): QRType | null => {
     if (parsed.scheme === 'matmsg') return QRType.EMAIL;
     if (PROTOCOL_PREFIXES.TEL.includes(parsed.scheme + ':')) return QRType.PHONE;
     if (PROTOCOL_PREFIXES.SMS.includes(parsed.scheme + ':')) return QRType.SMS;
-    if (parsed.scheme === 'geo') return QRType.LOCATION;
 
     if (parsed.scheme === 'http' || parsed.scheme === 'https') {
       const pathParts = parsed.path.split('/');
@@ -285,22 +404,12 @@ export const identifyProtocol = (raw: string): QRType | null => {
         return QRType.PAYMENT;
       }
 
-      // Find if any known domain is a suffix of the current domain
-      const knownSocial = Object.keys(SOCIAL_DOMAINS).find(
-        (d) => domain === d || domain.endsWith(`.${d}`)
-      );
-      if (knownSocial) {
+      // Only profile links the Social form can rebuild are Social; posts and shares stay Website.
+      if (parseSocialProfile(parsed)) {
         return QRType.SOCIAL;
       }
 
-      if (
-        isDomain('calendar.google.com') ||
-        isDomain('outlook.live.com') ||
-        isDomain('outlook.office.com') ||
-        isDomain('outlook.office365.com') ||
-        isDomain('calendar.yahoo.com') ||
-        (isDomain('google.com') && parsed.path.includes('/calendar/'))
-      ) {
+      if (calendarLinkProvider(parsed)) {
         return QRType.EVENT;
       }
 

@@ -63,7 +63,7 @@ describe('QRChecker (#1036)', () => {
     expect(screen.getByRole('button', { name: 'Choose picture' })).toBeInTheDocument();
   });
 
-  it('checks a pasted screenshot and a dropped picture, and ignores other files', async () => {
+  it('checks a pasted screenshot and a dropped picture, and turns away other files', async () => {
     vi.mocked(checkQrImage).mockResolvedValue({ kind: 'unreadable', message: 'None.' });
     render(<QRChecker />);
     const paste = new Event('paste') as ClipboardEvent;
@@ -74,7 +74,42 @@ describe('QRChecker (#1036)', () => {
     const zone = screen.getByTestId('qr-checker');
     fireEvent.drop(zone, { dataTransfer: { files: [new File(['x'], 'notes.txt', { type: 'text/plain' })] } });
     expect(checkQrImage).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please choose an image');
     fireEvent.drop(zone, { dataTransfer: { files: [image()] } });
     await waitFor(() => expect(checkQrImage).toHaveBeenCalledTimes(2));
+  });
+
+  describe('every input starts a check or says why not (#1298)', () => {
+    it('checks a picture whose file has no type, as the scanner does', async () => {
+      vi.mocked(checkQrImage).mockResolvedValue({ kind: 'unreadable', message: 'None.' });
+      render(<QRChecker />);
+      fireEvent.change(screen.getByLabelText('Choose a picture of a QR code'), { target: { files: [new File(['x'], 'IMG_0001', { type: '' })] } });
+      await waitFor(() => expect(checkQrImage).toHaveBeenCalledTimes(1));
+    });
+
+    it('says so when a dropped file is not a picture', async () => {
+      render(<QRChecker />);
+      fireEvent.drop(screen.getByTestId('qr-checker'), { dataTransfer: { files: [new File(['%PDF'], 'menu.pdf', { type: 'application/pdf' })] } });
+      expect(await screen.findByRole('alert')).toHaveTextContent('Please choose an image');
+      expect(checkQrImage).not.toHaveBeenCalled();
+    });
+
+    it('shows the check and its failure for a picture pasted over a result', async () => {
+      vi.mocked(checkQrImage).mockResolvedValueOnce({ kind: 'read', scan: describeScan('https://example.com/menu'), status: 'physical-pass' });
+      render(<QRChecker />);
+      fireEvent.change(screen.getByLabelText('Choose a picture of a QR code'), { target: { files: [image()] } });
+      expect(await screen.findByText('example.com')).toBeInTheDocument();
+
+      let finish: (outcome: Awaited<ReturnType<typeof checkQrImage>>) => void = () => {};
+      vi.mocked(checkQrImage).mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+      const paste = new Event('paste') as ClipboardEvent;
+      Object.defineProperty(paste, 'clipboardData', { value: { files: [image()] } });
+      document.dispatchEvent(paste);
+      expect(await screen.findByText('Checking...')).toBeInTheDocument();
+
+      finish({ kind: 'unreadable', message: 'No QR code was found in this picture.' });
+      expect(await screen.findByText('No QR code was found in this picture.')).toHaveAttribute('role', 'alert');
+      expect(screen.queryByText('example.com')).not.toBeInTheDocument();
+    });
   });
 });

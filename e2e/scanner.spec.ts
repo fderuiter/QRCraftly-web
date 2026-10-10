@@ -25,6 +25,7 @@
  * the generator. Budgets are generous so they do not flake on a CI runner; the
  * numbers are attached to each test as `time-to-decode` annotations.
  */
+import fs from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { Page, TestInfo } from '@playwright/test';
 import { test, expect } from './fixtures';
@@ -323,5 +324,37 @@ test.describe('Camera scanner with a scripted fake camera', () => {
       await expect(page.getByTestId('scan-result')).toBeVisible({ timeout: 10_000 });
       await expect.poll(() => liveCameraTracks(page)).toBe(0);
     });
+  });
+});
+
+test.describe('SVG files (#1294)', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'Chromium cannot decode SVG through createImageBitmap');
+
+  test("reads the generator's own SVG export in the scanner's Image mode and in the checker", async ({ page, context }) => {
+    test.setTimeout(60_000);
+    const code = 'https://qrcraftly.com/svg-export';
+    await installFakeCamera(context);
+    await openGenerator(page);
+    await page.locator('#url-input').fill(code);
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      (async () => {
+        await page.getByRole('button', { name: 'Download options' }).click();
+        await page.getByRole('radio', { name: 'SVG' }).click();
+        await page.getByRole('button', { name: 'Download SVG' }).click();
+      })(),
+    ]);
+    const svg = { name: 'qr.svg', mimeType: 'image/svg+xml', buffer: fs.readFileSync(await download.path()) };
+
+    await openScanner(page);
+    await page.getByRole('radio', { name: 'Image' }).click();
+    await page.getByLabel('Upload QR code image file').setInputFiles(svg);
+    await expect(page.getByTestId('scan-result-host')).toHaveText('qrcraftly.com', { timeout: 15_000 });
+    await editInGenerator(page, code);
+
+    await page.goto('/qr-code-checker');
+    await page.waitForSelector('main[data-hydrated="true"]');
+    await page.getByLabel('Choose a picture of a QR code').setInputFiles(svg);
+    await expect(page.getByTestId('scan-result-host')).toHaveText('qrcraftly.com', { timeout: 15_000 });
   });
 });

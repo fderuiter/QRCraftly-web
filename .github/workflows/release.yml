@@ -50,6 +50,7 @@ jobs:
         id: resolve
         env:
           INPUT_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           VERSION=$(node -p "JSON.parse(require('fs').readFileSync('package.json','utf8')).version")
@@ -62,10 +63,15 @@ jobs:
             exit 1
           fi
 
-          if [ -z "$INPUT_TAG" ] && git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-            echo "$TAG already exists; this push is not a release."
-            echo "published=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          if [ -z "$INPUT_TAG" ]; then
+            if VIEW_OUTPUT=$(gh release view "$TAG" 2>&1); then
+              echo "$TAG already has a published GitHub release; this push is not a new release."
+              echo "published=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            elif ! grep -qi "release not found" <<<"$VIEW_OUTPUT"; then
+              echo "::error::Could not check for an existing $TAG release: $VIEW_OUTPUT"
+              exit 1
+            fi
           fi
 
           if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
@@ -74,22 +80,24 @@ jobs:
           fi
           echo "published=true" >> "$GITHUB_OUTPUT"
 
+      - name: Extract release notes from CHANGELOG.md
+        if: steps.resolve.outputs.published == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.resolve.outputs.version }}
+        run: node scripts/release_engine.js --notes "$RELEASE_VERSION" > "$RUNNER_TEMP/release_notes.md"
+
       - name: Create annotated tag
         if: steps.resolve.outputs.published == 'true' && inputs.tag == ''
         env:
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+          if ! git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+          fi
           git push origin "refs/tags/$RELEASE_TAG"
-
-      - name: Extract release notes from CHANGELOG.md
-        if: steps.resolve.outputs.published == 'true'
-        env:
-          RELEASE_VERSION: ${{ steps.resolve.outputs.version }}
-        run: node scripts/release_engine.js --notes "$RELEASE_VERSION" > "$RUNNER_TEMP/release_notes.md"
 
       - name: Publish GitHub Release
         if: steps.resolve.outputs.published == 'true'
@@ -124,6 +132,8 @@ jobs:
 
       - name: Setup Environment
         uses: ./.github/actions/setup
+        with:
+          cache-playwright: 'true'
 
       - name: Wait for production to serve this release
         env:
