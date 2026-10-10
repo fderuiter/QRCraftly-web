@@ -52,7 +52,7 @@ Each replacement moves through these stages in order. The scorecard below record
 | `globals`                                  | `eslint/node-globals.js` (#1192); ESLint itself still pulls in `globals` 14 | Removed  |
 | `eslint-plugin-security`                   | ESLint core and our own rules in `eslint/rules/` (#1193)                    | Removed  |
 | `eslint-plugin-tailwindcss`                | our own rule on Tailwind's API (#1194)                                      | Contract |
-| `jscpd`                                    | our own duplicate-code checker (#1195)                                      | Contract |
+| `jscpd`                                    | `scripts/check-duplication.js` (#1195)                                      | Removed  |
 | `dependency-cruiser`                       | our own package-boundary checker (#1196)                                    | Contract |
 | `@vitejs/plugin-react`                     | Vite's esbuild JSX (#1197); Babel stays for `eslint-plugin-react-hooks`     | Removed  |
 
