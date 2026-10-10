@@ -25,7 +25,7 @@
   "scripts": {
     "dev": "vite",
     "prebuild": "node scripts/storage_privacy_ast_auditor.js",
-    "build": "node scripts/compile_docs_manifest.js --check && vite build && pnpm run postbuild",
+    "build": "vite build && pnpm run postbuild",
     "postbuild": "node scripts/write_build_info.js && node scripts/bundle_ast_audit.js && tsx scripts/generate_sitemap.ts && tsx scripts/generate_social_images.ts && node scripts/defer_page_scripts.js && node scripts/csp_hash_injector.js && node scripts/generate_sw.cjs && node scripts/generate_lhci_manifest.js",
     "preview": "vite preview",
     "test": "vitest",
@@ -40,7 +40,7 @@
     "validate:ui-catalog": "node scripts/validate_ui_catalog.js",
     "validate:duplication": "node scripts/check-duplication.js",
     "docs:sync": "node scripts/sync_docs.js",
-    "docs:lint": "node scripts/audit_markdown.js && node scripts/validate_adrs.js && node scripts/validate_ui_catalog.js && node scripts/compile_docs_manifest.js --check",
+    "docs:lint": "node scripts/audit_markdown.js && node scripts/validate_adrs.js && node scripts/validate_ui_catalog.js",
     "licenses:sync": "node scripts/sync_shipped_packages.js",
     "format:classes": "node scripts/sort_tailwind_classes.js",
     "format": "prettier --write .",

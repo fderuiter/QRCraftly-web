@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { compileManifest, docsPublicDir as defaultDocsPublicDir, outputManifestPath as defaultOutputManifestPath } from './compile_docs_manifest.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -269,19 +268,6 @@ export function syncAll(options = {}) {
     }
   } catch (err) {
     console.error(`❌ UI Catalog synchronization failed: ${err.message}`);
-  }
-
-  // 2. Compile Docs Manifest
-  if (!options.skipManifest) {
-    try {
-      compileManifest(
-        options.docsPublicDir || defaultDocsPublicDir,
-        options.outputManifestPath || defaultOutputManifestPath
-      );
-      console.log('✅ Docs manifest compiled successfully.');
-    } catch (err) {
-      console.error(`❌ Docs manifest compilation failed: ${err.message}`);
-    }
   }
 
   console.log(`🎉 Documentation synchronization completed in ${Date.now() - startTime}ms.`);

@@ -118,8 +118,8 @@ pnpm preview   # serves dist/ at http://localhost:3000
 | `pnpm run format`            | Formats the repository with Prettier. `pnpm run format:classes` sorts Tailwind classes.                         |
 | `pnpm build`                 | Builds the site, including the sitemap, social images, service worker and CSP hashes.                           |
 | `pnpm run check-bundle-size` | Checks the built site against the size budgets. Run it after `pnpm build`.                                      |
-| `pnpm run docs:sync`         | Regenerates the UI catalog entries and the docs manifest after UI or public-doc changes.                        |
-| `pnpm run docs:lint`         | Checks Markdown links, anchors, ADR numbering, the UI catalog and the docs manifest.                            |
+| `pnpm run docs:sync`         | Regenerates the UI catalog entries after UI component changes.                                                  |
+| `pnpm run docs:lint`         | Checks Markdown links, anchors, ADR numbering and the UI catalog.                                               |
 | `pnpm run wasm:build`        | Rebuilds the Rust modules into `src/wasm/` (needs Rust). `wasm:check` verifies the committed builds.            |
 | `pnpm run licenses:sync`     | Updates the list of packages shipped to the browser, shown on `/acknowledgements`.                              |
 | `pnpm run bench:*`           | Benchmarks: `scanner`, `wasm`, `qr-encode`, `transfer`, `outer-code`, `colour`, `optical`, `feedback` and more. |
@@ -186,7 +186,7 @@ Core features live in deep modules under `src/packages/`. App code imports a pac
 ├── scripts/             Build, audit, benchmark and release scripts
 ├── src/
 │   ├── components/      React components; ui/ holds the shared primitives (see UI_CATALOG.md)
-│   ├── data/            Page copy, navigation, landing pages and the docs manifest
+│   ├── data/            Page copy, navigation and landing pages
 │   ├── hooks/           React hooks (download, upload, scannability, focus)
 │   ├── layouts/         Layout, document head and index.css (theme tokens)
 │   ├── packages/        Deep modules (see above)
@@ -201,7 +201,7 @@ Core features live in deep modules under `src/packages/`. App code imports a pac
 `pnpm run lint` runs the same static checks as CI:
 
 - **Policy audits:** dependency licences and the allowlist, no third-party Rust crates, code-to-doc pairing, the storage allowlist, platform-independent paths and static SVG paths.
-- **Docs:** links, anchors, ADR numbering, the UI catalog and the docs manifest.
+- **Docs:** links, anchors, ADR numbering and the UI catalog.
 - **Code:** TypeScript, dependency-cruiser boundaries, ESLint (including jsx-a11y and security rules), Knip for dead code, Prettier and a duplication limit.
 - **Design:** WCAG contrast of UI colours, and a design-token audit that rejects raw palette colours in shared UI and arbitrary colour or size values anywhere.
 

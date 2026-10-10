@@ -60,6 +60,8 @@ export type ShippedPackageSummary = Omit<ShippedPackage, 'licenseText' | 'notice
 /** Site path of the generated license texts. */
 export const LICENSES_FILE = 'third-party-licenses.txt';
 
+import { DOCS_MANIFEST_ID } from './docsManifest';
+
 const VIRTUAL_ID = 'virtual:shipped-packages';
 const RESOLVED_VIRTUAL_ID = `\0${VIRTUAL_ID}`;
 const SYNC_ENV = 'QRCRAFTLY_SYNC_SHIPPED_PACKAGES';
@@ -130,6 +132,8 @@ export function packageOfModule(moduleId: string): { name: string; dir?: string 
   if (id === 'commonjsHelpers.js') return { name: COMMONJS_HELPERS };
   // This file's own data module.
   if (id === VIRTUAL_ID) return null;
+  // The /security page's docs, compiled from our own Markdown (scripts/vite/docsManifest.ts).
+  if (id === DOCS_MANIFEST_ID) return null;
   // Entry glue Vike generates for each page.
   if (id.startsWith('virtual:vike:')) return { name: 'vike' };
   return isVirtual ? { unknown: moduleId.slice(1) } : null;
