@@ -248,7 +248,7 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
               key={template.id}
               className={`group relative flex flex-col justify-between rounded-xl border p-3 transition-all ${
                 isSelected
-                  ? 'border-teal-600 bg-teal-50/30 ring-2 ring-teal-600 dark:border-teal-400 dark:bg-teal-950/20 dark:ring-teal-400'
+                  ? 'border-accent bg-accent-soft ring-2 ring-accent'
                   : 'border-line bg-surface hover:border-line'
               }`}
             >
@@ -403,7 +403,7 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
             </label>
             <textarea
               id="template-description-input"
-              className="w-full rounded-xl border border-line bg-surface-raised p-2.5 text-xs text-fg transition-colors focus:border-teal-600 focus:outline-hidden dark:focus:border-teal-400"
+              className="w-full rounded-xl border border-line bg-surface-raised p-2.5 text-xs text-fg transition-colors focus:border-accent focus:outline-hidden"
               rows={2}
               placeholder="e.g. Official brand colors for marketing campaigns"
               value={saveDescription}

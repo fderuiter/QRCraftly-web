@@ -46,7 +46,7 @@ export const ContrastBadge: React.FC<ContrastBadgeProps> = ({
     <span aria-live={announce ? 'polite' : undefined} aria-atomic={announce ? true : undefined} className="inline-block">
       {isVisible && (
         <span
-          className="flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400"
+          className="flex items-center gap-1 text-xs font-medium text-warning"
           data-testid={dataTestId}
         >
           <AlertTriangle className="size-3" aria-hidden="true" />

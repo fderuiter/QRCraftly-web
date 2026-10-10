@@ -119,10 +119,19 @@ export const hydrateVCardData = (raw: string): VCardData => {
         case 'ADR': {
           const cleanVal = val.replace(/;/g, ',');
           const adrParts = splitCompoundField(cleanVal, ',');
-          result.street = unescapeMECard(adrParts[2] || '');
-          result.city = unescapeMECard(adrParts[3] || '');
-          result.zip = unescapeMECard(adrParts[5] || '');
-          result.country = unescapeMECard(adrParts[6] || '');
+          if (adrParts.length >= 7) {
+            // DoCoMo's positional form: PO box, room, street, city, state, zip, country.
+            result.street = unescapeMECard(adrParts[2] || '');
+            result.city = unescapeMECard(adrParts[3] || '');
+            result.zip = unescapeMECard(adrParts[5] || '');
+            result.country = unescapeMECard(adrParts[6] || '');
+          } else {
+            // The one-line form QRCraftly writes: street, city, zip, country, empty ones left out.
+            const [street = '', city = '', zip = '', country = ''] = adrParts
+              .map((part) => unescapeMECard(part).trim())
+              .filter(Boolean);
+            Object.assign(result, { street, city, zip, country });
+          }
           break;
         }
       }
@@ -235,9 +244,10 @@ export const constructVCardString = (data: VCardData): string => {
     if (isPopulated(email)) parts.push(`EMAIL:${email};`);
     if (isPopulated(website)) parts.push(`URL:${website};`);
 
-    if (isPopulated(street) || isPopulated(city) || isPopulated(zip) || isPopulated(country)) {
-      parts.push(`ADR:,,${street},${city},,${zip},${country};`);
-    }
+    // One readable line without empty fields: ZXing-style readers show ADR as written, so the
+    // positional form (`,,1 Main,X,,,`) would show its stray commas (#1367).
+    const address = [street, city, zip, country].filter(isPopulated).join(', ');
+    if (address) parts.push(`ADR:${address};`);
     parts.push(';');
     return parts.join('');
   }

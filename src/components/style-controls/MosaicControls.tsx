@@ -93,7 +93,7 @@ export const MosaicControls: React.FC<MosaicControlsProps> = ({ config, onChange
       ) : (
         <Card variant="control" className="space-y-5">
           <div className="flex items-center gap-4">
-            <img src={config.mosaicImageUrl} alt="Mosaic design" width={48} height={48} className="size-12 rounded-md border border-slate-200 object-cover shadow-sm" />
+            <img src={config.mosaicImageUrl} alt="Mosaic design" width={48} height={48} className="size-12 rounded-md border border-line object-cover shadow-sm" />
             <p className="flex-1 text-xs text-fg-muted">
               Error correction is set to High. Check the scan badge before you print.
             </p>
@@ -107,7 +107,7 @@ export const MosaicControls: React.FC<MosaicControlsProps> = ({ config, onChange
                   key={option.id}
                   className={`flex cursor-pointer flex-col items-center gap-1 rounded-lg border p-2 text-xs focus-within:ring-2 focus-within:ring-focus ${
                     mode === option.id
-                      ? 'border-teal-500 bg-teal-50 text-accent-strong dark:bg-teal-900/20'
+                      ? 'border-accent bg-accent-soft text-accent-strong'
                       : 'border-line text-fg-muted hover:bg-surface-hover'
                   }`}
                 >

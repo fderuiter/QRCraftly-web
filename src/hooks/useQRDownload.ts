@@ -451,59 +451,37 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
     }
   }, [buildSvg, getFilename, config]);
 
-  const handleSaveEps = useCallback(async (options?: AssetOptions): Promise<ExportStatus> => {
-    const blocked = blockedExport(config, 'eps');
+  /** Saves the code as a vector EPS or PDF file, built from the same SVG as the SVG download. */
+  const saveVector = useCallback(async (format: 'eps' | 'pdf', options?: AssetOptions): Promise<ExportStatus> => {
+    const blocked = blockedExport(config, format);
     if (blocked) return blocked;
     try {
       const built = await buildSvg(options);
-      if (!built) return { success: false, format: 'eps', error: scanValidationFailed() };
+      if (!built) return { success: false, format, error: scanValidationFailed() };
 
-      const { convertSvgToEps } = await import('@/packages/qr-export');
-      const epsStr = convertSvgToEps(built.svg);
-
-      const blob = new Blob([epsStr], { type: 'application/postscript' });
+      const { convertSvgToEps, convertSvgToPdf } = await import('@/packages/qr-export');
+      const blob =
+        format === 'eps'
+          ? new Blob([await convertSvgToEps(built.svg)], { type: 'application/postscript' })
+          : new Blob([await convertSvgToPdf(built.svg)], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.download = getFilename('eps', options?.filename);
+      link.download = getFilename(format, options?.filename);
       // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
       link.href = url;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      return { success: true, format: 'eps', logoOmitted: built.logoOmitted };
+      return { success: true, format, logoOmitted: built.logoOmitted };
     } catch (err) {
-      console.warn('EPS export failed:', err instanceof Error ? err.name : typeof err);
-      return { success: false, format: 'eps', error: describeExportError(err, config) };
+      console.warn(`${format.toUpperCase()} export failed:`, err instanceof Error ? err.name : typeof err);
+      return { success: false, format, error: describeExportError(err, config) };
     }
   }, [buildSvg, getFilename, config]);
 
-  const handleSavePdf = useCallback(async (options?: AssetOptions): Promise<ExportStatus> => {
-    const blocked = blockedExport(config, 'pdf');
-    if (blocked) return blocked;
-    try {
-      const built = await buildSvg(options);
-      if (!built) return { success: false, format: 'pdf', error: scanValidationFailed() };
-
-      const { convertSvgToPdf } = await import('@/packages/qr-export');
-      const pdfBytes = convertSvgToPdf(built.svg);
-
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = getFilename('pdf', options?.filename);
-      // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
-      link.href = url;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      return { success: true, format: 'pdf', logoOmitted: built.logoOmitted };
-    } catch (err) {
-      console.warn('PDF export failed:', err instanceof Error ? err.name : typeof err);
-      return { success: false, format: 'pdf', error: describeExportError(err, config) };
-    }
-  }, [buildSvg, getFilename, config]);
+  const handleSaveEps = useCallback((options?: AssetOptions) => saveVector('eps', options), [saveVector]);
+  const handleSavePdf = useCallback((options?: AssetOptions) => saveVector('pdf', options), [saveVector]);
 
   /**
    * Copies the SVG markup to the clipboard as text, for pasting into design tools or code.

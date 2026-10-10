@@ -26,6 +26,9 @@ const LOGO_BORDER_HINTS: Record<LogoPaddingStyle, string> = {
   none: 'The logo sits straight on the code, with no backing or gap.',
 };
 
+/** Preset categories as tabs over the logo grid. */
+const CATEGORY_OPTIONS = PRESET_LOGO_CATEGORIES.map((category) => ({ value: category.id, label: category.label }));
+
 interface LogoControlsProps {
   config: QRConfig;
   onChange: (updates: Partial<QRConfig>) => void;
@@ -70,30 +73,23 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
 
       {/* Preset Logo Gallery */}
       <div className="mb-4">
-        <div className="mb-2.5 flex flex-wrap gap-1.5" role="tablist" aria-label="Preset logo categories">
-          {PRESET_LOGO_CATEGORIES.map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                role="tab"
-                aria-selected={isSelected}
-                tabIndex={isSelected ? 0 : -1}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                  isSelected
-                    ? 'bg-accent-soft font-semibold text-accent-strong shadow-xs'
-                    : 'hover:bg-surface-active bg-surface-hover text-fg-muted hover:text-fg'
-                }`}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
+        <SegmentedControl
+          kind="tablist"
+          label="Preset logo categories"
+          options={CATEGORY_OPTIONS}
+          value={selectedCategory}
+          onChange={setSelectedCategory}
+          tabId={(id) => `logo-category-tab-${id}`}
+          controls={() => 'logo-category-panel'}
+          className="mb-2.5"
+        />
 
-        <div className="grid grid-cols-5 gap-2 sm:grid-cols-6" aria-label="Preset logos">
+        <div
+          id="logo-category-panel"
+          role="tabpanel"
+          aria-labelledby={`logo-category-tab-${selectedCategory}`}
+          className="grid grid-cols-5 gap-2 sm:grid-cols-6"
+        >
           {filteredPresets.map((preset) => {
             const isSelected = config.logoUrl === preset.dataUrl;
             return (
@@ -110,7 +106,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
                 className={`group relative flex size-11 items-center justify-center rounded-lg border transition-all focus:ring-2 focus:ring-accent focus:outline-none ${
                   isSelected
                     ? 'border-accent bg-accent-soft shadow-xs ring-2 ring-accent'
-                    : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600'
+                    : 'border-line bg-surface-raised hover:border-line-strong'
                 }`}
               >
                 <img
@@ -149,7 +145,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
       ) : (
         <Card variant="control" className="space-y-5">
           <div className="flex items-center gap-4">
-            <img src={config.logoUrl} alt="Custom Brand Graphic" width={48} height={48} className="size-12 rounded-md border border-slate-200 bg-white object-contain shadow-sm" />
+            <img src={config.logoUrl} alt="Custom Brand Graphic" width={48} height={48} className="size-12 rounded-md border border-line bg-surface-raised object-contain shadow-sm" />
             <div className="flex-1">
               <p className="text-sm font-medium text-fg-soft">{activePreset ? `${activePreset.label} Logo` : 'Custom Logo'}</p>
               <p className="text-xs text-fg-muted">Embedded in center</p>

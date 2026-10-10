@@ -25,7 +25,7 @@ QRCraftly uses Tailwind CSS v4 without a `tailwind.config.js` file:
 
 ## 2. Design Tokens
 
-`src/layouts/index.css` defines the token layer in one `@theme` block (#1045). Components use the semantic names, never raw palette steps: `scripts/design_token_audit.js` (part of `pnpm run lint`) rejects raw palette colours in `src/components/ui/` and arbitrary colour or size values (`text-[11px]`, `bg-[#0a0f1d]`) anywhere in `src/`. Pages still carry some raw palette classes; move them to tokens when you touch them.
+`src/layouts/index.css` defines the token layer in one `@theme` block (#1045). Components use the semantic names, never raw palette steps: `scripts/design_token_audit.js` (part of `pnpm run lint`) rejects raw palette colours and arbitrary colour or size values (`text-[11px]`, `bg-[#0a0f1d]`) anywhere in `src/`. A few older files still carry raw palette classes; they are listed in `LEGACY_PALETTE_FILES` in the audit script. Move one to tokens when you touch it and take it off the list; the list never grows.
 
 Colour roles are CSS variables. A `.dark` block redefines their values, so a component writes `bg-surface text-fg` once and needs no `dark:` variant.
 

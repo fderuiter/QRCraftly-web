@@ -28,6 +28,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { Badge, type BadgeTone } from '../ui/Badge';
 
 /** Badge text per row category. A skipped row is not always a safety problem (it may be too long, say). */
 const CATEGORY_LABELS: Readonly<Record<PreflightRowDetail['category'], string>> = {
@@ -36,6 +37,43 @@ const CATEGORY_LABELS: Readonly<Record<PreflightRowDetail['category'], string>> 
   unsafe: 'skipped',
   caution: 'caution',
 };
+
+/** Badge colour per row category. */
+const CATEGORY_TONES: Readonly<Record<PreflightRowDetail['category'], BadgeTone>> = {
+  valid: 'success',
+  empty: 'neutral',
+  unsafe: 'danger',
+  caution: 'warning',
+};
+
+type MetricTone = 'neutral' | 'success' | 'danger' | 'warning';
+
+/** Card and text colours per metric tone. */
+const METRIC_TONES: Readonly<Record<MetricTone, { card: string; label: string; value: string }>> = {
+  neutral: { card: 'border-line bg-surface', label: 'text-fg-muted', value: 'text-fg' },
+  success: { card: 'border-success-line bg-success-soft', label: 'text-success', value: 'text-success' },
+  danger: { card: 'border-danger-line bg-danger-soft', label: 'text-danger', value: 'text-danger' },
+  warning: { card: 'border-warning-line bg-warning-soft', label: 'text-warning', value: 'text-warning' },
+};
+
+/** One count in the metrics grid. */
+const Metric: React.FC<{ label: string; value: number; testId: string; tone: MetricTone; icon?: React.ComponentType<{ className?: string }> }> = ({
+  label,
+  value,
+  testId,
+  tone,
+  icon: Icon,
+}) => (
+  <div className={`flex flex-col rounded-lg border p-2.5 text-center shadow-2xs ${METRIC_TONES[tone].card}`}>
+    <span className={`flex items-center justify-center gap-1 text-xs font-medium ${METRIC_TONES[tone].label}`}>
+      {Icon && <Icon className="size-3.5" aria-hidden="true" />}
+      {label}
+    </span>
+    <span className={`mt-1 text-lg font-bold ${METRIC_TONES[tone].value}`} data-testid={testId}>
+      {value}
+    </span>
+  </div>
+);
 
 export interface BulkCsvPreflightSummaryProps {
   report: PreflightReport;
@@ -48,86 +86,36 @@ export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = (
   const isAllValid = !hasIssues && report.totalRows > 0;
 
   return (
-    <div
-      className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 shadow-2xs transition-all dark:border-slate-700 dark:bg-slate-800/60"
-      data-testid="preflight-summary-card"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-slate-700/80">
+    <div className="rounded-xl border border-line bg-surface-sunken p-4 shadow-2xs transition-all" data-testid="preflight-summary-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
         <div className="flex items-center gap-2.5">
-          <FileSpreadsheet className="size-5 text-teal-600 dark:text-teal-400" />
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-            Preflight Validation Report
-          </h3>
+          <FileSpreadsheet className="size-5 text-accent" aria-hidden="true" />
+          <h3 className="text-sm font-semibold text-fg">Preflight Validation Report</h3>
         </div>
 
         <div className="flex items-center gap-2">
           {isAllValid && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
-              <CheckCircle2 className="size-3.5" />
+            <Badge tone="success" className="gap-1.5 px-2.5 font-medium">
+              <CheckCircle2 className="size-3.5" aria-hidden="true" />
               All {report.totalRows} rows valid
-            </span>
+            </Badge>
           )}
           {hasIssues && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
-              <AlertTriangle className="size-3.5" />
+            <Badge tone="warning" className="gap-1.5 px-2.5 font-medium">
+              <AlertTriangle className="size-3.5" aria-hidden="true" />
               {report.invalidDetails.length} {report.invalidDetails.length === 1 ? 'row requires' : 'rows require'} attention
-            </span>
+            </Badge>
           )}
         </div>
       </div>
 
       <div className="mt-3.5 grid grid-cols-2 gap-2.5 sm:grid-cols-5" data-testid="preflight-metrics-grid">
-        {/* Total Rows */}
-        <div className="flex flex-col rounded-lg border border-slate-200 bg-white p-2.5 text-center shadow-2xs dark:border-slate-700 dark:bg-slate-800">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Rows</span>
-          <span className="mt-1 text-lg font-bold text-slate-900 dark:text-white" data-testid="count-total">
-            {report.totalRows}
-          </span>
-        </div>
-
-        {/* Valid Rows */}
-        <div className="flex flex-col rounded-lg border border-emerald-200 bg-emerald-50/60 p-2.5 text-center shadow-2xs dark:border-emerald-800/60 dark:bg-emerald-950/30">
-          <span className="flex items-center justify-center gap-1 text-xs font-medium text-emerald-800 dark:text-emerald-300">
-            <CheckCircle2 className="size-3.5" />
-            Valid
-          </span>
-          <span className="mt-1 text-lg font-bold text-emerald-700 dark:text-emerald-300" data-testid="count-valid">
-            {report.validCount}
-          </span>
-        </div>
-
-        {/* Empty Rows */}
-        <div className="flex flex-col rounded-lg border border-slate-200 bg-white p-2.5 text-center shadow-2xs dark:border-slate-700 dark:bg-slate-800">
-          <span className="flex items-center justify-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400">
-            <AlertCircle className="size-3.5" />
-            Empty
-          </span>
-          <span className="mt-1 text-lg font-bold text-slate-700 dark:text-slate-300" data-testid="count-empty">
-            {report.emptyCount}
-          </span>
-        </div>
-
+        <Metric label="Total Rows" value={report.totalRows} testId="count-total" tone="neutral" />
+        <Metric label="Valid" value={report.validCount} testId="count-valid" tone="success" icon={CheckCircle2} />
+        <Metric label="Empty" value={report.emptyCount} testId="count-empty" tone="neutral" icon={AlertCircle} />
         {/* Rows left out: their content fails the payload checks */}
-        <div className="flex flex-col rounded-lg border border-rose-200 bg-rose-50/60 p-2.5 text-center shadow-2xs dark:border-rose-800/60 dark:bg-rose-950/30">
-          <span className="flex items-center justify-center gap-1 text-xs font-medium text-rose-800 dark:text-rose-300">
-            <XCircle className="size-3.5" />
-            Skipped
-          </span>
-          <span className="mt-1 text-lg font-bold text-rose-700 dark:text-rose-300" data-testid="count-unsafe">
-            {report.unsafeCount}
-          </span>
-        </div>
-
-        {/* Caution Warnings */}
-        <div className="flex flex-col rounded-lg border border-amber-200 bg-amber-50/60 p-2.5 text-center shadow-2xs dark:border-amber-800/60 dark:bg-amber-950/30">
-          <span className="flex items-center justify-center gap-1 text-xs font-medium text-amber-800 dark:text-amber-300">
-            <AlertTriangle className="size-3.5" />
-            Caution
-          </span>
-          <span className="mt-1 text-lg font-bold text-amber-700 dark:text-amber-300" data-testid="count-caution">
-            {report.cautionCount}
-          </span>
-        </div>
+        <Metric label="Skipped" value={report.unsafeCount} testId="count-unsafe" tone="danger" icon={XCircle} />
+        <Metric label="Caution" value={report.cautionCount} testId="count-caution" tone="warning" icon={AlertTriangle} />
       </div>
 
       {hasIssues && (
@@ -140,7 +128,7 @@ export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = (
             aria-expanded={isExpanded}
             aria-controls="preflight-details-panel"
             data-testid="preflight-expand-toggle"
-            className="flex items-center gap-1.5 text-xs text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+            className="flex items-center gap-1.5 text-xs text-fg-soft hover:text-fg"
           >
             {isExpanded ? (
               <>
@@ -159,32 +147,22 @@ export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = (
             <div
               id="preflight-details-panel"
               data-testid="preflight-details-panel"
-              className="mt-2.5 max-h-60 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800/90"
+              className="mt-2.5 max-h-60 overflow-y-auto rounded-lg border border-line bg-surface p-3"
             >
               <ul className="space-y-2 text-xs" data-testid="preflight-details-list">
                 {report.invalidDetails.map((item: PreflightRowDetail) => (
                   <li
                     key={item.rowNumber}
-                    className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2 last:border-0 last:pb-0 dark:border-slate-700/60"
+                    className="flex flex-wrap items-start justify-between gap-2 border-b border-line-subtle pb-2 last:border-0 last:pb-0"
                   >
                     <div className="flex items-start gap-2">
-                      <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
-                        Row {item.rowNumber}:
-                      </span>
-                      <span className="text-slate-800 dark:text-slate-200">{item.reason}</span>
+                      <span className="font-mono font-semibold text-fg-soft">Row {item.rowNumber}:</span>
+                      <span className="text-fg">{item.reason}</span>
                     </div>
 
-                    <span
-                      className={`inline-flex shrink-0 items-center rounded-xs px-1.5 py-0.5 text-xs font-semibold tracking-wider uppercase ${
-                        item.category === 'empty'
-                          ? 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
-                          : item.category === 'unsafe'
-                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                      }`}
-                    >
+                    <Badge tone={CATEGORY_TONES[item.category]} className="rounded-xs px-1.5 tracking-wider uppercase">
                       {CATEGORY_LABELS[item.category]}
-                    </span>
+                    </Badge>
                   </li>
                 ))}
               </ul>
