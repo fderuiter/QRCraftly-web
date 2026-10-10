@@ -9,7 +9,7 @@ import { normalizeLabel, unescapePunctuation } from './inline.js';
 
 const FENCE = /^( {0,3})(`{3,}|~{3,})(.*)$/;
 const ATX = /^ {0,3}(#{1,6})(?=[ \t]|$)(.*)$/;
-const HR = /^ {0,3}(?:(?:-[ \t]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})$/;
+const HR = /^ {0,3}(?:(?:-[ \t]*){3}[- \t]*|(?:_[ \t]*){3}[_ \t]*|(?:\*[ \t]*){3}[* \t]*)$/;
 const QUOTE = /^ {0,3}>/;
 const QUOTE_MARKER = /^ {0,3}> ?/;
 const BULLET = /^( {0,3})([*+-]|\d{1,9}[.)])(?=[ \t]|$)/;
