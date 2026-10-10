@@ -60,12 +60,12 @@ export function toHaveNoViolations(results: AxeResults) {
   const violations = levels.length
     ? results.violations.filter(v => v.impact != null && levels.includes(v.impact))
     : results.violations;
-  const pass = violations.length === 0;
+  const ok = violations.length === 0;
   return {
-    pass,
+    pass: ok,
     actual: violations,
     message: () =>
-      pass
+      ok
         ? 'Expected accessibility violations, but axe found none'
         : `Expected no accessibility violations, but axe found ${violations.length}:\n\n${violations
             .map(describeViolation)

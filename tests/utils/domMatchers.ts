@@ -297,15 +297,15 @@ function toBeVisible(this: MatcherState, element: unknown): Result {
   assertElement(this, 'toBeVisible', element);
   const attached = isInDocument(element);
   const view = viewOf(element);
-  const pass = attached && view !== null && isElementVisible(element, view);
-  return stateResult(this, 'toBeVisible', pass, `visible${attached ? '' : ' (element is not in the document)'}`, element);
+  const ok = attached && view !== null && isElementVisible(element, view);
+  return stateResult(this, 'toBeVisible', ok, `visible${attached ? '' : ' (element is not in the document)'}`, element);
 }
 
 function toBeEmptyDOMElement(this: MatcherState, element: unknown): Result {
   assertElement(this, 'toBeEmptyDOMElement', element);
-  const pass = Array.from(element.childNodes).every(node => node.nodeType === COMMENT_NODE);
+  const ok = Array.from(element.childNodes).every(node => node.nodeType === COMMENT_NODE);
   return {
-    pass,
+    pass: ok,
     message: () => [hint(this, 'toBeEmptyDOMElement'), '', 'Received:', `  ${this.utils.printReceived(element.innerHTML)}`].join('\n'),
   };
 }
@@ -335,15 +335,16 @@ function toBeChecked(this: MatcherState, element: unknown): Result {
         `only inputs with type="checkbox" or type="radio" or elements with role ${CHECKED_ROLES.join(', ')} and a valid aria-checked attribute can be used with .toBeChecked(). Use .toHaveValue() instead`,
     };
   }
-  const pass = isInput ? element.checked : ariaChecked === 'true';
-  return stateResult(this, 'toBeChecked', pass, 'checked', element);
+  const ok = isInput ? element.checked : ariaChecked === 'true';
+  return stateResult(this, 'toBeChecked', ok, 'checked', element);
 }
 
 function toHaveFocus(this: MatcherState, element: unknown): Result {
   assertElement(this, 'toHaveFocus', element);
   const active = element.ownerDocument.activeElement;
+  const ok = active === element;
   return {
-    pass: active === element,
+    pass: ok,
     message: () =>
       [
         hint(this, 'toHaveFocus'),
@@ -363,8 +364,9 @@ function toHaveFocus(this: MatcherState, element: unknown): Result {
 function toContainElement(this: MatcherState, container: unknown, element: unknown): Result {
   assertElement(this, 'toContainElement', container);
   if (element !== null) assertElement(this, 'toContainElement', element);
+  const ok = container.contains(element);
   return {
-    pass: container.contains(element),
+    pass: ok,
     message: () =>
       [
         this.utils.matcherHint(`${this.isNot ? '.not' : ''}.toContainElement`, 'element', 'element'),
@@ -425,8 +427,9 @@ function toHaveClass(this: MatcherState, element: unknown, ...params: unknown[])
           : [hint(this, 'toHaveClass'), 'At least one expected class must be provided.'].join('\n'),
     };
   }
+  const ok = exact ? subset && expected.length === received.length : subset;
   return {
-    pass: exact ? subset && expected.length === received.length : subset,
+    pass: ok,
     message: () =>
       report(
         this,
@@ -458,8 +461,9 @@ function toHaveStyle(this: MatcherState, element: unknown, css: string | Record<
       .map(name => `${name}: ${styles[name]};`)
       .join('\n');
   const entries = Object.keys(expected);
+  const ok = entries.length > 0 && entries.every(name => received[name] === expected[name]);
   return {
-    pass: entries.length > 0 && entries.every(name => received[name] === expected[name]),
+    pass: ok,
     message: () => report(this, hint(this, 'toHaveStyle'), 'Expected styles', print(expected), print(received), element),
   };
 }
@@ -528,11 +532,10 @@ function accessibleText(
   const actual = name === 'toHaveAccessibleName' ? computeAccessibleName(element) : computeAccessibleDescription(element);
   const label = name === 'toHaveAccessibleName' ? 'accessible name' : 'accessible description';
   const expected = rest[0];
-  let pass: boolean;
-  if (rest.length === 0) pass = actual !== '';
-  else pass = expected instanceof RegExp ? expected.test(actual) : state.equals(actual, expected);
+  const ok =
+    rest.length === 0 ? actual !== '' : expected instanceof RegExp ? expected.test(actual) : state.equals(actual, expected);
   return {
-    pass,
+    pass: ok,
     message: () =>
       report(state, hint(state, name), `Expected element ${state.isNot ? 'not to' : 'to'} have ${label}`, expected, actual, element),
   };
