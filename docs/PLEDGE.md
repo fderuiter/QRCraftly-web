@@ -7,7 +7,7 @@ Free QR codes that never expire. No sign-up, no ads, nothing leaves your browser
 - **No ads.** No banner ads, no sponsored placements, no affiliate links and no paid upgrades. Not now and not later.
 - **No tracking.** No analytics, no tracking cookies, no tracking pixels, no fingerprinting and no third-party scripts. I do not know who you are and I do not want to.
 - **Entirely in your browser.** Your QR codes are made on your device. What you type, upload or scan is never sent to a server. Once the page has loaded, the generator keeps working offline.
-- **Completely free.** Every feature, for everyone, with no account, no sign-up and no limits.
+- **Completely free.** Every feature, for everyone, with no account, no sign-up and no paid tier.
 
 If keeping QRCraftly running ever comes down to ads or nothing, it will be nothing: I will shut the project down before a single ad goes on it. The only way QRCraftly would ever change hands is if someone buys the whole project outright.
 

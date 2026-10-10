@@ -123,7 +123,7 @@ export function AppFooter() {
           <FooterLinks links={COMPANY_LINKS} className="space-y-2 text-sm text-fg-muted" />
           <ul className="mt-2 text-sm text-fg-muted">
             <li>
-              <a href="https://github.com/fderuiter/QRCraftly" target="_blank" rel="noopener noreferrer" className={FOOTER_LINK_CLASSES}>
+              <a href="https://github.com/fderuiter/QRCraftly-web" target="_blank" rel="noopener noreferrer" className={FOOTER_LINK_CLASSES}>
                 GitHub
               </a>
             </li>

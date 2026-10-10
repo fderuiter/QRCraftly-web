@@ -49,7 +49,7 @@ export default function Page() {
       <div className="mb-8 space-y-1 text-fg-muted">
         <p>
           This policy covers the app QRCraftly: QR Code Studio. For the QRCraftly website, see{' '}
-          <a href="/security#privacy" className={LINK_CLASSES}>Security &amp; Privacy</a>.
+          <a href="/security#compliance" className={LINK_CLASSES}>Security &amp; Privacy</a>.
         </p>
         <p>
           Effective date: <time dateTime={EFFECTIVE_DATE}>{EFFECTIVE_DATE_TEXT}</time>

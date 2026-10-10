@@ -59,7 +59,7 @@ describe('ButtonLink', () => {
   });
 
   it('passes link attributes through', () => {
-    render(<ButtonLink href="https://github.com/fderuiter/QRCraftly" target="_blank" rel="noopener noreferrer">GitHub</ButtonLink>);
+    render(<ButtonLink href="https://github.com/fderuiter/QRCraftly-web" target="_blank" rel="noopener noreferrer">GitHub</ButtonLink>);
     const link = screen.getByRole('link', { name: 'GitHub' });
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');

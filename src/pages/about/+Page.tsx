@@ -70,18 +70,18 @@ export default function Page() {
     <>
       <ArticleLayout
         title="About QRCraftly"
-        lead="A privacy-focused QR code generator that runs in your browser. Free, with no ads and no sign-up."
+        lead="A QR code generator that runs in your browser. Free, with no ads, no tracking and no sign-up."
         sections={SECTIONS}
       >
         <section id="why" aria-labelledby="why-title" className="mb-10 scroll-mt-6 space-y-3 text-fg-soft">
           <ArticleHeading id="why"><span id="why-title">Why QRCraftly exists</span></ArticleHeading>
           <p>
-            Many free QR code generators are not free for long. They send your codes through their own servers, then
-            switch them off when a trial ends, or fill the page with ads and trackers.
+            Many free QR code generators are not free for long. They route your codes through their own servers and
+            switch them off when a trial ends, or they pay for the site with ads and trackers.
           </p>
           <p>
-            QRCraftly makes static codes: what you encode is written into the code itself, so it keeps working without
-            us. QRCraftly is completely free to use. No sign-up, no login and no hidden fees.
+            QRCraftly makes static codes: what you encode is written into the code itself, so the code keeps working
+            even if this site goes away. It costs nothing and needs no account.
           </p>
         </section>
 
@@ -135,14 +135,14 @@ export default function Page() {
         <section id="open-source" aria-labelledby="open-source-title" className="mb-10 scroll-mt-6 text-fg-soft">
           <ArticleHeading id="open-source"><span id="open-source-title">Open source</span></ArticleHeading>
           <p className="mb-4">
-            QRCraftly is released under the <strong>GNU Affero General Public License v3.0 (AGPL-3.0)</strong>. The code
-            is open for inspection and contribution. We believe in transparency.
+            QRCraftly is released under the <strong>GNU Affero General Public License v3.0 (AGPL-3.0)</strong>. Anyone
+            can read the code, check the claims on this site against it, and suggest changes.
           </p>
           <p className="mb-4">
             QRCraftly is built on open-source packages too.{' '}
             <a href="/acknowledgements" className={LINK_CLASSES}>See every package it ships and its license</a>
           </p>
-          <ButtonLink href="https://github.com/fderuiter/QRCraftly" target="_blank" rel="noopener noreferrer" variant="outline">
+          <ButtonLink href="https://github.com/fderuiter/QRCraftly-web" target="_blank" rel="noopener noreferrer" variant="outline">
             <GithubIcon className="size-5" />
             View on GitHub
           </ButtonLink>

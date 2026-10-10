@@ -142,12 +142,20 @@ describe('HeadDefault', () => {
     expect(org.foundingDate).toBe('2025');
   });
 
-  it('includes Open Graph image dimensions', () => {
+  it('declares the real size of a generated share image', () => {
     const { container } = render(<HeadDefault />, { container: document.head });
 
-    const width = container.querySelector('meta[property="og:image:width"]');
-    expect(width).toBeInTheDocument();
-    expect(width?.getAttribute('content')).toBe('1280');
+    expect(container.querySelector('meta[property="og:image"]')?.getAttribute('content')).toBe('https://qrcraftly.com/og/index.png');
+    expect(container.querySelector('meta[property="og:image:width"]')?.getAttribute('content')).toBe('1200');
+    expect(container.querySelector('meta[property="og:image:height"]')?.getAttribute('content')).toBe('630');
+  });
+
+  it('declares the fallback image size on pages without their own share image', () => {
+    mockUsePageContext.mockReturnValue({ urlPathname: '/404', is404: true, config: { image: '/og-image.png' } });
+    const { container } = render(<HeadDefault />, { container: document.head });
+
+    expect(container.querySelector('meta[property="og:image:width"]')?.getAttribute('content')).toBe('1280');
+    expect(container.querySelector('meta[property="og:image:height"]')?.getAttribute('content')).toBe('720');
   });
 
   it('does not render breadcrumbs for the home page root path', () => {

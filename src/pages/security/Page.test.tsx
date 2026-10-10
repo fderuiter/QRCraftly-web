@@ -11,7 +11,7 @@ describe('Security Page', () => {
     // Check main heading (h1)
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
-    expect(h1s[0]).toHaveTextContent(/Security & Privacy Transparency Hub/i);
+    expect(h1s[0]).toHaveTextContent(/Security & Privacy/i);
     // Site navigation and the footer come from the app shell, never from the page.
     expect(screen.queryByRole('navigation', { name: /Primary navigation/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
@@ -26,7 +26,7 @@ describe('Security Page', () => {
     headers.forEach((header) => {
       // The only h1 should be the page title
       if (header.tagName === 'H1') {
-        expect(header).toHaveTextContent(/Security & Privacy Transparency Hub/i);
+        expect(header).toHaveTextContent(/Security & Privacy/i);
       }
     });
   });
@@ -34,11 +34,11 @@ describe('Security Page', () => {
   it('appends unique, document-prefixed ID attributes to heading elements and rewrites cross-file links', () => {
     const { container } = render(<Page />);
 
-    // Check heading ID for HIPAA Compliance Alignment in compliance document
-    const complianceHeading = container.querySelector('#compliance-hipaa-compliance-alignment');
+    // Check heading ID for the HIPAA section in the compliance document
+    const complianceHeading = container.querySelector('#compliance-hipaa-and-other-rules');
     expect(complianceHeading).not.toBeNull();
     expect(complianceHeading?.tagName).toBe('H3');
-    expect(complianceHeading?.textContent).toBe('HIPAA Compliance Alignment');
+    expect(complianceHeading?.textContent).toBe('HIPAA and other rules');
 
     // Check heading ID for CI/CD Security Governance in security document
     const securityHeading = container.querySelector('#security-cicd-security-governance');

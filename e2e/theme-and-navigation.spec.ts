@@ -102,9 +102,9 @@ test.describe('Security page (#1056)', () => {
   });
 
   test('a deep link opens the collapsed policy and scrolls to the heading', async ({ page }) => {
-    await page.goto('/security#compliance-hipaa-compliance-alignment');
+    await page.goto('/security#compliance-hipaa-and-other-rules');
     await page.waitForSelector('main[data-hydrated="true"]');
-    await expect(page.locator('#compliance-hipaa-compliance-alignment')).toBeInViewport();
+    await expect(page.locator('#compliance-hipaa-and-other-rules')).toBeInViewport();
   });
 });
 

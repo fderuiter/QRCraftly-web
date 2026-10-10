@@ -40,6 +40,7 @@ import { LANDING_GALLERIES, LANDING_PAGE_IDS, type LandingGalleryImage } from '.
 import { landingPageContent, type LandingCopy } from './landingPageContent';
 import { getExampleImage, getRelatedTypePages, TYPE_PAGE_TYPES, type RelatedPage } from './relatedPages';
 import { getGuideFaqs, guideFaqAnswer } from './guideFaqs';
+import { getPageGuides } from './pageGuides';
 import { typeGuides, type TypeGuide } from './typeGuides';
 import { generateGuideIndexSchema, generateGuideSchema, generateSchema } from '../utils/schemaGenerator';
 import { resolveDomainForPath, type JsonLdObject } from '../utils/metadataEngine';
@@ -62,6 +63,8 @@ export interface PageContent {
   gallery?: readonly LandingGalleryImage[];
   /** Sibling generator pages to link to. */
   related: RelatedPage[];
+  /** Guides to link to from the page body (#1309). */
+  guides?: RelatedPage[];
 }
 
 /** The how-to steps and FAQs of each page that has its own copy module, by registry key. */
@@ -99,11 +102,13 @@ export function buildPageContent(pageContext: MetadataPageContext): PageContent 
   const landing = landingPageContent[id];
   const example = getExampleImage(id);
   const gallery = LANDING_GALLERIES[id];
+  const pageGuides = getPageGuides(id);
   if (tool) content.tool = tool;
   if (guide) content.guide = guide;
   if (landing) content.landing = landing;
   if (example) content.example = example;
   if (gallery) content.gallery = gallery;
+  if (pageGuides.length > 0) content.guides = pageGuides;
   return content;
 }
 
