@@ -26,6 +26,7 @@ import type { Connect } from 'vite';
 import { shippedPackages } from './scripts/vite/thirdPartyLicenses';
 import { docsManifest } from './scripts/vite/docsManifest';
 import { foundryDefines } from './scripts/utils/rustWorkspace.js';
+import coverageThresholds from './scripts/ci/coverage_thresholds.json';
 
 /**
  * Applies the static rules in `public/_redirects` (the file Cloudflare serves them from) in
@@ -165,14 +166,11 @@ export default defineConfig(() => {
           reportOnFailure: true,
           // Floors set just under the measured totals for the scope below; raise
           // them as coverage improves, never lower them to make a PR pass.
-          thresholds: {
-            // Measured on dev when this scope was introduced: statements 80.4%,
-            // branches 73.1%, functions 86.1%, lines 81.4%.
-            statements: 80,
-            branches: 72,
-            functions: 85,
-            lines: 80,
-          },
+          // Measured on dev when this scope was introduced: statements 80.4%,
+          // branches 73.1%, functions 86.1%, lines 81.4%. The floors live in a
+          // JSON file so the CI coverage summary (scripts/ci/coverage_summary.js)
+          // shows the same numbers without parsing this config.
+          thresholds: { ...coverageThresholds },
           // Measure the logic layers: shared utilities and the deep-module
           // packages. Components, hooks and pages are exercised by the jsdom
           // project and Playwright but not gated here.

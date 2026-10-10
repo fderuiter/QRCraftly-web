@@ -158,9 +158,14 @@ jobs:
         env:
           VITEST_COVERAGE: "true"
 
-      - name: "Report Coverage"
-        if: github.event_name == 'pull_request'
-        uses: davelosert/vitest-coverage-report-action@c4bbc33a89b7ace0e63d35f1f7d4bcee31155a73 # v2
+      # Our own script instead of a third-party action (#1185). It writes the
+      # coverage table to this run's summary page and needs no write permission.
+      - name: Coverage summary
+        if: always()
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: node scripts/ci/coverage_summary.js
 
   # JOB: Rust WebAssembly modules (#1182, ADR 0033). Installs the toolchain pinned in
   # crates/rust-toolchain.toml with the runner's own rustup, checks the crates, and
