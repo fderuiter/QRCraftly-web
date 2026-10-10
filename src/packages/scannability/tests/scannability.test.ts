@@ -20,7 +20,7 @@ import { describe, it, expect } from 'vitest';
 import { calculateScannabilityHealth, getExportRiskPolicy } from '../index';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { evaluateScannability, performScannabilityCheck } from '../checker';
-import { QRConfig, QRType, QRErrorCorrectionLevel, QRStyle, SocialFormat, TemplateStyle } from '@/types';
+import { type QRConfig, QRType, QRErrorCorrectionLevel, QRStyle, SocialFormat, TemplateStyle } from '@/types';
 import { DEFAULT_CONFIG } from '@/constants';
 
 const getBaseConfig = (): QRConfig => ({

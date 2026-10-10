@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { EmpiricalScanPipeline, paintScanFrame, SCAN_FRAME_SIZE, SCAN_WATCHDOG_MS, ScanOutcome, WorkerLike, DetectorLike } from '../index';
+import { EmpiricalScanPipeline, paintScanFrame, SCAN_FRAME_SIZE, SCAN_WATCHDOG_MS, type ScanOutcome, type WorkerLike, type DetectorLike } from '../index';
 
 const frame = () => ({ data: new Uint8ClampedArray(SCAN_FRAME_SIZE * SCAN_FRAME_SIZE * 4), width: SCAN_FRAME_SIZE, height: SCAN_FRAME_SIZE }) as unknown as ImageData;
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));

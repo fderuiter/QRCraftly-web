@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG } from '../constants';
-import { QRConfig, QRStyle, QRType } from '../types';
+import { type QRConfig, QRStyle, QRType } from '../types';
 import { MAX_STYLE_FILE_BYTES, parseStyleFile, serializeStyle, STYLE_FILE_FORMAT } from './styleFile';
 
 const config = (overrides: Partial<QRConfig> = {}): QRConfig => ({ ...DEFAULT_CONFIG, ...overrides });

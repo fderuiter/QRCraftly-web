@@ -36,9 +36,9 @@ import {
   spawnProjectile,
   stepParticles,
   stepProjectiles,
-  TargetMatrix,
-  Projectile,
-  Particle,
+  type TargetMatrix,
+  type Projectile,
+  type Particle,
 } from '../index';
 
 /** A 2x2 checkerboard: dark modules at (0,0) and (1,1). */

@@ -1,4 +1,4 @@
-import { QRConfig } from '../types';
+import type { QRConfig } from '../types';
 import { LOW_RELIABILITY_PATTERNS, MIN_CONTRAST_THRESHOLD, PATTERNS, PRESET_COLORS } from '../constants';
 import { getContrastRatio } from './colorUtils';
 

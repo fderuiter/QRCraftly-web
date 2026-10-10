@@ -1,7 +1,7 @@
 import type { Guide } from '../data/guides';
 import type { ToolCopy } from '../data/copy/types';
-import { ToolContent, AuxiliaryContent, getContentForPath, getContentById } from '../data/contentRegistry';
-import { resolveDomainForPath, resolvePublicUrl, JsonLdObject } from './metadataEngine';
+import { type ToolContent, type AuxiliaryContent, getContentForPath, getContentById } from '../data/contentRegistry';
+import { resolveDomainForPath, resolvePublicUrl, type JsonLdObject } from './metadataEngine';
 
 /**
  * Absolute URL of a page's share image, on the page's own domain. The registry holds the

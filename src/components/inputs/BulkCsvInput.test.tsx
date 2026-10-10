@@ -21,7 +21,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BulkCsvInput } from './BulkCsvInput';
 import { LazyBulkCsvInput } from './LazyBulkCsvInput';
-import { BulkCsvData, SocialFormat } from '@/types';
+import { type BulkCsvData, SocialFormat } from '@/types';
 import { QRProvider } from '@/context/QRContext';
 import { ToastProvider } from '../ui/Toast';
 import * as downloadManager from '@/utils/downloadManager';

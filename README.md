@@ -98,7 +98,7 @@ pnpm install
 pnpm dev
 ```
 
-The dev server runs at `http://localhost:3000`. `pnpm install` also installs the Husky Git hooks. `pnpm run wizard:dev` walks through the local setup interactively.
+The dev server runs at `http://localhost:3000`. `pnpm install` also installs the Git hooks (`scripts/hooks/install.js` points `core.hooksPath` at `.githooks/`). `pnpm run wizard:dev` walks through the local setup interactively.
 
 ### Build and preview
 
@@ -211,7 +211,7 @@ CI also runs the unit tests with coverage, the end-to-end tests, the build with 
 - It fails if all shipped JavaScript and CSS together exceed 650 KB gzipped.
 - Each Rust module has its own gzipped budget, for example 32 KB for `qr-decode` and 10 KB for `prism-fec`.
 
-Before every commit, Husky and lint-staged format and lint the staged files and run the secret, storage and docs audits, then the type check, the duplication audit and the unit tests ([ADR 0010](docs/adr/0010-husky-and-lint-staged-git-guardrails.md)).
+Before every commit, our own pre-commit hook (`.githooks/pre-commit`) formats and lints the staged files and runs the secret, storage and docs audits, then the duplication audit, the type check and the unit tests ([ADR 0044](docs/adr/0044-own-git-hooks-and-staged-file-runner.md)). The staged-file rules are in `scripts/hooks/staged.config.js`.
 
 ## Contributing
 

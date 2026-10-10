@@ -19,7 +19,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { calculateLayout, renderFrame } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
-import { QRConfig } from '@/types';
+import type { QRConfig } from '@/types';
 
 describe('Frame Matrix & Layout Rendering', () => {
   it('adjusts draw bounds when frameStyle is active', () => {

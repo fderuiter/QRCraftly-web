@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRConfig } from '@/types';
+import type { QRConfig } from '@/types';
 
 /**
  * Draws the background and pattern (such as dashed or dotted) of the outer border.

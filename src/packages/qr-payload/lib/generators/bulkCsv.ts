@@ -17,7 +17,7 @@
 */
 
 import { previewRow } from '@/packages/bulk-csv';
-import { BulkCsvData, QRType, QRGeneratorContract } from '@/types';
+import { type BulkCsvData, QRType, type QRGeneratorContract } from '@/types';
 
 /**
  * Constructs the live preview payload: the first row's value in the payload column, encoded

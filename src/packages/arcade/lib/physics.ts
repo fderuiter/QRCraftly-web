@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { MicroCell, MicroGrid } from './microGrid';
+import type { MicroCell, MicroGrid } from './microGrid';
 
 /** Logical layout of the blaster arena, in arena pixels (independent of display size). */
 export interface ArenaGeometry {

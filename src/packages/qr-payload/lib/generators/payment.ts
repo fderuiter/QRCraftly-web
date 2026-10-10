@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { PaymentData, CryptoNetwork, QRType, QRGeneratorContract } from '@/types';
+import { type PaymentData, CryptoNetwork, QRType, type QRGeneratorContract } from '@/types';
 import { isDangerousUrl, sanitizeInput, REGEX_STRICT_CONTROL_CHARS } from '@/utils/security';
 import { identifyProtocol, safeDecodeURIComponent } from '../protocol';
 
@@ -360,7 +360,7 @@ export const hydratePaymentData = (raw: string): PaymentData => {
   }
 
   // 3. Known crypto networks
-  const validNetworks = [
+  const validNetworks: CryptoNetwork[] = [
     CryptoNetwork.BITCOIN,
     CryptoNetwork.ETHEREUM,
     CryptoNetwork.SOLANA,

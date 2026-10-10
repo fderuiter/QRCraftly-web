@@ -1,31 +1,35 @@
 import { getPublicDomain, getSanitizedPath } from "../utils/metadataEngine";
 import { landingPageMeta } from "./landingPageMeta";
 
-export enum SchemaType {
-  SoftwareApplication = "SoftwareApplication",
-  WebApplication = "WebApplication",
-  AboutPage = "AboutPage",
-  FAQPage = "FAQPage",
-  HowTo = "HowTo"
-}
+export const SchemaType = {
+  SoftwareApplication: "SoftwareApplication",
+  WebApplication: "WebApplication",
+  AboutPage: "AboutPage",
+  FAQPage: "FAQPage",
+  HowTo: "HowTo",
+} as const;
+export type SchemaType = (typeof SchemaType)[keyof typeof SchemaType];
 
-export enum SchemaCategory {
-  UtilitiesApplication = "UtilitiesApplication",
-  BusinessApplication = "BusinessApplication",
-  SocialNetworkingApplication = "SocialNetworkingApplication",
-  TravelApplication = "TravelApplication",
-  DeveloperApplication = "DeveloperApplication"
-}
+export const SchemaCategory = {
+  UtilitiesApplication: "UtilitiesApplication",
+  BusinessApplication: "BusinessApplication",
+  SocialNetworkingApplication: "SocialNetworkingApplication",
+  TravelApplication: "TravelApplication",
+  DeveloperApplication: "DeveloperApplication",
+} as const;
+export type SchemaCategory = (typeof SchemaCategory)[keyof typeof SchemaCategory];
 
-export enum TargetPersona {
-  HealthcareLegal = "Healthcare & Legal",
-  SecurityConsciousEnterprise = "Security-Conscious Enterprise"
-}
+export const TargetPersona = {
+  HealthcareLegal: "Healthcare & Legal",
+  SecurityConsciousEnterprise: "Security-Conscious Enterprise",
+} as const;
+export type TargetPersona = (typeof TargetPersona)[keyof typeof TargetPersona];
 
-export enum StrategicValueCategory {
-  ZeroTransitPrivacySovereignty = "Zero-Transit Privacy Sovereignty",
-  AsynchronousWebWorkerDiagnostics = "Asynchronous Web Worker Diagnostics"
-}
+export const StrategicValueCategory = {
+  ZeroTransitPrivacySovereignty: "Zero-Transit Privacy Sovereignty",
+  AsynchronousWebWorkerDiagnostics: "Asynchronous Web Worker Diagnostics",
+} as const;
+export type StrategicValueCategory = (typeof StrategicValueCategory)[keyof typeof StrategicValueCategory];
 
 export interface ToolContent {
   id: string;

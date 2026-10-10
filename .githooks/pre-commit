@@ -1,0 +1,12 @@
+#!/bin/sh
+# Pre-commit hook (ADR 0044). `pnpm install` points core.hooksPath here
+# through scripts/hooks/install.js. Skip it once with `git commit --no-verify`.
+set -eu
+
+# Staged-file checks: scripts/hooks/staged.config.js lists them.
+node scripts/hooks/staged.js
+
+# Whole-repository checks.
+pnpm run validate:duplication
+pnpm run typecheck
+pnpm test --run

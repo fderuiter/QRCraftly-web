@@ -17,12 +17,12 @@
 */
 
 import {
-  WifiData,
+  type WifiData,
   WifiEncryption,
   WifiEapMethod,
   WifiEapPhase2,
   QRType,
-  QRGeneratorContract,
+  type QRGeneratorContract,
 } from '@/types';
 import { identifyProtocol } from '../protocol';
 

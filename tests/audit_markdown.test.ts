@@ -41,6 +41,23 @@ describe('audit_markdown', () => {
       expect(headings.has('installation-guide')).toBe(true);
       expect(headings.has('api-reference')).toBe(true);
     });
+
+    it('reports unsupported Markdown once, with the line in the file', () => {
+      resetErrors();
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const content = '---\ndraft: false\n---\n# Title\n\nSubtitle\n--------\n';
+        expect(buildFileHeadings('setext.md', content).size).toBe(0);
+        expect(verifyLinks('setext.md', content, {})).toBe(false);
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+        const message = String(errorSpy.mock.calls[0][0]);
+        expect(message).toContain('Error in setext.md: Unsupported Markdown: setext.md:7: setext headings');
+        expect(message).toContain(`Fix: ${REMEDIATION_HINTS.unsupported}`);
+      } finally {
+        errorSpy.mockRestore();
+        resetErrors();
+      }
+    });
   });
 
   describe('verifyLinks', () => {
@@ -298,7 +315,7 @@ describe('audit_markdown', () => {
       try {
         const kinds: Array<keyof typeof REMEDIATION_HINTS> = [
           'missingFile', 'publishApproved', 'placeholder', 'outsideRoot',
-          'brokenFile', 'brokenAnchor', 'snippet'
+          'brokenFile', 'brokenAnchor', 'snippet', 'unsupported'
         ];
         expect([...kinds].sort()).toEqual(Object.keys(REMEDIATION_HINTS).sort());
         for (const kind of kinds) {

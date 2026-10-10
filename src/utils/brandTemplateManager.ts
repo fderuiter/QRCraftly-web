@@ -1,4 +1,4 @@
-import { BrandTemplate, BrandTemplateExportPayload, QRConfig } from '../types';
+import type { BrandTemplate, BrandTemplateExportPayload, QRConfig } from '../types';
 import { isStyleField, pickStyle } from './styleFields';
 
 /** Approved storage key for user-saved brand templates. */

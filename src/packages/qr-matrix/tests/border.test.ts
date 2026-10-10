@@ -19,7 +19,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderBorder, renderBorderDecoration } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
-import { QRConfig } from '@/types';
+import type { QRConfig } from '@/types';
 
 describe('renderBorder', () => {
   const createMockContext = () => ({

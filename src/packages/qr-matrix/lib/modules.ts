@@ -16,9 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRConfig, QRStyle, QRModules } from '@/types';
+import { type QRConfig, QRStyle, type QRModules } from '@/types';
 import { drawRoundRect, drawRoughRect, drawPoly, drawStar, drawCircularModule, drawCircuitModule, drawStandardModule } from './canvasHelpers';
-import { getIsCoveredByLogo, LogoMetrics, iterateMatrix } from './utils';
+import { getIsCoveredByLogo, type LogoMetrics, iterateMatrix } from './utils';
 import { getLuminance } from '@/utils/colorUtils';
 import { renderFluidModules, isFinderPattern } from './fluid';
 

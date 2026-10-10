@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { EmailData, QRType, QRGeneratorContract } from '@/types';
+import { type EmailData, QRType, type QRGeneratorContract } from '@/types';
 import {
   CONTAINMENT_PROFILES,
   identifyProtocol,

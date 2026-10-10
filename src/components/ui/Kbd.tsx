@@ -1,4 +1,4 @@
-import { HTMLAttributes } from 'react';
+import type { HTMLAttributes } from 'react';
 
 /** Properties for {@link Kbd}. */
 type KbdProps = HTMLAttributes<HTMLElement>;

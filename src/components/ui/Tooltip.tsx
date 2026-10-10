@@ -1,4 +1,4 @@
-import { cloneElement, ReactElement, useEffect, useId, useState } from 'react';
+import { cloneElement, type ReactElement, useEffect, useId, useState } from 'react';
 
 /** Properties a tooltip trigger must accept. */
 interface TriggerProps {

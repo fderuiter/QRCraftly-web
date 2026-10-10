@@ -1,5 +1,5 @@
 import React from "react";
-import { SocialData, SocialPlatform } from "../../types";
+import { type SocialData, SocialPlatform } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { FormBlock } from "../ui/FormBlock";
 

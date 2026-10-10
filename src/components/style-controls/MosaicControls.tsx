@@ -20,7 +20,7 @@ import React, { useRef } from 'react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { RangeInput } from '../ui/RangeInput';
-import { QRConfig, QRErrorCorrectionLevel, MosaicMode } from '../../types';
+import { type QRConfig, QRErrorCorrectionLevel, type MosaicMode } from '../../types';
 import { Grid3x3, LayoutGrid, Upload, X } from 'lucide-react';
 import { useImageUpload } from '../../hooks/useImageUpload';
 import { SYSTEM_LIMITS } from '../../constants';

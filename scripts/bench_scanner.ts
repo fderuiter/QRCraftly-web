@@ -40,6 +40,7 @@
  * the working tree's `src/wasm/qr-decode.wasm`.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execBinary } from './utils/execHelper.js';
@@ -49,7 +50,8 @@ import { qrReader } from '../tests/fixtures/qrReader.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DECODER_PATH = 'src/packages/optical-scanner/lib/decodeSync.ts';
-const CACHE_DIR = path.join(REPO_ROOT, 'node_modules', '.cache', 'bench-scanner');
+// Node refuses to strip types from files under node_modules, so the copies from older refs live in the temp folder.
+const CACHE_DIR = path.join(os.tmpdir(), 'qrcraftly-bench-scanner');
 const WORKTREE = 'WORKTREE';
 /** Camera frames a rotating decoder may use before a fixture counts as missed. */
 const CAMERA_FRAMES = 4;

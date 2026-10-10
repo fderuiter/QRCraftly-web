@@ -78,9 +78,9 @@ export const PATTERNS = [
   { id: QRStyle.STARBURST, label: 'Starburst' },
 ];
 
-export const LOW_RELIABILITY_PATTERNS = [QRStyle.GRUNGE, QRStyle.CIRCUIT, QRStyle.STARBURST];
+export const LOW_RELIABILITY_PATTERNS: readonly QRStyle[] = [QRStyle.GRUNGE, QRStyle.CIRCUIT, QRStyle.STARBURST];
 
-import colorsData from './colors.json';
+import colorsData from './colors.json' with { type: 'json' };
 
 /**
  * List of preset color themes.

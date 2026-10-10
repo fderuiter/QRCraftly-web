@@ -15,7 +15,7 @@ Each input component follows a consistent pattern:
 
 ```tsx
 import React from 'react';
-import { WifiData } from '../../types';
+import type { WifiData } from '../../types';
 
 interface WifiInputProps {
   data: WifiData;
@@ -56,7 +56,7 @@ Frame shapes (`frameStyle`), call-to-action text (`frameText`), positions (`fram
 
 ## Adding a New Input Type
 
-1.  Define the data structure in `src/types.ts`.
+1.  Define the data structure in `src/types.ts` and add the type to `QRType`. `QRType` and the other fixed value sets there are `as const` objects with a type of the same name, not `enum`s: the build runs scripts that import `src/` on Node's own type stripping, which cannot run an `enum` ([ADR 0045](../../../docs/adr/0045-typescript-scripts-on-node-type-stripping.md)). Use `typeof QRType.URL` where a type names one member.
 2.  Create the payload generator (construction, hydration, and parsing) in `src/packages/qr-payload/lib/generators/` and register it in `src/packages/qr-payload/lib/registry.ts`. Import generators from `@/packages/qr-payload`; there is no `utils` shim.
 3.  Create a new component file in this directory (e.g., `NewTypeInput.tsx`).
 4.  Register the component, its initial state, and helpers in `src/components/inputs/InputRegistry.ts`.

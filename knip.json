@@ -24,8 +24,7 @@
     "src/packages/scannability/**": ["exports", "types"]
   },
   "ignoreBinaries": ["shellcheck", "semgrep"],
-  "ignoreDependencies": ["wrangler", "lint-staged", "@ngraveio/bc-ur", "jscpd"],
-  "husky": false,
+  "ignoreDependencies": ["wrangler", "@ngraveio/bc-ur", "marked", "jscpd"],
   "rules": {
     "files": "error",
     "dependencies": "error",

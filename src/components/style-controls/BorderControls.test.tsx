@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BorderControls } from './BorderControls';
 import { DEFAULT_CONFIG } from '../../constants';
-import { QRConfig } from '../../types';
+import type { QRConfig } from '../../types';
 
 describe('BorderControls', () => {
   const mockOnChange = vi.fn();

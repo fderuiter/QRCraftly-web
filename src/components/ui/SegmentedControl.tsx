@@ -1,4 +1,4 @@
-import { KeyboardEvent, ReactNode, useRef } from 'react';
+import { type KeyboardEvent, type ReactNode, useRef } from 'react';
 import { Check } from 'lucide-react';
 import { Button } from './Button';
 

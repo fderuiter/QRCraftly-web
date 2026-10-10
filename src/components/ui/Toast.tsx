@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, type ReactNode, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './Button';
 import { getNotificationColors, getNotificationIcon } from '../../utils/notificationStyles';

@@ -405,7 +405,7 @@ function main() {
   const startTime = Date.now();
   let filesToScan = [];
 
-  // Parse files passed via environment variable or command line (e.g. from CI or lint-staged)
+  // Parse files passed via environment variable or command line (e.g. from CI or the pre-commit hook)
   if (process.env.ALL_CHANGED_FILES) {
     const raw = process.env.ALL_CHANGED_FILES.trim();
     if (raw.startsWith('[') && raw.endsWith(']')) {

@@ -1,4 +1,4 @@
-import { HTMLAttributes } from 'react';
+import type { HTMLAttributes } from 'react';
 
 /** Badge colour roles. */
 export type BadgeTone = 'neutral' | 'brand' | 'success' | 'warning' | 'danger' | 'beta';

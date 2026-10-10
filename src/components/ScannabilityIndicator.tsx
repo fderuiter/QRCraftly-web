@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useId, useRef } from 'react';
 import { ShieldCheck, Loader2, ShieldAlert, ShieldX, Check, X } from 'lucide-react';
-import { ScannabilityStatus, HealthScore } from '../hooks/useScannability';
+import type { ScannabilityStatus, HealthScore } from '../hooks/useScannability';
 import { getScanVerdict, getScanAdvice, getScanChecks, type ScanVerdict, type ScanFix } from '@/packages/scannability';
 import { Button } from './ui/Button';
 

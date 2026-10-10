@@ -22,11 +22,11 @@ import QRCanvas from './QRCanvas';
 import { DEFAULT_CONFIG } from '../constants';
 import {
   QRStyle,
-  LogoPaddingStyle,
+  type LogoPaddingStyle,
   QRErrorCorrectionLevel,
   SocialFormat,
   QRType,
-  QRConfig,
+  type QRConfig,
 } from '../types';
 import { createFakeQrEncoder, useCanvasEncoder } from '../../tests/fixtures/fakeQrEncoder';
 import { qrEncoder } from '../../tests/fixtures/qrEncoder';

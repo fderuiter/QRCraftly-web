@@ -18,7 +18,7 @@
 
 
 import React, { createContext, lazy, Suspense, useContext, useState } from 'react';
-import { QRConfig } from '../types';
+import type { QRConfig } from '../types';
 import {
   BorderControls,
   FrameControls,

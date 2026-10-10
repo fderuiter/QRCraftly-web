@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { TargetMatrix } from './matrix';
+import type { TargetMatrix } from './matrix';
 
 /** Micro-cells per macro module side: each module is split into a 4x4 grid. */
 export const MICRO_SUBDIVISION = 4;

@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRConfig, FramePosition, FrameIcon } from '@/types';
-import { LayoutMetrics } from './utils';
+import type { QRConfig, FramePosition, FrameIcon } from '@/types';
+import type { LayoutMetrics } from './utils';
 import { drawRoundRect } from './canvasHelpers';
 
 /**

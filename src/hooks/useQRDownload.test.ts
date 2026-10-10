@@ -23,7 +23,7 @@ import { PayloadRejectedError } from '@/packages/qr-export';
 import { QrEncodeError } from '@/packages/qr-matrix';
 import { describeViolation } from '@/packages/qr-payload';
 import { DEFAULT_CONFIG } from '../constants';
-import { QRConfig, QRType, TemplateStyle, SocialFormat } from '../types';
+import { type QRConfig, QRType, TemplateStyle, SocialFormat } from '../types';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { fakeQrRead } from '../../tests/utils/fakeQrRead';
 

@@ -23,7 +23,7 @@ import { Button } from './Button';
 import { Modal } from './Modal';
 import { Badge } from './Badge';
 import { isDangerousUrl } from '@/utils/security';
-import { PRIMARY_NAV_ITEMS, PrimaryNavItem, getCurrentPrimaryNavId } from '@/data/navigation';
+import { PRIMARY_NAV_ITEMS, type PrimaryNavItem, getCurrentPrimaryNavId } from '@/data/navigation';
 
 /**
  * Returns the current pathname from Vike's page context, falling back to the browser

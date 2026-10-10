@@ -17,13 +17,13 @@
 */
 
 import { useCallback, useEffect } from 'react';
-import { QRConfig, TemplateStyle, SocialFormat } from '../types';
+import { type QRConfig, TemplateStyle, SocialFormat } from '../types';
 import { generateQRSvg, PayloadRejectedError, renderQRRaster, validateSvgScannability } from '@/packages/qr-export';
 import { QrEncodeError } from '@/packages/qr-matrix';
 import { describeViolation } from '@/packages/qr-payload';
 import { previewFailureMessage, tooLongMessage } from '../utils/previewFailure';
 import { useCapabilities } from './useCapabilities';
-import { ExportOptions } from '../utils/exportRiskPolicy';
+import type { ExportOptions } from '../utils/exportRiskPolicy';
 import { isDangerousUrl } from '../utils/security';
 
 /**

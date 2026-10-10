@@ -124,14 +124,18 @@ export class FecBlockEncoder {
   private readonly instance: WasmInstance;
   private readonly handle: number;
   private readonly symbolFn: (handle: number, esi: number) => number;
+  readonly k: number;
+  readonly symbolSize: number;
 
   constructor(
     module: WebAssembly.Module,
-    readonly k: number,
-    readonly symbolSize: number,
+    k: number,
+    symbolSize: number,
     seed: number,
     source: Uint8Array,
   ) {
+    this.k = k;
+    this.symbolSize = symbolSize;
     this.instance = instantiateWasmSync(module);
     const create = this.instance.fn('fec_encoder_new');
     this.handle = this.instance.withBytes(source, (ptr, len) => create(k, symbolSize, seed >>> 0, ptr, len)) >>> 0;
@@ -155,13 +159,17 @@ export class FecBlockDecoder {
   /** Rank at which the block solves, L = K + S. */
   readonly needed: number;
   private complete = false;
+  readonly k: number;
+  readonly symbolSize: number;
 
   constructor(
     module: WebAssembly.Module,
-    readonly k: number,
-    readonly symbolSize: number,
+    k: number,
+    symbolSize: number,
     seed: number,
   ) {
+    this.k = k;
+    this.symbolSize = symbolSize;
     if (!(k >= 1 && k <= MAX_FEC_SOURCE_SYMBOLS && Number.isInteger(k)) || !validSymbolSize(symbolSize)) {
       throw new WasmModuleError('status', `The outer code refuses K = ${k}, T = ${symbolSize}.`);
     }
@@ -254,11 +262,13 @@ export class FecDecoder {
   private readonly ranks: number[];
   private received = 0;
   private remaining: number;
+  private readonly module: WebAssembly.Module;
 
   constructor(
-    private readonly module: WebAssembly.Module,
+    module: WebAssembly.Module,
     layout: FecLayout,
   ) {
+    this.module = module;
     if (!isValidFecLayout(layout)) throw new RangeError('The outer-code layout is out of range or inconsistent.');
     this.layout = { ...layout, blocks: [...layout.blocks] };
     const count = layout.blocks.length;

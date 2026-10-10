@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MeetingInput } from './MeetingInput';
-import { MeetingData } from '../../types';
+import type { MeetingData } from '../../types';
 import { announcePolitely } from '../../utils/a11y';
 
 vi.mock('../../utils/a11y', async (importOriginal) => {

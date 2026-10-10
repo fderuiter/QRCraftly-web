@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import lintStagedConfig from '../lint-staged.config.js';
+import stagedRules from '../scripts/hooks/staged.config.js';
 
 const root = process.cwd();
 const read = (relative: string) => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -52,8 +52,8 @@ describe('CI trigger paths (main.yml)', () => {
     'semgrep.yml',
     'pnpm-workspace.yaml',
     '.github/actions/setup/action.yml',
-    'lint-staged.config.js',
-    '.husky/pre-commit',
+    '.githooks/pre-commit',
+    'scripts/hooks/staged.config.js',
     '.nvmrc',
     '.github/rulesets/README.md'
   ])('runs CI when only %s changes', file => {
@@ -78,10 +78,11 @@ describe('documentation checks wiring', () => {
     expect(fs.readFileSync(path.join(process.cwd(), 'vite.config.ts'), 'utf8')).toContain('docsManifest()');
   });
 
-  it('runs the doc checks from lint-staged for staged Markdown files', () => {
-    const mdTask = lintStagedConfig['**/*.md'];
-    expect(typeof mdTask).toBe('function');
-    const commands = [mdTask(['docs/adr/0001-client-side-storage-allowlist.md'])].flat().join('\n');
+  it('runs the doc checks from the pre-commit hook for staged Markdown files', () => {
+    const commands = stagedRules
+      .filter(rule => rule.match('docs/adr/0001-client-side-storage-allowlist.md'))
+      .flatMap(rule => rule.commands.map(command => command.run.join(' ')))
+      .join('\n');
     expect(commands).toContain('prettier --write');
     expect(commands).toContain('node scripts/audit_markdown.js');
     expect(commands).toContain('node scripts/validate_adrs.js');

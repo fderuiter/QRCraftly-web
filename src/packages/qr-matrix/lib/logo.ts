@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRConfig } from '@/types';
-import { LogoMetrics } from './utils';
+import type { QRConfig } from '@/types';
+import type { LogoMetrics } from './utils';
 import { drawLogoBackground } from './canvasHelpers';
 
 export const renderLogo = (

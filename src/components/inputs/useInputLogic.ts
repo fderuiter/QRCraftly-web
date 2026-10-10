@@ -16,9 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { useState, useRef, useEffect, ElementType } from "react";
-import { QRConfig, QRType, WifiData, VCardData, PaymentData, UrlData, MeetingData, TextData } from "../../types";
-import { INPUT_REGISTRY, InputDataMap } from "./InputRegistry";
+import { useState, useRef, useEffect, type ElementType } from "react";
+import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData } from "../../types";
+import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
 import { CONTAINMENT_PROFILES } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";

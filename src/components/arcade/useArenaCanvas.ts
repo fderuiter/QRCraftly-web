@@ -16,9 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import type React from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTheme } from '@/context/ThemeContext';
-import { backingStoreSize, mapPointerToArena, ParticleTone, Point } from '@/packages/arcade';
+import { backingStoreSize, mapPointerToArena, type ParticleTone, type Point } from '@/packages/arcade';
 import { useLatestRef } from '@/packages/arcade/client';
 
 /** Theme colours used for the arena chrome and effects (the QR itself keeps its own colours). */

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import { loadWorkerModule, type InThreadWorkerScope, type WorkerModuleUnderTest } from '../../../../tests/utils/inThreadWorker';
-import { QRConfig, QRType, QRStyle, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from '@/types';
+import { type QRConfig, QRType, QRStyle, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from '@/types';
 
 describe('Matrix Worker', () => {
   let workerHandler: WorkerModuleUnderTest['handle'];

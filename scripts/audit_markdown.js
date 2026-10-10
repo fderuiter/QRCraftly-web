@@ -4,9 +4,10 @@ import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import { parseFrontmatter, isQuarantined } from './compile_docs_manifest.js';
 
+import { tokenize, walk, slugify, MarkdownSyntaxError } from './utils/markdown/index.js';
+
 const require = createRequire(import.meta.url);
-// marked and typescript ship as CJS; use createRequire so pnpm hoisting works.
-const { marked } = require('marked');
+// typescript ships as CJS; use createRequire so pnpm hoisting works.
 const ts = require('typescript');
 
 const __filename = fileURLToPath(import.meta.url);
@@ -68,7 +69,8 @@ export const REMEDIATION_HINTS = {
   outsideRoot: 'Link to a file inside the repository, or use an absolute https:// URL for external resources.',
   brokenFile: "Fix the relative path (it resolves from the linking file's folder and is case-sensitive), or restore the target file.",
   brokenAnchor: "Point the fragment at an existing heading slug in the target file (lowercase, spaces become '-', punctuation dropped).",
-  snippet: 'Make the snippet type-check against tsconfig.json, or fence it as ```text if it is only illustrative.'
+  snippet: 'Make the snippet type-check against tsconfig.json, or fence it as ```text if it is only illustrative.',
+  unsupported: 'Rewrite the construct with the Markdown subset scripts/utils/markdown supports (ATX headings, lists, tables, fenced code, links), or extend that parser with tests.'
 };
 
 /**
@@ -102,24 +104,54 @@ export let hasErrors = false;
 export function resetErrors() {
   hasErrors = false;
   parsedFilesCache.clear();
+  tokenCache.clear();
 }
 
 export function setErrors(val) {
   hasErrors = val;
 }
 
-export function slugify(text) {
-  let prev;
-  do {
-    prev = text;
-    text = text.replace(/<[^>]*>/g, '');
-  } while (text !== prev);
+export { slugify };
 
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, '') // remove non-word characters except spaces and hyphens
-    .replace(/\s+/g, '-');    // replace spaces with hyphens
+/** Tokens per file and source, so each file is parsed (and reports a syntax error) once. */
+const tokenCache = new Map();
+
+/**
+ * Tokenizes a file's Markdown body. Unsupported syntax is reported as an audit error.
+ * @param {string} file Repository-relative file name.
+ * @param {string} content Full file content (with frontmatter).
+ * @returns {object[]} Tokens, or an empty list when the file cannot be parsed.
+ */
+function tokensFor(file, content) {
+  const key = `${file}\0${content}`;
+  if (tokenCache.has(key)) return tokenCache.get(key);
+  const { body } = parseFrontmatter(content);
+  const lineOffset = content.slice(0, content.length - body.length).split(/\r?\n/).length - 1;
+  let tokens = [];
+  try {
+    tokens = tokenize(body, { file, lineOffset });
+  } catch (err) {
+    if (!(err instanceof MarkdownSyntaxError)) throw err;
+    reportError(file, `Unsupported Markdown: ${err.message}`, 'unsupported');
+  }
+  tokenCache.set(key, tokens);
+  return tokens;
+}
+
+/**
+ * Heading slugs of a file.
+ * @param {string} file Repository-relative file name.
+ * @param {string} content Full file content.
+ * @returns {Set<string>} Slugs.
+ */
+function headingSlugs(file, content) {
+  const headings = new Set();
+  walk(tokensFor(file, content), token => {
+    if (token.type === 'heading') {
+      headings.add(slugify(token.text));
+    }
+  });
+  return headings;
 }
 
 export function checkPublishApproved(file, content) {
@@ -165,17 +197,7 @@ export function buildFileHeadings(file, content) {
   if (isQuarantined(file)) {
     return new Set();
   }
-  const { body } = parseFrontmatter(content);
-  const tokens = marked.lexer(body);
-  const headings = new Set();
-  
-  marked.walkTokens(tokens, token => {
-    if (token.type === 'heading') {
-      headings.add(slugify(token.text));
-    }
-  });
-  
-  return headings;
+  return headingSlugs(file, content);
 }
 
 export function existsSyncCaseSensitive(targetPath) {
@@ -223,12 +245,10 @@ export function verifyLinks(file, content, fileHeadings) {
   if (isQuarantined(file)) {
     return false;
   }
-  const { body } = parseFrontmatter(content);
   let localHasErrors = false;
   const filePath = path.join(repoRoot, file);
-  const tokens = marked.lexer(body);
-  
-  marked.walkTokens(tokens, token => {
+
+  walk(tokensFor(file, content), token => {
     if (token.type === 'link') {
       const href = token.href;
       
@@ -276,14 +296,7 @@ export function verifyLinks(file, content, fileHeadings) {
           
           if (!headingsToSearch) {
             // Target file is valid but wasn't audited yet (e.g. README.md)
-            const { body: otherBody } = getParsedFile(targetFile);
-            const otherTokens = marked.lexer(otherBody);
-            headingsToSearch = new Set();
-            marked.walkTokens(otherTokens, t => {
-              if (t.type === 'heading') {
-                headingsToSearch.add(slugify(t.text));
-              }
-            });
+            headingsToSearch = headingSlugs(targetFile, getParsedFile(targetFile).content);
             fileHeadings[targetFile] = headingsToSearch;
           }
           
@@ -307,13 +320,12 @@ export function checkCodeSnippets(filesList) {
     for (const file of filesList) {
       const filePath = path.join(repoRoot, file);
       if (!fs.existsSync(filePath)) continue;
-      const { frontmatter, body } = getParsedFile(file);
+      const { frontmatter, content } = getParsedFile(file);
       if (frontmatter.draft === true) {
         continue;
       }
-      const tokens = marked.lexer(body);
-      
-      marked.walkTokens(tokens, token => {
+
+      walk(tokensFor(file, content), token => {
         if (token.type === 'code') {
           const lang = (token.lang || '').toLowerCase();
           if (['ts', 'tsx', 'typescript', 'typescriptreact'].includes(lang)) {

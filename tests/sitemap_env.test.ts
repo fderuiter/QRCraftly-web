@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execBinary } from './utils/execHelper';
 
@@ -9,6 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const sitemapScriptPath = join(__dirname, '../scripts/generate_sitemap.ts');
+// The script runs as the build runs it: plain Node with the extensionless-import hook (ADR 0045).
+const registerUrl = pathToFileURL(join(__dirname, '../scripts/utils/register-ts.js')).href;
 
 // A temp folder stands in for dist/client (SITEMAP_DIST_DIR), so the test never writes into
 // or deletes a real build that may be running alongside it.
@@ -27,8 +29,8 @@ describe('Sitemap Environment-Level Variable Resolution', () => {
     rmSync(distDir, { recursive: true, force: true });
   });
 
-  it('should use fallback domain under native tsx when import.meta.env and VITE_DOMAIN are unavailable', () => {
-    execBinary('pnpm', ['exec', 'tsx', sitemapScriptPath], {
+  it('should use fallback domain under plain Node when import.meta.env and VITE_DOMAIN are unavailable', () => {
+    execBinary(process.execPath, ['--import', registerUrl, sitemapScriptPath], {
       env: {
         ...process.env,
         VITE_DOMAIN: '',
@@ -45,7 +47,7 @@ describe('Sitemap Environment-Level Variable Resolution', () => {
   }, 30000);
 
   it('should resolve and apply a custom staging domain via process.env', () => {
-    execBinary('pnpm', ['exec', 'tsx', sitemapScriptPath], {
+    execBinary(process.execPath, ['--import', registerUrl, sitemapScriptPath], {
       env: {
         ...process.env,
         VITE_DOMAIN: 'https://staging.qrcraftly.net',
@@ -63,7 +65,7 @@ describe('Sitemap Environment-Level Variable Resolution', () => {
   }, 30000);
 
   it('should sanitize and strip any trailing slashes from the resolved VITE_DOMAIN', () => {
-    execBinary('pnpm', ['exec', 'tsx', sitemapScriptPath], {
+    execBinary(process.execPath, ['--import', registerUrl, sitemapScriptPath], {
       env: {
         ...process.env,
         VITE_DOMAIN: 'https://staging-trailing.qrcraftly.net////',
@@ -96,7 +98,7 @@ describe('Sitemap Environment-Level Variable Resolution', () => {
       const cleanedEnv = { ...process.env };
       delete cleanedEnv.VITE_DOMAIN;
 
-      execBinary('pnpm', ['exec', 'tsx', sitemapScriptPath], {
+      execBinary(process.execPath, ['--import', registerUrl, sitemapScriptPath], {
         env: {
           ...cleanedEnv,
           NODE_ENV: 'production',

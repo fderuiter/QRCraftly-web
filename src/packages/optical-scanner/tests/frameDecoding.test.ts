@@ -4,11 +4,15 @@ import { scan } from '../index';
 
 // Node has no ImageData; scan() only needs its shape.
 class PixelFrame {
-  constructor(
-    readonly data: Uint8ClampedArray,
-    readonly width: number,
-    readonly height: number
-  ) {}
+  readonly data: Uint8ClampedArray;
+  readonly width: number;
+  readonly height: number;
+
+  constructor(data: Uint8ClampedArray, width: number, height: number) {
+    this.data = data;
+    this.width = width;
+    this.height = height;
+  }
 }
 if (typeof globalThis.ImageData === 'undefined') {
   Object.defineProperty(globalThis, 'ImageData', { value: PixelFrame, configurable: true });

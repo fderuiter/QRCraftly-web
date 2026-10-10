@@ -1,4 +1,4 @@
-import { QRType, UrlData, MeetingData, TextData } from "../../types";
+import { QRType, type UrlData, type MeetingData, type TextData } from "../../types";
 import { QR_GENERATORS, validatePayload } from "@/packages/qr-payload";
 import { UNSUPPORTED_SCHEME_PREFIX } from "../../utils/security";
 
@@ -7,7 +7,7 @@ import { UNSUPPORTED_SCHEME_PREFIX } from "../../utils/security";
  * data scheme in any of them, or a scheme outside the allowlist in the link types. Returns a
  * violation code, or null when the content may be rendered.
  */
-export const findBlockingViolation = (type: QRType.URL | QRType.MEETING | QRType.TEXT, data: UrlData | MeetingData | TextData): string | null => {
+export const findBlockingViolation = (type: typeof QRType.URL | typeof QRType.MEETING | typeof QRType.TEXT,data: UrlData | MeetingData | TextData): string | null => {
   const value = type === QRType.TEXT ? (data as TextData).text : type === QRType.URL ? (data as UrlData).url : (data as MeetingData).url;
   if (!value) return null;
   const constructed = QR_GENERATORS[type].construct(data as never);

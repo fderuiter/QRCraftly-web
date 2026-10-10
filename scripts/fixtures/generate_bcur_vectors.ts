@@ -25,7 +25,7 @@
  *
  * ```sh
  * pnpm add -D @ngraveio/bc-ur@1.1.13
- * pnpm exec tsx scripts/fixtures/generate_bcur_vectors.ts
+ * node --import ./scripts/utils/register-ts.js scripts/fixtures/generate_bcur_vectors.ts
  * pnpm remove @ngraveio/bc-ur
  * ```
  *

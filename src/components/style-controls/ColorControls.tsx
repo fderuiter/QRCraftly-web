@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { GradientType, QRConfig } from '../../types';
+import type { GradientType, QRConfig } from '../../types';
 import { PRESET_COLORS, MIN_CONTRAST_THRESHOLD } from '../../constants';
 import { getContrastRatio } from '../../utils/colorUtils';
 import { ColorInput } from '../ui/ColorInput';

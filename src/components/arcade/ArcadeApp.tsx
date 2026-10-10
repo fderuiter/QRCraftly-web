@@ -18,7 +18,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Gamepad2 } from 'lucide-react';
-import { ARCADE_MODES, ArcadeMode, arcadeModeHref, blankTargetMatrix, buildTargetMatrix, parseArcadeMode } from '@/packages/arcade';
+import { ARCADE_MODES, type ArcadeMode, arcadeModeHref, blankTargetMatrix, buildTargetMatrix, parseArcadeMode } from '@/packages/arcade';
 import { BlasterMode } from './BlasterMode';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { SimulatorMode } from './SimulatorMode';

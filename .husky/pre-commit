@@ -1,4 +1,0 @@
-pnpm exec lint-staged
-pnpm run validate:duplication
-pnpm run typecheck
-pnpm test --run

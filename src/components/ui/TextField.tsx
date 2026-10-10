@@ -2,7 +2,7 @@ import React, { useState, forwardRef } from 'react';
 import { Button } from './Button';
 import { Eye, EyeOff } from 'lucide-react';
 import { useFieldIds } from '../../hooks/useFieldIds';
-import { FieldWrapper, BaseFieldProps } from './FieldWrapper';
+import { FieldWrapper, type BaseFieldProps } from './FieldWrapper';
 import { TEXT_FIELD_CLASSES, ERROR_INPUT_CLASSES, mergeClasses } from './styles';
 
 interface TextFieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'id'>, BaseFieldProps {

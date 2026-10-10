@@ -12,6 +12,8 @@
     "types": ["node"],
     "moduleResolution": "bundler",
     "isolatedModules": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",

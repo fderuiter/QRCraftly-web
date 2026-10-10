@@ -17,7 +17,7 @@
 */
 
 import React, { useMemo } from 'react';
-import { QRConfig, FrameStyle, FramePosition, FrameIcon } from '../../types';
+import type { QRConfig, FrameStyle, FramePosition, FrameIcon } from '../../types';
 import { SelectField, TextField } from '../ui/FormFields';
 import { ColorInput } from '../ui/ColorInput';
 import { getContrastRatio } from '../../utils/colorUtils';

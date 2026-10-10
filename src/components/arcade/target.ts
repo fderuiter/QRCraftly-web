@@ -17,7 +17,7 @@
 */
 
 import { DEFAULT_CONFIG } from '@/constants';
-import { QRConfig } from '@/types';
+import type { QRConfig } from '@/types';
 import { resolveEncodedValue } from '@/packages/qr-matrix';
 import type { ArcadeTarget } from '@/packages/arcade/handoff';
 

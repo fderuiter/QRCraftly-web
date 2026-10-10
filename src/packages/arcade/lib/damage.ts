@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { EccLevel, FinderId, finderAt } from './matrix';
+import { type EccLevel, type FinderId, finderAt } from './matrix';
 
 /** Share of modules each error correction tier can recover (approximate QR specification values). */
 export const ECC_RECOVERY: Readonly<Record<EccLevel, number>> = { L: 0.07, M: 0.15, Q: 0.25, H: 0.3 };

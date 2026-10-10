@@ -19,7 +19,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LocationInput } from './LocationInput';
-import { LocationData } from '../../types';
+import type { LocationData } from '../../types';
 import { announcePolitely } from '../../utils/a11y';
 
 vi.mock('../../utils/a11y', async (importOriginal) => {

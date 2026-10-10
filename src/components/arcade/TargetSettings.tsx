@@ -25,7 +25,7 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { ColorInput } from '@/components/ui/ColorInput';
 import { RangeInput } from '@/components/ui/RangeInput';
 import { getStyleAdaptiveMazePathWidth } from '@/packages/qr-matrix/maze';
-import { ECC_LEVELS, ECC_RECOVERY, EccLevel, FALLBACK_PAYLOAD } from '@/packages/arcade';
+import { ECC_LEVELS, ECC_RECOVERY, type EccLevel, FALLBACK_PAYLOAD } from '@/packages/arcade';
 import type { ArcadeTarget } from '@/packages/arcade/handoff';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 

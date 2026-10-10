@@ -13,6 +13,8 @@ To eliminate logical UI redundancy, prevent design drift, and maintain robust WC
 
 Document component props with JSDoc only where the comment adds information. Empty `/** */` blocks and bare `@param name` stubs are rejected by ESLint (`jsdoc/no-blank-blocks`, `jsdoc/check-param-names`), so do not generate them.
 
+Import types with `import type` or an inline `type` modifier (`import { type QRConfig, QRStyle } from '../../types'`). `tsconfig.json` sets `verbatimModuleSyntax` and `erasableSyntaxOnly` so that the build scripts can load shared code on Node's own type stripping (ADR 0045); for the same reason fixed value sets such as `QRStyle` are `as const` objects, not `enum`s.
+
 ---
 
 ## 1. Core Shared UI Elements (`src/components/ui/`)

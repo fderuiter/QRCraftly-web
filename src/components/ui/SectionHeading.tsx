@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 /** Eyebrow text colour: `muted` (default), `strong` (body text colour) or `accent` (brand). */
 type EyebrowTone = 'muted' | 'strong' | 'accent';

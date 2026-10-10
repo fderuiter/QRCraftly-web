@@ -1,8 +1,11 @@
 ---
-status: accepted
+status: superseded
+superseded_by: 0044
 ---
 
 # Husky and Lint-Staged Git Guardrails
+
+> Superseded by [ADR 0044](./0044-own-git-hooks-and-staged-file-runner.md): our own `.githooks/pre-commit`, installed by `scripts/hooks/install.js` and running `scripts/hooks/staged.js`, replaced Husky and lint-staged (#1190). The checks stayed the same. This record is kept for history.
 
 ## Context
 

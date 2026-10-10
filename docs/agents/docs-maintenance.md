@@ -18,10 +18,17 @@ It runs, in order:
 
 Every error names the file and prints a `Fix:` line with the remediation.
 
+## The Markdown parser
+
+The audit and the `/security` page both read Markdown with our own parser in `scripts/utils/markdown/` (no dependencies; it replaced `marked` in #1191). It supports the GitHub-flavoured subset our docs use: ATX headings, paragraphs with soft and hard breaks, emphasis and strong, code spans, fenced and indented code, ordered, unordered, nested and task lists, tables with alignment, inline, reference and autolinks, images, blockquotes, thematic breaks, backslash escapes, entities and HTML comments.
+
+- Setext headings (`===` or `---` under a line), footnotes and strikethrough (`~~`) are not supported. They fail `docs:lint` with `file:line`, so rewrite them (an ATX `#` heading, a sentence, plain words) or extend the parser with tests in `tests/scripts/markdown.test.ts`.
+- Rendering escapes text and attributes. Raw inline HTML such as `<kbd>` shows as literal text, links with `javascript:`, `vbscript:`, `data:` or `file:` targets render as plain text, and the only HTML passed through is an HTML comment on its own lines.
+
 ## Where the checks run
 
 - `pnpm run lint` calls `docs:lint`.
-- The Husky pre-commit hook runs lint-staged, which runs the Markdown audit and the ADR validator whenever a `*.md` file is staged.
+- The pre-commit hook (`.githooks/pre-commit`) runs `scripts/hooks/staged.js`, which runs the Markdown audit and the ADR validator whenever a `*.md` file is staged.
 - CI runs `pnpm run lint` on every pull request and on pushes that touch `docs/**` or any root `*.md` file, including `CONTEXT.md` and `AGENTS.md`.
 
 ## Adding an ADR

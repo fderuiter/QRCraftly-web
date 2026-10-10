@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRConfig, SocialFormat, TemplateStyle } from '@/types';
+import { type QRConfig, SocialFormat, TemplateStyle } from '@/types';
 import { validateConfig } from '@/packages/qr-payload';
 import { buildMatrix, drawQRInternal, loadQrEncoder } from '@/packages/qr-matrix';
 import { generateMaze, getCachedMaze, getMazeCacheKey, storeMaze, type MazeData } from '@/packages/qr-matrix/maze';

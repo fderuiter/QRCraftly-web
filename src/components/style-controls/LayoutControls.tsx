@@ -19,7 +19,7 @@
 import React from 'react';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { Square, Smartphone } from 'lucide-react';
-import { QRConfig, SocialFormat, TemplateStyle } from '../../types';
+import { type QRConfig, SocialFormat, TemplateStyle } from '../../types';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
 import { TextField } from '../ui/FormFields';

@@ -20,7 +20,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LayoutControls } from './LayoutControls';
 import { DEFAULT_CONFIG } from '../../constants';
-import { QRConfig, TemplateStyle } from '../../types';
+import { type QRConfig, TemplateStyle } from '../../types';
 
 describe('LayoutControls - Contrast Warnings', () => {
   const mockOnChange = vi.fn();

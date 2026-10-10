@@ -84,10 +84,13 @@ interface TileBitmap {
 class TileRenderer {
   private readonly cache = new Map<string, TileBitmap>();
 
-  constructor(
-    private readonly layout: TileLayout,
-    private readonly modulePx: number
-  ) {}
+  private readonly layout: TileLayout;
+  private readonly modulePx: number;
+
+  constructor(layout: TileLayout, modulePx: number) {
+    this.layout = layout;
+    this.modulePx = modulePx;
+  }
 
   public bitmap(text: string): TileBitmap {
     const cached = this.cache.get(text);
@@ -141,13 +144,18 @@ export class TileSender {
   private readonly renderer: TileRenderer;
   public readonly placement: { cell: Rect[]; code: Rect[] };
 
-  constructor(
-    public readonly stream: PrismStream,
-    public readonly layout: TileLayout,
-    public readonly screen: SimScreen,
-    public readonly hold: number,
-    public readonly staggered: boolean
-  ) {
+  public readonly stream: PrismStream;
+  public readonly layout: TileLayout;
+  public readonly screen: SimScreen;
+  public readonly hold: number;
+  public readonly staggered: boolean;
+
+  constructor(stream: PrismStream, layout: TileLayout, screen: SimScreen, hold: number, staggered: boolean) {
+    this.stream = stream;
+    this.layout = layout;
+    this.screen = screen;
+    this.hold = hold;
+    this.staggered = staggered;
     this.renderer = new TileRenderer(layout, screen.modulePx);
     this.placement = tilePlacement(layout, screen);
   }

@@ -17,11 +17,11 @@
 */
 
 import { DEFAULT_CONFIG } from '@/constants';
-import { type CsvRow } from './csv';
+import type { CsvRow } from './csv';
 import { hasPayload } from './preview';
 import { bulkValidationType, encodeBulkCell, type BulkContentType } from './payload';
 import { analyseLink, type LinkFinding } from '@/packages/link-safety';
-import { QRConfig } from '@/types';
+import type { QRConfig } from '@/types';
 import {
   isDangerousUrl,
   REGEX_STRICT_CONTROL_CHARS,

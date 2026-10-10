@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DEFAULT_CONFIG } from '../src/constants';
 import { PREBUILT_TEMPLATES } from '../src/data/brandTemplates';
-import { QRConfig, QRStyle, QRType, QRErrorCorrectionLevel } from '../src/types';
+import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel } from '../src/types';
 import {
   BRAND_TEMPLATES_STORAGE_KEY,
   MAX_CUSTOM_TEMPLATES,
