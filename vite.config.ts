@@ -19,7 +19,6 @@
 import fs from 'fs';
 import path from 'path';
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
 import vike from 'vike/plugin';
 import type { Plugin } from 'vite';
 import type { Connect } from 'vite';
@@ -67,7 +66,7 @@ const redirectsFile = (): Plugin => ({
  * Vite configuration file.
  * Configures the development server, plugins, environment variables, and path aliases.
  */
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
     const licenses = shippedPackages();
     const { version } = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')) as { version: string };
     return {
@@ -86,14 +85,19 @@ export default defineConfig(() => {
         host: '0.0.0.0',
       },
       plugins: [
-        react(),
         vike(),
         redirectsFile(),
         docsManifest(),
         licenses.plugin,
       ],
+      // Vite's own esbuild compiles JSX with React's automatic runtime, for the client and SSR
+      // builds and for Vitest; @vitejs/plugin-react and its Babel tree are gone (#1197). The dev
+      // server uses the development runtime, and reloads the page on save (no Fast Refresh).
       esbuild: {
-        target: 'es2022'
+        target: 'es2022',
+        jsx: 'automatic',
+        jsxImportSource: 'react',
+        jsxDev: command === 'serve',
       },
       optimizeDeps: {
         esbuildOptions: {

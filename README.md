@@ -111,7 +111,7 @@ pnpm preview   # serves dist/ at http://localhost:3000
 
 | Command                      | What it does                                                                                                    |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `pnpm dev`                   | Starts the Vite dev server.                                                                                     |
+| `pnpm dev`                   | Starts the Vite dev server. It reloads the page on save (no Fast Refresh).                                      |
 | `pnpm exec vitest run`       | Runs the unit tests once (`pnpm test` watches). Add `--coverage` for a coverage report.                         |
 | `pnpm test:e2e`              | Runs the Playwright end-to-end tests. Run `pnpm exec playwright install` once on a fresh machine.               |
 | `pnpm run lint`              | Runs every static check that CI runs (see [Quality gates](#quality-gates)).                                     |
