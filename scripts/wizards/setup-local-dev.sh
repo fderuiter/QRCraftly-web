@@ -210,7 +210,7 @@ pause "Press Enter to proceed to dependency installation."
 
 # ── Stage 2: Dependencies & Git Hooks ───────────────────────────────────────
 stage "Workspace: Dependencies & Git Hooks"
-say "Installing workspace dependencies and setting up Husky Git pre-commit hooks."
+say "Installing workspace dependencies and setting up the Git pre-commit hook (.githooks/pre-commit)."
 step "Running 'pnpm install'..."
 pnpm install || warn "pnpm install returned non-zero exit status; please check network/lockfile."
 

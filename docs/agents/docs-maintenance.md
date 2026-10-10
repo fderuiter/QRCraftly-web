@@ -21,7 +21,7 @@ Every error names the file and prints a `Fix:` line with the remediation.
 ## Where the checks run
 
 - `pnpm run lint` calls `docs:lint`.
-- The Husky pre-commit hook runs lint-staged, which runs the Markdown audit and the ADR validator whenever a `*.md` file is staged.
+- The pre-commit hook (`.githooks/pre-commit`) runs `scripts/hooks/staged.js`, which runs the Markdown audit and the ADR validator whenever a `*.md` file is staged.
 - CI runs `pnpm run lint` on every pull request and on pushes that touch `docs/**` or any root `*.md` file, including `CONTEXT.md` and `AGENTS.md`.
 
 ## Adding an ADR

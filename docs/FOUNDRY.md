@@ -47,7 +47,7 @@ Each replacement moves through these stages in order. The scorecard below record
 | `@testing-library/jest-dom`                | `tests/utils/domMatchers.ts` (#1188)                                        | Removed  |
 | `@ngraveio/bc-ur`                          | frozen vectors (#1181)                                                      | Removed  |
 | `tsx`                                      | Node's own type stripping (#1189)                                           | Contract |
-| `husky`, `lint-staged`                     | our own hooks and staged-file runner (#1190)                                | Contract |
+| `husky`, `lint-staged`                     | our own hooks and staged-file runner (#1190)                                | Removed  |
 | `marked`                                   | our own Markdown parser (#1191)                                             | Contract |
 | `globals`                                  | `eslint/node-globals.js` (#1192); ESLint itself still pulls in `globals` 14 | Removed  |
 | `eslint-plugin-security`                   | ESLint core and our own rules in `eslint/rules/` (#1193)                    | Removed  |

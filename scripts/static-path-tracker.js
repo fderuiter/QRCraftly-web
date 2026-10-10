@@ -80,7 +80,7 @@ export function scanFileForPaths(filePath) {
 function main() {
   let filesToScan = [];
 
-  // Parse files from command line arguments (e.g. from lint-staged)
+  // Parse files from command line arguments (e.g. from the pre-commit hook)
   if (process.argv.length > 2) {
     filesToScan = process.argv.slice(2).map(f => path.resolve(f));
   } else {

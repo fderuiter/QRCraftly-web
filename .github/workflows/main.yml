@@ -28,8 +28,7 @@ on:
       - 'postcss.config.js'
       - 'tsconfig.json'
       - 'playwright.dev.config.ts'
-      - 'lint-staged.config.js'
-      - '.husky/**'
+      - '.githooks/**'
       - '.nvmrc'
       - '.node-version'
       - '.prettierrc.json'
@@ -113,7 +112,7 @@ jobs:
         run: pnpm run lint
 
       - name: Run ShellCheck Static Analysis
-        run: shellcheck scripts/ci/*.sh
+        run: shellcheck scripts/ci/*.sh .githooks/pre-commit
 
       - name: Run Secret Scanning Guardrail
         if: steps.changed-files.outputs.any_changed == 'true'

@@ -65,7 +65,7 @@
     "release:dry-run": "node scripts/release_engine.js --dry-run",
     "release:changelog": "node scripts/release_engine.js --generate-changelog",
     "release:prepare": "node scripts/release_engine.js --prepare",
-    "prepare": "husky"
+    "prepare": "node scripts/hooks/install.js"
   },
   "dependencies": {
     "lucide-react": "^1.31.0",
@@ -94,11 +94,9 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-tailwindcss": "^4.2.0",
-    "husky": "^9.1.7",
     "jscpd": "^5.0.15",
     "jsdom": "^30.0.1",
     "knip": "^6.32.2",
-    "lint-staged": "^17.3.0",
     "marked": "^18.0.9",
     "postcss": "^8.5.26",
     "prettier": "^3.9.6",

@@ -191,7 +191,7 @@ A cross-platform launcher ensuring interactive bash wizards execute consistently
 _Avoid_: Bash bridge, script invoker, shell wrapper
 
 **Git Guardrails**:
-The automated client-side hooks combining Husky with lint-staged to enforce code formatting, syntax rules, and duplication constraints before commit creation.
+Our own client-side pre-commit hook (`.githooks/pre-commit` and the staged-file runner `scripts/hooks/staged.js`) that enforces code formatting, syntax rules, and duplication constraints before commit creation.
 _Avoid_: Commit hooks, git checks, pre-commit scripts, git filters
 
 **Authoritative Deployment Orchestrator**:
