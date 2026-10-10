@@ -395,4 +395,37 @@ describe('VCard generator', () => {
     expect(hydrated.phone).toBe('+15550001111');
     expect(hydrated.organization).toBe('');
   });
+
+  describe('MECARD address (#1367)', () => {
+    const card = {
+      version: 'mecard' as const,
+      firstName: 'Ann',
+      lastName: 'Lee',
+      organization: '',
+      title: '',
+      phone: '',
+      email: '',
+      website: '',
+      street: '1 Main St, Apt 2',
+      city: 'Springfield',
+      zip: '',
+      country: 'US',
+    };
+
+    it('writes one readable line without stray commas for empty fields', () => {
+      const mecard = constructVCardString(card);
+      expect(mecard).toContain('ADR:1 Main St\\, Apt 2, Springfield, US;');
+      expect(mecard).not.toMatch(/ADR:,|,,/);
+    });
+
+    it('reads the one-line form back into its fields', () => {
+      const hydrated = hydrateVCardData(constructVCardString({ ...card, zip: '12345' }));
+      expect(hydrated).toMatchObject({ street: '1 Main St, Apt 2', city: 'Springfield', zip: '12345', country: 'US' });
+    });
+
+    it('still reads the positional DoCoMo form', () => {
+      const hydrated = hydrateVCardData('MECARD:N:Lee,Ann;ADR:,,1 Main,Springfield,IL,62701,US;;');
+      expect(hydrated).toMatchObject({ street: '1 Main', city: 'Springfield', zip: '62701', country: 'US' });
+    });
+  });
 });
