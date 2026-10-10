@@ -7,6 +7,7 @@ import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
 import { useImageUpload } from '../../hooks/useImageUpload';
 import { SYSTEM_LIMITS } from '../../constants';
+import { MIN_LOGO_BACKING_PADDING } from '@/packages/qr-matrix';
 import { PRESET_LOGOS, PRESET_LOGO_CATEGORIES, PresetCategory } from '../../constants/presetLogos';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { combineIds } from '../../utils/a11y';
@@ -17,6 +18,13 @@ const LOGO_BORDER_STYLES: { id: LogoPaddingStyle; icon: typeof Square; label: st
   { id: 'circle', icon: Circle, label: 'Circle' },
   { id: 'none', icon: Minus, label: 'None' },
 ];
+
+/** What each backing does, shown under the choice. */
+const LOGO_BORDER_HINTS: Record<LogoPaddingStyle, string> = {
+  square: 'A square of the backing colour sits behind the logo, with a gap you set below.',
+  circle: 'A circle of the backing colour sits behind the logo, with a gap you set below.',
+  none: 'The logo sits straight on the code, with no backing or gap.',
+};
 
 interface LogoControlsProps {
   config: QRConfig;
@@ -158,6 +166,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
               options={LOGO_BORDER_STYLES.map((style) => ({
                 value: style.id,
                 ariaLabel: `Set logo border style to ${style.label}`,
+                describedBy: 'logo-border-style-hint',
                 label: (
                   <>
                     <style.icon className="size-4" aria-hidden="true" />
@@ -166,6 +175,9 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
                 ),
               }))}
             />
+            <p id="logo-border-style-hint" className="mt-2 text-xs text-fg-muted">
+              {LOGO_BORDER_HINTS[config.logoPaddingStyle]}
+            </p>
           </div>
 
           {/* Conditional Controls for Border */}
@@ -175,10 +187,10 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
                 <RangeInput
                   id="logo-padding"
                   label="Padding"
-                  min={0}
+                  min={MIN_LOGO_BACKING_PADDING}
                   max={4}
                   step={0.5}
-                  value={config.logoPadding}
+                  value={Math.max(MIN_LOGO_BACKING_PADDING, config.logoPadding)}
                   onChange={(val) => onChange({ logoPadding: val })}
                 />
               </div>

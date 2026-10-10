@@ -42,6 +42,7 @@ export {
   isAlignmentPatternZone,
   getAlignmentPatternCenters,
   ALIGNMENT_PATTERN_COORDINATES,
+  MIN_LOGO_BACKING_PADDING,
   type LogoMetrics,
   type LayoutMetrics,
 } from './lib/utils';

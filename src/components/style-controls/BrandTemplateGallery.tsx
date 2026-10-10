@@ -8,6 +8,9 @@ import {
   updateCustomTemplate,
   deleteCustomTemplate,
   validateTemplateJson,
+  addImportedTemplate,
+  isTemplateStorageAvailable,
+  TEMPLATE_STORAGE_ERROR,
   exportTemplateToJson,
   applyTemplateToConfig,
   MAX_CUSTOM_TEMPLATES,
@@ -46,7 +49,10 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
   // Feedback banner state
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+  const [storageAvailable, setStorageAvailable] = useState(true);
+
   useEffect(() => {
+    setStorageAvailable(isTemplateStorageAvailable());
     setCustomTemplates(getStoredTemplates());
   }, []);
 
@@ -128,31 +134,30 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
   const processImportFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (event) => {
+      let parsed: unknown;
       try {
-        const rawText = event.target?.result as string;
-        const parsed = JSON.parse(rawText);
-        const validation = validateTemplateJson(parsed);
-
-        if (!validation.valid || !validation.template) {
-          showFeedback(validation.error || 'Invalid template JSON file.', 'error');
-          return;
-        }
-
-        if (customTemplates.length >= MAX_CUSTOM_TEMPLATES) {
-          showFeedback(`Storage quota reached (${MAX_CUSTOM_TEMPLATES} templates max).`, 'error');
-          return;
-        }
-
-        const stored = getStoredTemplates();
-        const updated = [validation.template, ...stored];
-        localStorage.setItem('qrcraftly:brand-templates', JSON.stringify(updated));
-        setCustomTemplates(updated);
-        setActiveTab('custom');
-        setSelectedId(validation.template.id);
-        showFeedback(`Imported template "${validation.template.name}"!`);
+        parsed = JSON.parse(String(event.target?.result ?? ''));
       } catch {
         showFeedback('Could not parse JSON file. Please ensure it is a valid template file.', 'error');
+        return;
       }
+      const validation = validateTemplateJson(parsed);
+      if (!validation.valid || !validation.template) {
+        showFeedback(validation.error || 'Invalid template JSON file.', 'error');
+        return;
+      }
+
+      const result = addImportedTemplate(validation.template);
+      if (!result.success) {
+        showFeedback(result.error, 'error');
+        return;
+      }
+      setCustomTemplates(result.templates);
+      setActiveTab('custom');
+      setSelectedId(validation.template.id);
+      const skipped = validation.skipped ?? 0;
+      const skippedNote = skipped > 0 ? ` ${skipped} ${skipped === 1 ? 'setting' : 'settings'} could not be used.` : '';
+      showFeedback(`Imported template "${validation.template.name}"!${skippedNote}`);
     };
     reader.readAsText(file);
   };
@@ -355,12 +360,18 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
             className="col-span-full"
             level={4}
             illustration={<Sparkles className="size-6" />}
-            title="No custom templates saved yet."
-            body={'Customize colors, patterns, and borders, then click "Save as Template" or import a team JSON file.'}
+            title={storageAvailable ? 'No custom templates saved yet.' : 'Custom templates are unavailable.'}
+            body={
+              storageAvailable
+                ? 'Customize colors, patterns, and borders, then click "Save as Template" or import a team JSON file.'
+                : TEMPLATE_STORAGE_ERROR
+            }
             action={
-              <Button variant="outline" size="sm" onClick={handleOpenSaveModal}>
-                Save Current Style
-              </Button>
+              storageAvailable ? (
+                <Button variant="outline" size="sm" onClick={handleOpenSaveModal}>
+                  Save Current Style
+                </Button>
+              ) : undefined
             }
           />
         )}
