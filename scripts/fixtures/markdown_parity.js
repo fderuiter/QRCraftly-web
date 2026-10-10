@@ -61,7 +61,8 @@ function compileWithMarked(doc, manifest) {
       const [file, hash] = href.split('#');
       const baseName = file.split('/').pop() || file;
       const target = manifest.find(d => d.filename.toLowerCase() === baseName.toLowerCase());
-      if (target) token.href = hash ? `#${target.id}-${slugify(hash)}` : `#${target.id}`;
+      const suffix = hash ? `-${slugify(hash)}` : '';
+      if (target) token.href = `#${target.id}${suffix}`;
     }
   });
   return scoped.parse(contentWithoutH1);
