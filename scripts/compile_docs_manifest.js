@@ -1,11 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
-
-const require = createRequire(import.meta.url);
-// marked ships as CJS; use createRequire so pnpm hoisting works.
-const { Marked } = require('marked');
+import { tokenize, render, createSlugger, escapeTextContent, slugify } from './utils/markdown/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,20 +20,6 @@ export function isQuarantined(fileOrPath) {
   });
 }
 
-function slugify(text) {
-  let prev;
-  do {
-    prev = text;
-    text = text.replace(/<[^>]*>/g, '');
-  } while (text !== prev);
-
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, '') // remove non-word characters except spaces and hyphens
-    .replace(/\s+/g, '-');    // replace spaces with hyphens
-}
-
 /**
  * Whether a document's frontmatter marks it as internal developer documentation.
  * @param {Record<string, unknown>} frontmatter Parsed frontmatter.
@@ -46,6 +28,16 @@ function slugify(text) {
 export function isDeveloperAudience(frontmatter) {
   const audience = typeof frontmatter.audience === 'string' ? frontmatter.audience.trim().toLowerCase() : '';
   return audience === 'developers' || audience === 'developer';
+}
+
+/**
+ * Lines taken by the frontmatter block, so parser errors can name the line in the file.
+ * @param {string} content Full file content.
+ * @param {string} body Content after the frontmatter.
+ * @returns {number} Number of lines before the body.
+ */
+function countFrontmatterLines(content, body) {
+  return content.slice(0, content.length - body.length).split(/\r?\n/).length - 1;
 }
 
 export function extractTitle(content) {
@@ -139,6 +131,39 @@ export function parseFrontmatter(content) {
 }
 
 /**
+ * Renders one document for the /security page: the H1 is dropped (the page shows the title),
+ * headings move down one level and get unique `<docId>-<slug>` ids, and in-page and cross-doc
+ * links point at those ids.
+ * @param {{ id: string, content: string, source?: string, lineOffset?: number }} doc The document.
+ * @param {{ id: string, filename: string }[]} manifest Every published document (link targets).
+ * @returns {string} HTML.
+ */
+export function compileDocHtml(doc, manifest) {
+  const contentWithoutH1 = doc.content.replace(/^#\s+.+$/m, '');
+  const slugger = createSlugger();
+  const file = doc.source ? path.relative(repoRoot, doc.source).split(path.sep).join('/') : undefined;
+  const tokens = tokenize(contentWithoutH1, { file, lineOffset: doc.lineOffset });
+  return render(tokens, {
+    heading({ text, depth }) {
+      const newDepth = Math.min(depth + 1, 6);
+      const id = `${doc.id}-${slugger.slug(text)}`;
+      return `<h${newDepth} id="${id}">${escapeTextContent(text)}</h${newDepth}>`;
+    },
+    link(href) {
+      if (href.startsWith('#')) {
+        const fragment = href.slice(1);
+        return fragment ? `#${doc.id}-${slugify(fragment)}` : href;
+      }
+      const [targetFile, hash] = href.split('#');
+      const baseName = targetFile.split('/').pop() || targetFile;
+      const targetDoc = manifest.find(d => d.filename && d.filename.toLowerCase() === baseName.toLowerCase());
+      if (!targetDoc) return href;
+      return hash ? `#${targetDoc.id}-${slugify(hash)}` : `#${targetDoc.id}`;
+    }
+  });
+}
+
+/**
  * Compiles the public docs into the manifest the /security page renders. The Vite plugin in
  * `scripts/vite/docsManifest.ts` serves the result as `virtual:docs-manifest` at build, dev and
  * test time, so no generated copy is committed (and none can conflict in a merge).
@@ -189,7 +214,9 @@ export function buildManifest(inputDir = docsPublicDir) {
       id,
       filename: file,
       title,
-      content: body
+      content: body,
+      source: filePath,
+      lineOffset: countFrontmatterLines(content, body)
     });
   }
 
@@ -205,52 +232,21 @@ export function buildManifest(inputDir = docsPublicDir) {
           id: 'security',
           filename: 'SECURITY.md',
           title,
-          content: body
+          content: body,
+          source: securityPath,
+          lineOffset: countFrontmatterLines(content, body)
         });
       }
     }
   }
 
-  // Pre-compile Markdown to HTML using custom marked renderer & walkTokens
   for (const doc of manifest) {
-    const contentWithoutH1 = doc.content.replace(/^#\s+.+$/m, '');
-    const scopedMarked = new Marked({
-      renderer: {
-        heading({ text, depth }) {
-          const newDepth = Math.min(depth + 1, 6);
-          const slug = slugify(text);
-          const id = `${doc.id}-${slug}`;
-          return `<h${newDepth} id="${id}">${text}</h${newDepth}>`;
-        }
-      },
-      walkTokens(token) {
-        if (token.type === 'link') {
-          const href = token.href;
-          if (href.startsWith('#')) {
-            const fragment = href.slice(1);
-            if (fragment) {
-              token.href = `#${doc.id}-${slugify(fragment)}`;
-            }
-          } else {
-            const parts = href.split('#');
-            const file = parts[0];
-            const hash = parts[1];
-            const baseName = file.split('/').pop() || file;
-            const targetDoc = manifest.find(d => d.filename && d.filename.toLowerCase() === baseName.toLowerCase());
-            if (targetDoc) {
-              if (hash) {
-                token.href = `#${targetDoc.id}-${slugify(hash)}`;
-              } else {
-                token.href = `#${targetDoc.id}`;
-              }
-            }
-          }
-        }
-      }
-    });
-
-    doc.html = scopedMarked.parse(contentWithoutH1);
+    doc.html = compileDocHtml(doc, manifest);
+  }
+  for (const doc of manifest) {
     delete doc.content;
+    delete doc.source;
+    delete doc.lineOffset;
   }
 
   return manifest;
