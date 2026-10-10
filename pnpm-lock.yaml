@@ -53,9 +53,6 @@ importers:
       '@tailwindcss/postcss':
         specifier: ^4.3.3
         version: 4.3.3
-      '@testing-library/jest-dom':
-        specifier: ^7.0.1
-        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.11)
       '@testing-library/react':
         specifier: ^16.3.0
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -80,6 +77,9 @@ importers:
       dependency-cruiser:
         specifier: ^18.2.0
         version: 18.2.0
+      dom-accessibility-api:
+        specifier: ^0.6.3
+        version: 0.6.3
       eslint:
         specifier: ^9.39.4
         version: 9.39.5(jiti@2.7.0)
@@ -145,9 +145,6 @@ importers:
         version: 4.146.0(@types/node@22.20.4)
 
 packages:
-
-  '@adobe/css-tools@4.5.0':
-    resolution: {integrity: sha512-6OzddxPio9UiWTCemp4N8cYLV2ZN1ncRnV1cVGtve7dhPOtRkleRyx32GQCYSwDYgaHU3USMm84tNsvKzRCa1Q==}
 
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
@@ -1295,16 +1292,6 @@ packages:
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
     engines: {node: '>=18'}
 
-  '@testing-library/jest-dom@7.0.1':
-    resolution: {integrity: sha512-oMDTC3oA+6CXSO2JZnvOI7CA6oVub6kij5ggk9ohwye5slmkwxYDXcPOVxgMw/RQlticjtO0C1RZkR97HgrWMw==}
-    engines: {node: '>=22', npm: '>=6', yarn: '>=1'}
-    peerDependencies:
-      '@testing-library/dom': '>=10 <11'
-      vitest: '>= 0.32'
-    peerDependenciesMeta:
-      vitest:
-        optional: true
-
   '@testing-library/react@16.3.2':
     resolution: {integrity: sha512-XU5/SytQM+ykqMnAnvB2umaJNIOsLF3PVv//1Ew4CTcpz0/BRyy/af40qqrt7SjKpDdT1saBMc42CUok5gaw+g==}
     engines: {node: '>=18'}
@@ -1695,9 +1682,6 @@ packages:
   css-tree@3.2.1:
     resolution: {integrity: sha512-X7sjQzceUhu1u7Y/ylrRZFU2FS6LRiFVp6rKLPg23y3x3c3DOKAwuXGDp+PAGjh6CSnCjYeAul8pcT8bAl+lSA==}
     engines: {node: ^10 || ^12.20.0 || ^14.13.0 || >=15.0.0}
-
-  css.escape@1.5.1:
-    resolution: {integrity: sha512-YUifsXXuknHlUsmlgyY0PKzgPOr7/FjCePfHNt0jxm83wHZi44VDMQ7/fGNkjY3/jV1MC+1CmZbaHzugyeRtpg==}
 
   cssesc@3.0.0:
     resolution: {integrity: sha512-/Tb/JcjK111nNScGob5MNtsntNM1aCNUDipB/TkwZFhyDrrE47SOx/18wF2bbjgc3ZzCSKW1T5nt5EbFoAz/Vg==}
@@ -2119,10 +2103,6 @@ packages:
     resolution: {integrity: sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA==}
     engines: {node: '>=0.8.19'}
 
-  indent-string@4.0.0:
-    resolution: {integrity: sha512-EdDDZu4A2OyIK7Lr/2zG+w5jmbuk1DVBnEwREQvBzspBJkCEbRa8GxU1lghYcaGJCnRWibjDXlq779X1/y5xwg==}
-    engines: {node: '>=8'}
-
   ini@4.1.1:
     resolution: {integrity: sha512-QQnnxNyfvmHFIsj7gkPcYymR8Jdw/o7mp5ZFihxn6h8Ci6fh3Dx4E1gPjpQEpIuPo9XVNY/ZUwh4BPMjGyL01g==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
@@ -2515,10 +2495,6 @@ packages:
   mdn-data@2.27.1:
     resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
 
-  min-indent@1.0.1:
-    resolution: {integrity: sha512-I9jwMn07Sy/IwOj3zVkVik2JTvgpaykDZEigL6Rx6N9LbMywwUSMtxET+7lVoDLLd3O3IXwJwvuuns8UB/HeAg==}
-    engines: {node: '>=4'}
-
   miniflare@5.20261001.0-alpha:
     resolution: {integrity: sha512-GaimS5mSIOMyvd16ga+e1/QkI8cmp3z35QPHFex0DktqNQf2RVZQwMPQXdyoUreUiFP/0Gpe2MoQInTyMAD5xA==}
     engines: {node: '>=22.0.0'}
@@ -2740,10 +2716,6 @@ packages:
     resolution: {integrity: sha512-/vxpCXddiX8NGfGO/mTafwjq4aFa/71pvamip0++IQk3zG8cbCj0fifNPrjjF1XMXUne91jL9OoxmdykoEtifQ==}
     engines: {node: '>= 10.13.0'}
 
-  redent@3.0.0:
-    resolution: {integrity: sha512-6tDA8g98We0zd0GvVeMT9arEOnTw9qM03L9cJXaCjrip1OO764RDBLBfrB4cwzNGDj5OA5ioymC9GkizgWJDUg==}
-    engines: {node: '>=8'}
-
   reflect.getprototypeof@1.0.10:
     resolution: {integrity: sha512-00o4I+DVrefhv+nX0ulyi3biSHCPDe+yLv5o/p6d/UVlirijB8E16FtfwSAi4g3tcqrQ4lRAqQSoFEZJehYEcw==}
     engines: {node: '>= 0.4'}
@@ -2936,10 +2908,6 @@ packages:
   strip-bom@3.0.0:
     resolution: {integrity: sha512-vavAMRXOgBVNF6nyEEmL3DBK19iRpDcoIwW+swQ+CbGiu7lju6t+JklA1MHweoWtadgt4ISVUsXLyDq34ddcwA==}
     engines: {node: '>=4'}
-
-  strip-indent@3.0.0:
-    resolution: {integrity: sha512-laJTa3Jb+VQpaC6DseHhF7dXVqHTfJPCRDaEbid/drOhgitgYku/letMUqOXFoWV0zIIUbjpdH2t+tYj4bQMRQ==}
-    engines: {node: '>=8'}
 
   strip-json-comments@3.1.1:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
@@ -3327,8 +3295,6 @@ packages:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
-
-  '@adobe/css-tools@4.5.0': {}
 
   '@alloc/quick-lru@5.2.0': {}
 
@@ -4153,18 +4119,6 @@ snapshots:
       picocolors: 1.1.1
       pretty-format: 27.5.1
 
-  '@testing-library/jest-dom@7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.11)':
-    dependencies:
-      '@adobe/css-tools': 4.5.0
-      '@testing-library/dom': 10.4.1
-      aria-query: 5.3.2
-      css.escape: 1.5.1
-      dom-accessibility-api: 0.6.3
-      picocolors: 1.1.1
-      redent: 3.0.0
-    optionalDependencies:
-      vitest: 4.1.11(@types/node@22.20.4)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@6.4.3(@types/node@22.20.4)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)(yaml@2.9.0))
-
   '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@babel/runtime': 7.29.2
@@ -4615,8 +4569,6 @@ snapshots:
     dependencies:
       mdn-data: 2.27.1
       source-map-js: 1.2.2
-
-  css.escape@1.5.1: {}
 
   cssesc@3.0.0: {}
 
@@ -5190,8 +5142,6 @@ snapshots:
 
   imurmurhash@0.1.4: {}
 
-  indent-string@4.0.0: {}
-
   ini@4.1.1: {}
 
   internal-slot@1.1.0:
@@ -5569,8 +5519,6 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
-  min-indent@1.0.1: {}
-
   miniflare@5.20261001.0-alpha(@types/node@22.20.4):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
@@ -5841,11 +5789,6 @@ snapshots:
   rechoir@0.8.0:
     dependencies:
       resolve: 1.22.12
-
-  redent@3.0.0:
-    dependencies:
-      indent-string: 4.0.0
-      strip-indent: 3.0.0
 
   reflect.getprototypeof@1.0.10:
     dependencies:
@@ -6139,10 +6082,6 @@ snapshots:
       es-object-atoms: 1.1.2
 
   strip-bom@3.0.0: {}
-
-  strip-indent@3.0.0:
-    dependencies:
-      min-indent: 1.0.1
 
   strip-json-comments@3.1.1: {}
 

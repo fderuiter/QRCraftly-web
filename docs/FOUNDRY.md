@@ -44,7 +44,7 @@ Each replacement moves through these stages in order. The scorecard below record
 | `dawidd6/action-send-mail`                 | `scripts/ci/audit_issue.js` (#1184)                                         | Removed  |
 | `davelosert/vitest-coverage-report-action` | `scripts/ci/coverage_summary.js` (#1185)                                    | Removed  |
 | `vitest-axe`                               | `tests/utils/axe.ts` on axe-core (#1186)                                    | Removed  |
-| `@testing-library/jest-dom`                | our own DOM matchers (#1188)                                                | Contract |
+| `@testing-library/jest-dom`                | `tests/utils/domMatchers.ts` (#1188)                                        | Removed  |
 | `@ngraveio/bc-ur`                          | frozen vectors (#1181)                                                      | Removed  |
 | `tsx`                                      | Node's own type stripping (#1189)                                           | Contract |
 | `husky`, `lint-staged`                     | our own hooks and staged-file runner (#1190)                                | Contract |
@@ -62,6 +62,6 @@ These are foundations, kept by decision (Fred, 2026-10-04). The effort to replac
 
 - **Browser runtime:** React, React DOM, Vike, Vike React and `lucide-react`.
 - **Build:** Vite, TypeScript, Tailwind and PostCSS.
-- **Tests:** Vitest with coverage, jsdom, Testing Library React and user-event, Playwright, axe-core and `@axe-core/playwright`.
+- **Tests:** Vitest with coverage, jsdom, Testing Library React and user-event, Playwright, axe-core and `@axe-core/playwright`. `dom-accessibility-api` (already pulled in by Testing Library) computes accessible names and descriptions for our DOM matchers.
 - **Lint:** ESLint core with the TypeScript, React, React Hooks, JSX a11y and JSDoc plugins, Prettier and Knip.
 - **Hosting and CI:** Wrangler, Lighthouse CI, Scorecard, CodeQL, Semgrep and GitHub's own actions.
