@@ -125,12 +125,20 @@ interface Trial {
   blockShare: number;
   readable: number;
   frames: number;
+  /** Blocks whose tag refused the code's first repair: without the tag they would have been passed on wrong. */
+  refused: number;
+  /** Blocks returned as repaired whose bytes are not the bytes that were sent. Must be zero. */
+  wrong: number;
 }
+
+const sameBytes = (block: Uint8Array, payload: Uint8Array, offset: number): boolean => block.every((v, i) => v === payload[offset + i]);
 
 /** Encodes, captures and decodes a few frames of one shape, once per erasure threshold. */
 function codecTrial(shape: ModemProfile, preset: ChannelPreset, cameraPx: number, thresholds: number[], seeds: number[]): Trial[] {
   const capacity = frameCapacity(shape);
   const shares = thresholds.map(() => 0);
+  const refused = thresholds.map(() => 0);
+  const wrong = thresholds.map(() => 0);
   let readable = 0;
   for (const seed of seeds) {
     const payload = Uint8Array.from({ length: capacity.payloadBytes }, (_, i) => (i * 31 + seed * 7 + 5) & 255);
@@ -140,11 +148,13 @@ function codecTrial(shape: ModemProfile, preset: ChannelPreset, cameraPx: number
       if (!result.ok) return;
       if (t === 0) readable++;
       // A block counts only when its bytes are the bytes that were sent.
-      const good = result.blocks.filter((block, b) => block && block.every((v, i) => v === payload[b * shape.packetBytes + i])).length;
+      const good = result.blocks.filter((block, b) => block && sameBytes(block, payload, b * shape.packetBytes)).length;
       shares[t] += good / capacity.blocks;
+      refused[t] += result.refused;
+      wrong[t] += result.blocksOk - good;
     });
   }
-  return thresholds.map((_, t) => ({ blockShare: shares[t] / seeds.length, readable, frames: seeds.length }));
+  return thresholds.map((_, t) => ({ blockShare: shares[t] / seeds.length, readable, frames: seeds.length, refused: refused[t], wrong: wrong[t] }));
 }
 
 const goodputKBps = (shape: ModemProfile, share: number): number => (share * frameCapacity(shape).payloadBytes * CAMERA_FPS) / 1000;
@@ -162,7 +172,7 @@ function codecTables(quick: boolean): string[] {
     for (const preset of PRESETS) {
       for (const px of pxList) {
         const [hard, soft] = codecTrial(profile, preset, px, [0, DEFAULT_ERASURE_THRESHOLD], seeds);
-        goodput.push([`P${profile.id} ${profile.name}`, preset, px.toFixed(1), `${hard.readable}/${hard.frames}`, percent(hard.blockShare), percent(soft.blockShare), `${goodputKBps(profile, soft.blockShare).toFixed(1)} of ${goodputKBps(profile, 1).toFixed(1)}`]);
+        goodput.push([`P${profile.id} ${profile.name}`, preset, px.toFixed(1), `${hard.readable}/${hard.frames}`, percent(hard.blockShare), percent(soft.blockShare), `${goodputKBps(profile, soft.blockShare).toFixed(1)} of ${goodputKBps(profile, 1).toFixed(1)}`, hard.refused + soft.refused, hard.wrong + soft.wrong]);
         process.stdout.write(`codec P${profile.id} ${preset} ${px} px: hard ${percent(hard.blockShare)}, soft ${percent(soft.blockShare)} (${capacity.blocks} blocks)\n`);
       }
     }
@@ -191,9 +201,9 @@ function codecTables(quick: boolean): string[] {
   return [
     '## Codec: blocks repaired and goodput',
     '',
-    `Each row encodes frames of one profile (Reed-Solomon blocks, interleaved and whitened), captures them through the simulated channel and decodes them. "Readable" is how many frames had their fiducials and header read. "Hard" has the code find every wrong byte; "soft" marks bytes carried by a cell with confidence under ${DEFAULT_ERASURE_THRESHOLD} (of 255) as erasures. Goodput is the data bytes in repaired blocks times ${CAMERA_FPS} frames per second, in kilobytes (1000 bytes) per second, and assumes every camera frame is a fresh, untorn frame (the probe measures how many really are). It counts data only, before the outer code's overhead.`,
+    `Each row encodes frames of one profile (Reed-Solomon blocks, interleaved and whitened), captures them through the simulated channel and decodes them. "Readable" is how many frames had their fiducials and header read. "Hard" has the code find every wrong byte; "soft" marks bytes carried by a cell with confidence under ${DEFAULT_ERASURE_THRESHOLD} (of 255) as erasures. Goodput is the data bytes in repaired blocks times ${CAMERA_FPS} frames per second, in kilobytes (1000 bytes) per second, and assumes every camera frame is a fresh, untorn frame (the probe measures how many really are). It counts data only, before the outer code's overhead. Every block carries a CRC-32 tag over its session, frame sequence, index and data ([ADR 0043](adr/0043-optical-modem-block-tag.md)). "Refused by tag" counts blocks, hard and soft together, whose first repair the code accepted but whose tag did not match: without the tag they would have reached the outer code wrong. "Wrong accepts" counts blocks returned as repaired whose bytes differ from the bytes sent; it must be zero.`,
     '',
-    table(['Profile', 'Channel', 'Camera px per cell', 'Readable', 'Blocks repaired, hard', 'Blocks repaired, soft', 'Goodput KB/s (of full frame)'], goodput),
+    table(['Profile', 'Channel', 'Camera px per cell', 'Readable', 'Blocks repaired, hard', 'Blocks repaired, soft', 'Goodput KB/s (of full frame)', 'Refused by tag', 'Wrong accepts'], goodput),
     '',
     '### Soft versus hard decoding',
     '',
@@ -215,11 +225,13 @@ function codecTables(quick: boolean): string[] {
  * a frame carries one, the simulated camera reads the frames, and every repaired block is fed to the
  * outer decoder until the file comes back.
  */
-function transfer(shape: ModemProfile, preset: ChannelPreset, cameraPx: number, fileBytes: number, maxFrames: number): { frames: number; complete: boolean } {
+function transfer(shape: ModemProfile, preset: ChannelPreset, cameraPx: number, fileBytes: number, maxFrames: number): { frames: number; complete: boolean; refused: number; wrong: number } {
   const capacity = frameCapacity(shape);
   const message = Uint8Array.from({ length: fileBytes }, (_, i) => (i * 131 + 17) & 255);
   const encoder = new FountainEncoder(message, { blockSize: shape.packetBytes });
   const decoder = new FountainDecoder();
+  let refused = 0;
+  let wrong = 0;
   for (let frame = 0; frame < maxFrames; frame++) {
     const seqs = Array.from({ length: capacity.blocks }, (_, b) => encoder.seqForIndex(frame * capacity.blocks + b));
     const droplets = seqs.map((seq) => encoder.getDroplet(seq));
@@ -228,12 +240,15 @@ function transfer(shape: ModemProfile, preset: ChannelPreset, cameraPx: number, 
     const capture = simulateCapture(encodeModemFrame(shape, payload, SESSION, frame, CODEC_PITCH), preset, { pixelsPerCell: cameraPx, cellPitch: CODEC_PITCH, seed: frame + 1 });
     const result = decodeTimer.time(() => decodeModemFrame(capture, { geometries: [shape] }));
     if (!result.ok) continue;
+    refused += result.refused;
     result.blocks.forEach((block, b) => {
-      if (block) decoder.ingest({ seq: seqs[b], k: encoder.k, messageLength: encoder.messageLength, checksum: encoder.checksum }, block);
+      if (!block) return;
+      if (!sameBytes(block, payload, b * shape.packetBytes)) wrong++;
+      decoder.ingest({ seq: seqs[b], k: encoder.k, messageLength: encoder.messageLength, checksum: encoder.checksum }, block);
     });
-    if (decoder.isComplete) return { frames: frame + 1, complete: true };
+    if (decoder.isComplete) return { frames: frame + 1, complete: true, refused, wrong };
   }
-  return { frames: maxFrames, complete: false };
+  return { frames: maxFrames, complete: false, refused, wrong };
 }
 
 function transferTable(quick: boolean): string[] {
@@ -244,15 +259,15 @@ function transferTable(quick: boolean): string[] {
     const px = STRESS_PX[profile.id];
     const done = transfer(profile, 'typical', px, fileBytes, maxFrames);
     const seconds = done.frames / CAMERA_FPS;
-    rows.push([`P${profile.id} ${profile.name}`, px.toFixed(1), done.complete ? 'yes' : `no, gave up after ${maxFrames} frames`, done.frames, seconds.toFixed(1), done.complete ? (fileBytes / 1000 / seconds).toFixed(1) : '-']);
+    rows.push([`P${profile.id} ${profile.name}`, px.toFixed(1), done.complete ? 'yes' : `no, gave up after ${maxFrames} frames`, done.frames, seconds.toFixed(1), done.complete ? (fileBytes / 1000 / seconds).toFixed(1) : '-', done.refused, done.wrong]);
     process.stdout.write(`transfer P${profile.id}: ${done.complete ? done.frames + ' frames' : 'incomplete'}\n`);
   }
   return [
     '## End to end: a file through the outer code',
     '',
-    `A ${(fileBytes / 1000).toFixed(0)} KB file, split into droplets by the rateless outer code (the same one the QR transfer uses), one droplet per inner block, through the typical channel. Frames are counted until the file is complete and its checksum matches; the time assumes one frame per camera frame at ${CAMERA_FPS} fps. The file goodput includes the outer code's overhead.`,
+    `A ${(fileBytes / 1000).toFixed(0)} KB file, split into droplets by the rateless outer code (the same one the QR transfer uses), one droplet per inner block, through the typical channel. Frames are counted until the file is complete and its checksum matches; the time assumes one frame per camera frame at ${CAMERA_FPS} fps. The file goodput includes the outer code's overhead. "Refused by tag" and "Wrong accepts" are counted as in the codec table, over the blocks of the whole transfer.`,
     '',
-    table(['Profile', 'Camera px per cell', 'File complete', 'Frames', 'Seconds', 'File goodput KB/s'], rows),
+    table(['Profile', 'Camera px per cell', 'File complete', 'Frames', 'Seconds', 'File goodput KB/s', 'Refused by tag', 'Wrong accepts'], rows),
     '',
   ];
 }

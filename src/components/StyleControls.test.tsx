@@ -895,8 +895,16 @@ describe('Preset Logo Gallery', () => {
     expect(screen.getByRole('tab', { name: 'General' })).toBeInTheDocument();
 
     // Check preset buttons
-    expect(screen.getByRole('button', { name: 'Select Instagram logo' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Select WhatsApp logo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Select Network logo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Select Chat logo' })).toBeInTheDocument();
+  });
+
+  it('ships only generic preset marks, never third-party brand lookalikes (#1368)', () => {
+    const brands = /instagram|twitter|facebook|linkedin|youtube|tiktok|github|whatsapp|telegram|messenger|discord|paypal/i;
+    for (const preset of PRESET_LOGOS) {
+      expect(preset.id).not.toMatch(brands);
+      expect(preset.label).not.toMatch(brands);
+    }
   });
 
   it('filters preset icons when clicking category tabs', async () => {
@@ -908,11 +916,11 @@ describe('Preset Logo Gallery', () => {
     await user.click(screen.getByRole('tab', { name: 'Messaging' }));
 
     // Messaging icons should be present
-    expect(screen.getByRole('button', { name: 'Select WhatsApp logo' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Select Telegram logo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Select Chat logo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Select Send logo' })).toBeInTheDocument();
 
     // Social icons should be hidden
-    expect(screen.queryByRole('button', { name: 'Select Instagram logo' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Select Network logo' })).not.toBeInTheDocument();
   });
 
   it('selects a preset logo when clicked', async () => {
@@ -920,8 +928,8 @@ describe('Preset Logo Gallery', () => {
     render(<StyleControls config={DEFAULT_CONFIG} onChange={mockOnChange} />);
     expandAppearanceSections();
 
-    const instagramBtn = screen.getByRole('button', { name: 'Select Instagram logo' });
-    await user.click(instagramBtn);
+    const networkBtn = screen.getByRole('button', { name: 'Select Network logo' });
+    await user.click(networkBtn);
 
     expect(mockOnChange).toHaveBeenCalledWith({
       logoUrl: expect.stringContaining('data:image/svg+xml'),
@@ -929,27 +937,27 @@ describe('Preset Logo Gallery', () => {
   });
 
   it('displays preset logo name and highlights selected preset icon when logo is active', () => {
-    // Import PRESET_LOGOS to get Instagram dataUrl
-    const instagramPreset = PRESET_LOGOS.find((p) => p.id === 'instagram');
-    const instagramConfig = { ...DEFAULT_CONFIG, logoUrl: instagramPreset!.dataUrl };
+    // Import PRESET_LOGOS to get the Network preset's dataUrl
+    const networkPreset = PRESET_LOGOS.find((p) => p.id === 'network');
+    const networkConfig = { ...DEFAULT_CONFIG, logoUrl: networkPreset!.dataUrl };
 
-    render(<StyleControls config={instagramConfig} onChange={mockOnChange} />);
+    render(<StyleControls config={networkConfig} onChange={mockOnChange} />);
     expandAppearanceSections();
 
     // Preset button should be pressed/selected
-    const instagramBtn = screen.getByRole('button', { name: 'Select Instagram logo' });
-    expect(instagramBtn).toHaveAttribute('aria-pressed', 'true');
+    const networkBtn = screen.getByRole('button', { name: 'Select Network logo' });
+    expect(networkBtn).toHaveAttribute('aria-pressed', 'true');
 
     // Logo card should reflect preset label
-    expect(screen.getByText('Instagram Logo')).toBeInTheDocument();
+    expect(screen.getByText('Network Logo')).toBeInTheDocument();
   });
 
   it('removes selected preset logo when Remove is clicked', async () => {
     const user = userEvent.setup();
-    const instagramPreset = PRESET_LOGOS.find((p) => p.id === 'instagram');
-    const instagramConfig = { ...DEFAULT_CONFIG, logoUrl: instagramPreset!.dataUrl };
+    const networkPreset = PRESET_LOGOS.find((p) => p.id === 'network');
+    const networkConfig = { ...DEFAULT_CONFIG, logoUrl: networkPreset!.dataUrl };
 
-    render(<StyleControls config={instagramConfig} onChange={mockOnChange} />);
+    render(<StyleControls config={networkConfig} onChange={mockOnChange} />);
     expandAppearanceSections();
 
     const removeBtn = screen.getByRole('button', { name: /Remove/i });

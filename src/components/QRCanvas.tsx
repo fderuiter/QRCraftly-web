@@ -732,6 +732,17 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
           clearCanvasAndResize();
         }
       };
+      worker.onerror = (e) => {
+        // The worker script failed to load or crashed (for example a page from an older
+        // build asking for a worker file the server no longer has, #1259): encode on the
+        // main thread from now on and redo the pending request there.
+        console.warn("Matrix background worker failed, encoding on the main thread:", e);
+        e.preventDefault();
+        isWorkerFallbackRef.current = true;
+        if (workerRef.current === worker) workerRef.current = null;
+        worker?.terminate();
+        requestMatrixCalculation();
+      };
       workerRef.current = worker;
     } catch (err) {
       console.warn("Failed to initialize background worker, falling back:", err);
@@ -743,7 +754,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
         worker.terminate();
       }
     };
-  }, [paintMatrix, clearCanvasAndResize]);
+  }, [paintMatrix, clearCanvasAndResize, requestMatrixCalculation]);
 
   // Monitor value and error correction level to request calculations
   useLayoutEffect(() => {

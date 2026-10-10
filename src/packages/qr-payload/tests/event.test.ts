@@ -201,8 +201,11 @@ describe('Event generator', () => {
       description: 'Important meeting',
     };
     const str = constructEventString(dataWithTzid);
-    expect(str).toContain('DTSTART;TZID=America/New_York:20250101T123000');
-    expect(str).toContain('DTEND;TZID=America/New_York:20250101T133000');
+    // A TZID needs a VTIMEZONE block, so zoned times are written in UTC (#1281)
+    expect(str).not.toContain('TZID=');
+    expect(str).toContain('X-WR-TIMEZONE:America/New_York');
+    expect(str).toContain('DTSTART:20250101T173000Z');
+    expect(str).toContain('DTEND:20250101T183000Z');
   });
 
   describe('Timezone selection', () => {
@@ -216,8 +219,9 @@ describe('Event generator', () => {
         description: 'Quarterly review',
       };
       const str = constructEventString(data);
-      expect(str).toContain('DTSTART;TZID=America/New_York:20250615T090000');
-      expect(str).toContain('DTEND;TZID=America/New_York:20250615T100000');
+      expect(str).toContain('X-WR-TIMEZONE:America/New_York');
+      expect(str).toContain('DTSTART:20250615T130000Z');
+      expect(str).toContain('DTEND:20250615T140000Z');
 
       const hydrated = hydrateEventData(str);
       expect(hydrated).toEqual(data);
@@ -308,8 +312,8 @@ describe('Event generator', () => {
       expect(url).toContain('https://outlook.live.com/calendar/0/deeplink/compose?');
       expect(url).toContain('rru=addevent');
       expect(url).toContain('subject=Weekly+Sync');
-      expect(url).toContain('startdt=20261015T100000');
-      expect(url).toContain('enddt=20261015T110000');
+      expect(url).toContain('startdt=2026-10-15T10%3A00%3A00');
+      expect(url).toContain('enddt=2026-10-15T11%3A00%3A00');
       expect(url).toContain('body=Team+update');
 
       const hydrated = hydrateEventData(url);
@@ -368,12 +372,12 @@ describe('Event generator', () => {
       expect(googleUrl).toContain('dates=20261015T100000%2F20261015T100000');
 
       const outlookUrl = constructEventString({ ...baseData, provider: CalendarProvider.OUTLOOK });
-      expect(outlookUrl).toContain('startdt=20261015T100000');
-      expect(outlookUrl).toContain('enddt=20261015T100000');
+      expect(outlookUrl).toContain('startdt=2026-10-15T10%3A00%3A00');
+      expect(outlookUrl).toContain('enddt=2026-10-15T10%3A00%3A00');
 
       const officeUrl = constructEventString({ ...baseData, provider: CalendarProvider.OFFICE365 });
-      expect(officeUrl).toContain('startdt=20261015T100000');
-      expect(officeUrl).toContain('enddt=20261015T100000');
+      expect(officeUrl).toContain('startdt=2026-10-15T10%3A00%3A00');
+      expect(officeUrl).toContain('enddt=2026-10-15T10%3A00%3A00');
 
       const yahooUrl = constructEventString({ ...baseData, provider: CalendarProvider.YAHOO });
       expect(yahooUrl).toContain('ST=20261015T100000');

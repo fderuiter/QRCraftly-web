@@ -391,6 +391,8 @@ export interface EventData {
   endDate: string;
   /** Optional IANA timezone identifier (e.g. 'America/New_York', 'UTC') or local. */
   timezone?: string;
+  /** An all-day event: the dates are `YYYY-MM-DD` and the end date is the last day, inclusive. */
+  allDay?: boolean;
   /** The event location. */
   location: string;
   /** The event description. */

@@ -158,6 +158,19 @@ function phoneNotes(text: string): ContentNotes | null {
   return { rows: rows([['Number', number]]), cautions, secret: null, redacted: text };
 }
 
+/**
+ * Masks every `P:` field of a Wi-Fi payload, wherever it sits (#1295). Fields are split on
+ * unescaped semicolons, so `\;` inside another field never looks like the start of one.
+ */
+function redactWifiPassword(text: string): string {
+  const prefix = /^\s*WIFI:/i.exec(text);
+  if (!prefix) return text;
+  const fields = text.slice(prefix[0].length).replace(/(^|;)((?:\\[\s\S]|[^;\\])*)/g, (field, separator: string, body: string) =>
+    body.startsWith('P:') ? `${separator}P:${MASK}` : field
+  );
+  return prefix[0] + fields;
+}
+
 function wifiNotes(text: string): ContentNotes {
   const wifi = QR_GENERATORS[QRType.WIFI].hydrate(text);
   const cautions: string[] = [];
@@ -175,8 +188,7 @@ function wifiNotes(text: string): ContentNotes {
     ]),
     cautions,
     secret: wifi.password || null,
-    // The password sits in the `P:` field; `\;` inside it is an escaped semicolon.
-    redacted: text.replace(/((?:^|;)P:)(?:\\.|[^;\\])*/, `$1${MASK}`),
+    redacted: redactWifiPassword(text),
   };
 }
 

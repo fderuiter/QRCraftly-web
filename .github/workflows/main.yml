@@ -212,6 +212,8 @@ jobs:
 
       - name: Setup Environment
         uses: ./.github/actions/setup
+        with:
+          cache-playwright: 'true'
 
       - name: Download Build Output
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -446,6 +448,8 @@ jobs:
 
       - name: Setup Environment
         uses: ./.github/actions/setup
+        with:
+          cache-playwright: 'true'
 
       - name: Wait for staging to serve this commit
         env:

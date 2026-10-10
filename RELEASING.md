@@ -91,12 +91,13 @@ A release names what is already running in production: it bumps the version, wri
    `release:prepare` refuses to run unless you are on a clean `main` that matches `origin/main`. It creates `release/vX.Y.Z`, updates `package.json` and `CHANGELOG.md`, and commits `chore(release): vX.Y.Z`. Edit the changelog on the branch if you want to reword entries, then open a PR into `main` titled `chore(release): vX.Y.Z`.
 
 3. Squash-merge it by hand once `CI` passes (don't use auto-merge here). The **Release** workflow then:
-   - sees that `package.json` has a version with no tag, and checks `CHANGELOG.md` has a section for it
-   - creates the annotated tag `vX.Y.Z` on the merge commit
-   - publishes the GitHub Release with that changelog section as notes
+   - verifies whether a GitHub Release already exists for the `package.json` version using `gh release view`
+   - extracts release notes from `CHANGELOG.md` before creating or pushing tags, preventing orphaned tags if note extraction fails
+   - creates the annotated tag `vX.Y.Z` idempotently and pushes it to origin
+   - publishes or updates the GitHub Release with the extracted release notes
    - waits until both production URLs serve the new `/version.json`, then runs the smoke tests against each
 
-If the workflow failed for an external reason, rerun it from **Actions → Release → Run workflow**. Pass the tag, such as `v0.9.0`, to republish an existing release; leave it empty to tag the current `main` if the tag was never created. Rerunning is safe.
+If the workflow failed for an external reason (for example, network issues during release publishing or production deployment timeouts), rerun it from **Actions → Release → Run workflow** (or re-run the failed workflow run). When retried, the workflow detects if the Git tag was already pushed while the GitHub Release remains unpublished, extracts notes, updates tags idempotently, and publishes the GitHub Release automatically without requiring manual tag deletion or Git intervention. Rerunning is safe.
 
 ## Rolling back
 

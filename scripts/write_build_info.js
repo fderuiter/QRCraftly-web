@@ -6,7 +6,8 @@
  * release and commit it is serving. Release and staging smoke tests poll this file
  * to wait for Cloudflare Workers Builds to finish deploying before they run.
  *
- * Runs after generate_sw.cjs so the file is never precached by the service worker.
+ * The file is never precached: the service worker's shell holds only the homepage and what it
+ * loads (scripts/generate_sw.cjs).
  * Contains only public build metadata (package version and commit SHA).
  */
 

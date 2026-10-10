@@ -75,6 +75,10 @@ interface RunResult {
   /** Data bytes of repaired blocks per second, before the outer code, from the lock to the end (or the whole run). */
   steadyBytesPerSecond: number;
   lastLabel: string;
+  /** Blocks whose tag refused the inner code's first repair. */
+  refused: number;
+  /** Blocks returned as repaired whose bytes differ from those sent. Must be zero. */
+  wrong: number;
 }
 
 function table(header: string[], rows: (string | number)[][]): string {
@@ -101,6 +105,8 @@ function run(receiver: SimulatedReceiver, strategy: Strategy, bestProfile: numbe
   let reported: number | null = null;
   let steadyBytes = 0;
   let steadyFrames = 0;
+  let refused = 0;
+  let wrong = 0;
   for (let frame = 0; frame < maxFrames; frame++) {
     const timeMs = (frame * 1000) / CAMERA_FPS;
     while (pending.length > 0 && pending[0].at <= frame) {
@@ -130,9 +136,11 @@ function run(receiver: SimulatedReceiver, strategy: Strategy, bestProfile: numbe
       const result = decodeTimer.time(() => decodeModemFrame(capture, { geometries: [profile] }));
       tracker.record(observeDecode(timeMs, result));
       if (result.ok) {
+        refused += result.refused;
         result.blocks.forEach((block, b) => {
           if (!block) return;
           blocksOk++;
+          if (!block.every((v, i) => v === payload[b * profile.packetBytes + i])) wrong++;
           for (let j = 0; j < perBlock; j++) decoder.ingest({ seq: encoder.seqForIndex(result.header.seq + b * perBlock + j), ...meta }, block.subarray(j * SYMBOL_BYTES, (j + 1) * SYMBOL_BYTES));
         });
       }
@@ -157,6 +165,8 @@ function run(receiver: SimulatedReceiver, strategy: Strategy, bestProfile: numbe
       lockedProfile,
       steadyBytesPerSecond: steadyFrames === 0 ? 0 : (steadyBytes * CAMERA_FPS) / steadyFrames,
       lastLabel: linkLabel(tracker.state()),
+      refused,
+      wrong,
     };
   }
 }
@@ -214,6 +224,8 @@ function main(): void {
         r.complete && singleGoodput > 0 ? percent(goodput / singleGoodput) : '-',
         strategy === 'duplex' && r.lockedAt !== null ? `P${r.lockedProfile} at ${(r.lockedAt / CAMERA_FPS).toFixed(1)} s` : strategy === 'duplex' ? 'never' : '-',
         single.steadyBytesPerSecond > 0 && r.steadyBytesPerSecond > 0 ? `${(r.steadyBytesPerSecond / 1000).toFixed(1)} KB/s, ${percent(r.steadyBytesPerSecond / single.steadyBytesPerSecond)}` : '-',
+        r.refused,
+        r.wrong,
       ]);
     }
   }
@@ -230,9 +242,9 @@ function main(): void {
     '',
     '## Transfers',
     '',
-    `A ${(fileBytes / 1000).toFixed(0)} KB file through the outer code, droplets of ${SYMBOL_BYTES} bytes (the largest size that divides every profile's block, so a block of any profile carries whole droplets), one camera frame per frame sent at ${CAMERA_FPS} fps. The ladder cycle is ${ladderSchedule(DEFAULT_LADDER_WEIGHTS).map((p) => `P${p}`).join(' ')}; P0 and P1 are QR rungs that this modem-only receiver cannot use, so ${((DEFAULT_LADDER_WEIGHTS[0] + DEFAULT_LADDER_WEIGHTS[1]) * 100 / ladderSchedule(DEFAULT_LADDER_WEIGHTS).length).toFixed(0)}% of the ladder's airtime is lost to it in this bench. With feedback, the receiver reports a lock after holding the same profile for a second and the sender switches ${FEEDBACK_DELAY_FRAMES} frames later; it then sends only that profile and a beacon one frame in 16. "Steady" is the data rate of repaired blocks (before the outer code) from the lock to the end, against the oracle's.`,
+    `A ${(fileBytes / 1000).toFixed(0)} KB file through the outer code, droplets of ${SYMBOL_BYTES} bytes (the largest size that divides every profile's block, so a block of any profile carries whole droplets), one camera frame per frame sent at ${CAMERA_FPS} fps. The ladder cycle is ${ladderSchedule(DEFAULT_LADDER_WEIGHTS).map((p) => `P${p}`).join(' ')}; P0 and P1 are QR rungs that this modem-only receiver cannot use, so ${((DEFAULT_LADDER_WEIGHTS[0] + DEFAULT_LADDER_WEIGHTS[1]) * 100 / ladderSchedule(DEFAULT_LADDER_WEIGHTS).length).toFixed(0)}% of the ladder's airtime is lost to it in this bench. With feedback, the receiver reports a lock after holding the same profile for a second and the sender switches ${FEEDBACK_DELAY_FRAMES} frames later; it then sends only that profile and a beacon one frame in 16. "Steady" is the data rate of repaired blocks (before the outer code) from the lock to the end, against the oracle's. "Refused by tag" counts blocks whose first repair the inner code accepted but whose identity-bound tag ([ADR 0043](adr/0043-optical-modem-block-tag.md)) did not match, so without the tag they would have reached the outer code wrong; "wrong accepts" counts blocks returned as repaired whose bytes differ from those sent, and must be zero.`,
     '',
-    table(['Receiver', 'Sender', 'File complete', 'Frames', 'Seconds', 'File goodput KB/s', 'Of the oracle', 'Locked', 'Steady data rate'], rows),
+    table(['Receiver', 'Sender', 'File complete', 'Frames', 'Seconds', 'File goodput KB/s', 'Of the oracle', 'Locked', 'Steady data rate', 'Refused by tag', 'Wrong accepts'], rows),
     '',
   ].join('\n');
   process.stdout.write(`\n${report}\n`);

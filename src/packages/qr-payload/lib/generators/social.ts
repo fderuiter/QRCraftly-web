@@ -17,7 +17,7 @@
 */
 
 import { SocialData, SocialPlatform, QRType, QRGeneratorContract } from '@/types';
-import { SOCIAL_DOMAINS, parseProtocol, identifyProtocol } from '../protocol';
+import { parseProtocol, parseSocialProfile, identifyProtocol } from '../protocol';
 import { sanitizeSocialHandle } from '@/utils/security';
 
 const SOCIAL_PLATFORM_URLS: Record<SocialPlatform, (handle: string) => string> = {
@@ -59,27 +59,10 @@ export const hydrateSocialData = (raw: string): SocialData => {
   };
 
   const parsed = parseProtocol(raw);
-  if (parsed && (parsed.scheme === 'http' || parsed.scheme === 'https')) {
-    // Check if path starts with a known domain
-    const pathParts = parsed.path.split('/');
-    let domain = pathParts[0].toLowerCase();
-
-    // Remove www. if present
-    if (domain.startsWith('www.')) {
-      domain = domain.substring(4);
-    }
-
-    if (SOCIAL_DOMAINS[domain]) {
-      result.platform = SOCIAL_DOMAINS[domain];
-      let handlePart = pathParts[1] || '';
-      if (domain === 'linkedin.com' && handlePart === 'in') {
-        handlePart = pathParts[2] || '';
-      }
-      if (handlePart.startsWith('@')) {
-        handlePart = handlePart.substring(1);
-      }
-      result.handle = handlePart;
-    }
+  const profile = parsed ? parseSocialProfile(parsed) : null;
+  if (profile) {
+    result.platform = profile.platform;
+    result.handle = profile.handle;
   }
 
   return result;

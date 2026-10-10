@@ -35,6 +35,18 @@ describe('result gate', () => {
     expect(gate.offer('SLOW', 'qr-decode', 1000)).toBe(true);
   });
 
+  it('counts agreeing decodes with at most windowMisses misses between them, however far apart (#1292)', () => {
+    const gate = createResultGate({ windowMs: 500, windowMisses: 3 });
+    expect(gate.offer('SLOW', 'qr-decode', 0)).toBe(false);
+    for (let miss = 0; miss < 3; miss++) gate.miss();
+    expect(gate.offer('SLOW', 'qr-decode', 6000)).toBe(true);
+
+    expect(gate.offer('NEXT', 'qr-decode', 7000)).toBe(false);
+    for (let miss = 0; miss < 4; miss++) gate.miss();
+    expect(gate.offer('NEXT', 'qr-decode', 13000)).toBe(false);
+    expect(gate.offer('OTHER', 'qr-decode', 14000)).toBe(false);
+  });
+
   it('trusts the platform detector on one frame', () => {
     expect(createResultGate().offer('NATIVE', 'native', 0)).toBe(true);
   });
