@@ -43,6 +43,39 @@ describe('Colour layer simulation (#1147)', () => {
     expect(result.tileDecodes).toBeGreaterThanOrEqual(result.colourReads);
   }, 240_000);
 
+  it('reads tracked tiles from the box where they last read, and searches only when that misses (#1241)', async () => {
+    const full = await runColourTransfer({ mode: 'colour', bytes: 20_000, channel: REFERENCE_CHANNEL, screen: SMALL_SCREEN, maxFrames: 400 });
+    const tracked = await runColourTransfer({ mode: 'colour', bytes: 20_000, channel: REFERENCE_CHANNEL, screen: SMALL_SCREEN, maxFrames: 400, readPath: 'tracked' });
+    expect(full.verified).toBe(true);
+    expect(tracked.verified).toBe(true);
+    expect(full.trackedFallbacks).toBe(0);
+    // Most tracked reads hit; the misses are the first read after a beacon and the beacon frames themselves.
+    expect(tracked.trackedFallbacks).toBeLessThan(tracked.tileDecodes / 2);
+    expect(tracked.colourReads).toBe(full.colourReads);
+  }, 240_000);
+
+  it('drops the frames a slow decoder is too busy for, and still finishes on the camera clock (#1241)', async () => {
+    // A plane decode that takes 6 ms: a 4-tile frame is 12 planes, about 72 ms against a 33 ms frame budget.
+    const slow = (plane: Parameters<typeof qrDecoders.decodePlane>[0]) => {
+      const until = performance.now() + 6;
+      while (performance.now() < until);
+      return qrDecoders.decodePlane(plane);
+    };
+    const result = await runColourTransfer({ mode: 'colour', bytes: 20_000, channel: CLEAN_CHANNEL, screen: SMALL_SCREEN, maxFrames: 400, decodePlane: slow, deadline: true });
+    expect(result.verified).toBe(true);
+    expect(result.framesDropped).toBeGreaterThan(0);
+    expect(result.framesDecoded + result.framesDropped).toBe(result.cameraFrames);
+    // The transfer took at least as long as the camera frames it spanned.
+    expect(result.seconds).toBeGreaterThanOrEqual((result.cameraFrames - 1) / 30);
+  }, 240_000);
+
+  it('gives mono the same beacon start-up as colour (#1241)', async () => {
+    const result = await runColourTransfer({ mode: 'mono', bytes: 20_000, channel: CLEAN_CHANNEL, screen: SMALL_SCREEN, maxFrames: 400, readPath: 'tracked' });
+    expect(result.verified).toBe(true);
+    expect(result.startFrames).toBeGreaterThan(1);
+    expect(result.planeMsP95).toBeGreaterThanOrEqual(result.planeMsP50);
+  }, 240_000);
+
   it('needs the correction: the raw channels of the same camera do not decode, the corrected ones do', () => {
     const grid = (text: string) => QRCode.create(text, { errorCorrectionLevel: 'L', version: 20 }).modules;
     const texts = ['RED ' + 'r'.repeat(300), 'GREEN ' + 'g'.repeat(300), 'BLUE ' + 'b'.repeat(300)];
