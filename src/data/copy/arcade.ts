@@ -27,11 +27,11 @@ export const copy: ToolCopy = {
   faqs: [
       {
         "question": "Why does the code fail when a corner square is hit, even with budget left?",
-        "answer": "Scanners use the three 7x7 finder patterns to locate the grid. Once more than 20% of one is destroyed, alignment fails regardless of the remaining error correction budget."
+        "answer": "Scanners find the grid by its three 7×7 corner squares. Once more than 20% of one is destroyed, the Arcade counts the code as unreadable, however much error correction is left."
       },
       {
         "question": "What is the difference between the health bar and the live scanner?",
-        "answer": "The health bar is an instant mathematical model of Reed-Solomon capacity across interleaved blocks. The live scanner actually decodes the damaged image with BarcodeDetector or a Web Worker, so it is empirical proof of readability."
+        "answer": "The health bar works out from the error correction maths how much more damage the code can take. The live scanner tries to read the damaged picture, so it shows whether a real reader still can."
       },
       {
         "question": "Is my QR content uploaded?",

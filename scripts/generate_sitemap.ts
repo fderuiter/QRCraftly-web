@@ -160,19 +160,48 @@ export function getPreRenderedHtmlRoutes(distDir: string = DIST_DIR): string[] {
 let historyAvailable: boolean | null = null;
 
 /**
- * Whether the checkout has full git history. A shallow clone (as CI builders often make)
- * would stamp every page with the latest commit date, so lastmod is omitted instead.
+ * Whether the checkout is a shallow clone.
+ * @returns True when git reports a shallow repository or cannot tell.
+ */
+function isShallow(): boolean {
+  try {
+    return execBinary('git', ['rev-parse', '--is-shallow-repository'], { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).trim() !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Whether the checkout has full git history. Workers Builds checks out a shallow clone, which
+ * would stamp every page with the latest commit date, so on a build server the generator first
+ * fetches the commit history (commits and trees only, no file contents) from the public
+ * repository (#1309). Elsewhere, or if that fails, lastmod is left out rather than guessed.
  * @returns True when per-path commit dates are trustworthy.
  */
 function hasFullHistory(): boolean {
   if (historyAvailable === null) {
-    try {
-      historyAvailable = execBinary('git', ['rev-parse', '--is-shallow-repository'], { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).trim() === 'false';
-    } catch {
-      historyAvailable = false;
+    historyAvailable = !isShallow();
+    if (!historyAvailable && (process.env.WORKERS_CI === '1' || process.env.SITEMAP_UNSHALLOW === '1')) {
+      try {
+        execBinary('git', ['fetch', '--unshallow', '--filter=blob:none', '--quiet', 'origin'], { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000 });
+        historyAvailable = !isShallow();
+      } catch (error) {
+        console.warn(`[Sitemap] Could not fetch git history, so pages other than guides get no lastmod: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   }
   return historyAvailable;
+}
+
+/**
+ * The files whose last commit dates a route's lastmod: its page directory and, where it has
+ * one, its copy block in `src/data/copy/`.
+ * @param cleanPath - Sanitized route such as `/` or `/wifi-qr-code`.
+ * @returns Repository-relative POSIX paths that exist.
+ */
+export function getPageSourcePaths(cleanPath: string): string[] {
+  const id = cleanPath === '/' || cleanPath === '' ? 'index' : cleanPath.slice(1);
+  return [`src/pages/${id}`, `src/data/copy/${id}.ts`].filter((source) => fs.existsSync(path.join(REPO_ROOT, source)));
 }
 
 /**
@@ -184,11 +213,10 @@ export function getLastModified(cleanPath: string): string | null {
   const guideSlug = /^\/guides\/([^/]+)$/.exec(cleanPath)?.[1];
   const guide = guideSlug ? getGuide(guideSlug) : undefined;
   if (guide) return guide.dateModified;
-  if (!hasFullHistory()) return null;
-  const pageDir = cleanPath === '/' || cleanPath === '' ? 'src/pages/index' : `src/pages${cleanPath}`;
-  if (!fs.existsSync(path.join(REPO_ROOT, pageDir))) return null;
+  const sources = getPageSourcePaths(cleanPath);
+  if (sources.length === 0 || !hasFullHistory()) return null;
   try {
-    const iso = execBinary('git', ['log', '-1', '--format=%cI', '--', pageDir], { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const iso = execBinary('git', ['log', '-1', '--format=%cI', '--', ...sources], { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     return /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : null;
   } catch {
     return null;

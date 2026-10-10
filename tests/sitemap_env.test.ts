@@ -122,4 +122,17 @@ describe('Sitemap Environment-Level Variable Resolution', () => {
       }
     }
   }, 30000);
+
+  // CI checks out full history (fetch-depth: 0); a shallow local clone skips this check.
+  const shallow = execBinary('git', ['rev-parse', '--is-shallow-repository']).trim() !== 'false';
+  it.skipIf(shallow)('gives every page with a source a lastmod (#1309)', () => {
+    execBinary('pnpm', ['exec', 'tsx', sitemapScriptPath], {
+      env: { ...process.env, VITE_DOMAIN: '', NODE_ENV: 'production', SITEMAP_OUTPUT_PATH: sitemapPath, SITEMAP_DIST_DIR: distDir },
+    });
+
+    const entries = readFileSync(sitemapPath, 'utf8').split('<url>').slice(1);
+    const pages = entries.filter((entry) => !entry.includes('dummy-sample-route'));
+    expect(pages.length).toBeGreaterThan(30);
+    for (const entry of pages) expect(entry, entry).toMatch(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+  }, 30000);
 });

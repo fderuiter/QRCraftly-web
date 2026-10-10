@@ -44,8 +44,16 @@ What changed:
 - **Rewrite.** Every type and landing guide, how-to and type FAQ was rewritten shorter, and the “Key features” lists now use plain words instead of labels such as “Secure Client-Side”.
 - **Corrections.** Copy had fallen behind the app. It now says that payment codes cover SEPA (EPC QR), PayPal, Venmo and Cash App as well as crypto; that social codes cover eight networks, not three; that events have a time zone setting and Google, Outlook, Office 365 and Yahoo links; that contact cards come in vCard 2.1, 3.0, 4.0 and MECARD; that email codes take CC and BCC; and that downloads include EPS and PDF.
 
-Still to review with the same checklist:
+The About, Security and Pledge pages and the privacy and compliance notes (`docs/public/COMPLIANCE.md`) were reviewed with the same checklist in October 2026:
 
-- The About, Security, Pledge and Acknowledgements pages.
-- The guides under `/guides`, the scanner, checker, bulk and file transfer pages.
+- **About.** Filler (“no hidden fees”, “we believe in transparency”) is gone, and the FAQ says where your input goes instead of answering “Is my data secure?” with “Yes”.
+- **Security.** The FAQ no longer says QRCraftly is HIPAA and GDPR compliant. No software is, on its own, and Cloudflare does process IP addresses. The how-to now tells readers how to check the claims themselves, and the heading is plain “Security & Privacy”.
+- **Compliance notes.** Rewritten in plain words, with the scanner added and the claim that the app provides HIPAA technical safeguards removed.
+- **Pledge.** “No limits” became “no paid tier”, because bulk CSV takes at most 500 rows a batch.
+- **Bulk, file transfer and Arcade.** The how-tos and FAQs now use the labels on screen (the old file transfer steps named a button and a chunk size setting that no longer exist), and the bulk FAQ gives the 500-row limit.
+- **Guides.** The five guides under `/guides` were checked and left as they are: they are short for their subject, cite their sources and match the app. Each one is now linked from at least three tool pages ([#1309](https://github.com/fderuiter/QRCraftly-web/issues/1309)).
+
+Still to do:
+
+- The Acknowledgements page.
 - A human read-through for voice. A WCAG 2.2 AA check with a keyboard, a screen reader and real phones is tracked in [#1057](https://github.com/fderuiter/QRCraftly-web/issues/1057).
