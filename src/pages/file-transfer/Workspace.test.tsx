@@ -19,7 +19,7 @@
 // @vitest-environment jsdom
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { ToastProvider } from '@/components/ui/Toast';
 import SenderPage from './+Page';
 import ReceiverPage from './receive/+Page';

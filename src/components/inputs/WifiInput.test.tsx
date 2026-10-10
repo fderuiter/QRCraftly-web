@@ -18,7 +18,7 @@
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { WifiInput } from './WifiInput';
 import { WifiData, WifiEapMethod, WifiEapPhase2, WifiEncryption } from '../../types';
 

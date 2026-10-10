@@ -111,7 +111,7 @@ pnpm preview   # serves dist/ at http://localhost:3000
 
 | Command                      | What it does                                                                                                    |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `pnpm dev`                   | Starts the Vite dev server.                                                                                     |
+| `pnpm dev`                   | Starts the Vite dev server. It reloads the page on save (no Fast Refresh).                                      |
 | `pnpm exec vitest run`       | Runs the unit tests once (`pnpm test` watches). Add `--coverage` for a coverage report.                         |
 | `pnpm test:e2e`              | Runs the Playwright end-to-end tests. Run `pnpm exec playwright install` once on a fresh machine.               |
 | `pnpm run lint`              | Runs every static check that CI runs (see [Quality gates](#quality-gates)).                                     |
@@ -138,7 +138,7 @@ pnpm preview   # serves dist/ at http://localhost:3000
 | Compute     | Our own Rust compiled to WebAssembly, with no third-party crates ([ADR 0033](docs/adr/0033-rust-webassembly-modules.md), [RUST.md](docs/RUST.md))                                                                                 |
 | Concurrency | Web Workers for scannability, matrix and maze building, scanning and decoding, passing pixels as transferable `ArrayBuffer`s ([SCALING.md](docs/public/SCALING.md))                                                               |
 | Hosting     | Cloudflare Workers with Static Assets only, no server code ([ADR 0012](docs/adr/0012-cloudflare-workers-static-assets-and-multi-environment.md))                                                                                  |
-| Tests       | Vitest with jsdom and vitest-axe; Playwright with axe for end-to-end tests                                                                                                                                                        |
+| Tests       | Vitest with jsdom and axe-core (`tests/utils/axe.ts`); Playwright with axe for end-to-end tests                                                                                                                                   |
 
 Runtime dependencies are only React, React DOM, Vike, vike-react and lucide-react. Our own code comes first: a new runtime dependency needs its own ADR ([ADR 0040](docs/adr/0040-in-house-first.md)).
 

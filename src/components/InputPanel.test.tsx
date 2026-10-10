@@ -17,7 +17,7 @@
 */
 
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
-import { axe } from 'vitest-axe';
+import { axe } from '../../tests/utils/axe';
 import InputPanel from './InputPanel';
 import { getQRTypeLabel } from '@/data/qrTypeLabels';
 import { DEFAULT_CONFIG } from '../constants';

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execBinary } from './utils/execHelper.js';
 import { fileURLToPath } from 'url';
 
 // Excluded files or directories
@@ -422,7 +422,7 @@ function main() {
   } else {
     // No arguments, list files tracked by git
     try {
-      const gitFiles = execSync('git ls-files', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] })
+      const gitFiles = execBinary('git', ['ls-files'], { stdio: ['pipe', 'pipe', 'ignore'] })
         .split(/\r?\n/)
         .filter(Boolean);
       filesToScan = gitFiles;

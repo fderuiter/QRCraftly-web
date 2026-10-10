@@ -163,3 +163,4 @@ To avoid duplicate controls and logical divergence:
 2.  **Do Not Duplicate Pickers:** All color pickers must rely on `ColorInput` and its internal validators.
 3.  **Do Not Code Custom Color Math:** Do not write custom contrast checks, relative luminance weights, or hex parsers. Import `normalizeHex` or `getContrastRatio` directly from `src/utils/colorUtils.ts`.
 4.  **Audit Before Submitting:** If you are building a new feature, compare the required controls against this index. If a component matches, import and wrap it instead of replicating it.
+5.  **Test Components With the Shared Helpers:** Each component's companion test checks accessibility with `axe` from `tests/utils/axe.ts` (`expect(await axe(container)).toHaveNoViolations()`), and the DOM matchers (`toBeInTheDocument`, `toHaveAttribute`, `toHaveAccessibleName` and the rest) come from `tests/utils/domMatchers.ts`, registered in `vitest.setup.ts`.

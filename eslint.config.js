@@ -1,12 +1,12 @@
 import js from "@eslint/js";
-import globals from "globals";
 import tseslint from "typescript-eslint";
 import reactPlugin from "eslint-plugin-react";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
-import securityPlugin from "eslint-plugin-security";
 import jsdoc from "eslint-plugin-jsdoc";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import tailwind from "eslint-plugin-tailwindcss";
+import { NODE_GLOBALS, COMMONJS_GLOBALS } from "./eslint/node-globals.js";
+import qrcraftly from "./eslint/rules/index.js";
 
 // Unit/integration tests and their support code (Vitest + Testing Library).
 const TEST_FILES = [
@@ -47,6 +47,8 @@ export default tseslint.config(
       ".wrangler/**",
       ".vike/**",
       ".agents/**",
+      // Agent worktrees are copies of the repository, not part of it.
+      ".claude/**",
       ".jules/**",
       ".dependency-cruiser.cjs"
     ]
@@ -62,23 +64,40 @@ export default tseslint.config(
     }
   },
   {
+    // Security rules: ESLint core plus our own (eslint/rules/, #1193). They replace
+    // eslint-plugin-security, whose other rules target Node servers this static site
+    // does not have. Semgrep (semgrep.yml) runs in CI as a second layer.
+    files: ["**/*.{ts,tsx,js,cjs,mjs}"],
+    plugins: { qrcraftly },
+    rules: {
+      "no-eval": "error",
+      "no-implied-eval": "error",
+      "no-new-func": "error",
+      "no-script-url": "error",
+      "qrcraftly/no-unsafe-regex": "error",
+      "qrcraftly/no-bidi-characters": "error",
+      "qrcraftly/exec-through-helper": "error"
+    }
+  },
+  {
+    files: ["**/*.{ts,tsx}"],
+    rules: {
+      "qrcraftly/no-non-literal-regexp": "error"
+    }
+  },
+  {
     files: ["**/*.{ts,tsx}"],
     plugins: {
       "react": reactPlugin,
       "react-hooks": reactHooksPlugin,
-      "security": securityPlugin,
       "jsx-a11y": jsxA11y,
     },
-    languageOptions: {
-      globals: {
-        ...globals.browser,
-        process: "readonly",
-      }
-    },
     rules: {
+      // The TypeScript compiler reports undefined names, more accurately than this rule
+      // (typescript-eslint's advice), and typecheck runs in lint, CI and the pre-commit hook.
+      "no-undef": "off",
       ...reactPlugin.configs.recommended.rules,
       ...reactHooksPlugin.configs.recommended.rules,
-      ...securityPlugin.configs.recommended.rules,
       ...jsxA11y.flatConfigs.recommended.rules,
       "react/react-in-jsx-scope": "off",
       "react/prop-types": "off",
@@ -97,9 +116,6 @@ export default tseslint.config(
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/immutability": "off",
       "react-hooks/preserve-manual-memoization": "off",
-
-      // Flags every `obj[key]` access, typed keys included (~170 hits, effectively all false positives).
-      "security/detect-object-injection": "off",
 
       "no-useless-escape": "off",
       "no-case-declarations": "off",
@@ -122,53 +138,43 @@ export default tseslint.config(
   },
   {
     files: TEST_FILES,
-    languageOptions: {
-      globals: {
-        ...globals.node,
-        ...globals.vitest
-      }
-    },
     rules: {
       // Tests stub browser/worker APIs, build partial fixtures and destructure unused helpers;
       // type-safety and the security heuristics (fs paths, regexes built from fixtures) add noise there.
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-require-imports": "off",
-      "security/detect-non-literal-fs-filename": "off",
-      "security/detect-non-literal-regexp": "off",
-      "security/detect-unsafe-regex": "off",
+      "qrcraftly/no-non-literal-regexp": "off",
+      "qrcraftly/no-unsafe-regex": "off",
+      // Tests feed `javascript:` URLs to the sanitisers and evaluate inline scripts the build emits.
+      "no-script-url": "off",
+      "no-new-func": "off",
       // `vi.mock` factories define fake `use*` hooks at module scope.
       "react-hooks/rules-of-hooks": "off"
     }
   },
   {
     files: ["e2e/**/*.ts"],
-    languageOptions: {
-      globals: globals.node
-    },
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       // Playwright fixtures call `use()`, which the hooks plugin mistakes for React's `use`.
       "react-hooks/rules-of-hooks": "off",
-      "security/detect-non-literal-fs-filename": "off",
-      "security/detect-non-literal-regexp": "off"
+      "qrcraftly/no-non-literal-regexp": "off",
+      // Specs paste `javascript:` URLs to prove the app refuses them.
+      "no-script-url": "off"
     }
   },
   {
     files: NODE_FILES,
     languageOptions: {
-      globals: globals.node
-    },
-    rules: {
-      // Build tooling reads and writes paths derived from the repository layout, never user input.
-      "security/detect-non-literal-fs-filename": "off"
+      globals: NODE_GLOBALS
     }
   },
   {
     files: ["**/*.cjs"],
     languageOptions: {
       sourceType: "commonjs",
-      globals: globals.node
+      globals: { ...NODE_GLOBALS, ...COMMONJS_GLOBALS }
     },
     rules: {
       "@typescript-eslint/no-require-imports": "off"

@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { describe, expect, it, vi } from 'vitest';
 import { CommandPalette, ShortcutHelp } from './CommandPalette';
 import type { Command } from './commands';

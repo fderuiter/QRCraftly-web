@@ -1,4 +1,4 @@
-import { execFileSync, execSync } from 'child_process';
+import { execFileSync, execSync, spawnSync } from 'child_process';
 import fs from 'fs';
 
 const WINDOWS_CMD_EXECUTABLES = new Set(['npx', 'npm', 'pnpm', 'yarn', 'tsc', 'wrangler', 'depcruise']);
@@ -39,6 +39,19 @@ export function execBinary(file, args = [], options = {}) {
 
   const output = execFileSync(resolved, args, opts);
   return typeof output === 'string' ? output.replace(/\r\n/g, '\n') : output;
+}
+
+/**
+ * Runs a binary synchronously and returns its exit status instead of throwing, for
+ * interactive tools that inherit the terminal (`stdio: 'inherit'`).
+ *
+ * @param {string} file - Binary/command name or path
+ * @param {string[]} [args=[]] - Arguments array
+ * @param {import('child_process').SpawnSyncOptions} [options={}] - Node child_process options
+ * @returns {import('child_process').SpawnSyncReturns<string | Buffer>} The spawn result
+ */
+export function spawnBinary(file, args = [], options = {}) {
+  return spawnSync(resolveCommand(file), args, options);
 }
 
 /**

@@ -18,7 +18,7 @@
 
 import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../tests/utils/axe';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader, DESKTOP_WORKSPACE_QUERY } from './ToolWorkspaceLayout';
 
 type Listener = () => void;

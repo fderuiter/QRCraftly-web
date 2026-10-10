@@ -21,6 +21,7 @@ export const SafeUrlPipeline = {
   REGEX_CONTROL_CHARS: /[\x00-\x1F\x7F-\x9F\u200B-\u200D\u2060\uFEFF]/g,
 
   DANGEROUS_PROTOCOLS: [
+    // eslint-disable-next-line no-script-url -- a scheme to block, never a URL we navigate to.
     'javascript:',
     'vbscript:',
     'file:',
@@ -105,6 +106,7 @@ export const SafeUrlPipeline = {
    * Schemes that run script. They are refused even with whitespace after the colon,
    * because browsers still run `javascript: alert(1)`.
    */
+  // eslint-disable-next-line no-script-url -- schemes to block, never URLs we navigate to.
   SCRIPT_PROTOCOLS: ['javascript:', 'vbscript:', 'jscript:', 'wscript:'],
 
   /**
@@ -203,7 +205,6 @@ export const shouldNormalizeUrl = (url: string | undefined): boolean => {
 
   const hasDot = url.includes('.');
   const isWww = url.toLowerCase().startsWith('www.');
-  // eslint-disable-next-line security/detect-unsafe-regex -- linear: a single optional ':\d+' group, anchored at the start.
   const isLocalhost = /^localhost(?::\d+)?(?:[/?#]|$)/i.test(url);
 
   return hasDot || isWww || isLocalhost;

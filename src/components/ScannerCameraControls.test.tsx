@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../tests/utils/axe';
 import type { CameraInfo } from '@/packages/optical-scanner/client';
 import { ScannerCameraControls } from './ScannerCameraControls';
 

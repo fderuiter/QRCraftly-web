@@ -1,6 +1,6 @@
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../tests/utils/axe';
 import { ScannabilityIndicator } from './ScannabilityIndicator';
 
 describe('ScannabilityIndicator Component', () => {

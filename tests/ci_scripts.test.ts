@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execFile } from './utils/execHelper';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,12 +33,9 @@ describe('CI Modular Shell Scripts Validation', () => {
     const files = fs.readdirSync(ciScriptsDir).filter(f => f.endsWith('.sh'));
     expect(files.length).toBeGreaterThan(0);
 
-    const scriptPaths = files.map(f => path.join(ciScriptsDir, f));
+    // bash expands the glob, so no file name read by this test reaches a command line.
     try {
-      execSync(`shellcheck ${scriptPaths.map(p => `"${p}"`).join(' ')}`, {
-        encoding: 'utf8',
-        cwd: repoRoot,
-      });
+      execFile('bash', ['-c', 'shellcheck scripts/ci/*.sh'], { cwd: repoRoot });
     } catch (err: any) {
       const stdout = err.stdout ? err.stdout.toString() : '';
       const stderr = err.stderr ? err.stderr.toString() : '';
@@ -64,9 +61,9 @@ describe('CI Modular Shell Scripts Validation', () => {
       return;
     }
     // Test that set -euo pipefail properly catches intermediate pipe failures
-    const testCommand = `bash -c 'set -euo pipefail; false | echo "should not mask failure"; echo "unreachable"'`;
+    const script = 'set -euo pipefail; false | echo "should not mask failure"; echo "unreachable"';
     expect(() => {
-      execSync(testCommand, { stdio: 'pipe' });
+      execFile('bash', ['-c', script], { stdio: 'pipe' });
     }).toThrow();
   });
 });

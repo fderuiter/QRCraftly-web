@@ -29,7 +29,6 @@ const AXIS_LETTERS: Record<CoordinateAxis, { positive: string; negative: string 
 
 // A sign, whole degrees, an optional `.` or `,` fraction (phones in many locales offer a decimal
 // comma), an optional degree sign and an optional hemisphere letter.
-// eslint-disable-next-line security/detect-unsafe-regex -- linear: anchored, bounded digit groups and single optional characters.
 const COORDINATE_PATTERN = /^([-+]?)(\d{1,3})(?:[.,](\d{1,15}))?\s?°?\s?([NSEW])?$/i;
 
 /**

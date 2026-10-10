@@ -6,6 +6,7 @@ To protect against supply-chain attacks, this project enforces immutable depende
 
 - **Versioning Standard**: All third-party GitHub Actions must be pinned to specific, immutable SHA-1 hashes instead of mutable version tags (e.g., `@v4`). Each pinned hash must be accompanied by a human-readable comment specifying the original version tag (e.g., `# v4.1.0`) to maintain readability.
 - **Automated Monitoring**: Dependabot is configured to check for updates to external CI/CD dependencies weekly to ensure workflows are running the latest security patches.
+- **Lint security rules**: `pnpm run lint` runs ESLint's `no-eval`, `no-implied-eval`, `no-new-func` and `no-script-url`, plus our own rules in `eslint/rules/`: `qrcraftly/no-unsafe-regex` (regexes that can backtrack catastrophically), `qrcraftly/no-non-literal-regexp`, `qrcraftly/no-bidi-characters` (Trojan Source, CVE-2021-42574) and `qrcraftly/exec-through-helper` (processes run only through the exec helpers). Lists of blocked schemes such as `javascript:` in `src/utils/security.ts` and `src/utils/url.ts` carry a reasoned `no-script-url` exemption.
 - **Remediation**: In the event a vulnerable action is identified or an automated update PR is generated, developers must review the PR, verify the hash corresponds to the legitimate version update, and merge the update immediately. Any new workflows introduced must adhere to this pinning standard.
 
 ## Supply Chain

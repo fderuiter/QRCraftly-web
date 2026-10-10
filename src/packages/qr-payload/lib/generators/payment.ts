@@ -31,7 +31,6 @@ const WEI_DECIMALS = 18;
  * decimal or has more than 18 fractional digits.
  */
 const etherToWei = (amount: string): string | null => {
-  // eslint-disable-next-line security/detect-unsafe-regex -- linear: the digit runs are separated by a literal '.' and anchored.
   const match = /^(\d*)(?:\.(\d*))?$/.exec(amount.trim());
   if (!match) return null;
   const whole = match[1] || '';
@@ -49,7 +48,6 @@ const etherToWei = (amount: string): string | null => {
  * @returns The ether amount without trailing zeros, or null when it is not a valid integer amount.
  */
 const weiToEther = (value: string): string | null => {
-  // eslint-disable-next-line security/detect-unsafe-regex -- linear: digit runs are separated by literal '.' / 'e' and anchored.
   const match = /^(\d+)(?:\.(\d+))?(?:[eE]\+?(\d+))?$/.exec(value.trim());
   if (!match) return null;
   const intPart = match[1];
@@ -77,7 +75,6 @@ const cleanIban = (iban: string): string => {
 
 const cleanPayPalHandle = (handle: string): string => {
   let clean = handle.trim();
-  // eslint-disable-next-line security/detect-unsafe-regex -- linear: non-overlapping optional scheme and domain prefix.
   clean = clean.replace(/^(https?:\/\/)?(www\.)?paypal\.me\//i, '');
   clean = clean.replace(/^@/, '');
   return clean;
@@ -85,7 +82,6 @@ const cleanPayPalHandle = (handle: string): string => {
 
 const cleanVenmoHandle = (handle: string): string => {
   let clean = handle.trim();
-  // eslint-disable-next-line security/detect-unsafe-regex -- linear: non-overlapping optional scheme and domain prefix.
   clean = clean.replace(/^(https?:\/\/)?(www\.)?venmo\.com\/(u\/)?/i, '');
   clean = clean.replace(/^@/, '');
   return clean;
@@ -93,7 +89,6 @@ const cleanVenmoHandle = (handle: string): string => {
 
 const cleanCashAppHandle = (handle: string): string => {
   let clean = handle.trim();
-  // eslint-disable-next-line security/detect-unsafe-regex -- linear: non-overlapping optional scheme and domain prefix.
   clean = clean.replace(/^(https?:\/\/)?(www\.)?cash\.app\//i, '');
   clean = clean.replace(/^\$/, '');
   return clean;
@@ -126,7 +121,6 @@ export const paymentAmountError = (amount: string | undefined, network: CryptoNe
   const decimals = AMOUNT_DECIMALS[network];
   if (!value || decimals === undefined) return null;
   // The integer and fraction digits are split by a literal '.', so the match is linear.
-  // eslint-disable-next-line security/detect-unsafe-regex
   const match = /^(\d{0,15})(?:\.(\d+))?$/.exec(value);
   if (!match || !/\d/.test(value)) {
     return 'Enter the amount as a plain number, such as 12.50.';

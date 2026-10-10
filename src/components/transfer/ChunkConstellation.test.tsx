@@ -18,7 +18,7 @@
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { ChunkConstellation } from './ChunkConstellation';
 
 const eta = (seconds: number | null) => (seconds === null ? '--' : `${seconds} s`);

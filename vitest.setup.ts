@@ -16,24 +16,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import '@testing-library/jest-dom';
-import 'vitest-axe/extend-expect';
 import { terminateScannerWorker } from './src/packages/optical-scanner/scheduler';
-import * as matchers from 'vitest-axe/matchers';
+import { toHaveNoViolations } from './tests/utils/axe';
 import { vi, afterEach, expect } from 'vitest';
 import { InThreadWorker, assertStructuredCloneable } from './tests/utils/inThreadWorker';
 import { qrEncoder } from './tests/fixtures/qrEncoder';
 import { setQrCanvasRuntime } from './src/utils/qrCanvasRuntime';
+import { domMatchers } from './tests/utils/domMatchers';
 
 
-declare module 'vitest' {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  export interface Assertion<T = any> extends matchers.AxeMatchers {}
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  export interface AsymmetricMatchersContaining extends matchers.AxeMatchers {}
-}
-
-expect.extend(matchers);
+// Our own DOM matchers (#1188) and axe matcher (#1186), in place of jest-dom and vitest-axe.
+expect.extend({ ...domMatchers, toHaveNoViolations });
 
 function createMemoryStorage(): Storage {
   let store: Record<string, string> = {};
