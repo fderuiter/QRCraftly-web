@@ -79,7 +79,7 @@ interface AxeMatchers<R = unknown> {
 
 declare module 'vitest' {
   // Vitest declares Assertion<T = any>; a merged declaration must match it.
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   interface Assertion<T = any> extends AxeMatchers<T> {}
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   interface AsymmetricMatchersContaining extends AxeMatchers {}
