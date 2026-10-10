@@ -41,9 +41,10 @@ export const test = base.extend({
         const errorMsg = `Blocked unauthorized external request: ${url} (type: ${type})`;
         console.warn(errorMsg);
         
-        // The app loads no web fonts or stylesheets from other origins (#970), so any such
-        // request is a privacy regression and fails the test like any other data request.
-        if (['fetch', 'websocket', 'xmlhttprequest', 'font', 'stylesheet'].includes(type)) {
+        // The app loads nothing from other origins (#970, #1352): no data request, font, style,
+        // script, image, media or beacon. Any such request fails the test. Only a top-level
+        // navigation (a person following a link to another site) is aborted without failing.
+        if (type !== 'document') {
           blockedRequests.push(url);
         }
         
@@ -51,7 +52,20 @@ export const test = base.extend({
       }
     });
 
+    // QRCraftly has no server API (ADR 0022): the browser only ever reads static files. A request
+    // that sends a body or uses another method could carry a payload off the device (#1352).
+    const sendingRequests: string[] = [];
+    context.on('request', (request) => {
+      if (!['GET', 'HEAD'].includes(request.method()) || request.postDataBuffer()) {
+        sendingRequests.push(`${request.method()} ${request.url()}`);
+      }
+    });
+
     await use(page);
+
+    if (sendingRequests.length > 0 && testInfo.expectedStatus !== 'failed') {
+      throw new Error(`Requests that send data:\n${sendingRequests.map((r) => `  - ${r}`).join('\n')}`);
+    }
 
     // Enforce strict client-side data privacy boundaries by failing the test if any request was blocked
     console.log(`[Teardown] Blocked requests count: ${blockedRequests.length}`, blockedRequests);
