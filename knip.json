@@ -18,13 +18,17 @@
     "@/*": ["./src/*"]
   },
   "ignoreExportsUsedInFile": true,
-  "ignoreFiles": ["src/packages/*/index.ts", "tests/semgrep/**"],
+  "ignoreFiles": [
+    "src/packages/*/index.ts",
+    "tests/semgrep/**",
+    "tests/scripts/boundaries/fixtures/**"
+  ],
   "ignoreIssues": {
     "src/packages/*/*.ts": ["types"],
     "src/packages/scannability/**": ["exports", "types"]
   },
   "ignoreBinaries": ["shellcheck", "semgrep"],
-  "ignoreDependencies": ["wrangler", "@ngraveio/bc-ur", "marked", "jscpd"],
+  "ignoreDependencies": ["wrangler", "@ngraveio/bc-ur", "marked"],
   "rules": {
     "files": "error",
     "dependencies": "error",

@@ -13,7 +13,7 @@ The content registry (`src/data/contentRegistry.ts`), the type guides (`src/data
 - **One server-side builder.** `src/data/pageContent.ts` exports `buildPageContent(pageContext)`. It returns one page's title, registry entry, guide, landing copy, example picture, gallery and related links.
 - **Global `+data` hook.** `src/pages/+data.ts` calls the builder at prerender time. Vike serializes the result into the page's HTML and `index.pageContext.json`. `LayoutDefault` provides it through `PageContentContext`, and components read it with `usePageContent()`. `+title.ts` reads `pageContext.data.title`.
 - **Structured data in Head.** `getPageSchema(urlPathname)` builds a page's own JSON-LD (application, how-to, FAQ or article). The server-only Head renders it after the site-wide graph, so pages and components no longer render `JsonLdScript` themselves.
-- **Enforced boundary.** The dependency-cruiser rule `page-content-stays-on-server` stops components, hooks, contexts, layouts and pages from importing the registry, type guides, landing copy, related pages, page content builder or schema generator. The exceptions are Head, `+data.ts`, `+description.ts` and tests. Type-only imports are allowed.
+- **Enforced boundary.** The package-boundary rule `page-content-stays-on-server` (`scripts/boundaries.config.js`) stops components, hooks, contexts, layouts and pages from importing the registry, type guides, landing copy, related pages, page content builder or schema generator. The exceptions are Head, `+data.ts`, `+description.ts` and tests. Type-only imports are allowed.
 
 ## Consequences
 

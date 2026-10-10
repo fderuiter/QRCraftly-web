@@ -18,7 +18,6 @@ on:
       - 'eslint.config.js'
       - 'knip.json'
       - '.jscpd.json'
-      - '.dependency-cruiser.cjs'
       - 'semgrep.yml'
       - 'tests/semgrep/**'
       - 'requirements.txt'

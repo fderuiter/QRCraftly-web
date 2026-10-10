@@ -1,7 +1,7 @@
 import { execFileSync, execSync, type ExecFileSyncOptions } from 'child_process';
 import fs from 'fs';
 
-const WINDOWS_CMD_EXECUTABLES = new Set(['npx', 'npm', 'pnpm', 'yarn', 'tsc', 'wrangler', 'depcruise']);
+const WINDOWS_CMD_EXECUTABLES = new Set(['npx', 'npm', 'pnpm', 'yarn', 'tsc', 'wrangler']);
 
 /**
  * Resolves the executable name for the current platform.

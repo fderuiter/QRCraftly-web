@@ -4,7 +4,6 @@ import reactPlugin from "eslint-plugin-react";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
 import jsdoc from "eslint-plugin-jsdoc";
 import jsxA11y from "eslint-plugin-jsx-a11y";
-import tailwind from "eslint-plugin-tailwindcss";
 import { NODE_GLOBALS, COMMONJS_GLOBALS } from "./eslint/node-globals.js";
 import qrcraftly from "./eslint/rules/index.js";
 
@@ -49,8 +48,7 @@ export default tseslint.config(
       ".agents/**",
       // Agent worktrees are copies of the repository, not part of it.
       ".claude/**",
-      ".jules/**",
-      ".dependency-cruiser.cjs"
+      ".jules/**"
     ]
   },
   js.configs.recommended,
@@ -204,19 +202,12 @@ export default tseslint.config(
     }
   },
   {
+    // Our own Tailwind class checks (ADR 0046): official order, duplicates, contradictions,
+    // shorthands and needless arbitrary values. Custom classes are never flagged.
     files: ["**/*.{ts,tsx,js,jsx}"],
-    plugins: {
-      tailwindcss: tailwind,
-    },
+    plugins: { qrcraftly },
     rules: {
-      ...tailwind.configs.recommended.rules,
-      "tailwindcss/no-custom-classname": "off"
-    },
-    settings: {
-      tailwindcss: {
-        callees: ["classnames", "clsx", "ctl", "mergeClasses"],
-        cssConfigPath: "src/layouts/index.css"
-      }
+      "qrcraftly/tailwind-classes": "error"
     }
   }
 );

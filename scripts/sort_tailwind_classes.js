@@ -1,127 +1,77 @@
-import { execBinary } from './utils/execHelper.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+/**
+ * `pnpm run format:classes`: sorts Tailwind classes in Tailwind's official order (ADR 0046).
+ *
+ * A thin CLI around the `qrcraftly/tailwind-classes` ESLint rule's fixer, run on its own, so this
+ * command and `eslint --fix` always produce the same classes.
+ *
+ * Usage: `node scripts/sort_tailwind_classes.js [--check] [files or directories...]` (default: `src`).
+ */
+import { ESLint } from 'eslint';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import tseslint from 'typescript-eslint';
+import qrcraftly from '../eslint/rules/index.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-export const UI_DIR = path.resolve(__dirname, '../src/components/ui');
+const RULE_ID = 'qrcraftly/tailwind-classes';
 
 /**
- * Sorts a class string and resolves/deduplicates classes.
- * Supports static sections and template interpolations.
- * @param {string} classStr The input classes.
- * @returns {string} The sorted and deduplicated class string.
+ * Runs the class rule (and only it) over the targets.
+ * @param {object} options Options.
+ * @param {string[]} [options.targets] Files or directories, relative to `cwd` (default `src`).
+ * @param {boolean} [options.check] Report instead of writing fixes.
+ * @param {string} [options.cwd] Repository root.
+ * @param {Record<string, unknown>} [options.ruleOptions] Options passed to the rule.
+ * @returns {Promise<{ problems: Array<{ file: string, line: number, message: string }>, fixedFiles: string[] }>}
+ *   Remaining problems and the files whose classes changed.
  */
-export function sortClassString(classStr) {
-  const parts = classStr.split(/(\$\{[^}]+\})/g);
-  
-  const processedParts = parts.map(part => {
-    if (part.startsWith('${') && part.endsWith('}')) {
-      return part;
-    } else {
-      const classes = part.trim().split(/\s+/).filter(Boolean);
-      const uniqueClasses = Array.from(new Set(classes));
-      uniqueClasses.sort();
-      
-      const prefix = part.startsWith(' ') ? ' ' : '';
-      const suffix = part.endsWith(' ') ? ' ' : '';
-      if (uniqueClasses.length === 0) return '';
-      return prefix + uniqueClasses.join(' ') + suffix;
-    }
+export async function formatClasses({ targets = ['src'], check = false, cwd = process.cwd(), ruleOptions } = {}) {
+  const eslint = new ESLint({
+    cwd,
+    fix: !check,
+    overrideConfigFile: true,
+    overrideConfig: [
+      {
+        files: ['**/*.{ts,tsx,js,jsx,mjs,cjs}'],
+        languageOptions: {
+          parser: tseslint.parser,
+          parserOptions: { ecmaFeatures: { jsx: true } },
+        },
+        linterOptions: { reportUnusedDisableDirectives: 'off' },
+        plugins: { qrcraftly },
+        rules: { [RULE_ID]: ruleOptions ? ['error', ruleOptions] : 'error' },
+      },
+    ],
   });
-
-  return processedParts.join('');
-}
-
-/**
- * Sorts classes inside a file content.
- * @param {string} content The file content to modify.
- * @returns {string} The modified file content.
- */
-export function sortClassesInContent(content) {
-  let updated = content;
-
-  updated = updated.replace(/className="([^"]+)"/g, (match, p1) => {
-    return `className="${sortClassString(p1)}"`;
-  });
-  updated = updated.replace(/className='([^']+)'/g, (match, p1) => {
-    return `className='${sortClassString(p1)}'`;
-  });
-
-  updated = updated.replace(/className=\{`([^`]+)`\}/g, (match, p1) => {
-    return `className={\`${sortClassString(p1)}\`}`;
-  });
-
-  // Target specific styling variables in ui components precisely
-  const variables = [
-    'BASE_INPUT_CLASSES',
-    'TEXT_FIELD_CLASSES',
-    'TEXT_AREA_CLASSES',
-    'SELECT_CLASSES',
-    'ERROR_INPUT_CLASSES',
-    'baseStyles',
-    'variantStyles',
-    'sizeStyles'
-  ];
-
-  for (const varName of variables) {
-    const regex = new RegExp(`\\b(${varName})\\s*=\\s*(['"\`])([^'"\`\\n]+)\\2`, 'g');
-    updated = updated.replace(regex, (match, name, quote, p1) => {
-      return `${name} = ${quote}${sortClassString(p1)}${quote}`;
-    });
-  }
-
-  return updated;
-}
-
-/**
- * Recursively find all ts/tsx files under directory.
- * @param {string} dir Directory to scan.
- * @returns {string[]} Paths of all matching files.
- */
-export function getFiles(dir) {
-  let results = [];
-  const list = fs.readdirSync(dir);
-  list.forEach(file => {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-    if (stat && stat.isDirectory()) {
-      results = results.concat(getFiles(filePath));
-    } else {
-      if (filePath.endsWith('.tsx') || filePath.endsWith('.ts')) {
-        results.push(filePath);
+  const results = await eslint.lintFiles(targets);
+  if (!check) await ESLint.outputFixes(results);
+  const problems = [];
+  for (const result of results) {
+    for (const message of result.messages) {
+      if (message.ruleId === RULE_ID || message.fatal) {
+        problems.push({ file: path.relative(cwd, result.filePath).split(path.sep).join('/'), line: message.line, message: message.message });
       }
     }
-  });
-  return results;
+  }
+  const fixedFiles = results.filter((r) => typeof r.output === 'string').map((r) => path.relative(cwd, r.filePath).split(path.sep).join('/'));
+  return { problems, fixedFiles };
 }
 
-// Only run automatically if executed directly
-if (process.argv[1] && (process.argv[1] === fileURLToPath(import.meta.url) || process.argv[1].endsWith('sort_tailwind_classes.js'))) {
-  const checkOnly = process.argv.includes('--check');
-
-  // Extract arguments, filtering out option flags
-  const files = process.argv.slice(2).filter(arg => arg !== '--check');
-
-  // If files are provided as arguments, format/check those files.
-  // Otherwise, default to "src" directory to cover all folders repository-wide.
-  const targets = files.length > 0 ? files : ['src'];
-
-  try {
-    if (checkOnly) {
-      console.log(`🔍 AST-based Tailwind sorting check on: ${targets.join(' ')}`);
-      execBinary('pnpm', ['exec', 'eslint', ...targets], { stdio: 'inherit' });
-      console.log('✨ All classes are properly sorted and aligned!');
-    } else {
-      console.log(`⚙️ Formatting Tailwind CSS classes for: ${targets.join(' ')}`);
-      execBinary('pnpm', ['exec', 'eslint', '--fix', ...targets], { stdio: 'inherit' });
-      console.log('✅ Tailwind CSS classes sorted successfully!');
-    }
-    process.exit(0);
-  } catch {
-    console.error('❌ Tailwind CSS class sorting check or format failed.');
-    process.exit(1);
-  }
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const args = process.argv.slice(2);
+  const check = args.includes('--check');
+  const targets = args.filter((arg) => arg !== '--check');
+  formatClasses({ targets: targets.length > 0 ? targets : ['src'], check })
+    .then(({ problems, fixedFiles }) => {
+      for (const file of fixedFiles) console.log(`sorted ${file}`);
+      for (const p of problems) console.error(`${p.file}:${p.line} ${p.message}`);
+      if (problems.length > 0) {
+        console.error(`${problems.length} Tailwind class problem(s)${check ? '' : ' need a manual fix'}.`);
+        process.exit(1);
+      }
+      console.log(check ? 'Tailwind classes are in order.' : 'Tailwind classes sorted.');
+    })
+    .catch((error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    });
 }

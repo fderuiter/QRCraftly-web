@@ -19,7 +19,7 @@ QRCraftly uses Tailwind CSS v4 without a `tailwind.config.js` file:
 
 - **Root Stylesheet**: All theme configurations, variants, and base layer styles live exclusively in `src/layouts/index.css`.
 - **Dark Mode Variant**: Declared via `@variant dark (&:where(.dark, .dark *));` to support class-based dark mode toggling.
-- **Utility Class Formatting**: Standard class ordering is enforced via `pnpm run format:classes` and Prettier.
+- **Utility Class Formatting**: Classes follow Tailwind's official order. The `qrcraftly/tailwind-classes` ESLint rule enforces it, and `pnpm run format:classes` applies it.
 
 ---
 

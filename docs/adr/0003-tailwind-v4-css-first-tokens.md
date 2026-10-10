@@ -16,7 +16,7 @@ We manage all design system tokens, typography scales, semantic color mappings, 
 
 ## Rationale
 
-A single CSS-first source of truth leverages native CSS cascade rules and removes build-time JavaScript translation overhead. Utility class ordering is enforced deterministically by Prettier and `pnpm run format:classes`.
+A single CSS-first source of truth leverages native CSS cascade rules and removes build-time JavaScript translation overhead. Utility classes follow Tailwind's official order, enforced by the `qrcraftly/tailwind-classes` ESLint rule and `pnpm run format:classes` ([ADR 0046](./0046-own-tailwind-class-rule.md)).
 
 ## Consequences
 

@@ -16,9 +16,9 @@ We enforce a **deep module** architecture across `src/packages/` where every pac
 2. **Intra-Package Freedom**: Files inside a package's `lib/` directory may import each other freely to keep implementation complexity local.
 3. **Tests Through Entry Points**: Package tests under `tests/` exercise the module through its public entry points, importing fixtures only from their local `tests/` folder without deep-importing internal implementation files.
 4. **No Dependency Cycles**: Dependencies across the repository must remain strictly acyclic.
-5. **No App-Layer Imports**: Packages never import the app's React layers (`src/context`, `src/hooks`, `src/components`, `src/pages`, `src/registry.tsx`). Stores, capabilities and callbacks are injected from the call site. Pre-existing violations are listed as exact, commented known-violation edges in `.dependency-cruiser.cjs` (tracked by issue #980) and may only shrink.
+5. **No App-Layer Imports**: Packages never import the app's React layers (`src/context`, `src/hooks`, `src/components`, `src/pages`, `src/registry.tsx`). Stores, capabilities and callbacks are injected from the call site. Pre-existing violations are listed as exact, commented known-violation edges (tracked by issue #980) and may only shrink. Issue #980 removed the last of them, so no exemptions remain.
 6. **No Monolithic Barrels**: Packages avoid large re-exporting barrel files, preferring multiple focused root entry points when exposing distinct capabilities.
-7. **Automated Enforcement**: All boundary invariants are checked via `dependency-cruiser` (`pnpm run lint:boundaries` executing `depcruise src`), integrated into `pnpm run lint` and CI.
+7. **Automated Enforcement**: All boundary invariants are checked by `pnpm run lint:boundaries`, integrated into `pnpm run lint` and CI. This was `dependency-cruiser` (`depcruise src`) until #1196 replaced it with our own checker, `scripts/check_boundaries.js`, which reads the rules from `scripts/boundaries.config.js`.
 
 ## Rationale
 

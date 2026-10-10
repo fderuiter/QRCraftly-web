@@ -162,7 +162,7 @@ const ToastItem = (props: { toast: ToastMessage; onRemove: (id: string) => void 
           setIsFocused(false);
         }
       }}
-      className={mergeClasses("pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border p-4 shadow-overlay motion-safe:animate-slide-in data-closed:pointer-events-none motion-safe:data-closed:animate-slide-out", colors)}
+      className={mergeClasses("pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border p-4 shadow-overlay data-closed:pointer-events-none motion-safe:animate-slide-in motion-safe:data-closed:animate-slide-out", colors)}
     >
       {React.createElement(getNotificationIcon(toast.type), { className: "size-5 flex-shrink-0" })}
       <p className="flex-1 text-sm font-medium">{toast.message}</p>

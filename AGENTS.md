@@ -55,7 +55,7 @@ See `docs/agents/docs-maintenance.md`.
 
 - **TypeScript**: Strict typing across all files. Proactively avoid `any` or loose type assertions (`as`).
 - **Accessibility (a11y)**: Validate WCAG 2.1 SC 1.4.11 contrast compliance for UI states and generated QR codes. Test components with the axe helper in `tests/utils/axe.ts` (`expect(await axe(container)).toHaveNoViolations()`) and screen-reader accessible labels.
-- **Tailwind Formatting**: Run `pnpm run format:classes` to enforce standardized utility class ordering.
+- **Tailwind Formatting**: Run `pnpm run format:classes` to put classes in Tailwind's official order. It runs our `qrcraftly/tailwind-classes` ESLint rule's fixer, so it agrees with `eslint --fix` (ADR 0046).
 - **Git Guardrails**: Our own `.githooks/pre-commit` (installed by `pnpm install` through `scripts/hooks/install.js`) runs the staged-file checks in `scripts/hooks/staged.config.js`, then the duplication audit, typechecking and tests, before every commit. Read `docs/adr/0044-own-git-hooks-and-staged-file-runner.md`.
 - **Test Concurrency & File Isolation**: Tests interacting with build artifacts or script outputs (e.g. sitemaps) must isolate output paths via environment variables (such as `SITEMAP_OUTPUT_PATH` and `SITEMAP_DIST_DIR`) to avoid race conditions and file collisions during parallel Vitest executions; they never write into or delete the real `dist/`. Tests that run git in a temp repository first remove inherited `GIT_*` variables, which a git hook would otherwise point at the real repository.
 
@@ -64,7 +64,7 @@ See `docs/agents/docs-maintenance.md`.
 Before declaring any implementation task complete, verify your changes:
 
 1. **Standard Code Changes**: Run and ensure passing:
-   - `pnpm run lint` (runs dependency license compliance, the Rust no-dependency check, the git lineage (code-to-doc pairing) audit, AST storage checks, the path invariance audit, UI catalog validation, markdown audits, static SVG path tracking, TypeScript type-checking, dependency-cruiser package boundaries, ESLint, Knip, contrast checks, the design token audit, Prettier, and duplication checks)
+   - `pnpm run lint` (runs dependency license compliance, the Rust no-dependency check, the git lineage (code-to-doc pairing) audit, AST storage checks, the path invariance audit, UI catalog validation, markdown audits, static SVG path tracking, TypeScript type-checking, the package-boundary check (`scripts/check_boundaries.js`), ESLint, Knip, contrast checks, the design token audit, Prettier, and duplication checks)
    - `pnpm test` (Vitest test suite)
 2. **Build, Routing, or Core Generator Changes**: In addition to standard checks, run:
    - `pnpm build` (verifies SSG pre-rendering, the bundle AST audit, and postbuild security scripts; the gzipped bundle size budget is a separate CI step, `pnpm run check-bundle-size`)
