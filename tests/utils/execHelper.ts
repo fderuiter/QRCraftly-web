@@ -36,6 +36,16 @@ export function execBinary(
   return typeof output === 'string' ? output.replace(/\r\n/g, '\n') : (output as unknown as string);
 }
 
+/**
+ * Runs a real executable (node, git, bash, shellcheck) without a shell on every platform,
+ * so no argument is ever parsed by a shell. Use execBinary for package-manager shims
+ * (`pnpm`, `npx`) that need `.cmd` resolution on Windows.
+ */
+export function execFile(file: string, args: string[] = [], options: ExecFileSyncOptions = {}): string {
+  const output = execFileSync(file, args, { encoding: 'utf8', ...options, shell: false });
+  return typeof output === 'string' ? output.replace(/\r\n/g, '\n') : (output as unknown as string);
+}
+
 let cachedBash: string | null = null;
 
 /**

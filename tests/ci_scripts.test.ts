@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { execBinary } from './utils/execHelper';
+import { execFile } from './utils/execHelper';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,7 +36,7 @@ describe('CI Modular Shell Scripts Validation', () => {
     // Relative to the repository root, so no absolute path reaches the command line.
     const scriptPaths = files.map(f => `scripts/ci/${f}`);
     try {
-      execBinary('shellcheck', scriptPaths, { cwd: repoRoot });
+      execFile('shellcheck', scriptPaths, { cwd: repoRoot });
     } catch (err: any) {
       const stdout = err.stdout ? err.stdout.toString() : '';
       const stderr = err.stderr ? err.stderr.toString() : '';
@@ -64,7 +64,7 @@ describe('CI Modular Shell Scripts Validation', () => {
     // Test that set -euo pipefail properly catches intermediate pipe failures
     const script = 'set -euo pipefail; false | echo "should not mask failure"; echo "unreachable"';
     expect(() => {
-      execBinary('bash', ['-c', script], { stdio: 'pipe' });
+      execFile('bash', ['-c', script], { stdio: 'pipe' });
     }).toThrow();
   });
 });
