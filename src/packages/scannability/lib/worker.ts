@@ -47,10 +47,14 @@ const acknowledgeDroppedRequest = (configId: string) => {
   postWorkerMessage(response);
 };
 
-const requestImageDataRetry = (configId: string) => {
-  const response = { configId, retryWithImageData: true as const };
+/**
+ * Asks the main thread to resend the frame as pixels, handing the undrawable bitmap back so
+ * it can convert the same frame instead of reading the whole preview canvas (#1258).
+ */
+const requestImageDataRetry = (configId: string, imageBitmap: ImageBitmap) => {
+  const response = { configId, retryWithImageData: true as const, imageBitmap };
   assertWorkerResponse(response);
-  postWorkerMessage(response);
+  postWorkerMessage(response, [imageBitmap]);
 };
 
 /**
@@ -123,7 +127,10 @@ self.onmessage = async (e: MessageEvent<unknown>) => {
         frame = extractPixels(imageBitmap, width, height);
       } catch {
         if (configId !== undefined) {
-          requestImageDataRetry(configId);
+          // Ownership moves back to the main thread, so the finally block must not close it.
+          const returned = imageBitmap;
+          imageBitmap = undefined;
+          requestImageDataRetry(configId, returned);
           return;
         }
         throw new Error('Worker image extraction failed');

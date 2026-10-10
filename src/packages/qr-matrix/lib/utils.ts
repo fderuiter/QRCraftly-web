@@ -97,6 +97,13 @@ export const calculateLayout = (
   };
 };
 
+/**
+ * Smallest gap, in modules, between a Square or Circle logo backing and the logo. With no gap
+ * the backing hides behind the logo and looks the same as None (#1355), so older settings
+ * and templates with a padding of 0 draw with this gap.
+ */
+export const MIN_LOGO_BACKING_PADDING = 0.5;
+
 export const getLogoMetrics = (
   config: QRConfig,
   moduleCount: number,
@@ -113,7 +120,7 @@ export const getLogoMetrics = (
   const maxAllowedCutoutModules = moduleCount * safeAreaRatio;
 
   const requestedLogoSizeModules = moduleCount * config.logoSize;
-  const requestedPaddingModules = config.logoPaddingStyle !== 'none' ? config.logoPadding : 0;
+  const requestedPaddingModules = config.logoPaddingStyle !== 'none' ? Math.max(MIN_LOGO_BACKING_PADDING, config.logoPadding) : 0;
   const requestedTotalCutoutModules = requestedLogoSizeModules + (requestedPaddingModules * 2);
 
   let scaleFactor = 1;

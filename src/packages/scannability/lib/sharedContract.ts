@@ -93,6 +93,7 @@ export function isWorkerResponse(data: unknown): data is {
 } | {
   retryWithImageData: true;
   configId: string;
+  imageBitmap?: ImageBitmap;
 } | {
   success: boolean;
   physicalReady: boolean;
@@ -110,7 +111,7 @@ export function isWorkerResponse(data: unknown): data is {
     return typeof d.configId === 'string';
   }
   if (d.retryWithImageData === true) {
-    return typeof d.configId === 'string';
+    return typeof d.configId === 'string' && (d.imageBitmap === undefined || (typeof d.imageBitmap === 'object' && d.imageBitmap !== null));
   }
   if (typeof d.success !== 'boolean') return false;
   if (typeof d.physicalReady !== 'boolean') return false;

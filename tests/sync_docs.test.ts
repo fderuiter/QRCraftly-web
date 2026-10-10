@@ -181,7 +181,6 @@ publish-approved: true
         uiDirs: [mockUiDir, mockInputsDir, mockStyleControlsDir],
         catalogPath: mockCatalogPath,
         root: tempTestDir,
-        skipManifest: true,
       });
 
       expect(result.changed).toBe(true);

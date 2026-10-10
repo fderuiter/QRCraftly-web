@@ -1126,7 +1126,7 @@ describe('QRCanvas Circuit Style Eye Bracket Bug', () => {
   });
 
   
-  it('verifies that the bracket cuts in Circuit style are deep enough (fixed)', async () => {
+  it('keeps the Circuit finder notches shallower than the finder ring (#1278)', async () => {
      const config = { ...DEFAULT_CONFIG, style: QRStyle.CIRCUIT, value: 'test', eyeColor: '#000000', bgColor: '#ffffff' };
      const size = 100;
      render(<QRCanvas config={config} size={size} />);
@@ -1136,32 +1136,19 @@ describe('QRCanvas Circuit Style Eye Bracket Bug', () => {
      });
 
      const moduleCount = 21;
-     const displaySize = size; // 100
-     const minBorderPx = (4 * displaySize) / (moduleCount + 8);
-     const cellSize = (displaySize - 2 * minBorderPx) / moduleCount;
+     const minBorderPx = (4 * size) / (moduleCount + 8);
+     const cellSize = (size - 2 * minBorderPx) / moduleCount;
 
-     // The implementation draws the cuts using fillRect with bgColor
-     // We are looking for the calls to fillRect that make the cuts
-     // The fix sets depth to cellSize * 1.1
-
-     // Top cut: ctx.fillRect(cx - gap/2, y, gap, cellSize * 1.1);
-
-     const calls = mockContext.fillRect.mock.calls;
-
-     // Look for the Top Cut
-     // It should have height = cellSize * 1.1
-     const topCutCall = calls.find((args: any[]) => {
-         const [_dx, _dy, _dw, dh] = args;
-         // Check dimensions
-         const heightMatch = Math.abs(dh - (cellSize * 1.1)) < 0.01;
-         return heightMatch;
-     });
-
-     // Expect to find the cut call
-     expect(topCutCall).toBeDefined();
-
-     // Confirm the depth is correct
-     expect(topCutCall[3]).toBeCloseTo(cellSize * 1.1, 0.001);
+     // Each finder gets four notches of width 0.5 and depth 0.35 modules. A cut through the
+     // whole one-module ring breaks the finder run on the centre row and column.
+     const calls = mockContext.fillRect.mock.calls as number[][];
+     const notches = calls.filter(([, , w, h]) =>
+       (Math.abs(w - cellSize * 0.5) < 0.01 && Math.abs(h - cellSize * 0.35) < 0.01) ||
+       (Math.abs(h - cellSize * 0.5) < 0.01 && Math.abs(w - cellSize * 0.35) < 0.01)
+     );
+     expect(notches.length).toBeGreaterThanOrEqual(12);
+     const throughRing = calls.filter(([, , w, h]) => Math.abs(Math.max(w, h) - cellSize * 1.1) < 0.01);
+     expect(throughRing).toHaveLength(0);
   });
 });
 

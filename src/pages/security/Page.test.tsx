@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { axe } from 'vitest-axe';
-import docsManifest from '../../data/docs_manifest.json';
+import docsManifest from 'virtual:docs-manifest';
 import Page from './+Page';
 
 describe('Security Page', () => {

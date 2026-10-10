@@ -32,8 +32,7 @@ export default {
     return [
       prettierCommand(filenames),
       'node scripts/audit_markdown.js',
-      'node scripts/validate_adrs.js',
-      'node scripts/compile_docs_manifest.js --check'
+      'node scripts/validate_adrs.js'
     ];
   }
 };
