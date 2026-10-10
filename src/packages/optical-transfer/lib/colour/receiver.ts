@@ -53,8 +53,11 @@ export interface ColourReceiverOptions {
   layout: TileLayout;
   /** QR version of the stream's beacons. */
   beaconVersion: number;
-  /** Reads the one code in a single-channel crop. */
-  decodePlane(plane: GreyPlane): DecodedCode | null;
+  /**
+   * Reads the one code in a single-channel crop. `expected` is where the tracked tile's code sat last,
+   * in the crop's pixels, and its version, so a decoder with a fast path can read it without searching.
+   */
+  decodePlane(plane: GreyPlane, expected?: { rect: Rect; version: number }): DecodedCode | null;
   /** Reads the one code in a whole camera frame; used for the beacon. */
   decodeImage(image: RgbaImage): DecodedCode | null;
   /** Beacons without a colour read after which colour is given up (default {@link COLOUR_FALLBACK_BEACONS}). */
@@ -152,11 +155,15 @@ export class ColourReceiver {
   }
 
   private readTiles(image: RgbaImage, crops: readonly TileCrop[]): boolean {
+    const positions = this.tracker.positions;
+    const { version } = this.options.layout;
     const results = crops.map((crop) => {
       let found: Rect | undefined;
+      const code = positions.get(crop.tile);
+      const expected = code ? { rect: { x: code.x - crop.rect.x, y: code.y - crop.rect.y, width: code.width, height: code.height }, version } : undefined;
       for (const plane of splitChannels(image, crop.rect, this.calibrator.model)) {
         this.counters.colourDecodes += 1;
-        const hit = this.options.decodePlane(plane);
+        const hit = this.options.decodePlane(plane, expected);
         if (!hit || !looksLikePrismFrame(hit.text)) continue;
         this.counters.colourReads += 1;
         this.readsSinceSeed += 1;
