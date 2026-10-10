@@ -38,8 +38,8 @@ Packages are deep modules: see [src/packages/README.md](./src/packages/README.md
 
 ### Documentation checks
 
-- Run `pnpm run docs:sync` after changing a UI component in `src/components/ui/`, `src/components/inputs/` or `src/components/style-controls/`, or any page in `docs/public/` or `docs/SECURITY.md`. It regenerates `docs/public/UI_CATALOG.md` entries and `src/data/docs_manifest.json`. Commit what it changes.
-- Run `pnpm run docs:lint` after editing any Markdown. It checks links, anchors, unfinished-work placeholder markers and TS snippets in `docs/`, `docs/public/`, `docs/adr/`, `docs/agents/`, `docs/optical-transfer/`, `README.md`, `CONTEXT.md` and `AGENTS.md`; ADR file names and gap-free numbering; the UI catalog; and that the docs manifest is current. Every error prints a `Fix:` hint. `pnpm run lint`, CI and the pre-commit hook (for staged `*.md` files) run the same checks.
+- Run `pnpm run docs:sync` after changing a UI component in `src/components/ui/`, `src/components/inputs/` or `src/components/style-controls/`. It regenerates `docs/public/UI_CATALOG.md` entries. Commit what it changes. The `/security` page's docs are compiled from `docs/public/` and `docs/SECURITY.md` at build time (`virtual:docs-manifest`), so nothing is committed for them.
+- Run `pnpm run docs:lint` after editing any Markdown. It checks links, anchors, unfinished-work placeholder markers and TS snippets in `docs/`, `docs/public/`, `docs/adr/`, `docs/agents/`, `docs/optical-transfer/`, `README.md`, `CONTEXT.md` and `AGENTS.md`; ADR file names and gap-free numbering; and the UI catalog. Every error prints a `Fix:` hint. `pnpm run lint`, CI and the pre-commit hook (for staged `*.md` files) run the same checks.
 
 See `docs/agents/docs-maintenance.md`.
 
@@ -64,7 +64,7 @@ See `docs/agents/docs-maintenance.md`.
 Before declaring any implementation task complete, verify your changes:
 
 1. **Standard Code Changes**: Run and ensure passing:
-   - `pnpm run lint` (runs dependency license compliance, the Rust no-dependency check, the git lineage (code-to-doc pairing) audit, AST storage checks, the path invariance audit, UI catalog validation, markdown audits, static SVG path tracking, the docs manifest check, TypeScript type-checking, dependency-cruiser package boundaries, ESLint, Knip, contrast checks, the design token audit, Prettier, and duplication checks)
+   - `pnpm run lint` (runs dependency license compliance, the Rust no-dependency check, the git lineage (code-to-doc pairing) audit, AST storage checks, the path invariance audit, UI catalog validation, markdown audits, static SVG path tracking, TypeScript type-checking, dependency-cruiser package boundaries, ESLint, Knip, contrast checks, the design token audit, Prettier, and duplication checks)
    - `pnpm test` (Vitest test suite)
 2. **Build, Routing, or Core Generator Changes**: In addition to standard checks, run:
    - `pnpm build` (verifies SSG pre-rendering, the bundle AST audit, and postbuild security scripts; the gzipped bundle size budget is a separate CI step, `pnpm run check-bundle-size`)

@@ -64,15 +64,18 @@ describe('CI trigger paths (main.yml)', () => {
 describe('documentation checks wiring', () => {
   it('defines docs:lint with every doc audit', () => {
     const docsLint = pkg.scripts['docs:lint'];
-    for (const step of ['audit_markdown.js', 'validate_adrs.js', 'validate_ui_catalog.js', 'compile_docs_manifest.js --check']) {
+    for (const step of ['audit_markdown.js', 'validate_adrs.js', 'validate_ui_catalog.js']) {
       expect(docsLint).toContain(step);
     }
   });
 
-  it('runs docs:lint from lint, and never rewrites the docs manifest from lint or build', () => {
+  it('runs docs:lint from lint, and builds the docs manifest in Vite instead of committing it', () => {
     expect(pkg.scripts.lint).toContain('pnpm run docs:lint');
-    expect(pkg.scripts.lint).not.toMatch(/compile_docs_manifest\.js(?! --check)/);
-    expect(pkg.scripts.build).toContain('compile_docs_manifest.js --check');
+    for (const script of Object.values(pkg.scripts)) {
+      expect(script).not.toContain('compile_docs_manifest.js');
+    }
+    expect(fs.existsSync(path.join(process.cwd(), 'src/data/docs_manifest.json'))).toBe(false);
+    expect(fs.readFileSync(path.join(process.cwd(), 'vite.config.ts'), 'utf8')).toContain('docsManifest()');
   });
 
   it('runs the doc checks from lint-staged for staged Markdown files', () => {
@@ -82,7 +85,7 @@ describe('documentation checks wiring', () => {
     expect(commands).toContain('prettier --write');
     expect(commands).toContain('node scripts/audit_markdown.js');
     expect(commands).toContain('node scripts/validate_adrs.js');
-    expect(commands).toContain('node scripts/compile_docs_manifest.js --check');
+    expect(commands).not.toContain('compile_docs_manifest.js');
   });
 });
 

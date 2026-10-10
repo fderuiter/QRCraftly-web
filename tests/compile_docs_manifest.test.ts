@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { compileManifest, parseFrontmatter, extractTitle } from '../scripts/compile_docs_manifest.js';
+import { buildManifest, parseFrontmatter, extractTitle } from '../scripts/compile_docs_manifest.js';
+import { DOCS_MANIFEST_ID, docsManifest } from '../scripts/vite/docsManifest';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,7 +11,6 @@ const repoRoot = path.join(__dirname, '..');
 
 describe('Metadata-Driven Frontmatter Filtering', () => {
   const tempDir = path.join(repoRoot, 'tests', 'temp_compile_test_dir');
-  const tempManifestPath = path.join(tempDir, 'temp_docs_manifest.json');
 
   beforeAll(() => {
     // Set up test directory and mockup files
@@ -153,12 +153,9 @@ describe('Metadata-Driven Frontmatter Filtering', () => {
   describe('Integration Compilation Pass', () => {
     it('should exclude draft documents and include public ones during compile pass', () => {
       // Execute compiling manifest pass using mockup folder
-      compileManifest(tempDir, tempManifestPath);
+      const compiledData = buildManifest(tempDir);
 
-      expect(fs.existsSync(tempManifestPath)).toBe(true);
 
-      const compiledData = JSON.parse(fs.readFileSync(tempManifestPath, 'utf-8'));
-      
       // We expect 3 documents to compile: public-doc, explicit-public-doc, draft-no-doc
       expect(compiledData).toHaveLength(3);
 
@@ -198,10 +195,7 @@ describe('Metadata-Driven Frontmatter Filtering', () => {
         'utf-8'
       );
 
-      // Execute compileManifest
-      compileManifest(tempDir, tempManifestPath);
-
-      const compiledData = JSON.parse(fs.readFileSync(tempManifestPath, 'utf-8'));
+      const compiledData = buildManifest(tempDir);
       const ids = compiledData.map((doc: { id: string }) => doc.id);
       expect(ids).not.toContain('quarantined-note');
       expect(ids).not.toContain('internal-note');
@@ -223,10 +217,7 @@ describe('Metadata-Driven Frontmatter Filtering', () => {
         'utf-8'
       );
 
-      const linkManifestPath = path.join(sourceDir, 'manifest.json');
-      compileManifest(sourceDir, linkManifestPath);
-
-      const compiledData = JSON.parse(fs.readFileSync(linkManifestPath, 'utf-8'));
+      const compiledData = buildManifest(sourceDir);
       const refDoc = compiledData.find((d: { id: string }) => d.id === 'referencer_doc');
       expect(refDoc).toBeDefined();
       expect(refDoc.html).toContain('href="#target_doc-section-one"');
@@ -245,13 +236,11 @@ describe('developer-audience documents (#978)', () => {
     const os = await import('os');
     const fsMod = await import('fs');
     const pathMod = await import('path');
-    const { compileManifest: compile, isDeveloperAudience } = await import('../scripts/compile_docs_manifest.js');
+    const { buildManifest: build, isDeveloperAudience } = await import('../scripts/compile_docs_manifest.js');
     const dir = fsMod.mkdtempSync(pathMod.join(os.tmpdir(), 'docs-audience-'));
-    const out = pathMod.join(dir, 'out', 'manifest.json');
     fsMod.writeFileSync(pathMod.join(dir, 'PUBLIC.md'), '---\npublish-approved: true\n---\n# Public Policy\n\nFor everyone.');
     fsMod.writeFileSync(pathMod.join(dir, 'INTERNAL.md'), '---\npublish-approved: true\naudience: developers # repo only\n---\n# Internal Guide\n\nFor contributors.');
-    compile(dir, out);
-    const manifest = JSON.parse(fsMod.readFileSync(out, 'utf8')) as Array<{ id: string }>;
+    const manifest = build(dir);
     expect(manifest.map((d) => d.id)).toEqual(['public']);
     expect(isDeveloperAudience({ audience: 'Developers' })).toBe(true);
     expect(isDeveloperAudience({})).toBe(false);
@@ -259,7 +248,7 @@ describe('developer-audience documents (#978)', () => {
   });
 
   it('does not publish internal developer docs on the /security page', async () => {
-    const manifest = (await import('../src/data/docs_manifest.json')).default as Array<{ id: string }>;
+    const manifest = buildManifest();
     const ids = manifest.map((d) => d.id);
     expect(ids).toEqual(expect.arrayContaining(['security', 'compliance']));
     for (const internal of ['style_guide', 'ui_catalog', 'scaling']) {
@@ -268,42 +257,24 @@ describe('developer-audience documents (#978)', () => {
   });
 });
 
-describe('compileManifest check mode', () => {
-  const checkDir = path.join(repoRoot, 'tests', 'temp_compile_check_dir');
-  const checkManifest = path.join(checkDir, 'out', 'manifest.json');
+describe('virtual:docs-manifest plugin', () => {
+  const plugin = docsManifest();
+  const resolveId = plugin.resolveId as (id: string) => string | undefined;
+  const load = plugin.load as (this: { addWatchFile: (file: string) => void }, id: string) => string | undefined;
 
-  beforeAll(() => {
-    fs.rmSync(checkDir, { recursive: true, force: true });
-    fs.mkdirSync(checkDir, { recursive: true });
-    fs.writeFileSync(path.join(checkDir, 'page.md'), '# Page\n\nBody.\n', 'utf-8');
+  it('serves the compiled public docs as a module and watches their sources', () => {
+    const resolved = resolveId(DOCS_MANIFEST_ID);
+    expect(resolved).toBe(`\0${DOCS_MANIFEST_ID}`);
+    expect(resolveId('some-other-module')).toBeUndefined();
+
+    const watched: string[] = [];
+    const code = load.call({ addWatchFile: (file) => watched.push(file) }, resolved ?? '');
+    expect(code).toBe(`export default ${JSON.stringify(buildManifest())};`);
+    expect(watched.map((file) => path.basename(file))).toEqual(expect.arrayContaining(['SECURITY.md', 'COMPLIANCE.md']));
+    expect(load.call({ addWatchFile: () => undefined }, 'some-other-module')).toBeUndefined();
   });
 
-  afterAll(() => {
-    fs.rmSync(checkDir, { recursive: true, force: true });
-  });
-
-  it('reports a missing manifest as stale without writing it', () => {
-    const result = compileManifest(checkDir, checkManifest, { check: true });
-    expect(result).toEqual({ upToDate: false, written: false });
-    expect(fs.existsSync(checkManifest)).toBe(false);
-  });
-
-  it('writes once, then leaves an up-to-date manifest untouched', () => {
-    expect(compileManifest(checkDir, checkManifest)).toEqual({ upToDate: false, written: true });
-    const mtime = fs.statSync(checkManifest).mtimeMs;
-    expect(compileManifest(checkDir, checkManifest)).toEqual({ upToDate: true, written: false });
-    expect(fs.statSync(checkManifest).mtimeMs).toBe(mtime);
-    expect(compileManifest(checkDir, checkManifest, { check: true }).upToDate).toBe(true);
-  });
-
-  it('detects a source change in check mode without rewriting the manifest', () => {
-    const before = fs.readFileSync(checkManifest, 'utf-8');
-    fs.writeFileSync(path.join(checkDir, 'page.md'), '# Page\n\nChanged body.\n', 'utf-8');
-    expect(compileManifest(checkDir, checkManifest, { check: true }).upToDate).toBe(false);
-    expect(fs.readFileSync(checkManifest, 'utf-8')).toBe(before);
-  });
-
-  it('keeps the committed src/data/docs_manifest.json in sync with docs/public', () => {
-    expect(compileManifest(undefined, undefined, { check: true }).upToDate).toBe(true);
+  it('throws on a missing docs folder', () => {
+    expect(() => buildManifest(path.join(repoRoot, 'tests', 'no-such-docs-dir'))).toThrow(/does not exist/);
   });
 });
