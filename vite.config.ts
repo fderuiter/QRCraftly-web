@@ -19,13 +19,13 @@
 import fs from 'fs';
 import path from 'path';
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
 import vike from 'vike/plugin';
 import type { Plugin } from 'vite';
 import type { Connect } from 'vite';
 import { shippedPackages } from './scripts/vite/thirdPartyLicenses';
 import { docsManifest } from './scripts/vite/docsManifest';
 import { foundryDefines } from './scripts/utils/rustWorkspace.js';
+import coverageThresholds from './scripts/ci/coverage_thresholds.json';
 
 /**
  * Applies the static rules in `public/_redirects` (the file Cloudflare serves them from) in
@@ -66,7 +66,7 @@ const redirectsFile = (): Plugin => ({
  * Vite configuration file.
  * Configures the development server, plugins, environment variables, and path aliases.
  */
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
     const licenses = shippedPackages();
     const { version } = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')) as { version: string };
     return {
@@ -85,14 +85,19 @@ export default defineConfig(() => {
         host: '0.0.0.0',
       },
       plugins: [
-        react(),
         vike(),
         redirectsFile(),
         docsManifest(),
         licenses.plugin,
       ],
+      // Vite's own esbuild compiles JSX with React's automatic runtime, for the client and SSR
+      // builds and for Vitest; @vitejs/plugin-react and its Babel tree are gone (#1197). The dev
+      // server uses the development runtime, and reloads the page on save (no Fast Refresh).
       esbuild: {
-        target: 'es2022'
+        target: 'es2022',
+        jsx: 'automatic',
+        jsxImportSource: 'react',
+        jsxDev: command === 'serve',
       },
       optimizeDeps: {
         esbuildOptions: {
@@ -165,14 +170,11 @@ export default defineConfig(() => {
           reportOnFailure: true,
           // Floors set just under the measured totals for the scope below; raise
           // them as coverage improves, never lower them to make a PR pass.
-          thresholds: {
-            // Measured on dev when this scope was introduced: statements 80.4%,
-            // branches 73.1%, functions 86.1%, lines 81.4%.
-            statements: 80,
-            branches: 72,
-            functions: 85,
-            lines: 80,
-          },
+          // Measured on dev when this scope was introduced: statements 80.4%,
+          // branches 73.1%, functions 86.1%, lines 81.4%. The floors live in a
+          // JSON file so the CI coverage summary (scripts/ci/coverage_summary.js)
+          // shows the same numbers without parsing this config.
+          thresholds: { ...coverageThresholds },
           // Measure the logic layers: shared utilities and the deep-module
           // packages. Components, hooks and pages are exercised by the jsdom
           // project and Playwright but not gated here.

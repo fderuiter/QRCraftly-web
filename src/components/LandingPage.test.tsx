@@ -18,7 +18,7 @@
 
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../tests/utils/axe';
 import LayoutDefault from '@/layouts/LayoutDefault';
 import { LandingPage } from '@/components/LandingPage';
 import { clearRetainedAppearance } from '@/context/QRContext';

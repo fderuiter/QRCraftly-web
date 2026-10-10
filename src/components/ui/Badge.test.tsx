@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { Badge, type BadgeTone } from './Badge';
 
 const TONES: [BadgeTone, string][] = [

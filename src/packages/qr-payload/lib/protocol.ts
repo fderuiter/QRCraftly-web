@@ -23,7 +23,6 @@ import { splitCompoundField } from './rfcHelper';
  * Matches a `geo:` URI the Location form can show in full: two coordinates and nothing else.
  * Altitude, `;u=`, `;crs=` and `?q=` searches have no field, so such codes stay Text (#1282).
  */
-// eslint-disable-next-line security/detect-unsafe-regex -- linear: anchored, bounded digit groups separated by a fixed comma.
 export const PLAIN_GEO_URI = /^geo:([-+]?\d{1,3}(?:\.\d+)?),([-+]?\d{1,3}(?:\.\d+)?)$/i;
 
 /** A profile URL the Social form can rebuild exactly: a platform and a handle. */
@@ -133,7 +132,6 @@ export const CONTAINMENT_PROFILES = {
   URL: /^(?:https?|ftp):\/\/[^\s\x00-\x1F\x7F-\x9F\u200B-\u200D\u2060\uFEFF]+$/i,
   // The HTML "valid e-mail address" grammar (RFC 5322 atext local part, so O'Brien works), with at
   // least two domain labels (IDN A-labels such as xn--p1ai included) or an IPv4 address literal (#1273).
-  // eslint-disable-next-line security/detect-unsafe-regex -- linear: each label is bounded and must start after a dot.
   EMAIL: /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+|\[(?:\d{1,3}\.){3}\d{1,3}\])$/,
   PLAIN_TEXT: /^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B\u2060\uFEFF]*$/,
   // Control and hidden zero-width characters in text fields (allowing \t, \n, \r). Zero-width
@@ -379,7 +377,6 @@ export const identifyProtocol = (raw: string): QRType | null => {
   if (/begin:v(event|calendar)/i.test(trimmed)) return QRType.EVENT;
   if (/^(bitcoin|ethereum|litecoin|solana):/i.test(trimmed)) return QRType.PAYMENT;
   if (/^BCD\r?\n/i.test(trimmed)) return QRType.PAYMENT;
-  // eslint-disable-next-line security/detect-unsafe-regex -- linear: non-overlapping optional scheme, www prefix, and domain choices.
   if (/^(https?:\/\/)?(www\.)?(paypal\.me|cash\.app|venmo\.com)\//i.test(trimmed)) return QRType.PAYMENT;
 
   const parsed = parseProtocol(trimmed);

@@ -19,7 +19,7 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { ToastProvider } from '@/components/ui/Toast';
 import {
   PAUSED_ANNOUNCEMENT,

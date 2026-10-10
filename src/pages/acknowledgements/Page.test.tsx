@@ -18,7 +18,7 @@
 
 import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import shippedPackages, { licensesFile } from 'virtual:shipped-packages';
 import Page from './+Page';
 

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const crypto = require('node:crypto'); // eslint-disable-line no-redeclare -- explicit import shadows the Node global on purpose
+const crypto = require('node:crypto');
 
 const DIST_DIR = path.join(__dirname, '../dist/client');
 const OUTPUT_FILE = path.join(DIST_DIR, 'sw.js');

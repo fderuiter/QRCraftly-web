@@ -255,6 +255,7 @@ const isSafeDataUri = (uri: string): boolean => {
 
   const DANGEROUS_PATTERNS = [
     '<script',
+    // eslint-disable-next-line no-script-url -- a pattern to block, never a URL we navigate to.
     'javascript:',
     'onload',
     'onerror',

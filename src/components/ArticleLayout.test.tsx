@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../tests/utils/axe';
 import { ArticleHeading, ArticleLayout } from './ArticleLayout';
 
 type Entry = { isIntersecting: boolean; target: Element };

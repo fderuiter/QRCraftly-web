@@ -19,7 +19,7 @@
 import React from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { navigate } from 'vike/client/router';
 import LayoutDefault from '@/layouts/LayoutDefault';
 import Page from './+Page';

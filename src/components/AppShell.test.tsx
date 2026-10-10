@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../tests/utils/axe';
 import { AppShell } from './AppShell';
 import QRTool from './QRTool';
 import { ToastProvider } from './ui/Toast';

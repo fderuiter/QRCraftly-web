@@ -17,7 +17,7 @@
 */
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../tests/utils/axe';
 import { ToastProvider } from './ui/Toast';
 import QRTool from './QRTool';
 import { DEFAULT_CONFIG } from '@/constants';

@@ -19,7 +19,7 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { axe } from 'vitest-axe';
+import { axe } from '../../../tests/utils/axe';
 import { BundleComplete } from './BundleComplete';
 import { KeyCodeEntry } from './KeyCodeEntry';
 
