@@ -16,13 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRConfig, QRModules } from '@/types';
+import type { QRConfig, QRModules } from '@/types';
 import { calculateLayout, getLogoMetrics, getIsCoveredByLogo } from './utils';
 import { renderBorder, renderBorderDecoration } from './border';
-import { renderModules, ModuleRenderOptions } from './modules';
+import { renderModules, type ModuleRenderOptions } from './modules';
 import { renderEyes } from './eyes';
 import { renderLogo } from './logo';
-import { renderMaze, MazeData } from './maze';
+import { renderMaze, type MazeData } from './maze';
 import { planMosaic, renderMosaic, DEFAULT_MOSAIC_OPTIONS } from './mosaic';
 import { getMosaicSource } from './mosaicSource';
 import { renderFrame } from './frame';

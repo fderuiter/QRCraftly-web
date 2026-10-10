@@ -47,10 +47,10 @@ import {
 } from '../index';
 import {
   CryptoNetwork,
-  EventData,
+  type EventData,
   QRType,
-  VCardData,
-  WifiData,
+  type VCardData,
+  type WifiData,
   WifiEapMethod,
   WifiEapPhase2,
   WifiEncryption,

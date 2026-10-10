@@ -12,7 +12,7 @@ import { useOpticalSender } from '@/packages/optical-transfer/client';
 import QRCanvas from '@/components/QRCanvas';
 import { generateMaze, getCachedMaze, clearMazeCache, getMazeCacheKey } from '@/packages/qr-matrix/maze';
 import { DEFAULT_CONFIG } from '@/constants';
-import { QRConfig } from '@/types';
+import type { QRConfig } from '@/types';
 
 describe('Centralized Fallback Store & Off-Thread Maze Execution Suite', () => {
   beforeEach(() => {

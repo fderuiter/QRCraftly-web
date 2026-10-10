@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { DropletMetadata } from './contracts';
+import type { DropletMetadata } from './contracts';
 import { buildRobustSolitonCdf, getNeighborsForSeq } from './soliton';
 import { crc32 } from './crc32';
 import { solveGF2 } from './gf2';

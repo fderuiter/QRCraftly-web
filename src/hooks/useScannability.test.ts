@@ -22,7 +22,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useScannability } from './useScannability';
 import { QRProvider, useQRStore } from '@/context/QRContext';
 import { DEFAULT_CONFIG } from '@/constants';
-import { QRConfig, QRStyle } from '@/types';
+import { type QRConfig, QRStyle } from '@/types';
 
 // ---------------------------------------------------------------------------
 // Helpers

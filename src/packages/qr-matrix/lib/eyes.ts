@@ -16,9 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRConfig } from '@/types';
+import type { QRConfig } from '@/types';
 import { drawEyeFrame, drawEyeball } from './canvasHelpers';
-import { ModuleRenderOptions, sampleCellLuminances } from './modules';
+import { type ModuleRenderOptions, sampleCellLuminances } from './modules';
 import { getLuminance } from '@/utils/colorUtils';
 
 export const renderEyes = (

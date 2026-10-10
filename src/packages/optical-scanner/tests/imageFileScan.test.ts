@@ -22,11 +22,12 @@ interface FakeBitmap {
 class FakeOffscreenCanvas {
   static drawn: string[] = [];
   private pixels: Uint8ClampedArray;
+  width: number;
+  height: number;
 
-  constructor(
-    public width: number,
-    public height: number
-  ) {
+  constructor(width: number, height: number) {
+    this.width = width;
+    this.height = height;
     this.pixels = new Uint8ClampedArray(width * height * 4);
   }
 

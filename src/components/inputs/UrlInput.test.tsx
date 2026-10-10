@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { UrlInput } from './UrlInput';
-import { UrlData } from '../../types';
+import type { UrlData } from '../../types';
 
 describe('UrlInput', () => {
   const mockOnChange = vi.fn();

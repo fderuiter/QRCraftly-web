@@ -27,7 +27,7 @@ import {
   ALIGNMENT_PATTERN_COORDINATES,
 } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
-import { QRConfig, QRErrorCorrectionLevel } from '@/types';
+import { type QRConfig, QRErrorCorrectionLevel } from '@/types';
 
 describe('QR Renderer Utils', () => {
   describe('calculateLayout', () => {

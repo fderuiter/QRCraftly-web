@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { ROUTES, gotoHydrated } from './utils/routes';
 

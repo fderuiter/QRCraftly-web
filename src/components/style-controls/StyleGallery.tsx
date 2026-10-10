@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CircleCheck, Dices, Redo2, TriangleAlert, Undo2 } from 'lucide-react';
-import { QRConfig, SocialFormat, TemplateStyle } from '../../types';
+import { type QRConfig, SocialFormat, TemplateStyle } from '../../types';
 import { PATTERNS, PRESET_COLORS } from '../../constants';
 import { getSamplePayload } from '@/packages/qr-payload';
 import { useOptionalQRStore, useOptionalQRStoreSelector } from '../../context/QRContext';

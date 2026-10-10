@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { EventData, QRType, QRGeneratorContract, CalendarProvider } from '@/types';
+import { type EventData, QRType, type QRGeneratorContract, CalendarProvider } from '@/types';
 import { isDangerousUrl } from '@/utils/security';
 import { SafeUrlPipeline } from '@/utils/url';
 import { calendarLinkProvider, identifyProtocol, parseProtocol } from '../protocol';

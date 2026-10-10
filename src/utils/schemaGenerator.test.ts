@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateSchema } from './schemaGenerator';
 import type { ToolCopy } from '../data/copy/types';
-import { ToolContent, SchemaType, SchemaCategory, TargetPersona, StrategicValueCategory } from '../data/contentRegistry';
+import { type ToolContent, SchemaType, SchemaCategory, TargetPersona, StrategicValueCategory } from '../data/contentRegistry';
 import { safeJsonLdStringify } from './security';
 
 describe('schemaGenerator', () => {

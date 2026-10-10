@@ -23,7 +23,7 @@ import {
   SvgContext,
 } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
-import { SocialFormat, TemplateStyle, QRConfig, QRStyle } from '@/types';
+import { SocialFormat, TemplateStyle, type QRConfig, QRStyle } from '@/types';
 import * as qrMatrix from '@/packages/qr-matrix';
 import { calculateLayout } from '@/packages/qr-matrix';
 

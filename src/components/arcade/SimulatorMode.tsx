@@ -32,8 +32,8 @@ import {
   planBarrage,
   SCAN_FRAME_SIZE,
   SIMULATOR_WEAPONS,
-  SimulatorWeaponId,
-  TargetMatrix,
+  type SimulatorWeaponId,
+  type TargetMatrix,
 } from '@/packages/arcade';
 import { useEmpiricalScan, useLatestRef, useReducedMotion } from '@/packages/arcade/client';
 import type { ArcadeTarget } from '@/packages/arcade/handoff';
@@ -42,8 +42,8 @@ import { ArcadeCockpit } from './ArcadeCockpit';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { DefeatModal } from './DefeatModal';
 import { ScanHud } from './ScanHud';
-import { ArenaPalette, useArenaCanvas, useArenaPalette } from './useArenaCanvas';
-import { Announce, useArcadeStatus } from './useArcadeStatus';
+import { type ArenaPalette, useArenaCanvas, useArenaPalette } from './useArenaCanvas';
+import { type Announce, useArcadeStatus } from './useArcadeStatus';
 import { useScanFrameCapture } from './useScanFrameCapture';
 
 /** Logical side of the simulator board. */

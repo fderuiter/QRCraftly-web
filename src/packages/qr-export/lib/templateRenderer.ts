@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRConfig, QRModules, SocialFormat, TemplateStyle } from '@/types';
-import { drawQRInternal, ModuleRenderOptions, type MazeData } from '@/packages/qr-matrix';
+import { type QRConfig, type QRModules, SocialFormat, TemplateStyle } from '@/types';
+import { drawQRInternal, type ModuleRenderOptions, type MazeData } from '@/packages/qr-matrix';
 import { drawRoundRect } from '@/packages/qr-matrix/canvas';
 import { hexToRgba } from '@/utils/colorUtils';
 

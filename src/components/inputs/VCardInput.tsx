@@ -1,5 +1,5 @@
 import React from "react";
-import { VCardData } from "../../types";
+import type { VCardData } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
 import { isDangerousUrl } from "../../utils/security";

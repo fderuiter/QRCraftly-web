@@ -18,7 +18,7 @@
 
 import { useCallback, useState } from 'react';
 import { useOptionalQRStoreSelector } from '@/context/QRContext';
-import { ArcadeTarget, getStagedArcadeTarget } from '@/packages/arcade/handoff';
+import { type ArcadeTarget, getStagedArcadeTarget } from '@/packages/arcade/handoff';
 import { DEFAULT_ARCADE_TARGET, targetFromConfig } from './target';
 
 /** Target state for the arcade. */

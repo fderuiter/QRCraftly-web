@@ -1,4 +1,4 @@
-import { getMetadataForPageContext, MetadataPageContext } from "../data/contentRegistry";
+import { getMetadataForPageContext, type MetadataPageContext } from "../data/contentRegistry";
 
 /**
  * Page description from the content registry (the 404 page uses the `_error` entry).

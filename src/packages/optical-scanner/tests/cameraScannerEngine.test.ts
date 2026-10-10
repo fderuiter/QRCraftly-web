@@ -114,7 +114,11 @@ class FakeWorker {
   released = false;
   terminated = false;
 
-  constructor(private readonly handlers: ScannerWorkerHandlers) {}
+  private readonly handlers: ScannerWorkerHandlers;
+
+  constructor(handlers: ScannerWorkerHandlers) {
+    this.handlers = handlers;
+  }
 
   get attached() {
     return !this.released && !this.terminated;

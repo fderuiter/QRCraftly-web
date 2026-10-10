@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "../ui/Button";
-import { LocationData } from "../../types";
+import type { LocationData } from "../../types";
 import { TextField } from "../ui/FormFields";
 import { FormBlock } from "../ui/FormBlock";
 import { announcePolitely } from "../../utils/a11y";

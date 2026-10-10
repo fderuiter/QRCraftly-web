@@ -27,7 +27,7 @@ import { describe, it, expect } from 'vitest';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { DEFAULT_CONFIG } from '@/constants';
-import { QRConfig, QRStyle, QRErrorCorrectionLevel } from '@/types';
+import { type QRConfig, QRStyle, QRErrorCorrectionLevel } from '@/types';
 import { drawQRInternal, calculateLayout, clearFluidCache } from '../index';
 import { RasterContext, toContext } from './rasterContext';
 

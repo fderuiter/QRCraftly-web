@@ -1,5 +1,5 @@
 import React from "react";
-import { UrlData } from "../../types";
+import type { UrlData } from "../../types";
 import { TextField } from "../ui/FormFields";
 import { normalizeUrl } from "../../utils/url";
 import { describeViolation } from "@/packages/qr-payload";

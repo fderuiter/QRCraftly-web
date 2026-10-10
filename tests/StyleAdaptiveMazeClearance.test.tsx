@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent, screen } from '@testing-library/react';
-import { QRConfig, QRStyle, QRType, QRErrorCorrectionLevel } from '../src/types';
+import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel } from '../src/types';
 import { getStyleAdaptiveMazePathWidth, getMazeCacheKey, renderMaze } from '../src/packages/qr-matrix/maze';
 import { TargetSettings } from '../src/components/arcade/TargetSettings';
 import type { ArcadeTarget } from '../src/packages/arcade/handoff';

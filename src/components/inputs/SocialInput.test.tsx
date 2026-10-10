@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SocialInput } from './SocialInput';
-import { SocialData, SocialPlatform } from '../../types';
+import { type SocialData, SocialPlatform } from '../../types';
 
 describe('SocialInput', () => {
   const mockOnChange = vi.fn();

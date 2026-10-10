@@ -18,7 +18,7 @@
 
 
 import { describe, it, expect } from 'vitest';
-import { CryptoNetwork, PaymentData, QRType } from '@/types';
+import { CryptoNetwork, type PaymentData, QRType } from '@/types';
 import { constructPaymentString, hydratePaymentData, paymentAmountError, validatePayload } from '../index';
 
 const BTC = 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq';

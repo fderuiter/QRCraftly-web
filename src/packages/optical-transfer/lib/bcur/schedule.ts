@@ -61,7 +61,10 @@ function seedFor(seqNum: number, checksum: number): Uint8Array {
 export class FragmentChooser {
   private readonly table: { probs: Float64Array; aliases: Uint32Array };
 
-  constructor(private readonly count: number) {
+  private readonly count: number;
+
+  constructor(count: number) {
+    this.count = count;
     this.table = buildAliasTable(count);
   }
 

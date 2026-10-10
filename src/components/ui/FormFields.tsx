@@ -1,7 +1,7 @@
 import React from "react";
 import { TEXT_AREA_CLASSES, SELECT_CLASSES, ERROR_INPUT_CLASSES, mergeClasses } from "./styles";
 import { useFieldIds } from "../../hooks/useFieldIds";
-import { FieldWrapper, BaseFieldProps } from "./FieldWrapper";
+import { FieldWrapper, type BaseFieldProps } from "./FieldWrapper";
 export { TextField } from "./TextField";
 
 interface TextAreaFieldProps

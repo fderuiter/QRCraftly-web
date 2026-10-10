@@ -1,5 +1,5 @@
 import React from "react";
-import { TextData, QRType } from "../../types";
+import { type TextData, QRType } from "../../types";
 import { describeViolation } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
 import { TextAreaField } from "../ui/FormFields";

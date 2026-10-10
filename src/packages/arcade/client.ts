@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createScannabilityWorker } from '@/packages/scannability';
-import { EmpiricalScanPipeline, DetectorLike, ScanOutcome } from './lib/scanPipeline';
+import { EmpiricalScanPipeline, type DetectorLike, type ScanOutcome } from './lib/scanPipeline';
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 

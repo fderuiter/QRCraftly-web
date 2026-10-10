@@ -20,7 +20,7 @@ import { Eyebrow } from '@/components/ui/SectionHeading';
 import React from 'react';
 import { ShieldAlert, ShieldCheck, ScanLine, AlertTriangle } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
-import { DamageAnalysis, FALLBACK_PAYLOAD, FailureCause, healthTone, HealthTone } from '@/packages/arcade';
+import { type DamageAnalysis, FALLBACK_PAYLOAD, type FailureCause, healthTone, type HealthTone } from '@/packages/arcade';
 import type { EmpiricalState } from '@/packages/arcade/client';
 
 const BAR_CLASSES: Record<HealthTone, string> = {

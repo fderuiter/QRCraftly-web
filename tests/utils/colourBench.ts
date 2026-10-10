@@ -314,7 +314,11 @@ class CropReader {
   public readonly timings: number[] = [];
   public fallbacks = 0;
 
-  constructor(private readonly path: ReadPath) {}
+  private readonly path: ReadPath;
+
+  constructor(path: ReadPath) {
+    this.path = path;
+  }
 
   public read(pixels: Uint8ClampedArray, width: number, height: number, expected?: Expected): DecodedCode | null {
     const began = performance.now();
@@ -339,12 +343,14 @@ class MonoReceiver {
   public decodes = 0;
   private readonly tracker: TileTracker;
   private readonly dedup = createSymbolDedup();
+  private readonly layout: TileLayout;
+  private readonly beaconVersion: number;
+  private readonly reader: CropReader;
 
-  constructor(
-    private readonly layout: TileLayout,
-    private readonly beaconVersion: number,
-    private readonly reader: CropReader
-  ) {
+  constructor(layout: TileLayout, beaconVersion: number, reader: CropReader) {
+    this.layout = layout;
+    this.beaconVersion = beaconVersion;
+    this.reader = reader;
     this.tracker = new TileTracker({ layout });
   }
 

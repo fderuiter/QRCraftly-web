@@ -7,7 +7,7 @@ import QRCanvas from '../src/components/QRCanvas';
 import QRTool from '../src/components/QRTool';
 import { ToastProvider } from '../src/components/ui/Toast';
 import { DEFAULT_CONFIG } from '../src/constants';
-import { QRStyle, QRConfig } from '../src/types';
+import { QRStyle, type QRConfig } from '../src/types';
 
 describe('Structural Isolation and Reserved Space for QR Preview', () => {
   

@@ -183,7 +183,11 @@ export class LinkTracker {
   /**
    * @param windowMs - How far back the state looks, in milliseconds.
    */
-  constructor(private readonly windowMs = 3000) {}
+  private readonly windowMs: number;
+
+  constructor(windowMs = 3000) {
+    this.windowMs = windowMs;
+  }
 
   /**
    * Adds a camera frame.

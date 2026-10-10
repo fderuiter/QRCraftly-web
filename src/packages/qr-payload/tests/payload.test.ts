@@ -29,7 +29,7 @@ import {
 } from '../index';
 import {
   QRType,
-  QRConfig,
+  type QRConfig,
   QRErrorCorrectionLevel,
   QRStyle,
   SocialFormat,

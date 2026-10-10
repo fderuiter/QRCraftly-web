@@ -21,7 +21,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { FrameControls } from './FrameControls';
 import { DEFAULT_CONFIG } from '@/constants';
-import { QRConfig } from '@/types';
+import type { QRConfig } from '@/types';
 
 describe('FrameControls Component', () => {
   it('renders frame shape selector', () => {

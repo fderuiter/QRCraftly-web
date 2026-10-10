@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { generateQRSvg } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
-import { QRConfig } from '@/types';
+import type { QRConfig } from '@/types';
 
 if (typeof globalThis.DOMParser === 'undefined') {
   const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {

@@ -29,6 +29,8 @@ const TYPE_PATTERN = /^[a-z0-9-]+$/;
  * before QR encoding to use the denser alphanumeric mode.
  */
 export class BcUrEncoder {
+  private readonly type: string;
+  private readonly cbor: Uint8Array;
   private readonly fragments: Uint8Array[] = [];
   private readonly fragmentLength: number;
   private readonly checksum: number;
@@ -41,10 +43,12 @@ export class BcUrEncoder {
    * @param maxFragmentLength Largest fragment, in payload bytes (reference default 100).
    */
   constructor(
-    private readonly type: string,
-    private readonly cbor: Uint8Array,
+    type: string,
+    cbor: Uint8Array,
     maxFragmentLength = 100
   ) {
+    this.type = type;
+    this.cbor = cbor;
     if (!TYPE_PATTERN.test(type)) throw new RangeError('BC-UR: invalid type');
     if (cbor.length < 1) throw new RangeError('BC-UR: empty payload');
     if (!Number.isInteger(maxFragmentLength) || maxFragmentLength < 1) throw new RangeError('BC-UR: invalid fragment length');

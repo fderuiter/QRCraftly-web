@@ -1,5 +1,5 @@
 import React from "react";
-import { EmailData } from "../../types";
+import type { EmailData } from "../../types";
 import { TextField, TextAreaField } from "../ui/FormFields";
 import { CONTAINER_SPACING_CLASSES } from "../ui/styles";
 

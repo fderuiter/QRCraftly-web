@@ -1,5 +1,5 @@
 import React from "react";
-import { PaymentData, CryptoNetwork } from "../../types";
+import { type PaymentData, CryptoNetwork } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { isDangerousUrl } from "../../utils/security";
 import { FormBlock } from "../ui/FormBlock";
@@ -11,12 +11,13 @@ interface PaymentInputProps {
 }
 
 const isCryptoNetwork = (network: CryptoNetwork): boolean => {
-  return [
+  const known: CryptoNetwork[] = [
     CryptoNetwork.BITCOIN,
     CryptoNetwork.ETHEREUM,
     CryptoNetwork.SOLANA,
     CryptoNetwork.LITECOIN,
-  ].includes(network);
+  ];
+  return known.includes(network);
 };
 
 export const PaymentInput: React.FC<PaymentInputProps> = ({

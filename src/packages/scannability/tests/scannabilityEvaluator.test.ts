@@ -82,17 +82,23 @@ class FakeBitmap implements ImageBitmap {
     this.width = 0;
     this.height = 0;
   });
-  constructor(
-    public width = 10,
-    public height = 10
-  ) {}
+  width: number;
+  height: number;
+
+  constructor(width = 10, height = 10) {
+    this.width = width;
+    this.height = height;
+  }
 }
 
 class FakeCanvas implements ScannabilityCanvas {
-  constructor(
-    public width = 20,
-    public height = 20
-  ) {}
+  width: number;
+  height: number;
+
+  constructor(width = 20, height = 20) {
+    this.width = width;
+    this.height = height;
+  }
 }
 
 interface Posted {
@@ -106,7 +112,11 @@ class FakeWorker {
   terminated = false;
   failNextPost = false;
 
-  constructor(private readonly handlers: ScannabilityWorkerHandlers) {}
+  private readonly handlers: ScannabilityWorkerHandlers;
+
+  constructor(handlers: ScannabilityWorkerHandlers) {
+    this.handlers = handlers;
+  }
 
   get last(): WorkerRequest {
     const entry = this.posted.at(-1);

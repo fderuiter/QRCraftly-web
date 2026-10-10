@@ -93,7 +93,11 @@ export function cborEncode(value: CborValue): Uint8Array {
 class CborReader {
   private offset = 0;
 
-  constructor(private readonly bytes: Uint8Array) {}
+  private readonly bytes: Uint8Array;
+
+  constructor(bytes: Uint8Array) {
+    this.bytes = bytes;
+  }
 
   public get done(): boolean {
     return this.offset >= this.bytes.length;

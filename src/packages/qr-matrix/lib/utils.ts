@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRConfig, QRErrorCorrectionLevel } from '@/types';
+import { type QRConfig, QRErrorCorrectionLevel } from '@/types';
 
 export interface LayoutMetrics {
   drawX: number;

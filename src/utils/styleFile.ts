@@ -1,4 +1,4 @@
-import { QRConfig } from '../types';
+import type { QRConfig } from '../types';
 import { pickStyle } from './styleFields';
 import { extractStyleConfig } from './brandTemplateManager';
 

@@ -1,4 +1,4 @@
-import { AlertCircle, AlertTriangle, CheckCircle, Info, LucideIcon } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle, Info, type LucideIcon } from 'lucide-react';
 
 export type NotificationState = 'success' | 'error' | 'warning' | 'info';
 

@@ -46,7 +46,7 @@ Each replacement moves through these stages in order. The scorecard below record
 | `vitest-axe`                               | `tests/utils/axe.ts` on axe-core (#1186)                                    | Removed  |
 | `@testing-library/jest-dom`                | `tests/utils/domMatchers.ts` (#1188)                                        | Removed  |
 | `@ngraveio/bc-ur`                          | frozen vectors (#1181)                                                      | Removed  |
-| `tsx`                                      | Node's own type stripping (#1189)                                           | Contract |
+| `tsx`                                      | Node's own type stripping (#1189)                                           | Removed  |
 | `husky`, `lint-staged`                     | our own hooks and staged-file runner (#1190)                                | Removed  |
 | `marked`                                   | `scripts/utils/markdown/` (#1191)                                           | Removed  |
 | `globals`                                  | `eslint/node-globals.js` (#1192); ESLint itself still pulls in `globals` 14 | Removed  |

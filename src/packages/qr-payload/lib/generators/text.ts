@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { TextData, QRType, QRGeneratorContract } from '@/types';
+import { type TextData, QRType, type QRGeneratorContract } from '@/types';
 import { identifyProtocol } from '../protocol';
 
 /**

@@ -20,8 +20,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import {
   DARK_SCHEME_QUERY,
   THEME_STORAGE_KEY,
-  ResolvedTheme,
-  ThemePreference,
+  type ResolvedTheme,
+  type ThemePreference,
   applyThemeToDocument,
   nextThemePreference,
   parseThemePreference,

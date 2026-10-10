@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRConfig, QRType } from '@/types';
+import { type QRConfig, QRType } from '@/types';
 import {
   REGEX_STRICT_CONTROL_CHARS,
   REGEX_PRESERVE_FORMAT_CONTROL_CHARS,

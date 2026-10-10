@@ -29,7 +29,7 @@ import { describe, it, expect } from 'vitest';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import {
-  QRConfig,
+  type QRConfig,
   QRStyle,
   QRType,
   QRErrorCorrectionLevel,

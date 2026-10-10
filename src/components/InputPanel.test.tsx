@@ -21,7 +21,7 @@ import { axe } from '../../tests/utils/axe';
 import InputPanel from './InputPanel';
 import { getQRTypeLabel } from '@/data/qrTypeLabels';
 import { DEFAULT_CONFIG } from '../constants';
-import { QRType, QRConfig, WifiEncryption, WifiData, EmailData } from '../types';
+import { QRType, type QRConfig, WifiEncryption, type WifiData, type EmailData } from '../types';
 import { FIXTURES } from '../../tests/fixtures/data';
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { WifiInput, EmailInput } from './inputs';

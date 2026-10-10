@@ -93,7 +93,11 @@ export class FrameRateMeter {
   /**
    * @param windowMs - How far back the rate looks, in milliseconds.
    */
-  constructor(private readonly windowMs = 1000) {}
+  private readonly windowMs: number;
+
+  constructor(windowMs = 1000) {
+    this.windowMs = windowMs;
+  }
 
   /**
    * Records a frame.

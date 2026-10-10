@@ -21,35 +21,37 @@
  * Defines the visual style of the QR code.
  * Each style dictates the data modules, eye frame, and eyeball appearance.
  */
-export enum QRStyle {
-  STANDARD = 'standard',
-  MODERN = 'modern',
-  SWISS = 'swiss',
-  FLUID = 'fluid',
-  CIRCUIT = 'circuit',
-  HIVE = 'hive',
-  GRUNGE = 'grunge',
-  STARBURST = 'starburst',
-}
+export const QRStyle = {
+  STANDARD: 'standard',
+  MODERN: 'modern',
+  SWISS: 'swiss',
+  FLUID: 'fluid',
+  CIRCUIT: 'circuit',
+  HIVE: 'hive',
+  GRUNGE: 'grunge',
+  STARBURST: 'starburst',
+} as const;
+export type QRStyle = (typeof QRStyle)[keyof typeof QRStyle];
 
 /**
  * Defines the type of data encoded in the QR code.
  */
-export enum QRType {
-  URL = 'URL',
-  TEXT = 'TEXT',
-  WIFI = 'WIFI',
-  EVENT = 'EVENT',
-  EMAIL = 'EMAIL',
-  VCARD = 'VCARD',
-  PHONE = 'PHONE',
-  SMS = 'SMS',
-  PAYMENT = 'PAYMENT',
-  LOCATION = 'LOCATION',
-  MEETING = 'MEETING',
-  SOCIAL = 'SOCIAL',
-  BULK_CSV = 'BULK_CSV',
-}
+export const QRType = {
+  URL: 'URL',
+  TEXT: 'TEXT',
+  WIFI: 'WIFI',
+  EVENT: 'EVENT',
+  EMAIL: 'EMAIL',
+  VCARD: 'VCARD',
+  PHONE: 'PHONE',
+  SMS: 'SMS',
+  PAYMENT: 'PAYMENT',
+  LOCATION: 'LOCATION',
+  MEETING: 'MEETING',
+  SOCIAL: 'SOCIAL',
+  BULK_CSV: 'BULK_CSV',
+} as const;
+export type QRType = (typeof QRType)[keyof typeof QRType];
 
 /**
  * The standard contract for QR payload generators and hydrators.
@@ -70,33 +72,36 @@ export interface QRGeneratorContract<TData> {
 /**
  * Defines the encryption type for WiFi networks.
  */
-export enum WifiEncryption {
-  WPA = 'WPA',
-  WEP = 'WEP',
-  NOPASS = 'nopass',
-  WPA2_EAP = 'WPA2-EAP',
-}
+export const WifiEncryption = {
+  WPA: 'WPA',
+  WEP: 'WEP',
+  NOPASS: 'nopass',
+  WPA2_EAP: 'WPA2-EAP',
+} as const;
+export type WifiEncryption = (typeof WifiEncryption)[keyof typeof WifiEncryption];
 
 /**
  * EAP methods for WPA2-Enterprise networks, emitted as the `E:` field of a WIFI payload.
  */
-export enum WifiEapMethod {
-  PEAP = 'PEAP',
-  TTLS = 'TTLS',
-  TLS = 'TLS',
-  PWD = 'PWD',
-}
+export const WifiEapMethod = {
+  PEAP: 'PEAP',
+  TTLS: 'TTLS',
+  TLS: 'TLS',
+  PWD: 'PWD',
+} as const;
+export type WifiEapMethod = (typeof WifiEapMethod)[keyof typeof WifiEapMethod];
 
 /**
  * Phase 2 (inner) authentication for PEAP/TTLS, emitted as the `PH2:` field of a WIFI payload.
  * `NONE` omits the field.
  */
-export enum WifiEapPhase2 {
-  NONE = '',
-  MSCHAPV2 = 'MSCHAPV2',
-  GTC = 'GTC',
-  PAP = 'PAP',
-}
+export const WifiEapPhase2 = {
+  NONE: '',
+  MSCHAPV2: 'MSCHAPV2',
+  GTC: 'GTC',
+  PAP: 'PAP',
+} as const;
+export type WifiEapPhase2 = (typeof WifiEapPhase2)[keyof typeof WifiEapPhase2];
 
 /**
  * Defines the shape of the padding area around an embedded logo.
@@ -121,12 +126,13 @@ export interface ColorStop {
 /**
  * Defines the error correction level for the QR code.
  */
-export enum QRErrorCorrectionLevel {
-  L = 'L',
-  M = 'M',
-  Q = 'Q',
-  H = 'H',
-}
+export const QRErrorCorrectionLevel = {
+  L: 'L',
+  M: 'M',
+  Q: 'Q',
+  H: 'H',
+} as const;
+export type QRErrorCorrectionLevel = (typeof QRErrorCorrectionLevel)[keyof typeof QRErrorCorrectionLevel];
 
 /**
  * Configuration interface for generating a QR code.
@@ -371,13 +377,14 @@ export interface SmsData {
 /**
  * Supported web calendar providers.
  */
-export enum CalendarProvider {
-  ICAL = 'ical',
-  GOOGLE = 'google',
-  OUTLOOK = 'outlook',
-  OFFICE365 = 'office365',
-  YAHOO = 'yahoo',
-}
+export const CalendarProvider = {
+  ICAL: 'ical',
+  GOOGLE: 'google',
+  OUTLOOK: 'outlook',
+  OFFICE365: 'office365',
+  YAHOO: 'yahoo',
+} as const;
+export type CalendarProvider = (typeof CalendarProvider)[keyof typeof CalendarProvider];
 
 /**
  * Data structure for calendar event information.
@@ -404,17 +411,18 @@ export interface EventData {
 /**
  * Supported payment networks (Crypto & Fiat).
  */
-export enum CryptoNetwork {
-  BITCOIN = 'bitcoin',
-  ETHEREUM = 'ethereum',
-  SOLANA = 'solana',
-  LITECOIN = 'litecoin',
-  EPC_SEPA = 'epc_sepa',
-  PAYPAL = 'paypal',
-  VENMO = 'venmo',
-  CASH_APP = 'cash_app',
-  CUSTOM = 'custom',
-}
+export const CryptoNetwork = {
+  BITCOIN: 'bitcoin',
+  ETHEREUM: 'ethereum',
+  SOLANA: 'solana',
+  LITECOIN: 'litecoin',
+  EPC_SEPA: 'epc_sepa',
+  PAYPAL: 'paypal',
+  VENMO: 'venmo',
+  CASH_APP: 'cash_app',
+  CUSTOM: 'custom',
+} as const;
+export type CryptoNetwork = (typeof CryptoNetwork)[keyof typeof CryptoNetwork];
 
 /**
  * Data structure for Payment information (Crypto & Fiat).
@@ -475,16 +483,17 @@ export interface LocationData {
 /**
  * Supported social media platforms for deep links.
  */
-export enum SocialPlatform {
-  INSTAGRAM = 'instagram',
-  TWITTER = 'twitter',
-  TIKTOK = 'tiktok',
-  LINKEDIN = 'linkedin',
-  YOUTUBE = 'youtube',
-  FACEBOOK = 'facebook',
-  WHATSAPP = 'whatsapp',
-  GITHUB = 'github',
-}
+export const SocialPlatform = {
+  INSTAGRAM: 'instagram',
+  TWITTER: 'twitter',
+  TIKTOK: 'tiktok',
+  LINKEDIN: 'linkedin',
+  YOUTUBE: 'youtube',
+  FACEBOOK: 'facebook',
+  WHATSAPP: 'whatsapp',
+  GITHUB: 'github',
+} as const;
+export type SocialPlatform = (typeof SocialPlatform)[keyof typeof SocialPlatform];
 
 /**
  * Data structure for Social Media deep links.
@@ -507,21 +516,23 @@ export interface MeetingData {
 /**
  * Defines the social media export aspect ratio / format.
  */
-export enum SocialFormat {
-  SQUARE_1_1 = '1:1',
-  PORTRAIT_4_5 = '4:5',
-  STORY_9_16 = '9:16',
-}
+export const SocialFormat = {
+  SQUARE_1_1: '1:1',
+  PORTRAIT_4_5: '4:5',
+  STORY_9_16: '9:16',
+} as const;
+export type SocialFormat = (typeof SocialFormat)[keyof typeof SocialFormat];
 
 /**
  * Defines the visual template style applied to the social export canvas.
  */
-export enum TemplateStyle {
-  NONE = 'none',
-  MINIMALIST = 'minimalist',
-  GRADIENT_BLUR = 'gradient_blur',
-  SOLID_FRAME = 'solid_frame',
-}
+export const TemplateStyle = {
+  NONE: 'none',
+  MINIMALIST: 'minimalist',
+  GRADIENT_BLUR: 'gradient_blur',
+  SOLID_FRAME: 'solid_frame',
+} as const;
+export type TemplateStyle = (typeof TemplateStyle)[keyof typeof TemplateStyle];
 
 /**
  * Data structure for Bulk CSV Batch QR generation.

@@ -17,7 +17,7 @@
 */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DamageAnalysis, healthTone } from '@/packages/arcade';
+import { type DamageAnalysis, healthTone } from '@/packages/arcade';
 import type { EmpiricalState } from '@/packages/arcade/client';
 import { FAILURE_TITLES } from './ScanHud';
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { OpticalScannerHarness, HarnessFrameResult } from './utils/OpticalScannerHarness';
+import { OpticalScannerHarness, type HarnessFrameResult } from './utils/OpticalScannerHarness';
 import { fakeQrRead } from './utils/fakeQrRead';
 
 const qrRead = vi.fn();

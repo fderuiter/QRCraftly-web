@@ -1,5 +1,5 @@
 import React from "react";
-import { EventData, CalendarProvider } from "../../types";
+import { type EventData, CalendarProvider } from "../../types";
 import { TextField, TextAreaField, SelectField } from "../ui/FormFields";
 import { FieldNotes, LinkHints, firstWebAddress, hintsId } from "./FieldHints";
 import { CONTAINER_SPACING_CLASSES } from "../ui/styles";

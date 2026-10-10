@@ -30,7 +30,7 @@ if (typeof globalThis.DOMParser === 'undefined') {
 import { getCachedAsset, setCachedAsset, clearAssetCache, convertImageToBase64 } from './assetCache';
 import { generateQRSvg } from '@/packages/qr-export';
 import { DEFAULT_CONFIG } from '../constants';
-import { QRConfig } from '../types';
+import type { QRConfig } from '../types';
 
 describe('Asset Cache Utility', () => {
   beforeEach(() => {

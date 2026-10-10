@@ -185,7 +185,11 @@ export interface FountainTelemetry extends FountainProgress {
 export class FountainRateTracker {
   private stamps: number[] = [];
 
-  constructor(private readonly windowMs = 2000) {}
+  private readonly windowMs: number;
+
+  constructor(windowMs = 2000) {
+    this.windowMs = windowMs;
+  }
 
   /**
    * Records one decoded droplet frame.

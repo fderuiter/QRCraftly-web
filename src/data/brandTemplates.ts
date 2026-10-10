@@ -1,4 +1,4 @@
-import { BrandTemplate, QRStyle, BorderStyle, QRErrorCorrectionLevel } from '../types';
+import { type BrandTemplate, QRStyle, type BorderStyle, QRErrorCorrectionLevel } from '../types';
 
 /**
  * Curated pre-built brand templates.

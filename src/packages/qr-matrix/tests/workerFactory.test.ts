@@ -20,10 +20,13 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import { createMatrixWorker, createMazeWorker } from '../index';
 
 class RecordingWorker {
-  constructor(
-    public readonly url: URL | string,
-    public readonly options?: WorkerOptions
-  ) {}
+  readonly url: URL | string;
+  readonly options?: WorkerOptions;
+
+  constructor(url: URL | string, options?: WorkerOptions) {
+    this.url = url;
+    this.options = options;
+  }
 }
 
 describe('qr-matrix worker factories', () => {

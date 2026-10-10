@@ -18,7 +18,7 @@
 
 import { Progress } from '../ui/Progress';
 import { BulkCsvDropZone } from './BulkCsvDropZone';
-import React, { useState, useEffect, useMemo, useCallback, useRef, ChangeEvent } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, type ChangeEvent } from 'react';
 import {
   parseCsv,
   decodeCsvBytes,
@@ -39,7 +39,7 @@ import {
   type BulkContentType,
 } from '@/packages/bulk-csv';
 import { BulkCsvPreflightSummary } from './BulkCsvPreflightSummary';
-import { BulkCsvData, QRConfig, QRType } from '@/types';
+import { type BulkCsvData, type QRConfig, QRType } from '@/types';
 import { Alert } from '../ui/Alert';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';

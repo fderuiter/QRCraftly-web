@@ -1,14 +1,14 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import { QRConfig, LogoPaddingStyle } from '../../types';
+import type { QRConfig, LogoPaddingStyle } from '../../types';
 import { Upload, X, Square, Circle, Minus } from 'lucide-react';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
 import { useImageUpload } from '../../hooks/useImageUpload';
 import { SYSTEM_LIMITS } from '../../constants';
 import { MIN_LOGO_BACKING_PADDING } from '@/packages/qr-matrix';
-import { PRESET_LOGOS, PRESET_LOGO_CATEGORIES, PresetCategory } from '../../constants/presetLogos';
+import { PRESET_LOGOS, PRESET_LOGO_CATEGORIES, type PresetCategory } from '../../constants/presetLogos';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { combineIds } from '../../utils/a11y';
 import { useUndoToast } from '../../hooks/useUndoToast';

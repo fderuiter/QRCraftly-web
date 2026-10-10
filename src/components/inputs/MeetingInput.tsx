@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useRef } from "react";
-import { MeetingData, QRType } from "../../types";
+import { type MeetingData, QRType } from "../../types";
 import { describeViolation } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
 import { TextField } from "../ui/FormFields";

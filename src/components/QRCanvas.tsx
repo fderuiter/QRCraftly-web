@@ -17,7 +17,7 @@
 */
 
 import React, { useEffect, useLayoutEffect, useRef, useCallback, useState, useMemo } from 'react';
-import { QRConfig, SocialFormat, TemplateStyle, QRModules } from '../types';
+import { type QRConfig, SocialFormat, TemplateStyle, type QRModules } from '../types';
 import { drawQR, drawQRInternal } from '../utils/qrRenderer';
 import { drawWithTemplate, SOCIAL_DIMENSIONS } from '@/packages/qr-export';
 import { useImage } from '../hooks/useImage';

@@ -20,7 +20,7 @@ import React from 'react';
 import { RotateCcw } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { DamageAnalysis } from '@/packages/arcade';
+import type { DamageAnalysis } from '@/packages/arcade';
 import { FAILURE_TITLES, describeFailure } from './ScanHud';
 
 /** Properties for {@link DefeatModal}. */

@@ -1,5 +1,5 @@
 import React from 'react';
-import { QRConfig, QRStyle } from '../../types';
+import type { QRConfig, QRStyle } from '../../types';
 import { PATTERNS, LOW_RELIABILITY_PATTERNS } from '../../constants';
 import { PatternModule } from '../ui/PatternModule';
 import { Alert } from '../ui/Alert';

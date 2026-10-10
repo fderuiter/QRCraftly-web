@@ -157,10 +157,12 @@ export class InThreadWorker {
   /** Why the worker module could not be loaded, if it could not. */
   public loadError: unknown = null;
 
-  constructor(
-    public readonly url: string | URL,
-    public readonly options?: WorkerOptions,
-  ) {
+  public readonly url: string | URL;
+  public readonly options?: WorkerOptions;
+
+  constructor(url: string | URL, options?: WorkerOptions) {
+    this.url = url;
+    this.options = options;
     installSelfGetter();
     this.scope = this.createScope();
     this.ready = this.load();

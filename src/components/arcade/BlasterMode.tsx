@@ -28,7 +28,7 @@ import {
   analyzeDamage,
   BLASTER_ARENA,
   BLASTER_WEAPONS,
-  BlasterWeaponId,
+  type BlasterWeaponId,
   blasterWeaponForKey,
   blankTargetMatrix,
   buildTargetMatrix,
@@ -37,14 +37,14 @@ import {
   decayShake,
   finderAt,
   healthTone,
-  Impact,
+  type Impact,
   MAX_ROCKETS_IN_FLIGHT,
   MicroGrid,
   paintScanFrame,
-  Particle,
-  Point,
-  Projectile,
-  ProjectileKind,
+  type Particle,
+  type Point,
+  type Projectile,
+  type ProjectileKind,
   SCAN_FRAME_SIZE,
   spawnProjectile,
   stepParticles,
@@ -57,7 +57,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { DefeatModal } from './DefeatModal';
 import { ScanHud } from './ScanHud';
 import type { ModeProps } from './SimulatorMode';
-import { ArenaPalette, useArenaCanvas, useArenaPalette } from './useArenaCanvas';
+import { type ArenaPalette, useArenaCanvas, useArenaPalette } from './useArenaCanvas';
 import { useArcadeStatus } from './useArcadeStatus';
 import { useScanFrameCapture } from './useScanFrameCapture';
 

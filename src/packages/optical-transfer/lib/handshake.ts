@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRConfig, QRErrorCorrectionLevel, QRStyle, QRType, SocialFormat, TemplateStyle } from '@/types';
+import { type QRConfig, QRErrorCorrectionLevel, QRStyle, QRType, SocialFormat, TemplateStyle } from '@/types';
 import { drawQRInternal } from '@/packages/qr-matrix';
 import { createScannabilityWorker, isWorkerResponse } from '@/packages/scannability';
 import { performScannabilityCheck } from '@/packages/scannability/checker';

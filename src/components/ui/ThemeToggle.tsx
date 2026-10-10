@@ -20,7 +20,7 @@ import { Monitor, Moon, Sun } from 'lucide-react';
 import { Button } from './Button';
 import { Tooltip } from './Tooltip';
 import { useTheme } from '@/context/ThemeContext';
-import { ThemePreference, nextThemePreference } from '@/utils/theme';
+import { type ThemePreference, nextThemePreference } from '@/utils/theme';
 
 const THEME_LABELS: Record<ThemePreference, string> = {
   system: 'System',
