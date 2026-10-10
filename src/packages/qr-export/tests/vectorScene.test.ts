@@ -18,8 +18,18 @@
 
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { parseColor, parseTransform, readSvgScene, textWidth, toLatin1Codes, shadingDictionary, formatNum } from '../lib/vectorScene';
-import { alphaToMask, decodeSceneImages, splitAlpha } from '../lib/vectorImages';
+import {
+  alphaToMask,
+  decodeSceneImages,
+  formatNum,
+  parseColor,
+  parseTransform,
+  readSvgScene,
+  shadingDictionary,
+  splitAlpha,
+  textWidth,
+  toLatin1Codes,
+} from '../index';
 
 describe('vector scene reader (#1359)', () => {
   it('reads colours the SVG builder writes', () => {

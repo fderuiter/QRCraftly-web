@@ -105,7 +105,7 @@ describe('PDF Vector Export', () => {
       const file = bytesOf(pdf);
       const start = Number(/startxref\n(\d+)/.exec(file)?.[1]);
       expect(file.slice(start, start + 4)).toBe('xref');
-      const lines = file.slice(start).split('\n');
+      const lines = file.slice(start).split(/\r?\n/);
       const count = Number(lines[1].split(' ')[1]);
       for (let id = 1; id < count; id++) {
         const offset = Number(lines[2 + id].slice(0, 10));

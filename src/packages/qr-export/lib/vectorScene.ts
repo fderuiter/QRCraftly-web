@@ -116,10 +116,10 @@ export function parseColor(value: string | null | undefined): RgbColor | null {
     const n = parseInt(hex.slice(1), 16);
     return { r: ((n >> 16) & 0xff) / 255, g: ((n >> 8) & 0xff) / 255, b: (n & 0xff) / 255 };
   }
-  const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(color);
-  if (rgb) {
-    if (rgb[4] !== undefined && Number(rgb[4]) === 0) return null;
-    return { r: Number(rgb[1]) / 255, g: Number(rgb[2]) / 255, b: Number(rgb[3]) / 255 };
+  if (/^rgba?\(/.test(color) && color.endsWith(')')) {
+    const [r, g, b, alpha] = color.slice(color.indexOf('(') + 1, -1).split(',').map((part) => Number(part.trim()));
+    if (alpha === 0) return null;
+    if ([r, g, b].every(Number.isFinite)) return { r: r / 255, g: g / 255, b: b / 255 };
   }
   if (color === 'white') return { r: 1, g: 1, b: 1 };
   return BLACK;
@@ -371,8 +371,8 @@ function readText(el: Element, state: WalkState): SceneText | null {
   const content = el.textContent || '';
   if (!content) return null;
   const font = el.getAttribute('font') || '';
-  const size = /(\d+(?:\.\d+)?)px/.exec(font) || /^\s*(\d+(?:\.\d+)?)/.exec(el.getAttribute('font-size') || '');
-  const fontSize = size ? parseFloat(size[1]) : 16;
+  const size = parseFloat(/([\d.]+)px/.exec(font)?.[1] ?? el.getAttribute('font-size') ?? '');
+  const fontSize = size > 0 ? size : 16;
   const weight = el.getAttribute('font-weight') || '';
   const anchorAttr = el.getAttribute('text-anchor');
   const textLength = parseFloat(el.getAttribute('textLength') || '');
