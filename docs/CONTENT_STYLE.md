@@ -81,4 +81,4 @@ These ran on a production build in Chromium on 11 October 2026. They found no pr
 Still to do, because only a person can do it:
 
 - A read-through for voice by someone who did not write the copy.
-- Listening to the create, preview and download flow with VoiceOver on an iPhone and TalkBack on Android, and trying it on real phones at 200% text size. Tracked in [#1057](https://github.com/fderuiter/QRCraftly-web/issues/1057).
+- Listening to the create, preview and download flow with VoiceOver on an iPhone and TalkBack on Android, and trying it on real phones at 200% text size. Both are tracked in [#1406](https://github.com/fderuiter/QRCraftly-web/issues/1406).
