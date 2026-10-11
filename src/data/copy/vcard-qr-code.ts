@@ -8,7 +8,7 @@ export const copy: ToolCopy = {
     description: 'Make a contact card people can save with one scan.',
     steps: [
       { name: 'Enter your details', text: 'Fill in the fields you want to share. Fewer fields make a smaller code.' },
-      { name: 'Style it', text: 'Add your colours or logo if you like.' },
+      { name: 'Style it', text: 'Add your colors or logo if you like.' },
       { name: 'Download it', text: 'Save the code for your business card, badge or slides.' },
     ],
   },

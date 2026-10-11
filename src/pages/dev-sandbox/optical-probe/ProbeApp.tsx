@@ -136,7 +136,7 @@ function Sender() {
         {PHOTOSENSITIVITY_NOTICE} The patterns change on every screen refresh. Press Escape or Stop to end them.
       </Alert>
       <CheckboxField
-        label="Also play the flicker patterns (30, 60 and 120 Hz colour alternation, low contrast)"
+        label="Also play the flicker patterns (30, 60 and 120 Hz color alternation, low contrast)"
         checked={flicker && !reduced}
         disabled={reduced}
         onChange={(event) => setFlicker(event.target.checked)}
@@ -225,7 +225,7 @@ function Receiver({ meta }: ReceiverProps) {
             if (run && !cancelled) {
               const pattern = run.ingest(image, now);
               const summary = run.report();
-              setProgress(`${summary.framesAnalysed} frames analysed, last pattern: ${pattern === null ? 'not readable' : probeSequence()[pattern].label}`);
+              setProgress(`${summary.framesAnalysed} frames analyzed, last pattern: ${pattern === null ? 'not readable' : probeSequence()[pattern].label}`);
             }
             busy = false;
           }, 0);
@@ -294,7 +294,7 @@ export default function ProbeApp() {
       <header className="space-y-2">
         <h1 className="text-2xl font-bold text-fg">Optical channel probe</h1>
         <p className="text-fg-muted">
-          Experimental. Measures what a phone camera resolves of a screen through the browser: cell size, colour separation and frame rate. It makes no network calls and stores nothing.
+          Experimental. Measures what a phone camera resolves of a screen through the browser: cell size, color separation and frame rate. It makes no network calls and stores nothing.
         </p>
       </header>
       <section className="grid gap-4 sm:grid-cols-3" aria-label="Labels for the report">

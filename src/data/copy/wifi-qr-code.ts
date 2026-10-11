@@ -27,7 +27,7 @@ export const copy: ToolCopy = {
     {
       question: 'Does it work with hidden networks and WPA3?',
       answer:
-        'Yes. Tick Hidden Network if your router does not broadcast its name, and choose WPA/WPA2/WPA3 for almost any home or office router. WEP, WPA2 Enterprise (EAP) and open networks are there too.',
+        'Yes. Select Hidden Network if your router does not broadcast its name, and choose WPA/WPA2/WPA3 for almost any home or office router. WEP, WPA2 Enterprise (EAP) and open networks are there too.',
     },
     {
       question: 'What happens if I change my Wi-Fi password?',

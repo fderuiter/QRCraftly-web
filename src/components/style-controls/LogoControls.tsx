@@ -21,8 +21,8 @@ const LOGO_BORDER_STYLES: { id: LogoPaddingStyle; icon: typeof Square; label: st
 
 /** What each backing does, shown under the choice. */
 const LOGO_BORDER_HINTS: Record<LogoPaddingStyle, string> = {
-  square: 'A square of the backing colour sits behind the logo, with a gap you set below.',
-  circle: 'A circle of the backing colour sits behind the logo, with a gap you set below.',
+  square: 'A square of the backing color sits behind the logo, with a gap you set below.',
+  circle: 'A circle of the backing color sits behind the logo, with a gap you set below.',
   none: 'The logo sits straight on the code, with no backing or gap.',
 };
 

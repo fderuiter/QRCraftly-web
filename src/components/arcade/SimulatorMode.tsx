@@ -87,7 +87,7 @@ function drawBoard(
       const index = r * size + c;
       const dark = isDarkModule(matrix, r, c);
       if (damage.has(index)) {
-        // A damaged module reads as the wrong colour: dark modules scorch light, light ones char.
+        // A damaged module reads as the wrong color: dark modules scorch light, light ones char.
         ctx.fillStyle = palette.damage;
         ctx.fillRect(c * cell, r * cell, cell, cell);
         if (!dark) {
@@ -367,7 +367,7 @@ export function SimulatorMode({ target, encoder, settings, announce }: ModeProps
               <div><dt>Damage budget</dt><dd className="font-bold text-fg">{analysis.budget} modules</dd></div>
               <div><dt>Destroyed</dt><dd className="font-bold text-fg">{analysis.damagedCount} modules</dd></div>
               <div><dt>Block damage</dt><dd className="font-bold text-fg">{analysis.blockDamage.join(' · ')}</dd></div>
-              <div><dt>Blast maths</dt><dd className="font-bold text-fg">{latency} ms</dd></div>
+              <div><dt>Blast math</dt><dd className="font-bold text-fg">{latency} ms</dd></div>
             </dl>
           </Card>
         }

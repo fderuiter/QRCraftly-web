@@ -214,7 +214,7 @@ describe('StyleControls Component', () => {
       const { rerender } = render(<StyleControls config={logoConfig} onChange={mockOnChange} />);
       expandAppearanceSections();
 
-      expect(screen.getByText(/A square of the backing colour sits behind the logo/)).toBeInTheDocument();
+      expect(screen.getByText(/A square of the backing color sits behind the logo/)).toBeInTheDocument();
       const padding = screen.getByLabelText('Padding');
       expect(padding).toHaveAttribute('min', '0.5');
       expect(padding).toHaveValue('0.5');

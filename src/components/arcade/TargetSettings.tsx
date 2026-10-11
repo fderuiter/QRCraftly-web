@@ -122,7 +122,7 @@ export function TargetSettings({ target, onChange, onResetToGenerator, hasGenera
       </Button>
       <p className="text-xs text-fg-muted">
         {hasGeneratorDesign
-          ? 'Uses the design, colours and content from your generator session.'
+          ? 'Uses the design, colors and content from your generator session.'
           : 'No generator design in this tab yet: resets to the default high-contrast code.'}
       </p>
 

@@ -7,7 +7,7 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
   {
     id: 'preset-classic-slate',
     name: 'Classic Slate',
-    description: 'Clean professional slate theme with standard modules',
+    description: 'Square modules in dark slate on off-white, with no border.',
     isPrebuilt: true,
     config: {
       fgColor: '#334155',
@@ -21,7 +21,7 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
   {
     id: 'preset-modern-soft',
     name: 'Modern Teal',
-    description: 'Rounded soft modules with vibrant brand teal accents',
+    description: 'Rounded squares in teal on white, with a teal border.',
     isPrebuilt: true,
     config: {
       fgColor: '#0f766e',
@@ -39,7 +39,7 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
   {
     id: 'preset-cyber-neon',
     name: 'Cyber Circuit',
-    description: 'Futuristic high-tech circuit aesthetic on dark background',
+    description: 'Cyan circuit lines on near-black. Harder to scan, so test it.',
     isPrebuilt: true,
     config: {
       fgColor: '#22d3ee',
@@ -57,7 +57,7 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
   {
     id: 'preset-swiss-crimson',
     name: 'Swiss Crimson',
-    description: 'Precision swiss dot layout with sharp crimson contrast',
+    description: 'Round dots in crimson on white, with a dashed border.',
     isPrebuilt: true,
     config: {
       fgColor: '#be123c',
@@ -75,7 +75,7 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
   {
     id: 'preset-corporate-emerald',
     name: 'Corporate Emerald',
-    description: 'Sophisticated deep green palette on clean background',
+    description: 'Square modules in dark green on pale green, with a green border.',
     isPrebuilt: true,
     config: {
       fgColor: '#047857',
@@ -93,7 +93,7 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
   {
     id: 'preset-fluid-lavender',
     name: 'Fluid Lavender',
-    description: 'Organic fluid ink shapes with rich purple tones',
+    description: 'Joined, flowing shapes in purple on pale lilac, with a double border.',
     isPrebuilt: true,
     config: {
       fgColor: '#6b21a8',
@@ -111,7 +111,7 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
   {
     id: 'preset-golden-hive',
     name: 'Golden Hive',
-    description: 'Hexagonal hive geometry with warm amber contrast',
+    description: 'Amber hexagons on near-black. Light on dark fails in some apps.',
     isPrebuilt: true,
     config: {
       fgColor: '#d97706',
@@ -129,7 +129,7 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
   {
     id: 'preset-royal-starburst',
     name: 'Royal Starburst',
-    description: 'High-contrast energetic starburst pattern in blue',
+    description: 'Blue stars on pale blue. Stars scan less reliably, so test it.',
     isPrebuilt: true,
     config: {
       fgColor: '#1d4ed8',

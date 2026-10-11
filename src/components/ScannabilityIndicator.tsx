@@ -135,7 +135,7 @@ export const ScannabilityIndicator: React.FC<Props> = ({
   // The failure alert keeps its text while a re-check runs, so a design that still fails is not
   // announced again on every edit; it changes only when a check settles on a different result.
   const failureText = isFailure
-    ? `${VERDICT_LABELS.unreliable}. ${advice?.message ?? 'Adjust colours, pattern, or margin before exporting.'}`
+    ? `${VERDICT_LABELS.unreliable}. ${advice?.message ?? 'Adjust colors, pattern, or margin before exporting.'}`
     : '';
   useEffect(() => {
     if (verdict === 'checking') return;
@@ -191,7 +191,6 @@ export const ScannabilityIndicator: React.FC<Props> = ({
       {health && verdict !== 'checking' && (
         <>
           <ScoreMeter score={health.score} />
-          <span className="sr-only">, health score {health.score} of 100</span>
         </>
       )}
     </>
@@ -208,6 +207,7 @@ export const ScannabilityIndicator: React.FC<Props> = ({
           ref={triggerRef}
           type="button"
           className={`${pillClasses} hover:brightness-95 focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none`}
+          aria-label={health ? `${VERDICT_LABELS[verdict]}, health score ${health.score} of 100` : undefined}
           aria-expanded={open}
           aria-controls={panelId}
           onClick={() => setOpen((value) => !value)}
@@ -261,7 +261,7 @@ export const ScannabilityIndicator: React.FC<Props> = ({
                     setOpen(false);
                   }}
                 >
-                  Reset colours
+                  Reset colors
                 </Button>
               )}
             </div>

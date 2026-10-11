@@ -31,7 +31,7 @@ export const copy: ToolCopy = {
       },
       {
         "question": "What is the difference between the health bar and the live scanner?",
-        "answer": "The health bar works out from the error correction maths how much more damage the code can take. The live scanner tries to read the damaged picture, so it shows whether a real reader still can."
+        "answer": "The health bar works out from the error correction math how much more damage the code can take. The live scanner tries to read the damaged picture, so it shows whether a real reader still can."
       },
       {
         "question": "Is my QR content uploaded?",

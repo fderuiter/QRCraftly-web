@@ -42,7 +42,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
       {
         question: 'Is this an AI QR code?',
         answer:
-          'No. There is no AI model and no image generation. The picture you choose is shrunk to one colour per module and each module is recoloured towards its dark or light value, so the result is your own image, made with plain arithmetic in your browser.',
+          'No. There is no AI model and no image generation. The picture you choose is shrunk to one color per module and each module is recolored toward its dark or light value, so the result is your own image, made with plain arithmetic in your browser.',
       },
       {
         question: 'Will an image QR code still scan?',
@@ -59,7 +59,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
       intro:
         'Make a QR code out of your own picture, such as a logo or a product photo. There is no AI and no upload: your image is blended into the code in your browser.',
       scanned: [
-        'A phone sees an ordinary QR code. Every module is still dark or light, just painted in a colour from your picture, so the camera reads it like a black and white code.',
+        'A phone sees an ordinary QR code. Every module is still dark or light, just painted in a color from your picture, so the camera reads it like a black and white code.',
         'The data is not changed to draw the picture, so error correction is still there to cover scuffs and glare. It works with any content: a link, Wi-Fi details or a contact card.',
       ],
       useCases: [
@@ -69,7 +69,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
       ],
       printing: [
         'Print bigger than a plain code: at least 3 cm (1.2 in), more for anything read from across a room.',
-        'Pictures with clear light and dark areas work best. Flat, mid-grey pictures give the code less to work with.',
+        'Pictures with clear light and dark areas work best. Flat, mid-gray pictures give the code less to work with.',
         'Use Tiles for codes scanned from a distance and Halftone when the picture matters more.',
       ],
       checks: [
@@ -79,7 +79,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'Print a test copy and scan it with an iPhone and an Android phone before printing a batch.',
       ],
       privacy:
-        'Your picture is read by your browser, reduced to one colour per module and forgotten when you close the tab. It is never uploaded, and saved style templates leave it out.',
+        'Your picture is read by your browser, reduced to one color per module and forgotten when you close the tab. It is never uploaded, and saved style templates leave it out.',
     },
   },
   'qr-code-with-logo': {
@@ -102,7 +102,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
       {
         question: 'How big can the logo be?',
         answer:
-          'Smaller than you expect. Keep it to a modest square in the centre and never cover the three corner squares. The scan badge tells you when you have gone too far, and a printed test is the final answer.',
+          'Smaller than you expect. Keep it to a modest square in the center and never cover the three corner squares. The scan badge tells you when you have gone too far, and a printed test is the final answer.',
       },
       {
         question: 'Can I use an SVG or transparent PNG?',
@@ -142,9 +142,9 @@ export const landingPageContent: Record<string, LandingCopy> = {
       name: 'How to Make a Google Review QR Code',
       description: 'Get your review link from Google, then turn it into a QR code.',
       steps: [
-        { name: 'Find your review link', text: 'Sign in to your Google Business Profile and look for the option to share your review form, often labelled “Ask for reviews” or “Get more reviews”. Google changes the wording from time to time. Copy the link it gives you.' },
+        { name: 'Find your review link', text: 'Sign in to your Google Business Profile and look for the option to share your review form, often labeled “Ask for reviews” or “Get more reviews”. Google changes the wording from time to time. Copy the link it gives you.' },
         { name: 'Paste it above', text: 'Paste the link into the generator. QRCraftly makes a plain link code and makes no call to Google.' },
-        { name: 'Add your colours or logo', text: 'Match the code to your shop, then check that the scan badge says “Scans reliably”.' },
+        { name: 'Add your colors or logo', text: 'Match the code to your shop, then check that the scan badge says “Scans reliably”.' },
         { name: 'Print it and test it', text: 'Download the code, scan it with a phone that is not signed in as the owner, and check that the review form opens.' },
       ],
     },
@@ -198,7 +198,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
       steps: [
         { name: 'Put your menu online', text: 'Use a page on your own website, or a PDF you host somewhere with a stable link. QRCraftly does not host files.' },
         { name: 'Paste the link above', text: 'Paste the menu address into the generator.' },
-        { name: 'Style and check it', text: 'Match your brand colours, add your logo and wait for “Scans reliably”.' },
+        { name: 'Style and check it', text: 'Match your brand colors, add your logo and wait for “Scans reliably”.' },
         { name: 'Print, then test at a table', text: 'Print a copy, scan it at the table with a real phone, and check that the menu loads on mobile data.' },
       ],
     },
@@ -256,7 +256,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
       description: 'Turn your Instagram username into a code that opens your profile.',
       steps: [
         { name: 'Type your username', text: 'Enter your handle without the link. The Instagram option is already selected.' },
-        { name: 'Style the code', text: 'Add your colours or logo and wait for “Scans reliably”.' },
+        { name: 'Style the code', text: 'Add your colors or logo and wait for “Scans reliably”.' },
         { name: 'Download it', text: 'Save the code as a PNG for screens or an SVG for print.' },
         { name: 'Test it', text: 'Scan the code with a phone and check that it opens the right profile.' },
       ],
@@ -313,7 +313,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
       steps: [
         { name: 'Add your number to the link', text: 'The box above starts with https://wa.me/. Add your number after it in international format, digits only: no plus sign, no spaces, no leading zeros. For example, https://wa.me/15551234567.' },
         { name: 'Add a first message (optional)', text: 'To pre-fill a message, add ?text= and your message after the number, with spaces written as %20.' },
-        { name: 'Style the code', text: 'Add your colours or logo and wait for “Scans reliably”.' },
+        { name: 'Style the code', text: 'Add your colors or logo and wait for “Scans reliably”.' },
         { name: 'Download and test', text: 'Scan the code with a phone and check that it opens a chat with the right number.' },
       ],
     },
@@ -366,7 +366,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
       steps: [
         { name: 'Put the PDF online', text: 'Upload it to your own website or to a file host that gives you a public, permanent link. QRCraftly does not host files, so you need a place for it first.' },
         { name: 'Copy the link and paste it above', text: 'Use the public link. If the host offers “anyone with the link can view”, choose that.' },
-        { name: 'Style and check the code', text: 'Add your colours or logo and wait for “Scans reliably”.' },
+        { name: 'Style and check the code', text: 'Add your colors or logo and wait for “Scans reliably”.' },
         { name: 'Test it on a phone', text: 'Scan the code from a phone that is not signed in to your file host and check that the PDF opens.' },
       ],
     },
@@ -405,7 +405,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'A handout in a classroom or clinic.',
       ],
       printing: [
-        'Say what the code opens, such as “Scan for the full catalogue (PDF)”.',
+        'Say what the code opens, such as “Scan for the full catalog (PDF)”.',
         'Keep the PDF small, because many people will open it on mobile data.',
       ],
       checks: [

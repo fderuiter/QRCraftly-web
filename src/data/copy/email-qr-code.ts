@@ -8,7 +8,7 @@ export const copy: ToolCopy = {
     description: 'Make a code that opens a ready-to-send email.',
     steps: [
       { name: 'Enter the email', text: 'Type the address, and a subject and message if you want them.' },
-      { name: 'Style it', text: 'Pick colours and shapes if you like.' },
+      { name: 'Style it', text: 'Pick colors and shapes if you like.' },
       { name: 'Download it', text: 'Save the code for a receipt, poster or product.' },
     ],
   },

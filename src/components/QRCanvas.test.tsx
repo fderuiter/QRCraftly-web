@@ -148,7 +148,7 @@ describe('QRCanvas Component', () => {
 
     const canvas = screen.getByRole('img');
     expect(canvas).toBeInTheDocument();
-    expect(canvas).toHaveAttribute('aria-label', expect.stringContaining('QR Code for Url'));
+    expect(canvas).toHaveAttribute('aria-label', 'QR code for URL');
 
     await waitFor(() => {
         expect(QRCode.create).toHaveBeenCalledWith(DEFAULT_CONFIG.value, { errorCorrectionLevel: QRErrorCorrectionLevel.H });

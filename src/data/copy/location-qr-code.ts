@@ -8,7 +8,7 @@ export const copy: ToolCopy = {
     description: 'Make a code that opens a place in a maps app.',
     steps: [
       { name: 'Enter the coordinates', text: 'Type the latitude and longitude of the spot.' },
-      { name: 'Style it', text: 'Pick colours and shapes if you like.' },
+      { name: 'Style it', text: 'Pick colors and shapes if you like.' },
       { name: 'Download it', text: 'Save the code for an invitation or sign.' },
     ],
   },

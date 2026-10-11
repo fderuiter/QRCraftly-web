@@ -127,10 +127,10 @@ describe('BulkCsvInput Component', () => {
     expect(screen.getByText('test-batch.csv')).toBeInTheDocument();
     expect(screen.getByText('2 rows found • 2 columns detected')).toBeInTheDocument();
 
-    const payloadSelect = screen.getByLabelText('Payload Column (QR Content)') as HTMLSelectElement;
+    const payloadSelect = screen.getByLabelText('Content Column') as HTMLSelectElement;
     expect(payloadSelect.value).toBe('URL');
 
-    const filenameSelect = screen.getByLabelText('Filename Column') as HTMLSelectElement;
+    const filenameSelect = screen.getByLabelText('File Name Column') as HTMLSelectElement;
     expect(filenameSelect.value).toBe('Name');
 
     const formatSelect = screen.getByLabelText('Image Format') as HTMLSelectElement;
@@ -546,7 +546,7 @@ describe('BulkCsvInput Component', () => {
     renderWithToasts(<BulkCsvInput data={data} onChange={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
-    expect(await screen.findByText('Batch cancelled. No ZIP was made.')).toBeInTheDocument();
+    expect(await screen.findByText('Batch canceled. No ZIP was made.')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument());
     expect(downloadManager.triggerFileDownload).not.toHaveBeenCalled();
   });

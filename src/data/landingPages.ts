@@ -73,8 +73,8 @@ export const LANDING_GALLERIES: Readonly<Record<string, readonly LandingGalleryI
     },
     {
       src: '/examples/mosaic-tiles.png',
-      alt: 'A QR code tiled from a sunset over a striped sea in tiles mode, one colour per module',
-      caption: 'Tiles: one colour per module, which is bolder and scans from further away.',
+      alt: 'A QR code tiled from a sunset over a striped sea in tiles mode, one color per module',
+      caption: 'Tiles: one color per module, which is bolder and scans from further away.',
     },
   ],
 };

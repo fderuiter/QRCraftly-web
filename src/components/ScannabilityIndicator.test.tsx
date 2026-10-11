@@ -224,7 +224,7 @@ describe('ScannabilityIndicator Component', () => {
     expect(onFix).toHaveBeenCalledWith('increase-contrast');
 
     fireEvent.click(screen.getByTestId('scannability-pill'));
-    fireEvent.click(screen.getByRole('button', { name: 'Reset colours' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset colors' }));
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 

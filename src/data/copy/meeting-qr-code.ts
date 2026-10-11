@@ -8,7 +8,7 @@ export const copy: ToolCopy = {
     description: 'Make a code that opens your online meeting.',
     steps: [
       { name: 'Paste the meeting link', text: 'Copy the join link from your invitation.' },
-      { name: 'Style it', text: 'Pick colours, shapes or a logo if you like.' },
+      { name: 'Style it', text: 'Pick colors, shapes or a logo if you like.' },
       { name: 'Download it', text: 'Put the code on a slide, door sign or poster.' },
     ],
   },

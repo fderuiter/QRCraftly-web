@@ -8,7 +8,7 @@ export const copy: ToolCopy = {
     description: 'Make a code that opens a text message ready to send.',
     steps: [
       { name: 'Enter the number and message', text: 'Type the number that should receive the text and the words to send.' },
-      { name: 'Style it', text: 'Pick colours and shapes if you like.' },
+      { name: 'Style it', text: 'Pick colors and shapes if you like.' },
       { name: 'Download it', text: 'Save the code and print or share it.' },
     ],
   },

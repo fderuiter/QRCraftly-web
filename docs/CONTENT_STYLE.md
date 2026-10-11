@@ -28,6 +28,9 @@ Before you merge new or changed copy:
 - **Our own words.** Write from what the app does and what you tested. Link the source for any technical fact a reader might want to check, and never reword someone else’s text to hide where it came from.
 - **No hedged promises.** Do not promise that every phone will scan a code or that a page will rank. Say what to test instead.
 - **Headings.** FAQ questions are level 3 headings under the level 2 “Frequently Asked Questions”.
+- **US spelling.** Write “color”, “center”, “dialer” and “canceled”, because the controls say “Pattern & Colors” and “Color Presets”. Use the label on screen, in its own capitals, when you name a control.
+- **Messages say what to do.** A toast or error says what happened and what to try next, in one or two sentences: “Could not read menu.csv. Choose the file again.”, not “Failed to read file”. No “Please”, no “Successfully”, no exclamation marks.
+- **Screen-reader names read like speech.** An image or button name is what a person would say aloud (“QR code for WiFi Network”), not a raw type name or a sentence with stray punctuation.
 
 ## Inventory, October 2026
 
@@ -53,7 +56,29 @@ The About, Security and Pledge pages and the privacy and compliance notes (`docs
 - **Bulk, file transfer and Arcade.** The how-tos and FAQs now use the labels on screen (the old file transfer steps named a button and a chunk size setting that no longer exist), and the bulk FAQ gives the 500-row limit.
 - **Guides.** The five guides under `/guides` were checked and left as they are: they are short for their subject, cite their sources and match the app. Each one is now linked from at least three tool pages ([#1309](https://github.com/fderuiter/QRCraftly-web/issues/1309)).
 
-Still to do:
+A second, fresh-eyes pass in October 2026 found what the first one missed:
 
-- The Acknowledgements page.
-- A human read-through for voice. A WCAG 2.2 AA check with a keyboard, a screen reader and real phones is tracked in [#1057](https://github.com/fderuiter/QRCraftly-web/issues/1057).
+- **Home page.** Its how-to still read “Convert any website URL into a scannable QR code instantly”. It now matches the other pages, and the static versus dynamic answer no longer says “nobody can track” a static code (the page it opens can still count visits).
+- **Brand templates.** The eight curated templates were described as “Futuristic high-tech circuit aesthetic” and “Sophisticated deep green palette”. They now say what you get, and the three that scan less reliably (circuit lines, stars, light on dark) say so.
+- **Messages.** Bulk CSV and export toasts were rewritten as above, and the column labels became “Content Column” and “File Name Column” instead of “Payload Column (QR Content)”.
+- **Screen-reader names.** The preview image was named “QR Code for Wifi - Scan to view content”, and the scan badge read “Scans reliably , health score 100 of 100”. Both now read cleanly.
+- **Spelling.** Page copy used British spelling and the controls American. Both are now American.
+- **Acknowledgements.** Checked and left as it is.
+
+### Accessibility checks an agent can run
+
+These ran on a production build in Chromium on 11 October 2026. They found no problems beyond the two screen-reader names above. The reflow, WCAG 2.2 axe and keyboard download checks now run in the end-to-end suite.
+
+| Check                                                                                             | Result                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| axe-core with the `wcag22aa` rules added, every route, at 320 px wide                             | No violations                                                                                                                                                               |
+| Reflow (WCAG 1.4.10): no horizontal scrolling at 320 px                                           | Every route fits                                                                                                                                                            |
+| Text spacing (WCAG 1.4.12): line height 1.5, letter spacing 0.12 em, word spacing 0.16 em         | No text clipped                                                                                                                                                             |
+| Focus visible and not hidden by the header (WCAG 2.4.7, 2.4.11), first 80 Tab stops of each route | Every stop shows a focus ring; the toggle switch draws it on the visible track, not the hidden checkbox                                                                     |
+| Keyboard only: type a Wi-Fi network and password, then download                                   | The first field is Tab stop 19 on a phone layout and 22 on desktop, after the skip link, header and type links. Download PNG is 6 stops later and saves the file with Enter |
+| Accessibility tree of the generator                                                               | Every field, the scan badge, the preview image and the download buttons have names; the scan result is announced in a status region                                         |
+
+Still to do, because only a person can do it:
+
+- A read-through for voice by someone who did not write the copy.
+- Listening to the create, preview and download flow with VoiceOver on an iPhone and TalkBack on Android, and trying it on real phones at 200% text size. Tracked in [#1057](https://github.com/fderuiter/QRCraftly-web/issues/1057).
