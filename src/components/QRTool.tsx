@@ -258,12 +258,12 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
     buttonRef.current?.focus();
     if (result.success) {
       if (result.fallbackTriggered) {
-        addToast({ type: 'info', message: 'Sharing is not supported on this device/browser. The image will be downloaded instead.', duration: 5000 });
+        addToast({ type: 'info', message: 'This browser cannot share images, so the image was downloaded instead.', duration: 5000 });
       }
       if (result.logoOmitted) {
         addToast({
           type: 'warning',
-          message: 'The remote logo was omitted from the SVG export due to connection or security limits. Try uploading a local image file instead.',
+          message: 'The logo was left out of this file because it could not be loaded from its web address. Upload the logo as an image file to include it.',
           duration: 7000,
         });
       }

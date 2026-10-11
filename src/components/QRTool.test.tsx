@@ -804,7 +804,7 @@ describe('QRTool Component', () => {
         // Verify warning toast exists with role="alert" and the expected warning message
         await waitFor(() => {
           const alerts = screen.getAllByRole('alert');
-          const hasText = alerts.some(a => a.textContent?.includes('The remote logo was omitted from the SVG export due to connection or security limits. Try uploading a local image file instead.'));
+          const hasText = alerts.some(a => a.textContent?.includes('The logo was left out of this file because it could not be loaded from its web address. Upload the logo as an image file to include it.'));
           expect(hasText).toBe(true);
         });
 
@@ -907,7 +907,7 @@ describe('QRTool Component', () => {
       fireEvent.click(screen.getByTestId('mock-trigger-rendered'));
 
       fireEvent.click(await screen.findByRole('button', { name: /Won't scan reliably/ }, { timeout: SCANNABILITY_FAIL_TIMEOUT_MS }));
-      const resetBtn = screen.getByRole('button', { name: 'Reset colours' });
+      const resetBtn = screen.getByRole('button', { name: 'Reset colors' });
 
       fireEvent.click(resetBtn);
 

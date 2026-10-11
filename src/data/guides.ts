@@ -465,7 +465,7 @@ export const guides: Guide[] = [
             type: 'ul',
             items: [
               'Keep a blank margin of at least four squares on every side. Cropping it is the most common mistake.',
-              'Use dark squares on a light background, with strong contrast. Do not invert the colours.',
+              'Use dark squares on a light background, with strong contrast. Do not invert the colors.',
               'Print big enough for the distance it will be scanned from, and give a long address more room than a short one.',
               'Export a vector file (SVG or PDF) for print, and test a proof with more than one phone before the full run.',
             ],
@@ -488,7 +488,7 @@ export const guides: Guide[] = [
               ['Business card, ticket, product label', 'Hand held, 10 to 30 cm', '2 cm wide'],
               ['Menu, flyer, poster at a counter', 'Arm’s length, up to 60 cm', '3 to 4 cm wide'],
               ['Shop window, signage, shelf', '1 to 2 m', '8 to 15 cm wide'],
-              ['Billboard, vehicle, banner', 'Several metres', 'Roughly one tenth of the distance'],
+              ['Billboard, vehicle, banner', 'Several meters', 'Roughly one tenth of the distance'],
             ],
           },
           {
@@ -503,22 +503,22 @@ export const guides: Guide[] = [
         blocks: [
           {
             type: 'p',
-            text: 'The standard asks for a blank border, called the quiet zone, four squares wide on every side. It is how a reader finds where the code starts. Designers crop it because it looks like wasted space, and then the code scans only sometimes. If your code sits on a coloured panel or an image, the margin must be a plain light area, not a busy photo. If you are unsure whether a design leaves enough room, check a photo of it with the [QR code checker](/qr-code-checker).',
+            text: 'The standard asks for a blank border, called the quiet zone, four squares wide on every side. It is how a reader finds where the code starts. Designers crop it because it looks like wasted space, and then the code scans only sometimes. If your code sits on a colored panel or an image, the margin must be a plain light area, not a busy photo. If you are unsure whether a design leaves enough room, check a photo of it with the [QR code checker](/qr-code-checker).',
           },
         ],
       },
       {
         id: 'contrast',
-        heading: 'Contrast and colour',
+        heading: 'Contrast and color',
         blocks: [
           {
             type: 'p',
-            text: 'Dark squares on a light background is the arrangement every reader supports. Light squares on a dark background (an inverted code) work in some apps and fail in others, so avoid it for anything public. Colour is fine as long as the dark colour is much darker than the light one. Yellow on white, pale grey on white and red on black are common ways to lose it. Printing can reduce contrast further, because ink spreads and paper is never as white as a screen.',
+            text: 'Dark squares on a light background is the arrangement every reader supports. Light squares on a dark background (an inverted code) work in some apps and fail in others, so avoid it for anything public. Color is fine as long as the dark color is much darker than the light one. Yellow on white, pale gray on white and red on black are common ways to lose it. Printing can reduce contrast further, because ink spreads and paper is never as white as a screen.',
           },
           {
             type: 'note',
-            title: 'Test the colours before you print',
-            text: 'The [QR code checker](/qr-code-checker) reads a picture of your code after simulating a poor print, with blur and noise added, and tells you whether it still scans. Use it on the exact colours you plan to use.',
+            title: 'Test the colors before you print',
+            text: 'The [QR code checker](/qr-code-checker) reads a picture of your code after simulating a poor print, with blur and noise added, and tells you whether it still scans. Use it on the exact colors you plan to use.',
           },
         ],
       },
@@ -656,7 +656,7 @@ export const guides: Guide[] = [
         blocks: [
           {
             type: 'p',
-            text: 'A logo in the middle covers part of the code, and the reader treats that part as damage. That is why codes with logos should use level Q or H, and why the logo should stay small and sit in the centre, away from the corner squares. There is no safe percentage that works for every code, because it depends on the content and the grid, so test the result. QRCraftly’s [logo QR code](/qr-code-with-logo) page sets a high level for you and shows a scan badge that warns you when the logo covers too much, and the [QR code checker](/qr-code-checker) tests a finished picture.',
+            text: 'A logo in the middle covers part of the code, and the reader treats that part as damage. That is why codes with logos should use level Q or H, and why the logo should stay small and sit in the center, away from the corner squares. There is no safe percentage that works for every code, because it depends on the content and the grid, so test the result. QRCraftly’s [logo QR code](/qr-code-with-logo) page sets a high level for you and shows a scan badge that warns you when the logo covers too much, and the [QR code checker](/qr-code-checker) tests a finished picture.',
           },
         ],
       },

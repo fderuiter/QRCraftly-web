@@ -5,10 +5,10 @@ import { NEVER_EXPIRES } from './shared';
 export const copy: ToolCopy = {
   howTo: {
     name: 'How to Create a Phone QR Code',
-    description: 'Make a code that opens the dialler with your number.',
+    description: 'Make a code that opens the dialer with your number.',
     steps: [
       { name: 'Enter the number', text: 'Type the number people should call, with its country code.' },
-      { name: 'Style it', text: 'Pick colours and shapes if you like.' },
+      { name: 'Style it', text: 'Pick colors and shapes if you like.' },
       { name: 'Download it', text: 'Save the code for print or screens.' },
     ],
   },

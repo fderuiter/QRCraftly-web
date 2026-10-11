@@ -8,7 +8,7 @@ export const copy: ToolCopy = {
     description: 'Turn plain text into a QR code.',
     steps: [
       { name: 'Type your text', text: 'Type or paste the text.' },
-      { name: 'Style it', text: 'Pick colours, shapes or a logo if you like.' },
+      { name: 'Style it', text: 'Pick colors, shapes or a logo if you like.' },
       { name: 'Download it', text: 'Save it as PNG, SVG, EPS, PDF, JPEG or WebP.' },
     ],
   },

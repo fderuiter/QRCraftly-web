@@ -235,9 +235,9 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     try {
       const content = decodeCsvBytes(new Uint8Array(await file.arrayBuffer()));
       onChange({ csvContent: content, fileName: file.name });
-      addToast({ type: 'success', message: `Successfully loaded ${file.name}`, duration: 3000 });
+      addToast({ type: 'success', message: `Loaded ${file.name}.`, duration: 3000 });
     } catch {
-      addToast({ type: 'error', message: `Failed to read file ${file.name}`, duration: 5000 });
+      addToast({ type: 'error', message: `Could not read ${file.name}. Choose the file again.`, duration: 5000 });
     }
   };
 
@@ -250,7 +250,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     if (!payloadCol) {
       addToast({
         type: 'error',
-        message: 'Please select a payload column before generating batch.',
+        message: 'Pick a Content Column first. It holds what goes in each code.',
         duration: 4000,
       });
       return;
@@ -324,7 +324,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       }
 
       if (run.cancelled) {
-        if (!run.unmounted) addToast({ type: 'info', message: 'Batch cancelled. No ZIP was made.', duration: 4000 });
+        if (!run.unmounted) addToast({ type: 'info', message: 'Batch canceled. No ZIP was made.', duration: 4000 });
         return;
       }
 
@@ -347,14 +347,14 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
         message:
           skipped.length > 0
             ? `Downloaded a ZIP with ${plural(entries.length, 'QR code', 'QR codes')}. ${plural(skipped.length, 'row was', 'rows were')} left out.`
-            : `Generated and downloaded ZIP with ${plural(entries.length, 'QR code', 'QR codes')}!`,
+            : `Downloaded a ZIP with ${plural(entries.length, 'QR code', 'QR codes')}.`,
         duration: 5000,
       });
     } catch (err) {
       console.error('Batch generation failed:', err);
       addToast({
         type: 'error',
-        message: 'Failed to generate batch QR codes. Please try again.',
+        message: 'The batch stopped before the ZIP was made. Try again, or try a smaller file.',
         duration: 5000,
       });
     } finally {
@@ -470,7 +470,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
           <div className="grid gap-4 sm:grid-cols-2">
             <SelectField
               id="bulk-payload-column"
-              label="Payload Column (QR Content)"
+              label="Content Column"
               value={payloadCol}
               onChange={(e) => onChange({ payloadColumn: e.target.value })}
             >
@@ -483,7 +483,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
             <SelectField
               id="bulk-filename-column"
-              label="Filename Column"
+              label="File Name Column"
               value={filenameCol}
               onChange={(e) => onChange({ filenameColumn: e.target.value })}
             >

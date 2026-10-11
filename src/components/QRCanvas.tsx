@@ -37,6 +37,7 @@ import { buildMatrix, QrEncodeError, type QrEncoder } from '@/packages/qr-matrix
 import { getQrCanvasRuntime } from '../utils/qrCanvasRuntime';
 import { motionAllowed } from '../hooks/usePresence';
 import { tooLongMessage, type PreviewFailure } from '../utils/previewFailure';
+import { getQrTypeLabel } from '../utils/a11y';
 
 /** Length of the preview crossfade in ms (#1054). */
 const CROSSFADE_MS = 150;
@@ -834,8 +835,8 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     paintMatrix,
   ]);
 
-  const typeLabel = config.type.charAt(0).toUpperCase() + config.type.slice(1).toLowerCase();
-  const ariaLabel = `QR Code for ${typeLabel} - ${config.value ? 'Scan to view content' : 'Empty'}`;
+  const typeLabel = getQrTypeLabel(config.type);
+  const ariaLabel = config.value ? `QR code for ${typeLabel}` : `QR code for ${typeLabel}, nothing entered yet`;
 
   const aspectRatioClass = {
     [SocialFormat.SQUARE_1_1]: 'aspect-square',

@@ -119,3 +119,36 @@ test.describe('Focus Management & Keyboard Navigation', () => {
     await expect(page.locator('[role="status"]').first()).toHaveText('WiFi input loaded');
   });
 });
+
+test.describe('Keyboard-only create, preview and download (#1354)', () => {
+  test('a Wi-Fi code can be filled in and downloaded with Tab, typing and Enter alone', async ({ page }) => {
+    // Force the anchor-download fallback so Playwright observes a download event.
+    await page.addInitScript(() => Reflect.deleteProperty(window, 'showSaveFilePicker'));
+    await page.goto('/wifi-qr-code');
+    await page.waitForSelector('main[data-hydrated="true"]');
+
+    const ssid = page.getByLabel('Network Name (SSID)');
+    const password = page.getByRole('textbox', { name: 'Password' });
+    const download = page.getByRole('button', { name: 'Download PNG' });
+
+    /** Presses Tab until the locator has focus, failing after a fixed number of stops. */
+    const tabTo = async (target: typeof ssid): Promise<void> => {
+      for (let stop = 0; stop < 40; stop++) {
+        await page.keyboard.press('Tab');
+        if (await target.evaluate((el) => el === document.activeElement)) return;
+      }
+      throw new Error('Tab never reached the control');
+    };
+
+    await tabTo(ssid);
+    await page.keyboard.type('CafeGuest');
+    await tabTo(password);
+    await page.keyboard.type('hunter22');
+    await expect(page.getByTestId('scannability-verdict')).toHaveText('Scans reliably', { timeout: 15000 });
+
+    await tabTo(download);
+    const saved = page.waitForEvent('download');
+    await page.keyboard.press('Enter');
+    expect((await saved).suggestedFilename()).toBe('wifi-CafeGuest.png');
+  });
+});

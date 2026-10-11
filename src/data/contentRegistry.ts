@@ -119,7 +119,7 @@ export const contentRegistry: Record<string, ToolContent> = {
     "id": "about",
     "name": "About QRCraftly",
     "url": getPublicDomain() + "/about",
-    "description": "Why QRCraftly exists, how it makes QR codes in your browser, the no-ads pledge, every tool it offers and its open-source licence.",
+    "description": "Why QRCraftly exists, how it makes QR codes in your browser, the no-ads pledge, every tool it offers and its open-source license.",
     "seoTitle": "About QRCraftly - Privacy & Open Source",
     "image": "/og/about.png",
     "imageAlt": "About QRCraftly - Privacy & Open Source",
@@ -190,7 +190,7 @@ export const contentRegistry: Record<string, ToolContent> = {
     "id": "index",
     "name": "QRCraftly",
     "url": getPublicDomain(),
-    "description": "Make free QR codes that never expire. No sign-up, no ads, no tracking: every code is made in your browser. Add colours, logos and image mosaics.",
+    "description": "Make free QR codes that never expire. No sign-up, no ads, no tracking: every code is made in your browser. Add colors, logos and image mosaics.",
     "seoTitle": "Free QR Code Generator: No Sign-up, Never Expires | QRCraftly",
     "heading": "Free QR Code Generator",
     "intro": "QRCraftly makes static QR codes that keep working: no trial, no account, no watermark and no ads. Codes are made in your browser, so what you type never reaches our servers.",
@@ -198,7 +198,7 @@ export const contentRegistry: Record<string, ToolContent> = {
     "imageAlt": "Preview of the QRCraftly Free QR Code Generator",
     "features": [
       "Links, Wi-Fi, contacts, events and more",
-      "Colours, shapes, logos and image mosaics",
+      "Colors, shapes, logos and image mosaics",
       "Scan check before you download",
       "Made in your browser"
     ],
@@ -275,7 +275,7 @@ export const contentRegistry: Record<string, ToolContent> = {
     "image": "/og/phone-qr-code.png",
     "imageAlt": "Preview of the Phone QR Code Generator tool",
     "features": [
-      "Opens the dialler with your number",
+      "Opens the dialer with your number",
       "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],

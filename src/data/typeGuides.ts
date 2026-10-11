@@ -52,7 +52,7 @@ export const typeGuides: Record<string, TypeGuide> = {
       'Once joined, the phone remembers the network like any other.',
     ],
     useCases: [
-      'A guest card in a holiday rental.',
+      'A guest card in a vacation rental.',
       'A sign at the counter of a café or waiting room.',
       'A meeting room, so visitors stop asking for the password.',
     ],
@@ -64,7 +64,7 @@ export const typeGuides: Record<string, TypeGuide> = {
     checks: [
       'Type the network name exactly as the router shows it, capitals and spaces included.',
       'Pick the security type your router uses. WPA/WPA2/WPA3 covers almost every home and office router.',
-      'Tick Hidden Network only if the router does not broadcast its name.',
+      'Select Hidden Network only if the router does not broadcast its name.',
       'Enterprise (EAP) networks are less widely supported by phone cameras than password networks, so test those codes on the phones your guests use.',
     ],
     privacy:
@@ -142,7 +142,7 @@ export const typeGuides: Record<string, TypeGuide> = {
   },
   'phone-qr-code': {
     intro:
-      'Make a QR code that opens the phone’s dialler with your number ready. People scan it instead of reading and typing the digits.',
+      'Make a QR code that opens the phone’s dialer with your number ready. People scan it instead of reading and typing the digits.',
     scanned: [
       'The phone shows the number and offers to call it. The call only starts when the person confirms.',
     ],
@@ -196,12 +196,12 @@ export const typeGuides: Record<string, TypeGuide> = {
     ],
     useCases: [
       'A meeting point at a festival or market.',
-      'The car park or side entrance of a hard-to-find venue.',
+      'The parking lot or side entrance of a hard-to-find venue.',
       'A trailhead or viewpoint on a sign.',
     ],
     printing: [
       'Write the place name or address beside the code for anyone who cannot scan it.',
-      'Five decimal places are accurate to about a metre, which is enough for a door.',
+      'Five decimal places are accurate to about a meter (3 feet), which is enough for a door.',
     ],
     checks: [
       'Latitude comes first. South and west are negative, so do not drop the minus sign.',

@@ -56,7 +56,7 @@ export function GeneratorCommands({ actions, onDownload }: GeneratorCommandsProp
   const exportStyleFile = useCallback(async () => {
     const [{ serializeStyle }, { triggerFileDownload }] = await Promise.all([import('@/utils/styleFile'), import('@/utils/downloadManager')]);
     triggerFileDownload(new TextEncoder().encode(serializeStyle(store.getState().config)), 'qrcraftly-style.qrcraftly.json', 'application/json');
-    addToast({ type: 'success', message: 'Style saved. It holds colours and layout only, never your content.', duration: 5000 });
+    addToast({ type: 'success', message: 'Style saved. It holds colors and layout only, never your content.', duration: 5000 });
   }, [store, addToast]);
 
   useGeneratorShortcuts({

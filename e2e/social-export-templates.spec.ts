@@ -291,14 +291,14 @@ test.describe('Live QR canvas after format/template changes', () => {
     await page.getByRole('radio', { name: /Select Portrait format/i }).click();
 
     await expect(page.getByRole('img', { name: /QR Code for/i })).toBeVisible();
-    await expect(page.getByRole('img', { name: /Scan to view content/i })).toBeVisible();
+    await expect(page.getByRole('img', { name: /^QR code for [^,]+$/i })).toBeVisible();
   });
 
   test('QR canvas is visible after switching to Story format', async ({ page }) => {
     await page.getByRole('radio', { name: /Select Story format/i }).click();
 
     await expect(page.getByRole('img', { name: /QR Code for/i })).toBeVisible();
-    await expect(page.getByRole('img', { name: /Scan to view content/i })).toBeVisible();
+    await expect(page.getByRole('img', { name: /^QR code for [^,]+$/i })).toBeVisible();
   });
 
   test('QR canvas is visible after selecting Minimalist template', async ({ page }) => {

@@ -43,8 +43,9 @@ async function nestedScrollers(page: Page): Promise<string[]> {
   });
 }
 
-test.describe('No horizontal page overflow at 390px (#978)', () => {
-  test.use({ viewport: { width: 390, height: 844 } });
+/* 320 CSS px is the WCAG 1.4.10 reflow width (1280 px at 400% zoom), so it also covers 390 px phones (#978, #1354). */
+test.describe('No horizontal page overflow at 320px (#978, WCAG 1.4.10)', () => {
+  test.use({ viewport: { width: 320, height: 640 } });
 
   for (const route of ROUTES) {
     test(`${route} fits the viewport width`, async ({ page }) => {

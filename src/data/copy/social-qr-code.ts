@@ -8,7 +8,7 @@ export const copy: ToolCopy = {
     description: 'Make a code that opens your social profile.',
     steps: [
       { name: 'Pick the platform and type your username', text: 'Choose the network, then enter your username.' },
-      { name: 'Style it', text: 'Pick colours, shapes or a logo if you like.' },
+      { name: 'Style it', text: 'Pick colors, shapes or a logo if you like.' },
       { name: 'Download it', text: 'Put the code on a card, flyer or slide.' },
     ],
   },

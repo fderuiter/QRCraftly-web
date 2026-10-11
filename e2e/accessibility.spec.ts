@@ -18,7 +18,7 @@ async function runAccessibilityScan(page: Page) {
     ),
   );
   const accessibilityScanResults = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .exclude('input[type="color"]') // Filter out native browser color pickers
     .analyze();
 
