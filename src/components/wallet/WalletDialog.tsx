@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Download, Share2 } from 'lucide-react';
 import { type QRConfig, QRType } from '@/types';
 import { renderWalletCard, walletRefusalReason, WALLET_CARD_TEXT_LIMITS, WALLET_CARD_SIZE } from '@/packages/qr-export';
@@ -30,6 +30,7 @@ import { Button } from '../ui/Button';
 import { TextField } from '../ui/TextField';
 import { Alert } from '../ui/Alert';
 import { Skeleton } from '../ui/Skeleton';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { useToast } from '../ui/Toast';
 
 /**
@@ -50,6 +51,17 @@ export function suggestWalletTitle(config: Pick<QRConfig, 'type' | 'value'>): st
   }
   return getQRTypeLabel(config.type);
 }
+
+// Signing code loads only when someone opens the Apple Wallet tab.
+const ApplePassPanel = lazy(() => import('./ApplePassPanel'));
+
+/** What the dialog makes: the card image for everyone, or a signed pass with the person's own keys. */
+type WalletMode = 'card' | 'apple';
+
+const MODES = [
+  { value: 'card', label: 'Card image' },
+  { value: 'apple', label: 'Apple Wallet pass' },
+] as const satisfies readonly { value: WalletMode; label: string }[];
 
 /** Message shown when the card's own code fails the scan check. */
 export const WALLET_SCAN_FAILED = 'The wallet card did not pass the scan check, so it was not saved. Try shorter content.';
@@ -90,13 +102,14 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
   const [subtitle, setSubtitle] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState<'download' | 'share' | null>(null);
+  const [mode, setMode] = useState<WalletMode>('card');
   const { canShare } = useCapabilities();
   const { addToast } = useToast();
   const refusal = walletRefusalReason(config.type);
   const text = useDebounce(useMemo(() => ({ title, subtitle }), [title, subtitle]), 200);
 
   useEffect(() => {
-    if (!isOpen || refusal) return;
+    if (!isOpen || refusal || mode !== 'card') return;
     let cancelled = false;
     renderWalletCard(config, text)
       .then((canvas) => {
@@ -108,7 +121,7 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
     return () => {
       cancelled = true;
     };
-  }, [isOpen, refusal, config, text]);
+  }, [isOpen, refusal, mode, config, text]);
 
   const makeCard = async (): Promise<Blob | null> => {
     try {
@@ -164,11 +177,27 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
           </Alert>
         ) : (
           <>
+            <TextField label="Title" value={title} maxLength={WALLET_CARD_TEXT_LIMITS.title} onChange={(event) => setTitle(event.target.value)} />
+            <TextField label="Subtitle (optional)" value={subtitle} maxLength={WALLET_CARD_TEXT_LIMITS.subtitle} onChange={(event) => setSubtitle(event.target.value)} />
+            <SegmentedControl<WalletMode>
+              kind="tablist"
+              label="What to make"
+              options={MODES}
+              value={mode}
+              onChange={setMode}
+              tabId={(value) => `wallet-tab-${value}`}
+              controls={() => 'wallet-panel'}
+            />
+            <div id="wallet-panel" role="tabpanel" aria-labelledby={`wallet-tab-${mode}`} className="space-y-4">
+            {mode === 'apple' ? (
+              <Suspense fallback={<Skeleton className="h-48 w-full rounded-md" />}>
+                <ApplePassPanel config={config} title={title} subtitle={subtitle} filename={filename} />
+              </Suspense>
+            ) : (
+            <>
             <p className="text-sm text-fg-muted">
               This makes a card image with a plain black-and-white code that a wallet app can read. It is made on your device and is not sent anywhere.
             </p>
-            <TextField label="Title" value={title} maxLength={WALLET_CARD_TEXT_LIMITS.title} onChange={(event) => setTitle(event.target.value)} />
-            <TextField label="Subtitle (optional)" value={subtitle} maxLength={WALLET_CARD_TEXT_LIMITS.subtitle} onChange={(event) => setSubtitle(event.target.value)} />
             <div className="flex justify-center rounded-lg border border-line bg-surface-sunken p-3">
               {preview ? (
                 <img
@@ -208,8 +237,11 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
                   <span className="font-medium text-fg-soft">Other wallets:</span> if your wallet can add a pass from a photo or a barcode, use the card the same way.
                 </li>
               </ul>
-              <p className="text-xs text-fg-muted">Wallets draw their own plain copy of the code, so your colors, pattern and logo stay in your normal downloads.</p>
             </div>
+            </>
+            )}
+            </div>
+            <p className="text-xs text-fg-muted">Wallets draw their own plain copy of the code, so your colors, pattern and logo stay in your normal downloads.</p>
           </>
         )}
       </div>

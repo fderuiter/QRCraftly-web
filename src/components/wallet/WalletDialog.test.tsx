@@ -81,6 +81,14 @@ describe('WalletDialog (ADR 0047)', () => {
     expect(download).not.toHaveBeenCalled();
   });
 
+  it('switches to the Apple Wallet pass tab without drawing the card', async () => {
+    open({ type: QRType.URL, value: 'https://example.com' });
+    fireEvent.click(screen.getByRole('tab', { name: 'Apple Wallet pass' }));
+    expect(await screen.findByTestId('apple-pass-panel')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Download card' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'wallet-tab-apple');
+  });
+
   it('offers no card for payment codes', () => {
     open({ type: QRType.PAYMENT, value: 'bitcoin:bc1qexample' });
     expect(screen.getByText(/lock screen/)).toBeInTheDocument();

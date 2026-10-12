@@ -134,3 +134,9 @@ Boundary checks run automatically during `pnpm run lint` and CI. The check is ou
 - **Purpose**: Loads QRCraftly's own Rust WebAssembly modules ([ADR 0033](../../docs/adr/0033-rust-webassembly-modules.md), [RUST.md](../../docs/RUST.md)): same-origin compile with a per-URL cache, import-free instantiation, and typed helpers for copying bytes in and out, freeing on every path and turning traps and status codes into a `WasmModuleError`.
 - **Entry Points**:
   - `index.ts`: `compileWasmUrl`, `compileWasmBytes`, `instantiateWasm`, `WasmInstance`, `WasmModuleError`, `checkStatus`, `resolveSameOrigin`, `ABI_VERSION`, `WASM_STATUS`.
+
+### `wallet-pass` (`@/packages/wallet-pass`)
+
+- **Purpose**: Wallet passes made and signed in the browser ([#1408](https://github.com/fderuiter/QRCraftly-web/issues/1408), [ADR 0047](../../docs/adr/0047-wallet-passes-built-in-the-browser.md)), written in-house with WebCrypto and no third-party code. It turns the current content into pass fields, reads PEM certificates and keys, and builds Apple `.pkpass` files: a generic `pass.json` with one QR barcode and no web service, `manifest.json` with the SHA-1 of every file, and a detached CMS SignedData (RFC 5652) over the manifest with content type, signing time and message digest attributes, the signer's certificate and Apple's WWDR intermediate. The person's private key is imported as a non-extractable key, checked against the certificate, and kept only in memory.
+- **Entry Points**:
+  - `index.ts`: `describePassContent`, `passColorsFrom`, `passRefusalReason`, `createPassSigner` (loads and checks the certificate, key and intermediate), `buildApplePass`, `buildPassJson`, `messageEncodingFor`, `readCertificate`, `parsePem`, `WalletPassError`, and the minimal DER reader and writer behind the certificate and CMS code, which the tests also use to build a throwaway certificate authority so no private key is ever committed.
