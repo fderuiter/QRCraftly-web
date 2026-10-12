@@ -108,6 +108,16 @@ describe('WalletDialog (ADR 0048)', () => {
     expect(screen.queryByTestId('apple-pass-panel')).not.toBeInTheDocument();
   });
 
+  it('keeps the pass panel mounted when the developer section is collapsed again', async () => {
+    open({ type: QRType.URL, value: 'https://example.com' });
+    const toggle = screen.getByRole('button', { name: DEVELOPER_SECTION });
+    fireEvent.click(toggle);
+    expect(await screen.findByTestId('apple-pass-panel')).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('apple-pass-panel')).toBeInTheDocument();
+  });
+
   it('offers no card for payment codes', () => {
     open({ type: QRType.PAYMENT, value: 'bitcoin:bc1qexample' });
     expect(screen.getByText(/lock screen/)).toBeInTheDocument();

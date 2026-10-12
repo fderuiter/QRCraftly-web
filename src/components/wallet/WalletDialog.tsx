@@ -108,7 +108,8 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
   const [subtitle, setSubtitle] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState<'download' | 'share' | null>(null);
-  const [developerOpen, setDeveloperOpen] = useState(false);
+  // Set on first open and kept, so loaded keys survive collapsing the section; they go when the dialog closes.
+  const [developerOpened, setDeveloperOpened] = useState(false);
   const [passMode, setPassMode] = useState<PassMode>('apple');
   const { canShare } = useCapabilities();
   const { addToast } = useToast();
@@ -230,8 +231,8 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
               </ul>
             </div>
             <p className="text-xs text-fg-muted">Wallets draw their own plain copy of the code, so your colors, pattern and logo stay in your normal downloads.</p>
-            <AccordionItem title={WALLET_DEVELOPER_SECTION} onOpenChange={setDeveloperOpen}>
-              {developerOpen && (
+            <AccordionItem title={WALLET_DEVELOPER_SECTION} headingLevel={3} onOpenChange={(open) => open && setDeveloperOpened(true)}>
+              {developerOpened && (
                 <div className="space-y-4 pt-1 text-sm" data-testid="wallet-developer-section">
                   <p>
                     <Badge tone="beta">Beta</Badge> For developers and businesses with an Apple Pass Type ID certificate or a Google Wallet issuer account. You sign a real
