@@ -35,7 +35,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HIGH_RATE_PROFILES, decodeModemFrame, encodeModemFrame, frameCapacity, loadOpticalModem, simulateCapture, type CameraImpairments, type ChannelPreset, type ModemProfile, type RgbaImage, type TrackHint } from '../src/packages/optical-modem/index.ts';
+import { HIGH_RATE_PROFILES, decodeModemFrame, encodeModemFrame, frameCapacity, loadOpticalModem, simulateCapture, type CameraImpairments, type ChannelPreset, type ModemProfile, type RgbaImage, type TearCarry, type TrackHint } from '../src/packages/optical-modem/index.ts';
 import { FecDecoder, FecEncoder, loadFecModule } from '../src/packages/optical-transfer/index.ts';
 import { createRandom } from '../tests/utils/scannerCorpus.ts';
 
@@ -136,6 +136,9 @@ function transfer(scenario: Scenario, fecModule: WebAssembly.Module, framesOfFil
   const encoder = new FecEncoder(fecModule, file, { symbolSize: profile.packetBytes });
   const decoder = new FecDecoder(fecModule, encoder.layout);
   let hint: TrackHint | undefined;
+  let carry: TearCarry | undefined;
+  /** Symbols already given to the outer decoder, so a block read twice counts once. */
+  const seen = new Set<number>();
   let lockFrame = -1;
   let tracked = 0;
   let repaired = 0;
@@ -157,12 +160,13 @@ function transfer(scenario: Scenario, fecModule: WebAssembly.Module, framesOfFil
       : simulateCapture(shown, channel.preset, options);
     previous = image;
     const start = performance.now();
-    const result = decodeModemFrame(image, { geometries: [profile], track: hint });
+    const result = decodeModemFrame(image, { geometries: [profile], track: hint, carry });
     const elapsed = performance.now() - start;
     if (lockFrame >= 0) sent += capacity.blocks;
     if (!result.ok) {
       fullTimes.push(elapsed);
       hint = undefined;
+      carry = undefined;
       continue;
     }
     if (lockFrame < 0) {
@@ -172,12 +176,20 @@ function transfer(scenario: Scenario, fecModule: WebAssembly.Module, framesOfFil
     (result.tracked ? trackedTimes : fullTimes).push(elapsed);
     if (result.tracked) tracked++;
     hint = result.track;
+    carry = result.carry;
     const outerStart = performance.now();
-    result.blocks.forEach((block, b) => {
-      if (!block) return;
+    const add = (seq: number, b: number, block: Uint8Array | null): void => {
+      const index = seq * capacity.blocks + b;
+      if (!block || seen.has(index)) return;
+      seen.add(index);
       repaired++;
-      decoder.addAt(result.header.seq * capacity.blocks + b, block);
-    });
+      decoder.addAt(index, block);
+    };
+    result.blocks.forEach((block, b) => add(result.header.seq, b, block));
+    // Blocks of the other frame in a torn capture (ADR 0049), named by that frame's sequence.
+    for (const other of result.others ?? []) {
+      other.blocks.forEach((block, b) => add(other.seq, b, block));
+    }
     outerMs += performance.now() - outerStart;
     if (decoder.isComplete) {
       const rebuilt = decoder.finalize();
@@ -255,7 +267,7 @@ function render(runs: Run[]): string {
     '',
     '## Transfers',
     '',
-    `A seeded random file of ${runs[0] ? Math.round(runs[0].fileBytes / frameCapacity(runs[0].scenario.profile).payloadBytes) : 0} frames' worth of data through the outer code, one camera frame per frame sent. "Lock" is the camera frame the receiver first read; every later frame was looked for near the last one (the tracked search). "Blocks repaired" counts from the lock on. Goodput is the file's bytes over the camera time to the frame that completed it, lock-on included, after the rebuilt file matched the sent one byte for byte. A short file pays for the lock-on frame and the outer code's last symbols, so "steady rate" adds the data in repaired blocks per second from the lock on, the rate a long file approaches (before the outer code's overhead, about 0.1% in [TRANSFER_BENCHMARK.md](TRANSFER_BENCHMARK.md)). In the studio, typical and poor channels the simulated phone does not move between frames; the tracked search's tolerance of movement is tested in \`src/packages/optical-modem/tests/tracking.test.ts\`. The phone channel is the typical one plus guessed lens distortion, rolling-shutter shear, stabiliser jitter of up to 2 pixels, OLED PWM bands, edge enhancement, chroma and temporal noise reduction, and a screen refresh in every capture whose tear line drifts down the picture (\`phoneImpairments\` in the script). Its settings are guesses until the probe measures a phone (#1173); blocks below the tear belong to the next frame and are refused by their identity tag.`,
+    `A seeded random file of ${runs[0] ? Math.round(runs[0].fileBytes / frameCapacity(runs[0].scenario.profile).payloadBytes) : 0} frames' worth of data through the outer code, one camera frame per frame sent. "Lock" is the camera frame the receiver first read; every later frame was looked for near the last one (the tracked search). "Blocks repaired" counts from the lock on. Goodput is the file's bytes over the camera time to the frame that completed it, lock-on included, after the rebuilt file matched the sent one byte for byte. A short file pays for the lock-on frame and the outer code's last symbols, so "steady rate" adds the data in repaired blocks per second from the lock on, the rate a long file approaches (before the outer code's overhead, about 0.1% in [TRANSFER_BENCHMARK.md](TRANSFER_BENCHMARK.md)). In the studio, typical and poor channels the simulated phone does not move between frames; the tracked search's tolerance of movement is tested in \`src/packages/optical-modem/tests/tracking.test.ts\`. The phone channel is the typical one plus guessed lens distortion, rolling-shutter shear, stabiliser jitter of up to 2 pixels, OLED PWM bands, edge enhancement, chroma and temporal noise reduction, and a screen refresh in every capture whose tear line drifts down the picture (\`phoneImpairments\` in the script). Its settings are guesses until the probe measures a phone (#1173); blocks below the tear belong to the next frame, and the receiver reads them as that frame's blocks and finishes a frame from two consecutive captures ([ADR 0049](adr/0049-optical-modem-torn-capture-recovery.md)). A block read twice counts once.`,
     '',
     table(['Profile', 'Camera', 'Channel', 'Camera px per cell', 'File', 'Complete', 'Frames', 'Lock', 'Blocks repaired', 'Goodput at 30 fps', 'Goodput at 60 fps', 'Steady rate at 60 fps'], rows),
     '',
