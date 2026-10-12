@@ -179,7 +179,9 @@ export class ProbeRun {
    */
   public ingest(image: RgbaImage, timeMs: number): number | null {
     this.framesAnalysed++;
-    const acquired = acquireFrame(image, probeGeometries());
+    // The whole-image search only: the strict search (ADR 0047) reads frames this analysis could
+    // not, which would make a report incomparable with the ones recorded before it.
+    const acquired = acquireFrame(image, probeGeometries(), { strict: false });
     if (!acquired.ok) return this.reject(acquired.reason);
     const { frame } = acquired;
     if (frame.header.profile !== PROBE_PROFILE) return this.reject('foreign');

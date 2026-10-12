@@ -183,11 +183,13 @@ export class ModemKernels {
   /**
    * Finds a frame in the image last set: the fiducials, then the header against each geometry.
    * @param geometries - Grid sizes to try.
+   * @param strict - Whether the strict search looks again when the whole-image search's rings give
+   *   no frame (ADR 0047).
    * @returns 0 when a frame was found, or the 1-based index of its failure in {@link ACQUIRE_FAILURES}.
    */
-  public acquire(geometries: readonly GridGeometry[]): number {
+  public acquire(geometries: readonly GridGeometry[], strict = true): number {
     this.setGeometries(geometries);
-    return this.checked(this.rxAcquire(this.rx, geometries.length));
+    return this.checked(this.rxAcquire(this.rx, geometries.length, strict ? 0 : 1));
   }
 
   /**

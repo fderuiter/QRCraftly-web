@@ -346,12 +346,14 @@ pub unsafe extern "C" fn modem_rx_header(rx: *mut Rx) -> *const u8 {
 /// fiducials, 2 for no header, 3 for low contrast, 4 for an unsupported
 /// version, 5 for an unknown constellation and -1 for bad arguments. The
 /// fiducials are filled in whenever they were found; the core areas are -1
-/// otherwise.
+/// otherwise. A nonzero `whole_image_only` skips the strict search that runs
+/// when the whole-image search's rings give no frame (ADR 0047); the probe's
+/// analysis does, so its reports stay comparable with those recorded before.
 ///
 /// # Safety
 /// As [`modem_rx_free`].
 #[no_mangle]
-pub unsafe extern "C" fn modem_rx_acquire(rx: *mut Rx, count: usize) -> i32 {
+pub unsafe extern "C" fn modem_rx_acquire(rx: *mut Rx, count: usize, whole_image_only: u32) -> i32 {
     // SAFETY: forwarded.
     let Some(rx) = (unsafe { rx_mut(rx) }) else {
         return -1;
@@ -364,7 +366,12 @@ pub unsafe extern "C" fn modem_rx_acquire(rx: *mut Rx, count: usize) -> i32 {
         width: rx.width,
         height: rx.height,
     };
-    let found = frame::acquire(&image, &geometries[..count], &mut rx.locate);
+    let found = frame::acquire(
+        &image,
+        &geometries[..count],
+        &mut rx.locate,
+        whole_image_only == 0,
+    );
     rx.store(found)
 }
 
