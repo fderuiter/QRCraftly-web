@@ -23,7 +23,7 @@ import { REGEX_BIDI_CONTROL_CHARS, REGEX_STRICT_CONTROL_CHARS } from '@/utils/se
 import { PayloadRejectedError } from './svgExport';
 
 /**
- * The Wallet card (ADR 0047): a phone-sized image with a plain black-on-white code that a
+ * The Wallet card (ADR 0048): a phone-sized image with a plain black-on-white code that a
  * wallet app can turn into a pass from a photo (Google Wallet's "Photo" import). The code is
  * drawn without any of the design's colours, patterns or logo, because the wallet reads it
  * once and then draws its own plain copy.

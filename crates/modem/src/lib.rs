@@ -152,6 +152,53 @@ impl Rx {
     fn has_image(&self) -> bool {
         self.width > 0 && self.height > 0
     }
+
+    /// The `count` geometries at `io[128..]`, or `None` for bad arguments or
+    /// no image.
+    fn geometries(&self, count: usize) -> Option<[Grid; 64]> {
+        if !self.has_image() || count == 0 || count > 64 {
+            return None;
+        }
+        let mut geometries = [Grid { cols: 0, rows: 0 }; 64];
+        for (i, slot) in geometries.iter_mut().enumerate().take(count) {
+            let (cols, rows) = (self.io[IO_IN + 2 * i], self.io[IO_IN + 2 * i + 1]);
+            match Grid::new(cols as u32, rows as u32) {
+                Some(grid) if cols == grid.cols as f64 && rows == grid.rows as f64 => *slot = grid,
+                _ => return None,
+            }
+        }
+        Some(geometries)
+    }
+
+    /// Writes what an acquisition found to `io` and the header, and returns
+    /// its status.
+    fn store(&mut self, found: frame::Acquisition) -> i32 {
+        match found.fiducials {
+            Some(fiducials) => {
+                for (i, p) in fiducials.points.iter().enumerate() {
+                    self.io[IO_FIDUCIALS + 2 * i] = p.x;
+                    self.io[IO_FIDUCIALS + 2 * i + 1] = p.y;
+                }
+                for (i, &area) in fiducials.core_areas.iter().enumerate() {
+                    self.io[IO_CORES + i] = area as f64;
+                }
+            }
+            None => self.io[IO_CORES..IO_CORES + 4].fill(-1.0),
+        }
+        match found.result {
+            Ok(acquired) => {
+                self.header = acquired.header;
+                for (i, &v) in acquired.homography.iter().enumerate() {
+                    self.io[IO_HOMOGRAPHY + i] = v as f64;
+                }
+                for (i, &v) in acquired.palette[..acquired.symbols * 3].iter().enumerate() {
+                    self.io[IO_PALETTE + i] = v as f64;
+                }
+                0
+            }
+            Err(failure) => failure as i32,
+        }
+    }
 }
 
 /// Resizes a buffer to exactly `len` items, keeping its capacity, and returns it.
@@ -309,48 +356,60 @@ pub unsafe extern "C" fn modem_rx_acquire(rx: *mut Rx, count: usize) -> i32 {
     let Some(rx) = (unsafe { rx_mut(rx) }) else {
         return -1;
     };
-    if !rx.has_image() || count == 0 || count > 64 {
+    let Some(geometries) = rx.geometries(count) else {
         return -1;
-    }
-    let mut geometries = [Grid { cols: 0, rows: 0 }; 64];
-    for (i, slot) in geometries.iter_mut().enumerate().take(count) {
-        let (cols, rows) = (rx.io[IO_IN + 2 * i], rx.io[IO_IN + 2 * i + 1]);
-        match Grid::new(cols as u32, rows as u32) {
-            Some(grid) if cols == grid.cols as f64 && rows == grid.rows as f64 => *slot = grid,
-            _ => return -1,
-        }
-    }
+    };
     let image = Image {
         data: &rx.image,
         width: rx.width,
         height: rx.height,
     };
     let found = frame::acquire(&image, &geometries[..count], &mut rx.locate);
-    match found.fiducials {
-        Some(fiducials) => {
-            for (i, p) in fiducials.points.iter().enumerate() {
-                rx.io[IO_FIDUCIALS + 2 * i] = p.x;
-                rx.io[IO_FIDUCIALS + 2 * i + 1] = p.y;
-            }
-            for (i, &area) in fiducials.core_areas.iter().enumerate() {
-                rx.io[IO_CORES + i] = area as f64;
-            }
+    rx.store(found)
+}
+
+/// [`modem_rx_acquire`] for a receiver that has already found a frame: the
+/// fiducials are looked for within `radius` pixels of the centres at
+/// `io[0..8]` (with their core areas at `io[8..12]`), which the caller writes
+/// back from an earlier acquisition. Same results; on any failure the caller
+/// searches the whole frame with [`modem_rx_acquire`].
+///
+/// # Safety
+/// As [`modem_rx_free`].
+#[no_mangle]
+pub unsafe extern "C" fn modem_rx_track(rx: *mut Rx, count: usize, radius: f64) -> i32 {
+    // SAFETY: forwarded.
+    let Some(rx) = (unsafe { rx_mut(rx) }) else {
+        return -1;
+    };
+    let Some(geometries) = rx.geometries(count) else {
+        return -1;
+    };
+    let mut previous = locate::Fiducials::default();
+    for i in 0..4 {
+        previous.points[i] = locate::Point {
+            x: rx.io[IO_FIDUCIALS + 2 * i],
+            y: rx.io[IO_FIDUCIALS + 2 * i + 1],
+        };
+        let area = rx.io[IO_CORES + i];
+        if !(0.0..=u32::MAX as f64).contains(&area) {
+            return -1;
         }
-        None => rx.io[IO_CORES..IO_CORES + 4].fill(-1.0),
+        previous.core_areas[i] = area as u32;
     }
-    match found.result {
-        Ok(acquired) => {
-            rx.header = acquired.header;
-            for (i, &v) in acquired.homography.iter().enumerate() {
-                rx.io[IO_HOMOGRAPHY + i] = v as f64;
-            }
-            for (i, &v) in acquired.palette[..acquired.symbols * 3].iter().enumerate() {
-                rx.io[IO_PALETTE + i] = v as f64;
-            }
-            0
-        }
-        Err(failure) => failure as i32,
-    }
+    let image = Image {
+        data: &rx.image,
+        width: rx.width,
+        height: rx.height,
+    };
+    let found = frame::track(
+        &image,
+        &geometries[..count],
+        &mut rx.locate,
+        &previous,
+        radius,
+    );
+    rx.store(found)
 }
 
 /// Runs the decode kernel over the image: `symbols` palette colours at

@@ -54,7 +54,7 @@ import { PREVIEW_VIEWS, type PreviewView } from './mockups/previewViews';
 
 // The "In the wild" scenes, viewing test and PNG export load only when a view other than Flat is chosen.
 const MockupView = React.lazy(() => import('./mockups/MockupView'));
-// The phone wallet dialog (ADR 0047) loads only when it is opened.
+// The phone wallet dialog (ADR 0048) loads only when it is opened.
 const WalletDialog = React.lazy(() => import('./wallet/WalletDialog'));
 
 /** One-line promise under every generator heading. */

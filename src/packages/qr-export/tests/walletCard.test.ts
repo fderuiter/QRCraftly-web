@@ -63,7 +63,7 @@ function rasterize(plan: WalletCardPlan) {
   return data;
 }
 
-describe('Wallet card (ADR 0047)', () => {
+describe('Wallet card (ADR 0048)', () => {
   it('draws a plain code that our reader decodes', async () => {
     const value = 'WIFI:T:WPA;S:Home Network;P:correct horse battery staple;;';
     const plan = planWalletCard(modulesOf(value), { title: 'Home Wi-Fi', subtitle: 'Scan to join' }, measure);

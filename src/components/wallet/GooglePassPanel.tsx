@@ -33,7 +33,7 @@ interface GooglePassPanelProps {
 }
 
 /**
- * Google Wallet passes with the person's own Google Wallet issuer (ADR 0047). The service-account
+ * Google Wallet passes with the person's own Google Wallet issuer (ADR 0048). The service-account
  * key is read into this tab only and the link is signed here. Opening the link sends the pass to
  * Google, so the panel asks first and says exactly what Google receives.
  * @param props - The content and the card text.

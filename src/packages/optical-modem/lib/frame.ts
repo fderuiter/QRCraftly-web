@@ -64,7 +64,44 @@ export type AcquireResult = { ok: true; frame: AcquiredFrame; fiducials: Fiducia
 export function acquireFrame(image: RgbaImage, geometries: readonly GridGeometry[]): AcquireResult {
   const kernels = modemKernels();
   kernels.setImage(image);
-  const status = kernels.acquire(geometries);
+  return acquired(kernels.acquire(geometries));
+}
+
+/** Where a receiver last found a frame, so the next search can stay near it. */
+export interface TrackHint {
+  /** The fiducials of the last frame acquired. */
+  fiducials: FiducialSearch;
+  /** Cells across that frame. */
+  cols: number;
+}
+
+/**
+ * Cells of movement between two camera frames a tracked search allows, on top of the 4.5 cells from
+ * a fiducial's centre to its edge. A handheld phone at 30 fps moves a few cells per frame; a faster
+ * move falls back to the full search, which costs time but loses nothing.
+ */
+export const TRACK_MARGIN_CELLS = 12;
+
+/**
+ * Finds a frame near where the last one was: each fiducial is looked for in a small window around
+ * its last centre, then the header is read as {@link acquireFrame} does. Locked receivers spend most
+ * of their time here, and the full search, which labels every pixel, only runs to lock on (#1161).
+ * @param image - The captured frame.
+ * @param geometries - Grid sizes the receiver knows about.
+ * @param hint - Where the last frame was.
+ * @returns The acquired frame, or why it failed; the caller then falls back to {@link acquireFrame}.
+ */
+export function trackFrame(image: RgbaImage, geometries: readonly GridGeometry[], hint: TrackHint): AcquireResult {
+  const [a, b] = hint.fiducials.points;
+  // The top two fiducial centres are cols - 9 cells apart, whichever way the frame is turned.
+  const cell = Math.hypot(b.x - a.x, b.y - a.y) / Math.max(1, hint.cols - 9);
+  const kernels = modemKernels();
+  kernels.setImage(image);
+  return acquired(kernels.track(geometries, hint.fiducials, cell * (4.5 + TRACK_MARGIN_CELLS)));
+}
+
+function acquired(status: number): AcquireResult {
+  const kernels = modemKernels();
   const fiducials = kernels.fiducials();
   if (status !== 0) {
     const reason = ACQUIRE_FAILURES[status - 1];
