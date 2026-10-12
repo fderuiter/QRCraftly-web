@@ -33,27 +33,46 @@ export interface PwmBanding {
 
 /**
  * The brightness gain of one camera row: the lit share of its exposure window over the duty, so the
- * average over a cycle is 1.
+ * average over a cycle is 1. The lit time is found from whole cycles plus the partial ends, so the
+ * cost does not grow with the exposure length.
  * @param row - The camera row.
  * @param pwm - The settings.
- * @returns The gain.
+ * @returns The gain, from 0 (the window is dark) up to 1 / duty (the window is fully lit).
  */
 export function rowGain(row: number, pwm: PwmBanding): number {
-  void row;
-  void pwm;
-  return 1;
+  const { period, duty, exposureRows } = pwm;
+  if (duty >= 1) return 1;
+  if (duty <= 0) return 0;
+  if (period <= 0) return 1;
+  const litLength = duty * period;
+  const start = row + (pwm.phase ?? 0);
+  if (exposureRows <= 0) {
+    const offset = start - Math.floor(start / period) * period;
+    return offset < litLength ? 1 / duty : 0;
+  }
+  // Lit time in [0, t), for any t: whole cycles before t, plus the lit part of the partial cycle.
+  const litBefore = (t: number): number => {
+    const cycles = Math.floor(t / period);
+    return cycles * litLength + Math.min(t - cycles * period, litLength);
+  };
+  const lit = litBefore(start + exposureRows) - litBefore(start);
+  return lit / (exposureRows * duty);
 }
 
 /**
- * Applies {@link rowGain} to every row of RGB planes in place.
+ * Applies {@link rowGain} to every row of RGB planes in place. Values are not clamped: a gain above
+ * 1 can push a pixel past 255, and the caller clamps.
  * @param planes - Red, green and blue planes, 0 to 255.
  * @param width - Width in pixels.
  * @param height - Height in pixels.
  * @param pwm - The settings.
  */
 export function bandRows(planes: Float32Array[], width: number, height: number, pwm: PwmBanding): void {
-  void planes;
-  void width;
-  void height;
-  void pwm;
+  for (let row = 0; row < height; row++) {
+    const gain = rowGain(row, pwm);
+    const from = row * width;
+    for (const plane of planes) {
+      for (let x = from; x < from + width; x++) plane[x] *= gain;
+    }
+  }
 }

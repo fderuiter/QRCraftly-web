@@ -32,7 +32,10 @@ export interface LensDistortion {
 }
 
 /**
- * Maps a camera pixel position to the ideal (undistorted) position it shows.
+ * Maps a camera pixel position to the ideal (undistorted) position it shows. The sample taken at
+ * camera position (x, y) is the ideal image at the returned position, so a positive k1 pulls the
+ * screen inwards, most of all at its corners. Missing k2, p1 and p2 count as 0, and with all four
+ * at 0 the position is returned unchanged.
  * @param x - Camera x in pixels.
  * @param y - Camera y in pixels.
  * @param width - Camera width in pixels.
@@ -41,8 +44,19 @@ export interface LensDistortion {
  * @returns The ideal position in camera pixels.
  */
 export function undistort(x: number, y: number, width: number, height: number, lens: LensDistortion): [number, number] {
-  void width;
-  void height;
-  void lens;
-  return [x, y];
+  const k1 = lens.k1;
+  const k2 = lens.k2 ?? 0;
+  const p1 = lens.p1 ?? 0;
+  const p2 = lens.p2 ?? 0;
+  if (k1 === 0 && k2 === 0 && p1 === 0 && p2 === 0) return [x, y];
+  const cx = width / 2;
+  const cy = height / 2;
+  const s = Math.sqrt(width * width + height * height) / 2;
+  const u = (x - cx) / s;
+  const v = (y - cy) / s;
+  const r2 = u * u + v * v;
+  const radial = 1 + k1 * r2 + k2 * r2 * r2;
+  const uu = u * radial + 2 * p1 * u * v + p2 * (r2 + 2 * u * u);
+  const vv = v * radial + p1 * (r2 + 2 * v * v) + 2 * p2 * u * v;
+  return [cx + uu * s, cy + vv * s];
 }

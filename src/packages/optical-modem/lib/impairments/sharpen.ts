@@ -29,15 +29,58 @@ export interface Sharpening {
 }
 
 /**
- * Sharpens RGB planes in place, adding the same luma detail to all three channels.
+ * Blurs a plane in place with a separable [1 2 1] / 4 kernel, clamping at the image edges.
+ * Private copy of the blur in `channel.ts`, which cannot be imported here without a cycle.
+ * @param plane - The plane, width times height samples.
+ * @param width - Width in pixels.
+ * @param height - Height in pixels.
+ * @param passes - Number of passes.
+ */
+function blurLuma(plane: Float32Array, width: number, height: number, passes: number): void {
+  const tmp = new Float32Array(plane.length);
+  for (let pass = 0; pass < passes; pass++) {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const at = y * width + x;
+        tmp[at] = 0.25 * plane[at - (x > 0 ? 1 : 0)] + 0.5 * plane[at] + 0.25 * plane[at + (x < width - 1 ? 1 : 0)];
+      }
+    }
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const at = y * width + x;
+        plane[at] = 0.25 * tmp[at - (y > 0 ? width : 0)] + 0.5 * tmp[at] + 0.25 * tmp[at + (y < height - 1 ? width : 0)];
+      }
+    }
+  }
+}
+
+/**
+ * Sharpens RGB planes in place: an unsharp mask on luma whose detail is added equally to all three channels.
+ * Detail is luma minus its blurred copy; detail within the threshold is ignored, and the rest is
+ * cored (the threshold is subtracted) and scaled by the amount, then limited to the clamp. The
+ * result is not clamped to 0 to 255 here, so the caller must do that.
  * @param planes - Red, green and blue planes, 0 to 255.
  * @param width - Width in pixels.
  * @param height - Height in pixels.
  * @param sharpening - The settings.
  */
 export function sharpen(planes: Float32Array[], width: number, height: number, sharpening: Sharpening): void {
-  void planes;
-  void width;
-  void height;
-  void sharpening;
+  const { amount, passes = 1, threshold = 0, clamp = 255 } = sharpening;
+  const size = width * height;
+  if (size === 0 || amount === 0) return;
+  const [red, green, blue] = planes;
+  const luma = new Float32Array(size);
+  for (let i = 0; i < size; i++) luma[i] = 0.299 * red[i] + 0.587 * green[i] + 0.114 * blue[i];
+  const low = Float32Array.from(luma);
+  blurLuma(low, width, height, passes);
+  const limit = Math.abs(clamp);
+  for (let i = 0; i < size; i++) {
+    const detail = luma[i] - low[i];
+    let change = 0;
+    if (Math.abs(detail) > threshold) change = amount * (detail - Math.sign(detail) * threshold);
+    change = Math.min(limit, Math.max(-limit, change));
+    red[i] += change;
+    green[i] += change;
+    blue[i] += change;
+  }
 }
