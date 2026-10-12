@@ -30,7 +30,7 @@ One id byte: bits 0 to 2 are log2 of the symbol count (1 to 4), bit 3 marks the 
 Reed-Solomon over GF(256) with polynomial `0x11d`, with errors and erasures. Blocks are 164 bytes in the provisional profiles. Within a frame:
 
 - the data is cut into blocks, each block gets a 4-byte tag bound to its identity ([ADR 0043](0043-optical-modem-block-tag.md)) and then its check bytes;
-- bytes of different blocks alternate across the grid (byte `i` of block `b` sits at stream position `i * blocks + b`), so a stripe lost to a screen refresh or a reflection costs every block a few bytes instead of one block all of them (a torn capture, whose wrong half is another valid frame, is recovered by the receiver as [ADR 0048](0048-optical-modem-torn-capture-recovery.md) describes);
+- bytes of different blocks alternate across the grid (byte `i` of block `b` sits at stream position `i * blocks + b`), so a stripe lost to a screen refresh or a reflection costs every block a few bytes instead of one block all of them (a torn capture, whose wrong half is another valid frame, is recovered by the receiver as [ADR 0049](0049-optical-modem-torn-capture-recovery.md) describes);
 - the stream is XOR-ed with a pseudo-random sequence seeded by session and frame sequence, so large areas never settle on one colour;
 - the stream is cut into `log2(symbols)` bits per cell.
 

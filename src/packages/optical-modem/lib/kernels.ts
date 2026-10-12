@@ -350,7 +350,7 @@ export class ModemKernels {
   /**
    * Decodes the receiver's grid as a capture torn between two frames: the cells above a cut across
    * the camera's rows against `seqs[0]`, those below it against `seqs[1]`, each with the other
-   * side's bytes erased (ADR 0048).
+   * side's bytes erased (ADR 0049).
    * @param homography - The capture's homography, nine 32-bit floats: it says where the camera's rows run.
    * @param bits - Bits per cell.
    * @param shape - Grid and inner code.

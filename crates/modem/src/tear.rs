@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//! Torn captures (ADR 0048). A screen refresh during the camera's rolling
+//! Torn captures (ADR 0049). A screen refresh during the camera's rolling
 //! readout leaves the rows above one camera row from frame `n` and those
 //! below it from frame `n + 1`. Both halves are valid frames, so the wrong
 //! half's cells reach the code as confident errors, and because every block

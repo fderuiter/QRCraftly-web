@@ -17,7 +17,7 @@
 */
 
 /**
- * Torn captures (ADR 0048): a screen refresh during the camera's readout shows one frame above a
+ * Torn captures (ADR 0049): a screen refresh during the camera's readout shows one frame above a
  * camera row and the next below it. The receiver decodes each side against its own frame sequence
  * with the other side's bytes erased, and keeps the cells of a frame it saw only in part for the
  * next capture, which shows the rest of it. Nothing in the frame format changes; the block tag

@@ -99,7 +99,7 @@ const KNOWN_REFUSED_MISCORRECTIONS = 22;
  * Over the simulation corpus decoded hard, soft and with a high erasure threshold: the blocks of the
  * readable frames, those repaired, and those whose tag refused the code's first repair (each of
  * which the decoder without the tag passed on wrong). `plainBlocksOk` leaves out the blocks the
- * tear recovery (ADR 0048) added: it is what the decoder repaired before it, and is unchanged.
+ * tear recovery (ADR 0049) added: it is what the decoder repaired before it, and is unchanged.
  * The recovery added 17: the top of profile 2's frame torn at half height, whose 80 check bytes
  * per 164-byte block cover its erased lower half (5 hard, 6 soft and 6 at the high threshold). It
  * found no block of another frame (`others`) in the corpus.

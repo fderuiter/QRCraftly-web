@@ -47,7 +47,7 @@ The consequence is that a rolling shutter makes tearing, and tearing is already 
 Three things would have to be true for a temporal profile to pay, and none has been shown:
 
 - the exposure is short enough, on enough phones, to keep a sharp boundary (unmeasured, and absent on iOS if the issue is right);
-- the receiver can decode both halves of a torn frame. The modem's decoder now decodes each side of a straight tear against its own frame and finishes a frame from two consecutive captures, but only in the simulator so far ([ADR 0048](adr/0048-optical-modem-torn-capture-recovery.md)); and
+- the receiver can decode both halves of a torn frame. The modem's decoder now decodes each side of a straight tear against its own frame and finishes a frame from two consecutive captures, but only in the simulator so far ([ADR 0049](adr/0049-optical-modem-torn-capture-recovery.md)); and
 - the gain is more than the extra display refreshes would give a plain grid at 60 Hz instead of 30.
 
 A simpler way to use the refreshes already exists: show a new grid at every refresh and let the camera take what it takes, while the outer code absorbs the loss. That needs no exposure control and no knowledge of the boundary.

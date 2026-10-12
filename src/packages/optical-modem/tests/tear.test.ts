@@ -119,7 +119,7 @@ const decode = (image: RgbaImage, options: { tears?: boolean; carry?: TearCarry 
 
 beforeAll(() => loadOpticalModem());
 
-describe('torn captures (ADR 0048)', () => {
+describe('torn captures (ADR 0049)', () => {
   it('recovers a P6 frame torn at 0.70 to 0.80 of the camera height, where the plain decoder loses most of them', { timeout: 120_000 }, () => {
     const plain: number[] = [];
     for (const tear of [0.7, 0.75, 0.8]) {

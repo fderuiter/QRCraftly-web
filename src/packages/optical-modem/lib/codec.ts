@@ -110,7 +110,7 @@ export interface DecodeOptions {
    */
   track?: TrackHint;
   /**
-   * Recover a capture torn between two frames by a screen refresh (default on, ADR 0048). A capture
+   * Recover a capture torn between two frames by a screen refresh (default on, ADR 0049). A capture
    * whose header strips agree decodes exactly as with this off.
    */
   tears?: boolean;
