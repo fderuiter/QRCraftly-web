@@ -17,7 +17,7 @@
 */
 
 /**
- * Wallet passes made and signed in the browser (ADR 0047): Apple `.pkpass` files signed with the
+ * Wallet passes made and signed in the browser (ADR 0048): Apple `.pkpass` files signed with the
  * person's own Pass Type ID certificate. Keys are imported as non-extractable WebCrypto keys and
  * live only in memory; nothing is sent anywhere.
  */

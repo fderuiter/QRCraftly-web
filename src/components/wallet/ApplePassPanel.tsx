@@ -39,7 +39,7 @@ interface ApplePassPanelProps {
 }
 
 /**
- * Signed Apple Wallet passes with the person's own Pass Type ID certificate (ADR 0047). The files
+ * Signed Apple Wallet passes with the person's own Pass Type ID certificate (ADR 0048). The files
  * are read into this tab only, the key is imported so it cannot be read back, and everything is
  * forgotten when the dialog closes. Nothing is uploaded.
  * @param props - The content, the card text and the file name.
