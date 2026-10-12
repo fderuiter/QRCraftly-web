@@ -48,6 +48,11 @@ export interface AcquiredFrame {
   homography: Float32Array;
   /** Calibration colours read from the frame, three integers per symbol. */
   palette: Int32Array;
+  /**
+   * The sequence the top and the bottom header strip each gave when read alone, or null for a strip
+   * that did not. Two different numbers mean a screen refresh tore the capture between two frames.
+   */
+  strips: [number | null, number | null];
 }
 
 /** Result of {@link acquireFrame}. */
@@ -109,6 +114,6 @@ function acquired(status: number): AcquireResult {
   }
   const header = parseHeader(kernels.headerMessage());
   const { size } = constellationShape(header.constellation);
-  const frame: AcquiredFrame = { header, cols: header.cols, dataRows: header.rows - 2 * BAND_ROWS, homography: kernels.homography(), palette: kernels.palette(size) };
+  const frame: AcquiredFrame = { header, cols: header.cols, dataRows: header.rows - 2 * BAND_ROWS, homography: kernels.homography(), palette: kernels.palette(size), strips: kernels.strips() };
   return { ok: true, frame, fiducials: fiducials ?? { points: [], coreAreas: [] } };
 }

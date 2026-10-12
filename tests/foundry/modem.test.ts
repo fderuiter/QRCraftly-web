@@ -98,9 +98,13 @@ const KNOWN_REFUSED_MISCORRECTIONS = 22;
 /**
  * Over the simulation corpus decoded hard, soft and with a high erasure threshold: the blocks of the
  * readable frames, those repaired, and those whose tag refused the code's first repair (each of
- * which the decoder without the tag passed on wrong).
+ * which the decoder without the tag passed on wrong). `plainBlocksOk` leaves out the blocks the
+ * tear recovery (ADR 0048) added: it is what the decoder repaired before it, and is unchanged.
+ * The recovery added 17: the top of profile 2's frame torn at half height, whose 80 check bytes
+ * per 164-byte block cover its erased lower half (5 hard, 6 soft and 6 at the high threshold). It
+ * found no block of another frame (`others`) in the corpus.
  */
-const KNOWN_FRAME_TOTALS = { blocks: 1440, blocksOk: 779, refused: 249 };
+const KNOWN_FRAME_TOTALS = { blocks: 1440, blocksOk: 796, plainBlocksOk: 779, refused: 249, others: 0 };
 
 const FIXTURE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/modem-golden.json.gz');
 
@@ -191,7 +195,7 @@ describe('optical modem module against the TypeScript kernels it replaced (#1198
 
   // One test per profile and per probe run: under CI's coverage instrumentation the simulated
   // captures are slow, and a single test over the whole corpus ran past its timeout.
-  const frameTotals = { blocks: 0, blocksOk: 0, refused: 0 };
+  const frameTotals = { blocks: 0, blocksOk: 0, plainBlocksOk: 0, refused: 0, others: 0 };
   const frameCorpus = frameSpecs();
   it.each([0, 1, 2])('decodes profile %i of the simulation corpus without a wrong block', (profile) => {
     frameCorpus.forEach((spec, i) => {
@@ -201,7 +205,8 @@ describe('optical modem module against the TypeScript kernels it replaced (#1198
       const capacity = frameCapacity(shape);
       const payload = framePayload(capacity.payloadBytes, spec.seed);
       const sent = encodeModemFrame(shape, payload, CORPUS_SESSION, spec.seed, 4);
-      const next = spec.torn ? encodeModemFrame(shape, framePayload(capacity.payloadBytes, spec.seed + 1000), CORPUS_SESSION, spec.seed + 1, 4) : undefined;
+      const nextPayload = framePayload(capacity.payloadBytes, spec.seed + 1000);
+      const next = spec.torn ? encodeModemFrame(shape, nextPayload, CORPUS_SESSION, spec.seed + 1, 4) : undefined;
       const capture = rotate(simulateCapture(sent, spec.preset, { pixelsPerCell: spec.pixelsPerCell, cellPitch: 4, seed: spec.seed, next }), spec.turns);
       const geometries = spec.turns ? MODEM_PROFILES : [shape];
       for (const options of [{ geometries, soft: false }, { geometries }, { geometries, threshold: 96 }]) {
@@ -209,10 +214,20 @@ describe('optical modem module against the TypeScript kernels it replaced (#1198
         if (!decoded.ok) continue;
         frameTotals.blocks += decoded.blocks.length;
         frameTotals.blocksOk += decoded.blocksOk;
+        const tear = decoded.tear;
+        frameTotals.plainBlocksOk += decoded.blocksOk - (tear ? tear.blocksOk[tear.seqs.indexOf(decoded.header.seq)] : 0);
         frameTotals.refused += decoded.refused;
         decoded.blocks.forEach((block, b) => {
           if (block) expect(fnv1a(block), `frame ${i} block ${b}`).toBe(fnv1a(payload.subarray(b * shape.packetBytes, (b + 1) * shape.packetBytes)));
         });
+        for (const other of decoded.others ?? []) {
+          // A torn capture's other frame can only be the next one.
+          expect(other.seq, `frame ${i}`).toBe(spec.seed + 1);
+          frameTotals.others += other.blocksOk;
+          other.blocks.forEach((block, b) => {
+            if (block) expect(fnv1a(block), `frame ${i} next block ${b}`).toBe(fnv1a(nextPayload.subarray(b * shape.packetBytes, (b + 1) * shape.packetBytes)));
+          });
+        }
       }
     });
   }, 120_000);

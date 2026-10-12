@@ -19,6 +19,7 @@ export {
 } from './lib/probeAnalysis';
 export type { RgbaImage } from './lib/layout';
 export type { TrackHint } from './lib/frame';
+export type { TearCarry, TearReport, TornBlocks } from './lib/tear';
 export {
   encodeModemFrame,
   decodeModemFrame,
