@@ -431,9 +431,9 @@ mod tests {
         )
     }
 
-    fn payload(c: &Capacity, salt: u8) -> Vec<u8> {
+    fn payload(c: &Capacity, offset: u8) -> Vec<u8> {
         (0..c.payload_bytes())
-            .map(|i| (i as u8).wrapping_mul(29).wrapping_add(salt))
+            .map(|i| (i as u8).wrapping_mul(29).wrapping_add(offset))
             .collect()
     }
 
