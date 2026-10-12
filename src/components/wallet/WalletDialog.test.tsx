@@ -56,7 +56,7 @@ function open(config: Partial<QRConfig>) {
   );
 }
 
-describe('WalletDialog (ADR 0047)', () => {
+describe('WalletDialog (ADR 0048)', () => {
   beforeEach(() => {
     scan.success = true;
     download.mockClear();

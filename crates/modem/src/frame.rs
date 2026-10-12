@@ -23,7 +23,7 @@
 use crate::colour::luma;
 use crate::constellation;
 use crate::layout::{Grid, HEADER_BITS};
-use crate::locate::{locate_fiducials, solve_homography, Fiducials, Scratch};
+use crate::locate::{locate_fiducials, solve_homography, track_fiducials, Fiducials, Scratch};
 use crate::rs;
 use crate::sample::{read_patch, reference_midpoint, sample_cell};
 use crate::Image;
@@ -130,7 +130,26 @@ pub struct Acquisition {
 
 /// Finds a frame in a captured image. `geometries` must already be checked.
 pub fn acquire(image: &Image, geometries: &[Grid], scratch: &mut Scratch) -> Acquisition {
-    let Some(fiducials) = locate_fiducials(image, scratch) else {
+    let fiducials = locate_fiducials(image, scratch);
+    read_frame(image, geometries, fiducials)
+}
+
+/// Finds a frame near where an earlier frame's fiducials were (see
+/// [`track_fiducials`]). The caller falls back to [`acquire`] when it fails.
+pub fn track(
+    image: &Image,
+    geometries: &[Grid],
+    scratch: &mut Scratch,
+    previous: &Fiducials,
+    radius: f64,
+) -> Acquisition {
+    let fiducials = track_fiducials(image, scratch, previous, radius);
+    read_frame(image, geometries, fiducials)
+}
+
+/// Reads the header and palette of the frame whose fiducials were found.
+fn read_frame(image: &Image, geometries: &[Grid], fiducials: Option<Fiducials>) -> Acquisition {
+    let Some(fiducials) = fiducials else {
         return Acquisition {
             fiducials: None,
             result: Err(Failure::NoFiducials),

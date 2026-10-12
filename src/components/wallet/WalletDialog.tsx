@@ -92,7 +92,7 @@ interface WalletDialogProps {
 }
 
 /**
- * "Add to a phone wallet" (ADR 0047): a Wallet card image made on the device, with honest steps
+ * "Add to a phone wallet" (ADR 0048): a Wallet card image made on the device, with honest steps
  * for each phone. Nothing is sent anywhere.
  * @param props - The content, the file name and the dialog's open state.
  * @returns The dialog.

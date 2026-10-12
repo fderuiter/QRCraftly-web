@@ -105,6 +105,7 @@ export class ModemKernels {
   private readonly rxGrid: Fn;
   private readonly rxState: Fn;
   private readonly rxAcquire: Fn;
+  private readonly rxTrack: Fn;
   private readonly rxSample: Fn;
   private readonly rxDecode: Fn;
   private readonly frameEncode: Fn;
@@ -132,6 +133,7 @@ export class ModemKernels {
     this.rxGrid = wasm.fn('modem_rx_grid');
     this.rxState = wasm.fn('modem_rx_state');
     this.rxAcquire = wasm.fn('modem_rx_acquire');
+    this.rxTrack = wasm.fn('modem_rx_track');
     this.rxSample = wasm.fn('modem_rx_sample');
     this.rxDecode = wasm.fn('modem_rx_decode');
     this.frameEncode = wasm.fn('modem_frame_encode');
@@ -184,13 +186,40 @@ export class ModemKernels {
    * @returns 0 when a frame was found, or the 1-based index of its failure in {@link ACQUIRE_FAILURES}.
    */
   public acquire(geometries: readonly GridGeometry[]): number {
+    this.setGeometries(geometries);
+    return this.checked(this.rxAcquire(this.rx, geometries.length));
+  }
+
+  /**
+   * {@link acquire} near an earlier frame's fiducials: each is looked for only within `radius`
+   * pixels of where it was, which is far cheaper than searching the whole image.
+   * @param geometries - Grid sizes to try.
+   * @param previous - The fiducials of an earlier acquisition, in its numbering.
+   * @param radius - Half the side of each search window, in pixels.
+   * @returns As {@link acquire}; on a failure the caller searches the whole image.
+   */
+  public track(geometries: readonly GridGeometry[], previous: FiducialSearch, radius: number): number {
+    this.setGeometries(geometries);
+    if (previous.points.length !== 4 || previous.coreAreas.length !== 4) throw new Error('Give the four fiducials');
+    const io = this.io();
+    previous.points.forEach((p, i) => {
+      io[IO_FIDUCIALS + 2 * i] = p.x;
+      io[IO_FIDUCIALS + 2 * i + 1] = p.y;
+      io[IO_CORES + i] = previous.coreAreas[i];
+    });
+    return this.checked(this.rxTrack(this.rx, geometries.length, radius));
+  }
+
+  private setGeometries(geometries: readonly GridGeometry[]): void {
     if (geometries.length === 0 || geometries.length > MAX_GEOMETRIES) throw new Error(`Give 1 to ${MAX_GEOMETRIES} geometries`);
     const io = this.io();
     geometries.forEach((g, i) => {
       io[IO_IN + 2 * i] = g.cols;
       io[IO_IN + 2 * i + 1] = g.rows;
     });
-    const status = this.rxAcquire(this.rx, geometries.length);
+  }
+
+  private checked(status: number): number {
     if (status < 0) throw new WasmModuleError('status', 'The modem module refused these geometries.');
     return status;
   }

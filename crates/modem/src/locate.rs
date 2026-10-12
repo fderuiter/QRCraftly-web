@@ -346,18 +346,9 @@ fn best_quad(rings: &mut [Ring]) -> Option<[Ring; 4]> {
     best
 }
 
-/// Finds the four corner fiducials, or `None` when four similar rings are not found.
-pub fn locate_fiducials(image: &Image, scratch: &mut Scratch) -> Option<Fiducials> {
-    let (width, height) = (image.width, image.height);
-    scratch.luma.clear();
-    scratch.luma.extend(
-        image
-            .data
-            .chunks_exact(4)
-            .map(|px| luma(px[0] as u32, px[1] as u32, px[2] as u32) as u8),
-    );
-    let threshold = otsu_threshold(&scratch.luma) as u8;
-    label_dark(scratch, width, height, threshold);
+/// Puts every dark component that looks like a fiducial ring, with a smaller
+/// component near its centre for a core, in `scratch.rings`.
+fn collect_rings(scratch: &mut Scratch) {
     let Scratch {
         blobs,
         rings,
@@ -425,6 +416,22 @@ pub fn locate_fiducials(image: &Image, scratch: &mut Scratch) -> Option<Fiducial
             core_area,
         });
     }
+}
+
+/// Finds the four corner fiducials, or `None` when four similar rings are not found.
+pub fn locate_fiducials(image: &Image, scratch: &mut Scratch) -> Option<Fiducials> {
+    let (width, height) = (image.width, image.height);
+    scratch.luma.clear();
+    scratch.luma.extend(
+        image
+            .data
+            .chunks_exact(4)
+            .map(|px| luma(px[0] as u32, px[1] as u32, px[2] as u32) as u8),
+    );
+    let threshold = otsu_threshold(&scratch.luma) as u8;
+    label_dark(scratch, width, height, threshold);
+    collect_rings(scratch);
+    let rings = &mut scratch.rings;
     let mut group = best_quad(rings)?;
     clockwise(&mut group, |c| c.centre);
     let mut first = 0;
@@ -437,6 +444,78 @@ pub fn locate_fiducials(image: &Image, scratch: &mut Scratch) -> Option<Fiducial
     for i in 0..4 {
         let ring = group[(first + i) % 4];
         out.points[i] = ring.centre;
+        out.core_areas[i] = ring.core_area;
+    }
+    Some(out)
+}
+
+/// Smallest window side, in pixels, a tracked search accepts.
+const MIN_WINDOW: usize = 16;
+
+/// Finds the four fiducials again near their centres in an earlier frame
+/// (#1161): each is searched for only in the square of `radius` pixels around
+/// its old centre, so a receiver that has locked on to a frame does not label
+/// the whole image again. The numbering of `previous` is kept. `None` when a
+/// window is off the image or holds no ring; the caller then searches the
+/// whole frame with [`locate_fiducials`].
+pub fn track_fiducials(
+    image: &Image,
+    scratch: &mut Scratch,
+    previous: &Fiducials,
+    radius: f64,
+) -> Option<Fiducials> {
+    let (width, height) = (image.width, image.height);
+    // Also refuses a radius that is not a number.
+    if radius.is_nan() || radius < MIN_WINDOW as f64 / 2.0 {
+        return None;
+    }
+    let mut out = Fiducials::default();
+    for (i, p) in previous.points.iter().enumerate() {
+        if !p.x.is_finite() || !p.y.is_finite() {
+            return None;
+        }
+        let span = |centre: f64, size: usize| -> (usize, usize) {
+            let low = (centre - radius).max(0.0).min(size as f64) as usize;
+            // One past the truncation covers the ceiling without `std`.
+            let high = ((centre + radius).max(0.0).min(size as f64) as usize + 1).min(size);
+            (low, high)
+        };
+        let (x0, x1) = span(p.x, width);
+        let (y0, y1) = span(p.y, height);
+        if x1 < x0 + MIN_WINDOW || y1 < y0 + MIN_WINDOW {
+            return None;
+        }
+        let w = x1 - x0;
+        scratch.luma.clear();
+        for y in y0..y1 {
+            let row = &image.data[(y * width + x0) * 4..(y * width + x1) * 4];
+            scratch.luma.extend(
+                row.chunks_exact(4)
+                    .map(|px| luma(px[0] as u32, px[1] as u32, px[2] as u32) as u8),
+            );
+        }
+        let threshold = otsu_threshold(&scratch.luma) as u8;
+        label_dark(scratch, w, y1 - y0, threshold);
+        collect_rings(scratch);
+        let local = Point {
+            x: p.x - x0 as f64,
+            y: p.y - y0 as f64,
+        };
+        let square = |r: &Ring| {
+            let (dx, dy) = (r.centre.x - local.x, r.centre.y - local.y);
+            dx * dx + dy * dy
+        };
+        let mut best: Option<&Ring> = None;
+        for ring in scratch.rings.iter() {
+            if best.is_none_or(|b| square(ring) < square(b)) {
+                best = Some(ring);
+            }
+        }
+        let ring = best.filter(|r| square(r) <= radius * radius)?;
+        out.points[i] = Point {
+            x: ring.centre.x + x0 as f64,
+            y: ring.centre.y + y0 as f64,
+        };
         out.core_areas[i] = ring.core_area;
     }
     Some(out)
@@ -517,6 +596,28 @@ mod tests {
         let mut v = [(1, 'a'), (0, 'b'), (1, 'c'), (0, 'd')];
         js_sort_small(&mut v, |a, b| a.0 - b.0);
         assert_eq!(v, [(0, 'b'), (0, 'd'), (1, 'a'), (1, 'c')]);
+    }
+
+    #[test]
+    fn tracking_refuses_a_blank_frame_and_bad_hints() {
+        let data = alloc::vec![200u8; 64 * 48 * 4];
+        let image = Image {
+            data: &data,
+            width: 64,
+            height: 48,
+        };
+        let previous = Fiducials {
+            points: [Point { x: 10.0, y: 10.0 }; 4],
+            core_areas: [9, 7, 5, 3],
+        };
+        let mut scratch = Scratch::default();
+        assert!(track_fiducials(&image, &mut scratch, &previous, 20.0).is_none());
+        assert!(track_fiducials(&image, &mut scratch, &previous, f64::NAN).is_none());
+        let off = Fiducials {
+            points: [Point { x: -500.0, y: 10.0 }; 4],
+            ..previous
+        };
+        assert!(track_fiducials(&image, &mut scratch, &off, 20.0).is_none());
     }
 
     #[test]
