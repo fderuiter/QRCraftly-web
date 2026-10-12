@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { Code, ShieldCheck } from 'lucide-react';
+import { Code, ShieldCheck, Wallet } from 'lucide-react';
 import { Button } from './ui/Button';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { TextField } from './ui/TextField';
@@ -87,15 +87,17 @@ interface ExportOptionsProps {
   /** Copies the code as SVG markup. */
   onCopySvg: () => void;
   copySvgBusy: boolean;
+  /** Opens the phone wallet dialog. */
+  onWallet: () => void;
 }
 
 /**
  * The Download options panel of the generator: format, raster size with a print helper,
- * the file name and Copy as SVG. The Download button exports with these choices.
+ * the file name, Copy as SVG and Add to phone wallet. The Download button exports with these choices.
  * @param props - Current choices and their change handlers.
  * @returns The options panel.
  */
-export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, filename, onFilenameChange, onCopySvg, copySvgBusy }: ExportOptionsProps) {
+export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, filename, onFilenameChange, onCopySvg, copySvgBusy, onWallet }: ExportOptionsProps) {
   const preset = (Object.keys(SIZE_PRESETS) as (keyof typeof SIZE_PRESETS)[]).find((key) => SIZE_PRESETS[key] === size) ?? 'custom';
   return (
     <div
@@ -157,6 +159,11 @@ export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, 
       <Button variant="outline" size="sm" fullWidth onClick={onCopySvg} loading={copySvgBusy}>
         <Code className="size-4" aria-hidden="true" />
         Copy as SVG
+      </Button>
+
+      <Button variant="outline" size="sm" fullWidth onClick={onWallet}>
+        <Wallet className="size-4" aria-hidden="true" />
+        Add to phone wallet
       </Button>
 
       <div className="rounded-lg border border-line bg-surface-sunken p-3" data-testid="export-reassurance-card">

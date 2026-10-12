@@ -48,6 +48,14 @@ _Avoid_: Centre dot, data dot, halftone pixel
 A QR code whose content is encoded directly in its modules, with no redirect service in between. QRCraftly makes only static codes; dynamic (redirect-based) codes were removed ([ADR 0022](docs/adr/0022-no-dynamic-qr-codes-client-side-only.md)).
 _Avoid_: Offline QR code, permanent QR code
 
+**Wallet Card**:
+A phone-sized image of a plain black-on-white code, made on the device, that a wallet app can turn into a pass from a photo ([ADR 0048](docs/adr/0048-wallet-passes-built-in-the-browser.md)).
+_Avoid_: Wallet image, pass picture
+
+**Wallet Pass**:
+A pass signed for a phone wallet (an Apple `.pkpass` file or a Google Wallet save link). QRCraftly signs one only with keys the user loads into the tab, never with a key of its own ([ADR 0048](docs/adr/0048-wallet-passes-built-in-the-browser.md)).
+_Avoid_: Passbook, wallet ticket, digital card
+
 **Storage Allowlist**:
 The explicit set of persistent browser storage keys permitted in client memory.
 _Avoid_: Storage whitelist, cookie list, saved state keys

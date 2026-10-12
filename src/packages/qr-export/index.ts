@@ -45,3 +45,18 @@ export { SvgContext } from './lib/svgContext';
 export { drawWithTemplate, SOCIAL_DIMENSIONS } from './lib/templateRenderer';
 export { renderQRRaster } from './lib/rasterExport';
 export { parseSvgPath, type PathCommandVisitor } from './lib/pathParser';
+export {
+  cleanCardText,
+  paintWalletCard,
+  planWalletCard,
+  renderWalletCard,
+  walletRefusalReason,
+  WalletCardRefusedError,
+  WALLET_CARD_SIZE,
+  WALLET_CARD_TEXT_LIMITS,
+  type MeasureText,
+  type WalletCardContext,
+  type WalletCardLine,
+  type WalletCardPlan,
+  type WalletCardText,
+} from './lib/walletCard';
