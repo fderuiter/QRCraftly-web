@@ -41,6 +41,7 @@ const IO_FIDUCIALS = 0;
 const IO_CORES = 8;
 const IO_HOMOGRAPHY = 12;
 const IO_PALETTE = 21;
+const IO_STRIPS = 69;
 const IO_OUT = 72;
 const IO_IN = 128;
 const IO_LENGTH = 256;
@@ -82,6 +83,33 @@ export interface BlockDecode {
   refused: number;
 }
 
+/** One side of a torn capture's decode ({@link ModemKernels.decodeTorn}). Views into the module, as {@link BlockDecode}. */
+export interface TornSide extends BlockDecode {
+  /** Where the side was cut, in grid rows across the camera's rows, or null when no cut decoded its trial blocks. */
+  cut: number | null;
+}
+
+/** Cells of an earlier capture that fill in a frame a torn capture shows only in part. */
+export interface CarriedCells {
+  /** The frame's sequence. */
+  seq: number;
+  /** The side of that capture's cut the frame was on: 0 above, 1 below. */
+  side: 0 | 1;
+  /** That capture's homography, nine 32-bit floats. */
+  homography: Float32Array;
+  /** A symbol and a confidence per data cell, as that capture sampled them. */
+  symbols: Uint8Array;
+  confidence: Uint8Array;
+}
+
+/** Grid and inner code of a frame. */
+type Shape = { cols: number; rows: number; packetBytes: number; parity: number };
+
+/** Blocks in a frame of this shape, as `frameCapacity` counts them. */
+function blockCount(bits: number, shape: Shape): number {
+  return Math.floor(Math.floor((shape.cols * (shape.rows - 18) * bits) / 8) / (shape.packetBytes + BLOCK_TAG_BYTES + shape.parity));
+}
+
 /** The fitted cross-talk model as the module returns it: 9 + 3 + 9 + 3 + 1 numbers. */
 export interface CrossTalkNumbers {
   matrix: number[];
@@ -108,6 +136,7 @@ export class ModemKernels {
   private readonly rxTrack: Fn;
   private readonly rxSample: Fn;
   private readonly rxDecode: Fn;
+  private readonly rxDecodeTorn: Fn;
   private readonly frameEncode: Fn;
   private readonly rsEncodeFn: Fn;
   private readonly constellationFn: Fn;
@@ -136,6 +165,7 @@ export class ModemKernels {
     this.rxTrack = wasm.fn('modem_rx_track');
     this.rxSample = wasm.fn('modem_rx_sample');
     this.rxDecode = wasm.fn('modem_rx_decode');
+    this.rxDecodeTorn = wasm.fn('modem_rx_decode_torn');
     this.frameEncode = wasm.fn('modem_frame_encode');
     this.rsEncodeFn = wasm.fn('modem_rs_encode');
     this.constellationFn = wasm.fn('modem_constellation');
@@ -241,6 +271,17 @@ export class ModemKernels {
     return this.bytes(this.headerPtr, HEADER_MESSAGE_BYTES).slice();
   }
 
+  /**
+   * The sequence the top and the bottom header strip of the frame last acquired each gave when read
+   * alone, or null for a strip that did not decode alone into the frame's header. Two different
+   * numbers mean a screen refresh tore the capture between them.
+   */
+  public strips(): [number | null, number | null] {
+    const io = this.io();
+    const seq = (v: number): number | null => (v < 0 ? null : v);
+    return [seq(io[IO_STRIPS]), seq(io[IO_STRIPS + 1])];
+  }
+
   /** The homography of the frame last acquired, as nine 32-bit floats. */
   public homography(): Float32Array {
     return Float32Array.from(this.io().subarray(IO_HOMOGRAPHY, IO_HOMOGRAPHY + 9));
@@ -301,9 +342,82 @@ export class ModemKernels {
   ): BlockDecode {
     checkStatus(this.rxDecode(this.rx, bits, shape.cols, shape.rows, shape.packetBytes, shape.parity, session, seq, threshold ?? -1), 'modem_rx_decode');
     const io = this.io();
-    const blocks = Math.floor(Math.floor((shape.cols * (shape.rows - 18) * bits) / 8) / (shape.packetBytes + BLOCK_TAG_BYTES + shape.parity));
+    const blocks = blockCount(bits, shape);
     const out = this.output(blocks + blocks * shape.packetBytes);
     return { ok: out.subarray(0, blocks), data: out.subarray(blocks), blocksOk: io[IO_OUT], erasures: io[IO_OUT + 1], corrected: io[IO_OUT + 2], refused: io[IO_OUT + 3] };
+  }
+
+  /**
+   * Decodes the receiver's grid as a capture torn between two frames: the cells above a cut across
+   * the camera's rows against `seqs[0]`, those below it against `seqs[1]`, each with the other
+   * side's bytes erased (ADR 0048).
+   * @param homography - The capture's homography, nine 32-bit floats: it says where the camera's rows run.
+   * @param bits - Bits per cell.
+   * @param shape - Grid and inner code.
+   * @param session - Session id.
+   * @param seqs - Frame sequence above and below the cut.
+   * @param threshold - Confidence under which bytes are erasures, or null for none but the other side's.
+   * @param known - Per side, a flag per block already decoded (skipped), or null.
+   * @param carry - An earlier capture's cells of one side's frame, or null.
+   * @returns Views of each side's blocks and counts.
+   */
+  public decodeTorn(
+    homography: Float32Array,
+    bits: number,
+    shape: Shape,
+    session: number,
+    seqs: readonly [number, number],
+    threshold: number | null,
+    known: readonly [Uint8Array | null, Uint8Array | null],
+    carry: CarriedCells | null
+  ): [TornSide, TornSide] {
+    const blocks = blockCount(bits, shape);
+    const cells = shape.cols * (shape.rows - 18);
+    const input = this.input(2 * blocks + (carry ? 2 * cells : 0));
+    input.fill(0);
+    // An external grid sampler may have left another homography in the module since the acquisition.
+    this.io().set(homography.subarray(0, 9), IO_HOMOGRAPHY);
+    known.forEach((flags, side) => {
+      if (flags) input.set(flags.subarray(0, blocks), side * blocks);
+    });
+    if (carry) {
+      input.set(carry.symbols.subarray(0, cells), 2 * blocks);
+      input.set(carry.confidence.subarray(0, cells), 2 * blocks + cells);
+      this.io().set(carry.homography.subarray(0, 9), IO_IN);
+    }
+    checkStatus(
+      this.rxDecodeTorn(
+        this.rx,
+        bits,
+        shape.cols,
+        shape.rows,
+        shape.packetBytes,
+        shape.parity,
+        session >>> 0,
+        seqs[0] >>> 0,
+        seqs[1] >>> 0,
+        threshold ?? -1,
+        carry ? carry.seq >>> 0 : 0,
+        carry ? carry.side : -1
+      ),
+      'modem_rx_decode_torn'
+    );
+    const io = this.io();
+    const sideBytes = blocks + blocks * shape.packetBytes;
+    const out = this.output(2 * sideBytes);
+    const side = (s: number): TornSide => {
+      const at = IO_OUT + 5 * s;
+      return {
+        ok: out.subarray(s * sideBytes, s * sideBytes + blocks),
+        data: out.subarray(s * sideBytes + blocks, (s + 1) * sideBytes),
+        blocksOk: io[at],
+        erasures: io[at + 1],
+        corrected: io[at + 2],
+        refused: io[at + 3],
+        cut: Number.isNaN(io[at + 4]) ? null : io[at + 4],
+      };
+    };
+    return [side(0), side(1)];
   }
 
   /**

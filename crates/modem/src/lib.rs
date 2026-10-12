@@ -26,6 +26,7 @@
 //! - [`sample`]: the per-cell decode kernel (the constellation slicer).
 //! - [`frame`]: acquiring a frame and reading its header.
 //! - [`codec`] and [`rs`]: the frame codec over the shared Reed-Solomon code.
+//! - [`tear`]: decoding a capture torn between two frames.
 //! - [`constellation`]: the symbol colours.
 //! - [`probe`]: the channel probe's per-frame analysis.
 //! - [`crosstalk`]: colour cross-talk unmixing.
@@ -43,8 +44,10 @@
 //! - the state (`modem_rx_state`): a probe pattern's running totals;
 //! - `io` (`modem_rx_io`): 256 `f64` for small numbers. Slots 0 to 7 hold the
 //!   fiducial centres, 8 to 11 their core areas, 12 to 20 the homography (as
-//!   `f32` values), 21 to 68 the palette (red, green, blue per symbol), 72 to
-//!   127 a call's other results and 128 to 255 a call's other arguments.
+//!   `f32` values), 21 to 68 the palette (red, green, blue per symbol), 69 and
+//!   70 the sequence the top and the bottom header strip gave alone (-1 for
+//!   none), 72 to 127 a call's other results and 128 to 255 a call's other
+//!   arguments.
 //!
 //! Integer arithmetic decides what a receiver reads; coordinates use `f32`
 //! steps in a fixed order and the rest `f64` in the order the TypeScript
@@ -68,6 +71,7 @@ pub mod locate;
 pub mod probe;
 pub mod rs;
 pub mod sample;
+pub mod tear;
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -91,6 +95,8 @@ pub const IO_CORES: usize = 8;
 pub const IO_HOMOGRAPHY: usize = 12;
 /// `io` slot of the palette, three values per symbol.
 pub const IO_PALETTE: usize = 21;
+/// `io` slot of the sequences the two header strips gave alone.
+pub const IO_STRIPS: usize = 69;
 /// `io` slot of a call's other results.
 pub const IO_OUT: usize = 72;
 /// `io` slot of a call's other arguments.
@@ -114,6 +120,7 @@ pub struct Rx {
     header: [u8; frame::HEADER_MESSAGE_BYTES],
     locate: locate::Scratch,
     decode: codec::DecodeScratch,
+    tear: tear::TearScratch,
     stream: Vec<u8>,
     message: Vec<u8>,
 }
@@ -132,6 +139,7 @@ impl Rx {
             header: [0; frame::HEADER_MESSAGE_BYTES],
             locate: locate::Scratch::default(),
             decode: codec::DecodeScratch::default(),
+            tear: tear::TearScratch::default(),
             stream: Vec::new(),
             message: Vec::new(),
         }
@@ -188,6 +196,9 @@ impl Rx {
         match found.result {
             Ok(acquired) => {
                 self.header = acquired.header;
+                for (i, seq) in acquired.strips.iter().enumerate() {
+                    self.io[IO_STRIPS + i] = seq.map_or(-1.0, |s| s as f64);
+                }
                 for (i, &v) in acquired.homography.iter().enumerate() {
                     self.io[IO_HOMOGRAPHY + i] = v as f64;
                 }
@@ -196,7 +207,10 @@ impl Rx {
                 }
                 0
             }
-            Err(failure) => failure as i32,
+            Err(failure) => {
+                self.io[IO_STRIPS..IO_STRIPS + 2].fill(-1.0);
+                failure as i32
+            }
         }
     }
 }
@@ -521,6 +535,104 @@ pub unsafe extern "C" fn modem_rx_decode(
     rx.io[IO_OUT + 1] = decoded.erasures as f64;
     rx.io[IO_OUT + 2] = decoded.corrected as f64;
     rx.io[IO_OUT + 3] = decoded.refused as f64;
+    STATUS_OK
+}
+
+/// Decodes a torn capture from the grid (see [`tear::decode_torn`]): the
+/// cells above a cut across the camera's rows against `seq_top`, those below
+/// it against `seq_bottom`, through the homography at `io[12..]`. `input`
+/// holds a flag per block for each side (1 for a block already decoded, which
+/// is skipped) and, when `carry_side` is 0 or 1, an earlier capture's symbols
+/// and confidences, a byte per data cell each, for the frame `carry_seq`,
+/// which was above (0) or below (1) that capture's cut; its homography is at
+/// `io[128..137]`. `output` gets, per side, a flag per block and then each
+/// block's data. `io[72..82]` get, per side, the blocks repaired, the
+/// erasures used, the bytes repaired, the blocks whose tag refused the code's
+/// first repair and the cut (NaN when none decoded).
+///
+/// # Safety
+/// As [`modem_rx_free`].
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn modem_rx_decode_torn(
+    rx: *mut Rx,
+    bits: u32,
+    cols: u32,
+    rows: u32,
+    packet_bytes: u32,
+    parity: u32,
+    session: u32,
+    seq_top: u32,
+    seq_bottom: u32,
+    threshold: f64,
+    carry_seq: u32,
+    carry_side: i32,
+) -> i32 {
+    // SAFETY: forwarded.
+    let Some(rx) = (unsafe { rx_mut(rx) }) else {
+        return STATUS_BAD_INPUT;
+    };
+    let (Some(capacity), Some(grid)) = (
+        codec::Capacity::new(bits, cols, rows, packet_bytes, parity),
+        Grid::new(cols, rows),
+    ) else {
+        return STATUS_BAD_INPUT;
+    };
+    let (cells, blocks) = (capacity.data_cells, capacity.blocks);
+    let carried = matches!(carry_side, 0 | 1);
+    let input_len = 2 * blocks + if carried { 2 * cells } else { 0 };
+    if rx.grid.len() != cells * 5 || rx.input.len() != input_len || !(-1..=1).contains(&carry_side)
+    {
+        return STATUS_BAD_INPUT;
+    }
+    let h = rx.homography();
+    let carry_h: [f32; 9] = core::array::from_fn(|i| rx.io[IO_IN + i] as f32);
+    let (known, carry_cells) = rx.input.split_at(2 * blocks);
+    let (known_top, known_bottom) = known.split_at(blocks);
+    let carry = carried.then(|| tear::Carry {
+        seq: carry_seq,
+        side: carry_side as usize,
+        homography: carry_h,
+        symbols: &carry_cells[..cells],
+        confidence: &carry_cells[cells..],
+    });
+    let side_len = blocks + capacity.payload_bytes();
+    let output = sized(&mut rx.output, 2 * side_len);
+    let (top, bottom) = output.split_at_mut(side_len);
+    let (ok_top, out_top) = top.split_at_mut(blocks);
+    let (ok_bottom, out_bottom) = bottom.split_at_mut(blocks);
+    let threshold = if threshold >= 0.0 {
+        Some(threshold)
+    } else {
+        None
+    };
+    let sides = tear::decode_torn(
+        &capacity,
+        &grid,
+        &h,
+        &rx.grid[..cells],
+        &rx.grid[cells..2 * cells],
+        session,
+        [seq_top, seq_bottom],
+        threshold,
+        [known_top, known_bottom],
+        carry.as_ref(),
+        [ok_top, ok_bottom],
+        [out_top, out_bottom],
+        &mut rx.tear,
+    );
+    let sides = sides.unwrap_or_else(|| {
+        output.fill(0);
+        [tear::Side::default(); 2]
+    });
+    for (i, side) in sides.iter().enumerate() {
+        let at = IO_OUT + 5 * i;
+        rx.io[at] = side.blocks_ok as f64;
+        rx.io[at + 1] = side.erasures as f64;
+        rx.io[at + 2] = side.corrected as f64;
+        rx.io[at + 3] = side.refused as f64;
+        rx.io[at + 4] = side.cut.map_or(f64::NAN, |c| c as f64);
+    }
     STATUS_OK
 }
 

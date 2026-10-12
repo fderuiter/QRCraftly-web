@@ -201,8 +201,130 @@ pub struct Decoded {
 pub struct DecodeScratch {
     stream: Vec<u8>,
     sure: Vec<u8>,
+    block: BlockScratch,
+}
+
+/// Scratch for [`decode_block`].
+#[derive(Default)]
+pub struct BlockScratch {
     unsure: Vec<(u8, usize)>,
     marked: Vec<usize>,
+}
+
+/// Every set of erasures [`decode_block`] tries: at most all the check bytes,
+/// then half, then none.
+pub const ALL_ATTEMPTS: usize = 3;
+
+/// What [`decode_block`] made of one block.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct BlockOutcome {
+    /// Bytes the code repaired, when the block was repaired and its tag matched.
+    pub repaired: Option<usize>,
+    /// Bytes handed to the code as erasures by the attempt that worked.
+    pub erasures: usize,
+    /// Whether the code's first repair was refused by the tag.
+    pub refused: bool,
+}
+
+/// The stream bytes the cells carry, before de-whitening, and how sure each
+/// byte is: the lowest confidence of the cells it spans.
+pub fn read_stream(
+    capacity: &Capacity,
+    symbols: &[u8],
+    confidence: &[u8],
+    stream: &mut Vec<u8>,
+    sure: &mut Vec<u8>,
+) {
+    let bits = capacity.bits_per_cell;
+    stream.clear();
+    stream.resize(capacity.stream_bytes, 0);
+    sure.clear();
+    sure.resize(capacity.stream_bytes, 255);
+    for byte in 0..capacity.stream_bytes {
+        let mut value = 0u8;
+        for k in 0..8 {
+            let bit = byte * 8 + k;
+            let cell = bit / bits;
+            value = (value << 1) | ((symbols[cell] >> (bits - 1 - bit % bits)) & 1);
+        }
+        stream[byte] = value;
+        let first = byte * 8 / bits;
+        let last = (byte * 8 + 7) / bits;
+        for &c in &confidence[first..=last] {
+            sure[byte] = sure[byte].min(c);
+        }
+    }
+}
+
+/// Repairs one block, `received` (its `block_bytes` bytes) with how sure each
+/// byte is in `sure`. Bytes under `threshold` are unsure; `None` decodes hard.
+/// The first `attempts` of [`ALL_ATTEMPTS`] sets of erasures are tried, the
+/// least sure bytes first. A repair counts only when the tag matches the
+/// block's data, `session`, `seq` and `index`. On success `word` holds the
+/// repaired codeword.
+#[allow(clippy::too_many_arguments)]
+pub fn decode_block(
+    capacity: &Capacity,
+    received: &[u8],
+    sure: &[u8],
+    session: u32,
+    seq: u32,
+    index: u32,
+    threshold: Option<f64>,
+    attempts: usize,
+    word: &mut [u8; 255],
+    scratch: &mut BlockScratch,
+) -> BlockOutcome {
+    let BlockScratch { unsure, marked } = scratch;
+    let parity = capacity.parity;
+    let n = capacity.block_bytes;
+    unsure.clear();
+    for (i, &c) in sure[..n].iter().enumerate() {
+        if threshold.is_some_and(|t| (c as f64) < t) {
+            unsure.push((c, i));
+        }
+    }
+    // Spend at most all the check bytes on erasures, the least sure first; if that fails,
+    // half, then none.
+    unsure.sort_unstable();
+    let mut syndromes = [0u8; 255];
+    let checked = parity > 0 && rs::syndromes(&received[..n], parity, &mut syndromes);
+    let mut outcome = BlockOutcome::default();
+    let mut first_repair = true;
+    let mut tried = None;
+    for limit in [parity, parity >> 1, 0].into_iter().take(attempts) {
+        let erasures = limit.min(unsure.len());
+        if tried == Some(erasures) {
+            // The same erasures again would give the same answer.
+            continue;
+        }
+        tried = Some(erasures);
+        marked.clear();
+        marked.extend(unsure.iter().take(limit).map(|&(_, at)| at));
+        word[..n].copy_from_slice(&received[..n]);
+        let result = if checked {
+            rs::decode_from_syndromes(&mut word[..n], parity, marked, &syndromes[..parity])
+        } else {
+            rs::decode(&mut word[..n], parity, marked)
+        };
+        if result.is_some() {
+            if tag_matches(&word[..n], capacity.packet_bytes, session, seq, index) {
+                outcome.repaired = result;
+                outcome.erasures = marked.len();
+                break;
+            }
+            // With as many erasures as check bytes the code always finds a codeword, so
+            // only the tag tells a wrong repair from a right one.
+            if first_repair {
+                outcome.refused = true;
+            }
+            first_repair = false;
+        }
+        if marked.is_empty() {
+            break;
+        }
+    }
+    outcome
 }
 
 /// Decodes every block of a frame from its sampled cells. `threshold` is the
@@ -223,94 +345,45 @@ pub fn decode(
     out: &mut [u8],
     scratch: &mut DecodeScratch,
 ) -> Decoded {
-    let bits = capacity.bits_per_cell;
     let DecodeScratch {
         stream,
         sure,
-        unsure,
-        marked,
+        block,
     } = scratch;
-    stream.clear();
-    stream.resize(capacity.stream_bytes, 0);
-    sure.clear();
-    sure.resize(capacity.stream_bytes, 255);
-    for byte in 0..capacity.stream_bytes {
-        let mut value = 0u8;
-        for k in 0..8 {
-            let bit = byte * 8 + k;
-            let cell = bit / bits;
-            value = (value << 1) | ((symbols[cell] >> (bits - 1 - bit % bits)) & 1);
-        }
-        stream[byte] = value;
-        let first = byte * 8 / bits;
-        let last = (byte * 8 + 7) / bits;
-        for &c in &confidence[first..=last] {
-            sure[byte] = sure[byte].min(c);
-        }
-    }
+    read_stream(capacity, symbols, confidence, stream, sure);
     whiten(stream, session, seq);
     let mut decoded = Decoded::default();
-    let parity = capacity.parity;
     let n = capacity.block_bytes;
     let mut word = [0u8; 255];
     let mut received = [0u8; 255];
+    let mut block_sure = [0u8; 255];
     for b in 0..capacity.blocks {
-        unsure.clear();
         for i in 0..n {
             received[i] = stream[i * capacity.blocks + b];
-            let c = sure[i * capacity.blocks + b];
-            if threshold.is_some_and(|t| (c as f64) < t) {
-                unsure.push((c, i));
-            }
+            block_sure[i] = sure[i * capacity.blocks + b];
         }
-        // Spend at most all the check bytes on erasures, the least sure first; if that fails,
-        // half, then none.
-        unsure.sort_unstable();
-        let mut syndromes = [0u8; 255];
-        let checked = parity > 0 && rs::syndromes(&received[..n], parity, &mut syndromes);
-        let mut result = None;
-        let mut used = 0;
-        let mut first_repair = true;
-        let mut tried = None;
-        for limit in [parity, parity >> 1, 0] {
-            let erasures = limit.min(unsure.len());
-            if tried == Some(erasures) {
-                // The same erasures again would give the same answer.
-                continue;
-            }
-            tried = Some(erasures);
-            marked.clear();
-            marked.extend(unsure.iter().take(limit).map(|&(_, at)| at));
-            word[..n].copy_from_slice(&received[..n]);
-            result = if checked {
-                rs::decode_from_syndromes(&mut word[..n], parity, marked, &syndromes[..parity])
-            } else {
-                rs::decode(&mut word[..n], parity, marked)
-            };
-            if result.is_some() {
-                if tag_matches(&word[..n], capacity.packet_bytes, session, seq, b as u32) {
-                    used = marked.len();
-                    break;
-                }
-                // With as many erasures as check bytes the code always finds a codeword, so
-                // only the tag tells a wrong repair from a right one.
-                if first_repair {
-                    decoded.refused += 1;
-                }
-                first_repair = false;
-                result = None;
-            }
-            if marked.is_empty() {
-                break;
-            }
+        let outcome = decode_block(
+            capacity,
+            &received,
+            &block_sure,
+            session,
+            seq,
+            b as u32,
+            threshold,
+            ALL_ATTEMPTS,
+            &mut word,
+            block,
+        );
+        if outcome.refused {
+            decoded.refused += 1;
         }
         let target = &mut out[b * capacity.packet_bytes..(b + 1) * capacity.packet_bytes];
-        match result {
+        match outcome.repaired {
             Some(corrected) => {
                 ok[b] = 1;
                 target.copy_from_slice(&word[..capacity.packet_bytes]);
                 decoded.blocks_ok += 1;
-                decoded.erasures += used as u32;
+                decoded.erasures += outcome.erasures as u32;
                 decoded.corrected += corrected as u32;
             }
             None => {

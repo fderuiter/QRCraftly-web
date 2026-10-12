@@ -62,6 +62,11 @@ pub struct Acquired {
     /// Red, green and blue of each symbol.
     pub palette: [i32; 3 * constellation::MAX_SYMBOLS],
     pub symbols: usize,
+    /// The frame sequence the top and the bottom header strip each gave when
+    /// read alone, for a strip that decoded alone into the same header but
+    /// for its sequence. A screen refresh during the camera's readout leaves
+    /// two frames in one capture, and then the two strips differ.
+    pub strips: [Option<u32>; 2],
 }
 
 fn homography_for(
@@ -123,6 +128,37 @@ fn header_grid(message: &[u8; HEADER_MESSAGE_BYTES]) -> (u32, u32) {
         u16::from_be_bytes([message[12], message[13]]) as u32,
         u16::from_be_bytes([message[14], message[15]]) as u32,
     )
+}
+
+/// The `seq` field of a header message.
+pub fn header_seq(message: &[u8; HEADER_MESSAGE_BYTES]) -> u32 {
+    u32::from_be_bytes([message[8], message[9], message[10], message[11]])
+}
+
+/// The sequence each header strip gives alone, once the frame's header has
+/// been read from the top strip alone (`from` 0), the bottom one alone (1) or
+/// both together (2). The bottom strip is read again only when the top one
+/// gave the header; when the top one failed alone, it has no sequence. A strip
+/// whose header differs from the frame's in more than the sequence (another
+/// session, another shape) gives none.
+fn strip_sequences(
+    image: &Image,
+    h: &[f32; 9],
+    grid: &Grid,
+    midpoint: i32,
+    message: &[u8; HEADER_MESSAGE_BYTES],
+    from: usize,
+) -> [Option<u32>; 2] {
+    match from {
+        0 => {
+            let bottom = decode_header(&read_header_codeword(image, h, grid, midpoint, &[true]))
+                .filter(|other| other[..8] == message[..8] && other[12..] == message[12..])
+                .map(|other| header_seq(&other));
+            [Some(header_seq(message)), bottom]
+        }
+        1 => [None, Some(header_seq(message))],
+        _ => [None, None],
+    }
 }
 
 /// What [`acquire`] found.
@@ -214,9 +250,14 @@ fn read_frame(image: &Image, geometries: &[Grid], fiducials: Option<Fiducials>) 
             // each is tried alone before both together.
             let midpoint = reference_midpoint(&black, &white);
             let mut header = None;
-            for strips in [&[false][..], &[true][..], &[false, true][..]] {
+            let mut from = 0;
+            for (k, strips) in [&[false][..], &[true][..], &[false, true][..]]
+                .into_iter()
+                .enumerate()
+            {
                 header = decode_header(&read_header_codeword(image, &h, grid, midpoint, strips));
                 if header.is_some() {
+                    from = k;
                     break;
                 }
             }
@@ -242,11 +283,13 @@ fn read_frame(image: &Image, geometries: &[Grid], fiducials: Option<Fiducials>) 
                     2 + s as u32,
                 ));
             }
+            let strips = strip_sequences(image, &h, grid, midpoint, &message, from);
             return done(Ok(Acquired {
                 header: message,
                 homography: h,
                 palette,
                 symbols,
+                strips,
             }));
         }
     }
