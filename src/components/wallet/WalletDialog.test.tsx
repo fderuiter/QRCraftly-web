@@ -89,6 +89,12 @@ describe('WalletDialog (ADR 0047)', () => {
     expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'wallet-tab-apple');
   });
 
+  it('switches to the Google Wallet pass tab', async () => {
+    open({ type: QRType.URL, value: 'https://example.com' });
+    fireEvent.click(screen.getByRole('tab', { name: 'Google Wallet pass' }));
+    expect(await screen.findByTestId('google-pass-panel')).toBeInTheDocument();
+  });
+
   it('offers no card for payment codes', () => {
     open({ type: QRType.PAYMENT, value: 'bitcoin:bc1qexample' });
     expect(screen.getByText(/lock screen/)).toBeInTheDocument();

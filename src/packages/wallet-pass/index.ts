@@ -18,7 +18,8 @@
 
 /**
  * Wallet passes made and signed in the browser (ADR 0047): Apple `.pkpass` files signed with the
- * person's own Pass Type ID certificate. Keys are imported as non-extractable WebCrypto keys and
+ * person's own Pass Type ID certificate, and Google Wallet save links signed with their own
+ * service-account key. Keys are imported as non-extractable WebCrypto keys and
  * live only in memory; nothing is sent anywhere.
  */
 export { WalletPassError } from './lib/errors';
@@ -40,6 +41,15 @@ export {
   type PassImageName,
   type PassJson,
 } from './lib/pkpass';
+export {
+  buildGoogleSaveLink,
+  googleSaveClaims,
+  isIssuerId,
+  readServiceAccount,
+  type GoogleSaveLink,
+  type GoogleServiceAccount,
+  type GoogleWalletInput,
+} from './lib/google';
 export { readCertificate, type CertificateInfo } from './lib/certificate';
 export { parsePem, type PemBlock } from './lib/pem';
 // The minimal DER reader and writer behind the certificate and CMS code; the tests build their

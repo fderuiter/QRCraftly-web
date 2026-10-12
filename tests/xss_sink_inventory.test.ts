@@ -41,6 +41,7 @@ const INVENTORY: Record<string, string[]> = {
   'new window or navigation': [
     'src/components/arcade/StressTestButton.tsx', // fixed path /arcade
     'src/components/transfer/TransferComplete.tsx', // blob: URL of a safe received type
+    'src/components/wallet/GooglePassPanel.tsx', // fixed https://pay.google.com/ prefix plus our own JWT, after a confirmation
   ],
   'string as code': [],
 };

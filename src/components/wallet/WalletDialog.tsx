@@ -52,15 +52,17 @@ export function suggestWalletTitle(config: Pick<QRConfig, 'type' | 'value'>): st
   return getQRTypeLabel(config.type);
 }
 
-// Signing code loads only when someone opens the Apple Wallet tab.
+// Signing code loads only when someone opens a pass tab.
 const ApplePassPanel = lazy(() => import('./ApplePassPanel'));
+const GooglePassPanel = lazy(() => import('./GooglePassPanel'));
 
 /** What the dialog makes: the card image for everyone, or a signed pass with the person's own keys. */
-type WalletMode = 'card' | 'apple';
+type WalletMode = 'card' | 'apple' | 'google';
 
 const MODES = [
   { value: 'card', label: 'Card image' },
   { value: 'apple', label: 'Apple Wallet pass' },
+  { value: 'google', label: 'Google Wallet pass' },
 ] as const satisfies readonly { value: WalletMode; label: string }[];
 
 /** Message shown when the card's own code fails the scan check. */
@@ -192,6 +194,10 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
             {mode === 'apple' ? (
               <Suspense fallback={<Skeleton className="h-48 w-full rounded-md" />}>
                 <ApplePassPanel config={config} title={title} subtitle={subtitle} filename={filename} />
+              </Suspense>
+            ) : mode === 'google' ? (
+              <Suspense fallback={<Skeleton className="h-48 w-full rounded-md" />}>
+                <GooglePassPanel config={config} title={title} subtitle={subtitle} />
               </Suspense>
             ) : (
             <>

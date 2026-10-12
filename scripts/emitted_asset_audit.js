@@ -54,6 +54,7 @@ export const REVIEWED_HOSTS = {
   'www.iso.org': 'Links to the ISO/IEC 18004 standard',
   'calendar.google.com': 'Event QR links that open Google Calendar',
   'calendar.yahoo.com': 'Event QR links that open Yahoo Calendar',
+  'pay.google.com': 'Google Wallet save links, opened in a new tab only after the person confirms (#1411)',
   'wa.me': 'WhatsApp payload links',
   'x.com': 'Social profile payload links',
   'instagram.com': 'Social profile payload links',
