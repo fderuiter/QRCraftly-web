@@ -97,11 +97,54 @@ describe('optical modem temporal noise reduction', () => {
       ...BASE,
       impairments: { temporal: { previous, weight: 0.5 } },
     });
-    // Luma moves by 4 levels, so the weight is 0.5 * (1 - 4 / 24): 104 * 0.583 + 100 * 0.417, about 102.3.
-    const [r] = centre(image);
-    expect(r).toBeGreaterThan(100);
-    expect(r).toBeLessThan(104);
-    expectNear(r, 102);
+    // Luma moves by 4 levels, so the weight is 0.5 * (1 - 4 / 24) = 5/12: 104 * 7/12 + 100 * 5/12 = 102.33, which rounds to 102.
+    expect(centre(image)[0]).toBe(102);
+  });
+
+  it('tapers the blend as the change grows, so a change of 16 levels keeps only a third of the weight', () => {
+    const previous = simulateCapture(grey(100), 'ideal', { ...BASE });
+    const image = simulateCapture(grey(116), 'ideal', {
+      ...BASE,
+      impairments: { temporal: { previous, weight: 0.5 } },
+    });
+    // The weight is 0.5 * (1 - 16 / 24) = 1/6: 116 * 5/6 + 100 * 1/6 = 113.33, which rounds to 113.
+    expect(centre(image)[0]).toBe(113);
+  });
+
+  it('clamps the weight to 0 to 1, so a weight of 1.5 gives the same capture as 1 and a negative weight the same as 0', () => {
+    const previous = simulateCapture(grey(100), 'ideal', { ...BASE });
+    const plain = simulateCapture(grey(104), 'ideal', { ...BASE });
+    const weightOne = simulateCapture(grey(104), 'ideal', {
+      ...BASE,
+      impairments: { temporal: { previous, weight: 1 } },
+    });
+    const weightOverOne = simulateCapture(grey(104), 'ideal', {
+      ...BASE,
+      impairments: { temporal: { previous, weight: 1.5 } },
+    });
+    const weightBelowZero = simulateCapture(grey(104), 'ideal', {
+      ...BASE,
+      impairments: { temporal: { previous, weight: -0.5 } },
+    });
+    expect(weightOverOne.data).toEqual(weightOne.data);
+    expect(weightBelowZero.data).toEqual(plain.data);
+  });
+
+  it('with threshold 0 never uses the previous capture, so gives the capture without noise reduction', () => {
+    const previous = simulateCapture(grey(100), 'ideal', { ...BASE });
+    const plain = simulateCapture(grey(104), 'ideal', { ...BASE });
+    const withZeroThreshold = simulateCapture(grey(104), 'ideal', {
+      ...BASE,
+      impairments: { temporal: { previous, weight: 0.5, threshold: 0 } },
+    });
+    expect(withZeroThreshold.data).toEqual(plain.data);
+    // Even where the previous capture matches exactly, a threshold of 0 must not blend.
+    const same = simulateCapture(grey(104), 'ideal', { ...BASE });
+    const sameWithZeroThreshold = simulateCapture(grey(104), 'ideal', {
+      ...BASE,
+      impairments: { temporal: { previous: same, weight: 0.5, threshold: 0 } },
+    });
+    expect(sameWithZeroThreshold.data).toEqual(same.data);
   });
 
   it('ignores the previous capture where the change is large', () => {

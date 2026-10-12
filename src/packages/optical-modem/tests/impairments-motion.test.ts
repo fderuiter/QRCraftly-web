@@ -175,4 +175,29 @@ describe('rolling-shutter and stabiliser motion', () => {
     expect(bottom).toBeLessThan(-0.9);
     expect(bottom).toBeGreaterThan(-1.3);
   });
+
+  it('shiftY moves a horizontal line down by that many rows everywhere', () => {
+    const frame = horizontalLine(LINE_ROW);
+    const still = capture(frame);
+    const moved = capture(frame, { shiftY: 5 });
+    for (const column of [30, 45, CENTRE_X, 75, 90]) {
+      const shift = rowCentroid(moved, column, 26) - rowCentroid(still, column, 26);
+      expect(Math.abs(shift - 5)).toBeLessThanOrEqual(0.1);
+    }
+  });
+
+  it('a small rotation moves the left and right ends of a horizontal centre-row line in opposite vertical directions', () => {
+    // Frame row 30 is camera row 36, the centre row. The JSDoc says the top of a vertical line moves right under a
+    // positive rotation, so the picture turns clockwise on screen: the right end of a horizontal line moves down and the
+    // left end moves up. Each end is about 30 columns from the centre, so about 30 * 2 * 0.02 = 1.2 px.
+    const frame = horizontalLine(CENTRE_Y - 6);
+    const still = capture(frame);
+    const turned = capture(frame, { rotation: 0.02 });
+    const leftEnd = rowCentroid(turned, 30, CENTRE_Y) - rowCentroid(still, 30, CENTRE_Y);
+    const rightEnd = rowCentroid(turned, 90, CENTRE_Y) - rowCentroid(still, 90, CENTRE_Y);
+    expect(leftEnd).toBeLessThan(-0.9);
+    expect(leftEnd).toBeGreaterThan(-1.5);
+    expect(rightEnd).toBeGreaterThan(0.9);
+    expect(rightEnd).toBeLessThan(1.5);
+  });
 });

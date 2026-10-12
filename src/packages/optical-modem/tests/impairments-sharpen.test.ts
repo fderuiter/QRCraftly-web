@@ -180,4 +180,24 @@ describe('camera sharpening (ISP unsharp mask)', () => {
     const lumaSharpened = capture(lumaFrame, { amount: 2 });
     expect(maxDiff(lumaSharpened, lumaBase, interior(lumaBase))).toBeGreaterThanOrEqual(5);
   });
+
+  it('a negative threshold is treated as 0, so it gives the same capture as threshold 0', () => {
+    // Without the clamp, any detail, however small, would jump by the full amount times the threshold at detail 0.
+    const zero = capture(greyStep, { amount: 1, threshold: 0 });
+    const negative = capture(greyStep, { amount: 1, threshold: -5 });
+    expect(negative.data).toEqual(zero.data);
+  });
+
+  it('more passes widen the ringing: more columns next to the edge change by over one level', () => {
+    const one = capture(greyStep, { amount: 2, passes: 1 });
+    const three = capture(greyStep, { amount: 2, passes: 3 });
+    const widthOfRinging = (img: RgbaImage): number => {
+      let columns = 0;
+      for (let x = step - 12; x < step + 12; x++) {
+        if (Math.abs(red(img, x, midRow) - red(baseline, x, midRow)) > 1) columns++;
+      }
+      return columns;
+    };
+    expect(widthOfRinging(three)).toBeGreaterThan(widthOfRinging(one));
+  });
 });

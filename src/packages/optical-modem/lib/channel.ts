@@ -63,7 +63,7 @@ export interface ChannelParams {
   lens?: LensDistortion;
   /** Rolling-shutter shear and stretch, and the stabiliser's shift for this frame. */
   motion?: CameraMotion;
-  /** OLED PWM dimming bands. */
+  /** OLED PWM dimming bands, applied to whole camera rows (the bezel around the screen bands too). */
   pwm?: PwmBanding;
   /** ISP edge enhancement, after demosaicing. */
   sharpen?: Sharpening;
@@ -354,6 +354,8 @@ export function applyChannel(frame: RgbaImage, params: ChannelParams, next?: Rgb
   const planes = warp(frame, next, params);
   const size = width * height;
   if (params.blurPasses) for (const plane of planes) blurPlane(plane, width, height, params.blurPasses);
+  // PWM gates the light reaching the sensor, so it comes before the sensor's own black level and noise.
+  if (params.pwm) bandRows(planes, width, height, params.pwm);
   const x = params.crosstalk ?? 0;
   const gain = params.gain ?? [1, 1, 1];
   const lift = params.lift ?? 0;
@@ -366,7 +368,6 @@ export function applyChannel(frame: RgbaImage, params: ChannelParams, next?: Rgb
     const mixed = [(1 - x) * r + x * g, (1 - 2 * x) * g + x * (r + b), (1 - x) * b + x * g];
     for (let c = 0; c < 3; c++) planes[c][i] = mixed[c] * gain[c] * light + lift + (sigma > 0 ? sigma * rng.nextGaussian() : 0);
   }
-  if (params.pwm) bandRows(planes, width, height, params.pwm);
   for (const plane of planes) for (let i = 0; i < size; i++) plane[i] = Math.min(255, Math.max(0, plane[i]));
   if (params.bayer) demosaic(planes, width, height);
   if (params.chromaPasses) denoiseChroma(planes, width, height, params.chromaPasses);

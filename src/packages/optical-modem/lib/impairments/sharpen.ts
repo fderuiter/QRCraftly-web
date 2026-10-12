@@ -65,7 +65,8 @@ function blurLuma(plane: Float32Array, width: number, height: number, passes: nu
  * @param sharpening - The settings.
  */
 export function sharpen(planes: Float32Array[], width: number, height: number, sharpening: Sharpening): void {
-  const { amount, passes = 1, threshold = 0, clamp = 255 } = sharpening;
+  const { amount, passes = 1, clamp = 255 } = sharpening;
+  const threshold = Math.max(0, sharpening.threshold ?? 0);
   const size = width * height;
   if (size === 0 || amount === 0) return;
   const [red, green, blue] = planes;

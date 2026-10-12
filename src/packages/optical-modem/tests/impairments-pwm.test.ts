@@ -98,4 +98,29 @@ describe('PWM banding through the capture', () => {
     for (let i = 0; i < after.length; i++) expect(Math.abs(after[i] - before[i + 3])).toBeLessThanOrEqual(1);
     expect(after).not.toEqual(before.slice(0, after.length));
   });
+
+  it('scales the gain by the duty: a window fully inside the lit part of a 25% duty gains 4', () => {
+    const values = column(capture(40, { period: 8, duty: 0.25, exposureRows: 2 }), FROM, TO);
+    // Each cycle has one 2-row window wholly lit (gain 2 / (2 * 0.25) = 4), so the brightest row is 40 * 4.
+    expect(Math.abs(Math.max(...values) - 160)).toBeLessThanOrEqual(1);
+    // The gain averages to 1 over a cycle, so every whole cycle averages to the flat level, not twice it.
+    for (let start = 0; start + 8 <= values.length; start++) {
+      const mean = values.slice(start, start + 8).reduce((a, b) => a + b, 0) / 8;
+      expect(Math.abs(mean - 40)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('with no exposure rows, each row is lit for the duty share of the cycle at gain 1 / duty, else dark', () => {
+    const values = column(capture(100, { period: 10, duty: 0.5, exposureRows: 0 }), FROM, TO);
+    // Every row is either fully lit (100 / 0.5 = 200) or fully dark (0); nothing is at the flat level.
+    for (const v of values) expect(Math.min(Math.abs(v - 200), Math.abs(v))).toBeLessThanOrEqual(1);
+    expect(Math.max(...values)).toBeGreaterThanOrEqual(199);
+    expect(Math.min(...values)).toBeLessThanOrEqual(1);
+    // Over 40 rows (four whole cycles) half the rows are lit.
+    expect(values.filter((v) => v > 100).length).toBe(values.length / 2);
+    // With no phase each cycle starts lit: camera rows 0 to 4 of every 10 are lit, rows 5 to 9 dark.
+    for (let i = 0; i < values.length; i++) expect(values[i] > 100).toBe((FROM + i) % 10 < 5);
+    // The bands repeat every 10 rows.
+    for (let i = 0; i + 10 < values.length; i++) expect(Math.abs(values[i] - values[i + 10])).toBeLessThanOrEqual(1);
+  });
 });
