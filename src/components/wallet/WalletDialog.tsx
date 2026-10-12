@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Download, Share2 } from 'lucide-react';
 import { type QRConfig, QRType } from '@/types';
 import { renderWalletCard, walletRefusalReason, WALLET_CARD_TEXT_LIMITS, WALLET_CARD_SIZE } from '@/packages/qr-export';
@@ -32,6 +32,7 @@ import { Alert } from '../ui/Alert';
 import { Skeleton } from '../ui/Skeleton';
 import { Badge } from '../ui/Badge';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { AccordionItem } from '../ui/Accordion';
 import { useToast } from '../ui/Toast';
 
 /**
@@ -53,28 +54,20 @@ export function suggestWalletTitle(config: Pick<QRConfig, 'type' | 'value'>): st
   return getQRTypeLabel(config.type);
 }
 
-// Signing code loads only when someone opens a pass tab.
+// Signing code loads only when someone opens the developer section.
 const ApplePassPanel = lazy(() => import('./ApplePassPanel'));
 const GooglePassPanel = lazy(() => import('./GooglePassPanel'));
 
-/** What the dialog makes: the card image for everyone, or a signed pass with the person's own keys. */
-type WalletMode = 'card' | 'apple' | 'google';
+/** The signed passes in the developer section, made with the person's own keys. */
+type PassMode = 'apple' | 'google';
 
-/** A tab label with the Beta tag: signed passes are beta until they are checked on real phones (#1413). */
-function betaLabel(text: string) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      {text}
-      <Badge tone="beta">Beta</Badge>
-    </span>
-  );
-}
-
-const MODES: readonly { value: WalletMode; label: ReactNode; ariaLabel?: string }[] = [
-  { value: 'card', label: 'Card image' },
-  { value: 'apple', label: betaLabel('Apple Wallet pass'), ariaLabel: 'Apple Wallet pass (beta)' },
-  { value: 'google', label: betaLabel('Google Wallet pass'), ariaLabel: 'Google Wallet pass (beta)' },
+const PASS_MODES: readonly { value: PassMode; label: string }[] = [
+  { value: 'apple', label: 'Apple Wallet pass' },
+  { value: 'google', label: 'Google Wallet pass' },
 ];
+
+/** Label of the collapsed developer section that holds the signed passes. */
+const WALLET_DEVELOPER_SECTION = 'Have your own Apple or Google developer keys?';
 
 /** Message shown when the card's own code fails the scan check. */
 export const WALLET_SCAN_FAILED = 'The wallet card did not pass the scan check, so it was not saved. Try shorter content.';
@@ -115,14 +108,15 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
   const [subtitle, setSubtitle] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState<'download' | 'share' | null>(null);
-  const [mode, setMode] = useState<WalletMode>('card');
+  const [developerOpen, setDeveloperOpen] = useState(false);
+  const [passMode, setPassMode] = useState<PassMode>('apple');
   const { canShare } = useCapabilities();
   const { addToast } = useToast();
   const refusal = walletRefusalReason(config.type);
   const text = useDebounce(useMemo(() => ({ title, subtitle }), [title, subtitle]), 200);
 
   useEffect(() => {
-    if (!isOpen || refusal || mode !== 'card') return;
+    if (!isOpen || refusal) return;
     let cancelled = false;
     renderWalletCard(config, text)
       .then((canvas) => {
@@ -134,7 +128,7 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
     return () => {
       cancelled = true;
     };
-  }, [isOpen, refusal, mode, config, text]);
+  }, [isOpen, refusal, config, text]);
 
   const makeCard = async (): Promise<Blob | null> => {
     try {
@@ -192,26 +186,6 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
           <>
             <TextField label="Title" value={title} maxLength={WALLET_CARD_TEXT_LIMITS.title} onChange={(event) => setTitle(event.target.value)} />
             <TextField label="Subtitle (optional)" value={subtitle} maxLength={WALLET_CARD_TEXT_LIMITS.subtitle} onChange={(event) => setSubtitle(event.target.value)} />
-            <SegmentedControl<WalletMode>
-              kind="tablist"
-              label="What to make"
-              options={MODES}
-              value={mode}
-              onChange={setMode}
-              tabId={(value) => `wallet-tab-${value}`}
-              controls={() => 'wallet-panel'}
-            />
-            <div id="wallet-panel" role="tabpanel" aria-labelledby={`wallet-tab-${mode}`} className="space-y-4">
-            {mode === 'apple' ? (
-              <Suspense fallback={<Skeleton className="h-48 w-full rounded-md" />}>
-                <ApplePassPanel config={config} title={title} subtitle={subtitle} filename={filename} />
-              </Suspense>
-            ) : mode === 'google' ? (
-              <Suspense fallback={<Skeleton className="h-48 w-full rounded-md" />}>
-                <GooglePassPanel config={config} title={title} subtitle={subtitle} />
-              </Suspense>
-            ) : (
-            <>
             <p className="text-sm text-fg-muted">
               This makes a card image with a plain black-and-white code that a wallet app can read. It is made on your device and is not sent anywhere.
             </p>
@@ -255,10 +229,39 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
                 </li>
               </ul>
             </div>
-            </>
-            )}
-            </div>
             <p className="text-xs text-fg-muted">Wallets draw their own plain copy of the code, so your colors, pattern and logo stay in your normal downloads.</p>
+            <AccordionItem title={WALLET_DEVELOPER_SECTION} onOpenChange={setDeveloperOpen}>
+              {developerOpen && (
+                <div className="space-y-4 pt-1 text-sm" data-testid="wallet-developer-section">
+                  <p>
+                    <Badge tone="beta">Beta</Badge> For developers and businesses with an Apple Pass Type ID certificate or a Google Wallet issuer account. You sign a real
+                    wallet pass with your own keys, right here in this tab.
+                  </p>
+                  <p>
+                    Your key files are read on this device and are never uploaded or saved. QRCraftly has no signing server. A Google pass goes to Google only when you
+                    choose Continue to Google Wallet. You can check this in your browser&apos;s network panel.
+                  </p>
+                  <SegmentedControl<PassMode>
+                    kind="tablist"
+                    label="Which pass to make"
+                    options={PASS_MODES}
+                    value={passMode}
+                    onChange={setPassMode}
+                    tabId={(value) => `wallet-tab-${value}`}
+                    controls={() => 'wallet-pass-panel'}
+                  />
+                  <div id="wallet-pass-panel" role="tabpanel" aria-labelledby={`wallet-tab-${passMode}`}>
+                    <Suspense fallback={<Skeleton className="h-48 w-full rounded-md" />}>
+                      {passMode === 'apple' ? (
+                        <ApplePassPanel config={config} title={title} subtitle={subtitle} filename={filename} />
+                      ) : (
+                        <GooglePassPanel config={config} title={title} subtitle={subtitle} />
+                      )}
+                    </Suspense>
+                  </div>
+                </div>
+              )}
+            </AccordionItem>
           </>
         )}
       </div>
