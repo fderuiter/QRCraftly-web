@@ -6,7 +6,7 @@ import { ExportOptions, clampSize, printHint } from './ExportOptions';
 import { suggestFilename } from './QRTool';
 
 function renderOptions(format: 'png' | 'svg' = 'png', size = 2048) {
-  const handlers = { onFormatChange: vi.fn(), onSizeChange: vi.fn(), onFilenameChange: vi.fn(), onCopySvg: vi.fn() };
+  const handlers = { onFormatChange: vi.fn(), onSizeChange: vi.fn(), onFilenameChange: vi.fn(), onCopySvg: vi.fn(), onWallet: vi.fn() };
   const view = render(
     <ExportOptions id="opts" format={format} size={size} filename="url-example.com" copySvgBusy={false} {...handlers} />
   );
@@ -15,7 +15,7 @@ function renderOptions(format: 'png' | 'svg' = 'png', size = 2048) {
 
 describe('ExportOptions (#1052)', () => {
   it('has no axe violations and reports each choice', async () => {
-    const { container, onFormatChange, onSizeChange, onFilenameChange, onCopySvg } = renderOptions();
+    const { container, onFormatChange, onSizeChange, onFilenameChange, onCopySvg, onWallet } = renderOptions();
     expect(await axe(container)).toHaveNoViolations();
 
     fireEvent.click(screen.getByRole('radio', { name: 'JPEG' }));
@@ -26,6 +26,8 @@ describe('ExportOptions (#1052)', () => {
     expect(onFilenameChange).toHaveBeenCalledWith('menu');
     fireEvent.click(screen.getByRole('button', { name: 'Copy as SVG' }));
     expect(onCopySvg).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Add to phone wallet' }));
+    expect(onWallet).toHaveBeenCalled();
   });
 
   it('takes a custom width and hides the size for SVG, EPS, and PDF', () => {

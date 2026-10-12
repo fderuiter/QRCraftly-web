@@ -54,6 +54,8 @@ import { PREVIEW_VIEWS, type PreviewView } from './mockups/previewViews';
 
 // The "In the wild" scenes, viewing test and PNG export load only when a view other than Flat is chosen.
 const MockupView = React.lazy(() => import('./mockups/MockupView'));
+// The phone wallet dialog (ADR 0047) loads only when it is opened.
+const WalletDialog = React.lazy(() => import('./wallet/WalletDialog'));
 
 /** One-line promise under every generator heading. */
 const GENERATOR_SUBTITLE = 'No sign-up, no ads, never expires.';
@@ -326,21 +328,35 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
     });
   };
 
-  const executeWithSafetyGate = (action: (options?: AssetOptions) => void | Promise<void>) => {
+  /** Whether there is content that may be exported at all; says why not when there is none. */
+  const contentExportable = () => {
     if (exportsOffReason) {
       notifyExportsOff();
-      return;
+      return false;
     }
     if (previewFailure) {
       // There is no code to export: say why, with no "Export Anyway" (#1251).
       addToast({ type: 'error', message: previewFailureMessage(previewFailure, config.errorCorrectionLevel), duration: 6000 });
-      return;
+      return false;
     }
     if (isDangerousUrl(config.value)) {
       // A script or data link is refused outright: no "Export Anyway" for it.
       addToast({ type: 'error', message: BLOCKED_EXPORT_MESSAGE, duration: 6000 });
-      return;
+      return false;
     }
+    return true;
+  };
+
+  // The wallet card draws a plain black-on-white code, so the design's scan risk does not apply to it.
+  const [walletOpen, setWalletOpen] = useState(false);
+  const onWallet = () => {
+    if (!contentExportable()) return;
+    setOptionsOpen(false);
+    setWalletOpen(true);
+  };
+
+  const executeWithSafetyGate = (action: (options?: AssetOptions) => void | Promise<void>) => {
+    if (!contentExportable()) return;
     if (getExportRiskPolicy({ status: scannabilityStatus, health }) === 'unsafe') {
       setGateAction(() => () => action({ allowUnsafe: true }));
       setShowSafetyGate(true);
@@ -493,6 +509,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                         onFilenameChange={setCustomFilename}
                         onCopySvg={onCopySvg}
                         copySvgBusy={busyExport === 'svg-copy'}
+                        onWallet={onWallet}
                      />
                    )}
 
@@ -554,6 +571,11 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
              </Card>
         }
       />
+      {walletOpen && (
+        <Suspense fallback={null}>
+          <WalletDialog isOpen onClose={() => { setWalletOpen(false); optionsButtonRef.current?.focus(); }} config={config} filename={filename} />
+        </Suspense>
+      )}
       <GeneratorCommands actions={commandActions} onDownload={onDownload} />
       <MiniPreview sourceRef={canvasRef} targetId={PREVIEW_ID} renderKey={debouncedConfig} />
       {/* Keeps the last content clear of the mobile action bar. */}

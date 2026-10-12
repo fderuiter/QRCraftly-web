@@ -58,7 +58,7 @@ Boundary checks run automatically during `pnpm run lint` and CI. The check is ou
 
 - **Purpose**: Social template composition and self-contained SVG export: a `CanvasRenderingContext2D`-compatible SVG recorder, template frames and text, logo inlining, SVG sanitization and the offscreen scannability check before download.
 - **Entry Points**:
-  - `index.ts`: `generateQRSvg`, `rasterizeSvgToCanvas`, `validateSvgScannability`, `SvgContext`, `drawWithTemplate`, `SOCIAL_DIMENSIONS`.
+  - `index.ts`: `generateQRSvg`, `rasterizeSvgToCanvas`, `validateSvgScannability`, `SvgContext`, `drawWithTemplate`, `SOCIAL_DIMENSIONS`, and the Wallet card (`renderWalletCard`, `planWalletCard`, `paintWalletCard`, `walletRefusalReason`; [ADR 0047](../../docs/adr/0047-wallet-passes-built-in-the-browser.md)).
 
 ### `arcade` (`@/packages/arcade`)
 

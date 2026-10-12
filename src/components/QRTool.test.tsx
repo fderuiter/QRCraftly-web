@@ -199,6 +199,21 @@ describe('QRTool Component', () => {
     expect(badge).toHaveTextContent('Static · Non-expiring');
   });
 
+  it('opens the phone wallet dialog from the Download options, and not while there is no content (ADR 0047)', async () => {
+    const { unmount } = render(<ToastProvider><QRTool initialConfig={{ value: 'https://www.example.com/path' }} /></ToastProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Download options' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add to phone wallet' }));
+    expect(await screen.findByRole('dialog', { name: 'Add to a phone wallet' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Download options' })).not.toBeInTheDocument();
+    unmount();
+    expect(screen.queryByRole('dialog', { name: 'Add to a phone wallet' })).not.toBeInTheDocument();
+
+    render(<ToastProvider><QRTool initialConfig={{ value: '' }} /></ToastProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Download options' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add to phone wallet' }));
+    expect(screen.queryByRole('dialog', { name: 'Add to a phone wallet' })).not.toBeInTheDocument();
+  });
+
   it('offers format, size, print, file name and Copy as SVG in the Download options (#1052)', async () => {
     render(<ToastProvider><QRTool initialConfig={{ value: 'https://www.example.com/path' }} /></ToastProvider>);
     expect(downloadButton()).toHaveClass('bg-action');
