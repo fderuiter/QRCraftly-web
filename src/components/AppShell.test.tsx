@@ -60,7 +60,8 @@ describe('AppShell', () => {
     expect(within(company).getByRole('link', { name: 'Privacy Architecture' })).toHaveAttribute('href', '/security#compliance');
     expect(within(company).getByRole('link', { name: 'iPhone & Mac App Privacy' })).toHaveAttribute('href', '/privacy');
     expect(within(company).getByRole('link', { name: 'iPhone & Mac App Support' })).toHaveAttribute('href', '/support');
-    expect(footer).toHaveTextContent(/Open Source/);
+    expect(within(company).getByRole('link', { name: 'Contact' })).toHaveAttribute('href', 'mailto:hello@qrcraftly.com');
+    expect(footer).not.toHaveTextContent(/Open Source/);
   });
 
   it('links the no-ads pledge and has no donation links', () => {

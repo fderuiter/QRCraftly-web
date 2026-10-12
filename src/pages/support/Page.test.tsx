@@ -26,7 +26,7 @@ describe('App support page', () => {
     render(<Page />);
     expect(screen.getByRole('heading', { level: 1, name: 'QRCraftly for iPhone, iPad and Mac: Support' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', '/privacy');
-    expect(screen.getByText('YOUR_EMAIL')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'hello@qrcraftly.com' })).toHaveAttribute('href', 'mailto:hello@qrcraftly.com');
   });
 
   it('has a single h1, ordered headings and no axe violations', async () => {

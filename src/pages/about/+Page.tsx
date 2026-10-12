@@ -17,38 +17,20 @@
 */
 
 
-import React from 'react';
 import { Download, Keyboard, QrCode } from 'lucide-react';
 import { PLEDGE_COMMITMENT, PLEDGE_HEADLINE } from '@/data/pledge';
+import { CONTACT_ADDRESS, CONTACT_MAILTO } from '@/data/contact';
 import { GENERATOR_FOOTER_LINKS, TOOL_LINKS } from '@/data/navigation';
 import { isDangerousUrl } from '@/utils/security';
 import { ButtonLink } from '@/components/ui/Button';
 import { ArticleHeading, ArticleLayout, type ArticleSection } from '@/components/ArticleLayout';
-
-const GithubIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    viewBox="0 0 24 24"
-    width="24"
-    height="24"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    fill="none"
-    className={className}
-    aria-hidden="true"
-  >
-    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
-    <path d="M9 18c-4.51 2-5-2-7-2" />
-  </svg>
-);
 
 const SECTIONS: readonly ArticleSection[] = [
   { id: 'why', label: 'Why QRCraftly exists' },
   { id: 'how-it-works', label: 'How it works' },
   { id: 'pledge', label: 'The pledge' },
   { id: 'tools', label: 'Every tool' },
-  { id: 'open-source', label: 'Open source' },
+  { id: 'how-its-built', label: 'How it is built' },
 ];
 
 const STEPS = [
@@ -132,20 +114,24 @@ export default function Page() {
           </ul>
         </section>
 
-        <section id="open-source" aria-labelledby="open-source-title" className="mb-10 scroll-mt-6 text-fg-soft">
-          <ArticleHeading id="open-source"><span id="open-source-title">Open source</span></ArticleHeading>
-          <p className="mb-4">
-            QRCraftly is released under the <strong>GNU Affero General Public License v3.0 (AGPL-3.0)</strong>. Anyone
-            can read the code, check the claims on this site against it, and suggest changes.
+        <section id="how-its-built" aria-labelledby="how-its-built-title" className="mb-10 scroll-mt-6 space-y-3 text-fg-soft">
+          <ArticleHeading id="how-its-built"><span id="how-its-built-title">How it is built</span></ArticleHeading>
+          <p>
+            QRCraftly is a set of static files. The QR encoder and scanner are my own code, written in Rust and run in
+            your browser as WebAssembly. There is no server code, no database and no account system.
           </p>
-          <p className="mb-4">
-            QRCraftly is built on open-source packages too.{' '}
+          <p>
+            The code published up to October 2026 was released under the GNU AGPL v3.0. Later versions are not public,
+            but the privacy promises do not depend on reading the code: your browser enforces them.{' '}
+            <a href="/security" className={LINK_CLASSES}>How to check them yourself</a>
+          </p>
+          <p>
+            QRCraftly also uses a few open-source packages.{' '}
             <a href="/acknowledgements" className={LINK_CLASSES}>See every package it ships and its license</a>
           </p>
-          <ButtonLink href="https://github.com/fderuiter/QRCraftly-web" target="_blank" rel="noopener noreferrer" variant="outline">
-            <GithubIcon className="size-5" />
-            View on GitHub
-          </ButtonLink>
+          <p>
+            Questions or ideas? <a href={CONTACT_MAILTO} className={LINK_CLASSES}>Email {CONTACT_ADDRESS}</a>
+          </p>
         </section>
       </ArticleLayout>
     </>

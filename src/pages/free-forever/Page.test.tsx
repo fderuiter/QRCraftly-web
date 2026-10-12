@@ -45,9 +45,10 @@ describe('Free Forever (pledge) Page', () => {
     expect(screen.getByText(/Cloudflare, which hosts the site/i)).toBeInTheDocument();
   });
 
-  it('links the AGPL source code', () => {
+  it('points to checks that need no source code', () => {
     render(<Page />);
-    expect(screen.getByRole('link', { name: /source code on GitHub/i })).toHaveAttribute('href', 'https://github.com/fderuiter/QRCraftly-web');
+    expect(screen.getByRole('link', { name: 'security page' })).toHaveAttribute('href', '/security#compliance');
+    expect(screen.queryByRole('link', { name: /GitHub/i })).not.toBeInTheDocument();
   });
 
   it('has no donation or ad links', () => {

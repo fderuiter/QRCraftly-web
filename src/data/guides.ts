@@ -137,7 +137,7 @@ export const guides: Guide[] = [
           },
           {
             type: 'p',
-            text: 'The lasting fix is to stop depending on the middleman. A static code holds your address itself, so it keeps working for as long as that address does. If you still want to be able to change the destination later, you can do that without a vendor: point the static code at a short address on a domain you own, and change where that address leads. [Static vs dynamic QR codes](/guides/static-vs-dynamic-qr-codes) explains the trade-offs in full.',
+            text: 'The lasting fix is to stop depending on a middleman. A static code holds your address, so it works for as long as that address does. If you still want to change the destination later, point the code at a short address on a domain you own, then change where that address leads. [Static vs dynamic QR codes](/guides/static-vs-dynamic-qr-codes) covers the trade-offs.',
           },
         ],
       },
@@ -418,7 +418,7 @@ export const guides: Guide[] = [
         blocks: [
           {
             type: 'p',
-            text: 'QRCraftly makes static codes only. There are no accounts, no servers that store your codes and no redirects, so a code you make here keeps working as long as the address inside it does, whether or not this site is still around. That is a deliberate decision, recorded in [an architecture decision](https://github.com/fderuiter/QRCraftly-web/blob/main/docs/adr/0022-no-dynamic-qr-codes-client-side-only.md), and it has a cost: we cannot give you scan counts or editable destinations. If you need those, use the middle path above or a dynamic provider whose terms you have read.',
+            text: 'QRCraftly makes static codes only. There are no accounts, no servers that store your codes and no redirects, so a code you make here keeps working as long as the address inside it does, whether or not this site is still around. That is a deliberate decision, and it has a cost: we cannot give you scan counts or editable destinations. If you need those, use the middle path above or a dynamic provider whose terms you have read.',
           },
           {
             type: 'p',

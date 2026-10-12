@@ -5,7 +5,7 @@ export const copy: ToolCopy = {
   faqs: [
     {
       question: 'Is QRCraftly free?',
-      answer: 'Yes. Every feature is free for everyone, with no account and no paid tier.',
+      answer: 'Yes. Every feature on the site is free for everyone, with no account and no paid tier.',
     },
     {
       question: 'Does QRCraftly show ads?',
@@ -21,7 +21,7 @@ export const copy: ToolCopy = {
     },
     {
       question: 'Is QRCraftly open source?',
-      answer: 'Yes. The code is on GitHub at github.com/fderuiter/QRCraftly-web under the GNU Affero General Public License v3.0. Anyone can read it, run it or suggest a change.',
+      answer: 'Not any more. The code published up to October 2026 was released under the GNU AGPL v3.0; later versions are not public. You do not need the code to check the privacy promises: the security page shows how to check them in your own browser.',
     },
   ],
 };

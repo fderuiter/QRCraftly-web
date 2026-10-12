@@ -35,10 +35,10 @@ export interface LandingMeta {
 export const landingPageMeta: Record<string, LandingMeta> = {
   'mosaic-qr-code': {
     name: 'Image QR Code Generator',
-    seoTitle: 'Image QR Code Generator: Your Picture, No AI, Never Uploaded | QRCraftly',
+    seoTitle: 'Image QR Code Generator: No AI, Never Uploaded | QRCraftly',
     heading: 'Image QR Code Generator (Mosaic)',
     description:
-      'Turn your own picture into a QR code that still scans. No AI and no upload: your image is tiled into the code in your browser. Free, no sign-up, no ads.',
+      'Make a QR code from your own picture and check that it still scans. Your image stays in your browser. Free, no sign-up, no ads.',
     imageAlt: 'A QR code whose modules are tiled from a sunset picture, made with the QRCraftly image QR code generator',
     features: [
       'Your own picture is tiled into the QR code, not an AI rendering of it',

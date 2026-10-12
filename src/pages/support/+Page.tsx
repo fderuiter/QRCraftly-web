@@ -17,9 +17,8 @@
 */
 
 import { ArticleHeading, ArticleLayout, type ArticleSection } from '@/components/ArticleLayout';
+import { CONTACT_ADDRESS, CONTACT_MAILTO } from '@/data/contact';
 
-/** Where to reach us about the app. A placeholder until the address is chosen. */
-const CONTACT = 'YOUR_EMAIL';
 
 const SECTIONS: readonly ArticleSection[] = [
   { id: 'wont-scan', label: "A code won't scan" },
@@ -79,7 +78,9 @@ export default function Page() {
 
       <section id="contact" aria-labelledby="contact-title" className={SECTION_CLASSES}>
         <ArticleHeading id="contact"><span id="contact-title">Contact us</span></ArticleHeading>
-        <p>{CONTACT}</p>
+        <p>
+          Email <a href={CONTACT_MAILTO} className={LINK_CLASSES}>{CONTACT_ADDRESS}</a>.
+        </p>
       </section>
     </ArticleLayout>
   );
