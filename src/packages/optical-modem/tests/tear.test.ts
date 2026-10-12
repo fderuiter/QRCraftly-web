@@ -24,6 +24,7 @@ import {
   encodeModemFrame,
   frameCapacity,
   loadOpticalModem,
+  runReferenceKernel,
   simulateCapture,
   type DecodedFrame,
   type RgbaImage,
@@ -51,9 +52,24 @@ function frameOf(seq: number): RgbaImage {
   return frame;
 }
 
-/** A studio capture of frame `seq` with frame `seq + 1` from `tear` of the camera height down. */
-function torn(seq: number, tear: number, seed = seq): RgbaImage {
-  return simulateCapture(frameOf(seq), 'studio', { pixelsPerCell: CELL_PX, cellPitch: PITCH, seed, next: frameOf(seq + 1), tearFraction: tear });
+/** A studio capture of frame `seq` with frame `below` (by default `seq + 1`) from `tear` of the camera height down. */
+function torn(seq: number, tear: number, seed = seq, below = seq + 1): RgbaImage {
+  return simulateCapture(frameOf(seq), 'studio', { pixelsPerCell: CELL_PX, cellPitch: PITCH, seed, next: frameOf(below), tearFraction: tear });
+}
+
+/** The capture with its top or bottom header strip greyed out between the fiducials, past the calibration patches. */
+function withoutStrip(image: RgbaImage, bottom: boolean): RgbaImage {
+  const data = image.data.slice();
+  const screen = image.height / 1.2;
+  const rowY = (row: number): number => image.height / 2 - screen / 2 + (row / PROFILE.rows) * screen;
+  const cellX = image.width / 1.2 / PROFILE.cols;
+  const left = Math.floor((image.width - image.width / 1.2) / 2 + 23 * cellX);
+  const right = Math.ceil((image.width + image.width / 1.2) / 2 - 10 * cellX);
+  const first = bottom ? PROFILE.rows - 4 : 5;
+  for (let y = Math.floor(rowY(first) - 3); y < Math.ceil(rowY(first + 4) + 3); y++) {
+    for (let x = left; x < right; x++) data.fill(128, (y * image.width + x) * 4, (y * image.width + x) * 4 + 3);
+  }
+  return { ...image, data };
 }
 
 /** The image turned clockwise by `turns` quarters. */
@@ -163,25 +179,80 @@ describe('torn captures (ADR 0048)', () => {
     expect(quarter.wrong + flipped.wrong).toBe(0);
   });
 
-  it('guesses the sequence of a side whose header strip is unreadable, and the tag refuses the wrong guesses', { timeout: 120_000 }, () => {
+  it('guesses the sequence of a side whose header strip is unreadable, the likelier neighbour first', { timeout: 120_000 }, () => {
     const image = torn(10, 0.75);
-    // Grey out the bottom header strip between the fiducials, past the calibration patches.
-    const data = image.data.slice();
-    const screen = image.height / 1.2;
-    const rowY = (row: number): number => image.height / 2 - screen / 2 + (row / PROFILE.rows) * screen;
-    const cellX = image.width / 1.2 / PROFILE.cols;
-    const left = Math.floor((image.width - image.width / 1.2) / 2 + 23 * cellX);
-    const right = Math.ceil((image.width + image.width / 1.2) / 2 - 10 * cellX);
-    for (let y = Math.floor(rowY(PROFILE.rows - 4) - 3); y < Math.ceil(rowY(PROFILE.rows) + 3); y++) {
-      for (let x = left; x < right; x++) data.fill(128, (y * image.width + x) * 4, (y * image.width + x) * 4 + 3);
-    }
     const intact = decode(image);
     expect(intact.ok && intact.tear?.strips).toEqual([10, 11]);
-    const result = decode({ ...image, data });
+    const result = decode(withoutStrip(image, true));
     if (!result.ok) throw new Error('unreadable capture');
     // The bottom strip no longer reads, so its side is guessed as the next frame first.
     expect(result.tear?.strips).toEqual([10, null]);
     expect(result.tear?.seqs).toEqual([10, 11]);
+    const tally = new Tally();
+    tally.add(result);
+    expect(tally.count(10)).toBe(CAPACITY.blocks);
+    // With the top strip unreadable instead, the header is the bottom strip's frame 10, and the top side is guessed
+    // as the previous frame first: frame 9 over three quarters of the picture comes back from the first pair tried.
+    const above = decode(withoutStrip(torn(9, 0.75), false));
+    if (!above.ok) throw new Error('unreadable capture');
+    expect(above.header.seq).toBe(10);
+    expect(above.tear?.strips).toEqual([null, 10]);
+    expect(above.tear?.seqs).toEqual([9, 10]);
+    expect(above.tear?.tried).toBe(1);
+    expect(above.others?.map((o) => [o.seq, o.blocksOk])).toEqual([[9, CAPACITY.blocks]]);
+    tally.add(above);
+    expect(tally.wrong).toBe(0);
+  });
+
+  it('gives no block of a frame the guesses do not name, though its side holds enough of it', { timeout: 120_000 }, () => {
+    // Frame 10 above a quarter of the picture and frame 12 below: not a neighbour, so neither guess (11, 9) is right.
+    const image = torn(10, 0.25, 10, 12);
+    // With both strips readable, they name frame 12 and its blocks come back under its own sequence.
+    const named = decode(image);
+    const control = new Tally();
+    control.add(named);
+    expect(named.ok && named.tear?.strips).toEqual([10, 12]);
+    expect(control.count(12)).toBe(CAPACITY.blocks);
+    // With the bottom strip unreadable, both guesses are tried and the tag refuses every block they read.
+    const guessed = decode(withoutStrip(image, true));
+    if (!guessed.ok) throw new Error('unreadable capture');
+    expect(guessed.tear?.strips).toEqual([10, null]);
+    expect(guessed.tear?.tried).toBe(2);
+    expect(guessed.others).toBeUndefined();
+    expect(guessed.blocksOk).toBe(0);
+    const tally = new Tally();
+    tally.add(guessed);
+    expect(tally.wrong + control.wrong).toBe(0);
+  });
+
+  it('keeps no carry for a frame it only guessed, which would spoil the next capture', { timeout: 120_000 }, () => {
+    // Frame 10 over most of the picture and frame 15, not 11, below it, with the bottom strip unreadable: frame 10
+    // decodes, and the guess that the rest is frame 11 is wrong.
+    const first = decode(withoutStrip(torn(10, 0.75, 10, 15), true));
+    if (!first.ok) throw new Error('unreadable capture');
+    expect(first.tear?.strips).toEqual([10, null]);
+    expect(first.blocksOk).toBe(CAPACITY.blocks);
+    expect(first.carry).toBeUndefined();
+    // Frame 11 torn at 0.75 decodes in full from its own capture, also given whatever the first one returned.
+    const tally = new Tally();
+    tally.add(decode(torn(11, 0.75), { carry: first.carry }));
+    expect(tally.count(11)).toBe(CAPACITY.blocks);
+    expect(tally.wrong).toBe(0);
+  });
+
+  it('places the cut by the capture homography when an external sampler used the module for something else', { timeout: 60_000 }, () => {
+    const image = torn(10, 0.75);
+    // A shear: under it, the camera's rows would run diagonally across the grid.
+    const sheared = Float32Array.from([1, 0, 0, 0.5, 1, 0, 0, 0, 1]);
+    const result = decodeModemFrame(image, {
+      geometries: [PROFILE],
+      sampleGrid: (capture, uniforms) => {
+        const grid = runReferenceKernel(capture, uniforms);
+        // Sampling something else leaves another homography in the module.
+        runReferenceKernel(capture, { ...uniforms, homography: sheared });
+        return grid;
+      },
+    });
     const tally = new Tally();
     tally.add(result);
     expect(tally.count(10)).toBe(CAPACITY.blocks);

@@ -348,7 +348,8 @@ export class ModemKernels {
   /**
    * Decodes the receiver's grid as a capture torn between two frames: the cells above a cut across
    * the camera's rows against `seqs[0]`, those below it against `seqs[1]`, each with the other
-   * side's bytes erased (ADR 0048). The homography in place says where the camera's rows run.
+   * side's bytes erased (ADR 0048).
+   * @param homography - The capture's homography, nine 32-bit floats: it says where the camera's rows run.
    * @param bits - Bits per cell.
    * @param shape - Grid and inner code.
    * @param session - Session id.
@@ -359,6 +360,7 @@ export class ModemKernels {
    * @returns Views of each side's blocks and counts.
    */
   public decodeTorn(
+    homography: Float32Array,
     bits: number,
     shape: Shape,
     session: number,
@@ -371,6 +373,8 @@ export class ModemKernels {
     const cells = shape.cols * (shape.rows - 18);
     const input = this.input(2 * blocks + (carry ? 2 * cells : 0));
     input.fill(0);
+    // An external grid sampler may have left another homography in the module since the acquisition.
+    this.io().set(homography.subarray(0, 9), IO_HOMOGRAPHY);
     known.forEach((flags, side) => {
       if (flags) input.set(flags.subarray(0, blocks), side * blocks);
     });

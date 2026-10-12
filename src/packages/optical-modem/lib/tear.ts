@@ -25,6 +25,7 @@
  */
 import type { FrameHeader } from './header';
 import type { CarriedCells, ModemKernels, TornSide } from './kernels';
+import { BAND_ROWS } from './layout';
 
 /**
  * The cells of a frame a torn capture showed only in part, kept for the next capture to finish. Pass
@@ -93,8 +94,9 @@ function tearHypotheses(seq: number, strips: readonly [number | null, number | n
   const next = (seq + 1) >>> 0;
   const previous = (seq - 1) >>> 0;
   if (top !== null && bottom !== null) return top === bottom ? [] : [[top, bottom]];
+  // A camera reading its rows from the top shows the earlier frame above the tear and the later one below.
   if (top !== null) return [[seq, next], [seq, previous]];
-  if (bottom !== null) return [[next, seq], [previous, seq]];
+  if (bottom !== null) return [[previous, seq], [next, seq]];
   return [
     [seq, next],
     [previous, seq],
@@ -103,8 +105,9 @@ function tearHypotheses(seq: number, strips: readonly [number | null, number | n
   ];
 }
 
-/** Whether a carry belongs to this frame's session and shape. */
+/** Whether a carry belongs to this frame's session and shape, and holds a cell per data cell. */
 function carryFits(carry: TearCarry | undefined, header: FrameHeader): carry is TearCarry {
+  const cells = header.cols * (header.rows - 2 * BAND_ROWS);
   return (
     carry !== undefined &&
     carry.session === header.session &&
@@ -112,7 +115,11 @@ function carryFits(carry: TearCarry | undefined, header: FrameHeader): carry is 
     carry.rows === header.rows &&
     carry.constellation === header.constellation &&
     carry.packetBytes === header.packetBytes &&
-    carry.parity === header.parity
+    carry.parity === header.parity &&
+    (carry.side === 0 || carry.side === 1) &&
+    carry.homography.length >= 9 &&
+    carry.symbols.length >= cells &&
+    carry.confidence.length >= cells
   );
 }
 
@@ -123,7 +130,7 @@ const follows = (later: number, earlier: number): boolean => later === ((earlier
  * Recovers what a torn capture holds beyond the plain decode. Call it after the plain decode of the
  * grid in the module, with that decode's block flags. Tries each pair of sequences from
  * {@link tearHypotheses} until one gives blocks.
- * @param kernels - The module, holding the capture's grid and homography.
+ * @param kernels - The module, holding the capture's sampled grid.
  * @param bits - Bits per cell.
  * @param header - The frame's header.
  * @param blocks - Blocks in a frame.
@@ -131,7 +138,7 @@ const follows = (later: number, earlier: number): boolean => later === ((earlier
  * @param threshold - Confidence under which bytes are erasures, or null.
  * @param decoded - Per block, 1 when the plain decode repaired it.
  * @param carry - Cells an earlier torn capture kept, if any.
- * @param homography - This capture's homography, kept in a new carry.
+ * @param homography - This capture's homography, which places the cut and is kept in a new carry.
  * @returns What it recovered, or null when the capture shows no sign of a tear.
  */
 export function recoverTear(
@@ -154,7 +161,7 @@ export function recoverTear(
   let sides: [TornSide, TornSide] | null = null;
   for (const seqs of pairs) {
     const known: [Uint8Array | null, Uint8Array | null] = [seqs[0] === header.seq ? decoded : null, seqs[1] === header.seq ? decoded : null];
-    const result = kernels.decodeTorn(bits, header, header.session, seqs, threshold, known, usable && seqs.includes(usable.seq) ? usable : null);
+    const result = kernels.decodeTorn(homography, bits, header, header.session, seqs, threshold, known, usable && seqs.includes(usable.seq) ? usable : null);
     report.tried++;
     report.refused += result[0].refused + result[1].refused;
     report.seqs = seqs;
@@ -179,13 +186,17 @@ export function recoverTear(
       }
     });
   }
-  // Keep the later frame's cells when the strips named both frames or a pair gave blocks, and
-  // that frame is not yet complete: the next capture shows it on the other side of the tear.
-  if (sides || (strips[0] !== null && strips[1] !== null)) {
+  // Keep the later frame's cells when both frames are known to be in the capture and the later one
+  // is not yet complete: the next capture shows it on the other side of the tear. A frame is known
+  // by the header, by its own strip or by blocks of its side. A guessed sequence that gave nothing
+  // may name no frame of this capture, and its cells, carried under that sequence, would put
+  // confident errors where the next capture's decode would have had erasures.
+  const known = (s: 0 | 1): boolean => seqs[s] === header.seq || strips[s] === seqs[s] || (sides !== null && sides[s].blocksOk > 0);
+  if (known(0) && known(1)) {
     const later: 0 | 1 | null = follows(seqs[1], seqs[0]) ? 1 : follows(seqs[0], seqs[1]) ? 0 : null;
     const done = later === null ? blocks : (sides ? sides[later].blocksOk : 0) + (seqs[later] === header.seq ? decoded.reduce((n, f) => n + f, 0) : 0);
     if (later !== null && done < blocks) {
-      const cells = header.cols * (header.rows - 18);
+      const cells = header.cols * (header.rows - 2 * BAND_ROWS);
       const grid = kernels.grid(cells);
       recovery.carry = {
         session: header.session,

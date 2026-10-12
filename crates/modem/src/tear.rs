@@ -590,6 +590,64 @@ mod tests {
     }
 
     #[test]
+    fn odd_homographies_and_thresholds_give_no_wrong_block() {
+        let (c, grid) = shape();
+        let (a, sa) = frame(&c, 9);
+        let (_, sb) = frame(&c, 10);
+        let symbols = torn(&c, &grid, &sa, &sb, 0.8);
+        let confidence = alloc::vec![200u8; c.data_cells];
+        let nan = f32::NAN;
+        let homographies = [
+            // The projective term crosses zero inside the grid: some cells land at infinity.
+            [4.0, 0.0, 0.0, 0.0, 4.0, 0.0, -0.02, 0.0, 1.0],
+            [nan, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 1.0],
+            [4.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, nan],
+            [f32::INFINITY, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 1.0],
+            [1e-30, 0.0, 0.0, 0.0, 1e-30, 0.0, 0.0, 0.0, 1.0],
+            [4.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 1.0],
+        ];
+        for h in homographies {
+            for threshold in [None, Some(f64::NAN), Some(-1.0), Some(0.0), Some(1e9)] {
+                let carry = Carry {
+                    seq: 9,
+                    side: 0,
+                    homography: h,
+                    symbols: &sb,
+                    confidence: &confidence,
+                };
+                let mut ok = [alloc::vec![0u8; c.blocks], alloc::vec![0u8; c.blocks]];
+                let mut out = [
+                    alloc::vec![0u8; c.payload_bytes()],
+                    alloc::vec![0u8; c.payload_bytes()],
+                ];
+                let [ok0, ok1] = &mut ok;
+                let [out0, out1] = &mut out;
+                let _ = decode_torn(
+                    &c,
+                    &grid,
+                    &h,
+                    &symbols,
+                    &confidence,
+                    SESSION,
+                    [9, 10],
+                    threshold,
+                    [&[], &[]],
+                    Some(&carry),
+                    [ok0, ok1],
+                    [out0, out1],
+                    &mut TearScratch::default(),
+                );
+                // Side 1 shows frame 10 but too little of it; side 0 may only give frame 9's blocks.
+                assert!(ok[1].iter().all(|&f| f == 0), "{h:?} {threshold:?}");
+                let blocks = out[0].chunks(c.packet_bytes).zip(a.chunks(c.packet_bytes));
+                for (&flag, (got, sent)) in ok[0].iter().zip(blocks) {
+                    assert!(flag == 0 || got == sent, "{h:?} {threshold:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
     fn skips_known_blocks_and_refuses_a_degenerate_homography() {
         let (c, grid) = shape();
         let (_, sa) = frame(&c, 9);
