@@ -17,10 +17,10 @@
 */
 
 import { constellationShape } from './constellation';
-import { acquireFrame, drawFrame, type AcquireFailure } from './frame';
+import { acquireFrame, drawFrame, trackFrame, type AcquireFailure, type TrackHint } from './frame';
 import { MODEM_VERSION, type FrameHeader } from './header';
 import { kernelUniforms, type KernelUniforms, type SampledGrid } from './kernel';
-import { BLOCK_TAG_BYTES, modemKernels } from './kernels';
+import { BLOCK_TAG_BYTES, modemKernels, type FiducialSearch } from './kernels';
 import { BAND_ROWS, type GridGeometry, type RgbaImage } from './layout';
 import { MODEM_GEOMETRIES, type ModemProfile } from './profile';
 
@@ -103,6 +103,11 @@ export interface DecodeOptions {
    * same inputs and has to give the same bytes; return null to have the reference kernel do it.
    */
   sampleGrid?: (image: RgbaImage, uniforms: KernelUniforms) => SampledGrid | null;
+  /**
+   * Where the last frame was found ({@link DecodedFrame}'s `track`). The search then starts near
+   * it and only labels the whole image when the frame is not there.
+   */
+  track?: TrackHint;
 }
 
 /** Confidence under which a cell's bytes count as erasures, unless told otherwise. */
@@ -128,6 +133,10 @@ export type DecodedFrame =
        * they would have reached the outer code wrong. Each was retried with fewer erasures.
        */
       refused: number;
+      /** Pass this as the next frame's `track` option. */
+      track: TrackHint;
+      /** Whether the frame was found by the tracked search rather than the full one. */
+      tracked: boolean;
     }
   | { ok: false; reason: DecodeFailure };
 
@@ -142,8 +151,12 @@ export type DecodedFrame =
  * @returns The decoded blocks or why the frame was unreadable.
  */
 export function decodeModemFrame(image: RgbaImage, options: DecodeOptions = {}): DecodedFrame {
-  const acquired = acquireFrame(image, options.geometries ?? MODEM_GEOMETRIES);
+  const geometries = options.geometries ?? MODEM_GEOMETRIES;
+  let acquired = options.track ? trackFrame(image, geometries, options.track) : null;
+  const tracked = acquired?.ok === true;
+  if (!acquired?.ok) acquired = acquireFrame(image, geometries);
   if (!acquired.ok) return { ok: false, reason: acquired.reason };
+  const fiducials: FiducialSearch = acquired.fiducials;
   const { header } = acquired.frame;
   let capacity: FrameCapacity;
   try {
@@ -175,5 +188,15 @@ export function decodeModemFrame(image: RgbaImage, options: DecodeOptions = {}):
   for (let b = 0; b < capacity.blocks; b++) {
     blocks.push(decoded.ok[b] ? decoded.data.slice(b * header.packetBytes, (b + 1) * header.packetBytes) : null);
   }
-  return { ok: true, header, blocks, blocksOk: decoded.blocksOk, erasures: decoded.erasures, corrected: decoded.corrected, refused: decoded.refused };
+  return {
+    ok: true,
+    header,
+    blocks,
+    blocksOk: decoded.blocksOk,
+    erasures: decoded.erasures,
+    corrected: decoded.corrected,
+    refused: decoded.refused,
+    track: { fiducials, cols: header.cols },
+    tracked,
+  };
 }
