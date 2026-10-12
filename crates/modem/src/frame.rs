@@ -23,7 +23,10 @@
 use crate::colour::luma;
 use crate::constellation;
 use crate::layout::{Grid, HEADER_BITS};
-use crate::locate::{locate_fiducials, solve_homography, track_fiducials, Fiducials, Scratch};
+use crate::locate::{
+    locate_fiducials, locate_fiducials_strict, solve_homography, track_fiducials, Fiducials,
+    Scratch,
+};
 use crate::rs;
 use crate::sample::{read_patch, reference_midpoint, sample_cell};
 use crate::Image;
@@ -129,9 +132,43 @@ pub struct Acquisition {
 }
 
 /// Finds a frame in a captured image. `geometries` must already be checked.
-pub fn acquire(image: &Image, geometries: &[Grid], scratch: &mut Scratch) -> Acquisition {
+///
+/// When the four rings the whole-image search chose give no frame and `strict`
+/// is set, the strict search ([`locate_fiducials_strict`]) looks again; its
+/// rings are used only if they differ and give a frame. Otherwise the first
+/// failure is returned as it was, fiducials included, so a frame the
+/// whole-image search reads, or fails to read, gives the same result as before
+/// the strict search existed unless the strict search reads it (ADR 0047).
+/// A header that read but names a version or constellation this receiver does
+/// not know means the frame was found, so the strict search does not run.
+pub fn acquire(
+    image: &Image,
+    geometries: &[Grid],
+    scratch: &mut Scratch,
+    strict: bool,
+) -> Acquisition {
     let fiducials = locate_fiducials(image, scratch);
-    read_frame(image, geometries, fiducials)
+    let first = read_frame(image, geometries, fiducials);
+    let lost = matches!(
+        first.result,
+        Err(Failure::NoFiducials | Failure::NoHeader | Failure::LowContrast)
+    );
+    if !lost || !strict {
+        return first;
+    }
+    let mut second = None;
+    locate_fiducials_strict(scratch, |strict| {
+        if Some(*strict) == first.fiducials {
+            return false;
+        }
+        let read = read_frame(image, geometries, Some(*strict));
+        let ok = read.result.is_ok();
+        if ok {
+            second = Some(read);
+        }
+        ok
+    });
+    second.unwrap_or(first)
 }
 
 /// Finds a frame near where an earlier frame's fiducials were (see

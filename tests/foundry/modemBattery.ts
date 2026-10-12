@@ -150,9 +150,10 @@ export function runModemBattery(exports: WebAssembly.Exports): Uint8Array {
       image[(y * width + x) * 4 + 3] = 255;
     }
   }
-  // No fiducials in this picture: acquiring it must fail the same way everywhere.
+  // No fiducials in this picture: acquiring it, the strict search included (ADR 0047), must fail
+  // the same way everywhere.
   io().set([cols, rows], 128);
-  pushI32(call('modem_rx_acquire', rx, 1));
+  pushI32(call('modem_rx_acquire', rx, 1, 0));
   io().set(h, 12);
   io().set(colours, 21);
   pushI32(call('modem_rx_sample', rx, cols, dataRows, 9, 4));

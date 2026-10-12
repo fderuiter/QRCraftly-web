@@ -356,6 +356,18 @@ export interface CaptureOptions {
   /** The next frame, shown below `tearFraction` of the camera height. */
   next?: RgbaImage;
   tearFraction?: number;
+  /** Perspective in place of the channel's: the fraction of the frame height the right edge loses from top and bottom (see `placeFrame`). */
+  keystone?: number;
+  /** In-plane rotation in place of the channel's, as tan(angle / 2). */
+  tilt?: number;
+}
+
+/** Where {@link simulateCapture} puts a frame: the camera's size and the frame's four corners on it. */
+function placement(frame: RgbaImage, preset: ChannelPreset, options: CaptureOptions): { camera: { width: number; height: number }; corners: [Point, Point, Point, Point] } {
+  const { keystone, tilt } = PRESETS[preset];
+  const scale = options.pixelsPerCell / options.cellPitch;
+  const camera = { width: Math.ceil(frame.width * scale * 1.2), height: Math.ceil(frame.height * scale * 1.2) };
+  return { camera, corners: placeFrame(frame, camera, scale, options.keystone ?? keystone, options.tilt ?? tilt) };
 }
 
 /**
@@ -367,18 +379,44 @@ export interface CaptureOptions {
  * @returns The camera image.
  */
 export function simulateCapture(frame: RgbaImage, preset: ChannelPreset, options: CaptureOptions): RgbaImage {
-  const { keystone, tilt, ...params } = PRESETS[preset];
-  const scale = options.pixelsPerCell / options.cellPitch;
-  const camera = { width: Math.ceil(frame.width * scale * 1.2), height: Math.ceil(frame.height * scale * 1.2) };
+  const { keystone: _keystone, tilt: _tilt, ...params } = PRESETS[preset];
+  const { camera, corners } = placement(frame, preset, options);
   return applyChannel(
     frame,
     {
       ...params,
       ...camera,
-      corners: placeFrame(frame, camera, scale, keystone, tilt),
+      corners,
       seed: options.seed ?? 1,
       tearRow: options.next ? Math.floor(camera.height * (options.tearFraction ?? 0.5)) : undefined,
     },
     options.next
   );
+}
+
+/**
+ * Where points of a rendered frame land in the image {@link simulateCapture} makes with the same
+ * arguments, before blur and noise: what a test of the fiducial search compares its finds with.
+ * @param frame - The rendered frame.
+ * @param preset - The channel.
+ * @param options - As given to {@link simulateCapture}.
+ * @param points - Points of the rendered frame, in its pixels.
+ * @returns Where each lands, in camera pixels.
+ */
+export function capturedPoints(frame: RgbaImage, preset: ChannelPreset, options: CaptureOptions, points: readonly (readonly [number, number])[]): Point[] {
+  const { corners } = placement(frame, preset, options);
+  const h = modemKernels().solveHomography(
+    [
+      [0, 0],
+      [frame.width, 0],
+      [frame.width, frame.height],
+      [0, frame.height],
+    ],
+    corners
+  );
+  if (!h) throw new Error('Degenerate screen placement');
+  return points.map(([x, y]) => {
+    const w = h[6] * x + h[7] * y + 1;
+    return { x: (h[0] * x + h[1] * y + h[2]) / w, y: (h[3] * x + h[4] * y + h[5]) / w };
+  });
 }

@@ -31,7 +31,8 @@ export const WASM_MODULE_BUDGETS_KB = {
   'qr-encode': 20,
   'qr-decode': 32,
   'prism-fec': 10,
-  modem: 40,
+  // 40 KB under #1198; 48 KB since #1161 added the strict fiducial search (ADR 0047), about 45 KB.
+  modem: 48,
 };
 
 /**

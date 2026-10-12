@@ -57,14 +57,19 @@ export type AcquireResult = { ok: true; frame: AcquiredFrame; fiducials: Fiducia
  * Finds a frame in a captured image: the fiducials, then the header against each known geometry
  * and each of the four ways the fiducials could be numbered. The search runs in the modem module,
  * which keeps the image for the sampling that follows.
+ *
+ * When the four rings the whole-image search picks give no frame, a strict search checks rings cell
+ * by cell and tries again (ADR 0047); `strict: false` skips it.
  * @param image - The captured frame.
  * @param geometries - Grid sizes the receiver knows about.
+ * @param options - How hard to look.
+ * @param options.strict - Whether the strict search may look again (default true).
  * @returns The acquired frame with its live palette, or why it failed.
  */
-export function acquireFrame(image: RgbaImage, geometries: readonly GridGeometry[]): AcquireResult {
+export function acquireFrame(image: RgbaImage, geometries: readonly GridGeometry[], { strict = true }: { strict?: boolean } = {}): AcquireResult {
   const kernels = modemKernels();
   kernels.setImage(image);
-  return acquired(kernels.acquire(geometries));
+  return acquired(kernels.acquire(geometries, strict));
 }
 
 /** Where a receiver last found a frame, so the next search can stay near it. */
