@@ -199,7 +199,7 @@ describe('QRTool Component', () => {
     expect(badge).toHaveTextContent('Static · Non-expiring');
   });
 
-  it('opens the phone wallet dialog from the Download options, and not while there is no content (ADR 0047)', async () => {
+  it('opens the phone wallet dialog from the Download options, and not while there is no content (ADR 0048)', async () => {
     const { unmount } = render(<ToastProvider><QRTool initialConfig={{ value: 'https://www.example.com/path' }} /></ToastProvider>);
     fireEvent.click(screen.getByRole('button', { name: 'Download options' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add to phone wallet' }));
