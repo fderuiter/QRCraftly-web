@@ -18,6 +18,7 @@ export {
   type EdgeResult,
 } from './lib/probeAnalysis';
 export type { RgbaImage } from './lib/layout';
+export type { TrackHint } from './lib/frame';
 export {
   encodeModemFrame,
   decodeModemFrame,
@@ -27,7 +28,7 @@ export {
   type DecodedFrame,
   type FrameCapacity,
 } from './lib/codec';
-export { MODEM_PROFILES, type ModemProfile } from './lib/profile';
+export { HIGH_RATE_PROFILES, MODEM_PROFILES, type ModemProfile } from './lib/profile';
 export {
   KERNEL_MAX_SYMBOLS,
   runReferenceKernel,
