@@ -25,6 +25,7 @@ import { sharpen, type Sharpening } from './impairments/sharpen';
 import { denoiseChroma } from './impairments/chroma';
 import { denoiseTemporal, mixLinear, type TemporalNoiseReduction } from './impairments/temporal';
 import { bandRows, type PwmBanding } from './impairments/pwm';
+import { blurPlane } from './impairments/blur';
 
 /** How a screen becomes a camera frame in the simulator. Everything is optional except the placement. */
 export interface ChannelParams {
@@ -55,7 +56,7 @@ export interface ChannelParams {
   seed?: number;
   /** Camera rows the tear line drops per camera column from the centre, for a diagonal tear (a portrait phone on a landscape screen). */
   tearSlope?: number;
-  /** Share of the `next` frame in every pixel above the tear line: an exposure that spans a refresh. */
+  /** Share of the `next` frame in every pixel above the tear line (`tearRow` must be set): an exposure that spans a refresh. */
   blend?: number;
   /** Mix frames as light (through the sRGB curve) rather than as sRGB values. */
   linearLight?: boolean;
@@ -142,7 +143,7 @@ function warp(frame: RgbaImage, next: RgbaImage | undefined, params: ChannelPara
   const planes = [new Float32Array(width * height), new Float32Array(width * height), new Float32Array(width * height)];
   const sample = [0, 0, 0];
   const other = [0, 0, 0];
-  const blend = next ? (params.blend ?? 0) : 0;
+  const blend = next && params.tearRow !== undefined ? (params.blend ?? 0) : 0;
   const mix = params.linearLight ? mixLinear : (a: number, b: number, t: number) => a * (1 - t) + b * t;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -182,24 +183,6 @@ function warp(frame: RgbaImage, next: RgbaImage | undefined, params: ChannelPara
     }
   }
   return planes;
-}
-
-function blurPlane(plane: Float32Array, width: number, height: number, passes: number): void {
-  const tmp = new Float32Array(plane.length);
-  for (let pass = 0; pass < passes; pass++) {
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const at = y * width + x;
-        tmp[at] = 0.25 * plane[at - (x > 0 ? 1 : 0)] + 0.5 * plane[at] + 0.25 * plane[at + (x < width - 1 ? 1 : 0)];
-      }
-    }
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const at = y * width + x;
-        plane[at] = 0.25 * tmp[at - (y > 0 ? width : 0)] + 0.5 * tmp[at] + 0.25 * tmp[at + (y < height - 1 ? width : 0)];
-      }
-    }
-  }
 }
 
 function demosaic(planes: Float32Array[], width: number, height: number): void {

@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { blurPlane } from './blur';
+
 /** A phone ISP's edge enhancement: an unsharp mask on luma with a coring threshold and a clamp. */
 export interface Sharpening {
   /** Gain on the detail signal (luma minus its blur); 0 is off, phones use about 0.5 to 2. */
@@ -26,32 +28,6 @@ export interface Sharpening {
   threshold?: number;
   /** Largest change to a pixel in 8-bit levels, so edges ring but do not explode (default 255). */
   clamp?: number;
-}
-
-/**
- * Blurs a plane in place with a separable [1 2 1] / 4 kernel, clamping at the image edges.
- * Private copy of the blur in `channel.ts`, which cannot be imported here without a cycle.
- * @param plane - The plane, width times height samples.
- * @param width - Width in pixels.
- * @param height - Height in pixels.
- * @param passes - Number of passes.
- */
-function blurLuma(plane: Float32Array, width: number, height: number, passes: number): void {
-  const tmp = new Float32Array(plane.length);
-  for (let pass = 0; pass < passes; pass++) {
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const at = y * width + x;
-        tmp[at] = 0.25 * plane[at - (x > 0 ? 1 : 0)] + 0.5 * plane[at] + 0.25 * plane[at + (x < width - 1 ? 1 : 0)];
-      }
-    }
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const at = y * width + x;
-        plane[at] = 0.25 * tmp[at - (y > 0 ? width : 0)] + 0.5 * tmp[at] + 0.25 * tmp[at + (y < height - 1 ? width : 0)];
-      }
-    }
-  }
 }
 
 /**
@@ -73,7 +49,7 @@ export function sharpen(planes: Float32Array[], width: number, height: number, s
   const luma = new Float32Array(size);
   for (let i = 0; i < size; i++) luma[i] = 0.299 * red[i] + 0.587 * green[i] + 0.114 * blue[i];
   const low = Float32Array.from(luma);
-  blurLuma(low, width, height, passes);
+  blurPlane(low, width, height, passes);
   const limit = Math.abs(clamp);
   for (let i = 0; i < size; i++) {
     const detail = luma[i] - low[i];

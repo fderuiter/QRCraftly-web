@@ -65,6 +65,7 @@ export function steady(x: number, y: number, width: number, height: number, moti
   const shiftX = motion.shiftX ?? 0;
   const shiftY = motion.shiftY ?? 0;
   const t = motion.rotation ?? 0;
+  if (shear === 0 && stretch === 0 && shiftX === 0 && shiftY === 0 && t === 0) return [x, y];
   // Rolling shutter: each row was read while the picture had moved by a row-dependent amount.
   const x1 = x - shear * (y - cy);
   const y1 = y - stretch * (y - cy);
