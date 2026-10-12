@@ -27,7 +27,8 @@
  *   whole-image search alone), the header read back, why the others failed, and the median time;
  * - **negatives**: pictures with no frame a receiver may read; any acquisition is a false one;
  * - **timing**: the whole-image search alone and with the strict search after it, on large
- *   captures and on pixel noise. A module without the strict search ignores `strict: false`.
+ *   captures, on captures with a fiducial out of view (the strict search's slowest case) and on
+ *   pixel noise. A module without the strict search ignores `strict: false`.
  *
  * Options:
  *
@@ -162,10 +163,27 @@ if (!only || only === 'timing') {
     }
     return { width, height, data };
   };
+  // A frame whose bottom-right fiducial is out of the picture, as while a receiver is being aimed:
+  // the whole-image search finds three rings, and the strict search runs every stage, the
+  // fourth-fiducial search included, before it gives up. The slowest case for a failed frame.
+  const hidden = (frame: RgbaImage, profile: ModemProfile): RgbaImage => {
+    let state = 99;
+    for (let row = 0; row < 9; row++) {
+      for (let col = profile.cols - 9; col < profile.cols; col++) {
+        state = (Math.imul(state, 1103515245) + 12345) >>> 0;
+        const v = state >>> 31 ? 255 : 0;
+        for (let y = row * 2; y < row * 2 + 2; y++) for (let x = col * 2; x < col * 2 + 2; x++) frame.data.fill(v, (y * frame.width + x) * 4, (y * frame.width + x) * 4 + 3);
+      }
+    }
+    return frame;
+  };
+  const ultraMono = { ...ultra, constellation: constellationId(2, 'oklab') };
   const images: [string, RgbaImage][] = [
     ['P6 Wide 4-colour, 1080p-class, typical', simulateCapture(frameOf(wide, 1), 'typical', { pixelsPerCell: 4.2, cellPitch: 2, seed: 1 })],
     ['P7 Ultra 4-colour, 4K-class, typical', simulateCapture(frameOf(ultra, 1), 'typical', { pixelsPerCell: 4.2, cellPitch: 2, seed: 1 })],
-    ['P7 Ultra mono, 4K-class, typical', simulateCapture(frameOf({ ...ultra, constellation: constellationId(2, 'oklab') }, 1), 'typical', { pixelsPerCell: 4.2, cellPitch: 2, seed: 1 })],
+    ['P7 Ultra mono, 4K-class, typical', simulateCapture(frameOf(ultraMono, 1), 'typical', { pixelsPerCell: 4.2, cellPitch: 2, seed: 1 })],
+    ['P7 Ultra 4-colour, a fiducial out of view', simulateCapture(hidden(frameOf(ultra, 1), ultra), 'typical', { pixelsPerCell: 4.2, cellPitch: 2, seed: 1 })],
+    ['P7 Ultra mono, a fiducial out of view', simulateCapture(hidden(frameOf(ultraMono, 1), ultraMono), 'typical', { pixelsPerCell: 4.2, cellPitch: 2, seed: 1 })],
     ['pixel noise 1920 x 1080', noise(1920, 1080)],
     ['pixel noise 3840 x 2160', noise(3840, 2160)],
   ];

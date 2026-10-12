@@ -139,6 +139,8 @@ pub struct Acquisition {
 /// failure is returned as it was, fiducials included, so a frame the
 /// whole-image search reads, or fails to read, gives the same result as before
 /// the strict search existed unless the strict search reads it (ADR 0047).
+/// A header that read but names a version or constellation this receiver does
+/// not know means the frame was found, so the strict search does not run.
 pub fn acquire(
     image: &Image,
     geometries: &[Grid],
@@ -147,7 +149,11 @@ pub fn acquire(
 ) -> Acquisition {
     let fiducials = locate_fiducials(image, scratch);
     let first = read_frame(image, geometries, fiducials);
-    if first.result.is_ok() || !strict {
+    let lost = matches!(
+        first.result,
+        Err(Failure::NoFiducials | Failure::NoHeader | Failure::LowContrast)
+    );
+    if !lost || !strict {
         return first;
     }
     let mut second = None;

@@ -17,14 +17,14 @@ Grids sized so a cell covers about 4 camera pixels when the screen fills the sim
 
 A seeded random file of 10 frames' worth of data through the outer code, one camera frame per frame sent. "Lock" is the camera frame the receiver first read; every later frame was looked for near the last one (the tracked search). "Blocks repaired" counts from the lock on. Goodput is the file's bytes over the camera time to the frame that completed it, lock-on included, after the rebuilt file matched the sent one byte for byte. A short file pays for the lock-on frame and the outer code's last symbols, so "steady rate" adds the data in repaired blocks per second from the lock on, the rate a long file approaches (before the outer code's overhead, about 0.1% in [TRANSFER_BENCHMARK.md](TRANSFER_BENCHMARK.md)). The simulated phone does not move between frames; the tracked search's tolerance of movement is tested in `src/packages/optical-modem/tests/tracking.test.ts`.
 
-| Profile  | Camera | Channel | Camera px per cell | File    | Complete | Frames | Lock  | Blocks repaired | Goodput at 30 fps       | Goodput at 60 fps       | Steady rate at 60 fps   |
-| -------- | ------ | ------- | ------------------ | ------- | -------- | ------ | ----- | --------------- | ----------------------- | ----------------------- | ----------------------- |
-| P6 Wide  | 1080p  | studio  | 4.2                | 0.13 MB | yes      | 11     | 1     | 100.0%          | 0.36 MB/s (2.9 Mbit/s)  | 0.72 MB/s (5.8 Mbit/s)  | 0.80 MB/s (6.4 Mbit/s)  |
-| P6 Wide  | 1080p  | typical | 4.2                | 0.13 MB | yes      | 11     | 1     | 100.0%          | 0.36 MB/s (2.9 Mbit/s)  | 0.72 MB/s (5.8 Mbit/s)  | 0.80 MB/s (6.4 Mbit/s)  |
-| P6 Wide  | 1080p  | poor    | 4.2                | 0.13 MB | no       | 30     | 1     | 0.0%            | -                       | -                       | 0.00 MB/s (0.0 Mbit/s)  |
-| P7 Ultra | 4K     | studio  | 4.2                | 0.61 MB | yes      | 10     | 1     | 100.0%          | 1.84 MB/s (14.7 Mbit/s) | 3.67 MB/s (29.4 Mbit/s) | 3.67 MB/s (29.4 Mbit/s) |
-| P7 Ultra | 4K     | typical | 4.2                | 0.61 MB | yes      | 11     | 1     | 100.0%          | 1.67 MB/s (13.4 Mbit/s) | 3.34 MB/s (26.7 Mbit/s) | 3.67 MB/s (29.4 Mbit/s) |
-| P7 Ultra | 4K     | poor    | 4.2                | 0.61 MB | no       | 30     | never | 0.0%            | -                       | -                       | 0.00 MB/s (0.0 Mbit/s)  |
+| Profile  | Camera | Channel | Camera px per cell | File    | Complete | Frames | Lock | Blocks repaired | Goodput at 30 fps       | Goodput at 60 fps       | Steady rate at 60 fps   |
+| -------- | ------ | ------- | ------------------ | ------- | -------- | ------ | ---- | --------------- | ----------------------- | ----------------------- | ----------------------- |
+| P6 Wide  | 1080p  | studio  | 4.2                | 0.13 MB | yes      | 11     | 1    | 100.0%          | 0.36 MB/s (2.9 Mbit/s)  | 0.72 MB/s (5.8 Mbit/s)  | 0.80 MB/s (6.4 Mbit/s)  |
+| P6 Wide  | 1080p  | typical | 4.2                | 0.13 MB | yes      | 11     | 1    | 100.0%          | 0.36 MB/s (2.9 Mbit/s)  | 0.72 MB/s (5.8 Mbit/s)  | 0.80 MB/s (6.4 Mbit/s)  |
+| P6 Wide  | 1080p  | poor    | 4.2                | 0.13 MB | no       | 30     | 1    | 0.0%            | -                       | -                       | 0.00 MB/s (0.0 Mbit/s)  |
+| P7 Ultra | 4K     | studio  | 4.2                | 0.61 MB | yes      | 10     | 1    | 100.0%          | 1.84 MB/s (14.7 Mbit/s) | 3.67 MB/s (29.4 Mbit/s) | 3.67 MB/s (29.4 Mbit/s) |
+| P7 Ultra | 4K     | typical | 4.2                | 0.61 MB | yes      | 11     | 1    | 100.0%          | 1.67 MB/s (13.4 Mbit/s) | 3.34 MB/s (26.7 Mbit/s) | 3.67 MB/s (29.4 Mbit/s) |
+| P7 Ultra | 4K     | poor    | 4.2                | 0.61 MB | no       | 30     | 1    | 0.0%            | -                       | -                       | 0.00 MB/s (0.0 Mbit/s)  |
 
 Best: P7 Ultra, 4K camera, studio channel, a steady 3.67 MB/s (29.4 Mbit/s) at 60 fps: below 32 Mbit/s in the simulation.
 
@@ -34,12 +34,12 @@ Median wall time per camera frame on this machine, one thread, the modem module 
 
 | Profile  | Camera | Channel | Full   | Tracked | Frames per second per thread | Threads at 30 fps | Threads at 60 fps | Outer code |
 | -------- | ------ | ------- | ------ | ------- | ---------------------------- | ----------------- | ----------------- | ---------- |
-| P6 Wide  | 1080p  | studio  | 47 ms  | 20 ms   | 49.9                         | 1                 | 2                 | 12 ms      |
-| P6 Wide  | 1080p  | typical | 41 ms  | 21 ms   | 48.0                         | 1                 | 2                 | 7 ms       |
-| P6 Wide  | 1080p  | poor    | 41 ms  | 27 ms   | 37.5                         | 1                 | 2                 | 0 ms       |
-| P7 Ultra | 4K     | studio  | 201 ms | 72 ms   | 14.0                         | 3                 | 5                 | 101 ms     |
-| P7 Ultra | 4K     | typical | 250 ms | 84 ms   | 11.9                         | 3                 | 6                 | 127 ms     |
-| P7 Ultra | 4K     | poor    | 208 ms | -       | -                            | -                 | -                 | 0 ms       |
+| P6 Wide  | 1080p  | studio  | 46 ms  | 20 ms   | 49.7                         | 1                 | 2                 | 13 ms      |
+| P6 Wide  | 1080p  | typical | 45 ms  | 20 ms   | 49.6                         | 1                 | 2                 | 19 ms      |
+| P6 Wide  | 1080p  | poor    | 38 ms  | 27 ms   | 37.3                         | 1                 | 2                 | 0 ms       |
+| P7 Ultra | 4K     | studio  | 158 ms | 70 ms   | 14.4                         | 3                 | 5                 | 112 ms     |
+| P7 Ultra | 4K     | typical | 126 ms | 85 ms   | 11.7                         | 3                 | 6                 | 141 ms     |
+| P7 Ultra | 4K     | poor    | 294 ms | 100 ms  | 10.0                         | 3                 | 6                 | 0 ms       |
 
 ## What this does not show
 

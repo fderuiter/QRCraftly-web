@@ -67,17 +67,26 @@ The last column reads each capture's header from the fiducials' true centres. No
 - **By cell size.** On the shipped 4-colour profiles, 36 of 37 captures acquire at 2.75 to 3 px a cell. At 2.5 to 2.75 px, 16 of 23 acquire. All 14 misses on the held-out set, black and white included, are in the typical channel.
 - **The plan's bar of 95% is not met on this set, and no finder could meet it.** 4 of the 8 shipped 4-colour misses cannot be read even from the true centres: at 2.5 px a cell in the typical channel the header itself is marginal. Of the other 4, three found all four rings within a pixel of the truth but their header failed from those centres, and one found only three rings.
 - **No false acquisitions.** None in the benchmark's 270 negatives at 960 x 540 and 1920 x 1080, and none in the test's 216.
+- **The ceiling benchmark.** In [OPTICAL_CEILING.md](../OPTICAL_CEILING.md), regenerated with this module, P7 Ultra in the poor channel now locks on at the first frame instead of never, though no block decodes there. Every rate is unchanged.
 
 Times on one desktop thread, through the module [measured, sandbox; one run for pixel noise]:
 
-| Capture                  |           Before | Bucket index only | Strict search added |
-| ------------------------ | ---------------: | ----------------: | ------------------: |
-| P6 Wide 4-colour, 1080p  |            13 ms |             19 ms |   none (read first) |
-| P7 Ultra 4-colour, 4K    |           170 ms |             58 ms |   none (read first) |
-| P7 Ultra mono, 4K        | 439 ms, not read |   61 ms, not read |  86 ms in all, read |
-| Pixel noise, 1920 x 1080 |         5,891 ms |             72 ms |              +73 ms |
-| Pixel noise, 3840 x 2160 |       100,461 ms |            304 ms |             +257 ms |
+| Capture                               |           Before | Bucket index only |         Strict search added |
+| ------------------------------------- | ---------------: | ----------------: | --------------------------: |
+| P6 Wide 4-colour, 1080p               |            13 ms |             19 ms |           none (read first) |
+| P7 Ultra 4-colour, 4K                 |           170 ms |             58 ms |           none (read first) |
+| P7 Ultra mono, 4K                     | 439 ms, not read |   61 ms, not read |          88 ms in all, read |
+| P7 Ultra 4-colour, 4K, a fiducial off | 175 ms, not read |   57 ms, not read |     +477 ms (534 ms in all) |
+| P7 Ultra mono, 4K, a fiducial off     | 463 ms, not read |   64 ms, not read | +1,230 ms (1,294 ms in all) |
+| Pixel noise, 1920 x 1080              |         5,891 ms |             77 ms |                      +54 ms |
+| Pixel noise, 3840 x 2160              |       100,461 ms |            299 ms |                     +216 ms |
 
-On P6 the columns differ by run-to-run noise. The lock-on speed-up is the bucket index's. The strict search costs nothing on a frame the whole-image search reads, and adds up to about a quarter of a second on a 4K frame with nothing in it. None of this has run on a phone.
+On P6 the columns differ by run-to-run noise. The lock-on speed-up is the bucket index's. None of this has run on a phone.
+
+- **A frame the whole-image search reads costs nothing more.**
+- **A frame nothing reads pays for every stage.** That is about a quarter of a second on 4K pixel noise. The worst case is a frame with three fiducials in view and the fourth out of it, as while a receiver is being aimed (the "fiducial off" rows, `pnpm run bench:optical-finder --only timing`). There the strict search takes about half a second on P7 Ultra and 1.3 s in black and white: about 3 times what the whole-image search took on the same frames before the bucket index. Most of that is the fourth-fiducial search. That stage read 2 of 440 development and held-out captures (44 per profile) that no earlier stage read.
+- **A live receiver must budget for it.** It should not run the strict search on every camera frame while it hunts, and it should keep the search off the thread that takes frames, at least until its cost is measured on a phone.
+- **The ring check was made faster without changing a result.** In review the check got precomputed turned cells and branch-free counting of disagreements. A unit test compares it with the first version on 16,000 candidates. The 440 captures above, 270 negatives and 30 captures with a fiducial out of view give the same results, bit for bit. The "fiducial off" rows took 719 ms and 2,092 ms before this change.
+- **A header that reads stops the search.** When the whole-image search reads a header whose version or constellation this receiver does not know, the frame has been found, so the strict search does not run.
 
 The module grows from about 36 KB to 45 KB gzipped, so its budget in `scripts/check-bundle-size.js` goes from 40 KB to 48 KB.

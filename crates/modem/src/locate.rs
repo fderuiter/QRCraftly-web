@@ -636,44 +636,58 @@ struct Verified {
     core: u32,
 }
 
+/// The 81 cells of a fiducial's block, counted from its centre, turned by one of
+/// [`STRICT_ANGLES`] angles: the offsets [`check_ring`] samples at, in cells.
+type Turn = [(f64, f64); 81];
+
+/// The cells of a block turned by each of [`STRICT_ANGLES`] angles, 0 to 88
+/// degrees in steps of 2 (a square ring repeats every 90), worked out once per
+/// strict search rather than for every cell of every candidate.
+fn turns() -> Vec<Turn> {
+    (0..STRICT_ANGLES)
+        .map(|k| {
+            let angle = k as f64 * core::f64::consts::PI / 90.0;
+            let (c, s) = (cos(angle), sin(angle));
+            let mut turn = [(0.0, 0.0); 81];
+            for (cell, t) in turn.iter_mut().enumerate() {
+                let (u, v) = ((cell % 9) as f64 - 4.0, (cell / 9) as f64 - 4.0);
+                *t = (u * c - v * s, u * s + v * c);
+            }
+            turn
+        })
+        .collect()
+}
+
 /// Checks a ring candidate cell by cell against the fiducial pattern. The 9 x 9
 /// cells around `centre` are sampled through `shape` (a linear map from cells to
-/// pixels, see [`ring_shapes`]) turned by each of [`STRICT_ANGLES`] angles, and
+/// pixels, see [`ring_shapes`]) turned by each of the angles in `turns`, and
 /// thresholded halfway between the darkest and the lightest tenth of them, so
 /// each candidate sets its own threshold; the ring, the light ring
 /// and the margin must match, and the core must match one of the four cores in
 /// one of four quarter turns. The fewest disagreements, the core that fits
 /// best and the threshold, or `None` when every angle disagrees on more than
 /// [`STRICT_TOLERANCE`] cells.
-fn check_ring(
-    scratch: &Scratch,
-    centre: Point,
-    shape: &[f64; 4],
-    trig: &[(f64, f64); STRICT_ANGLES],
-) -> Option<Check> {
+fn check_ring(scratch: &Scratch, centre: Point, shape: &[f64; 4], turns: &[Turn]) -> Option<Check> {
     let (width, height) = (scratch.width, scratch.height);
-    // Where cell (u, v) of the block, counted from its centre, lands: `shape` takes the
+    let (right, bottom) = (width as f64, height as f64);
+    let luma = &scratch.luma[..];
+    let [a, b, c, d] = *shape;
+    // Off the image counts as light: a fiducial's margin is light. Cell (u, v) of the
+    // block, counted from its centre, lands at `centre + shape (u, v)`: `shape` takes the
     // ring's square to the ring seen, up to a turn (see [`ring_shapes`]).
-    let at = |u: f64, v: f64| -> (f64, f64) {
-        (
-            centre.x + shape[0] * u + shape[1] * v,
-            centre.y + shape[2] * u + shape[3] * v,
-        )
-    };
-    // Off the image counts as light: a fiducial's margin is light.
-    let sample = |x: f64, y: f64| -> u8 {
-        if x < 0.0 || y < 0.0 || x >= width as f64 || y >= height as f64 {
+    let sample = |u: f64, v: f64| -> u8 {
+        let (x, y) = (centre.x + a * u + b * v, centre.y + c * u + d * v);
+        if x < 0.0 || y < 0.0 || x >= right || y >= bottom {
             255
         } else {
-            scratch.luma[y as usize * width + x as usize]
+            luma[y as usize * width + x as usize]
         }
     };
     // The candidate's own threshold, from its 81 cells unturned: a fiducial's block always
     // holds both dark and light cells, whatever the threshold that found it.
     let mut values = [0u8; 81];
     for (k, v) in values.iter_mut().enumerate() {
-        let (x, y) = at((k % 9) as f64 - 4.0, (k / 9) as f64 - 4.0);
-        *v = sample(x, y);
+        *v = sample((k % 9) as f64 - 4.0, (k / 9) as f64 - 4.0);
     }
     values.sort_unstable();
     let (low, high) = (values[8] as u32, values[72] as u32);
@@ -682,24 +696,26 @@ fn check_ring(
     }
     let threshold = ((low + high) / 2) as u8;
     let mut best: Option<Check> = None;
-    for &(c, s) in trig.iter() {
+    for turn in turns {
+        // An angle must beat the best so far, and its core can only add disagreements.
+        let limit = best.map_or(STRICT_TOLERANCE, |b| b.misses.saturating_sub(1));
+        if best.is_some_and(|b| b.misses == 0) {
+            break;
+        }
         let mut dark = [false; 81];
         let mut misses = 0u32;
         for (k, seen) in dark.iter_mut().enumerate() {
-            let (dx, dy) = ((k % 9) as i32, (k / 9) as i32);
-            let (u, v) = (dx as f64 - 4.0, dy as f64 - 4.0);
-            let (x, y) = at(u * c - v * s, u * s + v * c);
-            let d = sample(x, y) <= threshold;
+            let (u, v) = turn[k];
+            let d = sample(u, v) <= threshold;
             *seen = d;
-            let in_core = (3..=5).contains(&dx) && (3..=5).contains(&dy);
-            if !in_core && d != fiducial_dark(0, dx, dy) {
-                misses += 1;
-                if misses > STRICT_TOLERANCE {
-                    break;
-                }
+            // Without a branch on the cell's colour, which random data makes unpredictable.
+            let pattern = RING_PATTERN[k];
+            misses += (u32::from(d) ^ u32::from(pattern == DARK)) & u32::from(pattern != CORE);
+            if misses > limit {
+                break;
             }
         }
-        if misses > STRICT_TOLERANCE {
+        if misses > limit {
             continue;
         }
         // The core in any quarter turn: which fiducial this is.
@@ -738,6 +754,36 @@ fn check_ring(
     best
 }
 
+/// [`RING_PATTERN`]'s values: a cell outside the core that is light or dark in
+/// every fiducial, or a core cell, which tells the fiducials apart.
+const LIGHT: u8 = 0;
+const DARK: u8 = 1;
+const CORE: u8 = 2;
+
+/// Each cell of a fiducial's 9 x 9 block, row by row: [`LIGHT`], [`DARK`] or
+/// [`CORE`] (the 3 x 3 in the middle), as [`fiducial_dark`] gives it.
+const RING_PATTERN: [u8; 81] = {
+    let mut pattern = [LIGHT; 81];
+    let mut k = 0;
+    while k < 81 {
+        let (dx, dy) = (k % 9, k / 9);
+        pattern[k] = if dx >= 3 && dx <= 5 && dy >= 3 && dy <= 5 {
+            CORE
+        } else if dx >= 1
+            && dx <= 7
+            && dy >= 1
+            && dy <= 7
+            && (dx == 1 || dx == 7 || dy == 1 || dy == 7)
+        {
+            DARK
+        } else {
+            LIGHT
+        };
+        k += 1;
+    }
+    pattern
+};
+
 /// The whole-image search again, for a frame whose four rings
 /// [`locate_fiducials`] chose did not give a header (#1161, ADR 0047). On a large
 /// grid, random data forms dark components that pass the ring test, often bigger
@@ -770,11 +816,7 @@ pub fn locate_fiducials_strict(
     scratch: &mut Scratch,
     mut reads: impl FnMut(&Fiducials) -> bool,
 ) -> Option<Fiducials> {
-    let mut trig = [(0.0, 0.0); STRICT_ANGLES];
-    for (k, t) in trig.iter_mut().enumerate() {
-        let angle = k as f64 * core::f64::consts::PI / 90.0;
-        *t = (cos(angle), sin(angle));
-    }
+    let turns = turns();
     scratch.verified.clear();
     let mut last: Option<Fiducials> = None;
     let mut attempt = |scratch: &mut Scratch| -> Option<Fiducials> {
@@ -789,7 +831,7 @@ pub fn locate_fiducials_strict(
     let original = scratch.threshold;
     // The other thresholds, worked out before the first labelling is replaced.
     let others = [screen_threshold(scratch), upper_threshold(scratch)];
-    verify_rings(scratch, &trig);
+    verify_rings(scratch, &turns);
     if let Some(found) = attempt(scratch) {
         return Some(found);
     }
@@ -808,11 +850,11 @@ pub fn locate_fiducials_strict(
         }
         tried[k] = threshold;
         collect_rings_with(scratch, true);
-        verify_rings(scratch, &trig);
+        verify_rings(scratch, &turns);
         if let Some(found) = attempt(scratch) {
             return Some(found);
         }
-        cores_skipped[k] = !verify_cores(scratch, &trig);
+        cores_skipped[k] = !verify_cores(scratch, &turns);
         if let Some(found) = attempt(scratch) {
             return Some(found);
         }
@@ -829,12 +871,12 @@ pub fn locate_fiducials_strict(
         }
         scratch.threshold = tried[k];
         label_dark(scratch, width, height, tried[k]);
-        verify_cores(scratch, &trig);
+        verify_cores(scratch, &turns);
         if let Some(found) = attempt(scratch) {
             return Some(found);
         }
     }
-    complete_quad(scratch, &trig);
+    complete_quad(scratch, &turns);
     attempt(scratch)
 }
 
@@ -873,14 +915,14 @@ fn add_verified(verified: &mut Vec<Verified>, found: Verified) {
 
 /// Checks every ring in `scratch.rings` against the fiducial pattern, through
 /// the shape its outline gives ([`ring_shapes`]).
-fn verify_rings(scratch: &mut Scratch, trig: &[(f64, f64); STRICT_ANGLES]) {
+fn verify_rings(scratch: &mut Scratch, turns: &[Turn]) {
     ring_shapes(scratch);
     let mut verified = core::mem::take(&mut scratch.verified);
     for (ring, shape) in scratch.rings.iter().zip(scratch.shapes.iter()) {
         let Some(shape) = shape else {
             continue;
         };
-        if let Some(Check { misses, core, .. }) = check_ring(scratch, ring.centre, shape, trig) {
+        if let Some(Check { misses, core, .. }) = check_ring(scratch, ring.centre, shape, turns) {
             let ring = *ring;
             add_verified(&mut verified, Verified { ring, misses, core });
         }
@@ -905,7 +947,7 @@ const MAX_CORE_SIDE: u32 = 64;
 /// only runs once an earlier one has verified a ring. Before the pattern check,
 /// the light ring between core and ring must be light in eight directions. A core's centre is its
 /// fiducial's centre: every core is symmetric under a half turn.
-fn verify_cores(scratch: &mut Scratch, trig: &[(f64, f64); STRICT_ANGLES]) -> bool {
+fn verify_cores(scratch: &mut Scratch, turns: &[Turn]) -> bool {
     let (width, height) = (scratch.width, scratch.height);
     let threshold = scratch.threshold;
     let mut verified = core::mem::take(&mut scratch.verified);
@@ -980,7 +1022,7 @@ fn verify_cores(scratch: &mut Scratch, trig: &[(f64, f64); STRICT_ANGLES]) -> bo
                 blob: index as u32,
             };
             let shape = [cell, 0.0, 0.0, cell];
-            if let Some(Check { misses, core, .. }) = check_ring(scratch, centre, &shape, trig) {
+            if let Some(Check { misses, core, .. }) = check_ring(scratch, centre, &shape, turns) {
                 if best.is_none_or(|b| misses < b.misses) {
                     best = Some(Verified { ring, misses, core });
                 }
@@ -1012,7 +1054,7 @@ const COMPLETION_CONTRAST: u32 = 24;
 /// cells out must be lighter than the centre in eight directions. The centre
 /// found is then refined to the centroid of the core's dark pixels. Adds what it
 /// finds to `scratch.verified`.
-fn complete_quad(scratch: &mut Scratch, trig: &[(f64, f64); STRICT_ANGLES]) {
+fn complete_quad(scratch: &mut Scratch, turns: &[Turn]) {
     let (width, height) = (scratch.width, scratch.height);
     // The verified ring with the fewest disagreements for each fiducial.
     let mut known: [Option<Verified>; 4] = [None; 4];
@@ -1086,7 +1128,7 @@ fn complete_quad(scratch: &mut Scratch, trig: &[(f64, f64); STRICT_ANGLES]) {
                     continue;
                 }
                 let shape = [size, 0.0, 0.0, size];
-                if let Some(check) = check_ring(scratch, centre, &shape, trig) {
+                if let Some(check) = check_ring(scratch, centre, &shape, turns) {
                     if best.is_none_or(|b| check.misses < b.0.misses) {
                         best = Some((check, centre, size));
                     }
@@ -1456,6 +1498,177 @@ pub fn solve_homography(source: &[(f64, f64); 4], target: &[Point; 4]) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// [`check_ring`] as first written, turning every cell at every angle and
+    /// sorting the block for its threshold. Kept to prove the precomputed turns,
+    /// the order statistics and the early exits change nothing.
+    fn check_ring_reference(
+        scratch: &Scratch,
+        centre: Point,
+        shape: &[f64; 4],
+        trig: &[(f64, f64); STRICT_ANGLES],
+    ) -> Option<Check> {
+        let (width, height) = (scratch.width, scratch.height);
+        let at = |u: f64, v: f64| -> (f64, f64) {
+            (
+                centre.x + shape[0] * u + shape[1] * v,
+                centre.y + shape[2] * u + shape[3] * v,
+            )
+        };
+        let sample = |x: f64, y: f64| -> u8 {
+            if x < 0.0 || y < 0.0 || x >= width as f64 || y >= height as f64 {
+                255
+            } else {
+                scratch.luma[y as usize * width + x as usize]
+            }
+        };
+        let mut values = [0u8; 81];
+        for (k, v) in values.iter_mut().enumerate() {
+            let (x, y) = at((k % 9) as f64 - 4.0, (k / 9) as f64 - 4.0);
+            *v = sample(x, y);
+        }
+        values.sort_unstable();
+        let (low, high) = (values[8] as u32, values[72] as u32);
+        if high < low + MIN_RING_CONTRAST {
+            return None;
+        }
+        let threshold = ((low + high) / 2) as u8;
+        let mut best: Option<Check> = None;
+        for &(c, s) in trig.iter() {
+            let mut dark = [false; 81];
+            let mut misses = 0u32;
+            for (k, seen) in dark.iter_mut().enumerate() {
+                let (dx, dy) = ((k % 9) as i32, (k / 9) as i32);
+                let (u, v) = (dx as f64 - 4.0, dy as f64 - 4.0);
+                let (x, y) = at(u * c - v * s, u * s + v * c);
+                let d = sample(x, y) <= threshold;
+                *seen = d;
+                let in_core = (3..=5).contains(&dx) && (3..=5).contains(&dy);
+                if !in_core && d != fiducial_dark(0, dx, dy) {
+                    misses += 1;
+                    if misses > STRICT_TOLERANCE {
+                        break;
+                    }
+                }
+            }
+            if misses > STRICT_TOLERANCE {
+                continue;
+            }
+            let mut core = (u32::MAX, 0u32);
+            for index in 0..4u32 {
+                for turn in 0..4 {
+                    let mut core_misses = 0;
+                    for dy in -1..=1i32 {
+                        for dx in -1..=1i32 {
+                            let (rx, ry) = match turn {
+                                0 => (dx, dy),
+                                1 => (-dy, dx),
+                                2 => (-dx, -dy),
+                                _ => (dy, -dx),
+                            };
+                            let seen = dark[((dy + 4) * 9 + dx + 4) as usize];
+                            if seen != fiducial_dark(index, rx + 4, ry + 4) {
+                                core_misses += 1;
+                            }
+                        }
+                    }
+                    if core_misses < core.0 {
+                        core = (core_misses, index);
+                    }
+                }
+            }
+            let total = misses + core.0;
+            if total <= STRICT_TOLERANCE && best.is_none_or(|b| total < b.misses) {
+                best = Some(Check {
+                    misses: total,
+                    core: core.1,
+                    threshold,
+                });
+            }
+        }
+        best
+    }
+
+    #[test]
+    fn the_ring_pattern_is_the_fiducial_pattern_outside_the_core() {
+        for (k, &pattern) in RING_PATTERN.iter().enumerate() {
+            let (dx, dy) = ((k % 9) as i32, (k / 9) as i32);
+            let in_core = (3..=5).contains(&dx) && (3..=5).contains(&dy);
+            let expected = if in_core {
+                CORE
+            } else if fiducial_dark(0, dx, dy) {
+                DARK
+            } else {
+                LIGHT
+            };
+            assert_eq!(pattern, expected, "cell ({dx}, {dy})");
+        }
+    }
+
+    #[test]
+    fn the_ring_check_matches_the_reference() {
+        let mut trig = [(0.0, 0.0); STRICT_ANGLES];
+        for (k, t) in trig.iter_mut().enumerate() {
+            let angle = k as f64 * core::f64::consts::PI / 90.0;
+            *t = (cos(angle), sin(angle));
+        }
+        let turns = turns();
+        let mut random = crate::codec::Mulberry32::new(0x1161);
+        let mut unit = || random.next_u32() as f64 / 4294967296.0;
+        let mut scratch = Scratch::default();
+        let (mut checked, mut passed) = (0, 0);
+        for seed in 0..40u32 {
+            let (width, height) = (160 + 7 * seed as usize, 120 + 5 * seed as usize);
+            scratch.luma = random_scene(seed + 1000, width, height);
+            scratch.width = width;
+            scratch.height = height;
+            // Fiducials of known size and place, so that many candidates pass.
+            let mut places = Vec::new();
+            for f in 0..4u32 {
+                let cell = 2 + (seed + f) as usize % 5;
+                let x0 = (seed as usize * 13 + f as usize * 37) % (width - 9 * cell);
+                let y0 = (seed as usize * 29 + f as usize * 17) % (height - 9 * cell);
+                paint_fiducial(&mut scratch.luma, width, x0, y0, cell, f);
+                let middle = 4.5 * cell as f64;
+                places.push((x0 as f64 + middle, y0 as f64 + middle, cell as f64));
+            }
+            for i in 0..400 {
+                let (centre, size) = if i % 2 == 0 {
+                    let (x, y, cell) = places[i / 2 % places.len()];
+                    let jitter = 0.6 * cell;
+                    let centre = Point {
+                        x: x + jitter * (unit() - 0.5),
+                        y: y + jitter * (unit() - 0.5),
+                    };
+                    (centre, cell * (0.85 + 0.3 * unit()))
+                } else {
+                    let centre = Point {
+                        x: unit() * width as f64 * 1.2 - 0.1 * width as f64,
+                        y: unit() * height as f64 * 1.2 - 0.1 * height as f64,
+                    };
+                    (centre, 1.0 + 7.0 * unit())
+                };
+                // An affine cell shape: a size, a stretch and a shear, sometimes none.
+                let shape = if i % 3 == 0 {
+                    [size, 0.0, 0.0, size]
+                } else {
+                    let shear = 0.4 * (unit() - 0.5) * size;
+                    [size * (0.8 + 0.4 * unit()), shear, shear, size]
+                };
+                let got = check_ring(&scratch, centre, &shape, &turns);
+                let want = check_ring_reference(&scratch, centre, &shape, &trig);
+                let fields = |c: Option<Check>| c.map(|c| (c.misses, c.core, c.threshold));
+                assert_eq!(fields(got), fields(want), "seed {seed}, candidate {i}");
+                checked += 1;
+                passed += usize::from(want.is_some());
+            }
+        }
+        // Both answers must turn up often, or the comparison proves little.
+        assert!(
+            passed > 1000 && checked - passed > 1000,
+            "{passed} of {checked} passed"
+        );
+    }
 
     /// The ring search before the bucket index (#1161): every blob against every
     /// candidate, in index order. Kept to prove the index changes nothing.
