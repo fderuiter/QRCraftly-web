@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Download, Share2 } from 'lucide-react';
 import { type QRConfig, QRType } from '@/types';
 import { renderWalletCard, walletRefusalReason, WALLET_CARD_TEXT_LIMITS, WALLET_CARD_SIZE } from '@/packages/qr-export';
@@ -30,6 +30,7 @@ import { Button } from '../ui/Button';
 import { TextField } from '../ui/TextField';
 import { Alert } from '../ui/Alert';
 import { Skeleton } from '../ui/Skeleton';
+import { Badge } from '../ui/Badge';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { useToast } from '../ui/Toast';
 
@@ -58,10 +59,20 @@ const ApplePassPanel = lazy(() => import('./ApplePassPanel'));
 /** What the dialog makes: the card image for everyone, or a signed pass with the person's own keys. */
 type WalletMode = 'card' | 'apple';
 
-const MODES = [
+/** A tab label with the Beta tag: signed passes are beta until they are checked on real phones (#1413). */
+function betaLabel(text: string) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {text}
+      <Badge tone="beta">Beta</Badge>
+    </span>
+  );
+}
+
+const MODES: readonly { value: WalletMode; label: ReactNode; ariaLabel?: string }[] = [
   { value: 'card', label: 'Card image' },
-  { value: 'apple', label: 'Apple Wallet pass' },
-] as const satisfies readonly { value: WalletMode; label: string }[];
+  { value: 'apple', label: betaLabel('Apple Wallet pass'), ariaLabel: 'Apple Wallet pass (beta)' },
+];
 
 /** Message shown when the card's own code fails the scan check. */
 export const WALLET_SCAN_FAILED = 'The wallet card did not pass the scan check, so it was not saved. Try shorter content.';

@@ -23,6 +23,7 @@ import { buildApplePass, createPassSigner, describePassContent, passColorsFrom, 
 import { triggerFileDownload } from '@/utils/downloadManager';
 import { Button } from '../ui/Button';
 import { Alert } from '../ui/Alert';
+import { Badge } from '../ui/Badge';
 import { useToast } from '../ui/Toast';
 import { renderPassImages } from './passImages';
 import { FilePicker, type PickedFile } from './FilePicker';
@@ -92,6 +93,9 @@ export default function ApplePassPanel({ config, title, subtitle, filename }: Ap
       <p className="text-sm text-fg-muted">
         With an Apple Developer account you can make a real Apple Wallet pass. Load your Pass Type ID certificate, Apple&apos;s WWDR intermediate and the private key. They stay in this tab, are
         never uploaded, and are forgotten when you close this window.
+      </p>
+      <p className="text-sm text-fg-muted">
+        <Badge tone="beta">Beta</Badge> Apple Wallet passes are new: QRCraftly has not yet tried them with a real Apple certificate on an iPhone, so add your pass to your own phone before you share it.
       </p>
       <FilePicker
         label="Certificates"
