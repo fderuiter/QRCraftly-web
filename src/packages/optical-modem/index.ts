@@ -5,7 +5,7 @@
  */
 
 export { getConstellation, constellationId, type Constellation, type ConstellationSpace } from './lib/constellation';
-export { simulateCapture, capturedPoints, type ChannelPreset, type CaptureOptions } from './lib/channel';
+export { simulateCapture, capturedPoints, type ChannelPreset, type CaptureOptions, type CameraImpairments } from './lib/channel';
 export { probeSequence, probeGeometries, drawProbeFrame, type ProbePattern } from './lib/probe';
 export {
   ProbeRun,

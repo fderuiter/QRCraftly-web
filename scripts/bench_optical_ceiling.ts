@@ -27,13 +27,15 @@
  * Goodput is file bytes over camera time until the file was rebuilt and its bytes compared, at 30
  * and at 60 camera frames per second. Decode times are this machine's, single threaded.
  *
- * It is a model, not a measurement: the simulator holds the phone still, and no device has been
- * measured. With `--write` it writes `docs/OPTICAL_CEILING.md`.
+ * It is a model, not a measurement, and no device has been measured. The `phone` channel adds the
+ * lens, shutter, display and ISP effects of `CameraImpairments` with guessed settings
+ * (`phoneImpairments`), to be replaced by the probe's measurements (#1173). With `--write` it writes
+ * `docs/OPTICAL_CEILING.md`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HIGH_RATE_PROFILES, decodeModemFrame, encodeModemFrame, frameCapacity, loadOpticalModem, simulateCapture, type ChannelPreset, type ModemProfile, type TrackHint } from '../src/packages/optical-modem/index.ts';
+import { HIGH_RATE_PROFILES, decodeModemFrame, encodeModemFrame, frameCapacity, loadOpticalModem, simulateCapture, type CameraImpairments, type ChannelPreset, type ModemProfile, type RgbaImage, type TrackHint } from '../src/packages/optical-modem/index.ts';
 import { FecDecoder, FecEncoder, loadFecModule } from '../src/packages/optical-transfer/index.ts';
 import { createRandom } from '../tests/utils/scannerCorpus.ts';
 
@@ -57,10 +59,47 @@ const CAMERAS: Record<string, Camera> = {
   uhd: { name: '4K', width: 3840 },
 };
 
+/** A simulator preset, optionally with the phone's own effects on top. */
+interface Channel {
+  name: string;
+  preset: ChannelPreset;
+  phone: boolean;
+}
+
+const CHANNELS: Record<string, Channel> = {
+  studio: { name: 'studio', preset: 'studio', phone: false },
+  typical: { name: 'typical', preset: 'typical', phone: false },
+  poor: { name: 'poor', preset: 'poor', phone: false },
+  phone: { name: 'phone (guessed)', preset: 'typical', phone: true },
+};
+
 interface Scenario {
   profile: ModemProfile;
   camera: Camera;
-  preset: ChannelPreset;
+  channel: Channel;
+}
+
+/**
+ * Guessed phone effects for one camera frame, on top of the typical channel, until the probe measures
+ * them (#1173): 0.2% residual barrel distortion at the corners, hand motion of about 50 camera pixels a
+ * second during a 16 ms readout with a stabiliser that leaves a pixel or two of jitter, a 480 Hz OLED
+ * at 90% duty, moderate edge enhancement, chroma and temporal noise reduction, and a screen refresh
+ * whose tear line drifts slowly down the picture because the camera and the screen run at nearly the
+ * same rate.
+ */
+function phoneImpairments(frame: number, height: number, previous: RgbaImage | undefined): { impairments: CameraImpairments; tearFraction: number } {
+  const jitter = [0, 1, -1, 2, -2];
+  return {
+    impairments: {
+      lens: { k1: -0.002 },
+      motion: { shear: 0.0008, stretch: 0.0004, shiftX: jitter[frame % 5], shiftY: jitter[(frame + 2) % 5] },
+      pwm: { period: height / 7.7, duty: 0.9, exposureRows: height / 4 },
+      sharpen: { amount: 1, passes: 1, threshold: 2, clamp: 24 },
+      chromaPasses: 1,
+      temporal: previous ? { previous, weight: 0.4, threshold: 24 } : undefined,
+    },
+    tearFraction: (0.3 + frame * 0.013) % 1,
+  };
 }
 
 interface Run {
@@ -88,7 +127,7 @@ const median = (values: number[]): number => {
 };
 
 function transfer(scenario: Scenario, fecModule: WebAssembly.Module, framesOfFile: number, maxFrames: number): Run {
-  const { profile, camera, preset } = scenario;
+  const { profile, camera, channel } = scenario;
   const capacity = frameCapacity(profile);
   const cellPx = (camera.width * SCREEN_SHARE) / profile.cols;
   const random = createRandom(SESSION + profile.id);
@@ -104,10 +143,19 @@ function transfer(scenario: Scenario, fecModule: WebAssembly.Module, framesOfFil
   let outerMs = 0;
   const fullTimes: number[] = [];
   const trackedTimes: number[] = [];
-  for (let frame = 0; frame < maxFrames; frame++) {
+  const draw = (frame: number): RgbaImage => {
     const payload = new Uint8Array(capacity.payloadBytes);
     for (let b = 0; b < capacity.blocks; b++) payload.set(encoder.symbol(frame * capacity.blocks + b).data, b * profile.packetBytes);
-    const image = simulateCapture(encodeModemFrame(profile, payload, SESSION, frame, PITCH), preset, { pixelsPerCell: cellPx, cellPitch: PITCH, seed: frame + 1 });
+    return encodeModemFrame(profile, payload, SESSION, frame, PITCH);
+  };
+  let previous: RgbaImage | undefined;
+  for (let frame = 0; frame < maxFrames; frame++) {
+    const options = { pixelsPerCell: cellPx, cellPitch: PITCH, seed: frame + 1 };
+    const shown = draw(frame);
+    const image = channel.phone
+      ? simulateCapture(shown, channel.preset, { ...options, next: draw(frame + 1), ...phoneImpairments(frame, Math.ceil(shown.height * (cellPx / PITCH) * 1.2), previous) })
+      : simulateCapture(shown, channel.preset, options);
+    previous = image;
     const start = performance.now();
     const result = decodeModemFrame(image, { geometries: [profile], track: hint });
     const elapsed = performance.now() - start;
@@ -167,7 +215,7 @@ function render(runs: Run[]): string {
   const rows = runs.map((r) => [
     `P${r.scenario.profile.id} ${r.scenario.profile.name}`,
     r.scenario.camera.name,
-    r.scenario.preset,
+    r.scenario.channel.name,
     r.cellPx.toFixed(1),
     `${(r.fileBytes / 1e6).toFixed(2)} MB`,
     r.complete ? 'yes' : 'no',
@@ -183,7 +231,7 @@ function render(runs: Run[]): string {
     return [
       `P${r.scenario.profile.id} ${r.scenario.profile.name}`,
       r.scenario.camera.name,
-      r.scenario.preset,
+      r.scenario.channel.name,
       ms(r.fullMs),
       ms(r.trackedMs),
       Number.isNaN(perCore) ? '-' : perCore.toFixed(1),
@@ -207,12 +255,12 @@ function render(runs: Run[]): string {
     '',
     '## Transfers',
     '',
-    `A seeded random file of ${runs[0] ? Math.round(runs[0].fileBytes / frameCapacity(runs[0].scenario.profile).payloadBytes) : 0} frames' worth of data through the outer code, one camera frame per frame sent. "Lock" is the camera frame the receiver first read; every later frame was looked for near the last one (the tracked search). "Blocks repaired" counts from the lock on. Goodput is the file's bytes over the camera time to the frame that completed it, lock-on included, after the rebuilt file matched the sent one byte for byte. A short file pays for the lock-on frame and the outer code's last symbols, so "steady rate" adds the data in repaired blocks per second from the lock on, the rate a long file approaches (before the outer code's overhead, about 0.1% in [TRANSFER_BENCHMARK.md](TRANSFER_BENCHMARK.md)). The simulated phone does not move between frames; the tracked search's tolerance of movement is tested in \`src/packages/optical-modem/tests/tracking.test.ts\`.`,
+    `A seeded random file of ${runs[0] ? Math.round(runs[0].fileBytes / frameCapacity(runs[0].scenario.profile).payloadBytes) : 0} frames' worth of data through the outer code, one camera frame per frame sent. "Lock" is the camera frame the receiver first read; every later frame was looked for near the last one (the tracked search). "Blocks repaired" counts from the lock on. Goodput is the file's bytes over the camera time to the frame that completed it, lock-on included, after the rebuilt file matched the sent one byte for byte. A short file pays for the lock-on frame and the outer code's last symbols, so "steady rate" adds the data in repaired blocks per second from the lock on, the rate a long file approaches (before the outer code's overhead, about 0.1% in [TRANSFER_BENCHMARK.md](TRANSFER_BENCHMARK.md)). In the studio, typical and poor channels the simulated phone does not move between frames; the tracked search's tolerance of movement is tested in \`src/packages/optical-modem/tests/tracking.test.ts\`. The phone channel is the typical one plus guessed lens distortion, rolling-shutter shear, stabiliser jitter of up to 2 pixels, OLED PWM bands, edge enhancement, chroma and temporal noise reduction, and a screen refresh in every capture whose tear line drifts down the picture (\`phoneImpairments\` in the script). Its settings are guesses until the probe measures a phone (#1173); blocks below the tear belong to the next frame and are refused by their identity tag.`,
     '',
     table(['Profile', 'Camera', 'Channel', 'Camera px per cell', 'File', 'Complete', 'Frames', 'Lock', 'Blocks repaired', 'Goodput at 30 fps', 'Goodput at 60 fps', 'Steady rate at 60 fps'], rows),
     '',
     best && steady(best, 60) > 0
-      ? `Best: P${best.scenario.profile.id} ${best.scenario.profile.name}, ${best.scenario.camera.name} camera, ${best.scenario.preset} channel, a steady ${mb(steady(best, 60))} at 60 fps: ${steady(best, 60) >= TARGET ? 'above' : 'below'} 32 Mbit/s in the simulation.`
+      ? `Best: P${best.scenario.profile.id} ${best.scenario.profile.name}, ${best.scenario.camera.name} camera, ${best.scenario.channel.name} channel, a steady ${mb(steady(best, 60))} at 60 fps: ${steady(best, 60) >= TARGET ? 'above' : 'below'} 32 Mbit/s in the simulation.`
       : 'No run completed.',
     '',
     '## Decode time',
@@ -236,17 +284,17 @@ async function main(): Promise<void> {
   await loadOpticalModem();
   const fecModule = await loadFecModule();
   const [wide, ultra] = HIGH_RATE_PROFILES;
-  const presets: ChannelPreset[] = quick ? ['typical'] : ['studio', 'typical', 'poor'];
+  const channels = quick ? [CHANNELS.typical, CHANNELS.phone] : [CHANNELS.studio, CHANNELS.typical, CHANNELS.poor, CHANNELS.phone];
   const scenarios: Scenario[] = [];
-  for (const preset of presets) scenarios.push({ profile: wide, camera: CAMERAS.hd, preset });
-  for (const preset of presets) scenarios.push({ profile: ultra, camera: CAMERAS.uhd, preset });
+  for (const channel of channels) scenarios.push({ profile: wide, camera: CAMERAS.hd, channel });
+  for (const channel of channels) scenarios.push({ profile: ultra, camera: CAMERAS.uhd, channel });
   const framesOfFile = quick ? 4 : 10;
   const runs: Run[] = [];
   for (const scenario of scenarios) {
     const run = transfer(scenario, fecModule, framesOfFile, framesOfFile * 3);
     runs.push(run);
     process.stdout.write(
-      `P${scenario.profile.id} ${scenario.camera.name} ${scenario.preset}: ${run.complete ? `${run.frames} frames, ${mb(goodput(run, 30))} at 30 fps, ${mb(goodput(run, 60))} at 60 fps` : 'incomplete'}; lock ${run.lockFrame + 1}, blocks ${(run.blockShare * 100).toFixed(1)}%, full ${ms(run.fullMs)}, tracked ${ms(run.trackedMs)}\n`
+      `P${scenario.profile.id} ${scenario.camera.name} ${scenario.channel.name}: ${run.complete ? `${run.frames} frames, ${mb(goodput(run, 30))} at 30 fps, ${mb(goodput(run, 60))} at 60 fps` : 'incomplete'}; lock ${run.lockFrame + 1}, blocks ${(run.blockShare * 100).toFixed(1)}%, full ${ms(run.fullMs)}, tracked ${ms(run.trackedMs)}\n`
     );
   }
   if (process.argv.includes('--write')) {

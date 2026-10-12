@@ -19,6 +19,13 @@
 import { createRng } from './prng';
 import { modemKernels, type Point } from './kernels';
 import type { RgbaImage } from './layout';
+import { undistort, type LensDistortion } from './impairments/lens';
+import { steady, type CameraMotion } from './impairments/motion';
+import { sharpen, type Sharpening } from './impairments/sharpen';
+import { denoiseChroma } from './impairments/chroma';
+import { denoiseTemporal, mixLinear, type TemporalNoiseReduction } from './impairments/temporal';
+import { bandRows, type PwmBanding } from './impairments/pwm';
+import { blurPlane } from './impairments/blur';
 
 /** How a screen becomes a camera frame in the simulator. Everything is optional except the placement. */
 export interface ChannelParams {
@@ -47,7 +54,31 @@ export interface ChannelParams {
   tearRow?: number;
   /** Seed for the noise. */
   seed?: number;
+  /** Camera rows the tear line drops per camera column from the centre, for a diagonal tear (a portrait phone on a landscape screen). */
+  tearSlope?: number;
+  /** Share of the `next` frame in every pixel above the tear line (`tearRow` must be set): an exposure that spans a refresh. */
+  blend?: number;
+  /** Mix frames as light (through the sRGB curve) rather than as sRGB values. */
+  linearLight?: boolean;
+  /** Lens distortion. */
+  lens?: LensDistortion;
+  /** Rolling-shutter shear and stretch, and the stabiliser's shift for this frame. */
+  motion?: CameraMotion;
+  /** OLED PWM dimming bands, applied to whole camera rows (the bezel around the screen bands too). */
+  pwm?: PwmBanding;
+  /** ISP edge enhancement, after demosaicing. */
+  sharpen?: Sharpening;
+  /** Passes of ISP chroma noise reduction, after demosaicing. */
+  chromaPasses?: number;
+  /** ISP temporal noise reduction against the previous capture. */
+  temporal?: TemporalNoiseReduction;
 }
+
+/** The impairments a phone's lens, shutter and ISP add, which a caller of {@link simulateCapture} can switch on. */
+export type CameraImpairments = Pick<
+  ChannelParams,
+  'tearSlope' | 'blend' | 'linearLight' | 'lens' | 'motion' | 'pwm' | 'sharpen' | 'chromaPasses' | 'temporal'
+>;
 
 /** Colour of the bezel around the screen. */
 const BEZEL = 16;
@@ -111,16 +142,22 @@ function warp(frame: RgbaImage, next: RgbaImage | undefined, params: ChannelPara
   if (!inverse) throw new Error('Degenerate screen placement');
   const planes = [new Float32Array(width * height), new Float32Array(width * height), new Float32Array(width * height)];
   const sample = [0, 0, 0];
+  const other = [0, 0, 0];
+  const blend = next && params.tearRow !== undefined ? (params.blend ?? 0) : 0;
+  const mix = params.linearLight ? mixLinear : (a: number, b: number, t: number) => a * (1 - t) + b * t;
   for (let y = 0; y < height; y++) {
-    const image = next && params.tearRow !== undefined && y >= params.tearRow ? next : frame;
     for (let x = 0; x < width; x++) {
+      const torn = next !== undefined && params.tearRow !== undefined && y >= params.tearRow + (params.tearSlope ?? 0) * (x - width / 2);
+      const image = torn ? next : frame;
       let r = 0;
       let g = 0;
       let b = 0;
       for (let j = 0; j < 3; j++) {
         for (let i = 0; i < 3; i++) {
-          const px = x + (i + 0.5) / 3;
-          const py = y + (j + 0.5) / 3;
+          let px = x + (i + 0.5) / 3;
+          let py = y + (j + 0.5) / 3;
+          if (params.motion) [px, py] = steady(px, py, width, height, params.motion);
+          if (params.lens) [px, py] = undistort(px, py, width, height, params.lens);
           const w = inverse[6] * px + inverse[7] * py + 1;
           const sx = (inverse[0] * px + inverse[1] * py + inverse[2]) / w;
           const sy = (inverse[3] * px + inverse[4] * py + inverse[5]) / w;
@@ -130,6 +167,10 @@ function warp(frame: RgbaImage, next: RgbaImage | undefined, params: ChannelPara
             b += BEZEL;
           } else {
             bilinear(image, sx, sy, sample);
+            if (blend > 0 && !torn && next) {
+              bilinear(next, sx, sy, other);
+              for (let c = 0; c < 3; c++) sample[c] = mix(sample[c], other[c], blend);
+            }
             r += sample[0];
             g += sample[1];
             b += sample[2];
@@ -142,24 +183,6 @@ function warp(frame: RgbaImage, next: RgbaImage | undefined, params: ChannelPara
     }
   }
   return planes;
-}
-
-function blurPlane(plane: Float32Array, width: number, height: number, passes: number): void {
-  const tmp = new Float32Array(plane.length);
-  for (let pass = 0; pass < passes; pass++) {
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const at = y * width + x;
-        tmp[at] = 0.25 * plane[at - (x > 0 ? 1 : 0)] + 0.5 * plane[at] + 0.25 * plane[at + (x < width - 1 ? 1 : 0)];
-      }
-    }
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const at = y * width + x;
-        plane[at] = 0.25 * tmp[at - (y > 0 ? width : 0)] + 0.5 * tmp[at] + 0.25 * tmp[at + (y < height - 1 ? width : 0)];
-      }
-    }
-  }
 }
 
 function demosaic(planes: Float32Array[], width: number, height: number): void {
@@ -300,7 +323,9 @@ function jpeg(planes: Float32Array[], width: number, height: number, quality: nu
 /**
  * Passes a frame through a model of a phone camera pointed at a screen: perspective, lens blur,
  * colour cross-talk, white balance and illumination, sensor noise, Bayer sampling, JPEG and a
- * screen refresh in the middle of the readout. Only additions, multiplications and divisions are
+ * screen refresh in the middle of the readout, and optionally lens distortion, rolling-shutter
+ * motion, PWM bands, frame blending and the ISP's chroma and temporal noise reduction and edge
+ * enhancement (in `impairments/`). Only additions, multiplications and divisions are
  * used (no `Math.sin`, `Math.exp` or similar), so a seed always gives the same capture.
  * @param frame - The rendered frame.
  * @param params - The channel.
@@ -312,6 +337,8 @@ export function applyChannel(frame: RgbaImage, params: ChannelParams, next?: Rgb
   const planes = warp(frame, next, params);
   const size = width * height;
   if (params.blurPasses) for (const plane of planes) blurPlane(plane, width, height, params.blurPasses);
+  // PWM gates the light reaching the sensor, so it comes before the sensor's own black level and noise.
+  if (params.pwm) bandRows(planes, width, height, params.pwm);
   const x = params.crosstalk ?? 0;
   const gain = params.gain ?? [1, 1, 1];
   const lift = params.lift ?? 0;
@@ -326,6 +353,10 @@ export function applyChannel(frame: RgbaImage, params: ChannelParams, next?: Rgb
   }
   for (const plane of planes) for (let i = 0; i < size; i++) plane[i] = Math.min(255, Math.max(0, plane[i]));
   if (params.bayer) demosaic(planes, width, height);
+  if (params.chromaPasses) denoiseChroma(planes, width, height, params.chromaPasses);
+  if (params.temporal) denoiseTemporal(planes, width, height, params.temporal);
+  if (params.sharpen) sharpen(planes, width, height, params.sharpen);
+  for (const plane of planes) for (let i = 0; i < size; i++) plane[i] = Math.min(255, Math.max(0, plane[i]));
   if (params.jpegQuality) jpeg(planes, width, height, params.jpegQuality);
   const out = new Uint8ClampedArray(size * 4);
   for (let i = 0; i < size; i++) {
@@ -337,10 +368,11 @@ export function applyChannel(frame: RgbaImage, params: ChannelParams, next?: Rgb
   return { width, height, data: out };
 }
 
-/** Named channels: a propped phone, a typical handheld one and an old one. */
-export type ChannelPreset = 'studio' | 'typical' | 'poor';
+/** Named channels: a perfect camera (for tests), a propped phone, a typical handheld one and an old one. */
+export type ChannelPreset = 'ideal' | 'studio' | 'typical' | 'poor';
 
 const PRESETS: Record<ChannelPreset, Omit<ChannelParams, 'width' | 'height' | 'corners' | 'seed' | 'tearRow'> & { keystone: number; tilt: number }> = {
+  ideal: { keystone: 0, tilt: 0 },
   studio: { blurPasses: 1, noise: 1.5, crosstalk: 0.04, bayer: true, jpegQuality: 92, keystone: 0.005, tilt: 0.005, gain: [1, 0.98, 0.97], lift: 2 },
   typical: { blurPasses: 2, noise: 3, crosstalk: 0.08, bayer: true, jpegQuality: 82, keystone: 0.02, tilt: 0.02, gain: [1.05, 0.98, 0.9], lift: 4, gradient: 0.1 },
   poor: { blurPasses: 3, noise: 6, crosstalk: 0.12, bayer: true, jpegQuality: 65, keystone: 0.04, tilt: 0.04, gain: [1.1, 0.95, 0.85], lift: 8, gradient: 0.2 },
@@ -360,6 +392,8 @@ export interface CaptureOptions {
   keystone?: number;
   /** In-plane rotation in place of the channel's, as tan(angle / 2). */
   tilt?: number;
+  /** Lens, shutter and ISP impairments on top of the channel's. */
+  impairments?: CameraImpairments;
 }
 
 /** Where {@link simulateCapture} puts a frame: the camera's size and the frame's four corners on it. */
@@ -385,6 +419,7 @@ export function simulateCapture(frame: RgbaImage, preset: ChannelPreset, options
     frame,
     {
       ...params,
+      ...options.impairments,
       ...camera,
       corners,
       seed: options.seed ?? 1,
@@ -396,7 +431,7 @@ export function simulateCapture(frame: RgbaImage, preset: ChannelPreset, options
 
 /**
  * Where points of a rendered frame land in the image {@link simulateCapture} makes with the same
- * arguments, before blur and noise: what a test of the fiducial search compares its finds with.
+ * arguments, before blur, noise and the lens and motion impairments: what a test of the fiducial search compares its finds with.
  * @param frame - The rendered frame.
  * @param preset - The channel.
  * @param options - As given to {@link simulateCapture}.
