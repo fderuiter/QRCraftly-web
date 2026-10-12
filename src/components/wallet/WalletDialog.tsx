@@ -53,11 +53,12 @@ export function suggestWalletTitle(config: Pick<QRConfig, 'type' | 'value'>): st
   return getQRTypeLabel(config.type);
 }
 
-// Signing code loads only when someone opens the Apple Wallet tab.
+// Signing code loads only when someone opens a pass tab.
 const ApplePassPanel = lazy(() => import('./ApplePassPanel'));
+const GooglePassPanel = lazy(() => import('./GooglePassPanel'));
 
 /** What the dialog makes: the card image for everyone, or a signed pass with the person's own keys. */
-type WalletMode = 'card' | 'apple';
+type WalletMode = 'card' | 'apple' | 'google';
 
 /** A tab label with the Beta tag: signed passes are beta until they are checked on real phones (#1413). */
 function betaLabel(text: string) {
@@ -72,6 +73,7 @@ function betaLabel(text: string) {
 const MODES: readonly { value: WalletMode; label: ReactNode; ariaLabel?: string }[] = [
   { value: 'card', label: 'Card image' },
   { value: 'apple', label: betaLabel('Apple Wallet pass'), ariaLabel: 'Apple Wallet pass (beta)' },
+  { value: 'google', label: betaLabel('Google Wallet pass'), ariaLabel: 'Google Wallet pass (beta)' },
 ];
 
 /** Message shown when the card's own code fails the scan check. */
@@ -203,6 +205,10 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
             {mode === 'apple' ? (
               <Suspense fallback={<Skeleton className="h-48 w-full rounded-md" />}>
                 <ApplePassPanel config={config} title={title} subtitle={subtitle} filename={filename} />
+              </Suspense>
+            ) : mode === 'google' ? (
+              <Suspense fallback={<Skeleton className="h-48 w-full rounded-md" />}>
+                <GooglePassPanel config={config} title={title} subtitle={subtitle} />
               </Suspense>
             ) : (
             <>

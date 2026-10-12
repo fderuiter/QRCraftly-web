@@ -54,7 +54,7 @@ export async function importRsaSigningKey(pem: string): Promise<CryptoKey> {
     return await crypto.subtle.importKey('pkcs8', privateKeyToPkcs8(pem) as BufferSource, RSA_SHA256, false, ['sign']);
   } catch (err) {
     if (err instanceof WalletPassError) throw err;
-    throw new WalletPassError('This private key could not be loaded. Pass Type ID keys are RSA keys in PEM form.');
+    throw new WalletPassError('This private key could not be loaded. Use an RSA private key in PEM form.');
   }
 }
 
