@@ -22,6 +22,7 @@ import type { QRConfig } from '@/types';
 import { buildGoogleSaveLink, describePassContent, isIssuerId, passColorsFrom, readServiceAccount, WalletPassError, type GoogleServiceAccount } from '@/packages/wallet-pass';
 import { Button } from '../ui/Button';
 import { Alert } from '../ui/Alert';
+import { Badge } from '../ui/Badge';
 import { TextField } from '../ui/TextField';
 import { useToast } from '../ui/Toast';
 import { FilePicker, type PickedFile } from './FilePicker';
@@ -84,6 +85,10 @@ export default function GooglePassPanel({ config, title, subtitle }: GooglePassP
       <p className="text-sm text-fg-muted">
         With your own Google Wallet issuer you can make a Google Wallet pass. Load your service-account key and enter your Issuer ID. The key stays in this tab, is never uploaded, and is forgotten when
         you close this window.
+      </p>
+      <p className="text-sm text-fg-muted">
+        <Badge tone="beta">Beta</Badge> Google Wallet passes are new: QRCraftly has not yet tried them with a real Google Wallet issuer on an Android phone, so save your pass to your own phone before you
+        share it.
       </p>
       <FilePicker
         label="Service-account key"
