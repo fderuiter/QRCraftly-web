@@ -90,3 +90,17 @@ On P6 the columns differ by run-to-run noise. The lock-on speed-up is the bucket
 - **A header that reads stops the search.** When the whole-image search reads a header whose version or constellation this receiver does not know, the frame has been found, so the strict search does not run.
 
 The module grows from about 36 KB to 45 KB gzipped, so its budget in `scripts/check-bundle-size.js` goes from 40 KB to 48 KB.
+
+## Amendment: Ultra Mono, a black-and-white 4K profile
+
+`HIGH_RATE_PROFILES` gains P8 Ultra Mono: Ultra's 768 x 432 grid and block sizes (176 data and 48 check bytes) in black and white. A receiver reads the grid, the constellation and the block sizes from the frame header, so it needs no table change to read it.
+
+The reason is the phone channel of [OPTICAL_CEILING.md](../OPTICAL_CEILING.md), whose settings are guesses until the probe measures a phone (#1173). There, the phone's chroma and temporal noise reduction erase the differences between Ultra's 4 colours: it locks on but reads no block. Black and white keeps a much wider margin. In the simulator:
+
+- **Phone channel (guessed):** Ultra Mono reads 91.7% of blocks and carries a steady 1.68 MB/s (13.5 Mbit/s) at 60 fps. Ultra reads 0%.
+- **Poor channel:** Ultra Mono reads 92.1% of blocks, at a steady 1.69 MB/s. Neither P6 Wide nor P7 Ultra reads at all there.
+- **Studio and typical channels:** Ultra Mono carries 1.84 MB/s, half of Ultra's 3.67 MB/s, because each cell carries 1 bit instead of 2. So Ultra stays for cameras that keep colour.
+- **Denser black-and-white grids do not help on the phone channel** (scratch runs, not in the report). 896 x 504 cells carry about the same rate as 768 x 432 (1.59 MB/s, 63% of blocks). 1024 x 576 and denser read nothing.
+- **4 grey levels at Ultra's cell size do not read at all**, even in the typical channel. Blur, demosaicing, JPEG and the black lift push the greys across the decision lines.
+
+Black and white is the finder's slowest case to lock on to (the "fiducial off" rows above), which matters while a phone is being aimed. Nothing about this profile has been measured on a device.
