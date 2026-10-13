@@ -58,6 +58,7 @@ function DataLink({ href, external = false, children }: { href?: string; externa
 export default function Page() {
   return (
     <ArticleLayout
+      pageId="acknowledgements"
       title="Open-source acknowledgements"
       lead={`QRCraftly is built on open-source software. These are the ${shippedPackages.length} third-party packages whose code your browser downloads when you use the site, with their licenses.`}
       sections={SECTIONS}

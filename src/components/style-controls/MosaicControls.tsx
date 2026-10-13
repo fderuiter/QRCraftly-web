@@ -79,12 +79,13 @@ export const MosaicControls: React.FC<MosaicControlsProps> = ({ config, onChange
 
       {!config.mosaicImageUrl ? (
         <Button
+          id="mosaic-upload-button"
           variant="dropzone"
           onClick={() => fileInputRef.current?.click()}
           aria-describedby={combineIds('mosaic-upload-help', error && 'mosaic-upload-error')}
         >
           <Upload className="mb-2 size-5" aria-hidden="true" />
-          <span className="text-sm font-medium">Upload Mosaic Design</span>
+          <span className="text-sm font-medium">Upload mosaic design</span>
           <span id="mosaic-upload-help" className="mt-1 text-xs text-fg-muted">
             Tiles your image into the code. It stays on this device.
           </span>

@@ -39,6 +39,7 @@ const SECTION_CLASSES = 'mb-10 scroll-mt-6 space-y-3 text-fg-soft';
 export default function Page() {
   return (
     <ArticleLayout
+      pageId="support"
       title="QRCraftly for iPhone, iPad and Mac: Support"
       lead="Help with the app QRCraftly: QR Code Studio."
       sections={SECTIONS}

@@ -18,6 +18,16 @@
 
 import { QRErrorCorrectionLevel, QRType, type QRConfig } from '@/types';
 
+/** A call to action above the generator's controls: opens an appearance section and focuses one control in it. */
+export interface LandingPrimaryAction {
+  /** Button text, such as "Add your picture". */
+  label: string;
+  /** Title of the appearance section to open. */
+  section: string;
+  /** Id of the control to focus once the section is open. */
+  focusId: string;
+}
+
 /** What a landing page asks of the generator it opens (#1035, #1037). */
 export interface LandingPreset {
   /** QR type the generator starts on. */
@@ -26,6 +36,8 @@ export interface LandingPreset {
   presetConfig?: Partial<QRConfig>;
   /** Appearance sections that start expanded. */
   openSections?: readonly string[];
+  /** Optional call to action that takes the person straight to the page's main input. */
+  primaryAction?: LandingPrimaryAction;
   /** Page title shown in the generator header. */
   title: string;
 }
@@ -41,7 +53,12 @@ const HIGH_EC_LOGO: Pick<LandingPreset, 'presetConfig' | 'openSections'> = {
  * with something the generic URL page lacks: a preset, instructions or examples (no doorway pages).
  */
 export const LANDING_PRESETS: Readonly<Record<string, LandingPreset>> = {
-  'mosaic-qr-code': { type: QRType.URL, title: 'Image QR Code', ...HIGH_EC_LOGO },
+  'mosaic-qr-code': {
+    type: QRType.URL,
+    title: 'Image QR Code',
+    ...HIGH_EC_LOGO,
+    primaryAction: { label: 'Add your picture', section: 'Logo', focusId: 'mosaic-upload-button' },
+  },
   'qr-code-with-logo': { type: QRType.URL, title: 'QR Code with Logo', ...HIGH_EC_LOGO },
   'google-review-qr-code': { type: QRType.URL, title: 'Google Review QR Code' },
   'menu-qr-code': { type: QRType.URL, title: 'Menu QR Code' },

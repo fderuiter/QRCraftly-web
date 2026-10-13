@@ -143,7 +143,7 @@ describe('StyleControls Component', () => {
   it('renders logo upload section', () => {
       render(<StyleControls config={DEFAULT_CONFIG} onChange={mockOnChange} />);
       expandAppearanceSections();
-      expect(screen.getByText('Upload Logo')).toBeInTheDocument();
+      expect(screen.getByText('Upload logo')).toBeInTheDocument();
   });
 
   it('gives the logo and Mosaic QR file inputs distinct accessible names', () => {

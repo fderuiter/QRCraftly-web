@@ -39,6 +39,7 @@ import {
   type BulkContentType,
 } from '@/packages/bulk-csv';
 import { BulkCsvPreflightSummary } from './BulkCsvPreflightSummary';
+import { BulkCsvRowPreview } from './BulkCsvRowPreview';
 import { type BulkCsvData, type QRConfig, QRType } from '@/types';
 import { Alert } from '../ui/Alert';
 import { Button } from '../ui/Button';
@@ -177,7 +178,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   }, [preview, preflightReport]);
 
   const buttonText = useMemo(() => {
-    if (isGenerating) return 'Generating Batch ZIP...';
+    if (isGenerating) return 'Generating ZIP…';
     if (!preflightReport || preflightReport.validCount === 0) return 'No Valid Rows to Generate';
     if (preflightReport.emptyCount > 0 || preflightReport.unsafeCount > 0) {
       return `Generate Batch for ${preflightReport.validCount} Valid Rows`;
@@ -534,6 +535,8 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
               </SelectField>
             )}
           </div>
+
+          <BulkCsvRowPreview rows={rows} rowNumbers={rowNumbers} payloadColumn={payloadCol} filenameColumn={filenameCol} />
 
           {preflightReport && <BulkCsvPreflightSummary report={preflightReport} />}
 

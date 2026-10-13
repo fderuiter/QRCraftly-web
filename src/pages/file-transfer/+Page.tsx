@@ -592,7 +592,7 @@ function FileTransferToolInner() {
                     aria-describedby={showNotice ? 'photosensitivity-notice' : undefined}
                   >
                     <Play className="size-4" aria-hidden="true" />
-                    {isVerifyingHandshake ? 'Checking QR…' : 'Start Transfer'}
+                    {isVerifyingHandshake ? 'Checking QR…' : 'Start transfer'}
                   </Button>
                 ) : (
                   <>
@@ -607,7 +607,7 @@ function FileTransferToolInner() {
                     </Button>
                     <Button variant="error" fullWidth onClick={stopTransfer} aria-label="Stop file transfer">
                       <Square className="size-4" aria-hidden="true" />
-                      Stop Transfer
+                      Stop transfer
                     </Button>
                   </>
                 )}

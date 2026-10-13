@@ -139,7 +139,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
             <span className="mb-2 flex size-10 items-center justify-center rounded-full bg-surface-hover transition-colors group-hover:bg-accent-soft">
               <Upload className="size-5" aria-hidden="true" />
             </span>
-            <span className="text-sm font-medium">Upload Logo</span>
+            <span className="text-sm font-medium">Upload logo</span>
             <span id="logo-upload-help" className="mt-1 text-xs text-fg-muted">{SYSTEM_LIMITS.SUPPORTED_IMAGE_FORMATS.map(t => t.replace('image/', '').replace('+xml', '').toUpperCase()).join(', ')} (Square recommended)</span>
             {error && <span id="logo-upload-error" role="alert" className="mt-2 text-xs text-danger">{error}</span>}
           </Button>

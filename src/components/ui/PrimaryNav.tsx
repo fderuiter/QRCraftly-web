@@ -16,14 +16,21 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Menu as MenuIcon } from 'lucide-react';
 import { usePageContext } from 'vike-react/usePageContext';
 import { Button } from './Button';
 import { Modal } from './Modal';
 import { Badge } from './Badge';
 import { isDangerousUrl } from '@/utils/security';
-import { PRIMARY_NAV_ITEMS, type PrimaryNavItem, getCurrentPrimaryNavId } from '@/data/navigation';
+import {
+  GENERATOR_FOOTER_LINKS,
+  HELP_LINKS,
+  PRIMARY_NAV_ITEMS,
+  type PrimaryNavItem,
+  getCurrentPrimaryNavId,
+  normalizePathname,
+} from '@/data/navigation';
 
 /**
  * Returns the current pathname from Vike's page context, falling back to the browser
@@ -88,6 +95,56 @@ function NavLink({
 }
 
 /**
+ * A labelled group of secondary links in the site menu (QR code types, Help). The current
+ * page is marked with `aria-current="page"`, as the primary links are.
+ * @param root0 - Component properties.
+ * @param root0.title - Group heading, also the group's accessible name.
+ * @param root0.links - Label and destination pairs.
+ * @param root0.pathname - The current pathname.
+ * @param root0.onNavigate - Called when a link is activated.
+ * @returns The labelled navigation group.
+ */
+function MenuSection({
+  title,
+  links,
+  pathname,
+  onNavigate,
+}: {
+  title: string;
+  links: readonly (readonly [label: string, href: string])[];
+  pathname: string;
+  onNavigate: () => void;
+}) {
+  const headingId = useId();
+  const current = normalizePathname(pathname);
+  return (
+    <div role="group" aria-labelledby={headingId} className="border-t border-line-subtle pt-4">
+      <h3 id={headingId} className="mb-1 px-3 text-xs font-semibold tracking-wide text-fg-muted uppercase">
+        {title}
+      </h3>
+      <ul>
+        {links.map(([label, href]) => {
+          if (isDangerousUrl(href)) return null;
+          const isCurrent = normalizePathname(href) === current;
+          return (
+            <li key={href}>
+              <a
+                href={href}
+                aria-current={isCurrent ? 'page' : undefined}
+                onClick={onNavigate}
+                className={`flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors hover:bg-surface-hover hover:text-accent ${isCurrent ? 'bg-accent-soft text-accent-strong' : 'text-fg-muted'}`}
+              >
+                {label}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/**
  * Site-wide primary navigation built from the shared `PRIMARY_NAV_ITEMS` data model and
  * rendered once, in the app shell header. From the `lg` breakpoint every destination is an
  * inline link; below it a menu button opens a dialog listing the same links, which traps
@@ -138,6 +195,10 @@ export function PrimaryNav() {
             ))}
           </ul>
         </nav>
+        <div className="mt-4 space-y-4">
+          <MenuSection title="QR code types" links={GENERATOR_FOOTER_LINKS} pathname={pathname} onNavigate={close} />
+          <MenuSection title="Help" links={HELP_LINKS} pathname={pathname} onNavigate={close} />
+        </div>
       </Modal>
     </nav>
   );

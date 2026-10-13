@@ -100,9 +100,9 @@ export function SidebarContent({ toolId }: SidebarContentProps) {
                 <div className="flex size-8 flex-shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent">
                   {idx + 1}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="mb-1 text-sm font-semibold text-fg">{step.name}</h3>
-                  <p className="text-sm text-fg-muted">{step.text}</p>
+                  <p className="text-sm wrap-anywhere text-fg-muted">{step.text}</p>
                 </div>
               </div>
             ))}

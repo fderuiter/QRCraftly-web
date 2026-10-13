@@ -54,6 +54,7 @@ export default function Page() {
   return (
     <>
       <ArticleLayout
+        pageId="about"
         title="About QRCraftly"
         lead="A QR code generator that runs in your browser. Free, with no ads, no tracking and no sign-up."
         sections={SECTIONS}
