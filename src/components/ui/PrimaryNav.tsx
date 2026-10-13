@@ -119,25 +119,27 @@ function MenuSection({
   const current = normalizePathname(pathname);
   return (
     <div role="group" aria-labelledby={headingId} className="border-t border-line-subtle pt-4">
-      <h3 id={headingId} className="mb-1 px-3 text-xs font-semibold tracking-wide text-fg-muted uppercase">
+      <h3 id={headingId} className="mb-1 px-3 text-xs font-semibold tracking-wider text-fg-muted uppercase">
         {title}
       </h3>
       <ul>
         {links.map(([label, href]) => {
-          if (isDangerousUrl(href)) return null;
-          const isCurrent = normalizePathname(href) === current;
-          return (
-            <li key={href}>
-              <a
-                href={href}
-                aria-current={isCurrent ? 'page' : undefined}
-                onClick={onNavigate}
-                className={`flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors hover:bg-surface-hover hover:text-accent ${isCurrent ? 'bg-accent-soft text-accent-strong' : 'text-fg-muted'}`}
-              >
-                {label}
-              </a>
-            </li>
-          );
+          if (!isDangerousUrl(href)) {
+            const isCurrent = normalizePathname(href) === current;
+            return (
+              <li key={href}>
+                <a
+                  href={href}
+                  aria-current={isCurrent ? 'page' : undefined}
+                  onClick={onNavigate}
+                  className={`flex min-h-11 items-center rounded-lg px-3 text-sm font-medium transition-colors hover:bg-surface-hover hover:text-accent ${isCurrent ? 'bg-accent-soft text-accent-strong' : 'text-fg-muted'}`}
+                >
+                  {label}
+                </a>
+              </li>
+            );
+          }
+          return null;
         })}
       </ul>
     </div>
