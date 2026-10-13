@@ -31,7 +31,7 @@ import { stageGeneratorContent } from '@/context/QRContext';
 const PROMISES = [
   { icon: CloudUpload, title: 'Nothing uploaded', text: 'The picture is read on this device and never sent anywhere.' },
   { icon: ShieldCheck, title: 'Links checked first', text: 'See the real address before opening a link. Script links are blocked.' },
-  { icon: Gamepad2, title: 'Test durability too', text: 'The Arcade damages a code the way smudges, folds and glare do.' },
+  { icon: Gamepad2, title: 'Test durability too', text: 'The Arcade knocks holes in a code to show how much damage it survives.' },
 ] as const;
 
 const LINK_CLASSES = 'font-medium text-accent underline-offset-2 hover:underline';

@@ -68,27 +68,7 @@ export function generateSchema(
       }
     ];
 
-    const faqs = (content as ToolContent & ToolCopy).faqs;
-    if (faqs && faqs.length > 0) {
-      aboutGraph.push({
-        "@type": "FAQPage",
-        "mainEntity": faqs.map(faq => ({
-          "@type": "Question",
-          "name": faq.question,
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": faq.answer
-          }
-        }))
-      });
-    }
-
-    if (content.personas && content.personas.length > 0) {
-      aboutGraph[0].audience = content.personas.map(persona => ({
-        "@type": "Audience",
-        "audienceType": persona
-      }));
-    }
+    aboutGraph.push(...faqGraph(content as ToolContent & ToolCopy));
 
     return {
       "@context": "https://schema.org",
@@ -97,10 +77,31 @@ export function generateSchema(
   }
 
   const toolContent = content as ToolContent & ToolCopy;
+
+  // A page about the project (such as the pledge) is not an app: describe it as the page it is.
+  if (toolContent.schemaType === "AboutPage") {
+    return {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "AboutPage",
+          "name": content.name,
+          "description": content.description,
+          "url": publicUrl,
+          "mainEntity": {
+            "@id": `${domain}/#organization`
+          }
+        },
+        ...faqGraph(toolContent)
+      ]
+    };
+  }
+
   const typeValue = toolContent.schemaType || "WebApplication";
   const categoryValue = toolContent.schemaCategory || "UtilitiesApplication";
 
-  const featureList = [toolContent.valueProposition, ...(toolContent.features || [])].filter(Boolean).join(", ");
+  // Only the features the page shows; the value-proposition and persona labels are internal.
+  const featureList = (toolContent.features || []).join(", ");
 
   const appEntity: JsonLdObject = {
     "@type": typeValue,
@@ -123,13 +124,6 @@ export function generateSchema(
     "featureList": featureList
   };
 
-  if (content.personas && content.personas.length > 0) {
-    appEntity.audience = content.personas.map(persona => ({
-      "@type": "Audience",
-      "audienceType": persona
-    }));
-  }
-
   const graph: JsonLdObject[] = [appEntity];
 
   if (toolContent.howTo) {
@@ -143,12 +137,6 @@ export function generateSchema(
         "currency": "USD",
         "value": "0"
       },
-      "tool": [
-        {
-          "@type": "HowToTool",
-          "name": `QRCraftly ${content.name.replace(' QR Code Generator', '')} Generator`
-        }
-      ],
       "step": toolContent.howTo.steps.map(step => ({
         "@type": "HowToStep",
         "name": step.name,
@@ -166,24 +154,33 @@ export function generateSchema(
     graph.push(howToObj);
   }
 
-  if (toolContent.faqs && toolContent.faqs.length > 0) {
-    graph.push({
-      "@type": "FAQPage",
-      "mainEntity": toolContent.faqs.map(faq => ({
-        "@type": "Question",
-        "name": faq.question,
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": faq.answer
-        }
-      }))
-    });
-  }
+  graph.push(...faqGraph(toolContent));
 
   return {
     "@context": "https://schema.org",
     "@graph": graph
   };
+}
+
+/**
+ * The FAQPage entity for a page's questions, or nothing when it has none. Every page that has
+ * FAQ copy renders the same questions and answers, so the markup matches what visitors see.
+ * @param copy - The page's copy.
+ * @returns Zero or one FAQPage entity.
+ */
+function faqGraph(copy: ToolCopy): JsonLdObject[] {
+  if (!copy.faqs || copy.faqs.length === 0) return [];
+  return [{
+    "@type": "FAQPage",
+    "mainEntity": copy.faqs.map(faq => ({
+      "@type": "Question",
+      "name": faq.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.answer
+      }
+    }))
+  }];
 }
 
 /**

@@ -76,8 +76,7 @@ describe('WiFi QR Code Page', () => {
     expect(howTo.supply[1].name).toBe('WiFi Password');
     expect(howTo.supply[2].name).toBe('Encryption Type');
 
-    expect(howTo.tool).toHaveLength(1);
-    expect(howTo.tool[0].name).toBe('QRCraftly WiFi Generator');
+    expect(howTo.tool).toBeUndefined();
 
     expect(howTo.step).toHaveLength(4);
   });

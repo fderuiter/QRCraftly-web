@@ -16,7 +16,7 @@ export const copy: ToolCopy = {
     {
       question: 'Is QRCraftly really free?',
       answer:
-        'Yes. Every generator, style option and download format is free, with no sign-up, no watermark and no limit on how many codes you make. QRCraftly is not ad supported and never will be.',
+        'Yes. Every generator, style option and download format is free, with no sign-up, no watermark and no limit on how many codes you make (bulk CSV takes up to 500 rows per batch). QRCraftly is not ad supported and never will be.',
     },
     NEVER_EXPIRES,
     {
@@ -27,7 +27,7 @@ export const copy: ToolCopy = {
     {
       question: 'Can I add a logo or change the colors?',
       answer:
-        'Yes. You can change the colors, module and corner shapes, add a logo, or tile your own image into the code with Mosaic QR. QRCraftly checks the result with a real scanner as you design, so you can see whether it still scans before you download it.',
+        'Yes. Change the colors and the module and corner shapes, add a logo, or turn your own picture into the code with Mosaic. The generator tests each code with a built-in scanner as you work, so you can see if it still scans before you download.',
     },
     {
       question: 'Which file formats can I download?',
