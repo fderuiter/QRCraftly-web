@@ -1,0 +1,46 @@
+name: Verify Production Deployment
+
+# Post-merge production check (#1217, ADR 0050). Cloudflare Workers Builds deploys every push
+# to main to production on its own. This workflow waits until /version.json on workers.dev
+# reports the merged commit and fails with an error annotation (plus the last response's
+# status, headers and body start) if production does not pick it up, then smoke tests it.
+# It replaces re-running the whole CI pipeline on main: the ruleset requires PRs to be up to
+# date and squash-merges them, so the merged tree is the one its PR's CI already tested.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true # a newer merge supersedes the deploy this run waits for
+
+jobs:
+  verify-staging:
+    name: Verify Production Deployment
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          cache-playwright: 'true'
+
+      - name: Wait for production to serve this commit
+        env:
+          BASE_URL: "https://qrcraftly.fpderuiter.workers.dev"
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: bash scripts/ci/wait_for_deploy.sh
+
+      - name: Run Playwright Smoke Tests on Production
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: "https://qrcraftly.fpderuiter.workers.dev"
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: bash scripts/ci/run_smoke_tests.sh

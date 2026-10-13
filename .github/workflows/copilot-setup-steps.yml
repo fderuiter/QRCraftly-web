@@ -1,14 +1,8 @@
 name: "Copilot Setup Steps"
 
-# Re-evaluate the workspace layout automatically if this definition is updated
+# Copilot reads this job's steps; it only needs a manual run to check them (ADR 0050).
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - .github/workflows/copilot-setup-steps.yml
-  pull_request:
-    paths:
-      - .github/workflows/copilot-setup-steps.yml
 
 permissions:
   contents: read
