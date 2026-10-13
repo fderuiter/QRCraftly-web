@@ -202,6 +202,8 @@ export const formatPathName = (segment: string): string => {
     'instagram-qr-code': 'Instagram QR Code',
     'whatsapp-qr-code': 'WhatsApp QR Code',
     'pdf-qr-code': 'PDF QR Code',
+    'static-qr-code-generator': 'Static QR Code',
+    'svg-qr-code': 'SVG QR Code',
   };
 
   if (overrides[segment]) {

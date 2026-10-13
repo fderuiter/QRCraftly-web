@@ -100,6 +100,8 @@ export const USE_CASE_LINKS: readonly (readonly [label: string, href: string])[]
   ['Instagram QR Code', '/instagram-qr-code'],
   ['WhatsApp QR Code', '/whatsapp-qr-code'],
   ['PDF QR Code', '/pdf-qr-code'],
+  ['Static QR Code', '/static-qr-code-generator'],
+  ['SVG QR Code', '/svg-qr-code'],
 ];
 
 const GENERATOR_PATHS = new Set<string>(Object.values(QR_TYPE_ROUTES));

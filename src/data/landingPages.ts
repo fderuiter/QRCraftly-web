@@ -48,6 +48,8 @@ export const LANDING_PRESETS: Readonly<Record<string, LandingPreset>> = {
   'instagram-qr-code': { type: QRType.SOCIAL, title: 'Instagram QR Code' },
   'whatsapp-qr-code': { type: QRType.URL, title: 'WhatsApp QR Code', presetConfig: { value: 'https://wa.me/' } },
   'pdf-qr-code': { type: QRType.URL, title: 'PDF QR Code' },
+  'static-qr-code-generator': { type: QRType.URL, title: 'Static QR Code' },
+  'svg-qr-code': { type: QRType.URL, title: 'SVG QR Code' },
 };
 
 /** Registry ids of every landing page, with the checker last, in the order they are listed. */

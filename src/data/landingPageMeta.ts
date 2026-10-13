@@ -138,6 +138,36 @@ export const landingPageMeta: Record<string, LandingMeta> = {
       'Download as PNG, JPEG, WebP or SVG',
     ],
   },
+  'static-qr-code-generator': {
+    name: 'Static QR Code Generator',
+    seoTitle: 'Static QR Code Generator: Permanent, No Expiry | QRCraftly',
+    heading: 'Static QR Code Generator',
+    description:
+      'Make a permanent QR code: the content is written into the code itself, so no service can switch it off. Free, no sign-up, no ads.',
+    imageAlt: 'A static QR code made with the QRCraftly static QR code generator',
+    features: [
+      'The content is written into the code, with no redirect service in between',
+      'Keeps working even if QRCraftly goes away',
+      'No account, trial or scan limit',
+      'Links, Wi-Fi, contacts, text, email, phone and more',
+      'Download as PNG, SVG, EPS or PDF',
+    ],
+  },
+  'svg-qr-code': {
+    name: 'SVG QR Code Generator',
+    seoTitle: 'Free SVG QR Code Generator: Vector Download | QRCraftly',
+    heading: 'Free SVG QR Code Generator',
+    description:
+      'Download a QR code as SVG, EPS or PDF vector files that stay sharp at any size, for print and design work. Made in your browser, free, no sign-up.',
+    imageAlt: 'A vector QR code ready to download as SVG, made with the QRCraftly SVG QR code generator',
+    features: [
+      'SVG, EPS and PDF vector downloads that stay sharp at any size',
+      'Copy the SVG code to paste straight into a web page',
+      'Colors, logo and frames carried into the vector file',
+      'A static code that never expires',
+      'Made in your browser and never uploaded',
+    ],
+  },
   'qr-code-checker': {
     name: 'QR Code Checker',
     seoTitle: 'QR Code Checker: Test If a QR Code Scans | QRCraftly',

@@ -417,6 +417,123 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'The link is put into the code in your browser. QRCraftly never sees the link or the file and adds no tracking. Your file host does see the downloads.',
     },
   },
+  'static-qr-code-generator': {
+    howTo: {
+      name: 'How to Make a Static QR Code',
+      description: 'Make a permanent QR code in four steps, all in your browser.',
+      steps: [
+        { name: 'Choose what the code holds', text: 'A link, Wi-Fi details, a contact card, text and more. Whatever you choose is written into the code itself.' },
+        { name: 'Type or paste the content', text: 'Check it carefully: a static code cannot be edited after it is printed.' },
+        { name: 'Style it and wait for the scan check', text: 'Change colors or add a logo if you like, and wait for “Scans reliably”.' },
+        { name: 'Download and test', text: 'Download PNG for screens, or SVG, EPS or PDF for print, and scan it with a phone before you share it.' },
+      ],
+    },
+    faqs: [
+      {
+        question: 'What is a static QR code?',
+        answer:
+          'A QR code that holds its content directly, such as the web address itself. A phone reads the content straight from the pattern, with no service in between, so nothing can switch it off.',
+      },
+      {
+        question: 'Do static QR codes expire?',
+        answer:
+          'No. A static code is just a pattern, so there is nothing to expire. It works as long as what it points to still exists: a link keeps working while the web page is online.',
+      },
+      {
+        question: 'Can I change a static QR code after printing it?',
+        answer:
+          'No, the content is fixed. If you need to change where a printed code goes, point it at a page you control, such as your own website, and change that page instead.',
+      },
+      {
+        question: 'Can I see how many people scanned it?',
+        answer:
+          'Not from the code. Counting scans needs a redirect service that records every visit, which is exactly what a static code avoids. Your own website’s statistics still show visits to the page it opens.',
+      },
+    ],
+    guide: {
+      intro:
+        'Make a QR code that never expires. A static code holds its content in the pattern itself, so no subscription, trial or service can switch it off.',
+      scanned: [
+        'The phone reads the content straight from the code: it opens the link, joins the Wi-Fi or saves the contact. No QRCraftly server is involved, because there is none.',
+        'Many “free” generators make dynamic codes instead. Those hold a short address on the vendor’s server, which forwards each scan, and they stop working when the trial or plan ends.',
+      ],
+      useCases: [
+        'Anything printed that must keep working for years: signs, packaging, books and business cards.',
+        'Wi-Fi cards and contact cards, which no redirect service could handle anyway.',
+        'Places where privacy matters, because no third party sees each scan.',
+      ],
+      printing: [
+        'Print the code at least 2 cm (about 0.8 in) wide, and larger if people scan it from further away.',
+        'Use SVG, EPS or PDF for print so it stays sharp at any size.',
+      ],
+      checks: [
+        'Check the content before printing: a static code cannot be edited later.',
+        'Link to a page you control and plan to keep, so you can update the page rather than the code.',
+        'Scan the downloaded file with two different phones.',
+      ],
+      privacy:
+        'The code is made in your browser and QRCraftly never sees what you type. Scans go straight to your link, with no redirect and no tracking in between.',
+    },
+  },
+  'svg-qr-code': {
+    howTo: {
+      name: 'How to Download a QR Code as SVG',
+      description: 'Make a vector QR code for print or the web in four steps.',
+      steps: [
+        { name: 'Enter the content', text: 'Type or paste a link, or choose another type such as Wi-Fi or a contact card.' },
+        { name: 'Style it', text: 'Pick colors, a pattern or a logo, and wait for “Scans reliably”.' },
+        { name: 'Choose SVG in the download options', text: 'Open the download options and pick SVG. EPS and PDF are there too, for print software that prefers them.' },
+        { name: 'Test the file', text: 'Open the SVG in your design tool or browser and scan it from the screen before you send it to print.' },
+      ],
+    },
+    faqs: [
+      {
+        question: 'Why use SVG for a QR code?',
+        answer:
+          'SVG is a vector format: it describes shapes rather than pixels, so the code stays sharp at any size, from a business card to a banner. PNG files blur or turn blocky when they are enlarged.',
+      },
+      {
+        question: 'SVG, EPS or PDF: which should I send to a printer?',
+        answer:
+          'Ask the printer. SVG suits the web and most modern design tools, EPS suits older print workflows, and PDF is the safest choice to email to a print shop. All three are vector and download free here.',
+      },
+      {
+        question: 'Can I paste the SVG into a web page?',
+        answer:
+          'Yes. Use “Copy SVG code” in the download options and paste it into your HTML. The code then scales with the page and needs no image file.',
+      },
+      {
+        question: 'Is the SVG made on a server?',
+        answer:
+          'No. The SVG is written in your browser from the code you made. Nothing is uploaded, and the file has no tracking or links back to QRCraftly.',
+      },
+    ],
+    guide: {
+      intro:
+        'Download a QR code as an SVG, EPS or PDF vector file that stays sharp at any size. Everything is made in your browser.',
+      scanned: [
+        'A phone reads a printed vector code exactly like any other QR code. The format only matters for how cleanly it prints.',
+        'Vector edges stay crisp when the code is scaled, so small print and large signs scan as well as the original.',
+      ],
+      useCases: [
+        'Print work: business cards, packaging, posters and signs.',
+        'Design files in Illustrator, Inkscape, Affinity or Figma, where the code can be resized freely.',
+        'Web pages, where an inline SVG scales with the layout.',
+      ],
+      printing: [
+        'Keep the quiet zone, the empty margin around the code, when you place it in a layout.',
+        'Do not stretch the code: scale it evenly, keeping it square.',
+        'Keep strong contrast, a dark code on a light background, after any color changes in your design tool.',
+      ],
+      checks: [
+        'Scan the code from your finished layout, not just the downloaded file.',
+        'If your print shop converts colors to CMYK, check the contrast on the proof.',
+        'Make sure the content is final: a static code cannot be edited after printing.',
+      ],
+      privacy:
+        'The SVG is written in your browser. QRCraftly never sees your content, and the file contains only the code’s shapes.',
+    },
+  },
   'qr-code-checker': {
     howTo: {
       name: 'How to Check a QR Code',

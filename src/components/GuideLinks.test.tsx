@@ -7,7 +7,7 @@ import { GuideLinks } from './GuideLinks';
 describe('GuideLinks', () => {
   it('renders nothing on a page without guides', () => {
     const { container } = render(
-      <PageContentContext.Provider value={buildPageContent({ urlPathname: '/wifi-qr-code' })}>
+      <PageContentContext.Provider value={buildPageContent({ urlPathname: '/about' })}>
         <GuideLinks />
       </PageContentContext.Provider>,
     );
