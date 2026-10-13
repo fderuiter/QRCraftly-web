@@ -111,7 +111,9 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
               >
                 <img
                   src={preset.dataUrl}
-                  alt={preset.label}
+                  alt=""
+                  width={24}
+                  height={24}
                   className="size-6 object-contain transition-transform group-hover:scale-110"
                 />
               </button>

@@ -43,7 +43,7 @@ describe('/qr-code-scanner page (#1034)', () => {
     const { container } = render(
       <LayoutDefault>{withPageContent('/qr-code-scanner', <Page />)}</LayoutDefault>
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'QR Code Scanner' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'QR Code Scanner Online' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start camera' })).toBeInTheDocument();
     expect(getUserMedia).not.toHaveBeenCalled();
     expect(await axe(container)).toHaveNoViolations();
@@ -77,6 +77,6 @@ describe('/qr-code-scanner page (#1034)', () => {
     expect(config.prerender).toBe(true);
     const meta = getMetadataForPath('/qr-code-scanner');
     expect(meta.title).toMatch(/QR Code Scanner/);
-    expect(meta.description).toMatch(/nothing is uploaded/);
+    expect(meta.description).toMatch(/nothing uploaded/);
   });
 });

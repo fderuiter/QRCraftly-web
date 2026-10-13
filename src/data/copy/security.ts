@@ -1,3 +1,4 @@
+import { CONTACT_ADDRESS } from '@/data/contact';
 import type { ToolCopy } from './types';
 
 /** The how-to steps and FAQs of the security page. */
@@ -11,12 +12,12 @@ export const copy: ToolCopy = {
         text: 'Open your browser’s developer tools, choose Network, and make a QR code. No request carries what you typed.',
       },
       {
-        name: 'Read the code',
-        text: 'The source is on GitHub under the AGPL. The build fails if the code gains an unreviewed network request or a browser storage key that is not on the allowlist.',
+        name: 'Go offline',
+        text: 'Load the page, turn off your connection and make a code. The generator keeps working, because nothing needs a server.',
       },
       {
         name: 'Report a problem',
-        text: 'Send security problems privately through GitHub security advisories, so they can be fixed before they are public.',
+        text: `Email security problems privately to ${CONTACT_ADDRESS}, so they can be fixed before they are public.`,
       },
     ],
   },

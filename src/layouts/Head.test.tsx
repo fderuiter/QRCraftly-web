@@ -138,7 +138,8 @@ describe('HeadDefault', () => {
     expect(org['@id']).toBe('https://qrcraftly.com/#organization');
     expect(org.name).toBe('QRCraftly');
     expect(org.description).toBe('Privacy-focused, client-side QR code generator.');
-    expect(org.slogan).toBe('Free. Secure. Open Source.');
+    expect(org.slogan).toBe('Free. Private. No ads.');
+    expect(org.sameAs).toBeUndefined();
     expect(org.foundingDate).toBe('2025');
   });
 

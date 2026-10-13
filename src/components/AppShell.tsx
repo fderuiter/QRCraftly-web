@@ -33,7 +33,7 @@ const COMPANY_LINKS = [
   ['No-Ads Pledge', '/free-forever'],
   ['Security Policy', '/security#security'],
   ['Privacy Architecture', '/security#compliance'],
-  ['Open-Source Licenses', '/acknowledgements'],
+  ['Third-Party Licenses', '/acknowledgements'],
   ['iPhone & Mac App Privacy', '/privacy'],
   ['iPhone & Mac App Support', '/support'],
 ] as const;
@@ -123,8 +123,8 @@ export function AppFooter() {
           <FooterLinks links={COMPANY_LINKS} className="space-y-2 text-sm text-fg-muted" />
           <ul className="mt-2 text-sm text-fg-muted">
             <li>
-              <a href="https://github.com/fderuiter/QRCraftly-web" target="_blank" rel="noopener noreferrer" className={FOOTER_LINK_CLASSES}>
-                GitHub
+              <a href="mailto:fpderuiter+qrcraftly@gmail.com" className={FOOTER_LINK_CLASSES}>
+                Contact
               </a>
             </li>
           </ul>
@@ -134,7 +134,7 @@ export function AppFooter() {
         <a href="/free-forever" className="font-medium text-fg-muted hover:text-accent">
           {PLEDGE_TAGLINE}
         </a>{' '}
-        &copy; {new Date().getFullYear()} QRCraftly. Open Source.
+        &copy; {new Date().getFullYear()} Fred de Ruiter.
       </p>
     </footer>
   );

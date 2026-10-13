@@ -74,9 +74,9 @@ export const guides: Guide[] = [
     slug: 'why-qr-codes-stop-working',
     title: 'Why your QR code stopped working (and how to make one that never will)',
     shortTitle: 'Why QR codes stop working',
-    seoTitle: 'Why Your QR Code Stopped Working (and How to Fix It for Good) | QRCraftly',
+    seoTitle: 'QR Code Stopped Working? Why, and How to Fix It | QRCraftly',
     description:
-      'QR codes do not expire by themselves. Find out whether yours was switched off, points at a dead page or is just hard to scan, and how to make one that lasts.',
+      'QR codes do not expire by themselves. Find out if yours was switched off, points at a dead page or is hard to scan, and how to make one that lasts.',
     lead: 'A QR code is only a picture of some data, so it cannot expire or switch itself off. When one stops working, it is nearly always one of three things. This guide shows you how to tell which in two minutes, and how to make a code that never stops.',
     datePublished: '2026-10-03',
     dateModified: '2026-10-03',
@@ -137,7 +137,7 @@ export const guides: Guide[] = [
           },
           {
             type: 'p',
-            text: 'The lasting fix is to stop depending on the middleman. A static code holds your address itself, so it keeps working for as long as that address does. If you still want to be able to change the destination later, you can do that without a vendor: point the static code at a short address on a domain you own, and change where that address leads. [Static vs dynamic QR codes](/guides/static-vs-dynamic-qr-codes) explains the trade-offs in full.',
+            text: 'The lasting fix is to stop depending on a middleman. A static code holds your address, so it works for as long as that address does. If you still want to change the destination later, point the code at a short address on a domain you own, then change where that address leads. [Static vs dynamic QR codes](/guides/static-vs-dynamic-qr-codes) covers the trade-offs.',
           },
         ],
       },
@@ -263,9 +263,9 @@ export const guides: Guide[] = [
     slug: 'static-vs-dynamic-qr-codes',
     title: 'Static vs dynamic QR codes: what you give up and what you pay',
     shortTitle: 'Static vs dynamic QR codes',
-    seoTitle: 'Static vs Dynamic QR Codes: What You Give Up and What You Pay | QRCraftly',
+    seoTitle: 'Static vs Dynamic QR Codes: What You Give Up | QRCraftly',
     description:
-      'A plain comparison of static and dynamic QR codes: editing, scan counts, cost, privacy and what happens if the provider disappears, with a way to keep both.',
+      'Static vs dynamic QR codes compared: editing, scan counts, cost, privacy and what happens if the provider disappears, with a way to keep both.',
     lead: 'Dynamic QR codes can be edited and counted, and static ones cannot. The price of that is a subscription, a dependency on one company and a record of every scan. This guide lays out both sides, including the parts that favour dynamic codes, so you can choose.',
     datePublished: '2026-10-03',
     dateModified: '2026-10-03',
@@ -418,7 +418,7 @@ export const guides: Guide[] = [
         blocks: [
           {
             type: 'p',
-            text: 'QRCraftly makes static codes only. There are no accounts, no servers that store your codes and no redirects, so a code you make here keeps working as long as the address inside it does, whether or not this site is still around. That is a deliberate decision, recorded in [an architecture decision](https://github.com/fderuiter/QRCraftly-web/blob/main/docs/adr/0022-no-dynamic-qr-codes-client-side-only.md), and it has a cost: we cannot give you scan counts or editable destinations. If you need those, use the middle path above or a dynamic provider whose terms you have read.',
+            text: 'QRCraftly makes static codes only. There are no accounts, no servers that store your codes and no redirects, so a code you make here keeps working as long as the address inside it does, whether or not this site is still around. That is a deliberate decision, and it has a cost: we cannot give you scan counts or editable destinations. If you need those, use the middle path above or a dynamic provider whose terms you have read.',
           },
           {
             type: 'p',
@@ -450,7 +450,7 @@ export const guides: Guide[] = [
     slug: 'how-to-print-a-qr-code-that-scans',
     title: 'How to print a QR code that scans every time',
     shortTitle: 'Printing a QR code that scans',
-    seoTitle: 'How to Print a QR Code That Scans: Size, Margin and Contrast | QRCraftly',
+    seoTitle: 'How to Print a QR Code: Size, Margin, Contrast | QRCraftly',
     description:
       'The size, quiet zone, contrast and file format that decide whether a printed QR code scans, with a checklist you can run before you send anything to print.',
     lead: 'Most QR codes that fail in the real world fail because of how they were printed, not how they were made. Four things decide it: how big the code is, the empty margin around it, the contrast of the squares, and what the paper or surface does to them. Here is how to get each one right before you print a thousand copies.',
@@ -587,7 +587,7 @@ export const guides: Guide[] = [
     slug: 'qr-code-error-correction-explained',
     title: 'QR code error correction explained: L, M, Q and H',
     shortTitle: 'Error correction explained',
-    seoTitle: 'QR Code Error Correction Levels Explained (L, M, Q, H) | QRCraftly',
+    seoTitle: 'QR Code Error Correction Levels (L, M, Q, H) | QRCraftly',
     description:
       'What the four QR code error correction levels recover, what each costs in size, and how to choose one when you add a logo or print on a rough surface.',
     lead: 'Every QR code carries spare data so a reader can rebuild what a scratch, a smudge or a logo has covered. You choose how much spare data there is, from level L to level H. This guide explains what each level recovers, what it costs, and how to pick one.',
@@ -694,7 +694,7 @@ export const guides: Guide[] = [
     slug: 'qr-code-scams-quishing',
     title: 'QR code scams (quishing): how they work and how to stay safe',
     shortTitle: 'QR code scams (quishing)',
-    seoTitle: 'QR Code Scams (Quishing): How They Work and How to Stay Safe | QRCraftly',
+    seoTitle: 'QR Code Scams (Quishing): How to Stay Safe | QRCraftly',
     description:
       'How fake QR codes steal logins and payments, the warning signs to look for before you scan, and what to do if you have already scanned one.',
     lead: 'A QR code hides its destination, which is exactly what scammers rely on. Quishing is phishing done with a QR code: a fake code takes you to a fake page that asks for a password or a payment. This guide covers how it works, how to spot it and what to do.',

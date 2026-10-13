@@ -19,8 +19,8 @@
 /**
  * The QRCraftly Pledge: the project's promise of no ads, no tracking, client-side
  * processing and free use. The /free-forever page, the About page and the site footers all
- * read from here so the wording never drifts. docs/PLEDGE.md and README.md carry the
- * same text for the repository.
+ * read from here so the wording never drifts. docs/PLEDGE.md carries the same text for the
+ * repository.
  */
 
 /** One-line summary used in site footers. */
@@ -50,7 +50,7 @@ export const PLEDGE_PROMISES: readonly PledgePromise[] = [
   },
   {
     title: 'Completely free',
-    text: 'Every feature, for everyone, with no account, no sign-up and no paid tier.',
+    text: 'Every feature on this site, for everyone, with no account, no sign-up and no paid tier.',
   },
 ];
 
@@ -60,7 +60,7 @@ export const PLEDGE_COMMITMENT =
 
 /** Why the project exists. */
 export const PLEDGE_WHY =
-  'This is the point of the project. A QR code generator should not need to know what you are encoding, and it should not be paid for by watching you. Keeping everything in your browser also makes QRCraftly fast and available anywhere, even without a connection.';
+  'This is the point of the project. A QR code generator should not need to know what you are encoding, and it should not be paid for by watching you. Keeping everything in your browser also makes QRCraftly fast and available anywhere, even without a connection once the page has loaded.';
 
 export const PLEDGE_SIGNATURE = 'Fred de Ruiter, creator of QRCraftly';
 
@@ -100,4 +100,4 @@ export const PLEDGE_NOT_COLLECTED: readonly string[] = [
 
 /** How anyone can check the claims above. */
 export const PLEDGE_VERIFY =
-  'The code is open source under the AGPL. The site\u2019s Content Security Policy tells your browser to refuse connections to any server other than QRCraftly itself, and the build fails if the code makes a network request that has not been reviewed and allowlisted.';
+  'You do not have to take my word for it. The site\u2019s Content Security Policy tells your browser to refuse connections to any server other than QRCraftly itself. Open your browser\u2019s developer tools, choose Network and make a code: no request carries what you typed. You can also load the page, turn off your connection and keep making codes.';

@@ -57,6 +57,6 @@ describe('/arcade page', () => {
     expect(config.prerender).toBe(true);
     const meta = getMetadataForPath('/arcade');
     expect(meta.title).toMatch(/QR Arcade/);
-    expect(meta.description).toMatch(/Reed-Solomon/);
+    expect(meta.description).toMatch(/live scanner/);
   });
 });

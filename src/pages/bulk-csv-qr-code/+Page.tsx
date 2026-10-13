@@ -24,5 +24,5 @@ import { copy } from '@/data/copy/bulk-csv-qr-code';
  * Bulk CSV Batch QR Code Page Component
  */
 export default function Page() {
-  return <QRTypePage type={QRType.BULK_CSV} title="Bulk CSV Batch QR Code" toolId="bulk-csv-qr-code" copy={copy} />;
+  return <QRTypePage type={QRType.BULK_CSV} title="Bulk QR Code Generator from CSV" toolId="bulk-csv-qr-code" copy={copy} />;
 }

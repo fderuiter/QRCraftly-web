@@ -28,7 +28,6 @@ const SECTIONS: readonly ArticleSection[] = [
 ];
 
 const LINK_CLASSES = 'font-medium text-accent underline-offset-2 hover:underline';
-const REPOSITORY = 'https://github.com/fderuiter/QRCraftly-web';
 
 /**
  * A link to a URL that comes from build data, or plain text when the URL is missing or unsafe.
@@ -108,16 +107,12 @@ export default function Page() {
         <ArticleHeading id="not-shipped"><span id="not-shipped-title">Tools that stay behind</span></ArticleHeading>
         <p>
           Tools that build, test and check QRCraftly, such as TypeScript, Vitest, Playwright and ESLint, run only on
-          developer machines and in continuous integration. None of their code is sent to your browser. Every dependency
-          is listed in{' '}
-          <a href={`${REPOSITORY}/blob/main/package.json`} target="_blank" rel="noopener noreferrer" className={LINK_CLASSES}>
-            package.json
-          </a>
-          .
+          developer machines and in continuous integration. None of their code is sent to your browser.
         </p>
         <p>
-          QRCraftly&apos;s own code is released under the GNU Affero General Public License v3.0 or later.{' '}
-          <a href="/about#open-source" className={LINK_CLASSES}>About the project</a>
+          QRCraftly&apos;s own code is not open source. The code published up to October 2026 was released under the
+          GNU AGPL v3.0.{' '}
+          <a href="/about#how-its-built" className={LINK_CLASSES}>How QRCraftly is built</a>
         </p>
       </section>
     </ArticleLayout>

@@ -17,5 +17,5 @@
 */
 
 export default {
-    imageAlt: 'Preview of the High-Performance Animated QR File Receiver'
+    imageAlt: 'Preview of the QRCraftly animated QR file receiver'
 }
