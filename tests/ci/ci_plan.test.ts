@@ -22,7 +22,7 @@ describe('scripts/ci/ci_plan.js', () => {
 
   it('treats Markdown the build does not read as docs only', () => {
     expect(isDocsOnlyFile('README.md')).toBe(true);
-    expect(isDocsOnlyFile('docs/adr/0049-ci-tiers-for-a-private-repository.md')).toBe(true);
+    expect(isDocsOnlyFile('docs/adr/0050-ci-tiers-for-a-private-repository.md')).toBe(true);
     expect(isDocsOnlyFile('docs/public/SCALING.md')).toBe(false);
     expect(isDocsOnlyFile('docs/SECURITY.md')).toBe(false);
     expect(isDocsOnlyFile('src/App.tsx')).toBe(false);

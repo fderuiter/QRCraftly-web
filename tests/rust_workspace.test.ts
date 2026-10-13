@@ -187,7 +187,7 @@ describe('CI wiring', () => {
   it('rebuilds the committed modules in a required job', () => {
     expect(workflow).toContain('run: pnpm run wasm:check');
     expect(workflow).toMatch(/needs: \[[^\]]*\bwasm-reproducible\b[^\]]*\]/);
-    // No paths filter, so a change to crates/ alone still runs it (ADR 0049).
+    // No paths filter, so a change to crates/ alone still runs it (ADR 0050).
     expect(workflow).not.toMatch(/^\s+paths:/m);
   });
 

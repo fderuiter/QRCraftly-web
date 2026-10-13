@@ -1,6 +1,6 @@
 name: CI/CD Pipeline
 
-# Metered minutes (ADR 0049): pull requests run a Chromium-only E2E tier and sample
+# Metered minutes (ADR 0050): pull requests run a Chromium-only E2E tier and sample
 # Lighthouse; the full four-browser E2E and every-page Lighthouse run nightly on main,
 # on release PRs and on PRs labelled `full-e2e`. Pushes to main do not re-run CI: the
 # ruleset requires PRs to be up to date and squash-merges them, so the commit that

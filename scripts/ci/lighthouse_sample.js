@@ -1,6 +1,6 @@
 /**
  * Narrows the generated Lighthouse config (dist/lighthouserc.json) to a sample of
- * pages for pull requests (ADR 0049). The sample holds one page of each template,
+ * pages for pull requests (ADR 0050). The sample holds one page of each template,
  * so a regression in shared layout, styles or scripts still shows up; the nightly
  * run on main audits every page.
  *

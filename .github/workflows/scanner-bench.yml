@@ -3,7 +3,7 @@ name: Scanner Benchmark
 # Decode rate and time per frame for each scanner decoder strategy over the generated
 # corpus (pnpm run bench:scanner, #1103). Timing depends on the runner, so this is a
 # report, not a PR gate: it runs weekly and on demand, optionally against a second ref
-# (weekly since the repository went private and Actions minutes became metered, ADR 0049).
+# (weekly since the repository went private and Actions minutes became metered, ADR 0050).
 on:
   schedule:
     - cron: '0 5 * * 1' # Mondays at 05:00 UTC

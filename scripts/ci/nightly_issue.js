@@ -1,5 +1,5 @@
 /**
- * Turns the nightly full-tier CI result on main (ADR 0049) into one GitHub issue,
+ * Turns the nightly full-tier CI result on main (ADR 0050) into one GitHub issue,
  * the same way scripts/ci/audit_issue.js handles the dependency audit.
  *
  * - Nightly failed, no alert open: opens "Nightly CI failing", assigned to the owner.
@@ -49,7 +49,7 @@ export function syncNightlyIssue({ outcome, runUrl, gh = runGh, log = console.lo
 
   const body = [
     NIGHTLY_MARKER,
-    'The nightly full-tier CI run on `main` failed (E2E on all four Playwright projects and Lighthouse on every page, ADR 0049).',
+    'The nightly full-tier CI run on `main` failed (E2E on all four Playwright projects and Lighthouse on every page, ADR 0050).',
     'Pull requests only run Chromium E2E and sampled Lighthouse, so this is where a Firefox, WebKit or per-page regression first shows up.',
     '',
     runLine,

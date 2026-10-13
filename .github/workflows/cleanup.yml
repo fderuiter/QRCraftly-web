@@ -2,7 +2,7 @@ name: Artifact & Branch Cleanup
 
 on:
   schedule:
-    - cron: '0 2 * * 0' # Weekly on Sunday at 2AM (no per-PR run: minutes are metered, ADR 0049)
+    - cron: '0 2 * * 0' # Weekly on Sunday at 2AM (no per-PR run: minutes are metered, ADR 0050)
   workflow_dispatch:
 
 # Read-only by default; each job asks only for the write scope it needs.

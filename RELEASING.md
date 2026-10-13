@@ -54,7 +54,7 @@ Prefer fewer, larger PRs that each carry a complete, tested change, over many sm
 
 ### CI tiers
 
-The repository is private, so Actions minutes are metered ([ADR 0049](docs/adr/0049-ci-tiers-for-a-private-repository.md)). `main.yml` does not run on pushes to `main`, and on PRs it runs in tiers:
+The repository is private, so Actions minutes are metered ([ADR 0050](docs/adr/0050-ci-tiers-for-a-private-repository.md)). `main.yml` does not run on pushes to `main`, and on PRs it runs in tiers:
 
 - **Draft PRs** run static checks, the dependency audit, the build and the WebAssembly build. The pre-commit hook already ran the unit tests. Keep work in draft until it is ready.
 - **Ready PRs** add unit tests with the coverage gate, Chromium E2E (`chromium` and `chromium-csp`) and Lighthouse on eight sample pages.

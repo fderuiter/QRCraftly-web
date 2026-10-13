@@ -1,6 +1,6 @@
 name: "Copilot Setup Steps"
 
-# Copilot reads this job's steps; it only needs a manual run to check them (ADR 0049).
+# Copilot reads this job's steps; it only needs a manual run to check them (ADR 0050).
 on:
   workflow_dispatch:
 

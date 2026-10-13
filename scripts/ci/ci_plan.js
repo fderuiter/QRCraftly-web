@@ -1,5 +1,5 @@
 /**
- * Decides how much of main.yml a run does (ADR 0049). GitHub Actions minutes are
+ * Decides how much of main.yml a run does (ADR 0050). GitHub Actions minutes are
  * metered once the repository is private, so the expensive jobs (E2E on four
  * browsers, Lighthouse on every page) run in full only where they pay off.
  *

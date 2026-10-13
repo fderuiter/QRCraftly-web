@@ -24,7 +24,7 @@ type PackageJson = {
 
 const pkg: PackageJson = JSON.parse(read('package.json'));
 
-describe('CI triggers and tiers (main.yml, ADR 0049)', () => {
+describe('CI triggers and tiers (main.yml, ADR 0050)', () => {
   const workflow = read('.github/workflows/main.yml');
 
   it('runs on pull requests, nightly and by hand, but not on pushes to main', () => {
