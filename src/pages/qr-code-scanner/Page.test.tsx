@@ -43,7 +43,7 @@ describe('/qr-code-scanner page (#1034)', () => {
     const { container } = render(
       <LayoutDefault>{withPageContent('/qr-code-scanner', <Page />)}</LayoutDefault>
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'QR Code Scanner' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'QR Code Scanner Online' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start camera' })).toBeInTheDocument();
     expect(getUserMedia).not.toHaveBeenCalled();
     expect(await axe(container)).toHaveNoViolations();

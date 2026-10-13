@@ -36,6 +36,9 @@ import { QrIllustration } from '@/components/QrIllustration';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from '@/components/ToolWorkspaceLayout';
 import { TransferModeSwitcher } from '@/components/TransferModeSwitcher';
 import { useOpticalSender } from '@/packages/optical-transfer/client';
+import { SidebarContent } from '@/components/SidebarContent';
+import { PageCopyContext } from '@/data/copy/PageCopyContext';
+import { copy } from '@/data/copy/file-transfer';
 import {
   MULTI_RATE_PROFILES,
   estimateTransferFrames,
@@ -796,5 +799,14 @@ function FileTransferToolInner() {
  * @returns The rendered Page component.
  */
 export default function Page() {
-  return <FileTransferToolInner />;
+  return (
+    <>
+      <FileTransferToolInner />
+      <div className="mx-auto max-w-3xl px-4 pb-12">
+        <PageCopyContext.Provider value={copy}>
+          <SidebarContent toolId="file-transfer" />
+        </PageCopyContext.Provider>
+      </div>
+    </>
+  );
 }

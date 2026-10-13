@@ -23,6 +23,8 @@ import { CONTACT_ADDRESS } from '@/data/contact';
 import { GENERATOR_FOOTER_LINKS, TOOL_LINKS } from '@/data/navigation';
 import { isDangerousUrl } from '@/utils/security';
 import { ButtonLink } from '@/components/ui/Button';
+import { PageFaq } from '@/components/PageFaq';
+import { copy } from '@/data/copy/about';
 import { ArticleHeading, ArticleLayout, type ArticleSection } from '@/components/ArticleLayout';
 
 const SECTIONS: readonly ArticleSection[] = [
@@ -31,6 +33,7 @@ const SECTIONS: readonly ArticleSection[] = [
   { id: 'pledge', label: 'The pledge' },
   { id: 'tools', label: 'Every tool' },
   { id: 'how-its-built', label: 'How it is built' },
+  { id: 'questions', label: 'Common questions' },
 ];
 
 const STEPS = [
@@ -132,6 +135,11 @@ export default function Page() {
           <p>
             Questions or ideas? <a href="mailto:fpderuiter+qrcraftly@gmail.com" className={LINK_CLASSES}>Email {CONTACT_ADDRESS}</a>
           </p>
+        </section>
+
+        <section id="questions" aria-labelledby="questions-title" className="mb-10 scroll-mt-6 text-fg-soft">
+          <ArticleHeading id="questions"><span id="questions-title">Common questions</span></ArticleHeading>
+          <PageFaq faqs={copy.faqs ?? []} />
         </section>
       </ArticleLayout>
     </>

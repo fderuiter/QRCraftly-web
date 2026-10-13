@@ -22,5 +22,5 @@
  * Sets the SEO title and description.
  */
 export default {
-    imageAlt: 'About QRCraftly - Free, Private QR Codes'
+    imageAlt: 'About QRCraftly: Free, Private QR Codes'
 }

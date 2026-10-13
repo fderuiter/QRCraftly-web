@@ -93,4 +93,9 @@ describe('public/_headers caching', () => {
     const content = fs.readFileSync(HEADERS_PATH, 'utf8');
     expect(content).toMatch(/^\/version\.json\r?\n\s+Cache-Control: no-store$/m);
   });
+
+  it('lets browsers keep the content-hashed files under /assets/ for a year', () => {
+    const content = fs.readFileSync(HEADERS_PATH, 'utf8');
+    expect(content).toMatch(/^\/assets\/\*\r?\n\s+Cache-Control: public, max-age=31536000, immutable$/m);
+  });
 });

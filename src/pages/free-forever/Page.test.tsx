@@ -42,7 +42,7 @@ describe('Free Forever (pledge) Page', () => {
     for (const item of [...PLEDGE_COLLECTED, ...PLEDGE_NOT_COLLECTED]) {
       expect(screen.getByText(item)).toBeInTheDocument();
     }
-    expect(screen.getByText(/Cloudflare, which hosts the site/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Cloudflare, which hosts the site/i).length).toBeGreaterThan(0);
   });
 
   it('points to checks that need no source code', () => {

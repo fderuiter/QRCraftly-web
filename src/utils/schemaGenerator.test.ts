@@ -71,7 +71,7 @@ describe('schemaGenerator', () => {
     expect(app).toBeDefined();
     expect(app.name).toBe(dummyContent.name);
     expect(app.applicationCategory).toBe('UtilitiesApplication');
-    expect(app.featureList).toBe('Asynchronous Web Worker Diagnostics, WPA, WPA2');
+    expect(app.featureList).toBe('WPA, WPA2');
     // Real package version, no placeholder publish date.
     expect(app.softwareVersion).toBe(__APP_VERSION__);
     expect(app.softwareVersion).not.toBe('0.1.0');
@@ -240,7 +240,9 @@ describe('schemaGenerator', () => {
     const schema1 = generateSchema(overrideTypeString);
     const app1 = schema1['@graph'].find((g: any) => g['@type'] === 'AboutPage');
     expect(app1).toBeDefined();
-    expect(app1.applicationCategory).toBe('SocialNetworkingApplication');
+    // An AboutPage is a page, not an app, so it carries no app properties.
+    expect(app1.applicationCategory).toBeUndefined();
+    expect(app1.offers).toBeUndefined();
 
     // 2. Array schemaType override
     const overrideTypeArray: ToolContent = {
@@ -254,17 +256,12 @@ describe('schemaGenerator', () => {
     expect(app2.applicationCategory).toBe('BusinessApplication');
   });
 
-  it('successfully injects user segment values (audience) into the output JSON-LD structure', () => {
+  it('keeps internal persona labels out of the JSON-LD, since the page never shows them', () => {
     const schema = generateSchema(dummyContent);
     const app = schema['@graph'].find((g: any) => Array.isArray(g['@type']) && g['@type'].includes('SoftwareApplication'));
     expect(app).toBeDefined();
-    expect(app.audience).toBeDefined();
-    expect(app.audience).toEqual([
-      {
-        "@type": "Audience",
-        "audienceType": "Security-Conscious Enterprise"
-      }
-    ]);
+    expect(app.audience).toBeUndefined();
+    expect(JSON.stringify(schema)).not.toContain('Security-Conscious Enterprise');
   });
 
   it('handles empty or undefined personas on about page and standard tool', () => {

@@ -120,9 +120,9 @@ export const contentRegistry: Record<string, ToolContent> = {
     "name": "About QRCraftly",
     "url": getPublicDomain() + "/about",
     "description": "Why QRCraftly exists, how it makes QR codes in your browser, the no-ads pledge and every tool it offers.",
-    "seoTitle": "About QRCraftly - Free, Private QR Codes",
+    "seoTitle": "About QRCraftly: Free, Private QR Codes",
     "image": "/og/about.png",
-    "imageAlt": "About QRCraftly - Free, Private QR Codes",
+    "imageAlt": "About QRCraftly: Free, Private QR Codes",
     "features": [],
     "schemaType": SchemaType.AboutPage,
     "schemaCategory": SchemaCategory.UtilitiesApplication,
@@ -134,7 +134,7 @@ export const contentRegistry: Record<string, ToolContent> = {
     "name": "The QRCraftly Pledge",
     "url": getPublicDomain() + "/free-forever",
     "description": "Free QR codes that never expire. No sign-up, no ads, nothing leaves your browser. QRCraftly will shut down before it ever becomes ad supported.",
-    "seoTitle": "Free QR Codes: No Ads, No Tracking, Never Expire - QRCraftly",
+    "seoTitle": "No Ads, No Tracking, Never Expires | QRCraftly",
     "image": "/og/free-forever.png",
     "imageAlt": "The QRCraftly Pledge: no ads, no tracking, free forever",
     "features": [
@@ -440,7 +440,7 @@ export const contentRegistry: Record<string, ToolContent> = {
     "url": getPublicDomain() + "/qr-code-scanner",
     "description": "Scan a QR code online with your camera or from a photo or screenshot. No app or sign-up, nothing uploaded, and you see the link before it opens.",
     "seoTitle": "QR Code Scanner Online, from Camera or Image | QRCraftly",
-    "heading": "QR Code Scanner",
+    "heading": "QR Code Scanner Online",
     "image": "/og/qr-code-scanner.png",
     "imageAlt": "QRCraftly QR code scanner reading a code with the camera",
     "features": [
@@ -469,7 +469,7 @@ export const contentRegistry: Record<string, ToolContent> = {
     "name": "Security & Privacy",
     "url": getPublicDomain() + "/security",
     "description": "What QRCraftly does with your data, what our host Cloudflare can see, how to check it yourself, and how to report a security problem.",
-    "seoTitle": "Security & Privacy - QRCraftly",
+    "seoTitle": "Security & Privacy | QRCraftly",
     "image": "/og/security.png",
     "imageAlt": "Security and privacy at QRCraftly",
     "features": [
@@ -489,7 +489,7 @@ export const auxiliaryRegistry: Record<string, AuxiliaryContent> = {
   "acknowledgements": {
     "id": "acknowledgements",
     "name": "Open-Source Acknowledgements",
-    "seoTitle": "Open-Source Acknowledgements and Licenses - QRCraftly",
+    "seoTitle": "Open-Source Acknowledgements | QRCraftly",
     "description": "Every open-source package whose code QRCraftly sends to your browser, with its version and full license text.",
     "image": "/og/acknowledgements.png",
     "imageAlt": "Open-source acknowledgements - QRCraftly",
@@ -519,7 +519,7 @@ export const auxiliaryRegistry: Record<string, AuxiliaryContent> = {
   "guides": {
     "id": "guides",
     "name": "QR Code Guides",
-    "seoTitle": "QR Code Guides: Plain Answers With Sources - QRCraftly",
+    "seoTitle": "QR Code Guides: Plain Answers | QRCraftly",
     "description": "Plain-language guides on why QR codes stop working, static versus dynamic codes and more, with sources. Free, ad-free and nothing tracked.",
     "image": "/og/guides.png",
     "imageAlt": "QR code guides - QRCraftly",

@@ -19,6 +19,8 @@
 
 import { Eyebrow } from '@/components/ui/SectionHeading';
 import { GuideLinks } from '@/components/GuideLinks';
+import { PageFaq } from '@/components/PageFaq';
+import { copy } from '@/data/copy/free-forever';
 import { Ban, EyeOff, Laptop, Gift } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -130,6 +132,11 @@ export default function Page() {
             </a>{' '}
             lists every request the site makes.
           </p>
+        </section>
+
+        <section aria-labelledby="pledge-questions" className="mb-12">
+          <h2 id="pledge-questions" className="mb-4 text-2xl font-bold text-fg">Common questions</h2>
+          <PageFaq faqs={copy.faqs ?? []} />
         </section>
 
         <GuideLinks />

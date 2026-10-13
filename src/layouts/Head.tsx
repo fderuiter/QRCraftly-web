@@ -47,6 +47,8 @@ export default function HeadDefault() {
   const pageContext = usePageContext() as PageContextServer;
   // Vike-react exposes the resolved config in pageContext.config
   const { config, is404 } = pageContext;
+  // Developer tools that a build may still serve stay out of search results.
+  const noindex = is404 || pageContext.urlPathname.startsWith('/dev-sandbox');
 
   // Helper to resolve potentially functional config values
   const getString = (val: string | ((pageContext: PageContextServer) => string | null | undefined) | undefined | null, context: PageContextServer, fallback: string): string => {
@@ -160,18 +162,17 @@ export default function HeadDefault() {
       <JsonLdScript data={consolidatedSchema} />
       {pageSchema && <JsonLdScript data={pageSchema} />}
 
-      {/* Canonical URL - Do not render for 404 pages to avoid indexing errors */}
-      {!is404 && <link rel="canonical" href={canonicalUrl} />}
+      {/* Canonical URL - Do not render for noindexed pages to avoid indexing errors */}
+      {!noindex && <link rel="canonical" href={canonicalUrl} />}
 
-      {/* Robots Meta for 404 */}
-      {is404 && <meta name="robots" content="noindex, nofollow" />}
+      {/* Robots Meta for 404 and developer pages */}
+      {noindex && <meta name="robots" content="noindex, nofollow" />}
 
       {/* Social Signals (Open Graph) */}
       <meta property="og:site_name" content="QRCraftly" />
       <meta property="og:type" content="website" />
       {!is404 && <meta property="og:url" content={canonicalUrl} />}
-      <meta property="og:title" content={title} />
-      <meta property="og:description" content={description} />
+      {/* og:title and og:description come from vike-react's own title and description tags. */}
       <meta property="og:image" content={imageUrl} />
       <meta property="og:image:type" content="image/png" />
       {imageSize && <meta property="og:image:width" content={String(imageSize.width)} />}
