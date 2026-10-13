@@ -182,7 +182,8 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   const optionsButtonRef = useRef<HTMLButtonElement>(null);
   const closeOptions = useCallback(() => setOptionsOpen(false), []);
   usePopoverDismiss({ open: optionsOpen, containerRef: exportRowRef, triggerRef: optionsButtonRef, onClose: closeOptions });
-  // The mobile action bar steps aside while the on-screen keyboard is up.
+  // The mobile action bar and mini preview step aside while the on-screen keyboard is up,
+  // so neither covers the field being typed in (WCAG 2.4.11).
   const [inputFocused, setInputFocused] = useState(false);
   useEffect(() => {
     // Fields in the Download options sit inside the bar, so they must not hide it.
@@ -374,8 +375,8 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
             This QR code might fail to scan in real-world conditions. We recommend adjusting colors, pattern, or margin for better contrast.
           </p>
           <div className="mt-4 flex w-full gap-3">
-             <Button variant="outline" fullWidth onClick={() => setShowSafetyGate(false)}>Go Back</Button>
-             <Button variant="primary" fullWidth onClick={() => {
+             <Button variant="primary" fullWidth onClick={() => setShowSafetyGate(false)}>Go Back</Button>
+             <Button variant="outline" fullWidth onClick={() => {
                setShowSafetyGate(false);
                if (gateAction) gateAction();
              }}>Export Anyway</Button>
@@ -453,7 +454,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                 {/* One export row. Below md it docks to the bottom of the screen as a sticky action bar. */}
                 <div
                    ref={exportRowRef}
-                   className={`fixed inset-x-0 bottom-0 z-30 flex items-center gap-2 border-t border-line bg-surface/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-overlay backdrop-blur md:relative md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none ${inputFocused ? 'max-md:hidden' : ''}`}
+                   className={`fixed inset-x-0 bottom-0 z-30 flex items-center gap-2 border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-overlay md:relative md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none ${inputFocused ? 'max-md:hidden' : ''}`}
                    data-testid="export-actions"
                 >
                    <span role="status" className="sr-only">{done?.message ?? ''}</span>
@@ -577,7 +578,8 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
         </Suspense>
       )}
       <GeneratorCommands actions={commandActions} onDownload={onDownload} />
-      <MiniPreview sourceRef={canvasRef} targetId={PREVIEW_ID} renderKey={debouncedConfig} />
+      {/* No thumbnail while there is no code to mirror: it would be an empty box. */}
+      <MiniPreview sourceRef={canvasRef} targetId={PREVIEW_ID} renderKey={debouncedConfig} suppressed={inputFocused || noVerdict} />
       {/* Keeps the last content clear of the mobile action bar. */}
       <div aria-hidden="true" className="h-20 md:hidden" />
 

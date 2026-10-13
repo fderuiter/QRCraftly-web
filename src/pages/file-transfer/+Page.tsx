@@ -401,7 +401,7 @@ function FileTransferToolInner() {
                   </div>
                   <div className="flex justify-between gap-3">
                     <span className="text-fg-muted">Size:</span>
-                    <span className="font-mono text-fg-soft">{(selectedSize / 1024 / 1024).toFixed(2)} MB</span>
+                    <span className="font-mono text-fg-soft">{formatFileSize(selectedSize)}</span>
                   </div>
                 </div>
               )}

@@ -27,6 +27,8 @@ interface MiniPreviewProps {
   targetId: string;
   /** Changes whenever the preview re-renders, so the thumbnail redraws. */
   renderKey: unknown;
+  /** Hides the thumbnail, for example while a text field has focus, so it never covers it. */
+  suppressed?: boolean;
 }
 
 /**
@@ -39,9 +41,10 @@ interface MiniPreviewProps {
  * @param props.sourceRef - The full-size preview canvas.
  * @param props.targetId - DOM id of the preview region.
  * @param props.renderKey - Value that changes on every preview render.
+ * @param props.suppressed - Hides the thumbnail while true.
  * @returns The floating thumbnail, or nothing while the preview is in view.
  */
-export function MiniPreview({ sourceRef, targetId, renderKey }: MiniPreviewProps) {
+export function MiniPreview({ sourceRef, targetId, renderKey, suppressed = false }: MiniPreviewProps) {
   const [visible, setVisible] = useState(false);
   const thumbRef = useRef<HTMLCanvasElement>(null);
 
@@ -54,7 +57,7 @@ export function MiniPreview({ sourceRef, targetId, renderKey }: MiniPreviewProps
   }, [targetId]);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || suppressed) return;
     // Draw after the preview canvas has painted this render.
     const frame = requestAnimationFrame(() => {
       const source = sourceRef.current;
@@ -65,9 +68,9 @@ export function MiniPreview({ sourceRef, targetId, renderKey }: MiniPreviewProps
       ctx.drawImage(source, 0, 0, thumb.width, thumb.height);
     });
     return () => cancelAnimationFrame(frame);
-  }, [visible, renderKey, sourceRef]);
+  }, [visible, suppressed, renderKey, sourceRef]);
 
-  if (!visible) return null;
+  if (!visible || suppressed) return null;
 
   return (
     <button

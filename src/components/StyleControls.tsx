@@ -42,7 +42,7 @@ const StyleGallery = lazy(() => import('./style-controls/StyleGallery'));
  * only (never persisted), so the open sections survive switching QR type without a reload.
  */
 const sectionOpenState = new Map<string, boolean>([
-  ['Brand Templates', true],
+  ['Brand Templates', false],
   ['Pattern & Colors', true]
 ]);
 
@@ -86,7 +86,7 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
   return (
     <Accordion>
       {/* Brand Template Gallery */}
-      <AccordionItem title="Brand Templates" headingLevel={3} defaultOpen={sectionOpenState.get('Brand Templates') ?? true} onOpenChange={rememberSection('Brand Templates')}>
+      <AccordionItem title="Brand Templates" headingLevel={3} defaultOpen={sectionOpenState.get('Brand Templates') ?? false} onOpenChange={rememberSection('Brand Templates')}>
         <div className="pt-1">
           <BrandTemplateGallery config={config} onChange={onChange} />
         </div>
