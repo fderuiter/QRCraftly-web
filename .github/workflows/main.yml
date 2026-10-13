@@ -39,6 +39,7 @@ jobs:
     outputs:
       run_checks: ${{ steps.plan.outputs.run_checks }}
       code_changed: ${{ steps.plan.outputs.code_changed }}
+      unit_tests: ${{ steps.plan.outputs.unit_tests }}
       e2e: ${{ steps.plan.outputs.e2e }}
       lighthouse: ${{ steps.plan.outputs.lighthouse }}
     steps:
@@ -148,7 +149,7 @@ jobs:
   test:
     name: Unit Tests
     needs: plan
-    if: needs.plan.outputs.run_checks == 'true'
+    if: needs.plan.outputs.unit_tests == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

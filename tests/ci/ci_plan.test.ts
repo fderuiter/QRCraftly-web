@@ -9,14 +9,15 @@ describe('scripts/ci/ci_plan.js', () => {
     expect(planRun({ eventName: 'pull_request', isDraft: 'false', changedFiles: ['src/App.tsx'] })).toEqual({
       runChecks: true,
       codeChanged: true,
+      unitTests: true,
       e2e: 'pr',
       lighthouse: 'sample',
     });
   });
 
-  it('skips E2E and Lighthouse on a draft pull request', () => {
+  it('skips unit tests, E2E and Lighthouse on a draft pull request', () => {
     const plan = planRun({ eventName: 'pull_request', isDraft: 'true', changedFiles: ['src/App.tsx'] });
-    expect(plan).toMatchObject({ runChecks: true, codeChanged: true, e2e: 'none', lighthouse: 'none' });
+    expect(plan).toEqual({ runChecks: true, codeChanged: true, unitTests: false, e2e: 'none', lighthouse: 'none' });
   });
 
   it('treats Markdown the build does not read as docs only', () => {
@@ -27,7 +28,7 @@ describe('scripts/ci/ci_plan.js', () => {
     expect(isDocsOnlyFile('src/App.tsx')).toBe(false);
 
     const plan = planRun({ eventName: 'pull_request', isDraft: 'false', changedFiles: ['README.md', 'docs/RUST.md'] });
-    expect(plan).toEqual({ runChecks: true, codeChanged: false, e2e: 'none', lighthouse: 'none' });
+    expect(plan).toEqual({ runChecks: true, codeChanged: false, unitTests: true, e2e: 'none', lighthouse: 'none' });
   });
 
   it('runs everything when the diff is unknown or empty', () => {
@@ -48,6 +49,7 @@ describe('scripts/ci/ci_plan.js', () => {
     expect(planRun({ eventName: 'schedule', headSha: SHA, lastNightlySha: SHA })).toEqual({
       runChecks: false,
       codeChanged: false,
+      unitTests: false,
       e2e: 'none',
       lighthouse: 'none',
     });
@@ -59,8 +61,8 @@ describe('scripts/ci/ci_plan.js', () => {
   });
 
   it('writes one output per line', () => {
-    expect(formatPlan({ runChecks: true, codeChanged: false, e2e: 'none', lighthouse: 'none' })).toBe(
-      'run_checks=true\ncode_changed=false\ne2e=none\nlighthouse=none\n',
+    expect(formatPlan({ runChecks: true, codeChanged: false, unitTests: true, e2e: 'none', lighthouse: 'none' })).toBe(
+      'run_checks=true\ncode_changed=false\nunit_tests=true\ne2e=none\nlighthouse=none\n',
     );
   });
 });

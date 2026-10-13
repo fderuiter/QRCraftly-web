@@ -23,7 +23,7 @@ Other things change with the switch:
 
 | Run                                                            | Static checks, audit, unit tests | Build and wasm | E2E                           | Lighthouse                        |
 | -------------------------------------------------------------- | -------------------------------- | -------------- | ----------------------------- | --------------------------------- |
-| Draft PR                                                       | Yes                              | Yes            | No                            | No                                |
+| Draft PR                                                       | No unit tests                    | Yes            | No                            | No                                |
 | Ready PR                                                       | Yes                              | Yes            | `chromium` and `chromium-csp` | 8 sample pages, 3 runs each       |
 | PR that only changes Markdown the build does not read          | Yes                              | No             | No                            | No                                |
 | Release PR (`release/` branch) or a PR labelled `full-e2e`     | Yes                              | Yes            | All four projects             | Every page                        |
@@ -38,7 +38,8 @@ Other things change with the switch:
 
 ## Consequences
 
-- A ready PR costs about 25 to 30 minutes instead of about 77, a draft push about 15, and a docs-only PR about 12. A push to `main` costs about 3.
+- A ready PR costs about 35 to 45 minutes instead of about 77 (2-vCPU runners are slower than the public 4-vCPU ones), a draft push about 7, and a docs-only PR about 15. A push to `main` costs about 3, and a nightly run that has something to test about 80.
+- Drafts skip unit tests because the pre-commit hook runs them before every commit; the ready tier runs them, with the coverage gate, before anything merges.
 - A Firefox or WebKit regression can reach `main` and is caught by the next nightly run, at most a day later. Changes that are likely to differ by browser (layout, media, camera, file APIs, workers) should carry the `full-e2e` label.
 - Contributors and Claude threads run `pnpm run lint` and `pnpm test` before pushing (the pre-commit hook already does), and `pnpm test:e2e` locally for navigation, rendering or input changes, so CI is a confirmation rather than the first test.
 - Drafts are cheap, so work stays in draft until it is ready, and many small pushes to a ready PR are expensive.

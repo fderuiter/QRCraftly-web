@@ -36,6 +36,7 @@ describe('CI triggers and tiers (main.yml, ADR 0049)', () => {
 
   it('lets the plan decide the E2E and Lighthouse tiers', () => {
     expect(jobBlock('plan')).toContain('run: node scripts/ci/ci_plan.js');
+    expect(jobBlock('test')).toContain("if: needs.plan.outputs.unit_tests == 'true'");
     expect(jobBlock('e2e')).toContain("if: needs.plan.outputs.e2e != 'none'");
     expect(jobBlock('e2e')).toContain('pnpm run test:e2e --project=chromium --project=chromium-csp');
     expect(jobBlock('lighthouse')).toContain("if: needs.plan.outputs.lighthouse != 'none'");

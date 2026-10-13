@@ -56,8 +56,8 @@ Prefer fewer, larger PRs that each carry a complete, tested change, over many sm
 
 The repository is private, so Actions minutes are metered ([ADR 0049](docs/adr/0049-ci-tiers-for-a-private-repository.md)). `main.yml` does not run on pushes to `main`, and on PRs it runs in tiers:
 
-- **Draft PRs** run static checks, the dependency audit, unit tests, the build and the WebAssembly build. Keep work in draft until it is ready.
-- **Ready PRs** add Chromium E2E (`chromium` and `chromium-csp`) and Lighthouse on eight sample pages.
+- **Draft PRs** run static checks, the dependency audit, the build and the WebAssembly build. The pre-commit hook already ran the unit tests. Keep work in draft until it is ready.
+- **Ready PRs** add unit tests with the coverage gate, Chromium E2E (`chromium` and `chromium-csp`) and Lighthouse on eight sample pages.
 - **PRs that only change Markdown** the build does not read run static checks and unit tests only.
 - **Release PRs and PRs labelled `full-e2e`** run E2E on all four projects and Lighthouse on every page. Add the label to changes that may differ by browser.
 - **Nightly at 07:00 UTC**, `main` gets the full tier, unless it has not changed since the last green nightly run. A red nightly run is fixed before the next merge.
