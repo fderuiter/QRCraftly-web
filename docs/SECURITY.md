@@ -106,6 +106,8 @@ The build and pre-commit pipelines run static AST analysis (`scripts/storage_pri
 
 ## Wallet Pass Keys
 
+The wallet dialog leads with the card image, which needs no keys. Signed passes sit in a closed developer section below it ("Have your own Apple or Google developer keys?"), marked Beta, and their signing code loads only when that section is opened.
+
 Signed Apple Wallet passes are made only with the person's own Pass Type ID certificate ([ADR 0048](./adr/0048-wallet-passes-built-in-the-browser.md)); QRCraftly has no signing key and no signing service. The certificate, the WWDR intermediate and the private key are read from files into the tab. The key is imported with WebCrypto as a non-extractable signing key, checked against the certificate by signing and verifying a random probe, and held only in component state, so it is gone when the dialog closes. Nothing is written to storage or sent anywhere. Password-protected keys are refused rather than asking for a password. The pass is a generic pass with no `webServiceURL` or authentication token, so it can never change or call home. The pass logo is drawn only from a logo already in the page as a `data:` or `blob:` image, so making a pass fetches nothing.
 
 Google Wallet passes are signed the same way with the person's own service-account key: a generic class and object in a JWT, signed RS256 in the tab. The panel says before anything is sent that Google receives the whole pass, including the code's content, and keeps it in the Google account that saves it. Only after that confirmation does it open the save link in a new tab (`noopener,noreferrer`). Image URLs are never put in the JWT, because Google would fetch them.
