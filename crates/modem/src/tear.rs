@@ -26,7 +26,10 @@
 //! The receiver here changes nothing in the frame format. It splits the cells
 //! at a cut across the camera's rows, decodes each side against its own frame
 //! sequence with the other side's bytes erased, and finds the cut by trying
-//! cuts on two blocks of each side. A capture whose other side is too small
+//! cuts on two blocks of each side. When no straight cut finishes either side,
+//! it tries cuts slanted against the camera's rows too: a phone turned against
+//! the screen reads its sensor across the screen's rows, and the refresh tears
+//! the picture on a slant. A capture whose other side is too small
 //! to decode alone can be finished by the next capture, which shows that
 //! frame on the other side of the tear (`Carry`). The block tag (ADR 0043)
 //! binds session, sequence and index, so a wrong cut or a wrong sequence
@@ -44,6 +47,21 @@ const TOP_STRIP_ROW: f64 = 7.0;
 const BOTTOM_STRIP_FROM_END: f64 = 2.0;
 /// Steps between the first and the last cut tried.
 const CUT_STEPS: u32 = 64;
+/// Most cuts tried along one slant, whose cells span more positions than a
+/// straight cut's.
+const MAX_CUT_STEPS: u32 = 4 * CUT_STEPS;
+/// Steps between the cuts a slant is first tried at: only a slant at which
+/// one of them decodes is tried at every step. At the tear's slant the cuts
+/// that decode span many steps.
+const COARSE: u32 = 4;
+/// Slants of the cut tried when no straight cut finishes a side, in degrees
+/// from the camera's rows, nearest first. A phone turned a quarter against
+/// the screen reads its sensor across the screen's rows, so the refresh tears
+/// the picture on a slant (about 25 degrees for a 16 ms readout of a screen
+/// that fills the picture).
+const SLANTS: [f32; 12] = [
+    10.0, -10.0, 20.0, -20.0, 30.0, -30.0, 40.0, -40.0, 50.0, -50.0, 60.0, -60.0,
+];
 
 /// Cells of an earlier capture of the frame a side shows, as that capture
 /// sampled them: they fill in the rows the current capture shows from
@@ -65,8 +83,12 @@ pub struct Carry<'a> {
 struct View {
     stream: Vec<u8>,
     sure: Vec<u8>,
+    /// Each data cell's position across the camera's rows and along them,
+    /// in rows (see [`Axis`]).
+    across: Vec<f32>,
+    along: Vec<f32>,
     /// Lowest and highest position of the cells of each byte, in rows along
-    /// the tear's normal (see [`Axis`]).
+    /// the cut's normal at the slant last placed (see [`place`]).
     lo: Vec<f32>,
     hi: Vec<f32>,
 }
@@ -76,10 +98,13 @@ struct View {
 pub struct TearScratch {
     current: View,
     carry: View,
-    keys: Vec<f32>,
     sides: [Vec<u8>; 2],
     carry_stream: Vec<u8>,
     block: BlockScratch,
+    /// A side's block flags and data at a slanted cut, until they are known
+    /// to beat the straight cut's.
+    spare_ok: Vec<u8>,
+    spare_out: Vec<u8>,
 }
 
 /// What one side of the cut gave.
@@ -95,6 +120,8 @@ pub struct Side {
     /// The cut the side was decoded at, in rows along the tear's normal; `None`
     /// when no cut decoded its trial blocks.
     pub cut: Option<f32>,
+    /// The cut's slant from the camera's rows, in degrees.
+    pub slant: f32,
 }
 
 /// Positions across the camera's rows, scaled so that the top header strip's
@@ -152,16 +179,22 @@ impl Axis {
         }
     }
 
-    /// The position of the point at column `u`, row `v` of the grid.
-    fn key(&self, u: f64, v: f64) -> f32 {
-        (TOP_STRIP_ROW + (self.coordinate(u, v) - self.top) * self.scale) as f32
+    /// The position of the point at column `u`, row `v` of the grid across
+    /// the camera's rows, and along them (from the image's edge, at the
+    /// same scale).
+    fn key(&self, u: f64, v: f64) -> (f32, f32) {
+        let (x, y) = self.point(u, v);
+        let (across, along) = if self.use_y { (y, x) } else { (x, y) };
+        (
+            (TOP_STRIP_ROW + (across - self.top) * self.scale) as f32,
+            (along * self.scale) as f32,
+        )
     }
 }
 
-/// Reads a capture's stream and places each byte across the camera's rows.
+/// Reads a capture's stream and places each data cell on the camera.
 fn build_view(
     view: &mut View,
-    keys: &mut Vec<f32>,
     capacity: &Capacity,
     grid: &Grid,
     axis: &Axis,
@@ -176,24 +209,39 @@ fn build_view(
         &mut view.sure,
     );
     let cols = grid.cols as usize;
-    keys.clear();
-    keys.extend((0..capacity.data_cells).map(|c| {
+    view.across.clear();
+    view.along.clear();
+    for c in 0..capacity.data_cells {
         let (col, row) = (c % cols, c / cols);
-        axis.key(col as f64 + 0.5, (BAND_ROWS as usize + row) as f64 + 0.5)
-    }));
+        let (across, along) = axis.key(col as f64 + 0.5, (BAND_ROWS as usize + row) as f64 + 0.5);
+        view.across.push(across);
+        view.along.push(along);
+    }
+}
+
+/// Places each byte of a view along the normal of a cut slanted by `slant`
+/// (its sine and cosine) from the camera's rows. Returns the lowest and
+/// highest position of any cell.
+fn place(view: &mut View, capacity: &Capacity, slant: (f32, f32)) -> (f32, f32) {
+    let (sin, cos) = slant;
     let bits = capacity.bits_per_cell;
     view.lo.clear();
     view.hi.clear();
+    let (mut min, mut max) = (f32::INFINITY, f32::NEG_INFINITY);
     for byte in 0..capacity.stream_bytes {
-        let cells = &keys[byte * 8 / bits..=(byte * 8 + 7) / bits];
+        let cells = byte * 8 / bits..=(byte * 8 + 7) / bits;
         let (mut lo, mut hi) = (f32::INFINITY, f32::NEG_INFINITY);
-        for &k in cells {
+        for (&a, &b) in view.across[cells.clone()].iter().zip(&view.along[cells]) {
+            let k = if sin == 0.0 { a } else { a * cos - b * sin };
             lo = if k < lo { k } else { lo };
             hi = if k > hi { k } else { hi };
         }
+        min = if lo < min { lo } else { min };
+        max = if hi > max { hi } else { max };
         view.lo.push(lo);
         view.hi.push(hi);
     }
+    (min, max)
 }
 
 /// Whether stream byte `j` of a view lies wholly on `side` of `cut`.
@@ -287,6 +335,38 @@ impl Sources<'_> {
     }
 }
 
+/// The sine and cosine of a slant in degrees.
+fn slant(degrees: f32) -> (f32, f32) {
+    let radians = degrees as f64 * core::f64::consts::PI / 180.0;
+    (fmath::sin(radians) as f32, fmath::cos(radians) as f32)
+}
+
+/// Places a capture's view, and an earlier capture's when given, along the
+/// normal of a cut slanted from the camera's rows by an angle with sine and
+/// cosine `slant`. Returns the
+/// first cut to try, the span the cuts cover and the steps across it: from
+/// `first` to `last` in [`CUT_STEPS`] for a straight cut, and across every
+/// cell at the same step, up to [`MAX_CUT_STEPS`], for a slanted one.
+fn place_views(
+    current: &mut View,
+    carry: Option<&mut View>,
+    capacity: &Capacity,
+    slant: (f32, f32),
+    first: f32,
+    last: f32,
+) -> (f32, f32, u32) {
+    let (min, max) = place(current, capacity, slant);
+    if let Some(view) = carry {
+        place(view, capacity, slant);
+    }
+    if slant.0 == 0.0 {
+        return (first, last - first, CUT_STEPS);
+    }
+    let span = max - min;
+    let steps = (span / (last - first) * CUT_STEPS as f32 + 1.0).clamp(1.0, MAX_CUT_STEPS as f32);
+    (min, span, steps as u32)
+}
+
 /// Decodes a torn capture: the cells above a cut against `seqs[0]` and those
 /// below it against `seqs[1]`, each with the other side's bytes erased. The
 /// cut of each side is the middle of the longest run of cuts at which two
@@ -320,19 +400,20 @@ pub fn decode_torn(
     let TearScratch {
         current,
         carry: carry_view,
-        keys,
         sides: side_streams,
         carry_stream,
         block,
+        spare_ok,
+        spare_out,
     } = scratch;
-    build_view(current, keys, capacity, grid, &axis, symbols, confidence);
+    build_view(current, capacity, grid, &axis, symbols, confidence);
     for (stream, &seq) in side_streams.iter_mut().zip(&seqs) {
         stream.clear();
         stream.extend_from_slice(&current.stream);
         codec::whiten(stream, session, seq);
     }
     if let (Some(c), Some(a)) = (carry, &carry_axis) {
-        build_view(carry_view, keys, capacity, grid, a, c.symbols, c.confidence);
+        build_view(carry_view, capacity, grid, a, c.symbols, c.confidence);
         carry_stream.clear();
         carry_stream.extend_from_slice(&carry_view.stream);
         codec::whiten(carry_stream, session, c.seq);
@@ -344,77 +425,246 @@ pub fn decode_torn(
     });
     let first = (BAND_ROWS - 1) as f32;
     let last = (grid.rows - BAND_ROWS + 1) as f32;
-    let cut_at = |i: u32| first + (last - first) * i as f32 / CUT_STEPS as f32;
     let trials: &[usize] = if capacity.blocks > 1 {
         &[0, capacity.blocks - 1]
     } else {
         &[0]
     };
-    let mut result = [Side::default(); 2];
-    for (side, (ok, out)) in ok.into_iter().zip(out).enumerate() {
-        let sources = Sources {
+    let carried = carry.is_some();
+    let carry_sides = seqs.map(|seq| carry.filter(|c| c.seq == seq).map(|c| c.side));
+    let mut work = Work {
+        received: [0u8; 255],
+        sure: [0u8; 255],
+        word: [0u8; 255],
+        block,
+    };
+    fn sources<'a>(
+        side: usize,
+        current: &'a View,
+        streams: &'a [Vec<u8>; 2],
+        carry: Option<(&'a View, &'a [u8], usize)>,
+    ) -> Sources<'a> {
+        Sources {
             side,
             current,
-            stream: &side_streams[side],
-            carry: carry
-                .filter(|c| c.seq == seqs[side])
-                .map(|c| (&*carry_view, &carry_stream[..], c.side)),
-        };
-        let mut work = Work {
-            received: [0u8; 255],
-            sure: [0u8; 255],
-            word: [0u8; 255],
-            block,
-        };
-        let decodes = |work: &mut Work, b: usize, cut: f32, attempts: usize| {
-            sources.decode(
-                capacity, b, cut, session, seqs[side], threshold, attempts, work,
-            )
-        };
-        // The longest run of cuts at which the trial blocks decode.
-        let (mut best, mut best_len, mut run) = (0u32, 0u32, 0u32);
-        for i in 0..=CUT_STEPS {
-            let cut = cut_at(i);
-            if trials
-                .iter()
-                .all(|&b| decodes(&mut work, b, cut, 1).repaired.is_some())
-            {
-                run += 1;
-                if run > best_len {
-                    best_len = run;
-                    best = i + 1 - run;
+            stream: &streams[side],
+            carry,
+        }
+    }
+    let mut result = [Side::default(); 2];
+    // A straight cut first, along the camera's rows.
+    place_views(
+        current,
+        carried.then_some(&mut *carry_view),
+        capacity,
+        (0.0, 1.0),
+        first,
+        last,
+    );
+    let mut done = [false; 2];
+    for side in 0..2 {
+        ok[side].fill(0);
+        out[side].fill(0);
+        let from = sources(
+            side,
+            current,
+            side_streams,
+            carry_sides[side].map(|s| (&*carry_view, &carry_stream[..], s)),
+        );
+        if let Some((cut, _)) = longest_run(
+            &from,
+            capacity,
+            trials,
+            session,
+            seqs[side],
+            threshold,
+            first,
+            last - first,
+            CUT_STEPS,
+            1,
+            &mut work,
+        ) {
+            result[side] = decode_side(
+                &from,
+                capacity,
+                cut,
+                session,
+                seqs[side],
+                threshold,
+                known[side],
+                ok[side],
+                out[side],
+                &mut work,
+            );
+        }
+        done[side] = (0..capacity.blocks)
+            .all(|b| ok[side][b] != 0 || known[side].get(b).is_some_and(|&k| k != 0));
+    }
+    // A side the straight cut finished shows that the tear is straight.
+    // Otherwise each side that is not finished takes the slant whose longest
+    // run of cuts is longest: a phone turned against the screen tears the
+    // picture on a slant.
+    if done.contains(&true) {
+        return Some(result);
+    }
+    let mut best: [Option<(f32, f32, u32)>; 2] = [None, None];
+    for degrees in SLANTS {
+        let (from, span, steps) = place_views(
+            current,
+            carried.then_some(&mut *carry_view),
+            capacity,
+            slant(degrees),
+            first,
+            last,
+        );
+        for (side, best) in best.iter_mut().enumerate() {
+            let sources = sources(
+                side,
+                current,
+                side_streams,
+                carry_sides[side].map(|s| (&*carry_view, &carry_stream[..], s)),
+            );
+            let run = |stride: u32, work: &mut Work| {
+                longest_run(
+                    &sources, capacity, trials, session, seqs[side], threshold, from, span, steps,
+                    stride, work,
+                )
+            };
+            if let Some((cut, len)) = run(COARSE, &mut work).and_then(|_| run(1, &mut work)) {
+                if best.is_none_or(|(_, _, l)| len > l) {
+                    *best = Some((degrees, cut, len));
                 }
-            } else {
-                run = 0;
-            }
-        }
-        ok.fill(0);
-        out.fill(0);
-        if best_len == 0 {
-            continue;
-        }
-        let cut = cut_at(best + (best_len - 1) / 2);
-        let found = &mut result[side];
-        found.cut = Some(cut);
-        for b in 0..capacity.blocks {
-            if known[side].get(b).is_some_and(|&k| k != 0) {
-                continue;
-            }
-            let outcome = decodes(&mut work, b, cut, ALL_ATTEMPTS);
-            if outcome.refused {
-                found.refused += 1;
-            }
-            if let Some(corrected) = outcome.repaired {
-                ok[b] = 1;
-                out[b * capacity.packet_bytes..(b + 1) * capacity.packet_bytes]
-                    .copy_from_slice(&work.word[..capacity.packet_bytes]);
-                found.blocks_ok += 1;
-                found.erasures += outcome.erasures as u32;
-                found.corrected += corrected as u32;
             }
         }
     }
+    for (side, best) in best.into_iter().enumerate() {
+        let Some((degrees, cut, _)) = best else {
+            continue;
+        };
+        place_views(
+            current,
+            carried.then_some(&mut *carry_view),
+            capacity,
+            slant(degrees),
+            first,
+            last,
+        );
+        spare_ok.clear();
+        spare_ok.resize(ok[side].len(), 0);
+        spare_out.clear();
+        spare_out.resize(out[side].len(), 0);
+        let mut slanted = decode_side(
+            &sources(
+                side,
+                current,
+                side_streams,
+                carry_sides[side].map(|s| (&*carry_view, &carry_stream[..], s)),
+            ),
+            capacity,
+            cut,
+            session,
+            seqs[side],
+            threshold,
+            known[side],
+            spare_ok,
+            spare_out,
+            &mut work,
+        );
+        if slanted.blocks_ok > result[side].blocks_ok {
+            ok[side].copy_from_slice(spare_ok);
+            out[side].copy_from_slice(spare_out);
+            slanted.slant = degrees;
+            result[side] = slanted;
+        }
+    }
     Some(result)
+}
+
+/// The longest run of cuts, `steps` steps across `span` from `from` tried
+/// every `stride` steps, at which every trial block decodes: the middle cut
+/// of the run and its length in cuts tried.
+#[allow(clippy::too_many_arguments)]
+fn longest_run(
+    sources: &Sources,
+    capacity: &Capacity,
+    trials: &[usize],
+    session: u32,
+    seq: u32,
+    threshold: Option<f64>,
+    from: f32,
+    span: f32,
+    steps: u32,
+    stride: u32,
+    work: &mut Work,
+) -> Option<(f32, u32)> {
+    let cut_at = |i: u32| from + span * i as f32 / steps as f32;
+    let (mut start, mut len, mut run) = (0u32, 0u32, 0u32);
+    for i in (0..=steps).step_by(stride as usize) {
+        let cut = cut_at(i);
+        if trials.iter().all(|&b| {
+            sources
+                .decode(capacity, b, cut, session, seq, threshold, 1, work)
+                .repaired
+                .is_some()
+        }) {
+            run += 1;
+            if run > len {
+                len = run;
+                start = i + stride - run * stride;
+            }
+        } else {
+            run = 0;
+        }
+    }
+    (len > 0).then(|| (cut_at(start + (len - 1) / 2 * stride), len))
+}
+
+/// Decodes every block of a side at `cut` that `known` does not flag,
+/// writing flags and data into `ok` and `out` as [`codec::decode`] does.
+#[allow(clippy::too_many_arguments)]
+fn decode_side(
+    sources: &Sources,
+    capacity: &Capacity,
+    cut: f32,
+    session: u32,
+    seq: u32,
+    threshold: Option<f64>,
+    known: &[u8],
+    ok: &mut [u8],
+    out: &mut [u8],
+    work: &mut Work,
+) -> Side {
+    let mut found = Side {
+        cut: Some(cut),
+        ..Side::default()
+    };
+    for b in 0..capacity.blocks {
+        if known.get(b).is_some_and(|&k| k != 0) {
+            continue;
+        }
+        let outcome = sources.decode(
+            capacity,
+            b,
+            cut,
+            session,
+            seq,
+            threshold,
+            ALL_ATTEMPTS,
+            work,
+        );
+        if outcome.refused {
+            found.refused += 1;
+        }
+        if let Some(corrected) = outcome.repaired {
+            ok[b] = 1;
+            out[b * capacity.packet_bytes..(b + 1) * capacity.packet_bytes]
+                .copy_from_slice(&work.word[..capacity.packet_bytes]);
+            found.blocks_ok += 1;
+            found.erasures += outcome.erasures as u32;
+            found.corrected += corrected as u32;
+        }
+    }
+    found
 }
 
 #[cfg(test)]
@@ -471,6 +721,31 @@ mod tests {
         (0..c.data_cells)
             .map(|i| {
                 if ((i / cols) as f64) < tear * rows {
+                    above[i]
+                } else {
+                    below[i]
+                }
+            })
+            .collect()
+    }
+
+    /// The cells of frame `above` above a line through `tear` of the data
+    /// rows at the middle column, dropping `slope` rows per column, and of
+    /// frame `below` under it: a phone turned against the screen.
+    fn slanted(
+        c: &Capacity,
+        grid: &Grid,
+        above: &[u8],
+        below: &[u8],
+        tear: f64,
+        slope: f64,
+    ) -> Vec<u8> {
+        let cols = grid.cols as usize;
+        let rows = grid.data_rows() as f64;
+        (0..c.data_cells)
+            .map(|i| {
+                let (col, row) = ((i % cols) as f64, (i / cols) as f64);
+                if row < tear * rows + slope * (col - cols as f64 / 2.0) {
                     above[i]
                 } else {
                     below[i]
@@ -538,6 +813,50 @@ mod tests {
         let r = run(&symbols, homography(false), [10, 9], None);
         assert!(all_ok(&r, 1, &a));
         assert_eq!(r.sides[0].blocks_ok, 0);
+    }
+
+    #[test]
+    fn a_slanted_tear_is_cut_on_a_slant() {
+        let (c, grid) = shape();
+        let (a, sa) = frame(&c, 9);
+        let (_, sb) = frame(&c, 10);
+        for (slope, turned) in [(0.3, false), (-0.3, false), (0.3, true)] {
+            let symbols = slanted(&c, &grid, &sa, &sb, 0.9, slope);
+            // No straight cut leaves few enough of frame 10's bytes in frame 9's side.
+            let r = run(&symbols, homography(turned), [9, 10], None);
+            assert!(all_ok(&r, 0, &a), "slope {slope} turned {turned}");
+            assert_ne!(r.sides[0].slant, 0.0);
+            assert_eq!(r.sides[1].blocks_ok, 0);
+        }
+        // A straight tear is still cut straight.
+        let symbols = torn(&c, &grid, &sa, &sb, 0.8);
+        assert_eq!(
+            run(&symbols, homography(false), [9, 10], None).sides[0].slant,
+            0.0
+        );
+    }
+
+    #[test]
+    fn an_earlier_capture_completes_a_frame_torn_on_a_slant() {
+        let (c, grid) = shape();
+        let (_, sa) = frame(&c, 9);
+        let (b, sb) = frame(&c, 10);
+        let (_, sc) = frame(&c, 11);
+        let first = slanted(&c, &grid, &sa, &sb, 0.5, 0.5);
+        let second = slanted(&c, &grid, &sb, &sc, 0.5, 0.5);
+        let alone = run(&second, homography(false), [10, 11], None);
+        assert_eq!(alone.sides[0].blocks_ok + alone.sides[1].blocks_ok, 0);
+        let confidence = alloc::vec![200u8; c.data_cells];
+        let carry = Carry {
+            seq: 10,
+            side: 1,
+            homography: homography(false),
+            symbols: &first,
+            confidence: &confidence,
+        };
+        let r = run(&second, homography(false), [10, 11], Some(&carry));
+        assert!(all_ok(&r, 0, &b));
+        assert_ne!(r.sides[0].slant, 0.0);
     }
 
     #[test]

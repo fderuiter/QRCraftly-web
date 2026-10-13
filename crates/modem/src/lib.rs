@@ -548,7 +548,8 @@ pub unsafe extern "C" fn modem_rx_decode(
 /// `io[128..137]`. `output` gets, per side, a flag per block and then each
 /// block's data. `io[72..82]` get, per side, the blocks repaired, the
 /// erasures used, the bytes repaired, the blocks whose tag refused the code's
-/// first repair and the cut (NaN when none decoded).
+/// first repair and the cut (NaN when none decoded); `io[82..84]` get each
+/// side's cut slant from the camera's rows, in degrees.
 ///
 /// # Safety
 /// As [`modem_rx_free`].
@@ -632,6 +633,7 @@ pub unsafe extern "C" fn modem_rx_decode_torn(
         rx.io[at + 2] = side.corrected as f64;
         rx.io[at + 3] = side.refused as f64;
         rx.io[at + 4] = side.cut.map_or(f64::NAN, |c| c as f64);
+        rx.io[IO_OUT + 10 + i] = side.slant as f64;
     }
     STATUS_OK
 }

@@ -85,8 +85,10 @@ export interface BlockDecode {
 
 /** One side of a torn capture's decode ({@link ModemKernels.decodeTorn}). Views into the module, as {@link BlockDecode}. */
 export interface TornSide extends BlockDecode {
-  /** Where the side was cut, in grid rows across the camera's rows, or null when no cut decoded its trial blocks. */
+  /** Where the side was cut, in grid rows along the cut's normal (across the camera's rows for a straight cut), or null when no cut decoded its trial blocks. */
   cut: number | null;
+  /** The cut's slant from the camera's rows, in degrees: not 0 only when no straight cut decoded the side. */
+  slant: number;
 }
 
 /** Cells of an earlier capture that fill in a frame a torn capture shows only in part. */
@@ -415,6 +417,7 @@ export class ModemKernels {
         corrected: io[at + 2],
         refused: io[at + 3],
         cut: Number.isNaN(io[at + 4]) ? null : io[at + 4],
+        slant: io[IO_OUT + 10 + s],
       };
     };
     return [side(0), side(1)];
