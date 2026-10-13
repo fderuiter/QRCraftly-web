@@ -48,6 +48,8 @@ vi.mock('@/packages/scannability/checker', () => ({ performScannabilityCheck: ()
 vi.mock('@/packages/qr-decode', () => ({ loadQrReader: async () => ({}) }));
 vi.mock('@/utils/downloadManager', () => ({ triggerFileDownload: download }));
 
+const DEVELOPER_SECTION = 'Have your own Apple or Google developer keys?';
+
 function open(config: Partial<QRConfig>) {
   return render(
     <ToastProvider>
@@ -81,18 +83,39 @@ describe('WalletDialog (ADR 0048)', () => {
     expect(download).not.toHaveBeenCalled();
   });
 
-  it('switches to the Apple Wallet pass tab without drawing the card', async () => {
-    open({ type: QRType.URL, value: 'https://example.com' });
-    fireEvent.click(screen.getByRole('tab', { name: 'Apple Wallet pass (beta)' }));
+  it('keeps the signed passes in a closed developer section until it is opened', async () => {
+    const { baseElement } = open({ type: QRType.URL, value: 'https://example.com' });
+    const toggle = screen.getByRole('button', { name: DEVELOPER_SECTION });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wallet-developer-section')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(await screen.findByTestId('apple-pass-panel')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Download card' })).not.toBeInTheDocument();
+    expect(screen.getByText(/never uploaded or saved/)).toBeInTheDocument();
     expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'wallet-tab-apple');
+    // The card image stays available above the developer section.
+    expect(screen.getByRole('button', { name: 'Download card' })).toBeInTheDocument();
+    expect(await axe(baseElement)).toHaveNoViolations();
   });
 
-  it('switches to the Google Wallet pass tab', async () => {
+  it('switches to the Google Wallet pass tab in the developer section', async () => {
     open({ type: QRType.URL, value: 'https://example.com' });
-    fireEvent.click(screen.getByRole('tab', { name: 'Google Wallet pass (beta)' }));
+    fireEvent.click(screen.getByRole('button', { name: DEVELOPER_SECTION }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Google Wallet pass' }));
     expect(await screen.findByTestId('google-pass-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('apple-pass-panel')).not.toBeInTheDocument();
+  });
+
+  it('keeps the pass panel mounted when the developer section is collapsed again', async () => {
+    open({ type: QRType.URL, value: 'https://example.com' });
+    const toggle = screen.getByRole('button', { name: DEVELOPER_SECTION });
+    fireEvent.click(toggle);
+    expect(await screen.findByTestId('apple-pass-panel')).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('apple-pass-panel')).toBeInTheDocument();
   });
 
   it('offers no card for payment codes', () => {
