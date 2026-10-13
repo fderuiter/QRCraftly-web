@@ -118,7 +118,8 @@ describe('Generator page template (#1029)', () => {
     const entry = contentRegistry[toolId];
     expect(words(typeGuides[toolId].intro)).toBeGreaterThanOrEqual(10);
     expect(words(typeGuides[toolId].intro)).toBeLessThanOrEqual(40);
-    expect(entry.seoTitle).toMatch(/^Free .+ QR Code Generator: No Sign-up, Never Expires \| QRCraftly$/);
+    expect(entry.seoTitle).toMatch(/^Free .+ QR Code Generator(, Never Expires)? \| QRCraftly$/);
+    expect(entry.seoTitle?.length ?? 0).toBeLessThanOrEqual(60);
     expect(entry.description.length).toBeLessThanOrEqual(155);
   });
 

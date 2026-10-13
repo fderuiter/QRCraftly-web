@@ -42,7 +42,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
       {
         question: 'Is this an AI QR code?',
         answer:
-          'No. There is no AI model and no image generation. The picture you choose is shrunk to one color per module and each module is recolored toward its dark or light value, so the result is your own image, made with plain arithmetic in your browser.',
+          'No. There is no AI model and no image generation. Your picture is shrunk to one color per module, and each module is pulled toward dark or light to match it. The result is your own picture, made in your browser.',
       },
       {
         question: 'Will an image QR code still scan?',
@@ -229,7 +229,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'Make a QR code for a menu you already host online. Put it on tables, windows and takeaway bags. It has no monthly fee and does not expire.',
       scanned: [
         'Diners scan the code and the menu opens in their browser. There is no app to install.',
-        'The code holds your menu’s address and nothing sits in between, so no provider can switch it off. Update the menu at that address and every printed code shows the new version.',
+        'The code holds your menu’s address and nothing sits in between, so no QR service can switch it off. Update the menu at that address and every printed code shows the new version.',
       ],
       useCases: [
         'Table tents and coasters.',

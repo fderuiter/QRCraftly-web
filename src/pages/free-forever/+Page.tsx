@@ -19,6 +19,8 @@
 
 import { Eyebrow } from '@/components/ui/SectionHeading';
 import { GuideLinks } from '@/components/GuideLinks';
+import { PageFaq } from '@/components/PageFaq';
+import { copy } from '@/data/copy/free-forever';
 import { Ban, EyeOff, Laptop, Gift } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -124,16 +126,17 @@ export default function Page() {
         <section aria-labelledby="pledge-verify" className="mb-12">
           <h2 id="pledge-verify" className="mb-4 text-2xl font-bold text-fg">Check it yourself</h2>
           <p className="leading-relaxed text-fg-muted">
-            {PLEDGE_VERIFY} Read the{' '}
+            {PLEDGE_VERIFY} The{' '}
             <a href="/security#compliance" className="font-medium text-accent underline hover:text-accent-strong">
-              privacy details
+              security page
             </a>{' '}
-            or the{' '}
-            <a href="https://github.com/fderuiter/QRCraftly-web" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline hover:text-accent-strong">
-              source code on GitHub
-            </a>
-            .
+            lists every request the site makes.
           </p>
+        </section>
+
+        <section aria-labelledby="pledge-questions" className="mb-12">
+          <h2 id="pledge-questions" className="mb-4 text-2xl font-bold text-fg">Common questions</h2>
+          <PageFaq faqs={copy.faqs ?? []} />
         </section>
 
         <GuideLinks />

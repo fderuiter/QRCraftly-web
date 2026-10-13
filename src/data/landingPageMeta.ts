@@ -35,10 +35,10 @@ export interface LandingMeta {
 export const landingPageMeta: Record<string, LandingMeta> = {
   'mosaic-qr-code': {
     name: 'Image QR Code Generator',
-    seoTitle: 'Image QR Code Generator: Your Picture, No AI, Never Uploaded | QRCraftly',
+    seoTitle: 'Image QR Code Generator: No AI, Never Uploaded | QRCraftly',
     heading: 'Image QR Code Generator (Mosaic)',
     description:
-      'Turn your own picture into a QR code that still scans. No AI and no upload: your image is tiled into the code in your browser. Free, no sign-up, no ads.',
+      'Make a QR code from your own picture and check that it still scans. Your image stays in your browser. Free, no sign-up, no ads.',
     imageAlt: 'A QR code whose modules are tiled from a sunset picture, made with the QRCraftly image QR code generator',
     features: [
       'Your own picture is tiled into the QR code, not an AI rendering of it',
@@ -50,7 +50,7 @@ export const landingPageMeta: Record<string, LandingMeta> = {
   },
   'qr-code-with-logo': {
     name: 'QR Code with Logo Generator',
-    seoTitle: 'Free QR Code with Logo Generator: No Sign-up, Never Expires | QRCraftly',
+    seoTitle: 'Free QR Code Generator with Logo | QRCraftly',
     heading: 'Free QR Code Generator with Logo',
     description:
       'Add your logo to a QR code and keep it scannable. High error correction is set for you and the scan badge warns you if the logo is too big. Free, no ads.',
@@ -80,7 +80,7 @@ export const landingPageMeta: Record<string, LandingMeta> = {
   },
   'menu-qr-code': {
     name: 'Menu QR Code Generator',
-    seoTitle: 'Free Menu QR Code Generator: Never Expires, No Sign-up | QRCraftly',
+    seoTitle: 'Free Menu QR Code Generator, Never Expires | QRCraftly',
     heading: 'Free Menu QR Code Generator',
     description:
       'Make a restaurant menu QR code that never expires. Link it to your menu page or PDF, download it and print it. Free, no sign-up, no ads, no monthly fee.',
@@ -95,7 +95,7 @@ export const landingPageMeta: Record<string, LandingMeta> = {
   },
   'instagram-qr-code': {
     name: 'Instagram QR Code Generator',
-    seoTitle: 'Free Instagram QR Code Generator: Link to Your Profile | QRCraftly',
+    seoTitle: 'Free Instagram QR Code Generator | QRCraftly',
     heading: 'Free Instagram QR Code Generator',
     description:
       'Make a QR code that opens your Instagram profile. Type your username, style the code and download it. Free, no sign-up, no ads, and it never expires.',
@@ -110,7 +110,7 @@ export const landingPageMeta: Record<string, LandingMeta> = {
   },
   'whatsapp-qr-code': {
     name: 'WhatsApp QR Code Generator',
-    seoTitle: 'Free WhatsApp QR Code Generator: Chat Link, No Sign-up | QRCraftly',
+    seoTitle: 'Free WhatsApp QR Code Generator for Chat Links | QRCraftly',
     heading: 'Free WhatsApp QR Code Generator',
     description:
       'Make a QR code that opens a WhatsApp chat with you. Add your number to a wa.me link and download the code. Free, no sign-up, no ads, never expires.',
@@ -140,7 +140,7 @@ export const landingPageMeta: Record<string, LandingMeta> = {
   },
   'qr-code-checker': {
     name: 'QR Code Checker',
-    seoTitle: 'QR Code Checker: Test If Your QR Code Scans, Nothing Uploaded | QRCraftly',
+    seoTitle: 'QR Code Checker: Test If a QR Code Scans | QRCraftly',
     heading: 'QR Code Checker',
     description:
       'Check any QR code from an image: see what it holds and whether it scans, even after print blur. Nothing is uploaded and there is no sign-up.',

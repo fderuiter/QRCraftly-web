@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ArticleHeading, ArticleLayout, type ArticleSection } from '@/components/ArticleLayout';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { copy } from '@/data/copy/security';
+import { CONTACT_ADDRESS } from '@/data/contact';
 import { SidebarContent } from '@/components/SidebarContent';
 
 /**
@@ -95,8 +96,8 @@ function DocSection({ id, label }: ArticleSection) {
 
 /** The four plain claims at the top of the page. Each one is backed by the details below. */
 const SUMMARY = [
-  { icon: MonitorSmartphone, title: 'Generated on your device', text: 'Your browser builds every QR code and file transfer itself.' },
-  { icon: CloudUpload, title: 'Nothing uploaded', text: 'What you type, scan or send never leaves this device.' },
+  { icon: MonitorSmartphone, title: 'Generated on your device', text: 'Your browser makes every QR code and file transfer.' },
+  { icon: CloudUpload, title: 'Nothing uploaded', text: 'What you type, scan or send is not uploaded. The one exception is a Google Wallet pass you choose to send with your own keys.' },
   { icon: Cookie, title: 'No tracking cookies or trackers', text: 'No analytics, pixels, fingerprinting or third-party scripts.' },
   { icon: CloudCog, title: 'Cloudflare keeps standard request logs', text: 'Our host sees page requests (IP address, browser, page, time), never your content.' },
 ] as const;
@@ -190,16 +191,11 @@ export default function Page() {
             <span id="report-title">Report a vulnerability</span>
           </ArticleHeading>
           <p className="mb-4 text-fg-soft">
-            Found a security problem? Report it privately through GitHub&apos;s security advisories so it can be fixed before it is public.
+            Found a security problem? Email it privately to {CONTACT_ADDRESS} so it can be fixed before it is public.
           </p>
-          <ButtonLink
-            href="https://github.com/fderuiter/QRCraftly-web/security/advisories/new"
-            target="_blank"
-            rel="noopener noreferrer"
-            variant="primary"
-          >
+          <ButtonLink href="mailto:fpderuiter+qrcraftly@gmail.com" variant="primary">
             <ShieldCheck className="size-5" aria-hidden="true" />
-            Report a vulnerability on GitHub
+            Report a vulnerability by email
           </ButtonLink>
         </section>
 

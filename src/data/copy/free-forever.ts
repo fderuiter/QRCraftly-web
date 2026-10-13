@@ -13,7 +13,7 @@ export const copy: ToolCopy = {
       },
       {
         "question": "Is my QR code data sent to a server?",
-        "answer": "No. QR codes are generated entirely in your browser. What you type, upload or scan never leaves your device."
+        "answer": "No. QR codes are generated entirely in your browser. What you type, upload or scan is not uploaded. The one exception is a Google Wallet pass, which is sent to Google only when you choose to create one with your own keys."
       },
       {
         "question": "Do QRCraftly QR codes expire?",

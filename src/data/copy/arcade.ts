@@ -16,7 +16,7 @@ export const copy: ToolCopy = {
         },
         {
           "name": "Watch both verdicts",
-          "text": "The health bar tracks the Reed-Solomon budget and finder patterns; the live scanner shows whether a real decoder can still read the code."
+          "text": "The health bar shows how much damage the code can still take. The live scanner shows whether it can still be read."
         },
         {
           "name": "Rebuild and compare",

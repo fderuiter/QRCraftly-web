@@ -17,5 +17,5 @@
 */
 
 export default {
-    imageAlt: 'Preview of the High-Performance Animated QR File Transfer tool'
+    imageAlt: 'Preview of the QRCraftly animated QR file transfer tool'
 }
