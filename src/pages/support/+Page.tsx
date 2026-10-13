@@ -17,7 +17,7 @@
 */
 
 import { ArticleHeading, ArticleLayout, type ArticleSection } from '@/components/ArticleLayout';
-import { CONTACT_ADDRESS, CONTACT_MAILTO } from '@/data/contact';
+import { CONTACT_ADDRESS } from '@/data/contact';
 
 
 const SECTIONS: readonly ArticleSection[] = [
@@ -79,7 +79,7 @@ export default function Page() {
       <section id="contact" aria-labelledby="contact-title" className={SECTION_CLASSES}>
         <ArticleHeading id="contact"><span id="contact-title">Contact us</span></ArticleHeading>
         <p>
-          Email <a href={CONTACT_MAILTO} className={LINK_CLASSES}>{CONTACT_ADDRESS}</a>.
+          Email <a href="mailto:hello@qrcraftly.com" className={LINK_CLASSES}>{CONTACT_ADDRESS}</a>.
         </p>
       </section>
     </ArticleLayout>

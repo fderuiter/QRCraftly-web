@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ArticleHeading, ArticleLayout, type ArticleSection } from '@/components/ArticleLayout';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { copy } from '@/data/copy/security';
-import { CONTACT_ADDRESS, CONTACT_MAILTO } from '@/data/contact';
+import { CONTACT_ADDRESS } from '@/data/contact';
 import { SidebarContent } from '@/components/SidebarContent';
 
 /**
@@ -193,7 +193,7 @@ export default function Page() {
           <p className="mb-4 text-fg-soft">
             Found a security problem? Email it privately to {CONTACT_ADDRESS} so it can be fixed before it is public.
           </p>
-          <ButtonLink href={CONTACT_MAILTO} variant="primary">
+          <ButtonLink href="mailto:hello@qrcraftly.com" variant="primary">
             <ShieldCheck className="size-5" aria-hidden="true" />
             Report a vulnerability by email
           </ButtonLink>

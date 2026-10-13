@@ -19,7 +19,7 @@
 
 import { Download, Keyboard, QrCode } from 'lucide-react';
 import { PLEDGE_COMMITMENT, PLEDGE_HEADLINE } from '@/data/pledge';
-import { CONTACT_ADDRESS, CONTACT_MAILTO } from '@/data/contact';
+import { CONTACT_ADDRESS } from '@/data/contact';
 import { GENERATOR_FOOTER_LINKS, TOOL_LINKS } from '@/data/navigation';
 import { isDangerousUrl } from '@/utils/security';
 import { ButtonLink } from '@/components/ui/Button';
@@ -130,7 +130,7 @@ export default function Page() {
             <a href="/acknowledgements" className={LINK_CLASSES}>See every package it ships and its license</a>
           </p>
           <p>
-            Questions or ideas? <a href={CONTACT_MAILTO} className={LINK_CLASSES}>Email {CONTACT_ADDRESS}</a>
+            Questions or ideas? <a href="mailto:hello@qrcraftly.com" className={LINK_CLASSES}>Email {CONTACT_ADDRESS}</a>
           </p>
         </section>
       </ArticleLayout>

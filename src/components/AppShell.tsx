@@ -23,7 +23,6 @@ import { isDangerousUrl } from '@/utils/security';
 import { PrimaryNav } from './ui/PrimaryNav';
 import { ThemeToggle } from './ui/ThemeToggle';
 import { PLEDGE_TAGLINE } from '@/data/pledge';
-import { CONTACT_MAILTO } from '@/data/contact';
 import { GENERATOR_FOOTER_LINKS, TOOL_LINKS, USE_CASE_LINKS } from '@/data/navigation';
 
 const FOOTER_LINK_CLASSES = 'transition-colors hover:text-accent';
@@ -124,7 +123,7 @@ export function AppFooter() {
           <FooterLinks links={COMPANY_LINKS} className="space-y-2 text-sm text-fg-muted" />
           <ul className="mt-2 text-sm text-fg-muted">
             <li>
-              <a href={CONTACT_MAILTO} className={FOOTER_LINK_CLASSES}>
+              <a href="mailto:hello@qrcraftly.com" className={FOOTER_LINK_CLASSES}>
                 Contact
               </a>
             </li>
