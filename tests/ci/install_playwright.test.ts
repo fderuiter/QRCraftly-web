@@ -79,7 +79,7 @@ describe('Playwright install in CI (scripts/ci/install_playwright.sh)', () => {
   it('limits each attempt and the whole step', () => {
     expect(read('scripts/ci/install_playwright.sh')).toMatch(/timeout --kill-after=\d+ "\$ATTEMPT_SECONDS"/);
     expect(read('.github/workflows/main.yml')).toMatch(
-      /- name: Install Playwright Browsers\n\s+timeout-minutes: \d+\n\s+run: bash scripts\/ci\/install_playwright\.sh\n/
+      /- name: Install Playwright Browsers\n\s+timeout-minutes: \d+\n[\s\S]*?bash scripts\/ci\/install_playwright\.sh\n[\s\S]*?bash scripts\/ci\/install_playwright\.sh chromium\n/
     );
   });
 

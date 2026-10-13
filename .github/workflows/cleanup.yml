@@ -2,9 +2,7 @@ name: Artifact & Branch Cleanup
 
 on:
   schedule:
-    - cron: '0 2 * * 0' # Weekly on Sunday at 2AM
-  pull_request:
-    types: [closed]
+    - cron: '0 2 * * 0' # Weekly on Sunday at 2AM (no per-PR run: minutes are metered, ADR 0049)
   workflow_dispatch:
 
 # Read-only by default; each job asks only for the write scope it needs.
@@ -16,7 +14,7 @@ jobs:
     name: Clean up abandoned/merged branches
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     permissions:
       contents: write # delete merged branch refs
       pull-requests: read

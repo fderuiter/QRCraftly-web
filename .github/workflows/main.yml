@@ -1,48 +1,22 @@
 name: CI/CD Pipeline
 
+# Metered minutes (ADR 0049): pull requests run a Chromium-only E2E tier and sample
+# Lighthouse; the full four-browser E2E and every-page Lighthouse run nightly on main,
+# on release PRs and on PRs labelled `full-e2e`. Pushes to main do not re-run CI: the
+# ruleset requires PRs to be up to date and squash-merges them, so the commit that
+# lands is the tree its PR already tested. deploy-verify.yml checks the deploy instead.
 on:
-  push:
-    branches: [main]
-    paths: &workflow_paths
-      - 'src/**'
-      - 'crates/**'
-      - 'public/**'
-      - 'scripts/**'
-      - 'e2e/**'
-      - 'tests/**'
-      - 'docs/**'
-      - '*.md'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'eslint.config.js'
-      - 'knip.json'
-      - '.jscpd.json'
-      - 'semgrep.yml'
-      - 'tests/semgrep/**'
-      - 'requirements.txt'
-      - 'playwright.config.ts'
-      - 'vite.config.ts'
-      - 'vitest.setup.ts'
-      - 'postcss.config.js'
-      - 'tsconfig.json'
-      - 'playwright.dev.config.ts'
-      - '.githooks/**'
-      - '.nvmrc'
-      - '.node-version'
-      - '.prettierrc.json'
-      - '.prettierignore'
-      - '.gitleaks.toml'
-      - '.github/rulesets/**'
-      - 'lighthouserc.json'
-      - 'wrangler.jsonc'
-      - '.github/workflows/**'
-      - '.github/actions/**'
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  schedule:
+    - cron: '0 7 * * *' # Nightly full tier on main, 2am US Central (CDT)
   workflow_dispatch:
-    # Manual trigger for re-running CI without a code push. Releases are tagged by
-    # .github/workflows/release.yml when a release PR merges (see RELEASING.md).
+    inputs:
+      full:
+        description: 'Run the full tier (four-browser E2E and Lighthouse on every page)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -53,23 +27,54 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # JOB 1: Install Deps & Cache
-  setup:
-    name: Setup & Install
+  # Decides what this run does (scripts/ci/ci_plan.js): which E2E and Lighthouse tier,
+  # whether the PR only changes docs, and whether a nightly run has anything new to test.
+  plan:
+    name: Plan
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read # the nightly run compares main with the last successful nightly run
+    outputs:
+      run_checks: ${{ steps.plan.outputs.run_checks }}
+      code_changed: ${{ steps.plan.outputs.code_changed }}
+      e2e: ${{ steps.plan.outputs.e2e }}
+      lighthouse: ${{ steps.plan.outputs.lighthouse }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Setup Environment
-        uses: ./.github/actions/setup
+      - name: Find the last successful nightly run
+        id: last-nightly
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          sha="$(gh run list --repo "$REPO" --workflow main.yml --event schedule --branch main --status success --limit 1 --json headSha --jq '.[0].headSha // ""' || true)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Plan the run
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+          HEAD_REF: ${{ github.head_ref }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          FULL_INPUT: ${{ inputs.full }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.sha }}
+          LAST_NIGHTLY_SHA: ${{ steps.last-nightly.outputs.sha }}
+        run: node scripts/ci/ci_plan.js
 
   # Runs in parallel with the other jobs (none of them depends on it), so a new
   # upstream advisory never skips lint, tests or build. The CI aggregate requires it.
   dependency-audit:
     name: Dependency Audit
+    needs: plan
+    if: needs.plan.outputs.run_checks == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -84,7 +89,8 @@ jobs:
   # JOB 2: Consolidated Static Validation Quality Gate
   static-validation:
     name: Consolidated Static Validation
-    needs: setup
+    needs: plan
+    if: needs.plan.outputs.run_checks == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -141,7 +147,8 @@ jobs:
   # JOB 3: Unit Tests
   test:
     name: Unit Tests
-    needs: setup
+    needs: plan
+    if: needs.plan.outputs.run_checks == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -170,7 +177,8 @@ jobs:
   # proves every committed src/wasm/*.wasm rebuilds byte-for-byte.
   wasm-reproducible:
     name: WebAssembly Reproducible Build
-    needs: setup
+    needs: plan
+    if: needs.plan.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -204,7 +212,8 @@ jobs:
   # Runs against the exact `dist` the Build job produced, so CI builds the app once.
   e2e:
     name: E2E Tests
-    needs: build
+    needs: [plan, build]
+    if: needs.plan.outputs.e2e != 'none'
     runs-on: ubuntu-latest
     # About 1,100 tests on one worker take about 28 minutes (2026-10-04); the cap leaves room for retries.
     timeout-minutes: 45
@@ -226,15 +235,31 @@ jobs:
 
       # Each attempt is time-limited and retried (scripts/ci/install_playwright.sh), so a stalled
       # apt mirror costs minutes, not the whole job.
+      # The PR tier needs only Chromium; the full tier installs every browser.
       - name: Install Playwright Browsers
         timeout-minutes: 13
-        run: bash scripts/ci/install_playwright.sh
+        env:
+          E2E_TIER: ${{ needs.plan.outputs.e2e }}
+        run: |
+          if [ "$E2E_TIER" = "full" ]; then
+            bash scripts/ci/install_playwright.sh
+          else
+            bash scripts/ci/install_playwright.sh chromium
+          fi
 
+      # PR tier: the chromium and chromium-csp projects. Full tier (nightly, release PRs,
+      # the `full-e2e` label): Firefox and WebKit as well.
       - name: Run Playwright tests
         env:
           # Serve the downloaded build with `vite preview` instead of rebuilding.
           PLAYWRIGHT_USE_EXISTING_BUILD: "true"
-        run: pnpm run test:e2e
+          E2E_TIER: ${{ needs.plan.outputs.e2e }}
+        run: |
+          if [ "$E2E_TIER" = "full" ]; then
+            pnpm run test:e2e
+          else
+            pnpm run test:e2e --project=chromium --project=chromium-csp
+          fi
 
       - name: Run Development Hydration Tests
         run: pnpm run test:e2e:dev
@@ -251,7 +276,8 @@ jobs:
   # JOB 5: Build Application
   build:
     name: Build
-    needs: setup # E2E consumes this job's dist artifact, so build first
+    needs: plan # E2E and Lighthouse consume this job's dist artifact
+    if: needs.plan.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -305,7 +331,8 @@ jobs:
   # median run is asserted, so one noisy run on a shared runner cannot fail CI.
   lighthouse:
     name: Lighthouse
-    needs: build
+    needs: [plan, build]
+    if: needs.plan.outputs.lighthouse != 'none'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
@@ -323,6 +350,11 @@ jobs:
           name: dist
           path: dist/
 
+      # Pull requests audit one page of each template; the full tier audits every page.
+      - name: Sample pages for a pull request
+        if: needs.plan.outputs.lighthouse == 'sample'
+        run: node scripts/ci/lighthouse_sample.js dist/lighthouserc.json
+
       - name: Run Lighthouse CI
         id: lighthouse_audit
         uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # v12
@@ -333,7 +365,9 @@ jobs:
           # The action's own `runs` input overrides `numberOfRuns` in the config.
           runs: 3
           uploadArtifacts: true
-          temporaryPublicStorage: true
+          # The repository is private: keep the reports in this run's artifacts instead
+          # of uploading them to Google's public temporary storage.
+          temporaryPublicStorage: false
 
       - name: Post Lighthouse Comment
         if: always()
@@ -418,52 +452,46 @@ jobs:
   # Single required check for rulesets. Branch rules require "CI" instead of every
   # job name, so renaming or adding jobs never leaves a PR waiting on a check that
   # no longer reports. It is also what auto-merge waits on (see RELEASING.md).
+  # A job the plan skipped (E2E on a draft, the build on a docs-only PR) counts as a
+  # pass; a failed or cancelled job, or a plan that did not succeed, fails it.
   ci:
     name: CI
-    needs: [setup, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse]
+    needs: [plan, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write # the nightly run opens or closes its alert issue
     steps:
-      - name: Require every quality job to succeed
+      - name: Require every planned quality job to succeed
+        id: check
         env:
+          PLAN_RESULT: ${{ needs.plan.result }}
           NEEDS_RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "Job results: $NEEDS_RESULTS"
+          echo "Plan: $PLAN_RESULT. Job results: $NEEDS_RESULTS"
+          if [ "$PLAN_RESULT" != "success" ]; then
+            echo "::error::The Plan job finished with '$PLAN_RESULT'."
+            exit 1
+          fi
           for result in $NEEDS_RESULTS; do
-            if [ "$result" != "success" ]; then
+            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
               echo "::error::A required CI job finished with '$result'."
               exit 1
             fi
           done
 
-  # Post-merge production check (#1217). Cloudflare Workers Builds deploys every push to
-  # main to production on its own; this job waits until /version.json on workers.dev reports
-  # the merged commit and fails with an error annotation (plus the last response's status,
-  # headers and body start) if production does not pick it up, then smoke tests it.
-  verify-staging:
-    name: Verify Production Deployment
-    needs: [ci]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout Code
+      # A red nightly run opens one issue (and a green one closes it) instead of an email
+      # nobody reads. Only nightly runs that tested something report.
+      - name: Check out the alert script
+        if: always() && github.event_name == 'schedule' && needs.plan.outputs.run_checks == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup Environment
-        uses: ./.github/actions/setup
-        with:
-          cache-playwright: 'true'
-
-      - name: Wait for production to serve this commit
+      - name: Sync Nightly CI Issue
+        if: always() && github.event_name == 'schedule' && needs.plan.outputs.run_checks == 'true'
         env:
-          BASE_URL: "https://qrcraftly.fpderuiter.workers.dev"
-          EXPECTED_COMMIT: ${{ github.sha }}
-        run: bash scripts/ci/wait_for_deploy.sh
-
-      - name: Run Playwright Smoke Tests on Production
-        env:
-          PLAYWRIGHT_TEST_BASE_URL: "https://qrcraftly.fpderuiter.workers.dev"
-          EXPECTED_COMMIT: ${{ github.sha }}
-        run: bash scripts/ci/run_smoke_tests.sh
+          CI_OUTCOME: ${{ steps.check.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci/nightly_issue.js

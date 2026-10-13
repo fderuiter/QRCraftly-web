@@ -64,4 +64,4 @@ These are foundations, kept by decision (Fred, 2026-10-04). The effort to replac
 - **Build:** Vite, TypeScript, Tailwind and PostCSS.
 - **Tests:** Vitest with coverage, jsdom, Testing Library React and user-event, Playwright, axe-core and `@axe-core/playwright`. `dom-accessibility-api` (already pulled in by Testing Library) computes accessible names and descriptions for our DOM matchers.
 - **Lint:** ESLint core with the TypeScript, React, React Hooks, JSX a11y and JSDoc plugins, Prettier and Knip.
-- **Hosting and CI:** Wrangler, Lighthouse CI, Scorecard, CodeQL, Semgrep and GitHub's own actions.
+- **Hosting and CI:** Wrangler, Lighthouse CI, Semgrep and GitHub's own actions. Scorecard and CodeQL left when the repository went private ([ADR 0049](./adr/0049-ci-tiers-for-a-private-repository.md)).

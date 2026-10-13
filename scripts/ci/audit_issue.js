@@ -104,20 +104,21 @@ function readAuditReport() {
  * @param {string[]} args
  * @returns {string}
  */
-function runGh(args) {
+export function runGh(args) {
   return execBinary('gh', args, { stdio: ['ignore', 'pipe', 'inherit'] });
 }
 
 /**
  * Finds the open alert issue's number, or null.
  * @param {(args: string[]) => string} gh
+ * @param {string} [marker] Hidden marker that identifies the alert issue.
  * @returns {number | null}
  */
-export function findOpenAlert(gh) {
+export function findOpenAlert(gh, marker = MARKER) {
   const issues = JSON.parse(gh(['issue', 'list', '--state', 'open', '--limit', '500', '--json', 'number,body']));
   /** @type {{ number: number, body?: string }[]} */
   const list = Array.isArray(issues) ? issues : [];
-  const match = list.find(issue => typeof issue.body === 'string' && issue.body.includes(MARKER));
+  const match = list.find(issue => typeof issue.body === 'string' && issue.body.includes(marker));
   return match ? match.number : null;
 }
 

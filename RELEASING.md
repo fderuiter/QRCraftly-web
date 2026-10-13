@@ -14,15 +14,16 @@ release/vX.Y.Z    ──release PR (chore(release): vX.Y.Z)──►  main ─�
                                                                      → wait for deploy → smoke tests
 ```
 
-| Piece                                    | Owner                     | What it does                                                                                                    |
-| ---------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `main`                                   | Pull requests only        | The trunk and repository default. Every commit on it passed CI through a squash-merged PR.                      |
-| Deploys                                  | Cloudflare Workers Builds | Builds every push. `main` deploys to production; every other branch uploads a preview version with its own URL. |
-| `package.json` `version`, `CHANGELOG.md` | Release PR                | Written by `pnpm run release:prepare`, reviewed and merged like any other change.                               |
-| `vX.Y.Z` tags                            | Release workflow          | Created on the release commit when the release PR merges. Protected from being moved or deleted.                |
-| `.github/workflows/main.yml`             | GitHub Actions            | Quality gate. The `CI` job aggregates every quality job. After each push to `main`, it smoke tests production.  |
-| `.github/workflows/release.yml`          | GitHub Actions            | Tags a new `package.json` version, publishes the GitHub Release, and smoke tests production for that version.   |
-| `.github/workflows/release-preview.yml`  | GitHub Actions            | Weekly read-only preview of the next version and changelog. Opens no PR and creates no tag.                     |
+| Piece                                    | Owner                     | What it does                                                                                                                      |
+| ---------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `main`                                   | Pull requests only        | The trunk and repository default. Every commit on it passed CI through a squash-merged PR.                                        |
+| Deploys                                  | Cloudflare Workers Builds | Builds every push. `main` deploys to production; every other branch uploads a preview version with its own URL.                   |
+| `package.json` `version`, `CHANGELOG.md` | Release PR                | Written by `pnpm run release:prepare`, reviewed and merged like any other change.                                                 |
+| `vX.Y.Z` tags                            | Release workflow          | Created on the release commit when the release PR merges. Protected from being moved or deleted.                                  |
+| `.github/workflows/main.yml`             | GitHub Actions            | Quality gate on PRs, plus the nightly full tier on `main` (see [CI tiers](#ci-tiers)). The `CI` job aggregates every quality job. |
+| `.github/workflows/deploy-verify.yml`    | GitHub Actions            | After each push to `main`, waits for the deploy and smoke tests production.                                                       |
+| `.github/workflows/release.yml`          | GitHub Actions            | Tags a new `package.json` version, publishes the GitHub Release, and smoke tests production for that version.                     |
+| `.github/workflows/release-preview.yml`  | GitHub Actions            | Weekly read-only preview of the next version and changelog. Opens no PR and creates no tag.                                       |
 
 ## Environments
 
@@ -49,14 +50,26 @@ Prefer fewer, larger PRs that each carry a complete, tested change, over many sm
 2. Open a PR into `main`. Give it a [Conventional Commit](https://www.conventionalcommits.org/) title, such as `fix(scanner): handle empty frames`. The `PR Title` check enforces this.
 3. Check the change on the branch preview URL, and wait for every required check to pass: `CI`, `PR Title` and `Workers Builds: qrcraftly`. If `main` moved, update the branch and let the checks run again. Nothing merges on a red or stale PR, admins included.
 4. Turn on **auto-merge (squash)** once the PR is ready, or merge with **Squash and merge** yourself. The PR title becomes the commit subject on `main`, which is what the changelog and version bump are built from.
-5. Cloudflare deploys it to production. The `Verify Production Deployment` job in `main.yml` is the post-merge check: it waits up to 15 minutes for `/version.json` on `https://qrcraftly.fpderuiter.workers.dev/` to report the merged commit, fails with an error annotation and the last response's status, headers and body start if it does not, and otherwise runs the smoke tests against it. Nobody needs to check the deploy by hand; a red `Verify Production Deployment` run on `main` is the signal.
+5. Cloudflare deploys it to production. The `Verify Production Deployment` workflow (`deploy-verify.yml`) is the post-merge check: it waits up to 15 minutes for `/version.json` on `https://qrcraftly.fpderuiter.workers.dev/` to report the merged commit, fails with an error annotation and the last response's status, headers and body start if it does not, and otherwise runs the smoke tests against it. Nobody needs to check the deploy by hand; a red `Verify Production Deployment` run on `main` is the signal.
+
+### CI tiers
+
+The repository is private, so Actions minutes are metered ([ADR 0049](docs/adr/0049-ci-tiers-for-a-private-repository.md)). `main.yml` does not run on pushes to `main`, and on PRs it runs in tiers:
+
+- **Draft PRs** run static checks, the dependency audit, unit tests, the build and the WebAssembly build. Keep work in draft until it is ready.
+- **Ready PRs** add Chromium E2E (`chromium` and `chromium-csp`) and Lighthouse on eight sample pages.
+- **PRs that only change Markdown** the build does not read run static checks and unit tests only.
+- **Release PRs and PRs labelled `full-e2e`** run E2E on all four projects and Lighthouse on every page. Add the label to changes that may differ by browser.
+- **Nightly at 07:00 UTC**, `main` gets the full tier, unless it has not changed since the last green nightly run. A red nightly run is fixed before the next merge.
+
+Run `pnpm run lint`, `pnpm test` and, for navigation, rendering or input changes, `pnpm test:e2e` locally before pushing.
 
 ### Auto-merge
 
 Auto-merge lets a PR merge itself the moment it is green, so nobody has to come back and press the button.
 
 - **Turn it on per PR** once the change is complete: **Enable auto-merge → Squash and merge** on the PR page, or `gh pr merge <number> --auto --squash`. Claude threads turn it on for the PRs they open.
-- GitHub then merges when every required check passes: `CI` (setup, dependency audit, static validation, unit tests, E2E and build), `PR Title` and `Workers Builds: qrcraftly`. A red check leaves the PR open; push a fix and it merges when the checks go green.
+- GitHub then merges when every required check passes: `CI` (dependency audit, static validation, unit tests, WebAssembly build, build, and the E2E and Lighthouse tier the plan picked), `PR Title` and `Workers Builds: qrcraftly`. A red check leaves the PR open; push a fix and it merges when the checks go green.
 - **Up to date first.** `main` requires branches to be current, and GitHub does not update them for you. When another PR merges first, press **Update branch** (or merge `main` in); CI runs again and the PR merges when it passes. Claude threads do this when they get the base-changed notice.
 - **Never on release PRs.** A `chore(release): vX.Y.Z` PR publishes a version, so a maintainer merges it by hand.
 - Enable it as a person (the button, `gh`, or a Claude thread acting for you), not from a workflow using `GITHUB_TOKEN`. GitHub does not start workflows from pushes made with that token, so the production smoke test and the Release workflow would never run after the merge.

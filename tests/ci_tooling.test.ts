@@ -15,18 +15,6 @@ function matchesGlob(file: string, glob: string): boolean {
   return new RegExp(`^${pattern}$`).test(file);
 }
 
-function workflowPushPaths(): string[] {
-  const lines = read('.github/workflows/main.yml').split(/\r?\n/);
-  const start = lines.findIndex(line => /^\s+paths:/.test(line));
-  const paths: string[] = [];
-  for (const line of lines.slice(start + 1)) {
-    const match = /^\s+- '([^']+)'\s*$/.exec(line);
-    if (!match) break;
-    paths.push(match[1]);
-  }
-  return paths;
-}
-
 type PackageJson = {
   scripts: Record<string, string>;
   engines?: Record<string, string>;
@@ -36,28 +24,31 @@ type PackageJson = {
 
 const pkg: PackageJson = JSON.parse(read('package.json'));
 
-describe('CI trigger paths (main.yml)', () => {
-  const paths = workflowPushPaths();
+describe('CI triggers and tiers (main.yml, ADR 0049)', () => {
+  const workflow = read('.github/workflows/main.yml');
 
-  it.each([
-    'docs/adr/0001-client-side-storage-allowlist.md',
-    'docs/agents/domain.md',
-    'CONTEXT.md',
-    'AGENTS.md',
-    'README.md',
-    'src/packages/scannability/worker.ts',
-    'tests/ci_tooling.test.ts',
-    'eslint.config.js',
-    'knip.json',
-    'semgrep.yml',
-    'pnpm-workspace.yaml',
-    '.github/actions/setup/action.yml',
-    '.githooks/pre-commit',
-    'scripts/hooks/staged.config.js',
-    '.nvmrc',
-    '.github/rulesets/README.md'
-  ])('runs CI when only %s changes', file => {
-    expect(paths.some(glob => matchesGlob(file, glob))).toBe(true);
+  it('runs on pull requests, nightly and by hand, but not on pushes to main', () => {
+    expect(workflow).toMatch(/pull_request:\n\s+branches: \[main\]\n\s+types: \[opened, synchronize, reopened, ready_for_review\]/);
+    expect(workflow).toMatch(/schedule:\n\s+- cron: '0 7 \* \* \*'/);
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).not.toMatch(/^\s+push:/m);
+  });
+
+  it('lets the plan decide the E2E and Lighthouse tiers', () => {
+    expect(jobBlock('plan')).toContain('run: node scripts/ci/ci_plan.js');
+    expect(jobBlock('e2e')).toContain("if: needs.plan.outputs.e2e != 'none'");
+    expect(jobBlock('e2e')).toContain('pnpm run test:e2e --project=chromium --project=chromium-csp');
+    expect(jobBlock('lighthouse')).toContain("if: needs.plan.outputs.lighthouse != 'none'");
+    expect(jobBlock('lighthouse')).toContain('run: node scripts/ci/lighthouse_sample.js dist/lighthouserc.json');
+    expect(jobBlock('lighthouse')).toContain('temporaryPublicStorage: false');
+  });
+
+  it('fails the CI aggregate on a failed plan or job but passes planned skips', () => {
+    const ci = jobBlock('ci');
+    expect(ci).toMatch(/needs: \[plan, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse\]/);
+    expect(ci).toContain('if: always()');
+    expect(ci).toContain('[ "$PLAN_RESULT" != "success" ]');
+    expect(ci).toContain('[ "$result" != "skipped" ]');
   });
 });
 
@@ -154,9 +145,9 @@ describe('playwright browser caching in workflows', () => {
     expect(release).toContain('cache-playwright: \'true\'');
   });
 
-  it('enables cache-playwright in main.yml e2e and verify-staging jobs', () => {
-    const main = read('.github/workflows/main.yml');
-    expect(main).toContain('cache-playwright: \'true\'');
+  it('enables cache-playwright in the main.yml e2e job and the deploy check', () => {
+    expect(jobBlock('e2e')).toContain('cache-playwright: \'true\'');
+    expect(read('.github/workflows/deploy-verify.yml')).toContain('cache-playwright: \'true\'');
   });
 });
 
@@ -193,8 +184,8 @@ describe('generated files stay out of the tracked tree', () => {
 });
 
 /** Returns the body of one job in main.yml (from `  <name>:` to the next top-level job). */
-function jobBlock(name: string): string {
-  const workflow = read('.github/workflows/main.yml');
+function jobBlock(name: string, file = '.github/workflows/main.yml'): string {
+  const workflow = read(file);
   const lines = workflow.split(/\r?\n/);
   const start = lines.findIndex(line => line === `  ${name}:`);
   expect(start).toBeGreaterThan(-1);
@@ -213,7 +204,7 @@ describe('CI builds the app once', () => {
     const e2e = jobBlock('e2e');
     expect(build).toMatch(/- run: pnpm run build/);
     expect(build).toMatch(/uses: actions\/upload-artifact@[0-9a-f]{40}[\s\S]*name: dist\n\s*path: dist\//);
-    expect(e2e).toMatch(/needs: build/);
+    expect(e2e).toMatch(/needs: \[plan, build\]/);
     expect(e2e).toMatch(/uses: actions\/download-artifact@[0-9a-f]{40}[\s\S]*name: dist\n\s*path: dist\//);
     expect(e2e).toContain('PLAYWRIGHT_USE_EXISTING_BUILD: "true"');
     expect(e2e).not.toMatch(/pnpm (run )?build/);
@@ -238,9 +229,10 @@ describe('CI builds the app once', () => {
 
 describe('post-merge production check (#1217)', () => {
   it('waits for workers.dev to serve the merged commit after every push to main', () => {
-    const job = jobBlock('verify-staging');
+    const job = jobBlock('verify-staging', '.github/workflows/deploy-verify.yml');
     expect(job).toContain('name: Verify Production Deployment');
-    expect(job).toContain("if: github.event_name == 'push' && github.ref == 'refs/heads/main'");
+    expect(read('.github/workflows/deploy-verify.yml')).toMatch(/push:\n\s+branches: \[main\]/);
+    expect(job).toContain("if: github.ref == 'refs/heads/main'");
     expect(job).toContain('BASE_URL: "https://qrcraftly.fpderuiter.workers.dev"');
     expect(job).toContain('EXPECTED_COMMIT: ${{ github.sha }}');
     expect(job).toContain('run: bash scripts/ci/wait_for_deploy.sh');
