@@ -5,7 +5,7 @@
  */
 
 export { getConstellation, constellationId, type Constellation, type ConstellationSpace } from './lib/constellation';
-export { simulateCapture, type ChannelPreset, type CaptureOptions } from './lib/channel';
+export { simulateCapture, capturedPoints, type ChannelPreset, type CaptureOptions, type CameraImpairments } from './lib/channel';
 export { probeSequence, probeGeometries, drawProbeFrame, type ProbePattern } from './lib/probe';
 export {
   ProbeRun,
@@ -18,7 +18,8 @@ export {
   type EdgeResult,
 } from './lib/probeAnalysis';
 export type { RgbaImage } from './lib/layout';
-export type { TrackHint } from './lib/frame';
+export { acquireFrame, type AcquireResult, type TrackHint } from './lib/frame';
+export type { TearCarry, TearReport, TornBlocks } from './lib/tear';
 export {
   encodeModemFrame,
   decodeModemFrame,

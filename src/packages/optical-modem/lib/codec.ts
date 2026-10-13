@@ -23,6 +23,7 @@ import { kernelUniforms, type KernelUniforms, type SampledGrid } from './kernel'
 import { BLOCK_TAG_BYTES, modemKernels, type FiducialSearch } from './kernels';
 import { BAND_ROWS, type GridGeometry, type RgbaImage } from './layout';
 import { MODEM_GEOMETRIES, type ModemProfile } from './profile';
+import { recoverTear, type TearCarry, type TearReport, type TornBlocks } from './tear';
 
 /** What a profile can carry in one frame. */
 export interface FrameCapacity {
@@ -108,6 +109,13 @@ export interface DecodeOptions {
    * it and only labels the whole image when the frame is not there.
    */
   track?: TrackHint;
+  /**
+   * Recover a capture torn between two frames by a screen refresh (default on, ADR 0049). A capture
+   * whose header strips agree decodes exactly as with this off.
+   */
+  tears?: boolean;
+  /** The last torn capture's {@link DecodedFrame} `carry`: cells of a frame it showed only in part. */
+  carry?: TearCarry;
 }
 
 /** Confidence under which a cell's bytes count as erasures, unless told otherwise. */
@@ -137,6 +145,15 @@ export type DecodedFrame =
       track: TrackHint;
       /** Whether the frame was found by the tracked search rather than the full one. */
       tracked: boolean;
+      /**
+       * Blocks of other frames than the header's, from a capture torn between two frames. Each names
+       * its own sequence, which is what identifies its blocks to the outer code.
+       */
+      others?: TornBlocks[];
+      /** What the tear recovery did, when the capture's header strips suggested a tear. */
+      tear?: TearReport;
+      /** Pass this as the next frame's `carry` option. */
+      carry?: TearCarry;
     }
   | { ok: false; reason: DecodeFailure };
 
@@ -183,12 +200,13 @@ export function decodeModemFrame(image: RgbaImage, options: DecodeOptions = {}):
     kernels.sample(uniforms.cols, uniforms.dataRows, uniforms.rowOffset, uniforms.palette.length / 3);
   }
   const soft = options.soft ?? true;
-  const decoded = kernels.decode(capacity.bitsPerCell, header, header.session, header.seq, soft ? (options.threshold ?? DEFAULT_ERASURE_THRESHOLD) : null);
+  const threshold = soft ? (options.threshold ?? DEFAULT_ERASURE_THRESHOLD) : null;
+  const decoded = kernels.decode(capacity.bitsPerCell, header, header.session, header.seq, threshold);
   const blocks: (Uint8Array | null)[] = [];
   for (let b = 0; b < capacity.blocks; b++) {
     blocks.push(decoded.ok[b] ? decoded.data.slice(b * header.packetBytes, (b + 1) * header.packetBytes) : null);
   }
-  return {
+  const frame: Extract<DecodedFrame, { ok: true }> = {
     ok: true,
     header,
     blocks,
@@ -199,4 +217,18 @@ export function decodeModemFrame(image: RgbaImage, options: DecodeOptions = {}):
     track: { fiducials, cols: header.cols },
     tracked,
   };
+  if (options.tears === false || decoded.blocksOk === capacity.blocks) return frame;
+  const recovery = recoverTear(kernels, capacity.bitsPerCell, header, capacity.blocks, acquired.frame.strips, threshold, decoded.ok.slice(), options.carry, uniforms.homography);
+  if (!recovery) return frame;
+  recovery.blocks.forEach((block, b) => {
+    if (!block || blocks[b]) return;
+    blocks[b] = block;
+    frame.blocksOk++;
+  });
+  frame.erasures += recovery.erasures;
+  frame.corrected += recovery.corrected;
+  frame.tear = recovery.report;
+  if (recovery.others.length > 0) frame.others = recovery.others;
+  if (recovery.carry) frame.carry = recovery.carry;
+  return frame;
 }

@@ -56,6 +56,7 @@
     "bench:feedback": "node --import ./scripts/utils/register-ts.js scripts/bench_feedback.ts",
     "bench:optical-ladder": "node --import ./scripts/utils/register-ts.js scripts/bench_optical_ladder.ts",
     "bench:optical-ceiling": "node --import ./scripts/utils/register-ts.js scripts/bench_optical_ceiling.ts",
+    "bench:optical-finder": "node --import ./scripts/utils/register-ts.js scripts/bench_optical_finder.ts",
     "bench:optical-gpu": "node --import ./scripts/utils/register-ts.js scripts/optical_gpu_conformance.ts",
     "resource-quota-report": "node scripts/resource-quota-report.js",
     "secret-scanner": "node scripts/secret-scanner.js",

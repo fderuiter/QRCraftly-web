@@ -23,7 +23,10 @@
 use crate::colour::luma;
 use crate::constellation;
 use crate::layout::{Grid, HEADER_BITS};
-use crate::locate::{locate_fiducials, solve_homography, track_fiducials, Fiducials, Scratch};
+use crate::locate::{
+    locate_fiducials, locate_fiducials_strict, solve_homography, track_fiducials, Fiducials,
+    Scratch,
+};
 use crate::rs;
 use crate::sample::{read_patch, reference_midpoint, sample_cell};
 use crate::Image;
@@ -59,6 +62,11 @@ pub struct Acquired {
     /// Red, green and blue of each symbol.
     pub palette: [i32; 3 * constellation::MAX_SYMBOLS],
     pub symbols: usize,
+    /// The frame sequence the top and the bottom header strip each gave when
+    /// read alone, for a strip that decoded alone into the same header but
+    /// for its sequence. A screen refresh during the camera's readout leaves
+    /// two frames in one capture, and then the two strips differ.
+    pub strips: [Option<u32>; 2],
 }
 
 fn homography_for(
@@ -122,6 +130,37 @@ fn header_grid(message: &[u8; HEADER_MESSAGE_BYTES]) -> (u32, u32) {
     )
 }
 
+/// The `seq` field of a header message.
+pub fn header_seq(message: &[u8; HEADER_MESSAGE_BYTES]) -> u32 {
+    u32::from_be_bytes([message[8], message[9], message[10], message[11]])
+}
+
+/// The sequence each header strip gives alone, once the frame's header has
+/// been read from the top strip alone (`from` 0), the bottom one alone (1) or
+/// both together (2). The bottom strip is read again only when the top one
+/// gave the header; when the top one failed alone, it has no sequence. A strip
+/// whose header differs from the frame's in more than the sequence (another
+/// session, another shape) gives none.
+fn strip_sequences(
+    image: &Image,
+    h: &[f32; 9],
+    grid: &Grid,
+    midpoint: i32,
+    message: &[u8; HEADER_MESSAGE_BYTES],
+    from: usize,
+) -> [Option<u32>; 2] {
+    match from {
+        0 => {
+            let bottom = decode_header(&read_header_codeword(image, h, grid, midpoint, &[true]))
+                .filter(|other| other[..8] == message[..8] && other[12..] == message[12..])
+                .map(|other| header_seq(&other));
+            [Some(header_seq(message)), bottom]
+        }
+        1 => [None, Some(header_seq(message))],
+        _ => [None, None],
+    }
+}
+
 /// What [`acquire`] found.
 pub struct Acquisition {
     pub fiducials: Option<Fiducials>,
@@ -129,9 +168,43 @@ pub struct Acquisition {
 }
 
 /// Finds a frame in a captured image. `geometries` must already be checked.
-pub fn acquire(image: &Image, geometries: &[Grid], scratch: &mut Scratch) -> Acquisition {
+///
+/// When the four rings the whole-image search chose give no frame and `strict`
+/// is set, the strict search ([`locate_fiducials_strict`]) looks again; its
+/// rings are used only if they differ and give a frame. Otherwise the first
+/// failure is returned as it was, fiducials included, so a frame the
+/// whole-image search reads, or fails to read, gives the same result as before
+/// the strict search existed unless the strict search reads it (ADR 0047).
+/// A header that read but names a version or constellation this receiver does
+/// not know means the frame was found, so the strict search does not run.
+pub fn acquire(
+    image: &Image,
+    geometries: &[Grid],
+    scratch: &mut Scratch,
+    strict: bool,
+) -> Acquisition {
     let fiducials = locate_fiducials(image, scratch);
-    read_frame(image, geometries, fiducials)
+    let first = read_frame(image, geometries, fiducials);
+    let lost = matches!(
+        first.result,
+        Err(Failure::NoFiducials | Failure::NoHeader | Failure::LowContrast)
+    );
+    if !lost || !strict {
+        return first;
+    }
+    let mut second = None;
+    locate_fiducials_strict(scratch, |strict| {
+        if Some(*strict) == first.fiducials {
+            return false;
+        }
+        let read = read_frame(image, geometries, Some(*strict));
+        let ok = read.result.is_ok();
+        if ok {
+            second = Some(read);
+        }
+        ok
+    });
+    second.unwrap_or(first)
 }
 
 /// Finds a frame near where an earlier frame's fiducials were (see
@@ -177,9 +250,14 @@ fn read_frame(image: &Image, geometries: &[Grid], fiducials: Option<Fiducials>) 
             // each is tried alone before both together.
             let midpoint = reference_midpoint(&black, &white);
             let mut header = None;
-            for strips in [&[false][..], &[true][..], &[false, true][..]] {
+            let mut from = 0;
+            for (k, strips) in [&[false][..], &[true][..], &[false, true][..]]
+                .into_iter()
+                .enumerate()
+            {
                 header = decode_header(&read_header_codeword(image, &h, grid, midpoint, strips));
                 if header.is_some() {
+                    from = k;
                     break;
                 }
             }
@@ -205,11 +283,13 @@ fn read_frame(image: &Image, geometries: &[Grid], fiducials: Option<Fiducials>) 
                     2 + s as u32,
                 ));
             }
+            let strips = strip_sequences(image, &h, grid, midpoint, &message, from);
             return done(Ok(Acquired {
                 header: message,
                 homography: h,
                 palette,
                 symbols,
+                strips,
             }));
         }
     }

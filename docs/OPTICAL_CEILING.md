@@ -15,16 +15,18 @@ Grids sized so a cell covers about 4 camera pixels when the screen fills the sim
 
 ## Transfers
 
-A seeded random file of 10 frames' worth of data through the outer code, one camera frame per frame sent. "Lock" is the camera frame the receiver first read; every later frame was looked for near the last one (the tracked search). "Blocks repaired" counts from the lock on. Goodput is the file's bytes over the camera time to the frame that completed it, lock-on included, after the rebuilt file matched the sent one byte for byte. A short file pays for the lock-on frame and the outer code's last symbols, so "steady rate" adds the data in repaired blocks per second from the lock on, the rate a long file approaches (before the outer code's overhead, about 0.1% in [TRANSFER_BENCHMARK.md](TRANSFER_BENCHMARK.md)). The simulated phone does not move between frames; the tracked search's tolerance of movement is tested in `src/packages/optical-modem/tests/tracking.test.ts`.
+A seeded random file of 10 frames' worth of data through the outer code, one camera frame per frame sent. "Lock" is the camera frame the receiver first read; every later frame was looked for near the last one (the tracked search). "Blocks repaired" counts from the lock on. Goodput is the file's bytes over the camera time to the frame that completed it, lock-on included, after the rebuilt file matched the sent one byte for byte. A short file pays for the lock-on frame and the outer code's last symbols, so "steady rate" adds the data in repaired blocks per second from the lock on, the rate a long file approaches (before the outer code's overhead, about 0.1% in [TRANSFER_BENCHMARK.md](TRANSFER_BENCHMARK.md)). In the studio, typical and poor channels the simulated phone does not move between frames; the tracked search's tolerance of movement is tested in `src/packages/optical-modem/tests/tracking.test.ts`. The phone channel is the typical one plus guessed lens distortion, rolling-shutter shear, stabiliser jitter of up to 2 pixels, OLED PWM bands, edge enhancement, chroma and temporal noise reduction, and a screen refresh in every capture whose tear line drifts down the picture (`phoneImpairments` in the script). Its settings are guesses until the probe measures a phone (#1173); blocks below the tear belong to the next frame, and the receiver reads them as that frame's blocks and finishes a frame from two consecutive captures ([ADR 0049](adr/0049-optical-modem-torn-capture-recovery.md)). A block read twice counts once.
 
-| Profile  | Camera | Channel | Camera px per cell | File    | Complete | Frames | Lock  | Blocks repaired | Goodput at 30 fps       | Goodput at 60 fps       | Steady rate at 60 fps   |
-| -------- | ------ | ------- | ------------------ | ------- | -------- | ------ | ----- | --------------- | ----------------------- | ----------------------- | ----------------------- |
-| P6 Wide  | 1080p  | studio  | 4.2                | 0.13 MB | yes      | 11     | 1     | 100.0%          | 0.36 MB/s (2.9 Mbit/s)  | 0.72 MB/s (5.8 Mbit/s)  | 0.80 MB/s (6.4 Mbit/s)  |
-| P6 Wide  | 1080p  | typical | 4.2                | 0.13 MB | yes      | 11     | 1     | 100.0%          | 0.36 MB/s (2.9 Mbit/s)  | 0.72 MB/s (5.8 Mbit/s)  | 0.80 MB/s (6.4 Mbit/s)  |
-| P6 Wide  | 1080p  | poor    | 4.2                | 0.13 MB | no       | 30     | 1     | 0.0%            | -                       | -                       | 0.00 MB/s (0.0 Mbit/s)  |
-| P7 Ultra | 4K     | studio  | 4.2                | 0.61 MB | yes      | 10     | 1     | 100.0%          | 1.84 MB/s (14.7 Mbit/s) | 3.67 MB/s (29.4 Mbit/s) | 3.67 MB/s (29.4 Mbit/s) |
-| P7 Ultra | 4K     | typical | 4.2                | 0.61 MB | yes      | 11     | 1     | 100.0%          | 1.67 MB/s (13.4 Mbit/s) | 3.34 MB/s (26.7 Mbit/s) | 3.67 MB/s (29.4 Mbit/s) |
-| P7 Ultra | 4K     | poor    | 4.2                | 0.61 MB | no       | 30     | never | 0.0%            | -                       | -                       | 0.00 MB/s (0.0 Mbit/s)  |
+| Profile  | Camera | Channel         | Camera px per cell | File    | Complete | Frames | Lock | Blocks repaired | Goodput at 30 fps       | Goodput at 60 fps       | Steady rate at 60 fps   |
+| -------- | ------ | --------------- | ------------------ | ------- | -------- | ------ | ---- | --------------- | ----------------------- | ----------------------- | ----------------------- |
+| P6 Wide  | 1080p  | studio          | 4.2                | 0.13 MB | yes      | 11     | 1    | 100.0%          | 0.36 MB/s (2.9 Mbit/s)  | 0.72 MB/s (5.8 Mbit/s)  | 0.80 MB/s (6.4 Mbit/s)  |
+| P6 Wide  | 1080p  | typical         | 4.2                | 0.13 MB | yes      | 11     | 1    | 100.0%          | 0.36 MB/s (2.9 Mbit/s)  | 0.72 MB/s (5.8 Mbit/s)  | 0.80 MB/s (6.4 Mbit/s)  |
+| P6 Wide  | 1080p  | poor            | 4.2                | 0.13 MB | no       | 30     | 1    | 0.0%            | -                       | -                       | 0.00 MB/s (0.0 Mbit/s)  |
+| P6 Wide  | 1080p  | phone (guessed) | 4.2                | 0.13 MB | yes      | 21     | 1    | 51.1%           | 0.19 MB/s (1.5 Mbit/s)  | 0.38 MB/s (3.0 Mbit/s)  | 0.41 MB/s (3.3 Mbit/s)  |
+| P7 Ultra | 4K     | studio          | 4.2                | 0.61 MB | yes      | 10     | 1    | 100.0%          | 1.84 MB/s (14.7 Mbit/s) | 3.67 MB/s (29.4 Mbit/s) | 3.67 MB/s (29.4 Mbit/s) |
+| P7 Ultra | 4K     | typical         | 4.2                | 0.61 MB | yes      | 11     | 1    | 100.0%          | 1.67 MB/s (13.4 Mbit/s) | 3.34 MB/s (26.7 Mbit/s) | 3.67 MB/s (29.4 Mbit/s) |
+| P7 Ultra | 4K     | poor            | 4.2                | 0.61 MB | no       | 30     | 1    | 0.0%            | -                       | -                       | 0.00 MB/s (0.0 Mbit/s)  |
+| P7 Ultra | 4K     | phone (guessed) | 4.2                | 0.61 MB | no       | 30     | 1    | 0.0%            | -                       | -                       | 0.00 MB/s (0.0 Mbit/s)  |
 
 Best: P7 Ultra, 4K camera, studio channel, a steady 3.67 MB/s (29.4 Mbit/s) at 60 fps: below 32 Mbit/s in the simulation.
 
@@ -32,14 +34,16 @@ Best: P7 Ultra, 4K camera, studio channel, a steady 3.67 MB/s (29.4 Mbit/s) at 6
 
 Median wall time per camera frame on this machine, one thread, the modem module in WebAssembly under Node, sampling on the CPU (the browser receiver can sample on the GPU, ADR 0029). "Full" is a frame found by the whole-image fiducial search, "tracked" one found near the last. "Threads at 30 / 60 fps" is how many such threads it would take to keep up, if frames are shared between workers. "Outer code" is the time spent adding the repaired blocks to the outer decoder over the whole transfer.
 
-| Profile  | Camera | Channel | Full   | Tracked | Frames per second per thread | Threads at 30 fps | Threads at 60 fps | Outer code |
-| -------- | ------ | ------- | ------ | ------- | ---------------------------- | ----------------- | ----------------- | ---------- |
-| P6 Wide  | 1080p  | studio  | 47 ms  | 20 ms   | 49.9                         | 1                 | 2                 | 12 ms      |
-| P6 Wide  | 1080p  | typical | 41 ms  | 21 ms   | 48.0                         | 1                 | 2                 | 7 ms       |
-| P6 Wide  | 1080p  | poor    | 41 ms  | 27 ms   | 37.5                         | 1                 | 2                 | 0 ms       |
-| P7 Ultra | 4K     | studio  | 201 ms | 72 ms   | 14.0                         | 3                 | 5                 | 101 ms     |
-| P7 Ultra | 4K     | typical | 250 ms | 84 ms   | 11.9                         | 3                 | 6                 | 127 ms     |
-| P7 Ultra | 4K     | poor    | 208 ms | -       | -                            | -                 | -                 | 0 ms       |
+| Profile  | Camera | Channel         | Full   | Tracked | Frames per second per thread | Threads at 30 fps | Threads at 60 fps | Outer code |
+| -------- | ------ | --------------- | ------ | ------- | ---------------------------- | ----------------- | ----------------- | ---------- |
+| P6 Wide  | 1080p  | studio          | 55 ms  | 18 ms   | 55.8                         | 1                 | 2                 | 14 ms      |
+| P6 Wide  | 1080p  | typical         | 35 ms  | 20 ms   | 49.1                         | 1                 | 2                 | 7 ms       |
+| P6 Wide  | 1080p  | poor            | 43 ms  | 26 ms   | 38.3                         | 1                 | 2                 | 0 ms       |
+| P6 Wide  | 1080p  | phone (guessed) | 35 ms  | 30 ms   | 33.0                         | 1                 | 2                 | 7 ms       |
+| P7 Ultra | 4K     | studio          | 167 ms | 70 ms   | 14.4                         | 3                 | 5                 | 109 ms     |
+| P7 Ultra | 4K     | typical         | 151 ms | 80 ms   | 12.5                         | 3                 | 5                 | 126 ms     |
+| P7 Ultra | 4K     | poor            | 210 ms | 100 ms  | 10.0                         | 3                 | 6                 | 1 ms       |
+| P7 Ultra | 4K     | phone (guessed) | 186 ms | 105 ms  | 9.6                          | 4                 | 7                 | 1 ms       |
 
 ## What this does not show
 
