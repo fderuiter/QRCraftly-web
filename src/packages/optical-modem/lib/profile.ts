@@ -55,13 +55,17 @@ export const MODEM_GEOMETRIES: readonly GridGeometry[] = MODEM_PROFILES.map(({ c
  * Profiles for high-resolution cameras (#1161): the whole frame of a 1080p or a 4K camera, rather
  * than the corner of it the ladder's profiles use. Cells are about 4 camera pixels when the screen
  * fills most of the picture, which the simulator reads in its typical handheld channel; the colour
- * count stays at 4 because 8 colours need about 5 pixels there (docs/OPTICAL_CEILING.md). They are
- * not on the ladder: they need a receiver that tracks the frame and a camera that delivers that
- * resolution, and nothing about them has been measured on a device.
+ * count stays at 4 because 8 colours need about 5 pixels there, and Ultra Mono drops to black and
+ * white for phones that smear colour (docs/OPTICAL_CEILING.md). They are not on the ladder: they
+ * need a receiver that tracks the frame and a camera that delivers that resolution, and nothing
+ * about them has been measured on a device.
  */
 export const HIGH_RATE_PROFILES: readonly ModemProfile[] = [
   // 384 x 216 cells: a 1920 x 1080 screen at 5 pixels per cell, a 1080p camera at about 4.
   { id: 6, name: 'Wide', constellation: constellationId(4, 'oklab'), cols: 384, rows: 216, packetBytes: 160, parity: 64 },
   // 768 x 432 cells: a 3840 x 2160 screen at 5 pixels per cell (1080p at 2.5), a 4K camera at about 4.
   { id: 7, name: 'Ultra', constellation: constellationId(4, 'oklab'), cols: 768, rows: 432, packetBytes: 176, parity: 48 },
+  // Ultra's grid in black and white, for a phone whose noise reduction erases colour cells: in the
+  // simulator's guessed phone channel it reads where 4 colours read nothing (docs/OPTICAL_CEILING.md).
+  { id: 8, name: 'Ultra Mono', constellation: constellationId(2, 'oklab'), cols: 768, rows: 432, packetBytes: 176, parity: 48 },
 ];

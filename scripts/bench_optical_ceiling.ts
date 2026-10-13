@@ -35,7 +35,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HIGH_RATE_PROFILES, decodeModemFrame, encodeModemFrame, frameCapacity, loadOpticalModem, simulateCapture, type CameraImpairments, type ChannelPreset, type ModemProfile, type RgbaImage, type TearCarry, type TrackHint } from '../src/packages/optical-modem/index.ts';
+import { HIGH_RATE_PROFILES, decodeModemFrame, encodeModemFrame, frameCapacity, getConstellation, loadOpticalModem, simulateCapture, type CameraImpairments, type ChannelPreset, type ModemProfile, type RgbaImage, type TearCarry, type TrackHint } from '../src/packages/optical-modem/index.ts';
 import { FecDecoder, FecEncoder, loadFecModule } from '../src/packages/optical-transfer/index.ts';
 import { createRandom } from '../tests/utils/scannerCorpus.ts';
 
@@ -222,7 +222,8 @@ function render(runs: Run[]): string {
   const best = runs.reduce((top, run) => (steady(run, 60) > steady(top, 60) ? run : top), runs[0]);
   const profileRows = HIGH_RATE_PROFILES.map((p) => {
     const c = frameCapacity(p);
-    return [`P${p.id} ${p.name}`, `${p.cols} x ${p.rows}`, 'OKLab 4', `${p.packetBytes} + ${p.parity}`, c.blocks, `${(c.payloadBytes / 1000).toFixed(1)} KB`];
+    const size = getConstellation(p.constellation).size;
+    return [`P${p.id} ${p.name}`, `${p.cols} x ${p.rows}`, size === 2 ? 'black and white' : `OKLab ${size}`, `${p.packetBytes} + ${p.parity}`, c.blocks, `${(c.payloadBytes / 1000).toFixed(1)} KB`];
   });
   const rows = runs.map((r) => [
     `P${r.scenario.profile.id} ${r.scenario.profile.name}`,
@@ -287,6 +288,7 @@ function render(runs: Run[]): string {
     '- That the camera delivers the frame rate. Browsers often deliver 4K at 30 fps, and some cameras not at all; the 60 fps column needs a camera and browser that hand over 60 full frames a second.',
     '- That the display shows every frame. A 60 Hz screen that drops or tears frames costs blocks; tearing is in the simulator but not in these rows.',
     '- That a phone decodes in time: the thread counts above are for a desktop CPU.',
+    '- How long Ultra Mono takes to lock on while the phone is being aimed. Black and white is the finder\'s slowest case: with a fiducial out of view a 4K frame takes about 1.3 s ([ADR 0047](adr/0047-optical-modem-tracked-search-and-high-rate-profiles.md)).',
     '',
   ].join('\n')}`;
 }
@@ -295,11 +297,12 @@ async function main(): Promise<void> {
   const quick = process.argv.includes('--quick');
   await loadOpticalModem();
   const fecModule = await loadFecModule();
-  const [wide, ultra] = HIGH_RATE_PROFILES;
+  const [wide, ultra, ultraMono] = HIGH_RATE_PROFILES;
   const channels = quick ? [CHANNELS.typical, CHANNELS.phone] : [CHANNELS.studio, CHANNELS.typical, CHANNELS.poor, CHANNELS.phone];
   const scenarios: Scenario[] = [];
   for (const channel of channels) scenarios.push({ profile: wide, camera: CAMERAS.hd, channel });
   for (const channel of channels) scenarios.push({ profile: ultra, camera: CAMERAS.uhd, channel });
+  for (const channel of channels) scenarios.push({ profile: ultraMono, camera: CAMERAS.uhd, channel });
   const framesOfFile = quick ? 4 : 10;
   const runs: Run[] = [];
   for (const scenario of scenarios) {

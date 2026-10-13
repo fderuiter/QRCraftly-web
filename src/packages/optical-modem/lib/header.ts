@@ -31,7 +31,7 @@ const HEADER_PARITY = 24;
 export interface FrameHeader {
   /** Format version, 0 to 15. */
   version: number;
-  /** Profile number, 0 to 15. The modem profiles are 2 to 4; 15 marks a probe frame. */
+  /** Profile number, 0 to 15. The ladder's profiles are 2 to 4 and the high-rate ones 6 to 8; 15 marks a probe frame. */
   profile: number;
   /** A constellation id. */
   constellation: number;
