@@ -18,7 +18,8 @@
 
 /**
  * Torn captures (ADR 0049): a screen refresh during the camera's readout shows one frame above a
- * camera row and the next below it. The receiver decodes each side against its own frame sequence
+ * camera row and the next below it, or above a slanted line when the phone is turned against the
+ * screen. The receiver decodes each side against its own frame sequence
  * with the other side's bytes erased, and keeps the cells of a frame it saw only in part for the
  * next capture, which shows the rest of it. Nothing in the frame format changes; the block tag
  * (ADR 0043) refuses every block read under the wrong sequence.
@@ -56,8 +57,10 @@ export interface TearReport {
   strips: [number | null, number | null];
   /** The frame sequence above and below the cut that gave blocks, or the last pair tried. */
   seqs: [number, number];
-  /** Each side's cut, in grid rows across the camera's rows, or null when that side gave nothing. */
+  /** Each side's cut, in grid rows along the cut's normal (across the camera's rows for a straight cut), or null when that side gave nothing. */
   cuts: [number | null, number | null];
+  /** Each side's cut slant from the camera's rows, in degrees (a phone turned against the screen tears on a slant). */
+  slants: [number, number];
   /** Blocks each side gave that the plain decode had not. */
   blocksOk: [number, number];
   /**
@@ -157,7 +160,7 @@ export function recoverTear(
   const usable = carryFits(carry, header) ? carry : undefined;
   // A pair with the carried frame on one side goes first: the carry was kept for it.
   if (usable) pairs.sort((a, b) => Number(b.includes(usable.seq)) - Number(a.includes(usable.seq)));
-  const report: TearReport = { strips: [strips[0], strips[1]], seqs: pairs[0], cuts: [null, null], blocksOk: [0, 0], refused: 0, tried: 0 };
+  const report: TearReport = { strips: [strips[0], strips[1]], seqs: pairs[0], cuts: [null, null], slants: [0, 0], blocksOk: [0, 0], refused: 0, tried: 0 };
   let sides: [TornSide, TornSide] | null = null;
   for (const seqs of pairs) {
     const known: [Uint8Array | null, Uint8Array | null] = [seqs[0] === header.seq ? decoded : null, seqs[1] === header.seq ? decoded : null];
@@ -166,6 +169,7 @@ export function recoverTear(
     report.refused += result[0].refused + result[1].refused;
     report.seqs = seqs;
     report.cuts = [result[0].cut, result[1].cut];
+    report.slants = [result[0].slant, result[1].slant];
     report.blocksOk = [result[0].blocksOk, result[1].blocksOk];
     if (result[0].blocksOk + result[1].blocksOk > 0) {
       sides = result;

@@ -52,9 +52,12 @@ function frameOf(seq: number): RgbaImage {
   return frame;
 }
 
-/** A studio capture of frame `seq` with frame `below` (by default `seq + 1`) from `tear` of the camera height down. */
-function torn(seq: number, tear: number, seed = seq, below = seq + 1): RgbaImage {
-  return simulateCapture(frameOf(seq), 'studio', { pixelsPerCell: CELL_PX, cellPitch: PITCH, seed, next: frameOf(below), tearFraction: tear });
+/**
+ * A studio capture of frame `seq` with frame `below` (by default `seq + 1`) from `tear` of the camera
+ * height down, on a line dropping `slope` camera rows per column (a phone turned against the screen).
+ */
+function torn(seq: number, tear: number, seed = seq, below = seq + 1, slope = 0): RgbaImage {
+  return simulateCapture(frameOf(seq), 'studio', { pixelsPerCell: CELL_PX, cellPitch: PITCH, seed, next: frameOf(below), tearFraction: tear, impairments: slope ? { tearSlope: slope } : undefined });
 }
 
 /** The capture with its top or bottom header strip greyed out between the fiducials, past the calibration patches. */
@@ -161,6 +164,25 @@ describe('torn captures (ADR 0049)', () => {
       expect(plain).toBe(0);
       // Frames 21 and 22 were seen below the tear in one capture and above it in the next.
       expect([tally.count(21), tally.count(22)], `tear at ${tear}`).toEqual([CAPACITY.blocks, CAPACITY.blocks]);
+      expect(tally.wrong).toBe(0);
+    }
+  });
+
+  it('cuts on a slant a capture torn on a slant, which no straight cut decodes', { timeout: 240_000 }, () => {
+    for (const slope of [0.5, -0.5]) {
+      const tally = new Tally();
+      let carry: TearCarry | undefined;
+      const slants: number[] = [];
+      for (let k = 0; k < 3; k++) {
+        const result = decode(torn(20 + k, 0.5, 40 + k, 21 + k, slope), { carry });
+        if (!result.ok) throw new Error('unreadable capture');
+        tally.add(result);
+        slants.push(...(result.tear?.slants ?? []));
+        carry = result.carry;
+      }
+      // Frames 21 and 22 were seen below the tear in one capture and above it in the next.
+      expect([tally.count(21), tally.count(22)], `slope ${slope}`).toEqual([CAPACITY.blocks, CAPACITY.blocks]);
+      expect(slants.some((s) => s !== 0)).toBe(true);
       expect(tally.wrong).toBe(0);
     }
   });

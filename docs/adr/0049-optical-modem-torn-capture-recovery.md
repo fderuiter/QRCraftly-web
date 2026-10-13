@@ -38,7 +38,38 @@ All figures are from the channel simulator or this sandbox's CPU. None has been 
 - **Cost [measured, sandbox, one desktop core, Node and wasm].** A tracked P6 decode takes about 19 ms. On a torn capture it takes 20 to 26 ms with the recovery; on a clean capture the time does not change. A tracked P7 decode goes from about 70 ms to 74 to 92 ms on a torn capture. A carry holds 2 bytes per data cell: 152 KB for P6 and 636 KB for P7.
 - **More tag checks per torn capture.** One pair of sequences costs at most 2 sides × 65 cuts × 2 trial blocks of 1 check, plus 3 per block for the full decode: about 760 checks for P6 and 2,350 for P7, against at most 3 per block for the plain decode. Up to four pairs are tried when no strip decodes alone. At about one chance in four billion per check, that is at worst about 2 × 10⁻⁶ wrong blocks per P7 capture. A wrong block would still fail the file's final SHA-256 ([PROTOCOL](../optical-transfer/PROTOCOL.md)); it cannot silently corrupt the file.
 - **Limits:**
-  - The cut is straight and follows the camera's rows or columns. A portrait phone facing a landscape screen tears along a diagonal. The simulator cannot draw that yet (build plan item 3), and this receiver does not search for it.
+  - The cut is straight and follows the camera's rows or columns. A portrait phone facing a landscape screen tears along a diagonal. The amendment below adds slanted cuts.
   - A blend, where both frames are mixed in the same rows rather than split between rows, is not a tear, and this does nothing for it (build plan item 7).
   - The carry needs consecutive captures. A receiver that skips frames keeps only what one capture gives.
   - A tear across the middle 40 to 60% of rows still costs the first frame of a run. Confining blocks to row bands would avoid that, but it is a format change (ADR 0028), left until devices show how often tears happen.
+
+## Amendment: slanted cuts for a phone turned against the screen
+
+A phone held upright in front of a landscape screen reads its sensor across the screen's rows. The refresh line then crosses the picture on a slant, not along a camera row, and no straight cut separates the two frames. The simulator draws this with `tearSlope` (camera rows the tear drops per camera column). With a slope of 0.5, about what a 16 ms readout gives when the screen fills the picture, the receiver above read nothing from P6 Wide in the studio channel at any tear position, and nothing from Ultra Mono in the guessed phone channel **[simulated]**.
+
+### Decision
+
+The receiver also tries cuts slanted against the camera's rows. The frame format does not change.
+
+- **Straight first.** Both sides are cut straight, exactly as before. When a straight cut repairs every block of either side, the tear is straight, and nothing else is tried. A capture whose tear is straight costs what it did, apart from the first capture of a run torn near the middle, which no straight cut finishes alone.
+- **Then 12 slants.** Each side that is not finished tries slants of 10 to 60 degrees from the camera's rows, either way, in steps of 10. Positions are measured along the slanted cut's normal, at the same scale as the straight cut's rows, and cuts are tried at the straight search's step across every cell, up to 256 of them. A slant is first tried at every fourth cut, and at every cut only if one of those decodes the trial blocks. The side takes the slant with the longest run of cuts at which both trial blocks decode, and keeps its blocks only if they outnumber the straight cut's.
+- **The carry is cut at the same slant.** An earlier capture's cells are placed at the slant being tried, so a frame torn on a slant is finished by the next capture as a straight one was.
+- **The report names the slant.** `TearReport.slants` gives each side's slant in degrees; 0 is a straight cut.
+
+### Consequences
+
+All figures are from the channel simulator or this sandbox's CPU. None has been measured on a phone.
+
+- **P6 Wide, 1080p, studio channel, runs of four captures at a fixed tear position from 0.2 to 0.8 [simulated]:** at slopes of 0.3, 0.5 and -0.5, every frame after the first came back whole (one frame at slope 0.3 lacked 1 of 83 blocks). Before, slope 0.5 gave nothing and slope 0.3 gave 0 to 25% of blocks between 0.35 and 0.65. At slope 1 (45 degrees), tears at 0.35 to 0.65 come back whole and tears at 0.2 and 0.8 give nothing.
+- **Guessed phone channel, drifting tear at slope 0.5 [simulated]:**
+  - Ultra Mono on a 4K camera: 87.5% of blocks, a steady 1.61 MB/s at 60 fps, against 0 before. The file finished in 8 camera frames. With a straight tear the same channel gives 91.7%, 1.68 MB/s ([OPTICAL_CEILING.md](../OPTICAL_CEILING.md)).
+  - P6 Wide in 4 colours on a 1080p camera: 17.9% of blocks, against 0. That profile loses most of its blocks to the phone's colour noise reduction anyway.
+- **No wrong block** was accepted in any of these runs or in the unit tests. A review harness compared 12,960 synthetic sides with the build before: every side the old receiver finished came back identical, and none lost a block.
+- **Cost [measured, sandbox, one desktop core, Node and wasm, tracked decode of one studio capture].** When no straight cut finishes either side: P6 from about 19 to 32 ms, Ultra Mono from about 81 to 106 ms, P7 from about 74 to 93 ms. When a straight cut finishes a side, the time does not change. An undecodable side costs about six times what it did.
+- **Size.** The module grows from about 47.4 to 49 KB gzipped, so its budget in `scripts/check-bundle-size.js` goes from 48 to 52 KB. It loads only for file transfer.
+- **More tag checks.** At worst each slant tries 320 cuts on two trial blocks, so one pair of sequences costs up to about 15,000 checks, and up to four pairs are tried. At one chance in four billion per check, that is at worst about 1.5 × 10⁻⁵ wrong blocks per capture that no straight cut finishes, still caught by the file's SHA-256.
+- **Limits:**
+  - Steep slants near the picture's edge fail: at slope 1, tears at 0.2 and 0.8 give nothing.
+  - The coarse first pass skips a slant whose run of decoding cuts is narrower than four steps. In the review harness that cost about 4% of the blocks trying every cut would have found.
+  - The cut is a straight line. Lens distortion bends a real tear, and a readout longer than a refresh shows three frames; neither is modelled.
+  - The slant is assumed the same in consecutive captures, as the cut's position already was.
