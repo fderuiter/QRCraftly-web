@@ -60,7 +60,7 @@ describe('AppShell', () => {
     expect(within(company).getByRole('link', { name: 'Privacy Architecture' })).toHaveAttribute('href', '/security#compliance');
     expect(within(company).getByRole('link', { name: 'iPhone & Mac App Privacy' })).toHaveAttribute('href', '/privacy');
     expect(within(company).getByRole('link', { name: 'iPhone & Mac App Support' })).toHaveAttribute('href', '/support');
-    expect(within(company).getByRole('link', { name: 'Contact' })).toHaveAttribute('href', 'mailto:hello@qrcraftly.com');
+    expect(within(company).getByRole('link', { name: 'Contact' })).toHaveAttribute('href', 'mailto:fpderuiter+qrcraftly@gmail.com');
     expect(footer).not.toHaveTextContent(/Open Source/);
   });
 

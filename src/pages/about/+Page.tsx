@@ -130,7 +130,7 @@ export default function Page() {
             <a href="/acknowledgements" className={LINK_CLASSES}>See every package it ships and its license</a>
           </p>
           <p>
-            Questions or ideas? <a href="mailto:hello@qrcraftly.com" className={LINK_CLASSES}>Email {CONTACT_ADDRESS}</a>
+            Questions or ideas? <a href="mailto:fpderuiter+qrcraftly@gmail.com" className={LINK_CLASSES}>Email {CONTACT_ADDRESS}</a>
           </p>
         </section>
       </ArticleLayout>

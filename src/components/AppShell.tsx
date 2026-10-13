@@ -123,7 +123,7 @@ export function AppFooter() {
           <FooterLinks links={COMPANY_LINKS} className="space-y-2 text-sm text-fg-muted" />
           <ul className="mt-2 text-sm text-fg-muted">
             <li>
-              <a href="mailto:hello@qrcraftly.com" className={FOOTER_LINK_CLASSES}>
+              <a href="mailto:fpderuiter+qrcraftly@gmail.com" className={FOOTER_LINK_CLASSES}>
                 Contact
               </a>
             </li>

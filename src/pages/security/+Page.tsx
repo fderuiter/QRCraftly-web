@@ -193,7 +193,7 @@ export default function Page() {
           <p className="mb-4 text-fg-soft">
             Found a security problem? Email it privately to {CONTACT_ADDRESS} so it can be fixed before it is public.
           </p>
-          <ButtonLink href="mailto:hello@qrcraftly.com" variant="primary">
+          <ButtonLink href="mailto:fpderuiter+qrcraftly@gmail.com" variant="primary">
             <ShieldCheck className="size-5" aria-hidden="true" />
             Report a vulnerability by email
           </ButtonLink>

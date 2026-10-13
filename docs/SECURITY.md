@@ -65,7 +65,7 @@ If you discover a security vulnerability or a privacy leak, please report it imm
 
 ### How to Report
 
-Please email [hello@qrcraftly.com](mailto:hello@qrcraftly.com) to report a vulnerability privately. We will acknowledge your report within 48 hours.
+Please email [fpderuiter+qrcraftly@gmail.com](mailto:fpderuiter+qrcraftly@gmail.com) to report a vulnerability privately. We will acknowledge your report within 48 hours.
 
 ### Scope
 
