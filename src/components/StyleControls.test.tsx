@@ -305,7 +305,7 @@ describe('StyleControls Component', () => {
       render(<StyleControls config={borderConfig} onChange={mockOnChange} />);
       expandAppearanceSections();
 
-      const textInput = screen.getByPlaceholderText('Text on border...');
+      const textInput = screen.getByPlaceholderText('Text on border…');
       fireEvent.change(textInput, { target: { value: 'Scan Me' } });
       expect(mockOnChange).toHaveBeenCalledWith({ borderText: 'Scan Me' });
 

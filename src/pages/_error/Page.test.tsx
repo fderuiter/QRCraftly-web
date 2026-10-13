@@ -82,7 +82,7 @@ describe('Error Page Integration Tests', () => {
 
     // Verify 500 message is displayed
     expect(screen.getByRole('heading', { level: 1, name: /500 - Internal Server Error/i })).toBeInTheDocument();
-    expect(screen.getByText(/Something went wrong on our end/i)).toBeInTheDocument();
+    expect(screen.getByText(/This page hit a problem/i)).toBeInTheDocument();
     
     // Verify reload / return safety controls are present
     const goHomeLink = screen.getByRole('link', { name: /Go Home/i });

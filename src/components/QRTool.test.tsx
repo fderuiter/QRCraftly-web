@@ -64,7 +64,7 @@ const downloadButton = () => screen.getByRole('button', { name: /^Download (PNG|
  */
 function downloadAs(label: 'PNG' | 'JPEG' | 'WebP' | 'SVG' | 'EPS' | 'PDF') {
   fireEvent.click(screen.getByRole('button', { name: 'Download options' }));
-  fireEvent.click(screen.getByRole('radio', { name: label }));
+  fireEvent.click(within(screen.getByRole('group', { name: 'Download options' })).getByRole('radio', { name: label }));
   fireEvent.click(screen.getByRole('button', { name: `Download ${label}` }));
 }
 
@@ -285,7 +285,7 @@ describe('QRTool Component', () => {
     fireEvent.click(downloadButton());
 
     expect(await screen.findByText(/too long for one QR code/)).toBeInTheDocument();
-    expect(screen.queryByText('Scan Safety Warning')).not.toBeInTheDocument();
+    expect(screen.queryByText('This Code May Not Scan')).not.toBeInTheDocument();
     expect(renderQRRaster).not.toHaveBeenCalled();
   });
 
@@ -296,11 +296,11 @@ describe('QRTool Component', () => {
 
     downloadAs('PNG');
 
-    expect(await screen.findByText('Scan Safety Warning')).toBeInTheDocument();
+    expect(await screen.findByText('This Code May Not Scan')).toBeInTheDocument();
     expect(clickSpy).not.toHaveBeenCalled();
     expect(screen.queryByText(/SCAN_VALIDATION_FAILED|ScanValidationError/)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Export Anyway' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export anyway' }));
     await waitFor(() => expect(clickSpy).toHaveBeenCalled());
     await waitFor(() => expect(exportStatus()).toBe('PNG downloaded'));
   });
@@ -315,11 +315,11 @@ describe('QRTool Component', () => {
     expect(downloadButton()).toHaveClass('bg-danger-action');
 
     fireEvent.click(screen.getByRole('button', { name: 'Download options' }));
-    fireEvent.click(screen.getByRole('radio', { name: format }));
-    expect(screen.queryByText('Scan Safety Warning')).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('group', { name: 'Download options' })).getByRole('radio', { name: format }));
+    expect(screen.queryByText('This Code May Not Scan')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: `Download ${format}` }));
-    expect(screen.getByText('Scan Safety Warning')).toBeInTheDocument();
+    expect(screen.getByText('This Code May Not Scan')).toBeInTheDocument();
   });
 
   it.each([
@@ -333,7 +333,7 @@ describe('QRTool Component', () => {
 
     fireEvent.click(screen.getByRole('button', { name }));
 
-    expect(screen.getByText('Scan Safety Warning')).toBeInTheDocument();
+    expect(screen.getByText('This Code May Not Scan')).toBeInTheDocument();
   });
 
   it('when scannability is unsafe and user clicks "Export Anyway" from the dropdown menu, download succeeds with allowUnsafe bypass', async () => {
@@ -351,15 +351,15 @@ describe('QRTool Component', () => {
     downloadAs('PNG');
 
     // 3. Scan Safety Warning modal opens
-    expect(screen.getByText('Scan Safety Warning')).toBeInTheDocument();
+    expect(screen.getByText('This Code May Not Scan')).toBeInTheDocument();
 
     // 4. Click "Export Anyway"
-    const exportAnywayBtn = screen.getByRole('button', { name: 'Export Anyway' });
+    const exportAnywayBtn = screen.getByRole('button', { name: 'Export anyway' });
     fireEvent.click(exportAnywayBtn);
 
     // 5. Modal closes and download succeeds
     await waitFor(() => {
-      expect(screen.queryByText('Scan Safety Warning')).not.toBeInTheDocument();
+      expect(screen.queryByText('This Code May Not Scan')).not.toBeInTheDocument();
     });
 
     expect(appendSpy).toHaveBeenCalled();
@@ -387,15 +387,15 @@ describe('QRTool Component', () => {
     downloadAs('SVG');
 
     // 3. Scan Safety Warning modal opens
-    expect(screen.getByText('Scan Safety Warning')).toBeInTheDocument();
+    expect(screen.getByText('This Code May Not Scan')).toBeInTheDocument();
 
     // 4. Click "Export Anyway"
-    const exportAnywayBtn = screen.getByRole('button', { name: 'Export Anyway' });
+    const exportAnywayBtn = screen.getByRole('button', { name: 'Export anyway' });
     fireEvent.click(exportAnywayBtn);
 
     // 5. Modal closes and download succeeds
     await waitFor(() => {
-      expect(screen.queryByText('Scan Safety Warning')).not.toBeInTheDocument();
+      expect(screen.queryByText('This Code May Not Scan')).not.toBeInTheDocument();
     });
 
     // The SVG is built asynchronously (the encoder may still be loading), so wait for the download.
@@ -432,15 +432,15 @@ describe('QRTool Component', () => {
       fireEvent.click(copyBtn);
 
       // 2. Modal opens
-      expect(screen.getByText('Scan Safety Warning')).toBeInTheDocument();
+      expect(screen.getByText('This Code May Not Scan')).toBeInTheDocument();
 
       // 3. Click "Export Anyway"
-      const exportAnywayBtn = screen.getByRole('button', { name: 'Export Anyway' });
+      const exportAnywayBtn = screen.getByRole('button', { name: 'Export anyway' });
       fireEvent.click(exportAnywayBtn);
 
       // 4. Modal closes and copy succeeds
       await waitFor(() => {
-        expect(screen.queryByText('Scan Safety Warning')).not.toBeInTheDocument();
+        expect(screen.queryByText('This Code May Not Scan')).not.toBeInTheDocument();
       });
 
       await waitFor(() => {
@@ -488,15 +488,15 @@ describe('QRTool Component', () => {
       fireEvent.click(shareBtn);
 
       // 2. Modal opens
-      expect(screen.getByText('Scan Safety Warning')).toBeInTheDocument();
+      expect(screen.getByText('This Code May Not Scan')).toBeInTheDocument();
 
       // 3. Click "Export Anyway"
-      const exportAnywayBtn = screen.getByRole('button', { name: 'Export Anyway' });
+      const exportAnywayBtn = screen.getByRole('button', { name: 'Export anyway' });
       fireEvent.click(exportAnywayBtn);
 
       // 4. Modal closes and share succeeds
       await waitFor(() => {
-        expect(screen.queryByText('Scan Safety Warning')).not.toBeInTheDocument();
+        expect(screen.queryByText('This Code May Not Scan')).not.toBeInTheDocument();
       });
 
       await waitFor(() => {
@@ -661,7 +661,7 @@ describe('QRTool Component', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Share QR code' }));
 
-      expect(screen.getByText('Scan Safety Warning')).toBeInTheDocument();
+      expect(screen.getByText('This Code May Not Scan')).toBeInTheDocument();
   });
 
   it('does not render share button if Web Share API is not supported', async () => {
@@ -767,7 +767,7 @@ describe('QRTool Component', () => {
     it('restores focus and announces politely when a PNG download is triggered', async () => {
       render(<ToastProvider><QRTool /></ToastProvider>);
       fireEvent.click(screen.getByRole('button', { name: 'Download options' }));
-      fireEvent.click(screen.getByRole('radio', { name: 'PNG' }));
+      fireEvent.click(within(screen.getByRole('group', { name: 'Download options' })).getByRole('radio', { name: 'PNG' }));
       const downloadBtn = downloadButton();
 
       downloadBtn.focus();
@@ -786,7 +786,7 @@ describe('QRTool Component', () => {
     it('restores focus and announces politely when an SVG download is triggered', async () => {
       render(<ToastProvider><QRTool /></ToastProvider>);
       fireEvent.click(screen.getByRole('button', { name: 'Download options' }));
-      fireEvent.click(screen.getByRole('radio', { name: 'SVG' }));
+      fireEvent.click(within(screen.getByRole('group', { name: 'Download options' })).getByRole('radio', { name: 'SVG' }));
       const downloadBtn = downloadButton();
 
       // Set focus to the Download button

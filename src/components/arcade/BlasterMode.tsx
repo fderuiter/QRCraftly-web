@@ -21,6 +21,7 @@ import { HeartPulse } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
+import { useMediaQuery } from '@/packages/arcade/client';
 import {
   addParticles,
   addShake,
@@ -221,6 +222,7 @@ export function BlasterMode({ target, encoder, settings, announce }: ModeProps) 
   );
   const grid = useMemo(() => new MicroGrid(matrix), [matrix]);
   const [weapon, setWeapon] = useState<BlasterWeaponId>('plasma');
+  const isCoarsePointer = useMediaQuery('(pointer: coarse)');
   const [autoFire, setAutoFire] = useState(false);
   const [durability, setDurability] = useState<Durability>(() => readDurability(grid));
   const [macroDamage, setMacroDamage] = useState<number[]>([]);
@@ -493,7 +495,9 @@ export function BlasterMode({ target, encoder, settings, announce }: ModeProps) 
         }
         hints={
           <p className="text-center text-xs text-fg-muted">
-            Move the pointer to aim · click or Space to fire · 1, 2, 3 switch weapons · arrow keys aim when the arena is focused
+            {isCoarsePointer
+              ? 'Tap to aim and fire · tap a weapon to switch'
+              : 'Move the pointer to aim · click or Space to fire · 1, 2, 3 switch weapons · arrow keys aim when the arena is focused'}
           </p>
         }
         hud={<ScanHud analysis={analysis} empirical={scan.state} isNative={scan.isNative} usedFallback={matrix.usedFallback} />}
@@ -540,10 +544,10 @@ export function BlasterMode({ target, encoder, settings, announce }: ModeProps) 
         }
         telemetry={
           <Card variant="control">
-            <h2 className="mb-3 text-sm font-bold text-fg">Telemetry</h2>
+            <h2 className="mb-3 text-sm font-bold text-fg">Stats</h2>
             <dl className="grid grid-cols-2 gap-3 text-xs text-fg-muted">
               <div><dt>QR grid</dt><dd className="font-bold text-fg">{matrix.size} × {matrix.size}</dd></div>
-              <div><dt>Micro grid</dt><dd className="font-bold text-fg">{grid.size} × {grid.size}</dd></div>
+              <div><dt>Cell grid</dt><dd className="font-bold text-fg">{grid.size} × {grid.size}</dd></div>
               <div><dt>Damaged modules</dt><dd className="font-bold text-fg">{analysis.damagedCount}</dd></div>
               <div><dt>Decoder</dt><dd className="font-bold text-fg">{scan.isNative ? 'BarcodeDetector' : 'Web Worker'}</dd></div>
             </dl>

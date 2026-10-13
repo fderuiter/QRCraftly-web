@@ -575,13 +575,7 @@ function FileTransferToolInner() {
                     className={`aspect-square transition-colors ${isDraggingFile ? 'border-accent bg-accent-soft' : ''}`}
                     illustration={<QrIllustration className={`size-7 text-accent ${isDraggingFile ? 'motion-safe:animate-pulse' : ''}`} />}
                     title="Drop a file to beam it"
-                    body="It plays as animated QR codes for the other device's camera. Nothing is uploaded."
-                    action={
-                      <Button variant="primary" onClick={() => fileInputRef.current?.click()}>
-                        <FileUp className="size-4" aria-hidden="true" />
-                        Choose a file
-                      </Button>
-                    }
+                    body="Pick a file in step 1, or drop one here. It plays as animated QR codes for the other device's camera. Nothing is uploaded."
                   />
                 </div>
               )}

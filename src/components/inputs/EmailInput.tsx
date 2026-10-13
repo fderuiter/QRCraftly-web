@@ -56,7 +56,7 @@ export const EmailInput: React.FC<EmailInputProps> = ({ data, onChange }) => {
         id="email-body"
         label="Body"
         rows={3}
-        placeholder="Write your message here..."
+        placeholder="Write your message here…"
         maxLength={2000}
         value={data.body}
         onChange={(e) => onChange({ body: e.target.value })}

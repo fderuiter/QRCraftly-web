@@ -53,7 +53,7 @@ export function SidebarContent({ toolId }: SidebarContentProps) {
         <section className="mb-10">
           <h2 className="mb-3 text-2xl font-bold text-fg">A QR code generator that stays free</h2>
           <p className="mb-3 text-sm leading-relaxed">{intro}</p>
-          <a href="/free-forever" className="text-sm font-semibold text-accent underline-offset-2 hover:underline">
+          <a href="/free-forever" className="inline-flex min-h-6 items-center text-sm font-semibold text-accent underline-offset-2 hover:underline">
             Read the no-ads pledge
           </a>
         </section>
@@ -163,7 +163,7 @@ export function SidebarContent({ toolId }: SidebarContentProps) {
                   </ul>
                 )}
                 {q.linksToSecurity && (
-                  <a href="/security" className="mt-2 inline-block font-semibold text-accent underline-offset-2 hover:underline">
+                  <a href="/security" className="mt-2 inline-flex min-h-6 items-center font-semibold text-accent underline-offset-2 hover:underline">
                     How QRCraftly keeps data in your browser
                   </a>
                 )}
@@ -185,7 +185,7 @@ export function SidebarContent({ toolId }: SidebarContentProps) {
               if (!isDangerousUrl(page.href)) {
                 return (
                   <li key={page.id}>
-                    <a href={page.href} className="font-semibold text-accent underline-offset-2 hover:underline">
+                    <a href={page.href} className="inline-flex min-h-6 items-center font-semibold text-accent underline-offset-2 hover:underline">
                       {page.name}
                     </a>
                   </li>

@@ -41,6 +41,7 @@ test('the Appearance panel works when the browser blocks site data', async ({ pa
   await expect(page.locator('#fg-color')).toBeAttached();
   await expect(page.getByText('This panel hit a snag.')).toHaveCount(0);
 
+  await page.getByRole('button', { name: 'Templates', exact: true }).click();
   await page.getByRole('tab', { name: /my templates/i }).click();
   await expect(page.getByText('Custom templates are unavailable.')).toBeVisible();
 });

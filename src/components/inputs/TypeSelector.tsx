@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { finishTypeViewTransition, startTypeViewTransition } from "../../utils/typeViewTransition";
 import { QR_TYPE_ROUTES } from "../../data/navigation";
 import { QRType } from "../../types";
@@ -47,8 +47,12 @@ const ITEMS = [
   { type: QRType.SOCIAL, icon: Share2, label: "Social" },
 ];
 
+// Phones get one scrolling row of chips, so the live preview is not pushed below the first
+// screen; wider screens keep the 4-column grid.
+const LIST_CLASSES =
+  "flex snap-x gap-2 overflow-x-auto rounded-xl bg-surface-hover p-2 md:grid md:grid-cols-4 md:overflow-visible";
 const LINK_BASE =
-  "relative flex min-h-11 w-full flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-sm font-medium transition duration-(--duration-fast) ease-standard motion-safe:active:scale-98";
+  "relative flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium whitespace-nowrap transition duration-(--duration-fast) ease-standard motion-safe:active:scale-98 md:flex-col md:gap-1 md:px-1 md:whitespace-normal";
 /* Selection is a filled tint plus a check badge, distinct from the offset focus ring. */
 const LINK_CURRENT = "border-accent-strong bg-accent-soft font-semibold text-accent-strong shadow-raised";
 const LINK_IDLE = "border-transparent text-fg-soft hover:bg-surface-hover hover:text-fg";
@@ -67,6 +71,16 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({ currentType }) => {
   // The new type page has rendered: let a running type-switch view transition animate.
   useEffect(() => finishTypeViewTransition(), [currentType]);
 
+  // On the scrolling phone row, bring the current type into view without moving the page.
+  const listRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    const current = list?.querySelector<HTMLElement>('[aria-current="page"]')?.parentElement;
+    if (!list || !current || list.scrollWidth <= list.clientWidth) return;
+    const offset = current.getBoundingClientRect().left - list.getBoundingClientRect().left + list.scrollLeft;
+    list.scrollLeft = offset - (list.clientWidth - current.offsetWidth) / 2;
+  }, [currentType]);
+
   /**
    * Crossfades to the next type page with a view transition (progressive enhancement).
    * Modified clicks (new tab, download) and the current tile are left alone.
@@ -79,13 +93,13 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({ currentType }) => {
 
   return (
     <nav aria-label="QR code types">
-      <ul className="grid grid-cols-4 gap-2 rounded-xl bg-surface-hover p-2">
+      <ul ref={listRef} className={LIST_CLASSES}>
         {ITEMS.map((item) => {
           const isCurrent = currentType === item.type;
           const href = QR_TYPE_ROUTES[item.type];
           if (!isDangerousUrl(href)) {
             return (
-              <li key={item.type}>
+              <li key={item.type} className="shrink-0 snap-start md:shrink">
                 <a
                   href={href}
                   aria-current={isCurrent ? "page" : undefined}
@@ -93,7 +107,7 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({ currentType }) => {
                   className={`${LINK_BASE} ${isCurrent ? LINK_CURRENT : LINK_IDLE}`}
                 >
                   <item.icon className="size-4" aria-hidden="true" />
-                  <span className="w-full text-center break-words whitespace-normal">{item.label}</span>
+                  <span className="text-center break-words md:w-full">{item.label}</span>
                   {isCurrent && (
                     <span
                       aria-hidden="true"

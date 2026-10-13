@@ -20,7 +20,7 @@ export function GuideLinks() {
           if (!isDangerousUrl(guide.href)) {
             return (
               <li key={guide.id}>
-                <a href={guide.href} className="font-semibold text-accent underline-offset-2 hover:underline">
+                <a href={guide.href} className="inline-flex min-h-6 items-center font-semibold text-accent underline-offset-2 hover:underline">
                   {guide.name}
                 </a>
               </li>

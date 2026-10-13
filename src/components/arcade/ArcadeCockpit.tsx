@@ -92,7 +92,7 @@ export function ArcadeCockpit({ settings, arsenal, arena, quickBar, hints, hud, 
             onClick={() => setDrawerOpen((open) => !open)}
           >
             <SlidersHorizontal className="size-4" aria-hidden="true" />
-            Target settings & telemetry
+            Target and stats
             <ChevronDown className={`size-4 transition-transform ${drawerOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
           </Button>
         </div>

@@ -50,4 +50,34 @@ describe('UrlInput', () => {
     expect(alertMessage.textContent).toContain('Unsafe URL scheme or malicious protocol detected.');
   });
 
+  it('warns, without blocking, when the text cannot be a web address', () => {
+    render(<UrlInput data={{ url: 'not a url' }} onChange={mockOnChange} />);
+
+    expect(screen.getByTestId('field-hints').textContent).toContain("doesn't look like a web address");
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('leaves a typo as typed on blur, so it can be fixed', () => {
+    render(<UrlInput data={{ url: 'not a url' }} onChange={mockOnChange} />);
+
+    fireEvent.blur(screen.getByLabelText('Website URL'));
+
+    expect(mockOnChange).not.toHaveBeenCalled();
+  });
+
+  it('says nothing for a real address', () => {
+    render(<UrlInput data={{ url: 'example.com/menu' }} onChange={mockOnChange} />);
+
+    expect(screen.queryByText(/doesn't look like a web address/)).not.toBeInTheDocument();
+  });
+
+  it('selects the sample address on focus, so typing replaces it', () => {
+    render(<UrlInput data={{ url: 'https://qrcraftly.com' }} onChange={mockOnChange} />);
+
+    const urlInput = screen.getByLabelText('Website URL') as HTMLInputElement;
+    fireEvent.focus(urlInput);
+
+    expect(urlInput.selectionStart).toBe(0);
+    expect(urlInput.selectionEnd).toBe(urlInput.value.length);
+  });
 });

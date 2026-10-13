@@ -162,7 +162,7 @@ describe('ScannabilityIndicator Component', () => {
 
     const alerts = screen.getAllByRole('alert');
     expect(alerts).toHaveLength(1);
-    expect(alerts[0]).toHaveTextContent("Won't scan reliably. The colours are a little close.");
+    expect(alerts[0]).toHaveTextContent("Won't scan reliably. The colors are a little close.");
 
     act(() => {
       vi.advanceTimersByTime(2000);

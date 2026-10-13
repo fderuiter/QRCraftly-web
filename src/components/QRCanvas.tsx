@@ -858,7 +858,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
             title="Generation Blocked"
             role="status"
             aria-live="polite"
-            className="flex size-full flex-col items-center justify-center gap-3 overflow-y-auto rounded-3xl border-2 border-dashed border-rose-300 bg-rose-50 p-6 text-center dark:border-rose-800 dark:bg-rose-950/25"
+            className="flex size-full flex-col items-center justify-center gap-3 overflow-y-auto rounded-xl border-2 border-dashed border-danger-line bg-danger-soft p-6 text-center"
           >
             <div className="mt-2 space-y-1.5">
               {violations.map((v, i) => {
@@ -894,7 +894,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
             title="Too much content"
             role="status"
             aria-live="polite"
-            className="flex size-full flex-col items-center justify-center gap-3 overflow-y-auto rounded-3xl border-2 border-dashed border-rose-300 bg-rose-50 p-6 text-center dark:border-rose-800 dark:bg-rose-950/25"
+            className="flex size-full flex-col items-center justify-center gap-3 overflow-y-auto rounded-xl border-2 border-dashed border-danger-line bg-danger-soft p-6 text-center"
           >
             <p className="mt-2 max-w-xs text-sm font-medium text-danger">
               {tooLongMessage(config.errorCorrectionLevel)}

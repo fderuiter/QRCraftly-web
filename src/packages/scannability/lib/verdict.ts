@@ -69,10 +69,10 @@ export function getScanAdvice({
   const top = health?.warnings?.[0] ?? '';
 
   if (top.startsWith('Contrast ratio is critically low')) {
-    return { message: 'The colours are too close for a camera to tell apart. Use dark modules on a light background.', fix: 'increase-contrast' };
+    return { message: 'The colors are too close for a camera to tell apart. Use dark modules on a light background.', fix: 'increase-contrast' };
   }
   if (top.startsWith('Contrast ratio is low')) {
-    return { message: 'The colours are a little close. Darker modules on a lighter background scan more reliably.', fix: 'increase-contrast' };
+    return { message: 'The colors are a little close. Darker modules on a lighter background scan more reliably.', fix: 'increase-contrast' };
   }
   if (top.startsWith('Local contrast drop')) {
     return canRaiseEc
@@ -80,7 +80,7 @@ export function getScanAdvice({
       : { message: 'Some modules blur together when printed. A bolder pattern or stronger contrast helps.', fix: 'standard-pattern' };
   }
   if (top.startsWith('Pattern complexity')) {
-    return { message: 'This pattern needs stronger contrast to scan. Try a bolder pattern or darker colours.', fix: 'standard-pattern' };
+    return { message: 'This pattern needs stronger contrast to scan. Try a bolder pattern or darker colors.', fix: 'standard-pattern' };
   }
   if (top.startsWith('Logo size')) {
     return { message: 'The logo covers too much of the code. A smaller logo leaves enough of it readable.', fix: 'smaller-logo' };

@@ -65,9 +65,9 @@ export const Card: React.FC<CardProps> = ({
 }) => {
   const resolvedBg = bg ?? (variant === 'control' ? 'bg-surface-sunken' : 'bg-surface');
   const resolvedBorder = border ?? 'border border-line';
-  const resolvedShadow = shadow ?? (variant === 'control' ? 'shadow-none' : 'shadow-2xl');
+  const resolvedShadow = shadow ?? (variant === 'control' ? 'shadow-none' : 'shadow-raised');
   const resolvedPadding = padding ?? (variant === 'control' ? 'p-4' : 'p-8');
-  const resolvedRounded = rounded ?? (variant === 'control' ? 'rounded-xl' : 'rounded-3xl');
+  const resolvedRounded = rounded ?? 'rounded-xl';
 
   const cardClasses = mergeClasses(
     resolvedBg,

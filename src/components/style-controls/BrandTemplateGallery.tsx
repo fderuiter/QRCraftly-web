@@ -67,7 +67,7 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
     const styleUpdates = applyTemplateToConfig(config, template.config);
     onChange(styleUpdates);
     setSelectedId(template.id);
-    showFeedback(`Applied "${template.name}" theme.`);
+    showFeedback(`Applied the "${template.name}" template.`);
     notifyUndo(`Applied "${template.name}"`);
   };
 
@@ -178,6 +178,8 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-fg-muted">A template sets the pattern, colors and border in one tap. Colors below change only the colors.</p>
+
       {/* Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle pb-3">
         <Button
@@ -187,7 +189,7 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
           aria-label="Save current visual settings as brand template"
         >
           <BookmarkPlus className="size-4" />
-          <span>Save as Template</span>
+          <span>Save as template</span>
         </Button>
 
         <Button
@@ -223,8 +225,8 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
         tabId={(tab) => `brand-templates-tab-${tab}`}
         controls={() => 'brand-templates-panel'}
         options={[
-          { value: 'presets', label: `Curated Presets (${PREBUILT_TEMPLATES.length})` },
-          { value: 'custom', label: `My Templates (${customTemplates.length}/${MAX_CUSTOM_TEMPLATES})` },
+          { value: 'presets', label: `Ready-made (${PREBUILT_TEMPLATES.length})` },
+          { value: 'custom', label: `My templates (${customTemplates.length}/${MAX_CUSTOM_TEMPLATES})` },
         ]}
       />
 
@@ -363,7 +365,7 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
             title={storageAvailable ? 'No custom templates saved yet.' : 'Custom templates are unavailable.'}
             body={
               storageAvailable
-                ? 'Customize colors, patterns, and borders, then click "Save as Template" or import a team JSON file.'
+                ? 'Customize colors, patterns, and borders, then click "Save as template" or import a team JSON file.'
                 : TEMPLATE_STORAGE_ERROR
             }
             action={

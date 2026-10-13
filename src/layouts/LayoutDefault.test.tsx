@@ -119,7 +119,7 @@ describe('LayoutDefault', () => {
     const alertHeader = screen.getByRole('alert');
     expect(alertHeader).toBeInTheDocument();
     expect(alertHeader).toHaveTextContent('Application Error');
-    expect(screen.getByText("We're sorry, but something went wrong while rendering this page.")).toBeInTheDocument();
+    expect(screen.getByText("This page could not be shown. Reload to try again.")).toBeInTheDocument();
 
     consoleSpy.mockRestore();
   });

@@ -1,11 +1,14 @@
 import React from "react";
 import type { UrlData } from "../../types";
 import { TextField } from "../ui/FormFields";
-import { normalizeUrl } from "../../utils/url";
-import { describeViolation } from "@/packages/qr-payload";
+import { looksLikeWebAddress, normalizeUrl } from "../../utils/url";
+import { describeViolation, SAMPLE_PAYLOADS } from "@/packages/qr-payload";
 import { QRType } from "../../types";
-import { LinkHints, hintsId } from './FieldHints';
+import { FieldNotes, LinkHints, hintsId } from './FieldHints';
 import { findBlockingViolation } from "./linkViolations";
+
+/** Shown under the field when what was typed cannot be a web address. */
+const NOT_AN_ADDRESS_NOTE = "This doesn't look like a web address. Check it before you print or share the code.";
 
 /**
  * Properties for the UrlInput component.
@@ -28,6 +31,8 @@ interface UrlInputProps {
 export const UrlInput: React.FC<UrlInputProps> = ({ data, onChange }) => {
   const violation = findBlockingViolation(QRType.URL, data);
   const urlError = violation ? describeViolation(violation) : undefined;
+  // A typo such as "my site" still makes a code, so say so before it is printed.
+  const notAnAddress = !urlError && !looksLikeWebAddress(data.url);
 
   return (
     <div className="space-y-4">
@@ -45,15 +50,21 @@ export const UrlInput: React.FC<UrlInputProps> = ({ data, onChange }) => {
           onChange={(e) => {
             onChange({ url: e.target.value });
           }}
+          onFocus={(e) => {
+            // The sample address is a placeholder with a working code: typing replaces it.
+            if (data.url === SAMPLE_PAYLOADS[QRType.URL]) e.currentTarget.select();
+          }}
           onBlur={() => {
-            if (data.url) {
+            // Leave a typo as typed, so the person can see and fix it.
+            if (data.url && looksLikeWebAddress(data.url)) {
               onChange({ url: normalizeUrl(data.url) });
             }
           }}
           error={urlError}
           aria-describedby={hintsId('url-input')}
         />
-        {!urlError && <LinkHints fieldId="url-input" address={data.url} />}
+        {notAnAddress && <FieldNotes fieldId="url-input" notes={[NOT_AN_ADDRESS_NOTE]} />}
+        {!urlError && !notAnAddress && <LinkHints fieldId="url-input" address={data.url} />}
       </div>
     </div>
   );

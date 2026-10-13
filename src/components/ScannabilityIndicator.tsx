@@ -38,7 +38,7 @@ const VERDICT_ICONS = {
   unreliable: ShieldX,
 } as const;
 
-const FIX_LABELS: Record<ScanFix, string> = {
+export const FIX_LABELS: Record<ScanFix, string> = {
   'raise-error-correction': 'Use high error correction',
   'increase-contrast': 'Use black on white',
   'standard-pattern': 'Use the standard pattern',
@@ -53,7 +53,7 @@ const FIX_LABELS: Record<ScanFix, string> = {
  */
 const getAnnouncementText = (verdict: ScanVerdict | null, health?: HealthScore): string => {
   if (!verdict) return '';
-  if (verdict === 'checking') return 'Checking scannability...';
+  if (verdict === 'checking') return 'Checking scannability…';
   const scorePart = health ? ` Health score: ${health.score} of 100.` : '';
   return `Scannability: ${VERDICT_LABELS[verdict]}.${scorePart}`;
 };
@@ -183,6 +183,8 @@ export const ScannabilityIndicator: React.FC<Props> = ({
   }
 
   const Icon = VERDICT_ICONS[verdict];
+  // A weak verdict says there is more inside, so the advice and its fix are not hidden.
+  const hint = verdict === 'fragile' || verdict === 'unreliable' ? (fix && onFix ? 'Fix' : 'Why?') : '';
   const pillClasses = `flex h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap select-none motion-safe:transition-colors motion-safe:duration-300 ${VERDICT_TONES[verdict]}`;
   const pillContent = (
     <>
@@ -193,6 +195,7 @@ export const ScannabilityIndicator: React.FC<Props> = ({
           <ScoreMeter score={health.score} />
         </>
       )}
+      {hint && <span className="border-l border-current/30 pl-1.5 font-semibold">{hint}</span>}
     </>
   );
 
@@ -207,7 +210,7 @@ export const ScannabilityIndicator: React.FC<Props> = ({
           ref={triggerRef}
           type="button"
           className={`${pillClasses} hover:brightness-95 focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none`}
-          aria-label={health ? `${VERDICT_LABELS[verdict]}, health score ${health.score} of 100` : undefined}
+          aria-label={health ? `${VERDICT_LABELS[verdict]}, health score ${health.score} of 100${hint ? `. ${hint === 'Fix' ? 'Show how to fix it' : 'Show why'}` : ''}` : undefined}
           aria-expanded={open}
           aria-controls={panelId}
           onClick={() => setOpen((value) => !value)}
