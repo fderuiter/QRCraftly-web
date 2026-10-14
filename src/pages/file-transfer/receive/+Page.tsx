@@ -390,8 +390,8 @@ function FileTransferReceiveInner() {
                       onClick={() => fileInputRef.current?.click()}
                       className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
                         isDragging
-                          ? 'border-teal-500 bg-teal-50/50 dark:border-teal-400 dark:bg-teal-950/30'
-                          : 'border-line hover:border-teal-500 dark:hover:border-teal-400'
+                          ? 'border-accent bg-accent-soft'
+                          : 'border-line hover:border-accent'
                       }`}
                       data-testid="sidebar-dropzone"
                     >
@@ -471,7 +471,7 @@ function FileTransferReceiveInner() {
             {feedbackActive && (
               <canvas
                 ref={feedbackCanvasRef}
-                className="fixed right-4 bottom-4 z-50 size-32 rounded-md bg-surface shadow-lg"
+                className="fixed right-4 bottom-4 z-50 size-32 rounded-lg bg-surface shadow-overlay"
                 role="img"
                 aria-label="Feedback code for the sender"
                 data-testid="feedback-code"
@@ -491,8 +491,8 @@ function FileTransferReceiveInner() {
               <SectionHeading icon={<Activity className="size-4 text-accent" aria-hidden="true" />} eyebrow="2. Transfer Progress" />
 
               {compilationStatus && (
-                <div className="flex items-center gap-2 rounded-xl border border-teal-100 bg-teal-50/50 p-4 text-xs text-teal-800 motion-safe:animate-pulse dark:border-teal-900/60 dark:bg-teal-950/20 dark:text-teal-400" data-testid="compilation-status">
-                  <Cpu className="size-4 text-teal-600 motion-safe:animate-spin" />
+                <div className="flex items-center gap-2 rounded-xl border border-accent-line bg-accent-soft p-4 text-xs text-accent motion-safe:animate-pulse" data-testid="compilation-status">
+                  <Cpu className="size-4 text-accent motion-safe:animate-spin" />
                   <span className="font-semibold">{compilationStatus}</span>
                 </div>
               )}

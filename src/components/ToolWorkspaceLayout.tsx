@@ -130,8 +130,8 @@ export function ToolWorkspaceLayout({
         >
           {/* Decorative glow, clipped so it never widens the page or creates a scroll area. */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-clip opacity-40 dark:opacity-20">
-            <div className="absolute top-0 left-0 size-96 -translate-1/2 rounded-full bg-teal-200 blur-3xl transition-colors duration-300 dark:bg-teal-900"></div>
-            <div className="absolute right-0 bottom-0 size-96 translate-1/2 rounded-full bg-slate-300 blur-3xl transition-colors duration-300 dark:bg-slate-800"></div>
+            <div className="absolute top-0 left-0 size-96 -translate-1/2 rounded-full bg-accent-line blur-3xl transition-colors duration-300"></div>
+            <div className="absolute right-0 bottom-0 size-96 translate-1/2 rounded-full bg-line blur-3xl transition-colors duration-300"></div>
           </div>
           <div className="relative z-10 w-full max-w-md lg:max-w-xl xl:max-w-2xl">
             <PanelErrorBoundary>{preview}</PanelErrorBoundary>

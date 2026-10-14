@@ -54,13 +54,13 @@ test.describe('Focus Management & Keyboard Navigation', () => {
     // Opening the download options is never gated, even for an unsafe QR.
     await page.getByRole('button', { name: 'Download options' }).click();
     await expect(page.getByRole('group', { name: 'Download options' })).toBeVisible();
-    await expect(page.getByText('Scan Safety Warning')).not.toBeVisible();
+    await expect(page.getByText('This Code May Not Scan')).not.toBeVisible();
 
     // Downloading triggers the safety gate Modal.
     await page.getByRole('button', { name: 'Download PNG' }).click();
 
     // The modal should appear
-    const modalTitle = page.getByText('Scan Safety Warning');
+    const modalTitle = page.getByText('This Code May Not Scan');
     await expect(modalTitle).toBeVisible();
 
     // The first focusable element (Close button 'Close modal') should be focused automatically
@@ -68,14 +68,14 @@ test.describe('Focus Management & Keyboard Navigation', () => {
     await expect(closeBtn).toBeFocused();
 
     // 2. Tab key sequence navigation cycles through the modal elements
-    // Tab -> Go Back button
+    // Tab -> the primary action: the one-tap fix for the top problem, or Go back
     await page.keyboard.press('Tab');
-    const goBackBtn = page.getByRole('button', { name: 'Go Back' });
-    await expect(goBackBtn).toBeFocused();
+    const primaryBtn = page.getByRole('button', { name: /^(Go back|Use black on white|Use high error correction|Use the standard pattern|Shrink the logo)$/ });
+    await expect(primaryBtn).toBeFocused();
 
     // Tab -> Export Anyway button
     await page.keyboard.press('Tab');
-    const exportAnywayBtn = page.getByRole('button', { name: 'Export Anyway' });
+    const exportAnywayBtn = page.getByRole('button', { name: 'Export anyway' });
     await expect(exportAnywayBtn).toBeFocused();
 
     // Tab again -> Cycles back to Close button

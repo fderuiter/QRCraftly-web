@@ -33,7 +33,7 @@ export function PairingGuide() {
       <div className="min-w-0">
         <p className="text-sm font-semibold text-fg">Point your other phone here</p>
         <p className="mt-0.5 text-xs text-fg-muted">
-          On the other phone open <a href="/file-transfer/receive" className="font-medium text-accent underline-offset-2 hover:underline">Receive</a>, press Start camera, then press Start Transfer here.
+          On the other phone open <a href="/file-transfer/receive" className="font-medium text-accent underline-offset-2 hover:underline">Receive</a>, press Start camera, then press Start transfer here.
         </p>
       </div>
     </div>

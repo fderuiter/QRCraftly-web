@@ -44,7 +44,9 @@ describe('File transfer workspaces (#796, #978)', () => {
     render(<ToastProvider><SenderPage /></ToastProvider>);
     const empty = screen.getByTestId('send-empty-state');
     expect(within(empty).getByRole('heading', { name: 'Drop a file to beam it' })).toBeInTheDocument();
-    expect(within(empty).getAllByRole('button').map((b) => b.textContent)).toEqual(['Choose a file']);
+    expect(within(empty).queryAllByRole('button')).toEqual([]);
+    expect(within(empty).getByText(/Pick a file in step 1/)).toBeInTheDocument();
+    expect(screen.getAllByLabelText('Choose a file to send')).toHaveLength(1);
     expect(follows(screen.getByRole('heading', { name: /2\. Transfer Settings/ }), empty)).toBe(true);
     expect(screen.queryByText(/Stream Style Preset/)).not.toBeInTheDocument();
     expect(screen.queryByText('Idle')).not.toBeInTheDocument();

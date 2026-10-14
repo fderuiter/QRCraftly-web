@@ -209,3 +209,25 @@ export const shouldNormalizeUrl = (url: string | undefined): boolean => {
 
   return hasDot || isWww || isLocalhost;
 };
+
+/**
+ * Whether text typed as a link looks like a web address a phone can open: it parses, and its
+ * host has a dot, or is localhost or an IP address. Used for a gentle hint, never to block; an
+ * empty field and other schemes (mailto:, tel:) pass, since other checks cover them.
+ * @param value - What the person typed.
+ * @returns False when the host is missing, has spaces, or has no dot.
+ */
+export const looksLikeWebAddress = (value: string): boolean => {
+  const text = value.trim();
+  if (!text) return true;
+  let parsed: URL;
+  try {
+    parsed = new URL(/^[a-z][a-z0-9+.-]*:/i.test(text) && !/^[^/?#]*:\d+(?:[/?#]|$)/.test(text) ? text : `https://${text}`);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return true;
+  const host = parsed.hostname;
+  if (host === 'localhost' || host.startsWith('[') || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return true;
+  return host.includes('.') && !host.includes('%') && !host.startsWith('.') && !host.endsWith('..');
+};

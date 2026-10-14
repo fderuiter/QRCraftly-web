@@ -140,11 +140,11 @@ test.describe('Isolated Web Worker Recovery & Export Bypass', () => {
     await downloadButton.click();
 
     // Verify that the "Scan Safety Warning" warning dialog/modal is open
-    const warningModalTitle = page.getByRole('heading', { name: 'Scan Safety Warning' });
+    const warningModalTitle = page.getByRole('heading', { name: 'This Code May Not Scan' });
     await expect(warningModalTitle).toBeVisible({ timeout: 15000 });
 
     // Assert that the active bypass trigger button "Export Anyway" is present in the warning dialog
-    const exportAnywayButton = page.getByRole('button', { name: 'Export Anyway' });
+    const exportAnywayButton = page.getByRole('button', { name: 'Export anyway' });
     await expect(exportAnywayButton).toBeVisible();
 
     // Click the active bypass trigger to ignore error and proceed

@@ -148,7 +148,7 @@ describe('Arcade hub: modes and generator sync (#922)', () => {
     fireEvent.click(screen.getByRole('radio', { name: /Level H/ }));
     expect(payloadField().value).toBe('Experiment');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reset to Generator QR' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use my generator design' }));
     expect(payloadField().value).toBe('Staged design');
     expect(screen.getByRole('radio', { name: /Level L/ })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByTestId('arcade-announcer')).toHaveTextContent('Target reset to the generator QR.');
@@ -158,6 +158,7 @@ describe('Arcade hub: modes and generator sync (#922)', () => {
     render(<ArcadeApp />);
     expect(payloadField().value).toMatch(/^https?:\/\//);
     expect(screen.getByRole('radio', { name: /Level H/ })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText("No design yet? You'll get a plain black-and-white code.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Secret text' }));
     expect(payloadField().value).toBe('PROMO_CODE_BLASTED_SURVIVAL');
   });
@@ -327,14 +328,37 @@ describe('Damage Simulator (#924)', () => {
   });
 });
 
+describe('Plain-language arcade copy', () => {
+  it('explains error correction behind a native disclosure', () => {
+    render(<ArcadeApp />);
+    const summary = screen.getByText('What is this?');
+    expect(summary.tagName).toBe('SUMMARY');
+    expect(summary.closest('details')).not.toBeNull();
+    expect(screen.queryByText(/Reed-Solomon/)).toBeNull();
+  });
+
+  it('shows the touch hint on coarse pointers and the keyboard hint otherwise', () => {
+    stubMatchMedia((query) => query === '(pointer: coarse)');
+    const { unmount } = render(<ArcadeApp />);
+    expect(screen.getByText('Tap to aim and fire · tap a weapon to switch')).toBeInTheDocument();
+    expect(screen.queryByText(/arrow keys aim/)).toBeNull();
+    unmount();
+
+    stubMatchMedia(() => false);
+    render(<ArcadeApp />);
+    expect(screen.getByText(/Move the pointer to aim/)).toBeInTheDocument();
+    expect(screen.queryByText(/Tap to aim/)).toBeNull();
+  });
+});
+
 describe('Dual-layer scannability HUD (#925)', () => {
   it('shows SCANNABLE with the decoded payload from the native detector', async () => {
     stubDetector([['ARCADE']]);
     stageArcadeTarget({ payload: 'ARCADE', ecc: 'H', fgColor: '#000000', bgColor: '#ffffff', eyeColor: '#000000' });
     render(<ArcadeApp />);
-    await waitFor(() => expect(screen.getByText('SCANNABLE')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Still scans')).toBeInTheDocument());
     expect(screen.getByTestId('arcade-readout')).toHaveTextContent('ARCADE');
-    expect(screen.getByRole('meter', { name: 'Error correction health' })).toHaveAttribute('aria-valuenow', '100');
+    expect(screen.getByRole('meter', { name: 'Damage it can still survive' })).toHaveAttribute('aria-valuenow', '100');
     expect(screen.getByText(/native BarcodeDetector/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('arcade-announcer')).toHaveTextContent('Live scanner: scannable.'));
   });
@@ -345,10 +369,10 @@ describe('Dual-layer scannability HUD (#925)', () => {
     window.history.replaceState(null, '', '/arcade?mode=simulator');
     stageArcadeTarget({ payload: 'ARCADE', ecc: 'H', fgColor: '#000000', bgColor: '#ffffff', eyeColor: '#000000' });
     render(<ArcadeApp />);
-    await waitFor(() => expect(screen.getByText('SCANNABLE')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Still scans')).toBeInTheDocument());
     scanResults[0] = []; // the damaged board no longer decodes
     fireEvent.click(screen.getByRole('button', { name: 'Artillery Barrage' }));
-    await waitFor(() => expect(screen.getByText('CORRUPTED / UNREADABLE')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('No longer scans')).toBeInTheDocument());
     expect(screen.getByTestId('arcade-readout')).toHaveTextContent('[No data decoded]');
   });
 });
@@ -358,7 +382,7 @@ describe('Responsive ergonomics (#926)', () => {
     render(<ArcadeApp />);
     const layout = document.querySelector('[data-layout]')!;
     expect(layout).toHaveAttribute('data-layout', 'stacked');
-    const drawerButton = screen.getByRole('button', { name: /Target settings & telemetry/ });
+    const drawerButton = screen.getByRole('button', { name: /Target and stats/ });
     const panel = screen.getByTestId('arcade-settings-panel');
     expect(drawerButton).toHaveAttribute('aria-expanded', 'false');
     expect(drawerButton).toHaveAttribute('aria-controls', panel.id);
@@ -376,13 +400,13 @@ describe('Responsive ergonomics (#926)', () => {
     const setMatch = stubMatchMedia((query) => query === '(min-width: 1024px)');
     render(<ArcadeApp />);
     expect(document.querySelector('[data-layout]')).toHaveAttribute('data-layout', 'cockpit');
-    expect(screen.queryByRole('button', { name: /Target settings & telemetry/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Target and stats/ })).not.toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Target and arsenal' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Live verification' })).toBeInTheDocument();
 
     act(() => setMatch('(min-width: 1024px)', false));
     expect(document.querySelector('[data-layout]')).toHaveAttribute('data-layout', 'stacked');
-    expect(screen.getByRole('button', { name: /Target settings & telemetry/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Target and stats/ })).toBeInTheDocument();
   });
 
   it('locks touch gestures on both arenas', () => {

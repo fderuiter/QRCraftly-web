@@ -245,6 +245,13 @@
 }
 
 @layer base {
+  /* Phones dock the export bar to the bottom of generator pages; keep tabbed-to controls clear of it (WCAG 2.4.11). */
+  @media (width < 48rem) {
+    html:has([data-docked-bar]) {
+      scroll-padding-bottom: 6rem;
+    }
+  }
+
   :focus {
     @apply outline-none;
   }

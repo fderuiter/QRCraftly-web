@@ -17,7 +17,7 @@
 */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BulkCsvInput } from './BulkCsvInput';
 import { LazyBulkCsvInput } from './LazyBulkCsvInput';
@@ -603,5 +603,37 @@ describe('BulkCsvInput Component', () => {
     const onChange = vi.fn();
     renderWithProvider(<BulkCsvInput data={{ ...initialData, csvContent: 'Video URL,Title\nhttps://example.com,Intro' }} onChange={onChange} />);
     await waitFor(() => expect(onChange).toHaveBeenCalledWith({ payloadColumn: 'Video URL', filenameColumn: 'Title' }));
+  });
+
+  it('previews the first rows under the chosen content and file name columns', () => {
+    const csvContent = 'URL,Name,Note\nhttps://example.com/1,first,a\nhttps://example.com/2,second,b\nhttps://example.com/3,third,c\nhttps://example.com/4,fourth,d';
+    const onChange = vi.fn();
+    const base = { ...initialData, csvContent, fileName: 'batch.csv', payloadColumn: 'URL', filenameColumn: 'Name' };
+    const { rerender } = renderWithProvider(<BulkCsvInput data={base} onChange={onChange} />);
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByRole('caption')).toHaveTextContent('First 3 rows');
+    expect(within(table).getAllByRole('row')).toHaveLength(4);
+    expect(screen.queryByText('fourth')).not.toBeInTheDocument();
+
+    // Changing the File Name Column in the select reports the mapping; the table follows the new data.
+    fireEvent.change(screen.getByLabelText('File Name Column'), { target: { value: 'Note' } });
+    expect(onChange).toHaveBeenCalledWith({ filenameColumn: 'Note' });
+    rerender(
+      <QRProvider>
+        <BulkCsvInput data={{ ...base, filenameColumn: 'Note' }} onChange={onChange} />
+      </QRProvider>
+    );
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers.map((h) => h.textContent)).toEqual(['Row', 'URLContent', 'NoteFile name']);
+    expect(screen.getByText('c')).toBeInTheDocument();
+
+    rerender(
+      <QRProvider>
+        <BulkCsvInput data={{ ...base, payloadColumn: 'Name', filenameColumn: 'URL' }} onChange={onChange} />
+      </QRProvider>
+    );
+    expect(screen.getAllByRole('columnheader')[1]).toHaveTextContent('NameContent');
+    expect(screen.getByText('second')).toBeInTheDocument();
   });
 });

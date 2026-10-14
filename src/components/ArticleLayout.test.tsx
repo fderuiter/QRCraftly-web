@@ -29,6 +29,24 @@ function renderArticle() {
 describe('ArticleLayout', () => {
   let callback: ObserverCallback | undefined;
 
+  it('shows the breadcrumb trail above the heading when given a page id', () => {
+    render(
+      <ArticleLayout pageId="privacy" title="Privacy Policy" sections={SECTIONS}>
+        <p>Body.</p>
+      </ArticleLayout>
+    );
+    const trail = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    const heading = screen.getByRole('heading', { level: 1, name: 'Privacy Policy' });
+    expect(trail.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(trail).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
+    expect(within(trail).getByText('App Privacy Policy')).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('renders no breadcrumb trail without a page id', () => {
+    renderArticle();
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
+  });
+
   beforeEach(() => {
     callback = undefined;
     vi.stubGlobal(

@@ -177,6 +177,8 @@ describe('metadataEngine', () => {
     it('capitalizes each word and replaces dashes with spaces for unknown segments', () => {
       expect(formatPathName('special-offer')).toBe('Special Offer');
       expect(formatPathName('nested-path-segment')).toBe('Nested Path Segment');
+      expect(formatPathName('sms-qr-code')).toBe('SMS QR Code');
+      expect(formatPathName('vcard-qr-code')).toBe('vCard QR Code');
     });
   });
 

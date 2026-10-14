@@ -360,7 +360,7 @@ export function SimulatorMode({ target, encoder, settings, announce }: ModeProps
         }
         telemetry={
           <Card variant="control">
-            <h2 className="mb-3 text-sm font-bold text-fg">Telemetry</h2>
+            <h2 className="mb-3 text-sm font-bold text-fg">Stats</h2>
             <dl className="grid grid-cols-2 gap-3 text-xs text-fg-muted">
               <div><dt>QR grid</dt><dd className="font-bold text-fg">{matrix.size} × {matrix.size}</dd></div>
               <div><dt>Total modules</dt><dd className="font-bold text-fg">{analysis.totalModules}</dd></div>

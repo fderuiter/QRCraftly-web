@@ -78,7 +78,7 @@ async function downloadSvg(page: Page): Promise<string> {
     page.waitForEvent('download'),
     (async () => {
       await page.getByRole('button', { name: 'Download options' }).click();
-      await page.getByRole('radio', { name: 'SVG' }).click();
+      await page.getByRole('group', { name: 'Download options' }).getByRole('radio', { name: 'SVG' }).click();
       await page.getByRole('button', { name: 'Download SVG' }).click();
     })(),
   ]);

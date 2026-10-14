@@ -131,7 +131,7 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
         id="event-description"
         label="Description"
         rows={3}
-        placeholder="Event details..."
+        placeholder="Event details…"
         maxLength={2000}
         value={data.description}
         onChange={(e) => onChange({ description: e.target.value })}

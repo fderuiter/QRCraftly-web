@@ -64,7 +64,7 @@ const Metric: React.FC<{ label: string; value: number; testId: string; tone: Met
   tone,
   icon: Icon,
 }) => (
-  <div className={`flex flex-col rounded-lg border p-2.5 text-center shadow-2xs ${METRIC_TONES[tone].card}`}>
+  <div className={`flex flex-col rounded-lg border p-2.5 text-center shadow-raised ${METRIC_TONES[tone].card}`}>
     <span className={`flex items-center justify-center gap-1 text-xs font-medium ${METRIC_TONES[tone].label}`}>
       {Icon && <Icon className="size-3.5" aria-hidden="true" />}
       {label}
@@ -86,7 +86,7 @@ export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = (
   const isAllValid = !hasIssues && report.totalRows > 0;
 
   return (
-    <div className="rounded-xl border border-line bg-surface-sunken p-4 shadow-2xs transition-all" data-testid="preflight-summary-card">
+    <div className="rounded-xl border border-line bg-surface-sunken p-4 shadow-raised transition-all" data-testid="preflight-summary-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
         <div className="flex items-center gap-2.5">
           <FileSpreadsheet className="size-5 text-accent" aria-hidden="true" />

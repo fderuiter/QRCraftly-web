@@ -33,7 +33,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex min-h-[50vh] flex-col items-center justify-center p-8 text-center text-fg-soft">
           <h2 role="alert" className="mb-4 text-3xl font-bold text-danger">Application Error</h2>
-          <p className="mb-8 text-lg">We're sorry, but something went wrong while rendering this page.</p>
+          <p className="mb-8 text-lg">This page could not be shown. Reload to try again.</p>
           <Button
             variant="primary"
             size="lg"

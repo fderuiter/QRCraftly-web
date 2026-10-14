@@ -17,8 +17,9 @@
 */
 
 
-import React, { createContext, lazy, Suspense, useContext, useState } from 'react';
+import React, { createContext, lazy, Suspense, useContext, useEffect, useState } from 'react';
 import type { QRConfig } from '../types';
+import type { LandingPrimaryAction } from '../data/landingPages';
 import {
   BorderControls,
   FrameControls,
@@ -31,7 +32,9 @@ import {
   BrandTemplateGallery
 } from './style-controls';
 import { Accordion, AccordionItem } from './ui/Accordion';
+import { Button } from './ui/Button';
 import { Skeleton } from './ui/Skeleton';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
 // The gallery draws a thumbnail of the person's QR for every look, so it loads (and draws)
 // only once its section is first opened.
@@ -42,7 +45,7 @@ const StyleGallery = lazy(() => import('./style-controls/StyleGallery'));
  * only (never persisted), so the open sections survive switching QR type without a reload.
  */
 const sectionOpenState = new Map<string, boolean>([
-  ['Brand Templates', true],
+  ['Templates', false],
   ['Pattern & Colors', true]
 ]);
 
@@ -51,6 +54,12 @@ const sectionOpenState = new Map<string, boolean>([
  * page). A section the person already opened or closed this visit keeps that choice.
  */
 export const PresetOpenSections = createContext<readonly string[]>([]);
+
+/**
+ * The call to action a landing page shows above its controls, or null. Clicking it opens the
+ * section, scrolls to the control and focuses it.
+ */
+export const PresetPrimaryAction = createContext<LandingPrimaryAction | null>(null);
 
 /**
  * Remembers a section's expanded state for the rest of the visit.
@@ -82,11 +91,41 @@ interface StyleControlsProps {
  */
 const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
   const presetOpen = useContext(PresetOpenSections);
+  const primaryAction = useContext(PresetPrimaryAction);
+  const reduceMotion = usePrefersReducedMotion();
   const [galleryOpened, setGalleryOpened] = useState(false);
+  // Each press of the call to action counts up, so the section reopens even after the person closed it.
+  const [openRequest, setOpenRequest] = useState<{ section: string; count: number } | null>(null);
+  const requestFor = (title: string) => (openRequest?.section === title ? openRequest.count : undefined);
+
+  // Runs after the section has opened (its request renders first), so the control is visible.
+  useEffect(() => {
+    if (!openRequest || !primaryAction) return;
+    const target = document.getElementById(primaryAction.focusId);
+    if (!target) return;
+    target.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+    target.focus({ preventScroll: true });
+  }, [openRequest, primaryAction, reduceMotion]);
+
   return (
     <Accordion>
+      {primaryAction && (
+        <div className="mb-4">
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            onClick={() =>
+              setOpenRequest((prev) => ({ section: primaryAction.section, count: (prev?.count ?? 0) + 1 }))
+            }
+          >
+            {primaryAction.label}
+          </Button>
+        </div>
+      )}
+
       {/* Brand Template Gallery */}
-      <AccordionItem title="Brand Templates" headingLevel={3} defaultOpen={sectionOpenState.get('Brand Templates') ?? true} onOpenChange={rememberSection('Brand Templates')}>
+      <AccordionItem title="Templates" headingLevel={3} defaultOpen={sectionOpenState.get('Templates') ?? false} onOpenChange={rememberSection('Templates')} openRequest={requestFor('Templates')}>
         <div className="pt-1">
           <BrandTemplateGallery config={config} onChange={onChange} />
         </div>
@@ -104,7 +143,7 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
       </AccordionItem>
 
       {/* Primary appearance controls: expanded by default. */}
-      <AccordionItem title="Pattern & Colors" headingLevel={3} defaultOpen={sectionOpenState.get('Pattern & Colors') ?? presetOpen.includes('Pattern & Colors')} onOpenChange={rememberSection('Pattern & Colors')}>
+      <AccordionItem title="Pattern & Colors" headingLevel={3} defaultOpen={sectionOpenState.get('Pattern & Colors') ?? presetOpen.includes('Pattern & Colors')} onOpenChange={rememberSection('Pattern & Colors')} openRequest={requestFor('Pattern & Colors')}>
         <div className="space-y-6 pt-1">
           <PatternControls config={config} onChange={onChange} />
           <div className="border-t border-line pt-5">
@@ -114,7 +153,7 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
       </AccordionItem>
 
       {/* Export layout (social media templates) and border */}
-      <AccordionItem title="Layout & Border" headingLevel={3} defaultOpen={sectionOpenState.get('Layout & Border') ?? presetOpen.includes('Layout & Border')} onOpenChange={rememberSection('Layout & Border')}>
+      <AccordionItem title="Layout & Border" headingLevel={3} defaultOpen={sectionOpenState.get('Layout & Border') ?? presetOpen.includes('Layout & Border')} onOpenChange={rememberSection('Layout & Border')} openRequest={requestFor('Layout & Border')}>
         <div className="space-y-6 pt-1">
           <LayoutControls config={config} onChange={onChange} />
           <div className="border-t border-line pt-5">
@@ -126,7 +165,7 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
         </div>
       </AccordionItem>
 
-      <AccordionItem title="Logo" headingLevel={3} defaultOpen={sectionOpenState.get('Logo') ?? presetOpen.includes('Logo')} onOpenChange={rememberSection('Logo')}>
+      <AccordionItem title="Logo" headingLevel={3} defaultOpen={sectionOpenState.get('Logo') ?? presetOpen.includes('Logo')} onOpenChange={rememberSection('Logo')} openRequest={requestFor('Logo')}>
         <div className="pt-1">
           <LogoControls config={config} onChange={onChange} />
           <div className="border-t border-line pt-5">

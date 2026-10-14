@@ -17,6 +17,7 @@
 */
 
 
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { Eyebrow } from '@/components/ui/SectionHeading';
 import { GuideLinks } from '@/components/GuideLinks';
 import { PageFaq } from '@/components/PageFaq';
@@ -50,10 +51,11 @@ export default function Page() {
   return (
     <>
       <div className="mx-auto max-w-4xl px-4 py-12">
+        <Breadcrumbs pageId="free-forever" />
 
         <header className="mb-12 text-center">
           <Eyebrow tone="accent" className="mb-3 justify-center">The QRCraftly Pledge</Eyebrow>
-          <h1 className="mb-6 text-4xl font-bold text-fg md:text-5xl">{PLEDGE_HEADLINE}</h1>
+          <h1 className="mb-6 text-3xl font-bold text-fg sm:text-4xl">{PLEDGE_HEADLINE}</h1>
           <p className="mx-auto mb-4 max-w-2xl text-xl font-medium text-fg">{PLEDGE_LEAD}</p>
           <p className="mx-auto max-w-2xl text-lg leading-relaxed text-fg-muted">{PLEDGE_WHY}</p>
         </header>

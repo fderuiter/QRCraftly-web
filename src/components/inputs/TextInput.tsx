@@ -19,7 +19,7 @@ export const TextInput: React.FC<TextInputProps> = ({ data, onChange }) => {
         label="Content"
         rows={4}
         maxLength={2500}
-        placeholder="Enter your text here..."
+        placeholder="Enter your text here…"
         value={data.text}
         onChange={(e) => onChange({ text: e.target.value })}
         showCharCount

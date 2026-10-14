@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GENERATOR_FOOTER_LINKS, PRIMARY_NAV_ITEMS, QR_TYPE_ROUTES, getCurrentPrimaryNavId, normalizePathname } from './navigation';
+import { GENERATOR_FOOTER_LINKS, HELP_LINKS, PRIMARY_NAV_ITEMS, QR_TYPE_ROUTES, getCurrentPrimaryNavId, normalizePathname } from './navigation';
 import { QRType } from '@/types';
 
 describe('primary navigation model', () => {
@@ -12,6 +12,13 @@ describe('primary navigation model', () => {
       'Security',
     ]);
     expect(PRIMARY_NAV_ITEMS.find((item) => item.id === 'transfer')?.tag).toBe('Beta');
+  });
+
+  it('lists the guides and the pledge as help links', () => {
+    expect(HELP_LINKS).toEqual([
+      ['Guides', '/guides'],
+      ['No-Ads Pledge', '/free-forever'],
+    ]);
   });
 
   it('lists one footer link per generator route', () => {

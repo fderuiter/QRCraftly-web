@@ -160,7 +160,7 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
 
       {link && (
         <div className="rounded-lg border border-line bg-surface-sunken p-3">
-          <p className="text-xs font-semibold tracking-wide text-fg-muted uppercase">Opens</p>
+          <p className="text-xs font-semibold tracking-wider text-fg-muted uppercase">Opens</p>
           <p className="text-xl font-bold break-all text-fg" data-testid="scan-result-host">
             {link.host}
           </p>
@@ -221,7 +221,7 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
       )}
 
       <div>
-        <p className="mb-1 text-xs font-semibold tracking-wide text-fg-muted uppercase" id="scan-result-text-label">
+        <p className="mb-1 text-xs font-semibold tracking-wider text-fg-muted uppercase" id="scan-result-text-label">
           Content
         </p>
         <pre

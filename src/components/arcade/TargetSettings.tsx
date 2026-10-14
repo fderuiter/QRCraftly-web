@@ -118,12 +118,12 @@ export function TargetSettings({ target, onChange, onResetToGenerator, hasGenera
       </div>
       <Button variant="secondary" fullWidth onClick={onResetToGenerator}>
         <RefreshCw className="size-4" aria-hidden="true" />
-        Reset to Generator QR
+        Use my generator design
       </Button>
       <p className="text-xs text-fg-muted">
         {hasGeneratorDesign
           ? 'Uses the design, colors and content from your generator session.'
-          : 'No generator design in this tab yet: resets to the default high-contrast code.'}
+          : "No design yet? You'll get a plain black-and-white code."}
       </p>
 
       {/* Maze Overlay Controls */}

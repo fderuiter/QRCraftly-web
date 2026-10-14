@@ -75,6 +75,6 @@ test.describe('QR Arcade', () => {
     expect(page.url()).not.toContain('example.com');
 
     await expect(page.getByRole('textbox', { name: 'Target QR content' })).toHaveValue(payload);
-    await expect(page.getByRole('button', { name: 'Reset to Generator QR' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Use my generator design' })).toBeVisible();
   });
 });

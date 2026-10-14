@@ -16,8 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { axe } from '../../tests/utils/axe';
 import LayoutDefault from '@/layouts/LayoutDefault';
 import { LandingPage } from '@/components/LandingPage';
@@ -91,5 +92,49 @@ describe('landing pages that preset the generator (#1035, #1037)', () => {
     clearRetainedAppearance();
     const { container } = renderLanding('mosaic-qr-code');
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  describe('"Add your picture" call to action on the mosaic page', () => {
+    const addPicture = () => screen.getByRole('button', { name: 'Add your picture' });
+    const uploadButton = () => screen.getByRole('button', { name: /Upload mosaic design/ });
+
+    it('opens the Logo section, scrolls to the upload and focuses it', async () => {
+      const user = userEvent.setup();
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      clearRetainedAppearance();
+      renderLanding('mosaic-qr-code');
+
+      // The preset opens Logo, so close it first to show that the call to action opens it again.
+      await user.click(logoButton());
+      expect(logoButton()).toHaveAttribute('aria-expanded', 'false');
+
+      await user.click(addPicture());
+      expect(logoButton()).toHaveAttribute('aria-expanded', 'true');
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' });
+      await waitFor(() => expect(uploadButton()).toHaveFocus());
+    });
+
+    it('scrolls without animation when the visitor prefers reduced motion', async () => {
+      const user = userEvent.setup();
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }));
+      try {
+        clearRetainedAppearance();
+        renderLanding('mosaic-qr-code');
+        await user.click(logoButton());
+        await user.click(addPicture());
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'auto' });
+      } finally {
+        window.matchMedia = originalMatchMedia;
+      }
+    });
   });
 });

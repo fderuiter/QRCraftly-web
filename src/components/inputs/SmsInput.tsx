@@ -44,7 +44,7 @@ export const SmsInput: React.FC<SmsInputProps> = ({ data, onChange }) => {
         label="Pre-filled Message"
         rows={3}
         maxLength={1600}
-        placeholder="Type your SMS message here..."
+        placeholder="Type your SMS message here…"
         value={data.message}
         onChange={(e) => onChange({ message: e.target.value })}
         showCharCount

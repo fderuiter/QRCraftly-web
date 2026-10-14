@@ -68,7 +68,7 @@ async function open(page: Page, path: string): Promise<void> {
 async function download(page: Page, format: 'PNG' | 'SVG'): Promise<void> {
   const done = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download options' }).click();
-  await page.getByRole('radio', { name: format }).click();
+  await page.getByRole('group', { name: 'Download options' }).getByRole('radio', { name: format }).click();
   await page.getByRole('button', { name: `Download ${format}` }).click();
   await done;
 }

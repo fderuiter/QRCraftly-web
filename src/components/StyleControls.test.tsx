@@ -143,7 +143,7 @@ describe('StyleControls Component', () => {
   it('renders logo upload section', () => {
       render(<StyleControls config={DEFAULT_CONFIG} onChange={mockOnChange} />);
       expandAppearanceSections();
-      expect(screen.getByText('Upload Logo')).toBeInTheDocument();
+      expect(screen.getByText('Upload logo')).toBeInTheDocument();
   });
 
   it('gives the logo and Mosaic QR file inputs distinct accessible names', () => {
@@ -305,7 +305,7 @@ describe('StyleControls Component', () => {
       render(<StyleControls config={borderConfig} onChange={mockOnChange} />);
       expandAppearanceSections();
 
-      const textInput = screen.getByPlaceholderText('Text on border...');
+      const textInput = screen.getByPlaceholderText('Text on border…');
       fireEvent.change(textInput, { target: { value: 'Scan Me' } });
       expect(mockOnChange).toHaveBeenCalledWith({ borderText: 'Scan Me' });
 

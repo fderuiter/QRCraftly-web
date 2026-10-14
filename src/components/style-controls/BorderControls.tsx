@@ -111,7 +111,7 @@ export const BorderControls: React.FC<BorderControlsProps> = ({ config, onChange
             {/* Border Text */}
             <div className="mb-3 space-y-2">
               <TextField
-                placeholder="Text on border..."
+                placeholder="Text on border…"
                 value={config.borderText}
                 onChange={(e) => onChange({ borderText: e.target.value })}
                 aria-label="Border text"

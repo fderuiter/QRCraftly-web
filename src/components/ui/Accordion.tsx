@@ -18,6 +18,11 @@ interface AccordionItemProps {
   panelId?: string;
   /** Called with the new expanded state whenever the section is toggled. */
   onOpenChange?: (open: boolean) => void;
+  /**
+   * Opens the panel each time this number changes (a page's call to action uses it). Leave it
+   * undefined for a section the page does not open.
+   */
+  openRequest?: number;
 }
 
 /**
@@ -32,10 +37,17 @@ interface AccordionItemProps {
  * @param props.headingLevel - Heading level wrapping the button.
  * @param props.panelId - Optional stable panel id.
  * @param props.onOpenChange - Called with the new expanded state.
+ * @param props.openRequest - Opens the panel each time this number changes.
  * @returns The disclosure section.
  */
-export function AccordionItem({ title, children, defaultOpen = false, headingLevel, panelId: panelIdProp, onOpenChange }: AccordionItemProps) {
+export function AccordionItem({ title, children, defaultOpen = false, headingLevel, panelId: panelIdProp, onOpenChange, openRequest }: AccordionItemProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  // A new open request opens the panel during this render, so it is open when the caller's effects run.
+  const [seenRequest, setSeenRequest] = useState(openRequest);
+  if (openRequest !== seenRequest) {
+    setSeenRequest(openRequest);
+    if (openRequest !== undefined) setIsOpen(true);
+  }
   const id = useId();
   const buttonId = `accordion-button-${id}`;
   const panelId = panelIdProp ?? `accordion-panel-${id}`;
@@ -44,6 +56,9 @@ export function AccordionItem({ title, children, defaultOpen = false, headingLev
   useEffect(() => {
     onOpenChangeRef.current = onOpenChange;
   });
+  useEffect(() => {
+    if (openRequest !== undefined) onOpenChangeRef.current?.(true);
+  }, [openRequest]);
 
   // A link to something inside a collapsed panel (such as a heading anchor) opens it.
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeUrl, SafeUrlPipeline } from './url';
+import { looksLikeWebAddress, normalizeUrl, SafeUrlPipeline } from './url';
 
 describe('SafeUrlPipeline', () => {
   describe('decodeHtmlEntities', () => {
@@ -131,5 +131,19 @@ describe('normalizeUrl', () => {
     // Lone surrogate \uD800 causes encodeURI to throw
     const invalid = '\uD800';
     expect(normalizeUrl(invalid)).toBe(invalid);
+  });
+});
+
+describe('looksLikeWebAddress', () => {
+  it('accepts addresses a phone can open', () => {
+    for (const value of ['', 'example.com', 'https://example.com/a%20b', 'www.example.co.uk/menu?x=1', 'localhost:3000', 'http://192.168.1.10/', 'mailto:a@b.example']) {
+      expect(looksLikeWebAddress(value)).toBe(true);
+    }
+  });
+
+  it('rejects text with no host, spaces in the host or no dot', () => {
+    for (const value of ['not a url', 'https://not%20a%20url/', 'mysite', 'https://intranet/']) {
+      expect(looksLikeWebAddress(value)).toBe(false);
+    }
   });
 });

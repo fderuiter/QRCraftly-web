@@ -40,6 +40,7 @@ export function LandingPage({ id }: { id: string }) {
       copy={copy}
       presetConfig={preset.presetConfig}
       openSections={preset.openSections}
+      primaryAction={preset.primaryAction}
     />
   );
 }

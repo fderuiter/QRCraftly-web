@@ -86,7 +86,7 @@ export function ScanHud({ analysis, empirical, isNative, usedFallback }: ScanHud
       <section aria-labelledby="arcade-hud-analytical">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 id="arcade-hud-analytical" className="text-sm font-bold text-fg">
-            Reed-Solomon ECC health
+            Damage it can still survive
           </h2>
           <span className={`rounded-md px-2 py-0.5 text-sm font-black tabular-nums ${BADGE_CLASSES[tone]}`} data-testid="arcade-health-percent">
             {analysis.healthPercent}%
@@ -94,15 +94,21 @@ export function ScanHud({ analysis, empirical, isNative, usedFallback }: ScanHud
         </div>
         <div
           role="meter"
-          aria-label="Error correction health"
+          aria-label="Damage it can still survive"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={analysis.healthPercent}
-          aria-valuetext={`${analysis.healthPercent}% error correction budget remaining`}
+          aria-valuetext={`${analysis.healthPercent}% of its damage allowance left`}
           className="h-3 w-full overflow-hidden rounded-full bg-line"
         >
           <div className={`h-full rounded-full transition-[width] duration-150 ${BAR_CLASSES[tone]}`} data-tone={tone} style={{ width: `${analysis.healthPercent}%` }} />
         </div>
+        <details className="mt-2 text-xs text-fg-muted">
+          <summary className="cursor-pointer font-semibold text-accent">What is this?</summary>
+          <p className="mt-1">
+            QR codes carry spare check data, so a scanner can rebuild squares that are missing or smudged. This bar shows how much damage is still within that spare allowance. Error correction is the name for this spare data.
+          </p>
+        </details>
         <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-fg-muted">
           <div>
             <dt>Damaged modules</dt>
@@ -172,7 +178,7 @@ function EmpiricalBadge({ state }: { state: EmpiricalState }) {
     return (
       <p className="flex items-center gap-2 rounded-lg border border-success-line bg-success-soft px-3 py-2 text-sm font-black tracking-widest text-success" data-status="scannable">
         <ShieldCheck className="size-5 motion-safe:animate-pulse" aria-hidden="true" />
-        SCANNABLE
+        Still scans
       </p>
     );
   }
@@ -180,7 +186,7 @@ function EmpiricalBadge({ state }: { state: EmpiricalState }) {
     return (
       <p className="flex items-center gap-2 rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-sm font-black tracking-widest text-danger" data-status="corrupted">
         <ShieldAlert className="size-5 motion-safe:animate-pulse" aria-hidden="true" />
-        CORRUPTED / UNREADABLE
+        No longer scans
       </p>
     );
   }
