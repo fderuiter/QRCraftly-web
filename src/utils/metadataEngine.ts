@@ -173,6 +173,16 @@ export const resolveImageUrl = (imageConfig: string | undefined, _path: string):
   return imageUrl;
 };
 
+/** Slug words with a fixed spelling in page names, so breadcrumbs read "SMS QR Code", not "Sms Qr Code". */
+const WORD_SPELLINGS: ReadonlyMap<string, string> = new Map([
+  ['qr', 'QR'],
+  ['sms', 'SMS'],
+  ['url', 'URL'],
+  ['pdf', 'PDF'],
+  ['csv', 'CSV'],
+  ['vcard', 'vCard'],
+]);
+
 export const formatPathName = (segment: string): string => {
   // Dictionary for specific overrides
   const overrides: Record<string, string> = {
@@ -210,10 +220,10 @@ export const formatPathName = (segment: string): string => {
     return overrides[segment];
   }
 
-  // Default: Capitalize each word (replace dashes with spaces)
+  // Default: Capitalize each word (replace dashes with spaces), keeping acronyms and vCard as written
   return segment
     .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map(word => WORD_SPELLINGS.get(word) ?? word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 };
 

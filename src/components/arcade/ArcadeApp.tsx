@@ -102,9 +102,9 @@ export function ArcadeApp() {
             <Gamepad2 className="size-7" />
           </span>
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-fg sm:text-3xl">QR Arcade &amp; Durability Lab</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-fg sm:text-4xl">QR Arcade &amp; Durability Lab</h1>
             <p className="mt-1 text-sm text-fg-muted sm:text-base">
-              Blast your QR design and watch Reed-Solomon error correction and a real scanner decide whether it survives.
+              Blast your QR design and watch its built-in error correction and a real scanner decide whether it still works.
             </p>
           </div>
         </div>

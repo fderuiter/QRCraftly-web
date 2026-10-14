@@ -79,4 +79,16 @@ describe('landing pages (#1035, #1036, #1037)', () => {
       }
     }
   });
+
+  it('offers the "Add your picture" call to action only on the mosaic page, and it opens the Logo section', () => {
+    expect(LANDING_PRESETS['mosaic-qr-code'].primaryAction).toEqual({
+      label: 'Add your picture',
+      section: 'Logo',
+      focusId: 'mosaic-upload-button',
+    });
+    expect(LANDING_PRESETS['mosaic-qr-code'].openSections).toContain('Logo');
+    for (const id of Object.keys(LANDING_PRESETS).filter((key) => key !== 'mosaic-qr-code')) {
+      expect(LANDING_PRESETS[id].primaryAction).toBeUndefined();
+    }
+  });
 });

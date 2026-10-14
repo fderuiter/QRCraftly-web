@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { Moon, Sun, SunMoon } from 'lucide-react';
 import { Button } from './Button';
 import { Tooltip } from './Tooltip';
 import { useTheme } from '@/context/ThemeContext';
@@ -28,7 +28,8 @@ const THEME_LABELS: Record<ThemePreference, string> = {
   dark: 'Dark',
 };
 
-const THEME_ICONS = { system: Monitor, light: Sun, dark: Moon } as const;
+// SunMoon reads as "follows the light/dark mode" rather than a display setting.
+const THEME_ICONS = { system: SunMoon, light: Sun, dark: Moon } as const;
 
 /**
  * Builds the toggle's accessible name: the current theme and what activating it does.

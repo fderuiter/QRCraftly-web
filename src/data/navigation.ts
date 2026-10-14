@@ -91,6 +91,12 @@ export const TOOL_LINKS: readonly (readonly [label: string, href: string])[] = [
   ['QR Code Checker', '/qr-code-checker'],
 ];
 
+/** Help pages, listed in the mobile site menu and in the footer's Company column. */
+export const HELP_LINKS: readonly (readonly [label: string, href: string])[] = [
+  ['Guides', '/guides'],
+  ['No-Ads Pledge', '/free-forever'],
+];
+
 /** The landing pages that open the generator with presets for one job (#1035, #1037), listed in the footer. */
 export const USE_CASE_LINKS: readonly (readonly [label: string, href: string])[] = [
   ['Image QR Code', '/mosaic-qr-code'],

@@ -36,7 +36,7 @@ import { getExportRiskPolicy } from '@/utils/exportRiskPolicy';
 import { isDangerousUrl } from '@/utils/security';
 import { useToast } from './ui/Toast';
 import { useScannability } from '@/hooks/useScannability';
-import { ScannabilityIndicator } from '@/components/ScannabilityIndicator';
+import { FIX_LABELS, ScannabilityIndicator } from '@/components/ScannabilityIndicator';
 import { QRProvider, useQRStore, useQRStoreSelector } from '@/context/QRContext';
 import { getSamplePayload, hydrateWifiData } from '@/packages/qr-payload';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -45,7 +45,7 @@ import { StressTestButton } from './arcade/StressTestButton';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from './ToolWorkspaceLayout';
 import { usePageContent } from '@/data/PageContentContext';
 import { MiniPreview } from './MiniPreview';
-import { getScanVerdict, type ScanFix, type ScanVerdict } from '@/packages/scannability';
+import { getScanAdvice, getScanVerdict, type ScanFix, type ScanVerdict } from '@/packages/scannability';
 import { GeneratorCommands } from './command/GeneratorCommands';
 import { useUndoToast } from '@/hooks/useUndoToast';
 import { SegmentedControl } from './ui/SegmentedControl';
@@ -182,7 +182,8 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   const optionsButtonRef = useRef<HTMLButtonElement>(null);
   const closeOptions = useCallback(() => setOptionsOpen(false), []);
   usePopoverDismiss({ open: optionsOpen, containerRef: exportRowRef, triggerRef: optionsButtonRef, onClose: closeOptions });
-  // The mobile action bar steps aside while the on-screen keyboard is up.
+  // The mobile action bar and mini preview step aside while the on-screen keyboard is up,
+  // so neither covers the field being typed in (WCAG 2.4.11).
   const [inputFocused, setInputFocused] = useState(false);
   useEffect(() => {
     // Fields in the Download options sit inside the bar, so they must not hide it.
@@ -276,7 +277,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
     if (result.error?.name === 'AbortError') return;
     addToast({
       type: 'error',
-      message: result.error?.message || `Failed to export QR code as ${result.format || 'image'}.`,
+      message: result.error?.message || `Could not export the QR code${result.format ? ` as ${result.format.toUpperCase()}` : ''}. Try again, or pick another format.`,
       duration: 5000,
     });
   }, [addToast]);
@@ -365,20 +366,31 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
     }
   };
 
+  // The safety gate names the top problem and offers its one-tap fix, the same advice as the badge.
+  const gateAdvice = showSafetyGate ? getScanAdvice({ status: scannabilityStatus, health, errorCorrectionLevel: config.errorCorrectionLevel }) : null;
+
   return (
     <div className="w-full" id="top">
-      <Modal isOpen={showSafetyGate} onClose={() => setShowSafetyGate(false)} title="Scan Safety Warning">
+      <Modal isOpen={showSafetyGate} onClose={() => setShowSafetyGate(false)} title="This Code May Not Scan">
         <div className="flex flex-col items-center gap-4 text-center">
           <AlertTriangle className="size-12 text-warning" aria-hidden="true" />
           <p className="text-fg-soft">
-            This QR code might fail to scan in real-world conditions. We recommend adjusting colors, pattern, or margin for better contrast.
+            This QR code might fail to scan in real-world conditions.{' '}
+            {gateAdvice?.message ?? 'Adjust the colors, pattern or margin, then try again.'}
           </p>
-          <div className="mt-4 flex w-full gap-3">
-             <Button variant="outline" fullWidth onClick={() => setShowSafetyGate(false)}>Go Back</Button>
-             <Button variant="primary" fullWidth onClick={() => {
+          <div className="mt-4 flex w-full flex-wrap gap-3">
+             {gateAdvice?.fix ? (
+               <Button variant="primary" fullWidth onClick={() => {
+                 if (gateAdvice.fix) handleFix(gateAdvice.fix);
+                 setShowSafetyGate(false);
+               }}>{FIX_LABELS[gateAdvice.fix]}</Button>
+             ) : (
+               <Button variant="primary" fullWidth onClick={() => setShowSafetyGate(false)}>Go back</Button>
+             )}
+             <Button variant="outline" fullWidth onClick={() => {
                setShowSafetyGate(false);
                if (gateAction) gateAction();
-             }}>Export Anyway</Button>
+             }}>Export anyway</Button>
           </div>
         </div>
       </Modal>
@@ -450,11 +462,21 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                    <QRCanvas ref={canvasRef} onRendered={handleRendered} onRenderFailed={setPreviewFailure} config={debouncedConfig} className={`rounded-lg shadow-raised ${STAGE_SIZE_CLASSES[debouncedConfig.socialFormat] ?? STAGE_SIZE_CLASSES[SocialFormat.SQUARE_1_1]}`} />
                 </div>
 
+                {/* The common formats in view, so a vector download is one click; the rest are in Download options. */}
+                <SegmentedControl<DownloadFormat>
+                   label="File format"
+                   className="mb-2 max-md:hidden"
+                   value={format}
+                   onChange={setFormat}
+                   options={[...new Set<DownloadFormat>(['png', 'svg', 'pdf', format])].map((value) => ({ value, label: FORMAT_LABELS[value] }))}
+                />
+
                 {/* One export row. Below md it docks to the bottom of the screen as a sticky action bar. */}
                 <div
                    ref={exportRowRef}
-                   className={`fixed inset-x-0 bottom-0 z-30 flex items-center gap-2 border-t border-line bg-surface/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-overlay backdrop-blur md:relative md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none ${inputFocused ? 'max-md:hidden' : ''}`}
+                   className={`fixed inset-x-0 bottom-0 z-30 flex items-center gap-2 border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-overlay md:relative md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none ${inputFocused ? 'max-md:hidden' : ''}`}
                    data-testid="export-actions"
+                   data-docked-bar
                 >
                    <span role="status" className="sr-only">{done?.message ?? ''}</span>
                    <span
@@ -577,7 +599,8 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
         </Suspense>
       )}
       <GeneratorCommands actions={commandActions} onDownload={onDownload} />
-      <MiniPreview sourceRef={canvasRef} targetId={PREVIEW_ID} renderKey={debouncedConfig} />
+      {/* No thumbnail while there is no code to mirror: it would be an empty box. */}
+      <MiniPreview sourceRef={canvasRef} targetId={PREVIEW_ID} renderKey={debouncedConfig} suppressed={inputFocused || noVerdict} />
       {/* Keeps the last content clear of the mobile action bar. */}
       <div aria-hidden="true" className="h-20 md:hidden" />
 

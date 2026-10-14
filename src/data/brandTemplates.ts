@@ -38,7 +38,7 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
   },
   {
     id: 'preset-cyber-neon',
-    name: 'Cyber Circuit',
+    name: 'Neon Circuit',
     description: 'Cyan circuit lines on near-black. Harder to scan, so test it.',
     isPrebuilt: true,
     config: {

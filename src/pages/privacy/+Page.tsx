@@ -42,6 +42,7 @@ const SECTION_CLASSES = 'mb-10 scroll-mt-6 space-y-3 text-fg-soft';
 export default function Page() {
   return (
     <ArticleLayout
+      pageId="privacy"
       title="QRCraftly for iPhone, iPad and Mac: Privacy Policy"
       lead="QRCraftly is made to work entirely on your device. We don't collect, store or share any of your data."
       sections={SECTIONS}

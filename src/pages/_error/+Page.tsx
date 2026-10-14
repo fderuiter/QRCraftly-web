@@ -48,15 +48,15 @@ export default function Page() {
   const home = (
     <ButtonLink href="/" variant="primary">
       <Home className="size-4" aria-hidden="true" />
-      Go Home
+      Go home
     </ButtonLink>
   );
 
   if (!is404) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center text-fg-soft">
-        <h1 className="mb-4 text-4xl font-bold">500 - Internal Server Error</h1>
-        <p className="mb-8">Something went wrong on our end.</p>
+        <h1 className="mb-4 text-3xl font-bold text-fg sm:text-4xl">500 - Internal Server Error</h1>
+        <p className="mb-8">This page hit a problem. Reload it, or go back to the home page.</p>
         {home}
       </div>
     );
@@ -64,7 +64,7 @@ export default function Page() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
-      <h1 className="mb-6 text-center text-3xl font-bold text-fg">404 - Page Not Found</h1>
+      <h1 className="mb-6 text-center text-3xl font-bold text-fg sm:text-4xl">404 - Page Not Found</h1>
       <EmptyState
         level={2}
         illustration={<QrIllustration broken className="size-7 text-accent" />}

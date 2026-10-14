@@ -148,7 +148,7 @@ describe('QRScanner Component', () => {
 
     render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
     const video = screen.getByLabelText('Webcam feed') as HTMLVideoElement;
-    expect(await screen.findByText('Starting the camera...')).toBeInTheDocument();
+    expect(await screen.findByText('Starting the camera…')).toBeInTheDocument();
 
     await act(async () => {
       grant();
@@ -156,7 +156,7 @@ describe('QRScanner Component', () => {
     await settle();
 
     expect(screen.getByLabelText('Webcam feed')).toBe(video);
-    expect(screen.queryByText('Starting the camera...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Starting the camera…')).not.toBeInTheDocument();
     expect(video.srcObject).not.toBeNull();
     expect(liveTracks()).toBe(1);
   });
@@ -258,6 +258,140 @@ describe('QRScanner Component', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Scan from an image instead' }));
     expect(screen.getByRole('heading', { name: 'Scan from an image' })).toBeInTheDocument();
+  });
+
+  describe('camera permission state (Permissions API)', () => {
+    type Listener = () => void;
+    type FakeStatus = { state: PermissionState } & Pick<PermissionStatus, 'addEventListener' | 'removeEventListener'>;
+    const originalPermissions = Object.getOwnPropertyDescriptor(navigator, 'permissions');
+    const originalLocation = Object.getOwnPropertyDescriptor(window, 'location');
+
+    /** A PermissionStatus whose state the test can change, firing its 'change' event. */
+    const fakeStatus = (state: PermissionState) => {
+      const listeners = new Set<Listener>();
+      const status: FakeStatus = {
+        state,
+        addEventListener: vi.fn((_type: string, listener: Listener) => listeners.add(listener)),
+        removeEventListener: vi.fn((_type: string, listener: Listener) => listeners.delete(listener)),
+      };
+      const change = (next: PermissionState) => {
+        status.state = next;
+        listeners.forEach((listener) => listener());
+      };
+      return { status, change, listeners };
+    };
+
+    const setPermissions = (value: Partial<Permissions> | undefined) => {
+      Object.defineProperty(navigator, 'permissions', { value, configurable: true, writable: true });
+    };
+
+    /** Stops the page reload from running in jsdom, and counts the calls. */
+    const stubReload = () => {
+      const reload = vi.fn();
+      Object.defineProperty(window, 'location', { value: { ...window.location, reload }, configurable: true, writable: true });
+      return reload;
+    };
+
+    afterEach(() => {
+      if (originalPermissions) Object.defineProperty(navigator, 'permissions', originalPermissions);
+      else Reflect.deleteProperty(navigator, 'permissions');
+      if (originalLocation) Object.defineProperty(window, 'location', originalLocation);
+    });
+
+    it('says the camera is blocked for this site and offers a reload when the browser denies it', async () => {
+      const { status } = fakeStatus('denied');
+      setPermissions({ query: vi.fn().mockResolvedValue(status) });
+      deny('NotAllowedError');
+      const reload = stubReload();
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+
+      expect(await screen.findByText('Camera blocked for this site')).toBeInTheDocument();
+      expect(screen.queryByText('Camera Access Denied')).not.toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(/Camera blocked for this site.*padlock or site settings icon/);
+      expect(screen.queryByRole('button', { name: /retry permission/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Start camera' })).not.toBeInTheDocument();
+      // The image fallback still comes first.
+      const switchBtn = screen.getByRole('button', { name: 'Scan from an image instead' });
+      const reloadBtn = screen.getByRole('button', { name: 'Reload page' });
+      expect(switchBtn.compareDocumentPosition(reloadBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+      fireEvent.click(reloadBtn);
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(await axe(switchBtn.closest('div.absolute') as HTMLElement)).toHaveNoViolations();
+    });
+
+    it('keeps Retry Permission when the browser will still prompt', async () => {
+      setPermissions({ query: vi.fn().mockResolvedValue(fakeStatus('prompt').status) });
+      deny('NotAllowedError');
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+
+      expect(await screen.findByText('Camera Access Denied')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /retry permission/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Reload page' })).not.toBeInTheDocument();
+    });
+
+    it('keeps Retry Permission when the Permissions API is missing', async () => {
+      setPermissions(undefined);
+      deny('NotAllowedError');
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+
+      expect(await screen.findByText('Camera Access Denied')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /retry permission/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Reload page' })).not.toBeInTheDocument();
+    });
+
+    it('keeps Retry Permission when query throws for the camera name (Firefox, Safari)', async () => {
+      setPermissions({
+        query: vi.fn(() => {
+          throw new TypeError("'camera' is not a valid value for enumeration PermissionName");
+        }),
+      });
+      deny('NotAllowedError');
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+
+      expect(await screen.findByText('Camera Access Denied')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /retry permission/i })).toBeInTheDocument();
+    });
+
+    it('keeps Retry Permission when the query is rejected', async () => {
+      setPermissions({ query: vi.fn().mockRejectedValue(new TypeError('unsupported')) });
+      deny('NotAllowedError');
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+
+      expect(await screen.findByText('Camera Access Denied')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /retry permission/i })).toBeInTheDocument();
+    });
+
+    it('offers Start camera once the camera is allowed in the browser settings', async () => {
+      const { status, change } = fakeStatus('denied');
+      setPermissions({ query: vi.fn().mockResolvedValue(status) });
+      deny('NotAllowedError');
+      stubReload();
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      expect(await screen.findByText('Camera blocked for this site')).toBeInTheDocument();
+
+      getUserMedia.mockImplementation(openTrack);
+      await act(async () => {
+        change('granted');
+      });
+      expect(screen.queryByRole('button', { name: 'Reload page' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Start camera' }));
+      await settle();
+      expect(liveTracks()).toBe(1);
+      expect(screen.queryByRole('button', { name: 'Start camera' })).not.toBeInTheDocument();
+    });
+
+    it('removes its permission listener on unmount', async () => {
+      const { status, listeners } = fakeStatus('prompt');
+      setPermissions({ query: vi.fn().mockResolvedValue(status) });
+      const { unmount } = render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+      expect(listeners.size).toBe(1);
+
+      unmount();
+      expect(status.removeEventListener).toHaveBeenCalledTimes(1);
+      expect(listeners.size).toBe(0);
+    });
   });
 
   it('explains a missing camera without offering a permission retry', async () => {

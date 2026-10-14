@@ -22,6 +22,7 @@ import { isDangerousUrl } from '@/utils/security';
 import { AccordionItem } from './ui/Accordion';
 import { ButtonLink } from './ui/Button';
 import { Tooltip } from './ui/Tooltip';
+import { Breadcrumbs } from './Breadcrumbs';
 
 /** One table-of-contents entry: the id and label of an H2 section of the article. */
 export interface ArticleSection {
@@ -30,6 +31,8 @@ export interface ArticleSection {
 }
 
 interface ArticleLayoutProps {
+  /** Registry id of the page; when set, its breadcrumb trail is shown above the heading. */
+  pageId?: string;
   /** The page heading (the only H1). */
   title: ReactNode;
   /** One or two sentences under the heading. */
@@ -105,11 +108,12 @@ function TocLinks({ sections, active }: { sections: readonly ArticleSection[]; a
  * @param props - Layout properties.
  * @returns The article layout.
  */
-export function ArticleLayout({ title, lead, sections, children }: ArticleLayoutProps) {
+export function ArticleLayout({ pageId, title, lead, sections, children }: ArticleLayoutProps) {
   const active = useActiveSection(sections.map((section) => section.id));
   return (
     <div className="mx-auto max-w-6xl min-w-0 px-4 py-10 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-12">
       <article className="max-w-[68ch] min-w-0">
+        {pageId && <Breadcrumbs pageId={pageId} />}
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-fg sm:text-4xl">{title}</h1>
           {lead && <p className="mt-3 text-lg text-fg-muted">{lead}</p>}

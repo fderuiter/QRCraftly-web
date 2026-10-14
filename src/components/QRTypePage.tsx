@@ -20,7 +20,8 @@ import React from 'react';
 import QRTool from '@/components/QRTool';
 import { DEFAULT_CONFIG } from '@/constants';
 import { QRType, type QRConfig } from '@/types';
-import { PresetOpenSections } from '@/components/StyleControls';
+import { PresetOpenSections, PresetPrimaryAction } from '@/components/StyleControls';
+import type { LandingPrimaryAction } from '@/data/landingPages';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import type { ToolCopy } from '@/data/copy/types';
 
@@ -37,6 +38,8 @@ interface QRTypePageProps {
   presetConfig?: Partial<QRConfig>;
   /** Appearance sections that start expanded. */
   openSections?: readonly string[];
+  /** Optional call to action above the controls. */
+  primaryAction?: LandingPrimaryAction;
 }
 
 /** Copy used when a page has none of its own. */
@@ -49,7 +52,7 @@ const NO_SECTIONS: readonly string[] = [];
  * A reusable page component for specific QR code type landing pages.
  * It sets up the QRTool with the correct type. Head renders the page's structured data.
  */
-export const QRTypePage: React.FC<QRTypePageProps> = ({ type, title, toolId, copy, presetConfig, openSections = NO_SECTIONS }) => {
+export const QRTypePage: React.FC<QRTypePageProps> = ({ type, title, toolId, copy, presetConfig, openSections = NO_SECTIONS, primaryAction = null }) => {
   // Only the link generator starts with an example link; every other type starts empty, so its
   // preview shows the type's sample with exports off until something is typed (#1272).
   const config = {
@@ -61,7 +64,9 @@ export const QRTypePage: React.FC<QRTypePageProps> = ({ type, title, toolId, cop
   return (
     <PageCopyContext.Provider value={copy ?? NO_COPY}>
       <PresetOpenSections.Provider value={openSections}>
-        <QRTool initialConfig={config} presetConfig={presetConfig} title={title} toolId={toolId} />
+        <PresetPrimaryAction.Provider value={primaryAction}>
+          <QRTool initialConfig={config} presetConfig={presetConfig} title={title} toolId={toolId} />
+        </PresetPrimaryAction.Provider>
       </PresetOpenSections.Provider>
     </PageCopyContext.Provider>
   );

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { PrimaryNav } from './PrimaryNav';
-import { PRIMARY_NAV_ITEMS } from '@/data/navigation';
+import { GENERATOR_FOOTER_LINKS, PRIMARY_NAV_ITEMS } from '@/data/navigation';
 
 let mockPathname = '/';
 vi.mock('vike-react/usePageContext', () => ({
@@ -46,8 +46,42 @@ describe('PrimaryNav', () => {
     expect(button).toHaveAttribute('aria-expanded', 'true');
     expect(button).toHaveAttribute('aria-haspopup', 'dialog');
     const dialog = menuDialog();
-    expect(within(dialog).getAllByRole('link')).toHaveLength(PRIMARY_NAV_ITEMS.length);
+    const primary = within(dialog).getByRole('navigation', { name: 'Site menu' });
+    expect(within(primary).getAllByRole('link')).toHaveLength(PRIMARY_NAV_ITEMS.length);
     expect(within(dialog).getByRole('link', { name: /File Transfer/ })).toHaveAttribute('href', '/file-transfer');
+  });
+
+  it('groups the QR code types and help pages below the primary destinations in the menu', () => {
+    render(<PrimaryNav />);
+    openMenu();
+    const dialog = menuDialog();
+    const types = within(dialog).getByRole('group', { name: 'QR code types' });
+    expect(within(types).getByRole('heading', { level: 3, name: 'QR code types' })).toBeInTheDocument();
+    expect(within(types).getByRole('link', { name: 'URL QR Code' })).toHaveAttribute('href', '/');
+    expect(within(types).getByRole('link', { name: 'Bulk CSV QR Codes' })).toHaveAttribute('href', '/bulk-csv-qr-code');
+    expect(within(types).getAllByRole('link')).toHaveLength(GENERATOR_FOOTER_LINKS.length);
+
+    const help = within(dialog).getByRole('group', { name: 'Help' });
+    expect(within(help).getByRole('heading', { level: 3, name: 'Help' })).toBeInTheDocument();
+    expect(within(help).getByRole('link', { name: 'Guides' })).toHaveAttribute('href', '/guides');
+    expect(within(help).getByRole('link', { name: 'No-Ads Pledge' })).toHaveAttribute('href', '/free-forever');
+  });
+
+  it('marks the current secondary link with aria-current="page"', () => {
+    mockPathname = '/guides/';
+    render(<PrimaryNav />);
+    openMenu();
+    const help = within(menuDialog()).getByRole('group', { name: 'Help' });
+    expect(within(help).getByRole('link', { name: 'Guides' })).toHaveAttribute('aria-current', 'page');
+    expect(within(help).getByRole('link', { name: 'No-Ads Pledge' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('closes the menu when a QR code type link is chosen', () => {
+    render(<PrimaryNav />);
+    const button = openMenu();
+    fireEvent.click(within(menuDialog()).getByRole('link', { name: 'Text QR Code' }));
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('marks the current destination with aria-current="page"', () => {
@@ -111,7 +145,12 @@ describe('PrimaryNav', () => {
     within(nav).getAllByRole('link').forEach((link) => expect(link.className).toContain('min-h-11'));
     const button = openMenu();
     expect(button.className).toContain('size-11');
-    within(menuDialog()).getAllByRole('link').forEach((link) => expect(link.className).toContain('min-h-12'));
+    within(menuDialog()).getByRole('navigation', { name: 'Site menu' }).querySelectorAll('a').forEach((link) => {
+      expect(link.className).toContain('min-h-12');
+    });
+    within(menuDialog()).getByRole('group', { name: 'QR code types' }).querySelectorAll('a').forEach((link) => {
+      expect(link.className).toContain('min-h-11');
+    });
   });
 
   it('has no axe violations closed or open', async () => {

@@ -37,6 +37,16 @@ describe('ThemeToggle', () => {
     expect(window.localStorage.getItem('qrcraftly:theme')).toBe('dark');
   });
 
+  it('shows a sun-and-moon icon for System, not a display icon', () => {
+    const { container } = render(
+      <ThemeProvider>
+        <ThemeToggle />
+      </ThemeProvider>,
+    );
+    expect(container.querySelector('.lucide-sun-moon')).not.toBeNull();
+    expect(container.querySelector('.lucide-monitor')).toBeNull();
+  });
+
   it('renders outside a provider without crashing', () => {
     render(<ThemeToggle />);
     expect(screen.getByRole('button', { name: /^Theme: System/ })).toBeInTheDocument();

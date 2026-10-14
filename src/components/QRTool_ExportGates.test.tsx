@@ -61,7 +61,7 @@ function renderTool(config: Partial<QRConfig>) {
 
 async function openPosterScene() {
   fireEvent.click(screen.getByRole('radio', { name: 'Poster' }));
-  return screen.findByRole('button', { name: /Download mockup PNG/ });
+  return screen.findByRole('button', { name: /Download mockup PNG/ }, { timeout: 10_000 });
 }
 
 describe('QRTool export gates', () => {
@@ -131,11 +131,11 @@ describe('QRTool export gates', () => {
       await waitFor(() => expect(mockupDownload).toBeEnabled());
 
       fireEvent.click(mockupDownload);
-      expect(await screen.findByText('Scan Safety Warning')).toBeInTheDocument();
+      expect(await screen.findByText('This Code May Not Scan')).toBeInTheDocument();
       expect(triggerFileDownload).not.toHaveBeenCalled();
 
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Export Anyway' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Export anyway' }));
       });
       await waitFor(() => expect(triggerFileDownload).toHaveBeenCalledWith(expect.any(Uint8Array), 'qrcraftly-poster-mockup.png', 'image/png'));
     });

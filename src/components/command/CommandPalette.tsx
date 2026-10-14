@@ -89,7 +89,7 @@ function PaletteBody({ commands, onClose }: { commands: readonly Command[]; onCl
           setActive(0);
         }}
         onKeyDown={onKeyDown}
-        className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-fg placeholder:text-fg-muted focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none"
+        className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-fg placeholder:text-fg-muted"
       />
       <p role="status" className="sr-only">
         {results.length === 0 ? 'No matching commands' : `${results.length} ${results.length === 1 ? 'command' : 'commands'} available`}

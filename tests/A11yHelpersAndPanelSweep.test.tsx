@@ -84,15 +84,15 @@ describe('Modular Accessibility Test Helpers & Full Panel Sweep', () => {
     fireEvent.click(downloadBtn);
 
     // Verify warning dialog is open
-    expect(screen.getByText('Scan Safety Warning')).toBeInTheDocument();
+    expect(screen.getByText('This Code May Not Scan')).toBeInTheDocument();
 
-    // Find and click 'Go Back' inside the modal to cancel/close the warning
-    const goBackBtn = screen.getByRole('button', { name: 'Go Back' });
-    fireEvent.click(goBackBtn);
+    // The dialog offers the matching fix first; close it without changing anything
+    expect(screen.getByRole('button', { name: 'Use black on white' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Close/ }));
 
     // Confirm that the warning dialog is hidden
     await waitFor(() => {
-      expect(screen.queryByText('Scan Safety Warning')).not.toBeInTheDocument();
+      expect(screen.queryByText('This Code May Not Scan')).not.toBeInTheDocument();
     });
 
     // Verify focus is restored to the element that opened the dialog (the Download button)
@@ -219,7 +219,7 @@ describe('Modular Accessibility Test Helpers & Full Panel Sweep', () => {
 
     // Validate Border section has expanded
     expect(screen.getByLabelText('Style')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Text on border...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Text on border…')).toBeInTheDocument();
 
     // Validate Layout/Template details has expanded
     expect(screen.getByPlaceholderText('Headline (e.g. Scan Me!)')).toBeInTheDocument();

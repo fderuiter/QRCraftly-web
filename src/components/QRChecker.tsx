@@ -129,7 +129,7 @@ export const QRChecker: React.FC<QRCheckerProps> = ({ onEdit, editLabel = 'Open 
       <div className="flex flex-col gap-4" data-testid="qr-checker">
         {feedback}
         <div className="rounded-xl border border-line bg-surface p-4">
-          <h2 className="mb-2 text-lg font-semibold text-fg">Scan check</h2>
+          <h2 className="mb-2 text-lg font-semibold text-fg">Scan Check</h2>
           {outcome.status ? (
             <ScannabilityIndicator status={outcome.status} />
           ) : (

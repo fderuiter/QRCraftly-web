@@ -47,6 +47,13 @@ const CAMERA_PROBLEMS: Record<CameraProblemStatus, { title: string; body: string
   error: { title: 'Camera Unavailable', body: 'You can still scan a QR code from a photo or screenshot.', retry: true },
 };
 
+/** Shown instead of the denied copy when the browser has blocked the camera for this site. */
+const BLOCKED_PROBLEM = {
+  title: 'Camera blocked for this site',
+  body: 'Your browser is blocking the camera for this site. To allow it, click the padlock or site settings icon in the address bar, set Camera to Allow, then reload this page.',
+  retry: false,
+};
+
 type CameraProblem = Extract<CameraSessionState, { error: Error }>;
 
 const isCameraProblem = (state: CameraSessionState): state is CameraProblem => 'error' in state;
@@ -100,6 +107,43 @@ function getPlatformInstructions(): string {
 /** Whether the async clipboard can read images here (`navigator.clipboard.read`). */
 const canReadClipboardImages = (): boolean =>
   typeof navigator !== 'undefined' && typeof navigator.clipboard?.read === 'function';
+
+/**
+ * The camera permission for this site, as the Permissions API reports it. Null when the browser
+ * cannot say (no Permissions API, or it rejects the camera name, as some Firefox and Safari
+ * versions do). Listens for changes, so a camera allowed in the browser settings shows up at once.
+ */
+function useCameraPermission(): PermissionState | null {
+  const [permission, setPermission] = useState<PermissionState | null>(null);
+  useEffect(() => {
+    let status: PermissionStatus | null = null;
+    let active = true;
+    const onChange = () => {
+      if (status && active) setPermission(status.state);
+    };
+    let query: Promise<PermissionStatus>;
+    try {
+      const permissions: Permissions | undefined = typeof navigator === 'undefined' ? undefined : navigator.permissions;
+      if (typeof permissions?.query !== 'function') return undefined;
+      query = permissions.query({ name: 'camera' });
+    } catch {
+      return undefined;
+    }
+    query
+      .then((result) => {
+        if (!active) return;
+        status = result;
+        setPermission(result.state);
+        result.addEventListener('change', onChange);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      status?.removeEventListener('change', onChange);
+    };
+  }, []);
+  return permission;
+}
 
 /** Two-finger pinch on the viewfinder sets the zoom (touch screens). */
 function usePinchZoom(zoom: { min: number; max: number; value: number } | null, setZoom: (value: number) => void) {
@@ -211,6 +255,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
   const [lock, setLock] = useState<CameraScanResult['corners']>(null);
   const [history, setHistory] = useState<ScanDescription[]>(() => sessionHistory);
   const [announcement, setAnnouncement] = useState('');
+  const permission = useCameraPermission();
 
   const ids = useId();
   const fileErrorId = `${ids}-file-error`;
@@ -316,7 +361,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
 
     setFileError(null);
     setFileProcessing(true);
-    setAnnouncement('Reading the image...');
+    setAnnouncement('Reading the image…');
 
     try {
       const scanned = await scanFile(file, { signal: controller.signal });
@@ -438,7 +483,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
 
   let statusLine = 'Point at a QR code';
   if (lock) statusLine = 'Got it';
-  else if (camera.status === 'requesting') statusLine = 'Starting the camera...';
+  else if (camera.status === 'requesting') statusLine = 'Starting the camera…';
   else if (frameStatus === 'pass') statusLine = 'Hold steady';
 
   const imageButtons = (
@@ -459,7 +504,10 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
   const renderCameraProblem = () => {
     if (!isCameraProblem(camera)) return null;
     const denied = camera.status === 'denied';
-    const problem = CAMERA_PROBLEMS[camera.status];
+    // A block in the site settings cannot be cleared by asking again, so say how to allow it.
+    const blocked = denied && permission === 'denied';
+    const allowedSinceDenied = denied && permission === 'granted';
+    const problem = blocked ? BLOCKED_PROBLEM : CAMERA_PROBLEMS[camera.status];
     // Lead with the ways that work without a camera; permission help is secondary.
     return (
       <div className="absolute inset-0 flex flex-col gap-3 overflow-y-auto bg-surface p-4">
@@ -487,11 +535,19 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
         />
         {denied && (
           <div className="flex flex-col items-center gap-2 text-center text-xs text-fg-muted">
-            <p className="max-w-sm">To use the camera: {getPlatformInstructions()}</p>
-            <Button variant="ghost" size="sm" onClick={() => void start()}>
-              <RefreshCw className="size-3.5" aria-hidden="true" />
-              Retry Permission
-            </Button>
+            {!blocked && <p className="max-w-sm">To use the camera: {getPlatformInstructions()}</p>}
+            {blocked && (
+              <Button variant="ghost" size="sm" onClick={() => window.location.reload()}>
+                <RefreshCw className="size-3.5" aria-hidden="true" />
+                Reload page
+              </Button>
+            )}
+            {!blocked && (
+              <Button variant="ghost" size="sm" onClick={() => void start()}>
+                <RefreshCw className="size-3.5" aria-hidden="true" />
+                {allowedSinceDenied ? 'Start camera' : 'Retry Permission'}
+              </Button>
+            )}
           </div>
         )}
         {problem.retry && (

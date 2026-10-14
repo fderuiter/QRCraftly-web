@@ -24,14 +24,13 @@ import { PrimaryNav } from './ui/PrimaryNav';
 import { InstallAppButton } from './InstallAppButton';
 import { ThemeToggle } from './ui/ThemeToggle';
 import { PLEDGE_TAGLINE } from '@/data/pledge';
-import { GENERATOR_FOOTER_LINKS, TOOL_LINKS, USE_CASE_LINKS } from '@/data/navigation';
+import { GENERATOR_FOOTER_LINKS, HELP_LINKS, TOOL_LINKS, USE_CASE_LINKS } from '@/data/navigation';
 
-const FOOTER_LINK_CLASSES = 'transition-colors hover:text-accent';
+const FOOTER_LINK_CLASSES = 'inline-flex min-h-6 items-center transition-colors hover:text-accent';
 
 const COMPANY_LINKS = [
   ['About', '/about'],
-  ['Guides', '/guides'],
-  ['No-Ads Pledge', '/free-forever'],
+  ...HELP_LINKS,
   ['Security Policy', '/security#security'],
   ['Privacy Architecture', '/security#compliance'],
   ['Third-Party Licenses', '/acknowledgements'],

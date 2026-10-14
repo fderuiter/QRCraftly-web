@@ -19,7 +19,7 @@ describe('BrandTemplateGallery Component', () => {
 
     expect(screen.getByText('Classic Slate')).toBeInTheDocument();
     expect(screen.getByText('Modern Teal')).toBeInTheDocument();
-    expect(screen.getByText('Save as Template')).toBeInTheDocument();
+    expect(screen.getByText('Save as template')).toBeInTheDocument();
     expect(screen.getByText('Import JSON')).toBeInTheDocument();
   });
 
@@ -64,7 +64,7 @@ describe('BrandTemplateGallery Component', () => {
     expect(stored[0].name).toBe('My Brand Dark');
   });
 
-  it('switches between Curated Presets and My Templates tabs', () => {
+  it('switches between the ready-made and my templates tabs', () => {
     render(<BrandTemplateGallery config={DEFAULT_CONFIG} onChange={mockOnChange} />);
 
     const myTemplatesTab = screen.getByRole('tab', { name: /my templates/i });
@@ -72,7 +72,7 @@ describe('BrandTemplateGallery Component', () => {
 
     expect(screen.getByText(/no custom templates saved yet/i)).toBeInTheDocument();
 
-    const presetsTab = screen.getByRole('tab', { name: /curated presets/i });
+    const presetsTab = screen.getByRole('tab', { name: /ready-made/i });
     fireEvent.click(presetsTab);
 
     expect(screen.getByText('Classic Slate')).toBeInTheDocument();

@@ -84,7 +84,7 @@ test.describe('Mobile action bar and mini preview (#1051)', () => {
     await gotoHydrated(page, '/');
 
     await expect(page.getByTestId('mini-preview')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Pattern & Colors' }).scrollIntoViewIfNeeded();
+    await page.getByRole('button', { name: 'Advanced Mode' }).scrollIntoViewIfNeeded();
     const thumb = page.getByTestId('mini-preview');
     await expect(thumb).toBeVisible();
     await expect(thumb).toBeInViewport();
@@ -103,6 +103,27 @@ test.describe('Mobile action bar and mini preview (#1051)', () => {
     await expect(bar).toBeHidden();
     await page.locator('#url-input').blur();
     await expect(bar).toBeVisible();
+  });
+
+  test('the thumbnail steps aside while typing so it does not cover the field', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoHydrated(page, '/');
+
+    const hex = page.getByRole('textbox', { name: 'Background Hex Code' });
+    await hex.scrollIntoViewIfNeeded();
+    await expect(page.getByTestId('mini-preview')).toBeVisible();
+    await hex.focus();
+    await expect(page.getByTestId('mini-preview')).toHaveCount(0);
+    await hex.blur();
+    await expect(page.getByTestId('mini-preview')).toBeVisible();
+  });
+
+  test('no thumbnail while there is no code to show', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoHydrated(page, '/wifi-qr-code');
+
+    await page.getByRole('button', { name: 'Advanced Mode' }).scrollIntoViewIfNeeded();
+    await expect(page.getByTestId('mini-preview')).toHaveCount(0);
   });
 
   test('desktop shows no mini preview or docked bar', async ({ page }) => {

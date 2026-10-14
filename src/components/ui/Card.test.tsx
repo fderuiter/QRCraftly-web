@@ -24,7 +24,7 @@ describe('Card Component', () => {
     const element = container.firstChild as HTMLElement;
     expect(element).toHaveClass('bg-red-500');
     expect(element).toHaveClass('custom-card-class');
-    expect(element).toHaveClass('shadow-2xl');
+    expect(element).toHaveClass('shadow-raised');
   });
 
   it('should apply the default variant classes correctly when not specified', () => {
@@ -32,9 +32,9 @@ describe('Card Component', () => {
     const element = container.firstChild as HTMLElement;
     expect(element).toHaveClass('bg-surface');
     expect(element).toHaveClass('border-line');
-    expect(element).toHaveClass('shadow-2xl');
+    expect(element).toHaveClass('shadow-raised');
     expect(element).toHaveClass('p-8');
-    expect(element).toHaveClass('rounded-3xl');
+    expect(element).toHaveClass('rounded-xl');
   });
 
   it('should apply control variant classes correctly', () => {

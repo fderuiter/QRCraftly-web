@@ -70,7 +70,10 @@ describe('SidebarContent FAQs and intro', () => {
   it('shows the homepage intro with a link to the pledge', () => {
     renderSidebar('index');
     expect(screen.getByText(contentRegistry['index'].intro ?? '')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Read the no-ads pledge' })).toHaveAttribute('href', '/free-forever');
+    const pledge = screen.getByRole('link', { name: 'Read the no-ads pledge' });
+    expect(pledge).toHaveAttribute('href', '/free-forever');
+    // Standalone links get a 24px minimum target (WCAG 2.2 SC 2.5.8).
+    expect(pledge).toHaveClass('min-h-6', 'inline-flex');
   });
 });
 

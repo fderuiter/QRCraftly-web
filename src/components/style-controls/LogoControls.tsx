@@ -103,9 +103,9 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
                 aria-label={`Select ${preset.label} logo`}
                 aria-pressed={isSelected}
                 title={preset.label}
-                className={`group relative flex size-11 items-center justify-center rounded-lg border transition-all focus:ring-2 focus:ring-accent focus:outline-none ${
+                className={`group relative flex size-11 items-center justify-center rounded-lg border transition-all ${
                   isSelected
-                    ? 'border-accent bg-accent-soft shadow-xs ring-2 ring-accent'
+                    ? 'border-accent bg-accent-soft shadow-raised ring-2 ring-accent'
                     : 'border-line bg-surface-raised hover:border-line-strong'
                 }`}
               >
@@ -139,7 +139,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
             <span className="mb-2 flex size-10 items-center justify-center rounded-full bg-surface-hover transition-colors group-hover:bg-accent-soft">
               <Upload className="size-5" aria-hidden="true" />
             </span>
-            <span className="text-sm font-medium">Upload Logo</span>
+            <span className="text-sm font-medium">Upload logo</span>
             <span id="logo-upload-help" className="mt-1 text-xs text-fg-muted">{SYSTEM_LIMITS.SUPPORTED_IMAGE_FORMATS.map(t => t.replace('image/', '').replace('+xml', '').toUpperCase()).join(', ')} (Square recommended)</span>
             {error && <span id="logo-upload-error" role="alert" className="mt-2 text-xs text-danger">{error}</span>}
           </Button>
@@ -147,7 +147,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
       ) : (
         <Card variant="control" className="space-y-5">
           <div className="flex items-center gap-4">
-            <img src={config.logoUrl} alt="Custom Brand Graphic" width={48} height={48} className="size-12 rounded-md border border-line bg-surface-raised object-contain shadow-sm" />
+            <img src={config.logoUrl} alt="Custom Brand Graphic" width={48} height={48} className="size-12 rounded-md border border-line bg-surface-raised object-contain shadow-raised" />
             <div className="flex-1">
               <p className="text-sm font-medium text-fg-soft">{activePreset ? `${activePreset.label} Logo` : 'Custom Logo'}</p>
               <p className="text-xs text-fg-muted">Embedded in center</p>
