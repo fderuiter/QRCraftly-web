@@ -82,11 +82,12 @@ describe('Content Registry Validation', () => {
     const validSchemaTypes = Object.values(SchemaType);
     const validSchemaCategories = Object.values(SchemaCategory);
 
-    // Verify exactly 27 registered pages exist and are fully populated (the two retired games
+    // Verify exactly 29 registered pages exist and are fully populated (the two retired games
     // were consolidated into "arcade"; their routes live in legacyRouteRegistry; "free-forever"
-    // is the no-ads pledge page; "qr-code-scanner" is the standalone scanner)
+    // is the no-ads pledge page; "qr-code-scanner" is the standalone scanner; the static and SVG
+    // landing pages joined on 2026-10-13)
     const registryKeys = Object.keys(contentRegistry);
-    expect(registryKeys.length).toBe(27);
+    expect(registryKeys.length).toBe(29);
 
     registryKeys.forEach((key) => {
       const tool = contentRegistry[key];

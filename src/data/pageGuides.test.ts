@@ -44,6 +44,6 @@ describe('PAGE_GUIDES', () => {
       name: 'QR code scams (quishing)',
       href: '/guides/qr-code-scams-quishing',
     });
-    expect(getPageGuides('wifi-qr-code')).toEqual([]);
+    expect(getPageGuides('about')).toEqual([]);
   });
 });

@@ -72,14 +72,14 @@ export const GUIDE_AUTHOR = 'QRCraftly';
 export const guides: Guide[] = [
   {
     slug: 'why-qr-codes-stop-working',
-    title: 'Why your QR code stopped working (and how to make one that never will)',
+    title: 'QR code not scanning or stopped working? Why, and how to fix it',
     shortTitle: 'Why QR codes stop working',
-    seoTitle: 'QR Code Stopped Working? Why, and How to Fix It | QRCraftly',
+    seoTitle: 'QR Code Not Scanning or Stopped Working? Fixes | QRCraftly',
     description:
-      'QR codes do not expire by themselves. Find out if yours was switched off, points at a dead page or is hard to scan, and how to make one that lasts.',
-    lead: 'A QR code is only a picture of some data, so it cannot expire or switch itself off. When one stops working, it is nearly always one of three things. This guide shows you how to tell which in two minutes, and how to make a code that never stops.',
+      'QR code not scanning? Find out if it was switched off, points at a dead page, is hard to read or meets a phone problem, and how to fix each one.',
+    lead: 'A QR code is only a picture of some data, so it cannot expire or switch itself off. When one will not scan or stops working, it is nearly always one of four things. This guide shows you how to tell which in two minutes, and how to make a code that never stops.',
     datePublished: '2026-10-03',
-    dateModified: '2026-10-03',
+    dateModified: '2026-10-13',
     sections: [
       {
         id: 'short-answer',

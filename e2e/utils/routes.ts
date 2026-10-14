@@ -56,6 +56,8 @@ export const ROUTES = [
   '/instagram-qr-code',
   '/whatsapp-qr-code',
   '/pdf-qr-code',
+  '/static-qr-code-generator',
+  '/svg-qr-code',
   '/this-page-does-not-exist',
 ] as const;
 

@@ -391,8 +391,9 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
         if (canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
-              title: 'QRCraftly Code',
-              text: 'Here is a QR code I created with QRCraftly!',
+              title: 'QR code',
+              // Only the site address, never anything about the code's content (no user data in URLs).
+              text: 'Made free with QRCraftly: https://qrcraftly.com',
               files: [file],
             });
             resolve({ success: true, format: 'share' });

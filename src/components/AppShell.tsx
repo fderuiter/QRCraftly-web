@@ -21,6 +21,7 @@ import type { ReactNode } from 'react';
 import { QrCode } from 'lucide-react';
 import { isDangerousUrl } from '@/utils/security';
 import { PrimaryNav } from './ui/PrimaryNav';
+import { InstallAppButton } from './InstallAppButton';
 import { ThemeToggle } from './ui/ThemeToggle';
 import { PLEDGE_TAGLINE } from '@/data/pledge';
 import { GENERATOR_FOOTER_LINKS, HELP_LINKS, TOOL_LINKS, USE_CASE_LINKS } from '@/data/navigation';
@@ -102,6 +103,7 @@ export function AppFooter() {
             QRCraftly
           </a>
           <p className="mt-3 max-w-sm text-sm text-fg-muted">Private, browser-based tools for creating and sharing QR codes.</p>
+          <InstallAppButton />
         </div>
         <nav aria-label="QR generators">
           <SectionHeading eyebrow="Generators" tone="strong" className="mb-3" />

@@ -464,6 +464,8 @@ export const contentRegistry: Record<string, ToolContent> = {
   "instagram-qr-code": landingEntry("instagram-qr-code"),
   "whatsapp-qr-code": landingEntry("whatsapp-qr-code"),
   "pdf-qr-code": landingEntry("pdf-qr-code"),
+  "static-qr-code-generator": landingEntry("static-qr-code-generator"),
+  "svg-qr-code": landingEntry("svg-qr-code"),
   "security": {
     "id": "security",
     "name": "Security & Privacy",
@@ -529,8 +531,8 @@ export const auxiliaryRegistry: Record<string, AuxiliaryContent> = {
   "guides/why-qr-codes-stop-working": {
     "id": "guides/why-qr-codes-stop-working",
     "name": "Why QR codes stop working",
-    "seoTitle": "QR Code Stopped Working? Why, and How to Fix It | QRCraftly",
-    "description": "QR codes do not expire by themselves. Find out if yours was switched off, points at a dead page or is hard to scan, and how to make one that lasts.",
+    "seoTitle": "QR Code Not Scanning or Stopped Working? Fixes | QRCraftly",
+    "description": "QR code not scanning? Find out if it was switched off, points at a dead page, is hard to read or meets a phone problem, and how to fix each one.",
     "image": "/og/guides-why-qr-codes-stop-working.png",
     "imageAlt": "Why QR codes stop working",
     "personas": [TargetPersona.SecurityConsciousEnterprise],
