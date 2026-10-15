@@ -47,7 +47,7 @@ import { Modal } from '../ui/Modal';
 import { SelectField } from '../ui/FormFields';
 import { useToast } from '../ui/Toast';
 import { useQRStoreSelector } from '@/context/QRContext';
-import { generateQRSvg, rasterizeSvgToCanvas, SOCIAL_DIMENSIONS } from '@/packages/qr-export';
+import { generateQRSvg, rasterizeSvgToCanvas, preflightLogoCheck, SOCIAL_DIMENSIONS } from '@/packages/qr-export';
 import { QrEncodeError } from '@/packages/qr-matrix';
 import { validateConfig, describeViolation } from '@/packages/qr-payload';
 import { triggerFileDownload } from '@/utils/downloadManager';
@@ -101,6 +101,9 @@ function isContentType(value: string): value is BulkContentType {
 function describeRowFailure(err: unknown, errorCorrectionLevel: string): string {
   if (err instanceof QrEncodeError && err.kind === 'too-long') {
     return `Too long for a QR code at error correction level ${errorCorrectionLevel}. Shorten it, or pick a lower level in Appearance.`;
+  }
+  if (err instanceof Error && (err.name === 'MissingImageError' || err.message.toLowerCase().includes('logo'))) {
+    return `Custom logo asset could not be rendered: ${err.message}`;
   }
   return 'This row could not be drawn as a QR code.';
 }
@@ -283,6 +286,21 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     setCompletedCount(0);
     setTotalCount(targetRows.length);
 
+    if (exportFormat === 'png' && (currentConfig.logoUrl || (currentConfig.isBorderEnabled && currentConfig.borderLogoUrl))) {
+      const logoCheck = await preflightLogoCheck(currentConfig, { timeoutMs: 3000 });
+      if (run.cancelled) return;
+      if (!logoCheck.ok) {
+        setIsGenerating(false);
+        runRef.current = null;
+        addToast({
+          type: 'error',
+          message: logoCheck.error || 'Could not load custom logo asset from the provided URL. Please check the logo URL or remove the logo before exporting PNG files.',
+          duration: 5000,
+        });
+        return;
+      }
+    }
+
     // PNGs keep the design's shape: the chosen resolution is the width, the height follows the format.
     const format = SOCIAL_DIMENSIONS[currentConfig.socialFormat] ?? { width: 1, height: 1 };
     const pngWidth = data.exportResolution || 1000;
@@ -291,6 +309,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     try {
       const entries: ZipEntry[] = [];
       const usedNames = new Set<string>();
+      let remoteLogoOmitted = false;
 
       for (let i = 0; i < targetRows.length; i++) {
         const row = targetRows[i];
@@ -303,7 +322,11 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
         };
 
         try {
-          const svgString = await generateQRSvg(rowConfig);
+          const svgString = await generateQRSvg(rowConfig, {
+            onLogoOmitted: () => {
+              remoteLogoOmitted = true;
+            },
+          });
           let entryData: ZipEntry['data'] = svgString;
           if (exportFormat === 'png') {
             const canvas = await rasterizeSvgToCanvas(svgString, pngWidth, pngHeight);
@@ -343,14 +366,22 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
         : 'qr-codes-batch.zip';
       triggerFileDownload(createZip(entries), zipFileName, 'application/zip');
 
-      addToast({
-        type: 'success',
-        message:
-          skipped.length > 0
-            ? `Downloaded a ZIP with ${plural(entries.length, 'QR code', 'QR codes')}. ${plural(skipped.length, 'row was', 'rows were')} left out.`
-            : `Downloaded a ZIP with ${plural(entries.length, 'QR code', 'QR codes')}.`,
-        duration: 5000,
-      });
+      if (remoteLogoOmitted) {
+        addToast({
+          type: 'warning',
+          message: 'Remote logo asset could not be loaded. SVG QR codes were generated without the embedded logo.',
+          duration: 5000,
+        });
+      } else {
+        addToast({
+          type: 'success',
+          message:
+            skipped.length > 0
+              ? `Downloaded a ZIP with ${plural(entries.length, 'QR code', 'QR codes')}. ${plural(skipped.length, 'row was', 'rows were')} left out.`
+              : `Downloaded a ZIP with ${plural(entries.length, 'QR code', 'QR codes')}.`,
+          duration: 5000,
+        });
+      }
     } catch (err) {
       console.error('Batch generation failed:', err);
       addToast({

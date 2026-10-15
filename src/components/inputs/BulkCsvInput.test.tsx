@@ -636,4 +636,94 @@ describe('BulkCsvInput Component', () => {
     expect(screen.getAllByRole('columnheader')[1]).toHaveTextContent('NameContent');
     expect(screen.getByText('second')).toBeInTheDocument();
   });
+
+  describe('Pre-flight Logo Asset Validation', () => {
+    it('halts PNG batch generation and shows actionable error toast when custom logo URL fails preflight check', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      } as any);
+
+      try {
+        const spyPreflight = vi.spyOn(qrExport, 'preflightLogoCheck');
+        const csvContent = 'URL,Name\nhttps://example.com/1,Code1\nhttps://example.com/2,Code2';
+        const data: BulkCsvData = {
+          ...initialData,
+          csvContent,
+          payloadColumn: 'URL',
+          filenameColumn: 'Name',
+          exportFormat: 'png',
+        };
+
+        const renderResult = renderWithToasts(
+          <QRProvider
+            initialConfig={{
+              logoUrl: 'https://example.com/unreachable-logo.png',
+            }}
+          >
+            <BulkCsvInput data={data} onChange={vi.fn()} />
+          </QRProvider>
+        );
+
+        const generateBtn = screen.getByRole('button', { name: 'Generate Batch' });
+        fireEvent.click(generateBtn);
+
+        await waitFor(() => {
+          expect(spyPreflight).toHaveBeenCalled();
+        });
+
+        await waitFor(() => {
+          expect(screen.getByRole('alert')).toHaveTextContent(/Could not load custom logo asset/i);
+        });
+
+        expect(downloadManager.triggerFileDownload).not.toHaveBeenCalled();
+        spyPreflight.mockRestore();
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('continues SVG batch export and warns user with toast when remote logo loading fails', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      } as any);
+
+      try {
+        const csvContent = 'URL,Name\nhttps://example.com/1,Code1';
+        const data: BulkCsvData = {
+          ...initialData,
+          csvContent,
+          payloadColumn: 'URL',
+          filenameColumn: 'Name',
+          exportFormat: 'svg',
+        };
+
+        renderWithToasts(
+          <QRProvider
+            initialConfig={{
+              logoUrl: 'https://example.com/unreachable-logo.png',
+            }}
+          >
+            <BulkCsvInput data={data} onChange={vi.fn()} />
+          </QRProvider>
+        );
+
+        const generateBtn = screen.getByRole('button', { name: 'Generate Batch' });
+        fireEvent.click(generateBtn);
+
+        await waitFor(() => {
+          expect(downloadManager.triggerFileDownload).toHaveBeenCalled();
+        });
+
+        await waitFor(() => {
+          expect(screen.getByRole('alert')).toHaveTextContent(/Remote logo asset could not be loaded/i);
+        });
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
 });
