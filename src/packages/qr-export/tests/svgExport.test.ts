@@ -72,7 +72,7 @@ if (typeof globalThis.DOMParser === 'undefined') {
   }
 }
 
-import { generateQRSvg, PayloadRejectedError, rasterizeSvgToCanvas, validateSvgScannability } from '../index';
+import { generateQRSvg, PayloadRejectedError, rasterizeSvgToCanvas, validateSvgScannability, preflightLogoCheck } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
 import { QRStyle, type QRConfig, SocialFormat, TemplateStyle, QRType } from '@/types';
 
@@ -687,6 +687,85 @@ describe('generateQRSvg', () => {
       parseAndAssertValidSvg(svg);
       // Full canvas background rect "M 0 0 L 1080 0 L 1080 1080 L 0 1080 Z" should not be rendered
       expect(svg).not.toContain('d="M 0 0 L 1080 0 L 1080 1080 L 0 1080 Z"');
+    });
+  });
+
+  describe('preflightLogoCheck', () => {
+    it('succeeds immediately when no logo URL is configured', async () => {
+      const config: QRConfig = {
+        ...(DEFAULT_CONFIG as QRConfig),
+        logoUrl: null,
+      };
+      const result = await preflightLogoCheck(config);
+      expect(result.ok).toBe(true);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('succeeds when logo URL is valid and fetches successfully', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'], { type: 'image/svg+xml' })),
+      } as any);
+
+      try {
+        const config: QRConfig = {
+          ...(DEFAULT_CONFIG as QRConfig),
+          logoUrl: 'https://example.com/good-logo.svg',
+        };
+        const result = await preflightLogoCheck(config);
+        expect(result.ok).toBe(true);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('fails cleanly with clear error message when logo URL is unreachable (HTTP failure)', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      } as any);
+
+      try {
+        const config: QRConfig = {
+          ...(DEFAULT_CONFIG as QRConfig),
+          logoUrl: 'https://example.com/broken-logo.png',
+        };
+        const result = await preflightLogoCheck(config);
+        expect(result.ok).toBe(false);
+        expect(result.error).toContain('Could not load custom logo asset');
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('fails cleanly when request times out', async () => {
+      const originalFetch = global.fetch;
+      // Fetch never resolves
+      global.fetch = vi.fn().mockImplementation(() => new Promise(() => {}));
+
+      try {
+        const config: QRConfig = {
+          ...(DEFAULT_CONFIG as QRConfig),
+          logoUrl: 'https://example.com/slow-logo.png',
+        };
+        const result = await preflightLogoCheck(config, { timeoutMs: 50 });
+        expect(result.ok).toBe(false);
+        expect(result.error).toContain('timed out');
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('rejects dangerous logo URLs', async () => {
+      const config: QRConfig = {
+        ...(DEFAULT_CONFIG as QRConfig),
+        logoUrl: 'javascript:alert("xss")',
+      };
+      const result = await preflightLogoCheck(config);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain('invalid or unsafe');
     });
   });
 });

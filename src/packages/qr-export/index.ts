@@ -21,6 +21,8 @@ export {
   PayloadRejectedError,
   rasterizeSvgToCanvas,
   validateSvgScannability,
+  preflightLogoCheck,
+  type LogoPreflightResult,
 } from './lib/svgExport';
 export { generateQREps, convertSvgToEps } from './lib/epsExport';
 export { generateQRPdf, convertSvgToPdf } from './lib/pdfExport';

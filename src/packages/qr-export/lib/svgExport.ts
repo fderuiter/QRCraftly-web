@@ -22,7 +22,7 @@ import { drawWithTemplate, SOCIAL_DIMENSIONS } from './templateRenderer';
 import { getQrTypeLabel, getQrTypeDescription } from '@/utils/a11y';
 
 import { SafeUrlPipeline, normalizeUrl } from '@/utils/url';
-import { getCachedAsset } from '@/utils/assetCache';
+import { getCachedAsset, setCachedAsset } from '@/utils/assetCache';
 import { sanitizeSvg } from '@/utils/security';
 
 import { validateConfig } from '@/packages/qr-payload';
@@ -97,19 +97,132 @@ async function toDataUrl(url: string): Promise<string | null> {
       const text = await blob.text();
       const sanitized = sanitizeSvg(text);
       const base64 = btoa(unescape(encodeURIComponent(sanitized)));
-      return `data:image/svg+xml;base64,${base64}`;
+      const result = `data:image/svg+xml;base64,${base64}`;
+      setCachedAsset(url, result);
+      return result;
     }
 
-    return await new Promise<string>((resolve, reject) => {
+    const result = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = () => reject(new Error('FileReader error'));
       reader.readAsDataURL(blob);
     });
+    if (result) {
+      setCachedAsset(url, result);
+    }
+    return result;
   } catch {
     // Omit the image if it fails to load
     return null;
   }
+}
+
+/** Result of a pre-flight logo asset check. */
+export interface LogoPreflightResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Validates availability and readability of configured logo assets (center logo
+ * and border logo if enabled) before bulk export batch processing.
+ *
+ * Enforces a default 3-second timeout for remote asset requests.
+ */
+export async function preflightLogoCheck(
+  config: QRConfig,
+  options?: { timeoutMs?: number }
+): Promise<LogoPreflightResult> {
+  const timeoutMs = options?.timeoutMs ?? 3000;
+
+  const urlsToCheck: string[] = [];
+  if (config.logoUrl) urlsToCheck.push(config.logoUrl);
+  if (config.isBorderEnabled && config.borderLogoUrl) urlsToCheck.push(config.borderLogoUrl);
+
+  if (urlsToCheck.length === 0) {
+    return { ok: true };
+  }
+
+  for (const url of urlsToCheck) {
+    const cached = getCachedAsset(url);
+    if (cached) continue;
+
+    if (SafeUrlPipeline.isDangerous(url)) {
+      return {
+        ok: false,
+        error: 'Custom logo URL is invalid or unsafe. Please check the logo URL or remove the logo before exporting PNG files.',
+      };
+    }
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error('TIMEOUT'));
+      }, timeoutMs);
+    });
+
+    try {
+      const dataUrl = await Promise.race([
+        toDataUrl(url),
+        timeoutPromise,
+      ]);
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+
+      if (!dataUrl) {
+        return {
+          ok: false,
+          error: 'Could not load custom logo asset from the provided URL. Please check the logo URL or remove the logo before exporting PNG files.',
+        };
+      }
+
+      // In browser/JSDOM environments, verify image decoding if element constructor exists
+      if (typeof document !== 'undefined') {
+        const isJsdom = typeof window !== 'undefined' && window.navigator?.userAgent?.includes('jsdom') === true;
+        if (!isJsdom) {
+          const imageDecodes = await new Promise<boolean>((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            let settled = false;
+            const finish = (valid: boolean) => {
+              if (settled) return;
+              settled = true;
+              img.onload = null;
+              img.onerror = null;
+              resolve(valid);
+            };
+            img.onload = () => finish(img.naturalWidth > 0 && img.naturalHeight > 0);
+            img.onerror = () => finish(false);
+            img.src = dataUrl;
+            if (img.complete) finish(img.naturalWidth > 0 && img.naturalHeight > 0);
+          });
+
+          if (!imageDecodes) {
+            return {
+              ok: false,
+              error: 'Custom logo asset is corrupt or invalid image data. Please check the logo URL or remove the logo before exporting PNG files.',
+            };
+          }
+        }
+      }
+
+      setCachedAsset(url, dataUrl);
+    } catch (err: unknown) {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      if (err instanceof Error && err.message === 'TIMEOUT') {
+        return {
+          ok: false,
+          error: 'Custom logo asset request timed out after 3 seconds. Please check the logo URL or remove the logo before exporting PNG files.',
+        };
+      }
+      return {
+        ok: false,
+        error: 'Could not load custom logo asset from the provided URL. Please check the logo URL or remove the logo before exporting PNG files.',
+      };
+    }
+  }
+
+  return { ok: true };
 }
 
 /**
