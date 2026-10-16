@@ -64,4 +64,29 @@ describe('ExportOptions (#1052)', () => {
     expect(card).toHaveTextContent(/static code/i);
     expect(card).toHaveTextContent(/no account, scan limit or subscription/i);
   });
+
+  it('shows inline error and aria-invalid="true" for out-of-bounds custom widths', () => {
+    const { onSizeChange } = renderOptions('png' as any, 50);
+    const input = screen.getByLabelText('Width in pixels');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Width must be between 128 and 8192 pixels.');
+
+    fireEvent.blur(input);
+    expect(onSizeChange).toHaveBeenCalledWith(128);
+  });
+
+  it('shows inline error when typing width exceeding maximum pixels', () => {
+    renderOptions('png' as any, 10000);
+    const input = screen.getByLabelText('Width in pixels');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent('Width must be between 128 and 8192 pixels.');
+  });
+
+  it('does not show inline error when custom width is within valid range', () => {
+    renderOptions('png' as any, 1000);
+    const input = screen.getByLabelText('Width in pixels');
+    expect(input).toHaveAttribute('aria-invalid', 'false');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });

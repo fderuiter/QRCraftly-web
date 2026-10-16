@@ -99,6 +99,8 @@ interface ExportOptionsProps {
  */
 export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, filename, onFilenameChange, onCopySvg, copySvgBusy, onWallet }: ExportOptionsProps) {
   const preset = (Object.keys(SIZE_PRESETS) as (keyof typeof SIZE_PRESETS)[]).find((key) => SIZE_PRESETS[key] === size) ?? 'custom';
+  const isOutOfBounds = preset === 'custom' && (size < MIN_SIZE || size > MAX_SIZE || !Number.isFinite(size));
+  const sizeError = isOutOfBounds ? `Width must be between ${MIN_SIZE} and ${MAX_SIZE} pixels.` : undefined;
   return (
     <div
       id={id}
@@ -143,6 +145,7 @@ export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, 
                 min={MIN_SIZE}
                 max={MAX_SIZE}
                 value={String(size)}
+                error={sizeError}
                 onChange={(event) => onSizeChange(Number(event.target.value))}
                 onBlur={() => onSizeChange(clampSize(size))}
               />
