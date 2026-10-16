@@ -21,6 +21,8 @@
  * signatures need. Only definite lengths are read or written, as DER requires.
  */
 
+import { concatBytes } from '@/utils/bytes';
+
 /** Universal tags used by certificates and CMS. */
 export const TAG = {
   BOOLEAN: 0x01,
@@ -143,17 +145,6 @@ function encodeLength(length: number): number[] {
   const bytes: number[] = [];
   for (let rest = length; rest > 0; rest = Math.floor(rest / 256)) bytes.unshift(rest & 0xff);
   return [0x80 | bytes.length, ...bytes];
-}
-
-/** Concatenates byte arrays. */
-export function concatBytes(parts: readonly Uint8Array[]): Uint8Array {
-  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
-  return out;
 }
 
 /** Encodes an element with `tag` around `contents`. */

@@ -25,6 +25,45 @@ import {
   splitByUnescapedSemicolons,
 } from '../protocol';
 
+export interface EmailListErrorOptions {
+  required?: boolean;
+}
+
+/**
+ * A sentence for the person when an address list has a malformed entry or is missing when required, else null.
+ */
+export const emailListError = (
+  value: string | undefined,
+  options?: EmailListErrorOptions
+): string | null => {
+  if (!value || !value.trim()) {
+    if (options?.required) {
+      return 'Add at least one recipient address.';
+    }
+    return null;
+  }
+
+  const entries = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  if (entries.length === 0) {
+    if (options?.required) {
+      return 'Add at least one recipient address.';
+    }
+    return null;
+  }
+
+  for (const entry of entries) {
+    if (!CONTAINMENT_PROFILES.EMAIL.test(entry)) {
+      return `"${entry}" is not an email address. Separate several addresses with commas.`;
+    }
+  }
+
+  return null;
+};
+
 /**
  * Percent-encodes a mailto recipient (RFC 6068) so that `?`, `&`, `#`, `%` and
  * whitespace in the address cannot start a query, inject a header or open a
@@ -127,7 +166,7 @@ export const EmailContract: QRGeneratorContract<EmailData> = {
     const parsed = parseProtocol(trimmed);
     if (!parsed) {
       // Fallback for raw email addresses
-      if (!CONTAINMENT_PROFILES.EMAIL.test(trimmed)) {
+      if (emailListError(trimmed, { required: true })) {
         violations.push('EMAIL_STRUCTURE_VIOLATION');
       }
       return violations;
@@ -140,15 +179,17 @@ export const EmailContract: QRGeneratorContract<EmailData> = {
     }
 
     // Validate email address (mailto recipients are percent-encoded, RFC 6068)
-    const recipients =
-      parsed.scheme === 'mailto' ? hydrateEmailData(trimmed).email.split(',') : [parsed.path];
-    if (!recipients.some(Boolean) || recipients.some((recipient) => !CONTAINMENT_PROFILES.EMAIL.test(recipient))) {
-      violations.push('EMAIL_STRUCTURE_VIOLATION');
-    }
     if (parsed.scheme === 'mailto') {
-      const { cc, bcc } = hydrateEmailData(trimmed);
-      const copies = [cc, bcc].flatMap((list) => (list || '').split(',')).map((address) => address.trim()).filter(Boolean);
-      if (copies.some((address) => !CONTAINMENT_PROFILES.EMAIL.test(address))) {
+      const hydrated = hydrateEmailData(trimmed);
+      if (
+        emailListError(hydrated.email, { required: true }) ||
+        emailListError(hydrated.cc) ||
+        emailListError(hydrated.bcc)
+      ) {
+        violations.push('EMAIL_STRUCTURE_VIOLATION');
+      }
+    } else if (parsed.scheme === 'matmsg') {
+      if (emailListError(parsed.path, { required: true })) {
         violations.push('EMAIL_STRUCTURE_VIOLATION');
       }
     }
@@ -201,3 +242,4 @@ export const EmailContract: QRGeneratorContract<EmailData> = {
     return Array.from(new Set(violations));
   },
 };
+

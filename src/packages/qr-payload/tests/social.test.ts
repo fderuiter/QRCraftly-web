@@ -17,8 +17,8 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { constructSocialString, hydrateSocialData } from '../index';
-import { SocialPlatform } from '@/types';
+import { constructSocialString, hydrateSocialData, identifyProtocol } from '../index';
+import { QRType, SocialPlatform } from '@/types';
 
 describe('Social generator', () => {
   it('constructs and hydrates successfully', () => {
@@ -79,14 +79,69 @@ describe('Social generator', () => {
     expect(hydrated.handle).toBe('qrcraftly');
   });
 
-  it('hydrates whatsapp', () => {
-    const hydrated = hydrateSocialData('https://wa.me/15551234567');
-    expect(hydrated.platform).toBe(SocialPlatform.WHATSAPP);
-    expect(hydrated.handle).toBe('15551234567');
+  it('hydrates whatsapp wa.me links with and without message', () => {
+    const hydratedNoMsg = hydrateSocialData('https://wa.me/15551234567');
+    expect(hydratedNoMsg.platform).toBe(SocialPlatform.WHATSAPP);
+    expect(hydratedNoMsg.handle).toBe('15551234567');
+    expect(hydratedNoMsg.message).toBeUndefined();
 
-    // The Social form builds wa.me links, so a whatsapp.com link is not one it can rebuild.
+    const hydratedWithMsg = hydrateSocialData('https://wa.me/15551234567?text=Hello%20World%0ANext%20Line');
+    expect(hydratedWithMsg.platform).toBe(SocialPlatform.WHATSAPP);
+    expect(hydratedWithMsg.handle).toBe('15551234567');
+    expect(hydratedWithMsg.message).toBe('Hello World\nNext Line');
+
+    // The Social form builds wa.me links, so a generic whatsapp.com link is not one it can rebuild.
     const hydratedCom = hydrateSocialData('https://whatsapp.com/15551234567');
     expect(hydratedCom.handle).toBe('');
+  });
+
+  it('keeps lossy WhatsApp links classified as QRType.URL', () => {
+    const lossyInputs = [
+      'https://api.whatsapp.com/send?phone=15551234567&text=Hello&utm_source=qr&app_absent=0',
+      'https://wa.me/15551234567?utm_source=qr',
+      'https://wa.me/15551234567?text=%20Hi%20',
+      'https://wa.me/15551234567?text=%20',
+      'https://wa.me/15551234567?text=C++',
+    ];
+
+    for (const input of lossyInputs) {
+      expect(identifyProtocol(input)).toBe(QRType.URL);
+      expect(hydrateSocialData(input).handle).toBe('');
+    }
+  });
+
+  it('round-trips multi-line whatsapp message exact URL', () => {
+    const link = 'https://wa.me/15551234567?text=Hello%20World%0ANext%20Line';
+    expect(identifyProtocol(link)).toBe(QRType.SOCIAL);
+    const hydrated = hydrateSocialData(link);
+    expect(hydrated).toEqual({
+      platform: SocialPlatform.WHATSAPP,
+      handle: '15551234567',
+      message: 'Hello World\nNext Line',
+    });
+    expect(constructSocialString(hydrated)).toBe(link);
+  });
+
+  it('constructs whatsapp URLs with encoded pre-filled messages', () => {
+    const noMsg = constructSocialString({
+      platform: SocialPlatform.WHATSAPP,
+      handle: '15551234567',
+    });
+    expect(noMsg).toBe('https://wa.me/15551234567');
+
+    const emptyMsg = constructSocialString({
+      platform: SocialPlatform.WHATSAPP,
+      handle: '15551234567',
+      message: '   ',
+    });
+    expect(emptyMsg).toBe('https://wa.me/15551234567');
+
+    const withMsg = constructSocialString({
+      platform: SocialPlatform.WHATSAPP,
+      handle: '15551234567',
+      message: 'Hello World!\nInquiry #101',
+    });
+    expect(withMsg).toBe('https://wa.me/15551234567?text=Hello%20World!%0AInquiry%20%23101');
   });
 
   it('hydrates github', () => {
