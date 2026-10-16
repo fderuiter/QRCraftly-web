@@ -1,0 +1,53 @@
+name: Agent task
+description: A bounded fix or refactor written so an agent (or a person) can pick it up without asking questions.
+labels: ['needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for work an agent may take on. Triage adds `ready-for-agent` once the product question is settled. Product decisions, export file formats, payload parsing rules, anything an ADR governs, and changes to guard files (CI, lint, Knip, size budgets, audit scripts, dependencies) are poor fits.
+        Do not paste real personal data; use placeholder values.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is wrong or missing on main today, and how to reproduce it, step by step.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Observable behaviours a user or a test can check, plus what must NOT change.
+      value: |
+        - [ ]
+        - [ ] Must NOT change:
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where
+      description: Files to change, and files not to touch (for example, shared files another open PR is changing).
+      value: |
+        Files to change: `src/...`
+        Do not touch:
+    validations:
+      required: true
+  - type: textarea
+    id: rules
+    attributes:
+      label: Rules that apply
+      description: The AGENTS.md lines, ADRs and review lessons that matter here, quoted.
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests
+      description: Behaviour tests to add, including blank, whitespace and boundary input, and an axe check for any new UI.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Links to the closed PR or discussion this came from, if any.

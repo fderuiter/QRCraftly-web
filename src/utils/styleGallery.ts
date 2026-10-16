@@ -3,7 +3,7 @@ import { LOW_RELIABILITY_PATTERNS, MIN_CONTRAST_THRESHOLD, PATTERNS, PRESET_COLO
 import { getContrastRatio } from './colorUtils';
 
 /** The settings a gallery tile or "Surprise me" changes. */
-export type StyleChoice = Pick<QRConfig, 'style' | 'fgColor' | 'bgColor' | 'eyeColor'>;
+export type StyleChoice = Pick<QRConfig, 'style' | 'fgColor' | 'bgColor' | 'eyeColor' | 'eyeFrameColor' | 'eyeBallColor'>;
 
 /** Scan outlook shown by the dot on a gallery tile. */
 export type StyleScanTone = 'good' | 'check';

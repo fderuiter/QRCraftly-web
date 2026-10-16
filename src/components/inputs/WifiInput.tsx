@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { type WifiData, WifiEncryption, WifiEapMethod, WifiEapPhase2 } from "../../types";
 import { TextField, SelectField, CheckboxField } from "../ui/FormFields";
-import { CONTAINMENT_PROFILES } from "@/packages/qr-payload";
+import { CONTAINMENT_PROFILES, wifiPassphraseProblem } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
 import { FieldNotes, hintsId } from "./FieldHints";
 
@@ -14,12 +14,16 @@ interface WifiInputProps {
 }
 
 export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
+  const [passwordBlurred, setPasswordBlurred] = useState(false);
+
   const ssidError = data.ssid && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(data.ssid)
     ? "Network Name cannot contain control or zero-width characters."
     : undefined;
 
   const passwordError = data.password && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(data.password)
     ? "Password cannot contain control or zero-width characters."
+    : passwordBlurred
+    ? wifiPassphraseProblem(data.encryption, data.password)
     : undefined;
 
   const eapIdentityError = data.eapIdentity && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(data.eapIdentity)
@@ -121,6 +125,7 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
           maxLength={63}
           value={data.password}
           onChange={(e) => onChange({ password: e.target.value })}
+          onBlur={() => setPasswordBlurred(true)}
           showPasswordToggle
           showCharCount
           error={passwordError}

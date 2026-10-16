@@ -52,6 +52,8 @@ function allBlocks(result: ReturnType<typeof decodeModemFrame>, payload: Uint8Ar
 
 beforeAll(() => loadOpticalModem());
 
+// 15 s and 60 s for the first test without and with v8 coverage on a laptop; it ran past 120 s
+// under coverage on CI's 2-vCPU runners (main, 2026-10-16), so the limit is about four times the laptop run.
 describe('tracked acquisition', () => {
   it('follows a frame that moves a few cells between camera frames and reads every block', () => {
     const first = sendFrame(1);
@@ -72,7 +74,7 @@ describe('tracked acquisition', () => {
       expect(allBlocks(result, sent.payload), `frame ${seq}`).toBe(true);
       if (result.ok) hint = result.track;
     }
-  }, 120_000);
+  }, 300_000);
 
   it('falls back to the full search when the frame is far from where it was', () => {
     const first = sendFrame(1);
@@ -83,5 +85,5 @@ describe('tracked acquisition', () => {
     const result = decodeModemFrame(capture(sent.image, 0, 0, 2), { geometries: [SHAPE], track: far });
     expect(result.ok && result.tracked).toBe(false);
     expect(allBlocks(result, sent.payload)).toBe(true);
-  }, 120_000);
+  }, 300_000);
 });

@@ -157,14 +157,14 @@ export const constructPaymentString = (data: PaymentData): string => {
   }
 
   if (data.network === CryptoNetwork.EPC_SEPA) {
+    if (sepaRefusal(data) !== null) return '';
     const iban = cleanIban(data.iban || data.address || '');
     // EPC fields are plain lines, so `?` and `&` are ordinary text here (`A? B & Co`).
     const name = epcText(data.name, 70);
     const bic = epcText(data.bic, 11).toUpperCase();
     const label = epcText(data.label, 140);
     const amount = (data.amount || '').trim().replace(/^EUR/i, '');
-    // The beneficiary name and IBAN are mandatory (EPC069-12), and a bad amount is refused.
-    if (!iban || !name || paymentAmountError(amount, CryptoNetwork.EPC_SEPA)) return '';
+    if (!iban || !name) return '';
     const amountStr = amount ? `EUR${Number(amount).toFixed(2)}` : '';
 
     const lines = [
@@ -410,6 +410,42 @@ export const hydratePaymentData = (raw: string): PaymentData => {
   return result;
 };
 
+/**
+ * Checks if SEPA payment data contains a refusal violation (bad amount, or a missing IBAN or beneficiary name).
+ * An all-blank or whitespace-only SEPA form is considered empty, not refused.
+ * @param data - Payment input data.
+ * @returns Violation code string or null if valid/empty.
+ */
+export const sepaRefusal = (data: PaymentData): string | null => {
+  if (!data || data.network !== CryptoNetwork.EPC_SEPA) {
+    return null;
+  }
+  const iban = cleanIban(data.iban || data.address || '');
+  const name = epcText(data.name, 70);
+  const amount = (data.amount || '').trim().replace(/^EUR/i, '');
+  const bic = epcText(data.bic, 11);
+  const label = epcText(data.label, 140);
+
+  // An all-blank form (no IBAN, name, amount, BIC, or label) is empty, not refused.
+  if (!iban && !name && !amount && !bic && !label) {
+    return null;
+  }
+
+  if (paymentAmountError(amount, CryptoNetwork.EPC_SEPA)) {
+    return 'PAYMENT_AMOUNT_VIOLATION';
+  }
+
+  if (!iban) {
+    return 'SEPA_IBAN_VIOLATION';
+  }
+
+  if (!name) {
+    return 'SEPA_NAME_VIOLATION';
+  }
+
+  return null;
+};
+
 export const PaymentContract: QRGeneratorContract<PaymentData> = {
   type: QRType.PAYMENT,
   construct: constructPaymentString,
@@ -421,7 +457,12 @@ export const PaymentContract: QRGeneratorContract<PaymentData> = {
       violations.push('URI_INJECTION_VIOLATION');
     }
     const data = hydratePaymentData(raw);
-    if (paymentAmountError(data.amount, data.network)) {
+    if (data.network === CryptoNetwork.EPC_SEPA) {
+      const refusal = sepaRefusal(data);
+      if (refusal) {
+        violations.push(refusal);
+      }
+    } else if (paymentAmountError(data.amount, data.network)) {
       violations.push('PAYMENT_AMOUNT_VIOLATION');
     }
     return violations;

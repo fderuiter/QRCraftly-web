@@ -19,6 +19,7 @@
 import { navigate } from 'vike/client/router';
 import { Camera, CloudUpload, ShieldCheck } from 'lucide-react';
 import { QRScanner } from '@/components/QRScanner';
+import { PrivacyPromiseGrid } from '@/components/ui/PrivacyPromiseGrid';
 import type { ScanDescription } from '@/components/scanner/describeScan';
 import { SidebarContent } from '@/components/SidebarContent';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
@@ -67,17 +68,7 @@ export default function Page() {
 
         <QRScanner autoStartCamera={false} onEdit={openInGenerator} editLabel="Open in generator" />
 
-        <ul className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Privacy">
-          {PROMISES.map(({ icon: Icon, title, text }) => (
-            <li key={title} className="flex gap-3 rounded-xl border border-line bg-surface p-4">
-              <Icon className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
-              <div>
-                <p className="font-semibold text-fg">{title}</p>
-                <p className="text-sm text-fg-muted">{text}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <PrivacyPromiseGrid items={PROMISES} ariaLabel="Privacy" className="mt-6" />
 
         <PageCopyContext.Provider value={copy}>
           <SidebarContent toolId="qr-code-scanner" />
