@@ -794,7 +794,7 @@ describe('BulkCsvInput Component', () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 404,
-      } as any);
+      });
 
       try {
         const spyPreflight = vi.spyOn(qrExport, 'preflightLogoCheck');
@@ -840,7 +840,7 @@ describe('BulkCsvInput Component', () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 404,
-      } as any);
+      });
 
       try {
         const csvContent = 'URL,Name\nhttps://example.com/1,Code1';
@@ -875,6 +875,29 @@ describe('BulkCsvInput Component', () => {
       } finally {
         global.fetch = originalFetch;
       }
+    });
+
+    it('closes the progress dialog when the batch is canceled during the logo check', async () => {
+      let finishCheck: (result: { ok: boolean }) => void = () => {};
+      const spyPreflight = vi
+        .spyOn(qrExport, 'preflightLogoCheck')
+        .mockImplementation(() => new Promise((resolve) => { finishCheck = resolve; }));
+      const data: BulkCsvData = { ...initialData, csvContent: 'URL,Name\nhttps://example.com/1,Code1', exportFormat: 'png' };
+      renderWithToasts(
+        <QRProvider initialConfig={{ logoUrl: 'data:image/png;base64,AA==' }}>
+          <BulkCsvInput data={data} onChange={vi.fn()} />
+        </QRProvider>
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
+      await waitFor(() => expect(spyPreflight).toHaveBeenCalled());
+      fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+      finishCheck({ ok: true });
+
+      expect(await screen.findByText('Batch canceled. No ZIP was made.')).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument());
+      expect(screen.getByRole('button', { name: 'Generate Batch' })).toBeEnabled();
+      expect(downloadManager.triggerFileDownload).not.toHaveBeenCalled();
+      spyPreflight.mockRestore();
     });
   });
 });

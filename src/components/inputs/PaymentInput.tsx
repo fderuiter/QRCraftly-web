@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { type PaymentData, CryptoNetwork } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { isDangerousUrl } from "../../utils/security";
@@ -25,9 +25,15 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
   onChange,
 }) => {
   const currentAddress = data.network === CryptoNetwork.EPC_SEPA ? (data.iban || data.address || "") : data.address;
+  // Checksums fail on every half-typed address, so they are judged once the field is left.
+  const [addressLeft, setAddressLeft] = useState(false);
 
   const addressError = currentAddress && isDangerousUrl(currentAddress)
     ? "Unsafe URL scheme or malicious protocol detected."
+    : !currentAddress && data.network === CryptoNetwork.EPC_SEPA && (data.name || "").trim()
+      ? "A SEPA transfer code needs the beneficiary's IBAN."
+    : !addressLeft
+      ? undefined
     : currentAddress &&
         isCryptoNetwork(data.network) &&
         checkCryptoAddress(data.network, currentAddress) === "invalid"
@@ -111,6 +117,7 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
             onChange({ address: val });
           }
         }}
+        onBlur={() => setAddressLeft(true)}
         error={addressError}
       />
 

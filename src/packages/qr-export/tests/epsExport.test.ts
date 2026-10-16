@@ -94,6 +94,10 @@ describe('EPS Vector Export', () => {
     it('re-encodes Helvetica to Latin-1 and escapes accented text', async () => {
       const eps = await convertSvgToEps(`<svg width="200" height="50"><text x="0" y="20" font="12px sans-serif">Café-1</text></svg>`);
       expect(eps).toContain('/Encoding ISOLatin1Encoding 256 array copy dup 45 /hyphen put');
+      expect(eps).toContain('dup 150 /endash put');
+      expect(eps).toContain('dup 128 /Euro put');
+      const dashed = await convertSvgToEps(`<svg width="200" height="50"><text x="0" y="20" font="12px sans-serif">A – “B”</text></svg>`);
+      expect(dashed).toContain('(A \\226 \\223B\\224) show');
       expect(eps).toContain('(Caf\\351-1) show');
       expect(eps).not.toContain('%%LanguageLevel');
     });

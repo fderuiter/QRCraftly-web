@@ -28,6 +28,8 @@ export interface FileScanRequest {
 
 /** The parts of a 2D context the decoder draws with. */
 export interface PixelContext {
+  fillStyle: string | CanvasGradient | CanvasPattern;
+  fillRect(x: number, y: number, w: number, h: number): void;
   drawImage(image: CanvasImageSource, dx: number, dy: number, dw: number, dh: number): void;
   getImageData(sx: number, sy: number, sw: number, sh: number): ImageData;
 }
@@ -63,6 +65,10 @@ export async function decodeImageAtSizes(
     previous = key;
     const context = createContext(size.width, size.height);
     if (!context) throw new Error('Failed to create canvas context.');
+    // A transparent PNG (our own transparent-background export) reads as dark marks on white, like
+    // a printed code; drawn as is, its clear pixels would read as black.
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, size.width, size.height);
     context.drawImage(image, 0, 0, size.width, size.height);
     const code = await decode(context.getImageData(0, 0, size.width, size.height).data, size.width, size.height);
     if (code) return { ...code, corners: mapCorners(code.corners, width / size.width, height / size.height) };

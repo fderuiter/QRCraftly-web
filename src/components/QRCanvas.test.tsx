@@ -869,6 +869,20 @@ describe('QRCanvas Rendering Logic Extended', () => {
        expect(mockContext.createRadialGradient).toHaveBeenCalled();
      });
   });
+
+  it.each<[string, Partial<QRConfig>]>([
+    ['a frame and its call to action', { frameStyle: 'banner', frameText: 'SCAN ME' }],
+    ['a template headline', { templateStyle: TemplateStyle.MINIMALIST, templateHeadline: 'SCAN ME' }],
+  ])('repaints at once when only %s changes', async (_label, change) => {
+    setModule(10, 10, true);
+    const base: QRConfig = { ...DEFAULT_CONFIG, value: 'https://qrcraftly.com', templateStyle: change.templateStyle ?? DEFAULT_CONFIG.templateStyle };
+    const { rerender } = render(<QRCanvas config={base} />);
+    await waitFor(() => expect(mockContext.fillRect).toHaveBeenCalled());
+    mockContext.fillText.mockClear();
+
+    rerender(<QRCanvas config={{ ...base, ...change }} />);
+    await waitFor(() => expect(mockContext.fillText.mock.calls.some(([text]: [string]) => text.includes('SCAN ME'))).toBe(true));
+  });
 });
 
 describe('QRCanvas Batch Rendering', () => {

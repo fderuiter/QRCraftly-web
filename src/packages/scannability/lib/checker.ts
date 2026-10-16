@@ -45,6 +45,33 @@ function tryRead(reader: QrReader, frame: PixelFrame, options: QrReadOptions): Q
 }
 
 /**
+ * The frame as printed on white: our reader ignores alpha, so a transparent background
+ * (stored as clear black) would read as a black page. The contrast audit and the print
+ * simulation already composite onto white the same way.
+ * @returns The frame itself when every pixel is opaque, else an opaque copy.
+ */
+function onWhite(frame: PixelFrame): PixelFrame {
+  const { data } = frame;
+  let opaque = true;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] !== 255) {
+      opaque = false;
+      break;
+    }
+  }
+  if (opaque) return frame;
+  const flat = new Uint8ClampedArray(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3] / 255;
+    flat[i] = data[i] * alpha + 255 * (1 - alpha);
+    flat[i + 1] = data[i + 1] * alpha + 255 * (1 - alpha);
+    flat[i + 2] = data[i + 2] * alpha + 255 * (1 - alpha);
+    flat[i + 3] = 255;
+  }
+  return { data: flat, width: frame.width, height: frame.height };
+}
+
+/**
  * How the physical check reads the simulated print: as the scanner's camera fallback does
  * (`optical-scanner` `decodeSync`), with both polarities, a whole-frame threshold and a half-size
  * retry, so the verdict tracks what a camera would read rather than one binarizer's limits.
@@ -82,12 +109,13 @@ export function* scannabilitySteps(
     minLocalContrast = audit.minContrast;
   }
   const metrics = { localContrastViolations, minLocalContrast };
+  const page = onWhite(frame);
 
   // 1. Digital check (pass 1: normal polarity, pass 2: inverted polarity)
-  let digital = tryRead(reader, frame, { inverted: false });
+  let digital = tryRead(reader, page, { inverted: false });
   if (digital === null) {
     yield;
-    digital = tryRead(reader, frame, { inverted: true });
+    digital = tryRead(reader, page, { inverted: true });
   }
 
   if (digital === null) {
@@ -102,7 +130,7 @@ export function* scannabilitySteps(
   yield;
 
   // 2. Optical print simulation, in module units around the code the digital check found (#1248)
-  const printed = simulatePrint(frame, digital, scratch);
+  const printed = simulatePrint(page, digital, scratch);
 
   yield;
 

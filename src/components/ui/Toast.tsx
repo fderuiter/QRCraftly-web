@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, type ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, type ReactNode, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { Button } from './Button';
 import { getNotificationColors, getNotificationIcon } from '../../utils/notificationStyles';
@@ -133,6 +133,18 @@ const ToastItem = (props: { toast: ToastMessage; onRemove: (id: string) => void 
   const { toast, onRemove } = props;
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  // Toasts never take focus, so whatever had it when this one appeared is where a keyboard user was.
+  const returnFocusRef = useRef<Element | null>(typeof document === 'undefined' ? null : document.activeElement);
+
+  const itemRef = useRef<HTMLDivElement>(null);
+  /** Closes the toast; if focus was inside it, hands focus back instead of dropping it on the page. */
+  const dismiss = () => {
+    const target = returnFocusRef.current;
+    if (itemRef.current?.contains(document.activeElement) && target instanceof HTMLElement && target.isConnected) {
+      target.focus();
+    }
+    onRemove(toast.id);
+  };
 
   useEffect(() => {
     if (toast.persistent || toast.closing || isHovered || isFocused) {
@@ -151,6 +163,7 @@ const ToastItem = (props: { toast: ToastMessage; onRemove: (id: string) => void 
   return (
     <div 
       role={toast.type === 'error' || toast.type === 'warning' ? 'alert' : 'status'}
+      ref={itemRef}
       tabIndex={0}
       data-closed={toast.closing || undefined}
       inert={toast.closing || undefined}
@@ -164,7 +177,7 @@ const ToastItem = (props: { toast: ToastMessage; onRemove: (id: string) => void 
       }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
-          onRemove(toast.id);
+          dismiss();
           event.stopPropagation();
         }
       }}
@@ -178,7 +191,7 @@ const ToastItem = (props: { toast: ToastMessage; onRemove: (id: string) => void 
           size="sm"
           onClick={() => {
             toast.action?.onClick();
-            onRemove(toast.id);
+            dismiss();
           }}
         >
           {toast.action.label}
@@ -188,7 +201,7 @@ const ToastItem = (props: { toast: ToastMessage; onRemove: (id: string) => void 
         variant="ghost"
         iconOnly
         size="sm"
-        onClick={() => onRemove(toast.id)}
+        onClick={dismiss}
         aria-label="Close notification"
       >
         <X className="size-4" />
