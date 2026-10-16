@@ -100,7 +100,7 @@ function crossfadeFrom(canvas: HTMLCanvasElement): () => void {
 /**
  * Interface representing the computed dimensions and pixel scaling properties for a canvas.
  */
-export interface CanvasDimensions {
+interface CanvasDimensions {
   useTemplate: boolean;
   displayWidth: number;
   displayHeight: number;
@@ -119,30 +119,24 @@ export interface CanvasDimensions {
  * @returns Object containing template status, display dimensions, pixel dimensions, and resolved pixel ratio.
  */
 export function calculateCanvasDimensions(
-  config: { templateStyle?: TemplateStyle; socialFormat?: SocialFormat },
+  config: Pick<QRConfig, 'templateStyle' | 'socialFormat'>,
   size: number,
   customPixelRatio?: number
 ): CanvasDimensions {
   const pixelRatio =
-    customPixelRatio !== undefined
-      ? customPixelRatio
-      : typeof window !== 'undefined' && window?.devicePixelRatio
-        ? window.devicePixelRatio || 1
-        : 1;
-
-  const templateStyle = config.templateStyle ?? TemplateStyle.NONE;
-  const socialFormat = config.socialFormat ?? SocialFormat.SQUARE_1_1;
+    customPixelRatio ??
+    (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
 
   const useTemplate =
-    templateStyle !== TemplateStyle.NONE ||
-    socialFormat !== SocialFormat.SQUARE_1_1;
+    config.templateStyle !== TemplateStyle.NONE ||
+    config.socialFormat !== SocialFormat.SQUARE_1_1;
 
   const displayWidth = size;
   let displayHeight = size;
 
   if (useTemplate) {
-    const { width: fw, height: fh } = SOCIAL_DIMENSIONS[socialFormat] ?? { width: 1, height: 1 };
-    displayHeight = Math.round(size * fh / fw);
+    const { width: fw, height: fh } = SOCIAL_DIMENSIONS[config.socialFormat];
+    displayHeight = Math.round((size * fh) / fw);
   }
 
   return {
@@ -363,15 +357,15 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
 
             if (currentDims.useTemplate) {
               ctx.save();
-              ctx.scale(currentDims.pixelRatio, currentDims.pixelRatio);
+              ctx.scale(dims.pixelRatio, dims.pixelRatio);
               drawWithTemplate(
                 ctx as unknown as CanvasRenderingContext2D,
                 frame.modules,
                 currentConfig,
                 currentLogoImg,
                 currentBorderLogoImg,
-                currentDims.displayWidth,
-                currentDims.displayHeight,
+                dims.displayWidth,
+                dims.displayHeight,
                 frame.modules.size,
                 false,
                 computedMazeDataRef.current

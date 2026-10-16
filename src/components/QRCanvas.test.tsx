@@ -33,6 +33,7 @@ import { createFakeQrEncoder, useCanvasEncoder } from '../../tests/fixtures/fake
 import { qrEncoder } from '../../tests/fixtures/qrEncoder';
 import { setQrCanvasRuntime } from '../utils/qrCanvasRuntime';
 import { QrEncodeError } from '@/packages/qr-matrix';
+import * as qrExport from '@/packages/qr-export';
 import React from 'react';
 
 const QRCode = createFakeQrEncoder();
@@ -1382,6 +1383,63 @@ describe('QRCanvas Animation Loop', () => {
     expect(canvas.height).toBe(512);
   });
 
+  it('maintains start-time template display dimensions when socialFormat changes mid-animation', async () => {
+    const drawSpy = vi.spyOn(qrExport, 'drawWithTemplate').mockImplementation(() => {});
+
+    const initialConfig: QRConfig = {
+      ...DEFAULT_CONFIG,
+      templateStyle: TemplateStyle.MINIMALIST,
+      socialFormat: SocialFormat.SQUARE_1_1,
+      animationValues: ['frame_one', 'frame_two'],
+      isAnimating: true,
+      animationFps: 30,
+    };
+
+    let rerenderFn: (ui: React.ReactElement) => void = () => {};
+    await act(async () => {
+      const rendered = render(<QRCanvas config={initialConfig} size={1024} />);
+      rerenderFn = rendered.rerender;
+    });
+
+    await vi.waitFor(() => {
+      expect(QRCode.create).toHaveBeenCalledWith('frame_one', expect.any(Object));
+    });
+
+    // Run first animation frame
+    mockTime += 50;
+    await act(async () => {
+      await Promise.resolve();
+      rafCallback(mockTime);
+    });
+
+    expect(drawSpy).toHaveBeenCalled();
+    const firstCallArgs = drawSpy.mock.calls[drawSpy.mock.calls.length - 1];
+    expect(firstCallArgs[5]).toBe(1024);
+    expect(firstCallArgs[6]).toBe(1024);
+
+    // Mid-animation change socialFormat to PORTRAIT_4_5 (which normally computes height 1280 for size 1024)
+    const updatedConfig: QRConfig = {
+      ...initialConfig,
+      socialFormat: SocialFormat.PORTRAIT_4_5,
+    };
+
+    await act(async () => {
+      rerenderFn(<QRCanvas config={updatedConfig} size={1024} />);
+    });
+
+    // Run next animation frame
+    mockTime += 50;
+    await act(async () => {
+      await Promise.resolve();
+      rafCallback(mockTime);
+    });
+
+    const secondCallArgs = drawSpy.mock.calls[drawSpy.mock.calls.length - 1];
+    // drawWithTemplate height should stay the start-time height (1024), not 1280
+    expect(secondCallArgs[5]).toBe(1024);
+    expect(secondCallArgs[6]).toBe(1024);
+  });
+
   it('stops loop cleanly on component unmount and cancels next requestAnimationFrame', async () => {
     const animationValues = ['frame_one'];
     const config = {
@@ -1736,15 +1794,37 @@ describe('calculateCanvasDimensions', () => {
     expect(dims.displayHeight).toBe(1024);
   });
 
-  it('falls back to window.devicePixelRatio or 1 when customPixelRatio is omitted', () => {
+  it('falls back to window.devicePixelRatio or 1 when customPixelRatio is omitted', ({ onTestFinished }) => {
     const config = {
       templateStyle: TemplateStyle.NONE,
       socialFormat: SocialFormat.SQUARE_1_1,
     };
-    const dims = calculateCanvasDimensions(config, 800);
-    const expectedRatio = typeof window !== 'undefined' && window?.devicePixelRatio ? window.devicePixelRatio || 1 : 1;
-    expect(dims.pixelRatio).toBe(expectedRatio);
-    expect(dims.pixelWidth).toBe(800 * expectedRatio);
-    expect(dims.pixelHeight).toBe(800 * expectedRatio);
+
+    const originalRatio = window.devicePixelRatio;
+    onTestFinished(() => {
+      Object.defineProperty(window, 'devicePixelRatio', {
+        value: originalRatio,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    Object.defineProperty(window, 'devicePixelRatio', {
+      value: 3,
+      writable: true,
+      configurable: true,
+    });
+    const dims3 = calculateCanvasDimensions(config, 800);
+    expect(dims3.pixelRatio).toBe(3);
+    expect(dims3.pixelWidth).toBe(2400);
+
+    Object.defineProperty(window, 'devicePixelRatio', {
+      value: 0,
+      writable: true,
+      configurable: true,
+    });
+    const dims0 = calculateCanvasDimensions(config, 800);
+    expect(dims0.pixelRatio).toBe(1);
+    expect(dims0.pixelWidth).toBe(800);
   });
 });
