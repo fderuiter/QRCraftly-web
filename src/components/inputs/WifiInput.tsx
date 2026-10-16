@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { type WifiData, WifiEncryption, WifiEapMethod, WifiEapPhase2 } from "../../types";
 import { TextField, SelectField, CheckboxField } from "../ui/FormFields";
-import { CONTAINMENT_PROFILES, describeViolation } from "@/packages/qr-payload";
+import { CONTAINMENT_PROFILES, wifiPassphraseProblem } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
 
 interface WifiInputProps {
@@ -10,16 +10,16 @@ interface WifiInputProps {
 }
 
 export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
+  const [passwordBlurred, setPasswordBlurred] = useState(false);
+
   const ssidError = data.ssid && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(data.ssid)
     ? "Network Name cannot contain control or zero-width characters."
     : undefined;
 
-  const isWpa = data.encryption === WifiEncryption.WPA || data.encryption === WifiEncryption.WPA2_EAP;
-
   const passwordError = data.password && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(data.password)
     ? "Password cannot contain control or zero-width characters."
-    : isWpa && data.password && data.password.length < 8
-    ? describeViolation("WIFI_PASSWORD_TOO_SHORT_VIOLATION")
+    : passwordBlurred
+    ? wifiPassphraseProblem(data.encryption, data.password)
     : undefined;
 
   const eapIdentityError = data.eapIdentity && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(data.eapIdentity)
@@ -113,9 +113,10 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
           autoComplete="off"
           type="password"
           placeholder="Network password"
-          maxLength={63}
+          maxLength={64}
           value={data.password}
           onChange={(e) => onChange({ password: e.target.value })}
+          onBlur={() => setPasswordBlurred(true)}
           showPasswordToggle
           showCharCount
           error={passwordError}

@@ -192,21 +192,26 @@ export const constructWifiString = (data: WifiData): string => {
   return `WIFI:${parts.join(';')};;`;
 };
 
+export const wifiPassphraseProblem = (
+  encryption: WifiEncryption | string | undefined,
+  password: string | undefined
+): string | undefined => {
+  if (encryption !== WifiEncryption.WPA || !password) {
+    return undefined;
+  }
+
+  const len = password.length;
+  if ((len >= 8 && len <= 63) || (len === 64 && /^[0-9a-fA-F]{64}$/.test(password))) {
+    return undefined;
+  }
+
+  return "WPA passwords are 8 to 63 characters. Phones can't join with this one.";
+};
+
 export const WifiContract: QRGeneratorContract<WifiData> = {
   type: QRType.WIFI,
   construct: constructWifiString,
   hydrate: hydrateWifiData,
   matches: (raw: string) => identifyProtocol(raw) === QRType.WIFI,
-  validate: (raw: string) => {
-    try {
-      const data = hydrateWifiData(raw);
-      const isWpa = data.encryption === WifiEncryption.WPA || data.encryption === WifiEncryption.WPA2_EAP;
-      if (isWpa && data.password && data.password.length > 0 && data.password.length < 8) {
-        return ['WIFI_PASSWORD_TOO_SHORT_VIOLATION'];
-      }
-    } catch {
-      // Control character errors or unparseable payload caught by validatePayload
-    }
-    return [];
-  },
+  validate: () => [],
 };

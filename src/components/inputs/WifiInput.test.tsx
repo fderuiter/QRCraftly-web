@@ -60,7 +60,7 @@ describe('WifiInput enterprise (WPA2-EAP) fields', () => {
 });
 
 describe('WifiInput WPA passphrase length validation', () => {
-  it('displays an inline error when WPA password is shorter than 8 characters', () => {
+  it('does not display warning initially, but displays warning after blur when WPA password is shorter than 8 characters', () => {
     const data: WifiData = {
       ssid: 'MyNet',
       password: 'short',
@@ -68,10 +68,14 @@ describe('WifiInput WPA passphrase length validation', () => {
       hidden: false,
     };
     render(<WifiInput data={data} onChange={vi.fn()} />);
-    expect(screen.getByText('WPA passwords must be at least 8 characters long.')).toBeInTheDocument();
+    const warningMsg = "WPA passwords are 8 to 63 characters. Phones can't join with this one.";
+    expect(screen.queryByText(warningMsg)).not.toBeInTheDocument();
+
+    fireEvent.blur(screen.getByLabelText('Password'));
+    expect(screen.getByText(warningMsg)).toBeInTheDocument();
   });
 
-  it('displays an inline error when WPA2-EAP password is shorter than 8 characters', () => {
+  it('does not display warning for WPA2-EAP password shorter than 8 characters even after blur', () => {
     const data: WifiData = {
       ssid: 'CorpNet',
       password: 'short',
@@ -79,10 +83,13 @@ describe('WifiInput WPA passphrase length validation', () => {
       hidden: false,
     };
     render(<WifiInput data={data} onChange={vi.fn()} />);
-    expect(screen.getByText('WPA passwords must be at least 8 characters long.')).toBeInTheDocument();
+    const warningMsg = "WPA passwords are 8 to 63 characters. Phones can't join with this one.";
+
+    fireEvent.blur(screen.getByLabelText('Password'));
+    expect(screen.queryByText(warningMsg)).not.toBeInTheDocument();
   });
 
-  it('does not display an error when WPA password is at least 8 characters', () => {
+  it('does not display warning when WPA password is at least 8 characters', () => {
     const data: WifiData = {
       ssid: 'MyNet',
       password: 'validpass',
@@ -90,10 +97,13 @@ describe('WifiInput WPA passphrase length validation', () => {
       hidden: false,
     };
     render(<WifiInput data={data} onChange={vi.fn()} />);
-    expect(screen.queryByText('WPA passwords must be at least 8 characters long.')).not.toBeInTheDocument();
+    const warningMsg = "WPA passwords are 8 to 63 characters. Phones can't join with this one.";
+
+    fireEvent.blur(screen.getByLabelText('Password'));
+    expect(screen.queryByText(warningMsg)).not.toBeInTheDocument();
   });
 
-  it('does not display an error when password field is empty', () => {
+  it('does not display warning when password field is empty', () => {
     const data: WifiData = {
       ssid: 'MyNet',
       password: '',
@@ -101,7 +111,10 @@ describe('WifiInput WPA passphrase length validation', () => {
       hidden: false,
     };
     render(<WifiInput data={data} onChange={vi.fn()} />);
-    expect(screen.queryByText('WPA passwords must be at least 8 characters long.')).not.toBeInTheDocument();
+    const warningMsg = "WPA passwords are 8 to 63 characters. Phones can't join with this one.";
+
+    fireEvent.blur(screen.getByLabelText('Password'));
+    expect(screen.queryByText(warningMsg)).not.toBeInTheDocument();
   });
 
   it('bypasses 8-character check for WEP encryption', () => {
@@ -112,7 +125,9 @@ describe('WifiInput WPA passphrase length validation', () => {
       hidden: false,
     };
     render(<WifiInput data={data} onChange={vi.fn()} />);
-    expect(screen.queryByText('WPA passwords must be at least 8 characters long.')).not.toBeInTheDocument();
+    const warningMsg = "WPA passwords are 8 to 63 characters. Phones can't join with this one.";
+
+    fireEvent.blur(screen.getByLabelText('Password'));
+    expect(screen.queryByText(warningMsg)).not.toBeInTheDocument();
   });
 });
-

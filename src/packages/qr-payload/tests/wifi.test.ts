@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { constructWifiString, hydrateWifiData, WifiContract } from '../index';
+import { constructWifiString, hydrateWifiData, WifiContract, wifiPassphraseProblem } from '../index';
 import { WifiEncryption, WifiEapMethod, WifiEapPhase2, QRType } from '@/types';
 
 describe('Wifi generator', () => {
@@ -191,36 +191,43 @@ describe('Wifi generator', () => {
     expect(hydrated.password).toBe('sec\ret');
   });
 
-  describe('WifiContract.validate', () => {
-    it('returns WIFI_PASSWORD_TOO_SHORT_VIOLATION for WPA passwords shorter than 8 characters', () => {
-      const shortWpa = 'WIFI:T:WPA;S:MyNet;P:1234567;;';
-      expect(WifiContract.validate?.(shortWpa)).toEqual(['WIFI_PASSWORD_TOO_SHORT_VIOLATION']);
+  describe('wifiPassphraseProblem', () => {
+    it('returns warning for WPA password with 7 characters', () => {
+      expect(wifiPassphraseProblem(WifiEncryption.WPA, '1234567')).toBe(
+        "WPA passwords are 8 to 63 characters. Phones can't join with this one."
+      );
     });
 
-    it('returns WIFI_PASSWORD_TOO_SHORT_VIOLATION for WPA2-EAP passwords shorter than 8 characters', () => {
-      const shortEap = 'WIFI:T:WPA2-EAP;S:CorpNet;P:1234567;I:user;;';
-      expect(WifiContract.validate?.(shortEap)).toEqual(['WIFI_PASSWORD_TOO_SHORT_VIOLATION']);
+    it('returns undefined for WPA password with 8 characters', () => {
+      expect(wifiPassphraseProblem(WifiEncryption.WPA, '12345678')).toBeUndefined();
     });
 
-    it('returns no violations for WPA passwords with 8 or more characters', () => {
-      const validWpa = 'WIFI:T:WPA;S:MyNet;P:12345678;;';
-      expect(WifiContract.validate?.(validWpa)).toEqual([]);
+    it('returns undefined for WPA password with 63 characters', () => {
+      expect(wifiPassphraseProblem(WifiEncryption.WPA, 'a'.repeat(63))).toBeUndefined();
     });
 
-    it('returns no violations when WPA password is empty', () => {
-      const emptyPass = 'WIFI:T:WPA;S:MyNet;P:;;';
-      expect(WifiContract.validate?.(emptyPass)).toEqual([]);
+    it('returns undefined for WPA password with 64 hex characters', () => {
+      expect(wifiPassphraseProblem(WifiEncryption.WPA, 'a'.repeat(64))).toBeUndefined();
+      expect(wifiPassphraseProblem(WifiEncryption.WPA, '0123456789abcdef'.repeat(4))).toBeUndefined();
     });
 
-    it('returns no violations for short passwords on WEP networks', () => {
-      const shortWep = 'WIFI:T:WEP;S:LegacyNet;P:12345;;';
-      expect(WifiContract.validate?.(shortWep)).toEqual([]);
+    it('returns warning for WPA password with 64 non-hex characters', () => {
+      expect(wifiPassphraseProblem(WifiEncryption.WPA, 'g'.repeat(64))).toBe(
+        "WPA passwords are 8 to 63 characters. Phones can't join with this one."
+      );
     });
 
-    it('returns no violations for open networks (NOPASS)', () => {
-      const openNet = 'WIFI:T:nopass;S:OpenNet;;';
-      expect(WifiContract.validate?.(openNet)).toEqual([]);
+    it('returns undefined when WPA password is empty or undefined', () => {
+      expect(wifiPassphraseProblem(WifiEncryption.WPA, '')).toBeUndefined();
+      expect(wifiPassphraseProblem(WifiEncryption.WPA, undefined)).toBeUndefined();
+    });
+
+    it('returns undefined for WEP encryption with short password', () => {
+      expect(wifiPassphraseProblem(WifiEncryption.WEP, '12345')).toBeUndefined();
+    });
+
+    it('returns undefined for WPA2-EAP encryption with short password', () => {
+      expect(wifiPassphraseProblem(WifiEncryption.WPA2_EAP, '12345')).toBeUndefined();
     });
   });
 });
-

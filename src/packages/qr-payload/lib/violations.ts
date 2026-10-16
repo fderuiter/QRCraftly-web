@@ -32,7 +32,6 @@ const VIOLATION_MESSAGES: Record<string, string> = {
     'Part of this email code is not encoded: a "?", "&" or ";" ends a field early, or it has a field other than To, Cc, Bcc, Subject and Body.',
   PAYMENT_AMOUNT_VIOLATION: 'The payment amount must be a plain number, within the decimal places its network allows.',
   SMS_PHONE_STRUCTURE_VIOLATION: 'SMS phone number contains invalid characters, letters, or line-breaks.',
-  WIFI_PASSWORD_TOO_SHORT_VIOLATION: 'WPA passwords must be at least 8 characters long.',
 };
 
 /**
