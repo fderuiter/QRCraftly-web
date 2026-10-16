@@ -63,6 +63,7 @@ const TEMPLATE_OPTIONS: Array<{ id: TemplateStyle; label: string }> = [
   { id: TemplateStyle.MINIMALIST, label: 'Minimalist' },
   { id: TemplateStyle.GRADIENT_BLUR, label: 'Gradient' },
   { id: TemplateStyle.SOLID_FRAME, label: 'Solid Frame' },
+  { id: TemplateStyle.WIFI_CARD, label: 'Wi-Fi Card' },
 ];
 
 /**
@@ -116,7 +117,7 @@ export const LayoutControls: React.FC<LayoutControlsProps> = ({ config, onChange
         <SegmentedControl<TemplateStyle>
           appearance="tiles"
           labelledBy="template-style-label"
-          className="grid-cols-2"
+          className="grid-cols-2 sm:grid-cols-3"
           value={config.templateStyle}
           onChange={(templateStyle) => onChange({ templateStyle })}
           options={TEMPLATE_OPTIONS.map((opt) => ({

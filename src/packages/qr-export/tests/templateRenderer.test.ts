@@ -23,7 +23,7 @@ import {
   SvgContext,
 } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
-import { SocialFormat, TemplateStyle, type QRConfig, QRStyle } from '@/types';
+import { SocialFormat, TemplateStyle, type QRConfig, QRStyle, QRType } from '@/types';
 import * as qrMatrix from '@/packages/qr-matrix';
 import { calculateLayout } from '@/packages/qr-matrix';
 
@@ -95,6 +95,9 @@ function makeMockCtx() {
     quadraticCurveTo: vi.fn(),
     closePath: vi.fn(),
     fill: vi.fn(),
+    stroke: vi.fn(),
+    arc: vi.fn(),
+    roundRect: vi.fn(),
     get fillStyle() { return _fillStyle; },
     set fillStyle(v: string) { _fillStyle = v; fillStyleHistory.push(v); },
     get strokeStyle() { return _strokeStyle; },
@@ -598,6 +601,92 @@ describe('drawWithTemplate – transparent background', () => {
 
     // Safe zone rounded rect should be filled with #ffffff
     expect((ctx as any)._fillStyleHistory).toContain('#ffffff');
+  });
+});
+
+describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
+  beforeEach(() => {
+    vi.spyOn(qrMatrix, 'drawQRInternal').mockImplementation(vi.fn());
+  });
+
+  it('renders Wi-Fi card with hydrated SSID and password', () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      type: QRType.WIFI,
+      value: 'WIFI:S:CafeGuest;P:secret123;T:WPA;;',
+      templateStyle: TemplateStyle.WIFI_CARD,
+      socialFormat: SocialFormat.PORTRAIT_4_5,
+    };
+    const ctx = makeMockCtx();
+    const modules = makeModules();
+
+    drawWithTemplate(ctx, modules, config, null, null, 1080, 1350, modules.size);
+
+    const filledTexts = (ctx.fillText as any).mock.calls.map((call: any[]) => call[0]);
+    expect(filledTexts).toContain('Connect to Wi-Fi');
+    expect(filledTexts).toContain('NETWORK');
+    expect(filledTexts).toContain('CafeGuest');
+    expect(filledTexts).toContain('PASSWORD');
+    expect(filledTexts).toContain('secret123');
+  });
+
+  it('displays "No password needed" for open NOPASS Wi-Fi networks', () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      type: QRType.WIFI,
+      value: 'WIFI:S:FreeCafe;P:;T:nopass;;',
+      templateStyle: TemplateStyle.WIFI_CARD,
+      socialFormat: SocialFormat.SQUARE_1_1,
+    };
+    const ctx = makeMockCtx();
+    const modules = makeModules();
+
+    drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
+
+    const filledTexts = (ctx.fillText as any).mock.calls.map((call: any[]) => call[0]);
+    expect(filledTexts).toContain('FreeCafe');
+    expect(filledTexts).toContain('No password needed');
+  });
+
+  it('falls back to templateHeadline and templateSubtext for non-Wi-Fi payloads', () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      type: QRType.URL,
+      value: 'https://qrcraftly.com',
+      templateStyle: TemplateStyle.WIFI_CARD,
+      templateHeadline: 'Welcome to Our Cafe',
+      templateSubtext: 'Table 5 Menu',
+      socialFormat: SocialFormat.SQUARE_1_1,
+    };
+    const ctx = makeMockCtx();
+    const modules = makeModules();
+
+    drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
+
+    const filledTexts = (ctx.fillText as any).mock.calls.map((call: any[]) => call[0]);
+    expect(filledTexts).toContain('Welcome to Our Cafe');
+    expect(filledTexts).toContain('Table 5 Menu');
+  });
+
+  it('correctly serializes Wi-Fi card elements via SvgContext for vector SVG export', () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      type: QRType.WIFI,
+      value: 'WIFI:S:HotelGuest;P:stay1234;T:WPA;;',
+      templateStyle: TemplateStyle.WIFI_CARD,
+      socialFormat: SocialFormat.SQUARE_1_1,
+    };
+    const svgCtx = new SvgContext(1080, 1080);
+    const modules = makeModules();
+
+    drawWithTemplate(svgCtx as unknown as CanvasRenderingContext2D, modules, config, null, null, 1080, 1080, modules.size);
+
+    const svgXml = svgCtx.serialize();
+    expect(svgXml).toContain('Connect to Wi-Fi');
+    expect(svgXml).toContain('NETWORK');
+    expect(svgXml).toContain('HotelGuest');
+    expect(svgXml).toContain('PASSWORD');
+    expect(svgXml).toContain('stay1234');
   });
 });
 

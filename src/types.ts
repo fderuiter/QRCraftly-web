@@ -531,6 +531,7 @@ export const TemplateStyle = {
   MINIMALIST: 'minimalist',
   GRADIENT_BLUR: 'gradient_blur',
   SOLID_FRAME: 'solid_frame',
+  WIFI_CARD: 'wifi_card',
 } as const;
 export type TemplateStyle = (typeof TemplateStyle)[keyof typeof TemplateStyle];
 

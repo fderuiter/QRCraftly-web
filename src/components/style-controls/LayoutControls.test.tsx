@@ -156,6 +156,21 @@ describe('LayoutControls - Contrast Warnings', () => {
     expect(mockOnChange).toHaveBeenCalledWith({ templateHeadline: 'New Scan' });
   });
 
+  it('allows selecting the Wi-Fi Card template option', () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      templateStyle: TemplateStyle.NONE,
+    };
+
+    render(<LayoutControls config={config} onChange={mockOnChange} />);
+
+    const wifiCardButton = screen.getByRole('radio', { name: /Select Wi-Fi Card template/i });
+    expect(wifiCardButton).toBeInTheDocument();
+
+    fireEvent.click(wifiCardButton);
+    expect(mockOnChange).toHaveBeenCalledWith({ templateStyle: TemplateStyle.WIFI_CARD });
+  });
+
   it('has toggle switch programmatic names dynamically matching the visual state text ("Custom" or "Inherit")', () => {
     const configInherit: QRConfig = {
       ...(DEFAULT_CONFIG as QRConfig),

@@ -16,10 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type QRConfig, type QRModules, SocialFormat, TemplateStyle } from '@/types';
+import { type QRConfig, type QRModules, QRType, SocialFormat, TemplateStyle, WifiEncryption, type WifiData } from '@/types';
 import { drawQRInternal, type ModuleRenderOptions, type MazeData } from '@/packages/qr-matrix';
 import { drawRoundRect } from '@/packages/qr-matrix/canvas';
 import { hexToRgba } from '@/utils/colorUtils';
+import { hydrateWifiData } from '@/packages/qr-payload';
 
 /**
  * Standard high-resolution dimensions for each social media format.
@@ -156,6 +157,34 @@ function drawSolidFrameBackground(
   ctx.fillRect(inset, inset, width - 2 * inset, height - 2 * inset);
 }
 
+/**
+ * Wi-Fi Display Card template: fills the background and draws an outer sign border.
+ */
+function drawWifiCardBackground(
+  ctx: CanvasRenderingContext2D,
+  config: QRConfig,
+  width: number,
+  height: number
+): void {
+  const bg = resolveTemplateBg(config);
+  const fg = resolveTemplateText(config);
+
+  // Background
+  if (bg !== 'transparent') {
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  // Outer decorative card border
+  const inset = width * 0.025;
+  const radius = width * 0.03;
+  ctx.strokeStyle = fg;
+  ctx.lineWidth = Math.max(2, width * 0.006);
+  ctx.beginPath();
+  drawRoundRect(ctx, inset, inset, width - 2 * inset, height - 2 * inset, radius);
+  ctx.stroke();
+}
+
 // ---------------------------------------------------------------------------
 // Text helpers
 // ---------------------------------------------------------------------------
@@ -193,6 +222,172 @@ function drawTemplateText(
 }
 
 /**
+ * Renders the Wi-Fi card sign header (Wi-Fi badge icon & heading) and network detail badges.
+ */
+function drawWifiCardChrome(
+  ctx: CanvasRenderingContext2D,
+  config: QRConfig,
+  displayWidth: number,
+  displayHeight: number,
+  qrY: number,
+  qrSize: number
+): void {
+  const fg = resolveTemplateText(config);
+  const bg = resolveTemplateBg(config);
+  const safePad = qrSize * 0.05;
+
+  // Header Area: Top to QR Safe-Zone
+  const headerTop = displayWidth * 0.04;
+  const headerBottom = qrY - safePad;
+  const headerHeight = Math.max(0, headerBottom - headerTop);
+  const headerCenterY = headerTop + headerHeight / 2;
+
+  // Wi-Fi Badge Icon & Heading
+  const iconRadius = Math.min(displayWidth * 0.035, headerHeight * 0.22);
+  const badgeCircleR = iconRadius * 1.3;
+  const iconX = displayWidth / 2;
+  const iconY = headerCenterY - iconRadius * 0.6;
+
+  ctx.save();
+  // Badge background circle
+  ctx.fillStyle = fg;
+  ctx.beginPath();
+  ctx.arc(iconX, iconY, badgeCircleR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wi-Fi Signal Arcs inside badge (drawn in background color)
+  const effectiveBg = bg === 'transparent' ? '#ffffff' : bg;
+  ctx.strokeStyle = effectiveBg;
+  ctx.fillStyle = effectiveBg;
+  ctx.lineWidth = Math.max(1.5, iconRadius * 0.2);
+
+  // Outer Arc
+  ctx.beginPath();
+  ctx.arc(iconX, iconY + iconRadius * 0.3, iconRadius, -Math.PI * 0.75, -Math.PI * 0.25);
+  ctx.stroke();
+
+  // Middle Arc
+  ctx.beginPath();
+  ctx.arc(iconX, iconY + iconRadius * 0.3, iconRadius * 0.65, -Math.PI * 0.75, -Math.PI * 0.25);
+  ctx.stroke();
+
+  // Inner Arc
+  ctx.beginPath();
+  ctx.arc(iconX, iconY + iconRadius * 0.3, iconRadius * 0.3, -Math.PI * 0.75, -Math.PI * 0.25);
+  ctx.stroke();
+
+  // Center Dot
+  ctx.beginPath();
+  ctx.arc(iconX, iconY + iconRadius * 0.35, iconRadius * 0.12, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Heading Text
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = fg;
+  const headline = config.templateHeadline?.trim() || 'Connect to Wi-Fi';
+  const headlineFontSize = Math.round(Math.min(displayWidth * 0.048, headerHeight * 0.28));
+  ctx.font = `bold ${headlineFontSize}px sans-serif`;
+  const headingY = iconY + badgeCircleR + headlineFontSize * 0.9;
+  ctx.fillText(headline, displayWidth / 2, headingY, displayWidth * 0.85);
+  ctx.restore();
+
+  // Bottom Area: QR Safe-Zone to Canvas Bottom
+  const bottomTop = qrY + qrSize + safePad;
+  const bottomHeight = displayHeight - bottomTop - displayWidth * 0.04;
+  const bottomCenterY = bottomTop + bottomHeight / 2;
+
+  // Hydrate Wi-Fi payload
+  let wifiData: WifiData | null = null;
+  if (config.type === QRType.WIFI || (config.value && config.value.trim().toUpperCase().startsWith('WIFI:'))) {
+    try {
+      wifiData = hydrateWifiData(config.value);
+    } catch {
+      wifiData = null;
+    }
+  }
+
+  const isWifiPayload = config.type === QRType.WIFI || (wifiData !== null && Boolean(wifiData.ssid));
+
+  if (isWifiPayload && wifiData) {
+    const ssid = wifiData.ssid || 'Wi-Fi Network';
+    const isOpenNetwork = wifiData.encryption === WifiEncryption.NOPASS || !wifiData.password;
+    const passVal = isOpenNetwork ? 'No password needed' : wifiData.password;
+
+    const badgeW = displayWidth * 0.84;
+    const badgeH = Math.min(displayWidth * 0.085, bottomHeight * 0.38);
+    const badgeGap = displayWidth * 0.018;
+    const totalBadgesH = badgeH * 2 + badgeGap;
+    const badgeX = (displayWidth - badgeW) / 2;
+    const badge1Y = bottomCenterY - totalBadgesH / 2;
+    const badge2Y = badge1Y + badgeH + badgeGap;
+    const padX = badgeW * 0.04;
+
+    const drawBadge = (
+      y: number,
+      label: string,
+      val: string,
+      isMonospace: boolean
+    ) => {
+      ctx.save();
+      // Badge background fill
+      ctx.fillStyle = hexToRgba(fg, 0.08);
+      ctx.strokeStyle = fg;
+      ctx.lineWidth = Math.max(1, displayWidth * 0.002);
+      ctx.beginPath();
+      drawRoundRect(ctx, badgeX, y, badgeW, badgeH, displayWidth * 0.015);
+      ctx.fill();
+      ctx.stroke();
+
+      // Label
+      ctx.fillStyle = fg;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const labelFontSize = Math.round(badgeH * 0.25);
+      ctx.font = `bold ${labelFontSize}px sans-serif`;
+      ctx.fillText(label, badgeX + padX, y + badgeH * 0.3, badgeW - padX * 2);
+
+      // Value
+      const valFontSize = Math.round(badgeH * 0.36);
+      const fontStyle = isMonospace ? `bold ${valFontSize}px monospace` : `bold ${valFontSize}px sans-serif`;
+      ctx.font = fontStyle;
+      ctx.fillText(val, badgeX + padX, y + badgeH * 0.7, badgeW - padX * 2);
+      ctx.restore();
+    };
+
+    drawBadge(badge1Y, 'NETWORK', ssid, false);
+    drawBadge(badge2Y, 'PASSWORD', passVal, true);
+  } else {
+    // Fallback for non-Wi-Fi payloads (Requirement 4)
+    const fallbackSubtext = config.templateSubtext?.trim() ?? '';
+    const fallbackHeadline = config.templateHeadline?.trim() ?? '';
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = fg;
+
+    if (fallbackHeadline && fallbackSubtext) {
+      const hSize = Math.round(displayWidth * 0.042);
+      const sSize = Math.round(displayWidth * 0.034);
+      ctx.font = `bold ${hSize}px sans-serif`;
+      ctx.fillText(fallbackHeadline, displayWidth / 2, bottomCenterY - sSize * 0.8, displayWidth * 0.85);
+      ctx.font = `${sSize}px sans-serif`;
+      ctx.fillText(fallbackSubtext, displayWidth / 2, bottomCenterY + hSize * 0.8, displayWidth * 0.85);
+    } else if (fallbackSubtext) {
+      const sSize = Math.round(displayWidth * 0.038);
+      ctx.font = `${sSize}px sans-serif`;
+      ctx.fillText(fallbackSubtext, displayWidth / 2, bottomCenterY, displayWidth * 0.85);
+    } else if (fallbackHeadline) {
+      const hSize = Math.round(displayWidth * 0.042);
+      ctx.font = `bold ${hSize}px sans-serif`;
+      ctx.fillText(fallbackHeadline, displayWidth / 2, bottomCenterY, displayWidth * 0.85);
+    }
+    ctx.restore();
+  }
+}
+
+/**
  * Strategy map for template background rendering.
  */
 type BackgroundPainter = (
@@ -207,6 +402,7 @@ const BACKGROUND_PAINTERS: Record<TemplateStyle, BackgroundPainter> = {
   [TemplateStyle.MINIMALIST]: drawMinimalistBackground,
   [TemplateStyle.GRADIENT_BLUR]: drawGradientBlurBackground,
   [TemplateStyle.SOLID_FRAME]: drawSolidFrameBackground,
+  [TemplateStyle.WIFI_CARD]: drawWifiCardBackground,
 };
 
 // ---------------------------------------------------------------------------
@@ -327,8 +523,12 @@ export function drawWithTemplate(
 
   ctx.restore();
 
-  // ── 5. Headline / Subtext ─────────────────────────────────────────────────
+  // ── 5. Headline / Subtext / Wi-Fi Card Chrome ────────────────────────────
   if (config.templateStyle !== TemplateStyle.NONE) {
-    drawTemplateText(ctx, config, displayWidth, displayHeight, qrY, qrSize);
+    if (config.templateStyle === TemplateStyle.WIFI_CARD) {
+      drawWifiCardChrome(ctx, config, displayWidth, displayHeight, qrY, qrSize);
+    } else {
+      drawTemplateText(ctx, config, displayWidth, displayHeight, qrY, qrSize);
+    }
   }
 }
