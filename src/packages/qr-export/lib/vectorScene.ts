@@ -309,11 +309,13 @@ const WIN_ANSI_EXTRAS: readonly (readonly [string, number, string, number, numbe
   ['Ÿ', 0x9f, 'Ydieresis', 667, 667],
 ];
 
-const WIN_ANSI_CODE = new Map(WIN_ANSI_EXTRAS.map(([ch, code]) => [ch.codePointAt(0) ?? 0, code]));
-const WIN_ANSI_WIDTH = new Map(WIN_ANSI_EXTRAS.map(([, code, , regular, bold]) => [code, [regular, bold] as const]));
+// Searched on use rather than prebuilt: nothing here runs when the module loads, so the bundler can
+// keep the vector writers out of the generator's first-load chunk (see `fontProlog` in epsExport.ts).
+const winAnsiByChar = (codePoint: number) => WIN_ANSI_EXTRAS.find(([ch]) => ch.codePointAt(0) === codePoint);
+const winAnsiByCode = (code: number) => WIN_ANSI_EXTRAS.find((extra) => extra[1] === code);
 
 /** `code /glyph put` pairs that give an ISOLatin1 font the WinAnsi extras, for the EPS font prolog. */
-export const WIN_ANSI_EXTRA_PUTS = WIN_ANSI_EXTRAS.map(([, code, glyph]) => `dup ${code} /${glyph} put`).join(' ');
+export const winAnsiExtraPuts = (): string => WIN_ANSI_EXTRAS.map(([, code, glyph]) => `dup ${code} /${glyph} put`).join(' ');
 
 /**
  * Converts text to WinAnsi codes, the encoding both writers select for Helvetica
@@ -325,15 +327,15 @@ export function toLatin1Codes(text: string): number[] {
   return Array.from(text, (ch) => {
     const code = ch.codePointAt(0) ?? 63;
     if ((code >= 32 && code <= 126) || (code >= 0xa0 && code <= 0xff)) return code;
-    return WIN_ANSI_CODE.get(code) ?? 63;
+    return winAnsiByChar(code)?.[1] ?? 63;
   });
 }
 
 const widthOf = (code: number, bold: boolean): number => {
   const table = bold ? HELVETICA_BOLD_WIDTHS : HELVETICA_WIDTHS;
   if (code >= 32 && code <= 126) return table[code - 32];
-  const extra = WIN_ANSI_WIDTH.get(code);
-  if (extra) return extra[bold ? 1 : 0];
+  const extra = winAnsiByCode(code);
+  if (extra) return extra[bold ? 4 : 3];
   // Accented letters take the width of their base letter.
   const base = String.fromCharCode(code).normalize('NFD').charCodeAt(0);
   return base >= 32 && base <= 126 ? table[base - 32] : 556;
