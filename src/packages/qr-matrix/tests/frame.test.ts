@@ -19,7 +19,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { calculateLayout, renderFrame, FRAME_FONT_STACKS } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
-import type { QRConfig, FrameFontFamily } from '@/types';
+import type { QRConfig } from '@/types';
 
 function createMockContext(): CanvasRenderingContext2D {
   return {
@@ -99,12 +99,9 @@ describe('Frame Matrix & Layout Rendering', () => {
   it('falls back to default sans-serif font stack on invalid or unknown frameFontFamily', () => {
     const mockCtx = createMockContext();
 
-    const config: QRConfig = {
-      ...(DEFAULT_CONFIG as QRConfig),
-      frameStyle: 'pill',
-      frameText: 'SCAN ME',
-      frameFontFamily: 'invalid-font' as unknown as FrameFontFamily,
-    };
+    const config: QRConfig = { ...(DEFAULT_CONFIG as QRConfig), frameStyle: 'pill', frameText: 'SCAN ME' };
+    // A value from an old or hand-edited file that is not a preset, and an Object prototype key.
+    Reflect.set(config, 'frameFontFamily', 'constructor');
 
     const layout = calculateLayout(config, 512, 29);
     renderFrame(mockCtx, config, 512, layout);

@@ -688,7 +688,7 @@ export class SvgContext {
 
   private _parseFont(fontStr: string): { fontFamily: string; fontSize: number; fontWeight: string } {
     const trimmed = fontStr ? fontStr.trim() : '';
-    const match = /^(?:(bold|[1-9]00|normal|italic|oblique)\s+)?(\d+(?:\.\d+)?)(?:px|pt|em|rem)?\s+(.+)$/i.exec(trimmed);
+    const match = /^(?:(bold|[1-9]00|normal)\s+)?(\d+(?:\.\d+)?)(?:px|pt|em|rem)?\s+(.+)$/i.exec(trimmed);
     if (match) {
       const weight = match[1] ? match[1].toLowerCase() : 'normal';
       const size = parseFloat(match[2]) || 16;

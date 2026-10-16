@@ -125,12 +125,11 @@ export const FrameControls: React.FC<FrameControlsProps> = ({ config, onChange }
               <SelectField
                 id="frame-font-family"
                 label="Badge Font"
+                aria-describedby="frame-font-family-hint"
                 value={config.frameFontFamily || 'sans-serif'}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  if (FRAME_FONT_FAMILIES.includes(val as FrameFontFamily)) {
-                    onChange({ frameFontFamily: val as FrameFontFamily });
-                  }
+                  const family = FRAME_FONT_FAMILIES.find((f) => f === e.target.value);
+                  if (family) onChange({ frameFontFamily: family });
                 }}
               >
                 {FRAME_FONT_OPTIONS.map((opt) => (
@@ -139,7 +138,7 @@ export const FrameControls: React.FC<FrameControlsProps> = ({ config, onChange }
                   </option>
                 ))}
               </SelectField>
-              <p className="mt-1 text-xs text-fg-muted">
+              <p id="frame-font-family-hint" className="mt-1 text-xs text-fg-muted">
                 PDF and EPS exports always use Helvetica.
               </p>
             </div>

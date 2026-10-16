@@ -20,6 +20,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { FrameControls } from './FrameControls';
+import { axe } from '../../../tests/utils/axe';
 import { DEFAULT_CONFIG } from '@/constants';
 import type { QRConfig } from '@/types';
 
@@ -75,6 +76,16 @@ describe('FrameControls Component', () => {
     fireEvent.change(fontSelect, { target: { value: 'serif' } });
 
     expect(onChange).toHaveBeenCalledWith({ frameFontFamily: 'serif' });
+  });
+
+  it('describes the badge font select with its export note and has no axe violations', async () => {
+    const config: QRConfig = { ...(DEFAULT_CONFIG as QRConfig), frameStyle: 'pill', frameText: 'SCAN ME' };
+    const { container } = render(<FrameControls config={config} onChange={vi.fn()} />);
+
+    expect(screen.getByLabelText('Badge Font')).toHaveAccessibleDescription(
+      'PDF and EPS exports always use Helvetica.',
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('shows low contrast warning when frame text contrast is below 4.5:1', () => {
