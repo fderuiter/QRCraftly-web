@@ -17,10 +17,10 @@
 */
 
 import { useState, useRef, useEffect, type ElementType } from "react";
-import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, type PhoneData, type SmsData } from "../../types";
+import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData } from "../../types";
 import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
-import { CONTAINMENT_PROFILES, validatePayload, PhoneContract, SmsContract, droppedPhoneCharacters } from "@/packages/qr-payload";
+import { CONTAINMENT_PROFILES } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
 
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
@@ -51,35 +51,6 @@ const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => 
     }
   } else if (type === QRType.URL || type === QRType.MEETING || type === QRType.TEXT) {
     if (findBlockingViolation(type, data as UrlData | MeetingData | TextData)) {
-      return false;
-    }
-  } else if (type === QRType.PHONE) {
-    const phone = data as PhoneData;
-    const hasInput = Boolean(phone.number && phone.number.trim() !== '');
-    if (phone.number && (isDangerousUrl(phone.number) || droppedPhoneCharacters(phone.number).length > 0)) {
-      return false;
-    }
-    const constructed = PhoneContract.construct(phone);
-    if (hasInput && !constructed) {
-      return false;
-    }
-    if (constructed && validatePayload(constructed, QRType.PHONE).length > 0) {
-      return false;
-    }
-  } else if (type === QRType.SMS) {
-    const sms = data as SmsData;
-    const hasInput = Boolean((sms.number && sms.number.trim() !== '') || (sms.message && sms.message.trim() !== ''));
-    if (sms.number && (isDangerousUrl(sms.number) || droppedPhoneCharacters(sms.number, true).length > 0)) {
-      return false;
-    }
-    if (sms.message && isDangerousUrl(sms.message)) {
-      return false;
-    }
-    const constructed = SmsContract.construct(sms);
-    if (hasInput && !constructed) {
-      return false;
-    }
-    if (constructed && validatePayload(constructed, QRType.SMS).length > 0) {
       return false;
     }
   }

@@ -85,20 +85,5 @@ export const PhoneContract: QRGeneratorContract<PhoneData> = {
   construct: constructPhoneString,
   hydrate: hydratePhoneData,
   matches: (raw: string) => identifyProtocol(raw) === QRType.PHONE,
-  validate: (raw: string) => {
-    const violations: string[] = [];
-    const parsed = parseProtocol(raw);
-    if (parsed && parsed.scheme === 'tel') {
-      const numberPart = safeDecodeURIComponent(parsed.path);
-      const mainNumber = numberPart.replace(/;ext=\d{1,10}$/i, '');
-      if (
-        /[a-zA-Z]/.test(mainNumber) ||
-        /[^0-9+*#\-().,\s]/.test(mainNumber) ||
-        /[\r\n]/.test(numberPart)
-      ) {
-        violations.push('PHONE_STRUCTURE_VIOLATION');
-      }
-    }
-    return violations;
-  },
+  validate: () => [],
 };
