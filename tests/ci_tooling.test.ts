@@ -47,7 +47,7 @@ describe('CI triggers and tiers (main.yml, ADR 0050)', () => {
   it('fails the CI aggregate on a failed plan or job but passes planned skips', () => {
     const ci = jobBlock('ci');
     expect(ci).toMatch(/needs: \[plan, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse\]/);
-    expect(ci).toContain('if: always()');
+    expect(ci).toContain('if: ${{ !cancelled() }}');
     expect(ci).toContain('[ "$PLAN_RESULT" != "success" ]');
     expect(ci).toContain('[ "$result" != "skipped" ]');
   });
@@ -238,5 +238,32 @@ describe('post-merge production check (#1217)', () => {
     expect(job).toContain('EXPECTED_COMMIT: ${{ github.sha }}');
     expect(job).toContain('run: bash scripts/ci/wait_for_deploy.sh');
     expect(job).not.toContain('continue-on-error');
+  });
+});
+
+describe('runner queue hygiene', () => {
+  it('cancels superseded PR Title runs', () => {
+    const title = read('.github/workflows/pr-title.yml');
+    expect(title).toContain('group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}');
+    expect(title).toContain('cancel-in-progress: true');
+  });
+});
+
+describe('visual baseline refresh (#1426)', () => {
+  const workflow = read('.github/workflows/update-snapshots.yml');
+
+  it('runs from a label or by hand, and never on main or a fork PR', () => {
+    expect(workflow).toMatch(/pull_request:\n\s+types: \[labeled\]/);
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain("github.ref != 'refs/heads/main'");
+    expect(workflow).toContain("github.event.label.name == 'update-snapshots'");
+    expect(workflow).toContain('github.event.pull_request.head.repo.full_name == github.repository');
+  });
+
+  it('runs only the visual spec and commits only its baselines', () => {
+    expect(workflow).toContain('pnpm exec playwright test e2e/visual-regression.spec.ts');
+    expect(workflow).toContain('--update-snapshots');
+    expect(workflow).toContain('git add e2e/visual-regression.spec.ts-snapshots');
+    expect(workflow).not.toMatch(/git add (-A|\.|--all)/);
   });
 });
