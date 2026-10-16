@@ -370,8 +370,9 @@ function clipRect(state: WalkState, x: number, y: number, w: number, h: number):
 function readText(el: Element, state: WalkState): SceneText | null {
   const content = el.textContent || '';
   if (!content) return null;
-  const font = el.getAttribute('font') || '';
-  const size = parseFloat(/([\d.]+)px/.exec(font)?.[1] ?? el.getAttribute('font-size') ?? '');
+  const fontAttr = el.getAttribute('font') || '';
+  const fontSizeAttr = el.getAttribute('font-size') || '';
+  const size = parseFloat(fontSizeAttr || (/([\d.]+)px/.exec(fontAttr)?.[1] ?? ''));
   const fontSize = size > 0 ? size : 16;
   const weight = el.getAttribute('font-weight') || '';
   const anchorAttr = el.getAttribute('text-anchor');
@@ -383,7 +384,7 @@ function readText(el: Element, state: WalkState): SceneText | null {
     y: num(el, 'y') + (BASELINE_SHIFT[el.getAttribute('dominant-baseline') || ''] || 0) * fontSize,
     color: parseColor(el.getAttribute('fill') || '#000000') || BLACK,
     fontSize,
-    bold: /\bbold\b|\b[6-9]00\b/.test(`${font} ${weight}`),
+    bold: /\bbold\b|\b[6-9]00\b/.test(`${fontAttr} ${weight}`),
     anchor: anchorAttr === 'middle' || anchorAttr === 'end' ? anchorAttr : 'start',
     textLength: textLength > 0 ? textLength : null,
     matrix: state.matrix,

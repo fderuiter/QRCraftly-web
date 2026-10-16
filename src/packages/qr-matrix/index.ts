@@ -47,7 +47,7 @@ export {
   type LayoutMetrics,
 } from './lib/utils';
 export { renderBorder, renderBorderDecoration } from './lib/border';
-export { renderFrame } from './lib/frame';
+export { renderFrame, FRAME_FONT_STACKS } from './lib/frame';
 export { renderEyes } from './lib/eyes';
 export { renderModules, sampleCellLuminances, type ModuleRenderOptions } from './lib/modules';
 export {
