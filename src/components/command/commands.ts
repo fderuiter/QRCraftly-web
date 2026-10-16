@@ -93,12 +93,19 @@ export function buildCommands(host: CommandHost): Command[] {
       group: 'Colors',
       keywords: 'theme palette preset',
       run: () => {
+        const currentStops = store.getState().config.gradientColorStops;
+        const stop1 = (currentStops && currentStops[1]?.color) ?? '#3b82f6';
         store.updateConfig({
           fgColor: preset.fg,
           bgColor: preset.bg,
           eyeColor: preset.eye,
           eyeFrameColor: preset.eye,
           eyeBallColor: preset.eye,
+          gradientType: 'none',
+          gradientColorStops: [
+            { offset: 0, color: preset.fg },
+            { offset: 1, color: stop1 },
+          ],
         });
         notifyUndo(`${preset.label} colors applied`);
       },

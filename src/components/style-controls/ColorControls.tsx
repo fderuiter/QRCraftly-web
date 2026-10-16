@@ -87,6 +87,10 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
         onChange={(label) => {
           const preset = PRESET_COLORS.find((p) => p.label === label);
           if (preset) {
+            const updatedStops = [
+              { offset: 0, color: preset.fg },
+              { offset: 1, color: stop1Color },
+            ];
             onChange({
               fgColor: preset.fg,
               bgColor: preset.bg,
@@ -94,6 +98,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
               eyeFrameColor: preset.eye,
               eyeBallColor: preset.eye,
               gradientType: 'none',
+              gradientColorStops: updatedStops,
             });
           }
         }}
@@ -129,9 +134,13 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
             if (type === 'none') {
               onChange({ gradientType: 'none' });
             } else {
+              const updatedStops = [
+                { offset: 0, color: config.fgColor || colorStops[0]?.color || '#000000' },
+                { offset: 1, color: colorStops[1]?.color ?? '#3b82f6' },
+              ];
               onChange({
                 gradientType: type,
-                gradientColorStops: colorStops,
+                gradientColorStops: updatedStops,
                 gradientAngle: config.gradientAngle ?? 0,
               });
             }

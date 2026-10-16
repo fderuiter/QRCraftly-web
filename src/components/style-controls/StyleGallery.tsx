@@ -156,7 +156,18 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
   const colorTiles = useMemo<Tile[]>(
     () =>
       PRESET_COLORS.map((c) => {
-        const patch = { fgColor: c.fg, bgColor: c.bg, eyeColor: c.eye, eyeFrameColor: c.eye, eyeBallColor: c.eye };
+        const patch = {
+          fgColor: c.fg,
+          bgColor: c.bg,
+          eyeColor: c.eye,
+          eyeFrameColor: c.eye,
+          eyeBallColor: c.eye,
+          gradientType: 'none' as const,
+          gradientColorStops: [
+            { offset: 0, color: c.fg },
+            { offset: 1, color: '#3b82f6' },
+          ],
+        };
         return { id: `color:${c.label}`, name: c.label, patch, choice: choiceOf(source, patch) };
       }),
     [source]
