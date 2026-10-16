@@ -17,10 +17,10 @@
 */
 
 import { useState, useRef, useEffect, type ElementType } from "react";
-import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, CryptoNetwork } from "../../types";
+import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, type EmailData, CryptoNetwork } from "../../types";
 import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
-import { CONTAINMENT_PROFILES, cardFieldsFor, vCardFieldError, paymentAmountError, sepaRefusal } from "@/packages/qr-payload";
+import { CONTAINMENT_PROFILES, emailListError, cardFieldsFor, vCardFieldError, paymentAmountError, sepaRefusal } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
 
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
@@ -38,6 +38,19 @@ const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => 
     }
     if (wifi.eapIdentity && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(wifi.eapIdentity)) {
       return false;
+    }
+  } else if (type === QRType.EMAIL) {
+    const emailData = data as EmailData;
+    const hasContent = [emailData.email, emailData.cc, emailData.bcc, emailData.subject, emailData.body].some((f) => f?.trim());
+    if (hasContent) {
+      const fieldErrors = [
+        emailListError(emailData.email, { required: true }),
+        emailListError(emailData.cc),
+        emailListError(emailData.bcc),
+      ];
+      if (fieldErrors.some(Boolean)) {
+        return false;
+      }
     }
   } else if (type === QRType.VCARD) {
     const vcard = data as VCardData;

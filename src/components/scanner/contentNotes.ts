@@ -45,6 +45,7 @@ const MASK = '\u2022'.repeat(8);
 
 const WIFI_SECURITY: Record<WifiEncryption, string> = {
   [WifiEncryption.WPA]: 'WPA/WPA2/WPA3',
+  [WifiEncryption.SAE]: 'WPA3 only (SAE)',
   [WifiEncryption.WEP]: 'WEP (outdated)',
   [WifiEncryption.NOPASS]: 'None (open network)',
   [WifiEncryption.WPA2_EAP]: 'WPA2 Enterprise',

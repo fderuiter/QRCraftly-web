@@ -23,6 +23,8 @@
  * generator write today) and Latin-1 otherwise (the standard's default).
  */
 
+import { concatBytes } from '@/utils/bytes';
+
 export type QrReadMode = 'numeric' | 'alphanumeric' | 'byte' | 'kanji' | 'hanzi';
 
 /** One data segment of a read code. */
@@ -141,12 +143,7 @@ export function decodeSegments(bytes: Uint8Array, records: readonly SegmentRecor
   let pending: Uint8Array[] = [];
   const flush = () => {
     if (pending.length === 0) return;
-    const joined = new Uint8Array(pending.reduce((n, b) => n + b.length, 0));
-    let at = 0;
-    for (const b of pending) {
-      joined.set(b, at);
-      at += b.length;
-    }
+    const joined = concatBytes(pending);
     text += decodeBytes(joined, null);
     pending = [];
   };

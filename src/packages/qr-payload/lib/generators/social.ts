@@ -45,6 +45,10 @@ export const constructSocialString = (data: SocialData): string => {
   const cleanHandle = sanitizeSocialHandle(data.handle);
   if (!cleanHandle) return '';
 
+  if (data.platform === SocialPlatform.WHATSAPP && data.message && data.message.trim()) {
+    return `https://wa.me/${cleanHandle}?text=${encodeURIComponent(data.message.trim())}`;
+  }
+
   const constructUrl = SOCIAL_PLATFORM_URLS[data.platform];
   return constructUrl ? constructUrl(cleanHandle) : '';
 };
@@ -63,6 +67,9 @@ export const hydrateSocialData = (raw: string): SocialData => {
   if (profile) {
     result.platform = profile.platform;
     result.handle = profile.handle;
+    if (profile.message) {
+      result.message = profile.message;
+    }
   }
 
   return result;

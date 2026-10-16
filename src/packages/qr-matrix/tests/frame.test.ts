@@ -17,9 +17,35 @@
 */
 
 import { describe, it, expect, vi } from 'vitest';
-import { calculateLayout, renderFrame } from '../index';
+import { calculateLayout, renderFrame, FRAME_FONT_STACKS } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
 import type { QRConfig } from '@/types';
+
+function createMockContext(): CanvasRenderingContext2D {
+  return {
+    save: vi.fn(),
+    restore: vi.fn(),
+    translate: vi.fn(),
+    scale: vi.fn(),
+    rotate: vi.fn(),
+    beginPath: vi.fn(),
+    closePath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    quadraticCurveTo: vi.fn(),
+    bezierCurveTo: vi.fn(),
+    fill: vi.fn(),
+    stroke: vi.fn(),
+    fillRect: vi.fn(),
+    fillText: vi.fn(),
+    measureText: vi.fn().mockReturnValue({ width: 50 }),
+    fillStyle: '',
+    strokeStyle: '',
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+  } as unknown as CanvasRenderingContext2D;
+}
 
 describe('Frame Matrix & Layout Rendering', () => {
   it('adjusts draw bounds when frameStyle is active', () => {
@@ -37,29 +63,7 @@ describe('Frame Matrix & Layout Rendering', () => {
   });
 
   it('renders frame shapes onto canvas context without error', () => {
-    const mockCtx = {
-      save: vi.fn(),
-      restore: vi.fn(),
-      translate: vi.fn(),
-      scale: vi.fn(),
-      rotate: vi.fn(),
-      beginPath: vi.fn(),
-      closePath: vi.fn(),
-      moveTo: vi.fn(),
-      lineTo: vi.fn(),
-      quadraticCurveTo: vi.fn(),
-      bezierCurveTo: vi.fn(),
-      fill: vi.fn(),
-      stroke: vi.fn(),
-      fillRect: vi.fn(),
-      fillText: vi.fn(),
-      measureText: vi.fn().mockReturnValue({ width: 50 }),
-      fillStyle: '',
-      strokeStyle: '',
-      font: '',
-      textAlign: '',
-      textBaseline: '',
-    } as unknown as CanvasRenderingContext2D;
+    const mockCtx = createMockContext();
 
     const config: QRConfig = {
       ...(DEFAULT_CONFIG as QRConfig),
@@ -73,5 +77,35 @@ describe('Frame Matrix & Layout Rendering', () => {
 
     const layout = calculateLayout(config, 512, 29);
     expect(() => renderFrame(mockCtx, config, 512, layout)).not.toThrow();
+  });
+
+  it('applies configured frameFontFamily to canvas font property', () => {
+    const mockCtx = createMockContext();
+
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      frameStyle: 'pill',
+      frameText: 'SCAN ME',
+      frameFontFamily: 'serif',
+    };
+
+    const layout = calculateLayout(config, 512, 29);
+    renderFrame(mockCtx, config, 512, layout);
+
+    const expectedStack = FRAME_FONT_STACKS['serif'];
+    expect(mockCtx.font).toContain(expectedStack);
+  });
+
+  it('falls back to default sans-serif font stack on invalid or unknown frameFontFamily', () => {
+    const mockCtx = createMockContext();
+
+    const config: QRConfig = { ...(DEFAULT_CONFIG as QRConfig), frameStyle: 'pill', frameText: 'SCAN ME' };
+    // A value from an old or hand-edited file that is not a preset, and an Object prototype key.
+    Reflect.set(config, 'frameFontFamily', 'constructor');
+
+    const layout = calculateLayout(config, 512, 29);
+    renderFrame(mockCtx, config, 512, layout);
+
+    expect(mockCtx.font).toContain(FRAME_FONT_STACKS['sans-serif']);
   });
 });

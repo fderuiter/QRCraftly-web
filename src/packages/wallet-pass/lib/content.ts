@@ -73,8 +73,10 @@ export function passRefusalReason(type: QRType): string | null {
 
 const ENCRYPTION_LABELS: Record<string, string> = {
   [WifiEncryption.WPA]: 'WPA/WPA2',
+  [WifiEncryption.SAE]: 'WPA3 (SAE)',
   [WifiEncryption.WEP]: 'WEP',
   [WifiEncryption.NOPASS]: 'Open',
+  [WifiEncryption.WPA2_EAP]: 'WPA2 Enterprise',
 };
 
 function cleanFields(fields: PassField[], limit: number): PassField[] {

@@ -47,7 +47,15 @@ import { Modal } from '../ui/Modal';
 import { SelectField } from '../ui/FormFields';
 import { useToast } from '../ui/Toast';
 import { useQRStoreSelector } from '@/context/QRContext';
-import { generateQRSvg, rasterizeSvgToCanvas, preflightLogoCheck, SOCIAL_DIMENSIONS } from '@/packages/qr-export';
+import {
+  generateQRSvg,
+  rasterizeSvgToCanvas,
+  preflightLogoCheck,
+  SOCIAL_DIMENSIONS,
+  MissingImageError,
+  convertSvgToEps,
+  convertSvgToPdf,
+} from '@/packages/qr-export';
 import { QrEncodeError } from '@/packages/qr-matrix';
 import { validateConfig, describeViolation } from '@/packages/qr-payload';
 import { triggerFileDownload } from '@/utils/downloadManager';
@@ -90,7 +98,7 @@ function parseContent(csvContent: string): ParseOutcome {
 }
 
 function isExportFormat(value: string): value is BulkCsvData['exportFormat'] {
-  return value === 'png' || value === 'svg';
+  return value === 'png' || value === 'svg' || value === 'eps' || value === 'pdf';
 }
 
 function isContentType(value: string): value is BulkContentType {
@@ -331,10 +339,23 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
           if (exportFormat === 'png') {
             const canvas = await rasterizeSvgToCanvas(svgString, pngWidth, pngHeight);
             entryData = await canvasToPngBytes(canvas);
+          } else if (exportFormat === 'eps') {
+            entryData = await convertSvgToEps(svgString);
+          } else if (exportFormat === 'pdf') {
+            entryData = await convertSvgToPdf(svgString);
           }
           const stem = sanitizeFileStem(row[filenameCol] ?? '', `qr_${rowNumber}`);
           entries.push({ name: allocateFileName(stem, exportFormat, usedNames), data: entryData });
         } catch (err) {
+          if (err instanceof MissingImageError) {
+            // Stop the batch because the same custom logo fails vector conversion on every row.
+            addToast({
+              type: 'error',
+              message: "The logo couldn't be embedded in EPS/PDF files. Upload the logo again, or choose PNG or SVG.",
+              duration: 5000,
+            });
+            return;
+          }
           // One row that cannot be drawn (too long, an image that never loads) costs that row only.
           skipped.push({ rowNumber, reason: describeRowFailure(err, currentConfig.errorCorrectionLevel) });
           setSkippedRows([...skipped]);
@@ -369,7 +390,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       if (remoteLogoOmitted) {
         addToast({
           type: 'warning',
-          message: 'Remote logo asset could not be loaded. SVG QR codes were generated without the embedded logo.',
+          message: 'The logo was left out of these codes because it could not be loaded from its web address. Upload the logo as an image file to include it.',
           duration: 5000,
         });
       } else {
@@ -550,6 +571,8 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
             >
               <option value="png">PNG Image</option>
               <option value="svg">SVG Vector Image</option>
+              <option value="eps">EPS Vector Image</option>
+              <option value="pdf">PDF Document</option>
             </SelectField>
 
             {exportFormat === 'png' && (

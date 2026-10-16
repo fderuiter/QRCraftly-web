@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { constructEmailString, hydrateEmailData, EmailContract } from '../index';
+import { constructEmailString, hydrateEmailData, EmailContract, emailListError } from '../index';
 import { QRType } from '@/types';
 
 describe('Email generator', () => {
@@ -209,3 +209,43 @@ describe('Email generator', () => {
     ).toEqual(['DELIMITER_VIOLATION']);
   });
 });
+
+describe('emailListError', () => {
+  it('returns null for optional empty or whitespace values', () => {
+    expect(emailListError(undefined)).toBeNull();
+    expect(emailListError('')).toBeNull();
+    expect(emailListError('   ')).toBeNull();
+  });
+
+  it('returns error when required and value is missing or whitespace', () => {
+    expect(emailListError(undefined, { required: true })).toBe('Add at least one recipient address.');
+    expect(emailListError('', { required: true })).toBe('Add at least one recipient address.');
+    expect(emailListError('   ', { required: true })).toBe('Add at least one recipient address.');
+  });
+
+  it('returns null for valid single and comma-separated email lists', () => {
+    expect(emailListError('user@example.com')).toBeNull();
+    expect(emailListError('user1@example.com, user2@example.com')).toBeNull();
+  });
+
+  it('allows trailing commas in address lists as valid', () => {
+    expect(emailListError('a@b.co,')).toBeNull();
+    expect(emailListError('a@b.co, ')).toBeNull();
+  });
+
+  it('returns formatted error for invalid email entries', () => {
+    expect(emailListError('invalid-email')).toBe(
+      '"invalid-email" is not an email address. Separate several addresses with commas.'
+    );
+    expect(emailListError('a@b.co, not-an-email')).toBe(
+      '"not-an-email" is not an email address. Separate several addresses with commas.'
+    );
+  });
+
+  it('returns formatted error for semicolon-separated address lists', () => {
+    expect(emailListError('a@b.co; c@d.co')).toBe(
+      '"a@b.co; c@d.co" is not an email address. Separate several addresses with commas.'
+    );
+  });
+});
+

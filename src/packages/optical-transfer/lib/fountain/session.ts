@@ -17,6 +17,8 @@
 */
 
 
+import { concatBytes } from '@/utils/bytes';
+
 /**
  * Payload compression applied before fountain encoding.
  * `none` means the file bytes are sent verbatim (incompressible input).
@@ -100,21 +102,13 @@ async function runTransform(
   }
 
   const parts: Uint8Array[] = [];
-  let total = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     parts.push(value);
-    total += value.length;
   }
   await written;
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
-  return out;
+  return concatBytes(parts);
 }
 
 const PRECOMPRESSED_MIME = /^(image\/(jpeg|png|gif|webp|avif|heic|heif)|video\/|audio\/(mpeg|mp4|aac|ogg|opus|webm)|application\/(zip|gzip|x-gzip|x-7z-compressed|vnd\.rar|x-rar-compressed|x-xz|x-bzip2|zstd))/i;

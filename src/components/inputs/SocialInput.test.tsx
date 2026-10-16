@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SocialInput } from './SocialInput';
 import { type SocialData, SocialPlatform } from '../../types';
+import { axe } from '../../../tests/utils/axe';
 
 describe('SocialInput', () => {
   const mockOnChange = vi.fn();
@@ -95,5 +96,45 @@ describe('SocialInput', () => {
 
     const handleInput = screen.getByLabelText('Username / Handle') as HTMLInputElement;
     expect(handleInput.value).toBe('myhandle123');
+  });
+
+  it('does not render pre-filled message field for non-WhatsApp platforms', () => {
+    render(<SocialInput data={defaultData} onChange={mockOnChange} />);
+    expect(screen.queryByLabelText(/Pre-filled Message/i)).not.toBeInTheDocument();
+  });
+
+  it('renders multi-line TextAreaField for WhatsApp platform with character count and passes axe accessibility check', async () => {
+    const whatsappData: SocialData = {
+      platform: SocialPlatform.WHATSAPP,
+      handle: '15551234567',
+      message: 'Hello\nWorld',
+    };
+    const { container } = render(<SocialInput data={whatsappData} onChange={mockOnChange} />);
+
+    const messageInput = screen.getByLabelText(/Pre-filled Message/i) as HTMLTextAreaElement;
+    expect(messageInput).toBeInTheDocument();
+    expect(messageInput.tagName.toLowerCase()).toBe('textarea');
+    expect(messageInput.value).toBe('Hello\nWorld');
+    expect(messageInput.getAttribute('maxLength')).toBe('256');
+
+    // Verify character count is displayed (11 / 256)
+    expect(screen.getByText('11 / 256')).toBeInTheDocument();
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('calls onChange when WhatsApp pre-filled message changes', () => {
+    const whatsappData: SocialData = {
+      platform: SocialPlatform.WHATSAPP,
+      handle: '15551234567',
+      message: '',
+    };
+    render(<SocialInput data={whatsappData} onChange={mockOnChange} />);
+
+    const messageInput = screen.getByLabelText(/Pre-filled Message/i);
+    fireEvent.change(messageInput, { target: { value: 'Inquiry about service:\nLine 1\nLine 2' } });
+
+    expect(mockOnChange).toHaveBeenCalledTimes(1);
+    expect(mockOnChange).toHaveBeenCalledWith({ message: 'Inquiry about service:\nLine 1\nLine 2' });
   });
 });
