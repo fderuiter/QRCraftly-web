@@ -529,6 +529,8 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                         onSizeChange={setSize}
                         filename={filename}
                         onFilenameChange={setCustomFilename}
+                        onCopyImage={onCopy}
+                        copyImageBusy={busyExport === 'clipboard'}
                         onCopySvg={onCopySvg}
                         copySvgBusy={busyExport === 'svg-copy'}
                         onWallet={onWallet}

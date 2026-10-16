@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { Code, ShieldCheck, Wallet } from 'lucide-react';
+import { Code, Copy, ShieldCheck, Wallet } from 'lucide-react';
 import { Button } from './ui/Button';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { TextField } from './ui/TextField';
@@ -84,6 +84,9 @@ interface ExportOptionsProps {
   /** File name without extension. */
   filename: string;
   onFilenameChange: (filename: string) => void;
+  /** Copies the raster image at selected width. */
+  onCopyImage: () => void;
+  copyImageBusy?: boolean;
   /** Copies the code as SVG markup. */
   onCopySvg: () => void;
   copySvgBusy: boolean;
@@ -93,11 +96,24 @@ interface ExportOptionsProps {
 
 /**
  * The Download options panel of the generator: format, raster size with a print helper,
- * the file name, Copy as SVG and Add to phone wallet. The Download button exports with these choices.
+ * the file name, Copy image, Copy as SVG and Add to phone wallet. The Download button exports with these choices.
  * @param props - Current choices and their change handlers.
  * @returns The options panel.
  */
-export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, filename, onFilenameChange, onCopySvg, copySvgBusy, onWallet }: ExportOptionsProps) {
+export function ExportOptions({
+  id,
+  format,
+  onFormatChange,
+  size,
+  onSizeChange,
+  filename,
+  onFilenameChange,
+  onCopyImage,
+  copyImageBusy,
+  onCopySvg,
+  copySvgBusy,
+  onWallet,
+}: ExportOptionsProps) {
   const preset = (Object.keys(SIZE_PRESETS) as (keyof typeof SIZE_PRESETS)[]).find((key) => SIZE_PRESETS[key] === size) ?? 'custom';
   return (
     <div
@@ -155,6 +171,11 @@ export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, 
       </div>
 
       <TextField label="File name" value={filename} onChange={(event) => onFilenameChange(event.target.value)} spellCheck={false} />
+
+      <Button variant="outline" size="sm" fullWidth onClick={onCopyImage} loading={copyImageBusy}>
+        <Copy className="size-4" aria-hidden="true" />
+        Copy image
+      </Button>
 
       <Button variant="outline" size="sm" fullWidth onClick={onCopySvg} loading={copySvgBusy}>
         <Code className="size-4" aria-hidden="true" />
