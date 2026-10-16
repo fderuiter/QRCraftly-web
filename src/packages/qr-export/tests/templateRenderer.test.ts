@@ -25,6 +25,7 @@ import {
 import { DEFAULT_CONFIG } from '@/constants';
 import { SocialFormat, TemplateStyle, type QRConfig, QRStyle, QRType } from '@/types';
 import * as qrMatrix from '@/packages/qr-matrix';
+import * as qrMatrixCanvas from '@/packages/qr-matrix/canvas';
 import { calculateLayout } from '@/packages/qr-matrix';
 
 // ---------------------------------------------------------------------------
@@ -782,6 +783,37 @@ describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
     expect(svgXml).toContain('HotelGuest');
     expect(svgXml).toContain('PASSWORD');
     expect(svgXml).toContain('stay1234');
+  });
+
+  it('keeps bottom of second badge at or below displayHeight - displayWidth * 0.025 on SQUARE_1_1 with templateQrScale 1.5', () => {
+    const drawRoundRectSpy = vi.spyOn(qrMatrixCanvas, 'drawRoundRect');
+
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      type: QRType.WIFI,
+      value: 'WIFI:S:MyNet;P:secret123;T:WPA;;',
+      templateStyle: TemplateStyle.WIFI_CARD,
+      socialFormat: SocialFormat.SQUARE_1_1,
+      templateQrScale: 1.5,
+    };
+    const ctx = makeMockCtx();
+    const modules = makeModules();
+
+    drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
+
+    // The last drawRoundRect call in drawWifiCardChrome is for badge2
+    expect(drawRoundRectSpy).toHaveBeenCalled();
+    const roundRectCalls = drawRoundRectSpy.mock.calls;
+    // Badge 2 is the last drawRoundRect call
+    const badge2Call = roundRectCalls[roundRectCalls.length - 1];
+    const badge2Y = badge2Call[2];
+    const badge2H = badge2Call[4];
+    const badge2Bottom = badge2Y + badge2H;
+
+    const maxAllowedBottom = 1080 - 1080 * 0.025; // 1053px
+    expect(badge2Bottom).toBeLessThanOrEqual(maxAllowedBottom);
+
+    drawRoundRectSpy.mockRestore();
   });
 });
 

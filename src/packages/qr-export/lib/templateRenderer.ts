@@ -460,21 +460,30 @@ export function drawWithTemplate(
 ): void {
   ctx.clearRect(0, 0, displayWidth, displayHeight);
 
+  // Fallback WIFI_CARD to SOLID_FRAME if payload type is not QRType.WIFI
+  const activeTemplateStyle =
+    config.templateStyle === TemplateStyle.WIFI_CARD && config.type !== QRType.WIFI
+      ? TemplateStyle.SOLID_FRAME
+      : config.templateStyle;
+
   // ── 1. Background ──────────────────────────────────────────────────────────
-  const drawBackground = BACKGROUND_PAINTERS[config.templateStyle] ?? drawNoneBackground;
+  const drawBackground = BACKGROUND_PAINTERS[activeTemplateStyle] ?? drawNoneBackground;
   drawBackground(ctx, config, displayWidth, displayHeight);
 
   // ── 2. QR Bounding-Box ────────────────────────────────────────────────────
   // For NONE template on a square canvas the QR fills 100 % so it looks
   // identical to the previous rendering path.
   const isNoneSquare =
-    config.templateStyle === TemplateStyle.NONE &&
+    activeTemplateStyle === TemplateStyle.NONE &&
     config.socialFormat === SocialFormat.SQUARE_1_1;
 
   // User-controlled scale multiplier (clamped to valid range).
   let userScale = Math.min(1.5, Math.max(0.5, config.templateQrScale ?? 1.0));
-  if (config.templateStyle === TemplateStyle.WIFI_CARD) {
-    userScale = Math.min(userScale, 1.2);
+  if (activeTemplateStyle === TemplateStyle.WIFI_CARD) {
+    userScale = Math.min(
+      userScale,
+      config.socialFormat === SocialFormat.SQUARE_1_1 ? 1.0 : 1.2
+    );
   }
   const baseQrFraction = isNoneSquare ? 1.0 : 0.5 * userScale;
 
@@ -541,8 +550,8 @@ export function drawWithTemplate(
   ctx.restore();
 
   // ── 5. Headline / Subtext / Wi-Fi Card Chrome ────────────────────────────
-  if (config.templateStyle !== TemplateStyle.NONE) {
-    if (config.templateStyle === TemplateStyle.WIFI_CARD && config.type === QRType.WIFI) {
+  if (activeTemplateStyle !== TemplateStyle.NONE) {
+    if (activeTemplateStyle === TemplateStyle.WIFI_CARD) {
       drawWifiCardChrome(ctx, config, displayWidth, displayHeight, qrY, qrSize);
     } else {
       drawTemplateText(ctx, config, displayWidth, displayHeight, qrY, qrSize);

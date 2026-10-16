@@ -71,6 +71,12 @@ const TEMPLATE_OPTIONS: Array<{ id: TemplateStyle; label: string }> = [
  * style applied to the QR code canvas.
  */
 export const LayoutControls: React.FC<LayoutControlsProps> = ({ config, onChange }) => {
+  React.useEffect(() => {
+    if (config.templateStyle === TemplateStyle.WIFI_CARD && config.type !== QRType.WIFI) {
+      onChange({ templateStyle: TemplateStyle.SOLID_FRAME });
+    }
+  }, [config.templateStyle, config.type, onChange]);
+
   const showTextInputs = config.templateStyle !== TemplateStyle.NONE;
   const showAdvanced = config.templateStyle !== TemplateStyle.NONE;
 

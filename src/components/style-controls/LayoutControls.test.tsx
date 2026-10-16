@@ -173,16 +173,17 @@ describe('LayoutControls - Contrast Warnings', () => {
     expect(mockOnChange).toHaveBeenCalledWith({ templateStyle: TemplateStyle.WIFI_CARD });
   });
 
-  it('hides the Wi-Fi Card tile for non-Wi-Fi types', () => {
+  it('hides the Wi-Fi Card tile for non-Wi-Fi types and resets templateStyle to SOLID_FRAME', () => {
     const config: QRConfig = {
       ...(DEFAULT_CONFIG as QRConfig),
       type: QRType.URL,
-      templateStyle: TemplateStyle.NONE,
+      templateStyle: TemplateStyle.WIFI_CARD,
     };
 
     render(<LayoutControls config={config} onChange={mockOnChange} />);
 
     expect(screen.queryByRole('radio', { name: /Select Wi-Fi Card template/i })).not.toBeInTheDocument();
+    expect(mockOnChange).toHaveBeenCalledWith({ templateStyle: TemplateStyle.SOLID_FRAME });
   });
 
   it('has no axe violations', async () => {
