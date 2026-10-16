@@ -675,14 +675,14 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
 
   const requestMatrixCalculation = useCallback(() => {
     const currentConfig = configRef.current;
+    // Every request, the empty one included, supersedes answers still on their way for older values.
+    sequenceIdRef.current += 1;
+    const currentSeqId = sequenceIdRef.current;
     if (!currentConfig.value) {
       lastModulesRef.current = null;
       clearCanvasAndResize();
       return;
     }
-
-    sequenceIdRef.current += 1;
-    const currentSeqId = sequenceIdRef.current;
 
     if (workerRef.current && !isWorkerFallbackRef.current) {
       workerRef.current.postMessage({
@@ -796,7 +796,8 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     }
   }, [computedMazeData, activeIsAnimating, repaintCanvasOnly]);
 
-  // Monitor structural and aesthetic changes to repaint immediately
+  // Monitor structural and aesthetic changes to repaint immediately. Every design field the renderer
+  // reads belongs here: one left out (frames, eye colours) only showed after some other change.
   useLayoutEffect(() => {
     if (activeIsAnimating) return;
     if (lastModulesRef.current) {
@@ -806,6 +807,14 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     config.fgColor,
     config.bgColor,
     config.eyeColor,
+    config.eyeFrameColor,
+    config.eyeBallColor,
+    config.frameStyle,
+    config.frameText,
+    config.frameBgColor,
+    config.frameTextColor,
+    config.framePosition,
+    config.frameIcon,
     config.gradientType,
     config.gradientColorStops,
     config.gradientAngle,
@@ -826,6 +835,12 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     config.borderLogoPosition,
     config.socialFormat,
     config.templateStyle,
+    config.templateHeadline,
+    config.templateSubtext,
+    config.templateBgColor,
+    config.templateTextColor,
+    config.templateQrScale,
+    config.backgroundImageUrl,
     activeConfig.isMazeEnabled,
     activeConfig.isMazeBridgesEnabled,
     activeConfig.mazeColor,

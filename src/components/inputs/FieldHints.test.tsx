@@ -18,7 +18,7 @@
 
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { axe } from '../../../tests/utils/axe';
 import { CryptoNetwork, QRType, type MeetingData } from '@/types';
 import { UrlInput } from './UrlInput';
@@ -92,6 +92,7 @@ describe('generator hints (#1159)', () => {
   it('flags a wallet address that fails its checksum but still allows it', () => {
     const data = { network: CryptoNetwork.BITCOIN, address: '1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN3', amount: '', label: '' };
     const { rerender } = render(<PaymentInput data={data} onChange={noop} />);
+    fireEvent.blur(screen.getByLabelText('Receiver Address'));
     expect(screen.getByText(/does not pass its built-in check/)).toBeInTheDocument();
     rerender(<PaymentInput data={{ ...data, address: '1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2' }} onChange={noop} />);
     expect(screen.queryByText(/does not pass its built-in check/)).not.toBeInTheDocument();

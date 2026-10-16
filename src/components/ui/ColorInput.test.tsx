@@ -218,22 +218,37 @@ describe('ColorInput Component Accessibility', () => {
 
       const textInput = screen.getByLabelText('Shorthand Test Hex Code') as HTMLInputElement;
 
-      // User types shorthand hex
+      // Shorthand could still be the start of a six-digit value, so typing it changes nothing yet
       fireEvent.change(textInput, { target: { value: '#123' } });
-      expect(handleChange).toHaveBeenCalledWith('#112233');
-
+      expect(handleChange).not.toHaveBeenCalled();
       rerender(
         <ColorInput
           id="test-blur-shorthand"
           label="Shorthand Test"
-          value="#112233"
+          value="#ff0000"
           onChange={handleChange}
         />
       );
 
-      // User blurs input
+      // Leaving the field takes it, once
       fireEvent.blur(textInput);
       expect(textInput.value).toBe('#112233');
+      expect(handleChange).toHaveBeenCalledTimes(1);
+      expect(handleChange).toHaveBeenCalledWith('#112233');
+    });
+
+    it('commits only full six-digit values while typing, so no in-between colour flashes', () => {
+      const handleChange = vi.fn();
+      render(<ColorInput id="test-typing" label="Typing Test" value="#000000" onChange={handleChange} />);
+      const textInput = screen.getByLabelText('Typing Test Hex Code') as HTMLInputElement;
+      for (const typed of ['#', '#c', '#c0', '#c0f', '#c0ff', '#c0ffe', '#c0ffee']) {
+        fireEvent.change(textInput, { target: { value: typed } });
+      }
+      expect(handleChange.mock.calls).toEqual([['#c0ffee']]);
+
+      fireEvent.change(textInput, { target: { value: 'bad' } });
+      expect(handleChange).toHaveBeenCalledTimes(1);
+      fireEvent.change(textInput, { target: { value: '   ' } });
       expect(handleChange).toHaveBeenCalledTimes(1);
     });
 

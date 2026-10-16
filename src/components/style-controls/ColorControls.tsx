@@ -47,17 +47,18 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
       ];
 
   const stop0Color = colorStops[0]?.color ?? config.fgColor;
-  const stop1Color = colorStops[1]?.color ?? DEFAULT_GRADIENT_END_COLOR;
+  const stop1Color = colorStops[colorStops.length - 1]?.color ?? DEFAULT_GRADIENT_END_COLOR;
+  const stopColors = colorStops.map((stop) => stop.color).join(',');
 
   const contrastRatios = useMemo(() => {
     const bgForContrast = config.bgColor === 'transparent' ? '#ffffff' : config.bgColor;
-    // A gradient is only as scannable as its weakest stop, so both ends are checked.
-    const moduleColors = activeGradientType !== 'none' ? [stop0Color, stop1Color] : [config.fgColor];
+    // A gradient is only as scannable as its weakest stop, so every stop is checked (an imported style can have more than two).
+    const moduleColors = activeGradientType !== 'none' ? stopColors.split(',') : [config.fgColor];
     const fgContrast = Math.min(...moduleColors.map((color) => getContrastRatio(color, bgForContrast)));
     const eyeFrameContrast = getContrastRatio(config.eyeFrameColor || config.eyeColor, bgForContrast);
     const eyeBallContrast = getContrastRatio(config.eyeBallColor || config.eyeColor, bgForContrast);
     return { fg: fgContrast, eyeFrame: eyeFrameContrast, eyeBall: eyeBallContrast };
-  }, [activeGradientType, stop0Color, stop1Color, config.fgColor, config.bgColor, config.eyeColor, config.eyeFrameColor, config.eyeBallColor]);
+  }, [activeGradientType, stopColors, config.fgColor, config.bgColor, config.eyeColor, config.eyeFrameColor, config.eyeBallColor]);
 
   const isLowContrast =
     contrastRatios.fg < MIN_CONTRAST_THRESHOLD ||

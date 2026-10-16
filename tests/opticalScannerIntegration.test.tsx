@@ -58,6 +58,8 @@ describe('Optical Detection Engine — Unified Package Integration Tests', () =>
     } as any;
 
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      fillStyle: '#000000',
+      fillRect: vi.fn(),
       drawImage: vi.fn(),
       getImageData: vi.fn().mockReturnValue({
         data: new Uint8ClampedArray(400),
