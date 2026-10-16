@@ -44,5 +44,5 @@ describe('fiducial search negatives', () => {
     }
     expect(count).toBe(NEGATIVES);
     expect(acquired).toEqual([]);
-  }, 120_000);
+  }, 240_000); // about 50 s under coverage on a laptop, twice that on CI's 2-vCPU runners
 });
