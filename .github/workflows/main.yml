@@ -5,10 +5,14 @@ name: CI/CD Pipeline
 # on release PRs and on PRs labelled `full-e2e`. Pushes to main do not re-run CI: the
 # ruleset requires PRs to be up to date and squash-merges them, so the commit that
 # lands is the tree its PR already tested. deploy-verify.yml checks the deploy instead.
+# merge_group runs the ready-PR tier on each merge-queue group, so the `CI` check the
+# ruleset requires also reports there once the merge queue is on (ADR 0051).
 on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
   schedule:
     - cron: '0 7 * * *' # Nightly full tier on main, 2am US Central (CDT)
   workflow_dispatch:
@@ -42,6 +46,7 @@ jobs:
       unit_tests: ${{ steps.plan.outputs.unit_tests }}
       e2e: ${{ steps.plan.outputs.e2e }}
       lighthouse: ${{ steps.plan.outputs.lighthouse }}
+      awaiting_approval: ${{ steps.plan.outputs.awaiting_approval }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -64,6 +69,7 @@ jobs:
           IS_DRAFT: ${{ github.event.pull_request.draft }}
           HEAD_REF: ${{ github.head_ref }}
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
           FULL_INPUT: ${{ inputs.full }}
           BASE_REF: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.sha }}
@@ -469,11 +475,16 @@ jobs:
         id: check
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
+          AWAITING_APPROVAL: ${{ needs.plan.outputs.awaiting_approval }}
           NEEDS_RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           echo "Plan: $PLAN_RESULT. Job results: $NEEDS_RESULTS"
           if [ "$PLAN_RESULT" != "success" ]; then
             echo "::error::The Plan job finished with '$PLAN_RESULT'."
+            exit 1
+          fi
+          if [ "$AWAITING_APPROVAL" = "true" ]; then
+            echo "::error::This bot PR has not been reviewed yet. A maintainer adds the ci-approved label, then updates the branch to run CI."
             exit 1
           fi
           for result in $NEEDS_RESULTS; do
