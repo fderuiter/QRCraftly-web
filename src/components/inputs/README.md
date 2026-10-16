@@ -106,9 +106,9 @@ These parameters are controlled via `AdvancedControls.tsx`.
 
 `QRConfig` also carries the Mosaic QR style fields (ADR 0019): `mosaicImageUrl` (the uploaded design as a `data:` URL, or null), `mosaicMode` (`halftone` or `tiles`) and `mosaicContrast` (0..1). They are style fields, not content, and are controlled by `MosaicControls.tsx`.
 
-## Independent Eye Frame and Ball Configuration
+## Independent Eye Frame, Ball, and Per-Eye Corner Configuration
 
-`QRConfig` in `src/types.ts` includes optional `eyeFrameColor` and `eyeBallColor` properties for setting distinct outer finder frame and inner eyeball colors, falling back to `eyeColor` when omitted.
+`QRConfig` in `src/types.ts` includes optional `eyeFrameColor`, `eyeBallColor`, `eyeFrameStyle`, `eyeBallStyle`, and `eyeOverrides` properties for setting distinct outer finder frame, inner eyeball, and per-eye corner shapes and colors, falling back safely to `eyeColor` and `style` when omitted.
 
 ## Template Export Configuration
 

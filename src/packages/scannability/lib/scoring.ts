@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { QRConfig } from '@/types';
+import type { EyePosition, QRConfig } from '@/types';
 import { LOW_RELIABILITY_PATTERNS, SYSTEM_LIMITS } from '@/constants';
 import { getContrastRatio } from '@/utils/colorUtils';
 
@@ -49,8 +49,19 @@ export function calculateScannabilityHealth(
     : [config.fgColor];
 
   const fgContrast = Math.min(...moduleColors.map((color) => getContrastRatio(color, bgForContrast)));
-  const eyeFrameContrast = getContrastRatio(config.eyeFrameColor || config.eyeColor, bgForContrast);
-  const eyeBallContrast = getContrastRatio(config.eyeBallColor || config.eyeColor, bgForContrast);
+
+  const eyePositions: EyePosition[] = ['top-left', 'top-right', 'bottom-left'];
+  const frameColors = [
+    config.eyeFrameColor || config.eyeColor,
+    ...eyePositions.map((pos) => config.eyeOverrides?.[pos]?.frameColor || config.eyeOverrides?.[pos]?.color).filter(Boolean) as string[],
+  ];
+  const ballColors = [
+    config.eyeBallColor || config.eyeColor,
+    ...eyePositions.map((pos) => config.eyeOverrides?.[pos]?.ballColor || config.eyeOverrides?.[pos]?.color).filter(Boolean) as string[],
+  ];
+
+  const eyeFrameContrast = Math.min(...frameColors.map((color) => getContrastRatio(color, bgForContrast)));
+  const eyeBallContrast = Math.min(...ballColors.map((color) => getContrastRatio(color, bgForContrast)));
   const worstContrast = Math.min(fgContrast, eyeFrameContrast, eyeBallContrast);
 
   if (worstContrast < 3.0) {

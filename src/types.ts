@@ -34,6 +34,32 @@ export const QRStyle = {
 export type QRStyle = (typeof QRStyle)[keyof typeof QRStyle];
 
 /**
+ * Defines the eye corner positions in a QR code matrix.
+ */
+export type EyePosition = 'top-left' | 'top-right' | 'bottom-left';
+
+/**
+ * Visual override settings for an individual finder eye.
+ */
+export interface EyeOverride {
+  /** Optional style override for the outer eye frame. */
+  frameStyle?: QRStyle;
+  /** Optional style override for the inner eyeball. */
+  ballStyle?: QRStyle;
+  /** Optional color override for the outer eye frame. */
+  frameColor?: string;
+  /** Optional color override for the inner eyeball. */
+  ballColor?: string;
+  /** Optional color override for both outer frame and inner eyeball. */
+  color?: string;
+}
+
+/**
+ * Structured overrides for top-left, top-right, and bottom-left eyes.
+ */
+export type EyeOverrides = Partial<Record<EyePosition, EyeOverride>>;
+
+/**
  * Defines the type of data encoded in the QR code.
  */
 export const QRType = {
@@ -165,6 +191,12 @@ export interface QRConfig {
   eyeFrameColor?: string;
   /** Optional independent color for the inner eyeballs. Falls back to eyeColor. */
   eyeBallColor?: string;
+  /** Optional independent style for outer finder eye frames. Falls back to style. */
+  eyeFrameStyle?: QRStyle;
+  /** Optional independent style for inner eyeballs. Falls back to style. */
+  eyeBallStyle?: QRStyle;
+  /** Optional per-eye overrides for top-left, top-right, and bottom-left eyes. */
+  eyeOverrides?: EyeOverrides;
   /** The error correction level. */
   errorCorrectionLevel: QRErrorCorrectionLevel;
   /** Whether to draw a border around the QR code. */

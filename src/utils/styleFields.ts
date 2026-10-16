@@ -10,6 +10,9 @@ import {
   type LogoPaddingStyle,
   type MosaicMode,
   type QRConfig,
+  type EyePosition,
+  type EyeOverride,
+  type EyeOverrides,
   QRErrorCorrectionLevel,
   QRStyle,
   SocialFormat,
@@ -22,7 +25,8 @@ type FieldRule =
   | { kind: 'color'; allowTransparent?: boolean }
   | { kind: 'number'; min: number; max: number }
   | { kind: 'boolean' }
-  | { kind: 'colorStops' };
+  | { kind: 'colorStops' }
+  | { kind: 'eyeOverrides' };
 
 const enumOf = (values: readonly string[]): FieldRule => ({ kind: 'enum', values });
 
@@ -68,6 +72,9 @@ const STYLE_FIELDS: Partial<Record<keyof QRConfig, FieldRule>> = {
   frameIcon: enumOf(['none', 'scan', 'camera', 'star', 'heart', 'info', 'phone'] satisfies FrameIcon[]),
   eyeFrameColor: { kind: 'color' },
   eyeBallColor: { kind: 'color' },
+  eyeFrameStyle: enumOf(Object.values(QRStyle)),
+  eyeBallStyle: enumOf(Object.values(QRStyle)),
+  eyeOverrides: { kind: 'eyeOverrides' },
   mazePathWidth: { kind: 'number', min: 0.1, max: 0.5 },
   mosaicMode: enumOf(['tiles', 'halftone'] satisfies MosaicMode[]),
   mosaicContrast: { kind: 'number', min: 0, max: 1 },
@@ -88,7 +95,7 @@ export function isStyleField(key: string): boolean {
  * @param value - The value from the file.
  * @returns The cleaned value, or undefined when it is not accepted.
  */
-function cleanValue(rule: FieldRule, value: unknown): string | number | boolean | ColorStop[] | undefined {
+function cleanValue(rule: FieldRule, value: unknown): string | number | boolean | ColorStop[] | EyeOverrides | undefined {
   switch (rule.kind) {
     case 'enum':
       return typeof value === 'string' && rule.values.includes(value) ? value : undefined;
@@ -111,6 +118,59 @@ function cleanValue(rule: FieldRule, value: unknown): string | number | boolean 
         }
       }
       return stops.length > 0 ? stops : undefined;
+    }
+    case 'eyeOverrides': {
+      if (typeof value !== 'object' || value === null) return undefined;
+      const allowedPositions: EyePosition[] = ['top-left', 'top-right', 'bottom-left'];
+      const validStyles = Object.values(QRStyle) as string[];
+      const cleaned: EyeOverrides = {};
+      let hasValid = false;
+
+      for (const pos of allowedPositions) {
+        const overrideObj = (value as Record<string, unknown>)[pos];
+        if (typeof overrideObj === 'object' && overrideObj !== null) {
+          const item = overrideObj as Record<string, unknown>;
+          const cleanedItem: EyeOverride = {};
+          let itemValid = false;
+
+          if (typeof item.frameStyle === 'string' && validStyles.includes(item.frameStyle)) {
+            cleanedItem.frameStyle = item.frameStyle as QRStyle;
+            itemValid = true;
+          }
+          if (typeof item.ballStyle === 'string' && validStyles.includes(item.ballStyle)) {
+            cleanedItem.ballStyle = item.ballStyle as QRStyle;
+            itemValid = true;
+          }
+          if (typeof item.frameColor === 'string') {
+            const col = normalizeHex(item.frameColor);
+            if (col) {
+              cleanedItem.frameColor = col;
+              itemValid = true;
+            }
+          }
+          if (typeof item.ballColor === 'string') {
+            const col = normalizeHex(item.ballColor);
+            if (col) {
+              cleanedItem.ballColor = col;
+              itemValid = true;
+            }
+          }
+          if (typeof item.color === 'string') {
+            const col = normalizeHex(item.color);
+            if (col) {
+              cleanedItem.color = col;
+              itemValid = true;
+            }
+          }
+
+          if (itemValid) {
+            cleaned[pos] = cleanedItem;
+            hasValid = true;
+          }
+        }
+      }
+
+      return hasValid ? cleaned : undefined;
     }
   }
 }

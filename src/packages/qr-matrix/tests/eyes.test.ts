@@ -217,4 +217,81 @@ describe('renderEyes', () => {
     expect(fillStyleSetter).not.toHaveBeenCalledWith('#ff00ff');
     expect(fillStyleSetter).toHaveBeenCalledWith('#111111');
   });
+
+  it('renders independent eyeFrameStyle and eyeBallStyle', () => {
+    const ctx = createMockCtx();
+    renderEyes(
+      ctx,
+      {
+        ...baseConfig,
+        style: QRStyle.STANDARD,
+        eyeFrameStyle: QRStyle.MODERN,
+        eyeBallStyle: QRStyle.SWISS,
+      },
+      0,
+      0,
+      10,
+      21
+    );
+
+    // Modern eye frame draws round rects (quadraticCurveTo), Swiss eyeball draws circles (arc)
+    expect(ctx.quadraticCurveTo).toHaveBeenCalled();
+    expect(ctx.arc).toHaveBeenCalled();
+  });
+
+  it('renders per-eye overrides for individual positions with distinct shapes and colors', () => {
+    const fillStyleSetter = vi.fn();
+    const ctx = createMockCtx();
+    Object.defineProperty(ctx, 'fillStyle', {
+      set: fillStyleSetter,
+      get: () => '',
+      configurable: true,
+    });
+
+    renderEyes(
+      ctx,
+      {
+        ...baseConfig,
+        style: QRStyle.STANDARD,
+        eyeColor: '#000000',
+        eyeOverrides: {
+          'top-left': { frameStyle: QRStyle.SWISS, ballStyle: QRStyle.MODERN, frameColor: '#ff0000', ballColor: '#00ff00' },
+          'top-right': { frameStyle: QRStyle.HIVE, ballStyle: QRStyle.CIRCUIT, color: '#0000ff' },
+          'bottom-left': { frameStyle: QRStyle.MODERN, ballStyle: QRStyle.SWISS, frameColor: '#ffff00', ballColor: '#00ffff' },
+        },
+      },
+      0,
+      0,
+      10,
+      21
+    );
+
+    expect(fillStyleSetter).toHaveBeenCalledWith('#ff0000');
+    expect(fillStyleSetter).toHaveBeenCalledWith('#00ff00');
+    expect(fillStyleSetter).toHaveBeenCalledWith('#0000ff');
+    expect(fillStyleSetter).toHaveBeenCalledWith('#ffff00');
+    expect(fillStyleSetter).toHaveBeenCalledWith('#00ffff');
+  });
+
+  it('punches holes cleanly on transparent background with mixed per-eye styles', () => {
+    const ctx = createMockCtx();
+    renderEyes(
+      ctx,
+      {
+        ...baseConfig,
+        bgColor: 'transparent',
+        style: QRStyle.STANDARD,
+        eyeOverrides: {
+          'top-left': { frameStyle: QRStyle.MODERN, ballStyle: QRStyle.SWISS },
+          'top-right': { frameStyle: QRStyle.STANDARD, ballStyle: QRStyle.MODERN },
+        },
+      },
+      0,
+      0,
+      10,
+      21
+    );
+
+    expect(ctx.fill).toHaveBeenCalledWith('evenodd');
+  });
 });

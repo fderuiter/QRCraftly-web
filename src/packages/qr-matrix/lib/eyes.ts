@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { QRConfig } from '@/types';
+import type { EyePosition, QRConfig } from '@/types';
 import { drawEyeFrame, drawEyeball } from './canvasHelpers';
 import { type ModuleRenderOptions, sampleCellLuminances } from './modules';
 import { getLuminance } from '@/utils/colorUtils';
@@ -54,13 +54,18 @@ export const renderEyes = (
     }
   }
 
-  const drawEyePattern = (r: number, c: number, eyeId: string) => {
+  const drawEyePattern = (r: number, c: number, eyeId: EyePosition) => {
     const x = drawX + c * cellSize;
     const y = drawY + r * cellSize;
     const size = 7 * cellSize;
 
-    let frameColor = config.eyeFrameColor || config.eyeColor;
-    let ballColor = config.eyeBallColor || config.eyeColor;
+    const override = config.eyeOverrides?.[eyeId];
+
+    const frameStyle = override?.frameStyle || config.eyeFrameStyle || config.style;
+    const ballStyle = override?.ballStyle || config.eyeBallStyle || config.style;
+
+    let frameColor = override?.frameColor || override?.color || config.eyeFrameColor || config.eyeColor;
+    let ballColor = override?.ballColor || override?.color || config.eyeBallColor || config.eyeColor;
     let holeColor = config.bgColor;
 
     if (cellLuminance || config.isLuminanceMaskingEnabled) {
@@ -91,7 +96,7 @@ export const renderEyes = (
       y,
       size,
       cellSize,
-      config.style,
+      frameStyle,
       frameColor,
       holeColor
     );
@@ -102,7 +107,7 @@ export const renderEyes = (
       y,
       size,
       cellSize,
-      config.style,
+      ballStyle,
       ballColor,
       holeColor,
       eyeId

@@ -120,9 +120,9 @@ Animation configuration structures in `types.ts` are strictly statically typed t
 
 Maze overlay configurations in `types.ts` (e.g., `isMazeEnabled`, `isMazeBridgesEnabled`, `mazeColor`, `mazePathWidth`, `showMazeSolution`) are statically typed and strictly validated at runtime. This prevents injection or path manipulation during maze rendering. Web calendar providers and iCalendar event types (`EventData` and `CalendarProvider` in `types.ts`) construct direct calendar URLs and VEVENT payloads with optional explicit IANA / UTC timezones, validating all parameter links with `isDangerousUrl` to prevent URI injection attacks.
 
-## Independent Eye Colors
+## Independent Eye Colors & Per-Eye Overrides
 
-Finder pattern color properties in `types.ts` (`eyeFrameColor` and `eyeBallColor`) are statically typed visual parameters. They allow distinct outer frame and inner eyeball styling while falling back safely to `eyeColor`.
+Finder pattern color and shape properties in `types.ts` (`eyeFrameColor`, `eyeBallColor`, `eyeFrameStyle`, `eyeBallStyle`, `eyeOverrides`) are statically typed visual parameters. They allow distinct outer frame, inner eyeball, and per-eye corner styling while falling back safely to `eyeColor` and `style`.
 
 ## Custom Frame Shapes and CTA Badges
 

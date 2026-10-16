@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { GradientType, QRConfig } from '../../types';
+import type { EyePosition, GradientType, QRConfig } from '../../types';
 import { PRESET_COLORS, MIN_CONTRAST_THRESHOLD } from '../../constants';
 import { getContrastRatio } from '../../utils/colorUtils';
 import { ColorInput } from '../ui/ColorInput';
@@ -54,10 +54,21 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
     // A gradient is only as scannable as its weakest stop, so both ends are checked.
     const moduleColors = activeGradientType !== 'none' ? [stop0Color, stop1Color] : [config.fgColor];
     const fgContrast = Math.min(...moduleColors.map((color) => getContrastRatio(color, bgForContrast)));
-    const eyeFrameContrast = getContrastRatio(config.eyeFrameColor || config.eyeColor, bgForContrast);
-    const eyeBallContrast = getContrastRatio(config.eyeBallColor || config.eyeColor, bgForContrast);
+
+    const eyePositions: EyePosition[] = ['top-left', 'top-right', 'bottom-left'];
+    const frameColors = [
+      config.eyeFrameColor || config.eyeColor,
+      ...eyePositions.map((pos) => config.eyeOverrides?.[pos]?.frameColor || config.eyeOverrides?.[pos]?.color).filter(Boolean) as string[],
+    ];
+    const ballColors = [
+      config.eyeBallColor || config.eyeColor,
+      ...eyePositions.map((pos) => config.eyeOverrides?.[pos]?.ballColor || config.eyeOverrides?.[pos]?.color).filter(Boolean) as string[],
+    ];
+
+    const eyeFrameContrast = Math.min(...frameColors.map((color) => getContrastRatio(color, bgForContrast)));
+    const eyeBallContrast = Math.min(...ballColors.map((color) => getContrastRatio(color, bgForContrast)));
     return { fg: fgContrast, eyeFrame: eyeFrameContrast, eyeBall: eyeBallContrast };
-  }, [activeGradientType, stop0Color, stop1Color, config.fgColor, config.bgColor, config.eyeColor, config.eyeFrameColor, config.eyeBallColor]);
+  }, [activeGradientType, stop0Color, stop1Color, config.fgColor, config.bgColor, config.eyeColor, config.eyeFrameColor, config.eyeBallColor, config.eyeOverrides]);
 
   const isLowContrast =
     contrastRatios.fg < MIN_CONTRAST_THRESHOLD ||

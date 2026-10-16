@@ -57,6 +57,30 @@ describe('style file', () => {
     expect(parsed.ok && parsed.style).toEqual(expect.objectContaining({ bgColor: 'transparent', eyeFrameColor: '#123456', eyeBallColor: '#654321' }));
   });
 
+  it('round-trips eyeFrameStyle, eyeBallStyle, and eyeOverrides', () => {
+    const original = config({
+      eyeFrameStyle: QRStyle.MODERN,
+      eyeBallStyle: QRStyle.SWISS,
+      eyeOverrides: {
+        'top-left': { frameStyle: QRStyle.HIVE, ballStyle: QRStyle.FLUID, frameColor: '#112233' },
+        'bottom-left': { frameStyle: QRStyle.CIRCUIT, ballColor: '#445566' },
+      },
+    });
+    const parsed = parseStyleFile(serializeStyle(original));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.style).toEqual(
+      expect.objectContaining({
+        eyeFrameStyle: QRStyle.MODERN,
+        eyeBallStyle: QRStyle.SWISS,
+        eyeOverrides: {
+          'top-left': { frameStyle: QRStyle.HIVE, ballStyle: QRStyle.FLUID, frameColor: '#112233' },
+          'bottom-left': { frameStyle: QRStyle.CIRCUIT, ballColor: '#445566' },
+        },
+      })
+    );
+  });
+
   it('accepts transparent only for the background', () => {
     const parsed = parseStyleFile(JSON.stringify({ format: STYLE_FILE_FORMAT, version: 1, style: { bgColor: 'transparent', fgColor: 'transparent' } }));
     expect(parsed.ok && parsed.style).toEqual({ bgColor: 'transparent' });

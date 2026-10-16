@@ -15,7 +15,8 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { PatternControls } from './PatternControls';
 import { DEFAULT_CONFIG } from '../../constants';
@@ -26,20 +27,85 @@ describe('PatternControls', () => {
     const handleChange = vi.fn();
     render(<PatternControls config={DEFAULT_CONFIG} onChange={handleChange} />);
 
-    // Check group role and label
-    const group = screen.getByRole('radiogroup', { name: /pattern style/i });
-    expect(group).toBeInTheDocument();
+    // Check group role and labels for Pattern Style, Frame Shape, and Eyeball Shape
+    const patternGroup = screen.getByRole('radiogroup', { name: /^pattern style$/i });
+    expect(patternGroup).toBeInTheDocument();
+
+    const frameGroup = screen.getByRole('radiogroup', { name: /^frame shape$/i });
+    expect(frameGroup).toBeInTheDocument();
+
+    const ballGroup = screen.getByRole('radiogroup', { name: /^eyeball shape$/i });
+    expect(ballGroup).toBeInTheDocument();
 
     // Check radios have aria-labels
     const radios = screen.getAllByRole('radio');
-    radios.forEach(radio => {
+    radios.forEach((radio) => {
       expect(radio).toHaveAttribute('aria-label');
-      expect(radio.getAttribute('aria-label')).toMatch(/select .* pattern/i);
+      expect(radio.getAttribute('aria-label')).toMatch(/select .* (pattern|frame shape|eyeball shape)/i);
     });
 
     // Check checked state
     const standardRadio = screen.getByLabelText(/select standard industrial pattern/i);
     expect(standardRadio).toBeChecked();
+  });
+
+  it('allows changing frame shape and eyeball shape', async () => {
+    const handleChange = vi.fn();
+    render(<PatternControls config={DEFAULT_CONFIG} onChange={handleChange} />);
+
+    const modernFrameRadio = screen.getByRole('radio', { name: /select modern soft frame shape/i });
+    await userEvent.click(modernFrameRadio);
+    expect(handleChange).toHaveBeenCalledWith({ eyeFrameStyle: QRStyle.MODERN });
+
+    const swissBallRadio = screen.getByRole('radio', { name: /select swiss dot eyeball shape/i });
+    await userEvent.click(swissBallRadio);
+    expect(handleChange).toHaveBeenCalledWith({ eyeBallStyle: QRStyle.SWISS });
+  });
+
+  it('toggles individual eye styling and allows setting per-eye overrides', async () => {
+    const handleChange = vi.fn();
+    const { rerender } = render(<PatternControls config={DEFAULT_CONFIG} onChange={handleChange} />);
+
+    const toggle = screen.getByLabelText(/customize individual eyes/i);
+    expect(toggle).not.toBeChecked();
+
+    await userEvent.click(toggle);
+    expect(handleChange).toHaveBeenCalledWith({
+      eyeOverrides: {
+        'top-left': {},
+        'top-right': {},
+        'bottom-left': {},
+      },
+    });
+
+    // Rerender with eyeOverrides enabled
+    rerender(
+      <PatternControls
+        config={{
+          ...DEFAULT_CONFIG,
+          eyeOverrides: {
+            'top-left': {},
+            'top-right': {},
+            'bottom-left': {},
+          },
+        }}
+        onChange={handleChange}
+      />
+    );
+
+    const individualControls = screen.getByTestId('individual-eye-controls');
+    expect(individualControls).toBeInTheDocument();
+
+    // Change Top-Left Frame Shape to Modern
+    const topLeftFrameRadio = screen.getByRole('radio', { name: /select modern soft for top-left eye frame/i });
+    await userEvent.click(topLeftFrameRadio);
+    expect(handleChange).toHaveBeenCalledWith({
+      eyeOverrides: {
+        'top-left': { frameStyle: QRStyle.MODERN },
+        'top-right': {},
+        'bottom-left': {},
+      },
+    });
   });
 
   it('shows the pattern warning as a static note that screen readers are not interrupted by', () => {
