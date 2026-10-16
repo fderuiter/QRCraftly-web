@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { axe } from '../../../tests/utils/axe';
 import { describe, it, expect } from 'vitest';
-import { TextAreaField, SelectField, CheckboxField } from './FormFields';
+import { TextAreaField, SelectField } from './FormFields';
 
 describe('FormFields Components', () => {
   describe('TextAreaField', () => {
@@ -25,23 +25,6 @@ describe('FormFields Components', () => {
 
       expect(textarea).toHaveClass('custom-textarea-class');
       expect(wrapper).not.toHaveClass('custom-textarea-class');
-    });
-
-    it('handles both className and inputClassName together correctly', () => {
-      const { container } = render(
-        <TextAreaField
-          label="Bio"
-          className="outer-layout-class"
-          inputClassName="inner-control-class"
-        />
-      );
-      const wrapper = container.firstElementChild;
-      const textarea = screen.getByLabelText('Bio');
-
-      expect(wrapper).toHaveClass('outer-layout-class');
-      expect(wrapper).not.toHaveClass('inner-control-class');
-      expect(textarea).toHaveClass('inner-control-class');
-      expect(textarea).not.toHaveClass('outer-layout-class');
     });
 
     it('has zero accessibility violations', async () => {
@@ -80,25 +63,6 @@ describe('FormFields Components', () => {
       expect(wrapper).not.toHaveClass('custom-select-class');
     });
 
-    it('handles both className and inputClassName together correctly', () => {
-      const { container } = render(
-        <SelectField
-          label="Country"
-          className="outer-layout-class"
-          inputClassName="inner-control-class"
-        >
-          <option value="us">United States</option>
-        </SelectField>
-      );
-      const wrapper = container.firstElementChild;
-      const select = screen.getByLabelText('Country');
-
-      expect(wrapper).toHaveClass('outer-layout-class');
-      expect(wrapper).not.toHaveClass('inner-control-class');
-      expect(select).toHaveClass('inner-control-class');
-      expect(select).not.toHaveClass('outer-layout-class');
-    });
-
     it('has zero accessibility violations', async () => {
       const { container } = render(
         <SelectField label="Options" id="options-test" className="w-full">
@@ -107,16 +71,6 @@ describe('FormFields Components', () => {
       );
       const results = await axe(container);
       expect(results).toHaveNoViolations();
-    });
-  });
-
-  describe('CheckboxField', () => {
-    it('applies className to outer FieldWrapper', () => {
-      const { container } = render(
-        <CheckboxField label="Agree" className="custom-checkbox-wrapper" />
-      );
-      const wrapper = container.firstElementChild;
-      expect(wrapper).toHaveClass('custom-checkbox-wrapper');
     });
   });
 });

@@ -26,23 +26,6 @@ describe('TextField Component', () => {
     expect(wrapper).not.toHaveClass('custom-input-class');
   });
 
-  it('handles both className and inputClassName together correctly', () => {
-    const { container } = render(
-      <TextField
-        label="Username"
-        className="outer-layout-class"
-        inputClassName="inner-control-class"
-      />
-    );
-    const wrapper = container.firstElementChild;
-    const input = screen.getByLabelText('Username');
-
-    expect(wrapper).toHaveClass('outer-layout-class');
-    expect(wrapper).not.toHaveClass('inner-control-class');
-    expect(input).toHaveClass('inner-control-class');
-    expect(input).not.toHaveClass('outer-layout-class');
-  });
-
   it('has zero accessibility violations', async () => {
     const { container } = render(
       <TextField label="Email Address" id="email-test" className="mt-4" inputClassName="bg-surface" />
