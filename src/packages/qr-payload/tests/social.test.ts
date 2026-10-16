@@ -79,14 +79,61 @@ describe('Social generator', () => {
     expect(hydrated.handle).toBe('qrcraftly');
   });
 
-  it('hydrates whatsapp', () => {
-    const hydrated = hydrateSocialData('https://wa.me/15551234567');
-    expect(hydrated.platform).toBe(SocialPlatform.WHATSAPP);
-    expect(hydrated.handle).toBe('15551234567');
+  it('hydrates whatsapp wa.me links with and without message', () => {
+    const hydratedNoMsg = hydrateSocialData('https://wa.me/15551234567');
+    expect(hydratedNoMsg.platform).toBe(SocialPlatform.WHATSAPP);
+    expect(hydratedNoMsg.handle).toBe('15551234567');
+    expect(hydratedNoMsg.message).toBeUndefined();
 
-    // The Social form builds wa.me links, so a whatsapp.com link is not one it can rebuild.
+    const hydratedWithMsg = hydrateSocialData('https://wa.me/15551234567?text=Hello%20World%0ANext%20Line');
+    expect(hydratedWithMsg.platform).toBe(SocialPlatform.WHATSAPP);
+    expect(hydratedWithMsg.handle).toBe('15551234567');
+    expect(hydratedWithMsg.message).toBe('Hello World\nNext Line');
+
+    // The Social form builds wa.me links, so a generic whatsapp.com link is not one it can rebuild.
     const hydratedCom = hydrateSocialData('https://whatsapp.com/15551234567');
     expect(hydratedCom.handle).toBe('');
+  });
+
+  it('hydrates whatsapp api.whatsapp.com links with phone and message query parameters', () => {
+    const hydrated = hydrateSocialData('https://api.whatsapp.com/send?phone=15551234567&text=Product%20Inquiry');
+    expect(hydrated.platform).toBe(SocialPlatform.WHATSAPP);
+    expect(hydrated.handle).toBe('15551234567');
+    expect(hydrated.message).toBe('Product Inquiry');
+
+    // Isolates phone numbers from extra query arguments
+    const hydratedWithExtraParams = hydrateSocialData('https://api.whatsapp.com/send?phone=+15551234567&text=Hello&utm_source=qr&app_absent=0');
+    expect(hydratedWithExtraParams.platform).toBe(SocialPlatform.WHATSAPP);
+    expect(hydratedWithExtraParams.handle).toBe('15551234567');
+    expect(hydratedWithExtraParams.message).toBe('Hello');
+
+    // Works with phone only
+    const hydratedPhoneOnly = hydrateSocialData('https://api.whatsapp.com/send?phone=15551234567');
+    expect(hydratedPhoneOnly.platform).toBe(SocialPlatform.WHATSAPP);
+    expect(hydratedPhoneOnly.handle).toBe('15551234567');
+    expect(hydratedPhoneOnly.message).toBeUndefined();
+  });
+
+  it('constructs whatsapp URLs with encoded pre-filled messages', () => {
+    const noMsg = constructSocialString({
+      platform: SocialPlatform.WHATSAPP,
+      handle: '15551234567',
+    });
+    expect(noMsg).toBe('https://wa.me/15551234567');
+
+    const emptyMsg = constructSocialString({
+      platform: SocialPlatform.WHATSAPP,
+      handle: '15551234567',
+      message: '   ',
+    });
+    expect(emptyMsg).toBe('https://wa.me/15551234567');
+
+    const withMsg = constructSocialString({
+      platform: SocialPlatform.WHATSAPP,
+      handle: '15551234567',
+      message: 'Hello World!\nInquiry #101',
+    });
+    expect(withMsg).toBe('https://wa.me/15551234567?text=Hello%20World!%0AInquiry%20%23101');
   });
 
   it('hydrates github', () => {

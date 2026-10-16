@@ -503,6 +503,8 @@ export interface SocialData {
   platform: SocialPlatform;
   /** The username or handle on the platform. */
   handle: string;
+  /** Optional pre-filled message for WhatsApp links. */
+  message?: string;
 }
 
 /**

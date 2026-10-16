@@ -56,6 +56,7 @@ export const REVIEWED_HOSTS = {
   'calendar.yahoo.com': 'Event QR links that open Yahoo Calendar',
   'pay.google.com': 'Google Wallet save links, opened in a new tab only after the person confirms (#1411)',
   'wa.me': 'WhatsApp payload links',
+  'api.whatsapp.com': 'WhatsApp payload links',
   'x.com': 'Social profile payload links',
   'instagram.com': 'Social profile payload links',
   'facebook.com': 'Social profile payload links',

@@ -18,6 +18,7 @@
 
 import { CalendarProvider, QRType, SocialPlatform } from '@/types';
 import { splitCompoundField } from './rfcHelper';
+import { sanitizeSocialHandle } from '@/utils/security';
 
 /**
  * Matches a `geo:` URI the Location form can show in full: two coordinates and nothing else.
@@ -29,6 +30,7 @@ export const PLAIN_GEO_URI = /^geo:([-+]?\d{1,3}(?:\.\d+)?),([-+]?\d{1,3}(?:\.\d
 export interface SocialProfile {
   platform: SocialPlatform;
   handle: string;
+  message?: string;
 }
 
 /** Hosts whose profile URLs the Social form builds, after `www.`, `m.` or `mobile.` is removed. */
@@ -41,6 +43,7 @@ const PROFILE_HOSTS: Record<string, SocialPlatform> = {
   'youtube.com': SocialPlatform.YOUTUBE,
   'facebook.com': SocialPlatform.FACEBOOK,
   'wa.me': SocialPlatform.WHATSAPP,
+  'api.whatsapp.com': SocialPlatform.WHATSAPP,
   'github.com': SocialPlatform.GITHUB,
 };
 
@@ -63,18 +66,23 @@ const HANDLE_PATTERN = /^[A-Za-z0-9_.-]+$/;
  */
 export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null => {
   if (parsed.scheme !== 'http' && parsed.scheme !== 'https') return null;
-  if (parsed.params.size > 0 || parsed.path.includes('#')) return null;
+  if (parsed.path.includes('#')) return null;
 
   const [rawHost, ...rest] = parsed.path.split('/');
   const host = rawHost.toLowerCase().replace(/^(?:www|m|mobile)\./, '');
   const platform = PROFILE_HOSTS[host];
   if (!platform) return null;
 
+  // Non-WhatsApp profile URLs reject query parameters
+  if (platform !== SocialPlatform.WHATSAPP && parsed.params.size > 0) return null;
+
   // One trailing slash is fine; empty segments elsewhere are not.
   const segments = rest.length > 0 && rest[rest.length - 1] === '' ? rest.slice(0, -1) : rest;
   if (segments.some((segment) => segment === '')) return null;
 
   let handle: string | undefined;
+  let message: string | undefined;
+
   switch (platform) {
     case SocialPlatform.LINKEDIN:
       if (segments.length === 2 && segments[0] === 'in') handle = segments[1];
@@ -84,7 +92,27 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
       if (segments.length === 1 && segments[0].startsWith('@')) handle = segments[0].substring(1);
       break;
     case SocialPlatform.WHATSAPP:
-      if (segments.length === 1 && /^\d+$/.test(segments[0])) handle = segments[0];
+      if (host === 'api.whatsapp.com') {
+        if (segments.length === 1 && segments[0] === 'send') {
+          const phoneParam = parsed.params.get('phone');
+          if (phoneParam) {
+            const cleanPhone = sanitizeSocialHandle(phoneParam);
+            if (/^\d+$/.test(cleanPhone)) {
+              handle = cleanPhone;
+            }
+          }
+        }
+      } else {
+        if (segments.length === 1 && /^\d+$/.test(segments[0])) {
+          handle = segments[0];
+        }
+      }
+      if (handle) {
+        const textParam = parsed.params.get('text');
+        if (textParam) {
+          message = textParam;
+        }
+      }
       break;
     default:
       if (segments.length === 1 && !RESERVED_SEGMENTS[platform]?.has(segments[0].toLowerCase())) {
@@ -92,7 +120,9 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
       }
   }
 
-  return handle && HANDLE_PATTERN.test(handle) ? { platform, handle } : null;
+  if (!handle || !HANDLE_PATTERN.test(handle)) return null;
+
+  return message !== undefined ? { platform, handle, message } : { platform, handle };
 };
 
 /**

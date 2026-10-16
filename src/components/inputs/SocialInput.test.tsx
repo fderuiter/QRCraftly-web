@@ -96,4 +96,42 @@ describe('SocialInput', () => {
     const handleInput = screen.getByLabelText('Username / Handle') as HTMLInputElement;
     expect(handleInput.value).toBe('myhandle123');
   });
+
+  it('does not render pre-filled message field for non-WhatsApp platforms', () => {
+    render(<SocialInput data={defaultData} onChange={mockOnChange} />);
+    expect(screen.queryByLabelText('Pre-filled Message (optional)')).not.toBeInTheDocument();
+  });
+
+  it('renders multi-line TextAreaField for WhatsApp platform with character count', () => {
+    const whatsappData: SocialData = {
+      platform: SocialPlatform.WHATSAPP,
+      handle: '15551234567',
+      message: 'Hello\nWorld',
+    };
+    render(<SocialInput data={whatsappData} onChange={mockOnChange} />);
+
+    const messageInput = screen.getByLabelText('Pre-filled Message (optional)') as HTMLTextAreaElement;
+    expect(messageInput).toBeInTheDocument();
+    expect(messageInput.tagName.toLowerCase()).toBe('textarea');
+    expect(messageInput.value).toBe('Hello\nWorld');
+    expect(messageInput.getAttribute('maxLength')).toBe('256');
+
+    // Verify character count is displayed (11 / 256)
+    expect(screen.getByText('11 / 256')).toBeInTheDocument();
+  });
+
+  it('calls onChange when WhatsApp pre-filled message changes', () => {
+    const whatsappData: SocialData = {
+      platform: SocialPlatform.WHATSAPP,
+      handle: '15551234567',
+      message: '',
+    };
+    render(<SocialInput data={whatsappData} onChange={mockOnChange} />);
+
+    const messageInput = screen.getByLabelText('Pre-filled Message (optional)');
+    fireEvent.change(messageInput, { target: { value: 'Inquiry about service:\nLine 1\nLine 2' } });
+
+    expect(mockOnChange).toHaveBeenCalledTimes(1);
+    expect(mockOnChange).toHaveBeenCalledWith({ message: 'Inquiry about service:\nLine 1\nLine 2' });
+  });
 });
