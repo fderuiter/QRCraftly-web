@@ -1081,7 +1081,6 @@ describe('QRScanner Component', () => {
 
   describe('audio feedback and toggle control', () => {
     beforeEach(() => {
-      window.localStorage.clear();
       vi.mocked(playChime).mockClear();
     });
 
@@ -1134,13 +1133,14 @@ describe('QRScanner Component', () => {
     });
 
     it('invokes playChime on camera scan success when sound is toggled on', async () => {
-      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      const { container } = render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
       await settle();
 
       const toggleBtn = screen.getByRole('button', { name: 'Scan sound' });
       await act(async () => {
         fireEvent.click(toggleBtn);
       });
+      expect(await axe(container)).toHaveNoViolations();
 
       await decode('https://example.com/audio-test');
       expect(playChime).toHaveBeenCalledTimes(1);
@@ -1148,6 +1148,16 @@ describe('QRScanner Component', () => {
     });
 
     it('does not invoke playChime on image mode scan reads', async () => {
+      globalThis.mockWorkerControl.setInterceptor((msg, worker) => {
+        setTimeout(() => {
+          worker.dispatchMessage({
+            status: 'pass',
+            sequenceId: msg.sequenceId,
+            decodedData: 'https://example.com/image-read',
+            buffer: msg.buffer || new ArrayBuffer(0),
+          });
+        }, 0);
+      });
       render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
       await settle();
 
@@ -1161,13 +1171,16 @@ describe('QRScanner Component', () => {
         fireEvent.click(imageTab);
       });
 
+      qrRead.mockReturnValue([fakeQrRead('https://example.com/image-read')]);
       const mockFile = new File(['mock content'], 'qr.png', { type: 'image/png' });
       const fileInput = screen.getByLabelText(/upload qr code image file/i);
       await act(async () => {
         fireEvent.change(fileInput, { target: { files: [mockFile] } });
       });
-      await settle();
 
+      await waitFor(() => {
+        expect(mockOnScanSuccess).toHaveBeenCalledWith('https://example.com/image-read');
+      });
       expect(playChime).not.toHaveBeenCalled();
     });
   });

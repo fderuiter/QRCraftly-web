@@ -265,12 +265,11 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const permission = useCameraPermission();
 
   const soundOnRef = useRef(soundOn);
-  useEffect(() => {
-    soundOnRef.current = soundOn;
-  }, [soundOn]);
 
   const toggleSound = () => {
-    setSoundOn((prev) => !prev);
+    const next = !soundOnRef.current;
+    soundOnRef.current = next;
+    setSoundOn(next);
   };
 
   const ids = useId();
