@@ -41,7 +41,8 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
       {data.platform === SocialPlatform.WHATSAPP && (
         <TextAreaField
           id="social-message"
-          label="Pre-filled Message (optional)"
+          label="Pre-filled Message"
+          contextualLabel="Optional"
           placeholder="Enter pre-filled message..."
           rows={3}
           maxLength={256}

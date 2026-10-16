@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SocialInput } from './SocialInput';
 import { type SocialData, SocialPlatform } from '../../types';
+import { axe } from '../../../tests/utils/axe';
 
 describe('SocialInput', () => {
   const mockOnChange = vi.fn();
@@ -99,18 +100,18 @@ describe('SocialInput', () => {
 
   it('does not render pre-filled message field for non-WhatsApp platforms', () => {
     render(<SocialInput data={defaultData} onChange={mockOnChange} />);
-    expect(screen.queryByLabelText('Pre-filled Message (optional)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Pre-filled Message/i)).not.toBeInTheDocument();
   });
 
-  it('renders multi-line TextAreaField for WhatsApp platform with character count', () => {
+  it('renders multi-line TextAreaField for WhatsApp platform with character count and passes axe accessibility check', async () => {
     const whatsappData: SocialData = {
       platform: SocialPlatform.WHATSAPP,
       handle: '15551234567',
       message: 'Hello\nWorld',
     };
-    render(<SocialInput data={whatsappData} onChange={mockOnChange} />);
+    const { container } = render(<SocialInput data={whatsappData} onChange={mockOnChange} />);
 
-    const messageInput = screen.getByLabelText('Pre-filled Message (optional)') as HTMLTextAreaElement;
+    const messageInput = screen.getByLabelText(/Pre-filled Message/i) as HTMLTextAreaElement;
     expect(messageInput).toBeInTheDocument();
     expect(messageInput.tagName.toLowerCase()).toBe('textarea');
     expect(messageInput.value).toBe('Hello\nWorld');
@@ -118,6 +119,8 @@ describe('SocialInput', () => {
 
     // Verify character count is displayed (11 / 256)
     expect(screen.getByText('11 / 256')).toBeInTheDocument();
+
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('calls onChange when WhatsApp pre-filled message changes', () => {
@@ -128,7 +131,7 @@ describe('SocialInput', () => {
     };
     render(<SocialInput data={whatsappData} onChange={mockOnChange} />);
 
-    const messageInput = screen.getByLabelText('Pre-filled Message (optional)');
+    const messageInput = screen.getByLabelText(/Pre-filled Message/i);
     fireEvent.change(messageInput, { target: { value: 'Inquiry about service:\nLine 1\nLine 2' } });
 
     expect(mockOnChange).toHaveBeenCalledTimes(1);

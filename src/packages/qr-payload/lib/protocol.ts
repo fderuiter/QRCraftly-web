@@ -18,7 +18,6 @@
 
 import { CalendarProvider, QRType, SocialPlatform } from '@/types';
 import { splitCompoundField } from './rfcHelper';
-import { sanitizeSocialHandle } from '@/utils/security';
 
 /**
  * Matches a `geo:` URI the Location form can show in full: two coordinates and nothing else.
@@ -43,7 +42,6 @@ const PROFILE_HOSTS: Record<string, SocialPlatform> = {
   'youtube.com': SocialPlatform.YOUTUBE,
   'facebook.com': SocialPlatform.FACEBOOK,
   'wa.me': SocialPlatform.WHATSAPP,
-  'api.whatsapp.com': SocialPlatform.WHATSAPP,
   'github.com': SocialPlatform.GITHUB,
 };
 
@@ -61,6 +59,9 @@ const HANDLE_PATTERN = /^[A-Za-z0-9_.-]+$/;
  * Reads a social profile link that the Social form can rebuild without losing anything. Posts,
  * share links, searches, short-link hosts and links with a query or fragment are not profiles,
  * so they return `null` and stay Website codes (#1282).
+ *
+ * For WhatsApp (`wa.me`), a query is accepted only when its only key is `text` and its
+ * decoded value is non-blank, at most 256 characters, and equal to its own `trim()`.
  * @param parsed - The parsed `http`/`https` URL.
  * @returns The platform and handle, or `null`.
  */
@@ -92,26 +93,18 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
       if (segments.length === 1 && segments[0].startsWith('@')) handle = segments[0].substring(1);
       break;
     case SocialPlatform.WHATSAPP:
-      if (host === 'api.whatsapp.com') {
-        if (segments.length === 1 && segments[0] === 'send') {
-          const phoneParam = parsed.params.get('phone');
-          if (phoneParam) {
-            const cleanPhone = sanitizeSocialHandle(phoneParam);
-            if (/^\d+$/.test(cleanPhone)) {
-              handle = cleanPhone;
-            }
-          }
-        }
-      } else {
-        if (segments.length === 1 && /^\d+$/.test(segments[0])) {
-          handle = segments[0];
-        }
+      if (segments.length === 1 && /^\d+$/.test(segments[0])) {
+        handle = segments[0];
       }
-      if (handle) {
-        const textParam = parsed.params.get('text');
-        if (textParam) {
-          message = textParam;
+      if (handle && parsed.params.size > 0) {
+        if (parsed.params.size !== 1 || !parsed.params.has('text')) {
+          return null;
         }
+        const textParam = parsed.params.get('text');
+        if (!textParam || textParam !== textParam.trim() || textParam.length > 256) {
+          return null;
+        }
+        message = textParam;
       }
       break;
     default:

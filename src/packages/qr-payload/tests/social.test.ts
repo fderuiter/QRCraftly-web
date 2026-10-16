@@ -17,8 +17,8 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { constructSocialString, hydrateSocialData } from '../index';
-import { SocialPlatform } from '@/types';
+import { constructSocialString, hydrateSocialData, identifyProtocol } from '../index';
+import { QRType, SocialPlatform } from '@/types';
 
 describe('Social generator', () => {
   it('constructs and hydrates successfully', () => {
@@ -95,23 +95,31 @@ describe('Social generator', () => {
     expect(hydratedCom.handle).toBe('');
   });
 
-  it('hydrates whatsapp api.whatsapp.com links with phone and message query parameters', () => {
-    const hydrated = hydrateSocialData('https://api.whatsapp.com/send?phone=15551234567&text=Product%20Inquiry');
-    expect(hydrated.platform).toBe(SocialPlatform.WHATSAPP);
-    expect(hydrated.handle).toBe('15551234567');
-    expect(hydrated.message).toBe('Product Inquiry');
+  it('keeps lossy WhatsApp links classified as QRType.URL', () => {
+    const lossyInputs = [
+      'https://api.whatsapp.com/send?phone=15551234567&text=Hello&utm_source=qr&app_absent=0',
+      'https://wa.me/15551234567?utm_source=qr',
+      'https://wa.me/15551234567?text=%20Hi%20',
+      'https://wa.me/15551234567?text=%20',
+      'https://wa.me/15551234567?text=C++',
+    ];
 
-    // Isolates phone numbers from extra query arguments
-    const hydratedWithExtraParams = hydrateSocialData('https://api.whatsapp.com/send?phone=+15551234567&text=Hello&utm_source=qr&app_absent=0');
-    expect(hydratedWithExtraParams.platform).toBe(SocialPlatform.WHATSAPP);
-    expect(hydratedWithExtraParams.handle).toBe('15551234567');
-    expect(hydratedWithExtraParams.message).toBe('Hello');
+    for (const input of lossyInputs) {
+      expect(identifyProtocol(input)).toBe(QRType.URL);
+      expect(hydrateSocialData(input).handle).toBe('');
+    }
+  });
 
-    // Works with phone only
-    const hydratedPhoneOnly = hydrateSocialData('https://api.whatsapp.com/send?phone=15551234567');
-    expect(hydratedPhoneOnly.platform).toBe(SocialPlatform.WHATSAPP);
-    expect(hydratedPhoneOnly.handle).toBe('15551234567');
-    expect(hydratedPhoneOnly.message).toBeUndefined();
+  it('round-trips multi-line whatsapp message exact URL', () => {
+    const link = 'https://wa.me/15551234567?text=Hello%20World%0ANext%20Line';
+    expect(identifyProtocol(link)).toBe(QRType.SOCIAL);
+    const hydrated = hydrateSocialData(link);
+    expect(hydrated).toEqual({
+      platform: SocialPlatform.WHATSAPP,
+      handle: '15551234567',
+      message: 'Hello World\nNext Line',
+    });
+    expect(constructSocialString(hydrated)).toBe(link);
   });
 
   it('constructs whatsapp URLs with encoded pre-filled messages', () => {
