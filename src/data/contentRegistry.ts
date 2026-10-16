@@ -457,6 +457,7 @@ export const contentRegistry: Record<string, ToolContent> = {
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
   },
   "qr-code-checker": landingEntry("qr-code-checker"),
+  "qr-code-size-calculator": landingEntry("qr-code-size-calculator"),
   "mosaic-qr-code": landingEntry("mosaic-qr-code"),
   "qr-code-with-logo": landingEntry("qr-code-with-logo"),
   "google-review-qr-code": landingEntry("google-review-qr-code"),
@@ -480,7 +481,8 @@ export const contentRegistry: Record<string, ToolContent> = {
       "No analytics, tracking cookies or third-party scripts",
       "Private vulnerability reports by email"
     ],
-    "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
+    // A page about how the project handles data, not an app: no Offer or HowTo in its schema.
+    "schemaType": SchemaType.AboutPage,
     "schemaCategory": SchemaCategory.UtilitiesApplication,
     "personas": [TargetPersona.HealthcareLegal, TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty,
@@ -575,6 +577,16 @@ export const auxiliaryRegistry: Record<string, AuxiliaryContent> = {
     "description": "How fake QR codes steal logins and payments, the warning signs to look for before you scan, and what to do if you have already scanned one.",
     "image": "/og/guides-qr-code-scams-quishing.png",
     "imageAlt": "QR code scams (quishing)",
+    "personas": [TargetPersona.SecurityConsciousEnterprise],
+    "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty
+  },
+  "guides/qr-code-without-subscription": {
+    "id": "guides/qr-code-without-subscription",
+    "name": "QR codes without a subscription",
+    "seoTitle": "QR Code Without a Subscription: What to Check | QRCraftly",
+    "description": "Need a QR code without a subscription? Static codes need no plan and keep working while their link does. Here is how to check a generator first.",
+    "image": "/og/guides-qr-code-without-subscription.png",
+    "imageAlt": "QR codes without a subscription",
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty
   },
