@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { EyePosition, QRConfig } from '@/types';
+import { EYE_POSITIONS, type QRConfig } from '@/types';
 import { LOW_RELIABILITY_PATTERNS, SYSTEM_LIMITS } from '@/constants';
 import { getContrastRatio } from '@/utils/colorUtils';
 
@@ -50,15 +50,16 @@ export function calculateScannabilityHealth(
 
   const fgContrast = Math.min(...moduleColors.map((color) => getContrastRatio(color, bgForContrast)));
 
-  const eyePositions: EyePosition[] = ['top-left', 'top-right', 'bottom-left'];
-  const frameColors = [
-    config.eyeFrameColor || config.eyeColor,
-    ...eyePositions.map((pos) => config.eyeOverrides?.[pos]?.frameColor || config.eyeOverrides?.[pos]?.color).filter(Boolean) as string[],
-  ];
-  const ballColors = [
-    config.eyeBallColor || config.eyeColor,
-    ...eyePositions.map((pos) => config.eyeOverrides?.[pos]?.ballColor || config.eyeOverrides?.[pos]?.color).filter(Boolean) as string[],
-  ];
+  const frameColors: string[] = [config.eyeFrameColor || config.eyeColor];
+  const ballColors: string[] = [config.eyeBallColor || config.eyeColor];
+
+  for (const pos of EYE_POSITIONS) {
+    const frameCol = config.eyeOverrides?.[pos]?.frameColor || config.eyeOverrides?.[pos]?.color;
+    if (frameCol) frameColors.push(frameCol);
+
+    const ballCol = config.eyeOverrides?.[pos]?.ballColor || config.eyeOverrides?.[pos]?.color;
+    if (ballCol) ballColors.push(ballCol);
+  }
 
   const eyeFrameContrast = Math.min(...frameColors.map((color) => getContrastRatio(color, bgForContrast)));
   const eyeBallContrast = Math.min(...ballColors.map((color) => getContrastRatio(color, bgForContrast)));

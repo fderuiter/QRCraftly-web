@@ -10,9 +10,11 @@ import {
   type LogoPaddingStyle,
   type MosaicMode,
   type QRConfig,
-  type EyePosition,
   type EyeOverride,
   type EyeOverrides,
+  EyeShape,
+  isEyeShape,
+  isEyePosition,
   QRErrorCorrectionLevel,
   QRStyle,
   SocialFormat,
@@ -72,8 +74,8 @@ const STYLE_FIELDS: Partial<Record<keyof QRConfig, FieldRule>> = {
   frameIcon: enumOf(['none', 'scan', 'camera', 'star', 'heart', 'info', 'phone'] satisfies FrameIcon[]),
   eyeFrameColor: { kind: 'color' },
   eyeBallColor: { kind: 'color' },
-  eyeFrameStyle: enumOf(Object.values(QRStyle)),
-  eyeBallStyle: enumOf(Object.values(QRStyle)),
+  eyeFrameStyle: enumOf(Object.values(EyeShape)),
+  eyeBallStyle: enumOf(Object.values(EyeShape)),
   eyeOverrides: { kind: 'eyeOverrides' },
   mazePathWidth: { kind: 'number', min: 0.1, max: 0.5 },
   mosaicMode: enumOf(['tiles', 'halftone'] satisfies MosaicMode[]),
@@ -110,10 +112,13 @@ function cleanValue(rule: FieldRule, value: unknown): string | number | boolean 
       if (!Array.isArray(value)) return undefined;
       const stops: ColorStop[] = [];
       for (const item of value) {
-        if (typeof item === 'object' && item !== null && typeof (item as { offset?: unknown }).offset === 'number' && typeof (item as { color?: unknown }).color === 'string') {
-          const color = normalizeHex((item as { color: string }).color);
-          if (color) {
-            stops.push({ offset: Math.max(0, Math.min(1, (item as { offset: number }).offset)), color });
+        if (typeof item === 'object' && item !== null) {
+          const obj = item as { offset?: unknown; color?: unknown };
+          if (typeof obj.offset === 'number' && typeof obj.color === 'string') {
+            const color = normalizeHex(obj.color);
+            if (color) {
+              stops.push({ offset: Math.max(0, Math.min(1, obj.offset)), color });
+            }
           }
         }
       }
@@ -121,45 +126,36 @@ function cleanValue(rule: FieldRule, value: unknown): string | number | boolean 
     }
     case 'eyeOverrides': {
       if (typeof value !== 'object' || value === null) return undefined;
-      const allowedPositions: EyePosition[] = ['top-left', 'top-right', 'bottom-left'];
-      const validStyles = Object.values(QRStyle) as string[];
+      const dict = value as Record<string, unknown>;
       const cleaned: EyeOverrides = {};
       let hasValid = false;
 
-      for (const pos of allowedPositions) {
-        const overrideObj = (value as Record<string, unknown>)[pos];
-        if (typeof overrideObj === 'object' && overrideObj !== null) {
-          const item = overrideObj as Record<string, unknown>;
+      for (const pos of Object.keys(dict)) {
+        if (!isEyePosition(pos)) continue;
+        const item = dict[pos];
+        if (typeof item === 'object' && item !== null) {
+          const raw = item as Record<string, unknown>;
           const cleanedItem: EyeOverride = {};
           let itemValid = false;
 
-          if (typeof item.frameStyle === 'string' && validStyles.includes(item.frameStyle)) {
-            cleanedItem.frameStyle = item.frameStyle as QRStyle;
+          if (isEyeShape(raw.frameStyle)) {
+            cleanedItem.frameStyle = raw.frameStyle;
             itemValid = true;
           }
-          if (typeof item.ballStyle === 'string' && validStyles.includes(item.ballStyle)) {
-            cleanedItem.ballStyle = item.ballStyle as QRStyle;
+          if (isEyeShape(raw.ballStyle)) {
+            cleanedItem.ballStyle = raw.ballStyle;
             itemValid = true;
           }
-          if (typeof item.frameColor === 'string') {
-            const col = normalizeHex(item.frameColor);
-            if (col) {
-              cleanedItem.frameColor = col;
-              itemValid = true;
-            }
-          }
-          if (typeof item.ballColor === 'string') {
-            const col = normalizeHex(item.ballColor);
-            if (col) {
-              cleanedItem.ballColor = col;
-              itemValid = true;
-            }
-          }
-          if (typeof item.color === 'string') {
-            const col = normalizeHex(item.color);
-            if (col) {
-              cleanedItem.color = col;
-              itemValid = true;
+
+          const colorKeys = ['frameColor', 'ballColor', 'color'] as const;
+          for (const key of colorKeys) {
+            const val = raw[key];
+            if (typeof val === 'string') {
+              const col = normalizeHex(val);
+              if (col) {
+                cleanedItem[key] = col;
+                itemValid = true;
+              }
             }
           }
 

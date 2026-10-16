@@ -53,11 +53,11 @@ describe('PatternControls', () => {
     const handleChange = vi.fn();
     render(<PatternControls config={DEFAULT_CONFIG} onChange={handleChange} />);
 
-    const modernFrameRadio = screen.getByRole('radio', { name: /select modern soft frame shape/i });
+    const modernFrameRadio = screen.getByRole('radio', { name: /select rounded frame shape/i });
     await userEvent.click(modernFrameRadio);
     expect(handleChange).toHaveBeenCalledWith({ eyeFrameStyle: QRStyle.MODERN });
 
-    const swissBallRadio = screen.getByRole('radio', { name: /select swiss dot eyeball shape/i });
+    const swissBallRadio = screen.getByRole('radio', { name: /select circle eyeball shape/i });
     await userEvent.click(swissBallRadio);
     expect(handleChange).toHaveBeenCalledWith({ eyeBallStyle: QRStyle.SWISS });
   });
@@ -96,8 +96,8 @@ describe('PatternControls', () => {
     const individualControls = screen.getByTestId('individual-eye-controls');
     expect(individualControls).toBeInTheDocument();
 
-    // Change Top-Left Frame Shape to Modern
-    const topLeftFrameRadio = screen.getByRole('radio', { name: /select modern soft for top-left eye frame/i });
+    // Change Top-Left Frame Shape to Modern (Rounded)
+    const topLeftFrameRadio = screen.getByRole('radio', { name: /select rounded for top-left eye frame/i });
     await userEvent.click(topLeftFrameRadio);
     expect(handleChange).toHaveBeenCalledWith({
       eyeOverrides: {

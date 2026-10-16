@@ -86,6 +86,7 @@ To prevent injection of arbitrary characters or command payloads into telephone,
 - **SMS Multi-Recipient Isolation**: To support advanced client-side SMS campaign configurations, the SMS generator uses an isolated sanitization option that preserves semicolons and commas, while rejecting letters, other symbols, and line-break control characters.
 - **URI Delimiter Encoding**: After sanitization, `#` in a dial string is percent-encoded as `%23` (RFC 3966) so it cannot start a URI fragment and truncate the number. Mailto recipients (including optional CC and BCC recipients) are percent-encoded (RFC 6068, keeping `@`) so `?`, `&`, and `#` in the address cannot inject headers, and crypto wallet addresses, SEPA transfer fields, and fiat payment handles (PayPal, Venmo, Cash App) are sanitized and percent-encoded so `&` or `#` cannot inject payment parameters.
 - **Social Handle Sanitization**: Social profile handles (`SocialPlatform` in `src/types.ts`) strip leading `@` signs and path-injection characters using `sanitizeSocialHandle` before constructing deep link URLs for Instagram, Twitter / X, TikTok, LinkedIn, YouTube, Facebook, WhatsApp, and GitHub.
+- **Finder Eye Shape and Position Safety**: Finder eye shapes (`EyeShape` in `src/types.ts`) and corner positions (`EYE_POSITIONS`) enforce strict structural type bounds and validation rules during runtime parsing and template import.
 
 ## SVG Sanitization & Path Tracking
 

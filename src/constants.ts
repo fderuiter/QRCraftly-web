@@ -18,7 +18,7 @@ import { getPublicDomain } from "./utils/metadataEngine";
 */
 
 
-import { QRStyle, QRType, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from './types';
+import { QRStyle, QRType, QRErrorCorrectionLevel, SocialFormat, TemplateStyle, EyeShape } from './types';
 
 /**
  * The default configuration settings for the QR code generator.
@@ -77,6 +77,21 @@ export const PATTERNS = [
   { id: QRStyle.GRUNGE, label: 'Grunge' },
   { id: QRStyle.STARBURST, label: 'Starburst' },
 ];
+
+/**
+ * List of available finder eye shapes with display labels.
+ * Curated for finder eye frames and eyeballs.
+ */
+export const EYE_SHAPES = [
+  { id: EyeShape.SQUARE, label: 'Square' },
+  { id: EyeShape.ROUNDED, label: 'Rounded' },
+  { id: EyeShape.CIRCLE, label: 'Circle' },
+  { id: EyeShape.FLUID, label: 'Fluid' },
+  { id: EyeShape.CIRCUIT, label: 'Cyber Circuit' },
+  { id: EyeShape.HIVE, label: 'Hive' },
+  { id: EyeShape.GRUNGE, label: 'Grunge' },
+  { id: EyeShape.STARBURST, label: 'Starburst' },
+] as const;
 
 export const LOW_RELIABILITY_PATTERNS: readonly QRStyle[] = [QRStyle.GRUNGE, QRStyle.CIRCUIT, QRStyle.STARBURST];
 

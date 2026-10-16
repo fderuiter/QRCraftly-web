@@ -1,6 +1,7 @@
 import React from 'react';
-import type { EyeOverride, EyePosition, QRConfig, QRStyle } from '../../types';
-import { PATTERNS, LOW_RELIABILITY_PATTERNS } from '../../constants';
+import type { EyeOverride, EyePosition, QRConfig, QRStyle, EyeShape } from '../../types';
+import { EYE_POSITIONS } from '../../types';
+import { PATTERNS, EYE_SHAPES, LOW_RELIABILITY_PATTERNS } from '../../constants';
 import { PatternModule } from '../ui/PatternModule';
 import { Alert } from '../ui/Alert';
 import { SegmentedControl } from '../ui/SegmentedControl';
@@ -12,11 +13,11 @@ interface PatternControlsProps {
   onChange: (updates: Partial<QRConfig>) => void;
 }
 
-const EYE_POSITIONS: Array<{ id: EyePosition; label: string }> = [
-  { id: 'top-left', label: 'Top-Left Eye' },
-  { id: 'top-right', label: 'Top-Right Eye' },
-  { id: 'bottom-left', label: 'Bottom-Left Eye' },
-];
+const EYE_LABELS: Record<EyePosition, string> = {
+  'top-left': 'Top-Left Eye',
+  'top-right': 'Top-Right Eye',
+  'bottom-left': 'Bottom-Left Eye',
+};
 
 export const PatternControls: React.FC<PatternControlsProps> = ({ config, onChange }) => {
   const isLowReliability = LOW_RELIABILITY_PATTERNS.includes(config.style);
@@ -73,32 +74,32 @@ export const PatternControls: React.FC<PatternControlsProps> = ({ config, onChan
 
       <div>
         <h4 className="mb-3 text-sm font-semibold text-fg-soft">Frame Shape</h4>
-        <SegmentedControl<QRStyle>
+        <SegmentedControl<EyeShape>
           appearance="tiles"
           label="Frame Shape"
           className="grid-cols-4"
-          value={config.eyeFrameStyle || config.style}
+          value={(config.eyeFrameStyle || config.style) as EyeShape}
           onChange={(eyeFrameStyle) => onChange({ eyeFrameStyle })}
-          options={PATTERNS.map((pattern) => ({
-            value: pattern.id,
-            ariaLabel: `Select ${pattern.label} frame shape`,
-            label: pattern.label,
+          options={EYE_SHAPES.map((shape) => ({
+            value: shape.id,
+            ariaLabel: `Select ${shape.label} frame shape`,
+            label: shape.label,
           }))}
         />
       </div>
 
       <div>
         <h4 className="mb-3 text-sm font-semibold text-fg-soft">Eyeball Shape</h4>
-        <SegmentedControl<QRStyle>
+        <SegmentedControl<EyeShape>
           appearance="tiles"
           label="Eyeball Shape"
           className="grid-cols-4"
-          value={config.eyeBallStyle || config.style}
+          value={(config.eyeBallStyle || config.style) as EyeShape}
           onChange={(eyeBallStyle) => onChange({ eyeBallStyle })}
-          options={PATTERNS.map((pattern) => ({
-            value: pattern.id,
-            ariaLabel: `Select ${pattern.label} eyeball shape`,
-            label: pattern.label,
+          options={EYE_SHAPES.map((shape) => ({
+            value: shape.id,
+            ariaLabel: `Select ${shape.label} eyeball shape`,
+            label: shape.label,
           }))}
         />
       </div>
@@ -131,10 +132,11 @@ export const PatternControls: React.FC<PatternControlsProps> = ({ config, onChan
 
         {isCustomEyesEnabled && (
           <div className="mt-4 space-y-6 pl-1" data-testid="individual-eye-controls">
-            {EYE_POSITIONS.map(({ id: pos, label }) => {
+            {EYE_POSITIONS.map((pos) => {
+              const label = EYE_LABELS[pos];
               const eyeOverride = config.eyeOverrides?.[pos] ?? {};
-              const currentFrameStyle = eyeOverride.frameStyle || config.eyeFrameStyle || config.style;
-              const currentBallStyle = eyeOverride.ballStyle || config.eyeBallStyle || config.style;
+              const currentFrameStyle = (eyeOverride.frameStyle || config.eyeFrameStyle || config.style) as EyeShape;
+              const currentBallStyle = (eyeOverride.ballStyle || config.eyeBallStyle || config.style) as EyeShape;
               const currentFrameColor = eyeOverride.frameColor || eyeOverride.color || config.eyeFrameColor || config.eyeColor;
               const currentBallColor = eyeOverride.ballColor || eyeOverride.color || config.eyeBallColor || config.eyeColor;
 
@@ -144,32 +146,32 @@ export const PatternControls: React.FC<PatternControlsProps> = ({ config, onChan
 
                   <div>
                     <span className="mb-2 block text-xs font-medium text-fg-soft">{label} Frame Shape</span>
-                    <SegmentedControl<QRStyle>
+                    <SegmentedControl<EyeShape>
                       appearance="tiles"
                       label={`${label} Frame Shape`}
                       className="grid-cols-4"
                       value={currentFrameStyle}
                       onChange={(frameStyle) => handleEyeOverrideChange(pos, { frameStyle })}
-                      options={PATTERNS.map((pattern) => ({
-                        value: pattern.id,
-                        ariaLabel: `Select ${pattern.label} for ${label} frame`,
-                        label: pattern.label,
+                      options={EYE_SHAPES.map((shape) => ({
+                        value: shape.id,
+                        ariaLabel: `Select ${shape.label} for ${label} frame`,
+                        label: shape.label,
                       }))}
                     />
                   </div>
 
                   <div>
                     <span className="mb-2 block text-xs font-medium text-fg-soft">{label} Eyeball Shape</span>
-                    <SegmentedControl<QRStyle>
+                    <SegmentedControl<EyeShape>
                       appearance="tiles"
                       label={`${label} Eyeball Shape`}
                       className="grid-cols-4"
                       value={currentBallStyle}
                       onChange={(ballStyle) => handleEyeOverrideChange(pos, { ballStyle })}
-                      options={PATTERNS.map((pattern) => ({
-                        value: pattern.id,
-                        ariaLabel: `Select ${pattern.label} for ${label} eyeball`,
-                        label: pattern.label,
+                      options={EYE_SHAPES.map((shape) => ({
+                        value: shape.id,
+                        ariaLabel: `Select ${shape.label} for ${label} eyeball`,
+                        label: shape.label,
                       }))}
                     />
                   </div>

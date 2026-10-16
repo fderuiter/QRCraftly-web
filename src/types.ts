@@ -18,8 +18,7 @@
 
 
 /**
- * Defines the visual style of the QR code.
- * Each style dictates the data modules, eye frame, and eyeball appearance.
+ * Defines the visual style of the QR code modules.
  */
 export const QRStyle = {
   STANDARD: 'standard',
@@ -34,18 +33,52 @@ export const QRStyle = {
 export type QRStyle = (typeof QRStyle)[keyof typeof QRStyle];
 
 /**
+ * Defines the visual shape/style options for finder eye frames and eyeballs.
+ */
+export const EyeShape = {
+  SQUARE: 'standard',
+  ROUNDED: 'modern',
+  CIRCLE: 'swiss',
+  FLUID: 'fluid',
+  CIRCUIT: 'circuit',
+  HIVE: 'hive',
+  GRUNGE: 'grunge',
+  STARBURST: 'starburst',
+} as const;
+export type EyeShape = (typeof EyeShape)[keyof typeof EyeShape];
+
+/**
+ * Type guard checking whether a value is a valid EyeShape.
+ */
+export function isEyeShape(val: unknown): val is EyeShape {
+  return typeof val === 'string' && (Object.values(EyeShape) as string[]).includes(val);
+}
+
+/**
+ * Canonical corner eye position list in a QR code matrix.
+ */
+export const EYE_POSITIONS = ['top-left', 'top-right', 'bottom-left'] as const;
+
+/**
  * Defines the eye corner positions in a QR code matrix.
  */
-export type EyePosition = 'top-left' | 'top-right' | 'bottom-left';
+export type EyePosition = (typeof EYE_POSITIONS)[number];
+
+/**
+ * Type guard checking whether a value is a valid EyePosition.
+ */
+export function isEyePosition(val: unknown): val is EyePosition {
+  return typeof val === 'string' && (EYE_POSITIONS as readonly string[]).includes(val);
+}
 
 /**
  * Visual override settings for an individual finder eye.
  */
 export interface EyeOverride {
   /** Optional style override for the outer eye frame. */
-  frameStyle?: QRStyle;
+  frameStyle?: EyeShape;
   /** Optional style override for the inner eyeball. */
-  ballStyle?: QRStyle;
+  ballStyle?: EyeShape;
   /** Optional color override for the outer eye frame. */
   frameColor?: string;
   /** Optional color override for the inner eyeball. */
@@ -192,9 +225,9 @@ export interface QRConfig {
   /** Optional independent color for the inner eyeballs. Falls back to eyeColor. */
   eyeBallColor?: string;
   /** Optional independent style for outer finder eye frames. Falls back to style. */
-  eyeFrameStyle?: QRStyle;
+  eyeFrameStyle?: EyeShape;
   /** Optional independent style for inner eyeballs. Falls back to style. */
-  eyeBallStyle?: QRStyle;
+  eyeBallStyle?: EyeShape;
   /** Optional per-eye overrides for top-left, top-right, and bottom-left eyes. */
   eyeOverrides?: EyeOverrides;
   /** The error correction level. */
