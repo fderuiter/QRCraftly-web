@@ -249,7 +249,7 @@ export const contentRegistry: Record<string, ToolContent> = {
     "id": "payment-qr-code",
     "name": "Payment QR Code Generator",
     "url": getPublicDomain() + "/payment-qr-code",
-    "description": "Make a payment QR code for crypto, SEPA bank transfers, PayPal, Venmo or Cash App. Free, no ads, no sign-up, and nothing leaves your browser.",
+    "description": "Make a payment QR code for crypto, SEPA transfers, UPI, PayPal, Venmo or Cash App. Free, no ads, no sign-up, and nothing leaves your browser.",
     "seoTitle": "Free Payment QR Code Generator, Never Expires | QRCraftly",
     "heading": "Free Payment QR Code Generator",
     "image": "/og/payment-qr-code.png",
@@ -257,6 +257,7 @@ export const contentRegistry: Record<string, ToolContent> = {
     "features": [
       "Crypto payment requests",
       "SEPA bank transfers (EPC QR)",
+      "UPI payments in India",
       "PayPal, Venmo and Cash App links",
       "Made in your browser"
     ],

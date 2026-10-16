@@ -44,7 +44,7 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
 - `VCardInput.tsx`: For `QRType.VCARD`. Complex form for contact details supporting vCard 2.1, 3.0, 4.0 (RFC 6350), and MECard formats, with social profile fields (X, LinkedIn, Instagram, Facebook, GitHub) in vCard formats only.
 - `PhoneInput.tsx`: For `QRType.PHONE`. Simple phone number input.
 - `SmsInput.tsx`: For `QRType.SMS`. Phone number and message body.
-- `PaymentInput.tsx`: For `QRType.PAYMENT`. Supports Bitcoin, Ethereum, Solana, Litecoin, SEPA credit transfers (EPC QR), PayPal, Venmo, and Cash App.
+- `PaymentInput.tsx`: For `QRType.PAYMENT`. Supports Bitcoin, Ethereum, Solana, Litecoin, SEPA credit transfers (EPC QR), UPI (India), PayPal, Venmo, and Cash App.
 - `LocationInput.tsx`: For `QRType.LOCATION`. Collects latitude and longitude with support for browser geolocation APIs.
 - `MeetingInput.tsx`: For `QRType.MEETING`. Handles online meeting links for Zoom, Microsoft Teams, and Google Meet, with automatic parsing.
 - `SocialInput.tsx`: For `QRType.SOCIAL`. Configures social media platform username and handle details for Instagram, Twitter / X, TikTok, LinkedIn, YouTube, Facebook, WhatsApp (with multi-line pre-filled message support), and GitHub.

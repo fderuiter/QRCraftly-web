@@ -19,9 +19,9 @@
 import { type PaymentData, CryptoNetwork, QRType, type QRGeneratorContract } from '@/types';
 import { isDangerousUrl, sanitizeInput, REGEX_STRICT_CONTROL_CHARS } from '@/utils/security';
 import { identifyProtocol, safeDecodeURIComponent } from '../protocol';
+import { paymentAmountError, WEI_DECIMALS } from '../paymentAmount';
+import { buildUpiPayload, parseUpiPayload, upiRefusal } from '../upi';
 
-/** Number of wei in one ether (10^18), as used by EIP-681 `value=`. */
-const WEI_DECIMALS = 18;
 
 /**
  * Converts a decimal ether amount to an integer wei string using exact string
@@ -94,46 +94,6 @@ const cleanCashAppHandle = (handle: string): string => {
   return clean;
 };
 
-/** Decimal places each network's amount can carry (BIP-21 and EIP-681 amounts, EPC euro cents). */
-const AMOUNT_DECIMALS: Partial<Record<CryptoNetwork, number>> = {
-  [CryptoNetwork.BITCOIN]: 8,
-  [CryptoNetwork.LITECOIN]: 8,
-  [CryptoNetwork.SOLANA]: 9,
-  [CryptoNetwork.ETHEREUM]: WEI_DECIMALS,
-  [CryptoNetwork.EPC_SEPA]: 2,
-  [CryptoNetwork.PAYPAL]: 2,
-  [CryptoNetwork.VENMO]: 2,
-  [CryptoNetwork.CASH_APP]: 2,
-};
-
-/** EPC069-12: at most EUR 999,999,999.99. */
-const EPC_MAX_AMOUNT = 999999999.99;
-
-/**
- * Says what is wrong with a payment amount, so it is refused instead of encoded as `-1` or
- * `1e3`, or silently dropped (#1283). Amounts are plain decimals (BIP-21 §`amount`) within the network's decimal places.
- * @param amount - The typed amount.
- * @param network - The payment network.
- * @returns A sentence, or `null` when the amount is empty or fine.
- */
-export const paymentAmountError = (amount: string | undefined, network: CryptoNetwork): string | null => {
-  const value = (amount || '').trim();
-  const decimals = AMOUNT_DECIMALS[network];
-  if (!value || decimals === undefined) return null;
-  // The integer and fraction digits are split by a literal '.', so the match is linear.
-  const match = /^(\d{0,15})(?:\.(\d+))?$/.exec(value);
-  if (!match || !/\d/.test(value)) {
-    return 'Enter the amount as a plain number, such as 12.50.';
-  }
-  if ((match[2] || '').length > decimals) {
-    return `This amount can have at most ${decimals} decimal place${decimals === 1 ? '' : 's'}.`;
-  }
-  if (network === CryptoNetwork.EPC_SEPA && Number(value) > EPC_MAX_AMOUNT) {
-    return 'A SEPA transfer code can ask for at most EUR 999,999,999.99.';
-  }
-  return null;
-};
-
 /** Removes control characters (line breaks would shift every EPC field after them). */
 const epcText = (value: string | undefined, maxLength: number): string =>
   (value || '').replace(REGEX_STRICT_CONTROL_CHARS, ' ').trim().slice(0, maxLength);
@@ -152,12 +112,15 @@ export const constructPaymentString = (data: PaymentData): string => {
   }
 
   // An amount the network cannot carry is refused, never encoded or silently dropped (#1283).
-  if (data.network !== CryptoNetwork.EPC_SEPA && paymentAmountError(data.amount, data.network)) {
+  if (paymentRefusal(data) !== null) {
     return '';
   }
 
+  if (data.network === CryptoNetwork.UPI) {
+    return buildUpiPayload(data);
+  }
+
   if (data.network === CryptoNetwork.EPC_SEPA) {
-    if (sepaRefusal(data) !== null) return '';
     const iban = cleanIban(data.iban || data.address || '');
     // EPC fields are plain lines, so `?` and `&` are ordinary text here (`A? B & Co`).
     const name = epcText(data.name, 70);
@@ -310,6 +273,9 @@ export const hydratePaymentData = (raw: string): PaymentData => {
     }
   }
 
+  const upi = parseUpiPayload(raw);
+  if (upi) return upi;
+
   // 2. Fiat Payment Links (PayPal, Venmo, Cash App)
   if (/paypal\.me\//i.test(raw)) {
     const idx = raw.toLowerCase().indexOf('paypal.me/');
@@ -416,7 +382,7 @@ export const hydratePaymentData = (raw: string): PaymentData => {
  * @param data - Payment input data.
  * @returns Violation code string or null if valid/empty.
  */
-export const sepaRefusal = (data: PaymentData): string | null => {
+const sepaRefusal = (data: PaymentData): string | null => {
   if (!data || data.network !== CryptoNetwork.EPC_SEPA) {
     return null;
   }
@@ -446,6 +412,18 @@ export const sepaRefusal = (data: PaymentData): string | null => {
   return null;
 };
 
+/**
+ * Says why a payment form cannot make a code: a SEPA or UPI form missing a required field, or an
+ * amount its network cannot carry. The one check behind the form, the preview and `validate` (#1436).
+ * @param data - Payment form data.
+ * @returns A violation code, or `null` when the form is empty or makes a code.
+ */
+export const paymentRefusal = (data: PaymentData): string | null => {
+  if (data.network === CryptoNetwork.EPC_SEPA) return sepaRefusal(data);
+  if (data.network === CryptoNetwork.UPI) return upiRefusal(data);
+  return paymentAmountError(data.amount, data.network) ? 'PAYMENT_AMOUNT_VIOLATION' : null;
+};
+
 export const PaymentContract: QRGeneratorContract<PaymentData> = {
   type: QRType.PAYMENT,
   construct: constructPaymentString,
@@ -456,14 +434,9 @@ export const PaymentContract: QRGeneratorContract<PaymentData> = {
     if (raw && isDangerousUrl(raw)) {
       violations.push('URI_INJECTION_VIOLATION');
     }
-    const data = hydratePaymentData(raw);
-    if (data.network === CryptoNetwork.EPC_SEPA) {
-      const refusal = sepaRefusal(data);
-      if (refusal) {
-        violations.push(refusal);
-      }
-    } else if (paymentAmountError(data.amount, data.network)) {
-      violations.push('PAYMENT_AMOUNT_VIOLATION');
+    const refusal = paymentRefusal(hydratePaymentData(raw));
+    if (refusal) {
+      violations.push(refusal);
     }
     return violations;
   },

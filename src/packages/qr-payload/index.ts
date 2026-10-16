@@ -66,7 +66,9 @@ export { VCardContract, constructVCardString, hydrateVCardData, CARD_FIELDS, car
 export { VCARD_SOCIAL_FIELDS, VCARD_SOCIAL_NETWORKS, socialProfileUrl, type VCardSocialField } from './lib/vcardSocial';
 export { constructPhoneString, hydratePhoneData, droppedPhoneCharacters } from './lib/generators/phone';
 export { SmsContract, constructSmsString, hydrateSmsData } from './lib/generators/sms';
-export { PaymentContract, constructPaymentString, hydratePaymentData, paymentAmountError, sepaRefusal } from './lib/generators/payment';
+export { PaymentContract, constructPaymentString, hydratePaymentData, paymentRefusal } from './lib/generators/payment';
+export { paymentAmountError } from './lib/paymentAmount';
+export { upiVpaError, UPI_NAME_MAX_LENGTH } from './lib/upi';
 export { EventContract, constructEventString, hydrateEventData } from './lib/generators/event';
 export { UrlContract, constructUrlString } from './lib/generators/url';
 export { constructTextString, hydrateTextData } from './lib/generators/text';
