@@ -77,6 +77,7 @@ export const WifiEncryption = {
   WEP: 'WEP',
   NOPASS: 'nopass',
   WPA2_EAP: 'WPA2-EAP',
+  SAE: 'SAE',
 } as const;
 export type WifiEncryption = (typeof WifiEncryption)[keyof typeof WifiEncryption];
 
