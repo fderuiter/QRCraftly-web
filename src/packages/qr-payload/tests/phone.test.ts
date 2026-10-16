@@ -17,7 +17,8 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { constructPhoneString, hydratePhoneData } from '../index';
+import { PhoneContract, constructPhoneString, hydratePhoneData, validatePayload } from '../index';
+import { QRType } from '@/types';
 
 describe('Phone generator', () => {
   it('constructs and hydrates successfully', () => {
@@ -37,5 +38,34 @@ describe('Phone generator', () => {
   it('hydrates empty object when given invalid string', () => {
     const hydrated = hydratePhoneData('invalid-string');
     expect(hydrated).toEqual({ number: '' });
+  });
+
+  describe('Phone input validation rules', () => {
+    it('accepts valid phone numbers, extensions, USSD codes, and pauses', () => {
+      expect(PhoneContract.validate?.('tel:+1234567890')).toEqual([]);
+      expect(PhoneContract.validate?.('tel:+1234567890;ext=89')).toEqual([]);
+      expect(PhoneContract.validate?.('tel:*%2306%23')).toEqual([]); // decoded as *#06#
+      expect(PhoneContract.validate?.('tel:123,456')).toEqual([]);
+      expect(PhoneContract.validate?.('tel:+1%20555%20123%204567')).toEqual([]);
+    });
+
+    it('rejects numbers containing letters in the main number part', () => {
+      const invalidUri = 'tel:+1555abc1234';
+      const violations = PhoneContract.validate?.(invalidUri);
+      expect(violations).toContain('PHONE_STRUCTURE_VIOLATION');
+      expect(validatePayload(invalidUri, QRType.PHONE)).toContain('PHONE_STRUCTURE_VIOLATION');
+    });
+
+    it('rejects numbers containing invalid or non-dialable symbols', () => {
+      const invalidUri = 'tel:+15551234567<script>alert(1)</script>';
+      const violations = PhoneContract.validate?.(invalidUri);
+      expect(violations).toContain('PHONE_STRUCTURE_VIOLATION');
+    });
+
+    it('rejects numbers containing line breaks', () => {
+      const invalidUri = 'tel:+15551234567\n+15559876543';
+      const violations = PhoneContract.validate?.(invalidUri);
+      expect(violations).toContain('PHONE_STRUCTURE_VIOLATION');
+    });
   });
 });

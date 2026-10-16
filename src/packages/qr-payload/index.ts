@@ -63,7 +63,7 @@ export {
 export { WifiContract, constructWifiString, hydrateWifiData } from './lib/generators/wifi';
 export { EmailContract, constructEmailString, hydrateEmailData } from './lib/generators/email';
 export { VCardContract, constructVCardString, hydrateVCardData } from './lib/generators/vcard';
-export { constructPhoneString, hydratePhoneData, droppedPhoneCharacters } from './lib/generators/phone';
+export { PhoneContract, constructPhoneString, hydratePhoneData, droppedPhoneCharacters } from './lib/generators/phone';
 export { SmsContract, constructSmsString, hydrateSmsData } from './lib/generators/sms';
 export { PaymentContract, constructPaymentString, hydratePaymentData, paymentAmountError } from './lib/generators/payment';
 export { EventContract, constructEventString, hydrateEventData } from './lib/generators/event';
