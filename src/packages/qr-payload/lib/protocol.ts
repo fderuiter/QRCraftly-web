@@ -18,6 +18,7 @@
 
 import { CalendarProvider, QRType, SocialPlatform } from '@/types';
 import { splitCompoundField } from './rfcHelper';
+import { isRebuildableUpiPayload } from './upi';
 
 /**
  * Matches a `geo:` URI the Location form can show in full: two coordinates and nothing else.
@@ -377,6 +378,7 @@ export const identifyProtocol = (raw: string): QRType | null => {
   if (/begin:v(event|calendar)/i.test(trimmed)) return QRType.EVENT;
   if (/^(bitcoin|ethereum|litecoin|solana):/i.test(trimmed)) return QRType.PAYMENT;
   if (/^BCD\r?\n/i.test(trimmed)) return QRType.PAYMENT;
+  if (isRebuildableUpiPayload(trimmed)) return QRType.PAYMENT;
   if (/^(https?:\/\/)?(www\.)?(paypal\.me|cash\.app|venmo\.com)\//i.test(trimmed)) return QRType.PAYMENT;
 
   const parsed = parseProtocol(trimmed);

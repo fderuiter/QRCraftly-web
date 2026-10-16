@@ -17,7 +17,14 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { constructPaymentString, hydratePaymentData, PaymentContract, sepaRefusal } from '../index';
+import {
+  constructPaymentString,
+  describeViolation,
+  hydratePaymentData,
+  identifyProtocol,
+  PaymentContract,
+  paymentRefusal,
+} from '../index';
 import { CryptoNetwork, QRType, type PaymentData } from '@/types';
 
 describe('Payment generator', () => {
@@ -178,7 +185,7 @@ describe('Payment generator', () => {
     });
   });
 
-  describe('sepaRefusal', () => {
+  describe('paymentRefusal', () => {
     it('returns null for empty or whitespace-only SEPA data', () => {
       const emptyData: PaymentData = {
         network: CryptoNetwork.EPC_SEPA,
@@ -189,7 +196,7 @@ describe('Payment generator', () => {
         bic: '   ',
         label: '   ',
       };
-      expect(sepaRefusal(emptyData)).toBeNull();
+      expect(paymentRefusal(emptyData)).toBeNull();
     });
 
     it('returns SEPA_NAME_VIOLATION when IBAN is present but name is missing', () => {
@@ -200,7 +207,7 @@ describe('Payment generator', () => {
         amount: '',
         label: '',
       };
-      expect(sepaRefusal(data)).toBe('SEPA_NAME_VIOLATION');
+      expect(paymentRefusal(data)).toBe('SEPA_NAME_VIOLATION');
     });
 
     it('returns SEPA_IBAN_VIOLATION when name is present but IBAN is missing', () => {
@@ -211,7 +218,7 @@ describe('Payment generator', () => {
         amount: '',
         label: '',
       };
-      expect(sepaRefusal(data)).toBe('SEPA_IBAN_VIOLATION');
+      expect(paymentRefusal(data)).toBe('SEPA_IBAN_VIOLATION');
     });
 
     it('returns PAYMENT_AMOUNT_VIOLATION when amount is invalid', () => {
@@ -222,7 +229,7 @@ describe('Payment generator', () => {
         amount: '10.123',
         label: '',
       };
-      expect(sepaRefusal(data)).toBe('PAYMENT_AMOUNT_VIOLATION');
+      expect(paymentRefusal(data)).toBe('PAYMENT_AMOUNT_VIOLATION');
     });
 
     it('returns null when IBAN checksum is invalid but name and amount are valid', () => {
@@ -233,7 +240,7 @@ describe('Payment generator', () => {
         amount: '10.00',
         label: '',
       };
-      expect(sepaRefusal(data)).toBeNull();
+      expect(paymentRefusal(data)).toBeNull();
     });
 
     it('returns null for complete valid SEPA data', () => {
@@ -244,7 +251,7 @@ describe('Payment generator', () => {
         amount: '10.00',
         label: '',
       };
-      expect(sepaRefusal(data)).toBeNull();
+      expect(paymentRefusal(data)).toBeNull();
     });
   });
 
@@ -330,5 +337,136 @@ describe('Payment generator', () => {
 
     // Dangerous validation
     expect(PaymentContract.validate?.('javascript:alert(1)')).toEqual(['URI_INJECTION_VIOLATION']);
+  });
+});
+
+describe('UPI payment preset (#1469)', () => {
+  const upi = (overrides: Partial<PaymentData> = {}): PaymentData => ({
+    network: CryptoNetwork.UPI,
+    address: 'jane@okaxis',
+    name: 'Jane Doe',
+    amount: '',
+    label: '',
+    ...overrides,
+  });
+
+  describe('constructPaymentString', () => {
+    it('builds a upi://pay link with a literal @, cu=INR and encoded name and note', () => {
+      expect(
+        constructPaymentString({
+          network: CryptoNetwork.UPI,
+          address: 'jane@okaxis',
+          name: 'Jane Doe',
+          amount: '250.50',
+          label: 'Rent & bills',
+        })
+      ).toBe('upi://pay?pa=jane@okaxis&pn=Jane%20Doe&am=250.50&cu=INR&tn=Rent%20%26%20bills');
+    });
+
+    it('always includes cu=INR and leaves out a blank amount or note', () => {
+      expect(constructPaymentString(upi())).toBe('upi://pay?pa=jane@okaxis&pn=Jane%20Doe&cu=INR');
+      expect(constructPaymentString(upi({ amount: '', label: '' }))).toBe(
+        'upi://pay?pa=jane@okaxis&pn=Jane%20Doe&cu=INR'
+      );
+    });
+
+    it('leaves out a whitespace-only amount or note', () => {
+      expect(constructPaymentString(upi({ amount: '   ', label: ' \t ' }))).toBe(
+        'upi://pay?pa=jane@okaxis&pn=Jane%20Doe&cu=INR'
+      );
+    });
+
+    it('accepts the boundary amounts with two decimal places and refuses a third', () => {
+      expect(constructPaymentString(upi({ amount: '0.01' }))).toContain('&am=0.01&cu=INR');
+      expect(constructPaymentString(upi({ amount: '12.34' }))).toContain('&am=12.34&cu=INR');
+      expect(constructPaymentString(upi({ amount: '12.345' }))).toBe('');
+      expect(paymentRefusal(upi({ amount: '12.345' }))).toBe('PAYMENT_AMOUNT_VIOLATION');
+    });
+
+    it('turns control characters in the name into spaces and trims them', () => {
+      expect(constructPaymentString(upi({ name: 'Jane\nDoe' }))).toBe(
+        'upi://pay?pa=jane@okaxis&pn=Jane%20Doe&cu=INR'
+      );
+      expect(constructPaymentString(upi({ name: '  Jane\u0000  ' }))).toBe(
+        'upi://pay?pa=jane@okaxis&pn=Jane&cu=INR'
+      );
+    });
+
+    it('turns control characters in the note into spaces and trims them', () => {
+      expect(constructPaymentString(upi({ label: 'Rent\r\nMay\t' }))).toBe(
+        'upi://pay?pa=jane@okaxis&pn=Jane%20Doe&cu=INR&tn=Rent%20May'
+      );
+    });
+
+    it.each(['jane', 'jane@', '@okaxis', 'j@okaxis', 'jane@ok axis'])(
+      'refuses the UPI ID %j',
+      (address) => {
+        expect(constructPaymentString(upi({ address }))).toBe('');
+        expect(paymentRefusal(upi({ address }))).toBe('UPI_VPA_VIOLATION');
+      }
+    );
+
+    it.each(['', '   ', '\n\t'])('refuses a blank payee name %j with a valid UPI ID', (name) => {
+      expect(constructPaymentString(upi({ name }))).toBe('');
+      expect(paymentRefusal(upi({ name }))).toBe('UPI_NAME_VIOLATION');
+    });
+
+    it('treats an all-blank or all-whitespace UPI form as empty, not refused', () => {
+      const empty = upi({ address: '', name: '', amount: '', label: '' });
+      const blank = upi({ address: '   ', name: '   ', amount: '   ', label: '   ' });
+      expect(paymentRefusal(empty)).toBeNull();
+      expect(paymentRefusal(blank)).toBeNull();
+      expect(constructPaymentString(empty)).toBe('');
+      expect(constructPaymentString(blank)).toBe('');
+    });
+  });
+
+  describe('hydratePaymentData', () => {
+    it('hydrates a full form back to the same data', () => {
+      const data = upi({ amount: '250.50', label: 'Rent & bills' });
+      expect(hydratePaymentData(constructPaymentString(data))).toEqual(data);
+    });
+
+    it('hydrates a form without amount or note back to the same data', () => {
+      const data = upi({ amount: '', label: '' });
+      expect(hydratePaymentData(constructPaymentString(data))).toEqual(data);
+    });
+  });
+
+  describe('identifyProtocol', () => {
+    it('identifies a link the form can rebuild byte for byte as PAYMENT', () => {
+      expect(identifyProtocol('upi://pay?pa=jane@okaxis&pn=Jane&cu=INR')).toBe(QRType.PAYMENT);
+      expect(identifyProtocol(constructPaymentString(upi({ amount: '250.50', label: 'Rent' })))).toBe(
+        QRType.PAYMENT
+      );
+    });
+
+    it.each([
+      ['a currency other than INR', 'upi://pay?pa=jane@okaxis&pn=Jane&cu=USD'],
+      ['a merchant code', 'upi://pay?pa=jane@okaxis&pn=Jane&cu=INR&mc=1234'],
+      ['an encoded @ in the UPI ID', 'upi://pay?pa=jane%40okaxis&pn=Jane&cu=INR'],
+      ['no payee name', 'upi://pay?pa=jane@okaxis&cu=INR'],
+    ])('identifies a link with %s as TEXT', (_label, raw) => {
+      expect(identifyProtocol(raw)).toBe(QRType.TEXT);
+    });
+  });
+
+  describe('PaymentContract', () => {
+    it('flags a UPI link without a payee name', () => {
+      expect(PaymentContract.validate?.('upi://pay?pa=jane@okaxis&cu=INR')).toContain('UPI_NAME_VIOLATION');
+    });
+
+    it('raises no violation for a complete UPI link', () => {
+      expect(PaymentContract.validate?.('upi://pay?pa=jane@okaxis&pn=Jane%20Doe&cu=INR')).toEqual([]);
+    });
+  });
+
+  describe('describeViolation', () => {
+    it.each(['UPI_VPA_VIOLATION', 'UPI_NAME_VIOLATION'])('describes %s as a sentence, not the raw code', (code) => {
+      const message = describeViolation(code);
+      expect(message).not.toBe(code);
+      expect(message).toMatch(/\s/);
+      expect(message).toMatch(/\.$/);
+    });
   });
 });

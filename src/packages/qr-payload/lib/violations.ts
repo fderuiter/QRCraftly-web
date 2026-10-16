@@ -33,6 +33,8 @@ const VIOLATION_MESSAGES: Record<string, string> = {
   PAYMENT_AMOUNT_VIOLATION: 'The payment amount must be a plain number, within the decimal places its network allows.',
   SEPA_IBAN_VIOLATION: 'A SEPA transfer code needs an IBAN.',
   SEPA_NAME_VIOLATION: "A SEPA transfer code needs the beneficiary's name.",
+  UPI_VPA_VIOLATION: 'A UPI payment code needs a UPI ID in the form name@bank.',
+  UPI_NAME_VIOLATION: "A UPI payment code needs the payee's name.",
   SMS_PHONE_STRUCTURE_VIOLATION: 'SMS phone number contains invalid characters, letters, or line-breaks.',
 };
 
