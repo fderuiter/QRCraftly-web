@@ -98,6 +98,10 @@ export default defineConfig(({ command }) => {
         jsx: 'automatic',
         jsxImportSource: 'react',
         jsxDev: command === 'serve',
+        // Third-party license headers stay out of the shipped chunks: /third-party-licenses.txt
+        // carries every shipped package's full license text, and the inline copies cost about
+        // 2 KB gzipped of every page's first load.
+        legalComments: 'none',
       },
       optimizeDeps: {
         esbuildOptions: {

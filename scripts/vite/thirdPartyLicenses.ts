@@ -372,13 +372,12 @@ function collect(bundle: Rollup.OutputBundle, seen: Seen, unknown: Set<string>):
         if ('unknown' in owner) unknown.add(owner.unknown);
         else add(owner.name, owner.dir);
       }
-    } else if (output.fileName.endsWith('.css')) {
-      // Tailwind compiles its base styles into the site's CSS and marks them with a banner.
-      const css = typeof output.source === 'string' ? output.source : new TextDecoder().decode(output.source);
-      if (/\/\*! tailwindcss v/.test(css)) add('tailwindcss');
     }
   }
 }
+
+/** A stylesheet that imports Tailwind, which compiles Tailwind's base styles into the site's CSS. */
+const TAILWIND_IMPORT = /@import\s+['"]tailwindcss['"]/;
 
 /**
  * Compares the packages in the client bundle with the committed list and the installed copies.
@@ -434,6 +433,18 @@ export function shippedPackages(): { plugin: Plugin; workerPlugin: () => Plugin 
     enforce: 'post',
     configResolved(config) {
       root = config.root;
+    },
+    transform: {
+      // Read the stylesheet's source before PostCSS compiles it: the build drops license comments
+      // from what it ships (third-party-licenses.txt carries the texts), so the minified CSS no
+      // longer has Tailwind's banner to find.
+      order: 'pre',
+      handler(code, id) {
+        if (this.environment.config.consumer === 'client' && /\.css(?:$|\?)/.test(id) && TAILWIND_IMPORT.test(code)) {
+          seen.set('tailwindcss', new Set([undefined]));
+        }
+        return undefined;
+      },
     },
     resolveId(id) {
       return id === VIRTUAL_ID ? RESOLVED_VIRTUAL_ID : undefined;
