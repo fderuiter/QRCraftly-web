@@ -187,7 +187,7 @@ describe('Modular Accessibility Test Helpers & Full Panel Sweep', () => {
   });
 
   // Requirement 5 / AC 5: Programmatic Style Sections Expansion Helper
-  it('utilizes custom helper to programmatically expand all style sections and checks interactive sequence compliance', () => {
+  it('utilizes custom helper to programmatically expand all style sections and checks interactive sequence compliance', async () => {
     const mockOnChange = vi.fn();
     
     // Initial configuration with Border disabled and Template Style as NONE
@@ -211,6 +211,8 @@ describe('Modular Accessibility Test Helpers & Full Panel Sweep', () => {
       templateStyle: TemplateStyle.SOLID_FRAME,
     };
     rerender(<StyleControls config={expandedConfig} onChange={mockOnChange} />);
+    // Layout & Border loads its controls the first time it opens.
+    await screen.findByPlaceholderText('Headline (e.g. Scan Me!)');
 
     // Validate Advanced Mode has expanded
     const advancedToggle = screen.getByRole('button', { name: /Advanced Mode/i });
