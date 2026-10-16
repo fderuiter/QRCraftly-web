@@ -240,3 +240,22 @@ describe('post-merge production check (#1217)', () => {
     expect(job).not.toContain('continue-on-error');
   });
 });
+
+describe('visual baseline refresh (#1426)', () => {
+  const workflow = read('.github/workflows/update-snapshots.yml');
+
+  it('runs from a label or by hand, and never on main or a fork PR', () => {
+    expect(workflow).toMatch(/pull_request:\n\s+types: \[labeled\]/);
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain("github.ref != 'refs/heads/main'");
+    expect(workflow).toContain("github.event.label.name == 'update-snapshots'");
+    expect(workflow).toContain('github.event.pull_request.head.repo.full_name == github.repository');
+  });
+
+  it('runs only the visual spec and commits only its baselines', () => {
+    expect(workflow).toContain('pnpm exec playwright test e2e/visual-regression.spec.ts');
+    expect(workflow).toContain('--update-snapshots');
+    expect(workflow).toContain('git add e2e/visual-regression.spec.ts-snapshots');
+    expect(workflow).not.toMatch(/git add (-A|\.|--all)/);
+  });
+});

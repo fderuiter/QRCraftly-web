@@ -1,0 +1,118 @@
+name: Update Visual Baselines
+
+# Regenerates the Playwright visual-regression screenshots (e2e/visual-regression.spec.ts)
+# on a CI runner, so the baselines carry the same fonts and rendering that E2E compares
+# against. Screenshots taken on a laptop or in a cloud session never match CI.
+#
+# Two ways to run it, both on a branch, never on main:
+# - add the `update-snapshots` label to a pull request from this repository;
+# - run it by hand on a branch (Actions > Update Visual Baselines > Run workflow).
+# It commits the changed baselines to that branch. A commit pushed with GITHUB_TOKEN does
+# not start CI, so push again or mark the PR ready for review to get CI on the new commit.
+# Only the visual spec runs (a few minutes), not the whole E2E suite (ADR 0050).
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      projects:
+        description: 'Playwright projects to refresh, separated by spaces'
+        type: string
+        default: 'chromium firefox webkit'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-snapshots-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Update visual baselines
+    # Fork PRs get a read-only token and cannot receive the commit, so only same-repo PRs run.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.event.label.name == 'update-snapshots' &&
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # commit the new baselines to the branch
+      pull-requests: write # remove the label once done
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The branch itself, not the PR merge commit, so the commit can be pushed back.
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          cache-playwright: 'true'
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Choose projects
+        id: projects
+        env:
+          REQUESTED: ${{ inputs.projects }}
+        run: |
+          projects="${REQUESTED:-chromium firefox webkit}"
+          for project in $projects; do
+            case "$project" in
+              chromium|firefox|webkit) ;;
+              *) echo "::error::Unknown project '$project' (use chromium, firefox or webkit)"; exit 1 ;;
+            esac
+          done
+          echo "list=$projects" >> "$GITHUB_OUTPUT"
+
+      - name: Install Playwright Browsers
+        timeout-minutes: 13
+        env:
+          PROJECTS: ${{ steps.projects.outputs.list }}
+        run: |
+          read -ra browsers <<< "$PROJECTS"
+          bash scripts/ci/install_playwright.sh "${browsers[@]}"
+
+      - name: Regenerate baselines
+        env:
+          PLAYWRIGHT_USE_EXISTING_BUILD: "true"
+          PROJECTS: ${{ steps.projects.outputs.list }}
+        run: |
+          read -ra projects <<< "$PROJECTS"
+          args=()
+          for project in "${projects[@]}"; do args+=("--project=$project"); done
+          pnpm exec playwright test e2e/visual-regression.spec.ts "${args[@]}" --update-snapshots --retries=0
+
+      - name: Commit changed baselines
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          PROJECTS: ${{ steps.projects.outputs.list }}
+        run: |
+          git add e2e/visual-regression.spec.ts-snapshots
+          if git diff --cached --quiet; then
+            echo "Baselines already match this branch; nothing to commit." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git diff --cached --stat >> "$GITHUB_STEP_SUMMARY"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "test(e2e): refresh visual baselines on CI ($PROJECTS)"
+          git push origin "HEAD:$BRANCH"
+
+      - name: Remove label
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: gh pr edit "$PR" --repo "$REPO" --remove-label update-snapshots || true
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: update-snapshots-results
+          path: test-results/
+          retention-days: 7
