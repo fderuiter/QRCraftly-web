@@ -24,7 +24,7 @@
     "tests/scripts/boundaries/fixtures/**"
   ],
   "ignoreIssues": {
-    "src/packages/*/*.ts": ["exports", "types"],
+    "src/packages/*/*.ts": ["types"],
     "src/packages/scannability/**": ["exports", "types"]
   },
   "ignoreBinaries": ["shellcheck", "semgrep"],
