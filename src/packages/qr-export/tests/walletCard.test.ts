@@ -114,4 +114,30 @@ describe('Wallet card (ADR 0048)', () => {
     expect(walletRefusalReason(QRType.WIFI)).toBeNull();
     expect(walletRefusalReason(QRType.URL)).toBeNull();
   });
+
+  it('consolidates dark module runs into fewer fillRect calls', () => {
+    const modules = modulesOf('https://qrcraftly.com');
+    const plan = planWalletCard(modules, {}, measure);
+    let fillRectCount = 0;
+    let darkModuleCount = 0;
+    for (let r = 0; r < modules.size; r++) {
+      for (let c = 0; c < modules.size; c++) {
+        if (modules.get(r, c)) darkModuleCount++;
+      }
+    }
+    const ctx: WalletCardContext = {
+      fillStyle: '',
+      font: '',
+      textAlign: 'center',
+      textBaseline: 'alphabetic',
+      fillText: () => undefined,
+      fillRect: () => {
+        fillRectCount++;
+      },
+    };
+    paintWalletCard(ctx, plan);
+    // Subtract 1 for the background fillRect call
+    const moduleFillRects = fillRectCount - 1;
+    expect(moduleFillRects).toBeLessThan(darkModuleCount * 0.5);
+  });
 });

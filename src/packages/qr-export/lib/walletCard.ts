@@ -165,7 +165,7 @@ export function planWalletCard(modules: QRModules, text: WalletCardText, measure
 /** The drawing calls the card needs, so it can be painted onto any 2D context. */
 export type WalletCardContext = Pick<CanvasRenderingContext2D, 'fillStyle' | 'font' | 'textAlign' | 'textBaseline' | 'fillRect' | 'fillText'>;
 
-/** Paints a planned card: white paper, the text, then one square per dark module. */
+/** Paints a planned card: white paper, the text, then horizontal runs of dark modules. */
 export function paintWalletCard(ctx: WalletCardContext, plan: WalletCardPlan): void {
   ctx.fillStyle = PAPER;
   ctx.fillRect(0, 0, plan.width, plan.height);
@@ -179,8 +179,17 @@ export function paintWalletCard(ctx: WalletCardContext, plan: WalletCardPlan): v
   ctx.fillStyle = INK;
   const { modules, moduleSize, originX, originY } = plan;
   for (let row = 0; row < modules.size; row++) {
+    let runStart = -1;
     for (let col = 0; col < modules.size; col++) {
-      if (modules.get(row, col)) ctx.fillRect(originX + col * moduleSize, originY + row * moduleSize, moduleSize, moduleSize);
+      if (modules.get(row, col)) {
+        if (runStart < 0) runStart = col;
+      } else if (runStart >= 0) {
+        ctx.fillRect(originX + runStart * moduleSize, originY + row * moduleSize, (col - runStart) * moduleSize, moduleSize);
+        runStart = -1;
+      }
+    }
+    if (runStart >= 0) {
+      ctx.fillRect(originX + runStart * moduleSize, originY + row * moduleSize, (modules.size - runStart) * moduleSize, moduleSize);
     }
   }
 }
