@@ -29,6 +29,7 @@ export const PLAIN_GEO_URI = /^geo:([-+]?\d{1,3}(?:\.\d+)?),([-+]?\d{1,3}(?:\.\d
 export interface SocialProfile {
   platform: SocialPlatform;
   handle: string;
+  message?: string;
 }
 
 /** Hosts whose profile URLs the Social form builds, after `www.`, `m.` or `mobile.` is removed. */
@@ -58,23 +59,31 @@ const HANDLE_PATTERN = /^[A-Za-z0-9_.-]+$/;
  * Reads a social profile link that the Social form can rebuild without losing anything. Posts,
  * share links, searches, short-link hosts and links with a query or fragment are not profiles,
  * so they return `null` and stay Website codes (#1282).
+ *
+ * For WhatsApp (`wa.me`), a query is accepted only when its only key is `text` and its
+ * decoded value is non-blank, at most 256 characters, and equal to its own `trim()`.
  * @param parsed - The parsed `http`/`https` URL.
  * @returns The platform and handle, or `null`.
  */
 export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null => {
   if (parsed.scheme !== 'http' && parsed.scheme !== 'https') return null;
-  if (parsed.params.size > 0 || parsed.path.includes('#')) return null;
+  if (parsed.path.includes('#')) return null;
 
   const [rawHost, ...rest] = parsed.path.split('/');
   const host = rawHost.toLowerCase().replace(/^(?:www|m|mobile)\./, '');
   const platform = PROFILE_HOSTS[host];
   if (!platform) return null;
 
+  // Non-WhatsApp profile URLs reject query parameters
+  if (platform !== SocialPlatform.WHATSAPP && parsed.params.size > 0) return null;
+
   // One trailing slash is fine; empty segments elsewhere are not.
   const segments = rest.length > 0 && rest[rest.length - 1] === '' ? rest.slice(0, -1) : rest;
   if (segments.some((segment) => segment === '')) return null;
 
   let handle: string | undefined;
+  let message: string | undefined;
+
   switch (platform) {
     case SocialPlatform.LINKEDIN:
       if (segments.length === 2 && segments[0] === 'in') handle = segments[1];
@@ -84,7 +93,19 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
       if (segments.length === 1 && segments[0].startsWith('@')) handle = segments[0].substring(1);
       break;
     case SocialPlatform.WHATSAPP:
-      if (segments.length === 1 && /^\d+$/.test(segments[0])) handle = segments[0];
+      if (segments.length === 1 && /^\d+$/.test(segments[0])) {
+        handle = segments[0];
+      }
+      if (handle && parsed.params.size > 0) {
+        if (parsed.params.size !== 1 || !parsed.params.has('text')) {
+          return null;
+        }
+        const textParam = parsed.params.get('text');
+        if (!textParam || textParam !== textParam.trim() || textParam.length > 256) {
+          return null;
+        }
+        message = textParam;
+      }
       break;
     default:
       if (segments.length === 1 && !RESERVED_SEGMENTS[platform]?.has(segments[0].toLowerCase())) {
@@ -92,7 +113,9 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
       }
   }
 
-  return handle && HANDLE_PATTERN.test(handle) ? { platform, handle } : null;
+  if (!handle || !HANDLE_PATTERN.test(handle)) return null;
+
+  return message !== undefined ? { platform, handle, message } : { platform, handle };
 };
 
 /**

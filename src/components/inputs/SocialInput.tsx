@@ -1,6 +1,6 @@
 import React from "react";
 import { type SocialData, SocialPlatform } from "../../types";
-import { TextField, SelectField } from "../ui/FormFields";
+import { TextField, SelectField, TextAreaField } from "../ui/FormFields";
 import { FormBlock } from "../ui/FormBlock";
 
 interface SocialInputProps {
@@ -38,6 +38,19 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
         onChange={(e) => onChange({ handle: e.target.value })}
         showCharCount
       />
+      {data.platform === SocialPlatform.WHATSAPP && (
+        <TextAreaField
+          id="social-message"
+          label="Pre-filled Message"
+          contextualLabel="Optional"
+          placeholder="Enter pre-filled message..."
+          rows={3}
+          maxLength={256}
+          value={data.message || ""}
+          onChange={(e) => onChange({ message: e.target.value })}
+          showCharCount
+        />
+      )}
     </FormBlock>
   );
 };

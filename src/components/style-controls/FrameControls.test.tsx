@@ -20,6 +20,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { FrameControls } from './FrameControls';
+import { axe } from '../../../tests/utils/axe';
 import { DEFAULT_CONFIG } from '@/constants';
 import type { QRConfig } from '@/types';
 
@@ -43,7 +44,7 @@ describe('FrameControls Component', () => {
     expect(onChange).toHaveBeenCalledWith({ frameStyle: 'pill' });
   });
 
-  it('renders text, icon, and position fields when frame is enabled', () => {
+  it('renders text, icon, font, and position fields when frame is enabled', () => {
     const onChange = vi.fn();
     const config: QRConfig = {
       ...(DEFAULT_CONFIG as QRConfig),
@@ -58,6 +59,33 @@ describe('FrameControls Component', () => {
     expect(screen.getByLabelText('Position')).toBeInTheDocument();
     expect(screen.getByLabelText('Badge Icon')).toBeInTheDocument();
     expect(screen.getByLabelText('Call to Action Text')).toBeInTheDocument();
+    expect(screen.getByLabelText('Badge Font')).toBeInTheDocument();
+  });
+
+  it('triggers onChange when frame font family changes', () => {
+    const onChange = vi.fn();
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      frameStyle: 'pill',
+      frameFontFamily: 'sans-serif',
+    };
+
+    render(<FrameControls config={config} onChange={onChange} />);
+
+    const fontSelect = screen.getByLabelText('Badge Font');
+    fireEvent.change(fontSelect, { target: { value: 'serif' } });
+
+    expect(onChange).toHaveBeenCalledWith({ frameFontFamily: 'serif' });
+  });
+
+  it('describes the badge font select with its export note and has no axe violations', async () => {
+    const config: QRConfig = { ...(DEFAULT_CONFIG as QRConfig), frameStyle: 'pill', frameText: 'SCAN ME' };
+    const { container } = render(<FrameControls config={config} onChange={vi.fn()} />);
+
+    expect(screen.getByLabelText('Badge Font')).toHaveAccessibleDescription(
+      'PDF and EPS exports always use Helvetica.',
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('shows low contrast warning when frame text contrast is below 4.5:1', () => {

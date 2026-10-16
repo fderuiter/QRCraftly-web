@@ -53,7 +53,6 @@ export {
   planWalletCard,
   renderWalletCard,
   walletRefusalReason,
-  WalletCardRefusedError,
   WALLET_CARD_SIZE,
   WALLET_CARD_TEXT_LIMITS,
   type MeasureText,

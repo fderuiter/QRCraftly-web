@@ -77,6 +77,7 @@ export const WifiEncryption = {
   WEP: 'WEP',
   NOPASS: 'nopass',
   WPA2_EAP: 'WPA2-EAP',
+  SAE: 'SAE',
 } as const;
 export type WifiEncryption = (typeof WifiEncryption)[keyof typeof WifiEncryption];
 
@@ -247,6 +248,8 @@ export interface QRConfig {
   framePosition?: FramePosition;
   /** Optional icon to display inside the frame badge. */
   frameIcon?: FrameIcon;
+  /** Typography font family for the frame badge text. */
+  frameFontFamily?: FrameFontFamily;
   /** Type of gradient fill applied to QR code modules ('none', 'linear', or 'radial'). */
   gradientType?: GradientType;
   /** Sequence of color stops defining the gradient fill. */
@@ -269,6 +272,22 @@ export type FramePosition = 'bottom' | 'top' | 'left' | 'right';
  * Defines the optional icon displayed inside the frame CTA badge.
  */
 export type FrameIcon = 'none' | 'scan' | 'camera' | 'star' | 'heart' | 'info' | 'phone';
+
+/**
+ * Available typography font family choices for the outer frame CTA badge.
+ */
+export const FRAME_FONT_FAMILIES = [
+  'sans-serif',
+  'serif',
+  'monospace',
+  'display',
+  'cursive',
+] as const;
+
+/**
+ * Defines the typography font family for the outer frame CTA badge text.
+ */
+export type FrameFontFamily = (typeof FRAME_FONT_FAMILIES)[number];
 
 /**
  * Mosaic QR layout (ADR 0019).
@@ -503,6 +522,8 @@ export interface SocialData {
   platform: SocialPlatform;
   /** The username or handle on the platform. */
   handle: string;
+  /** Optional pre-filled message for WhatsApp links. */
+  message?: string;
 }
 
 /**
@@ -531,6 +552,7 @@ export const TemplateStyle = {
   MINIMALIST: 'minimalist',
   GRADIENT_BLUR: 'gradient_blur',
   SOLID_FRAME: 'solid_frame',
+  WIFI_CARD: 'wifi_card',
 } as const;
 export type TemplateStyle = (typeof TemplateStyle)[keyof typeof TemplateStyle];
 
@@ -544,8 +566,8 @@ export interface BulkCsvData {
   payloadColumn: string;
   /** Selected column for the image filename. */
   filenameColumn: string;
-  /** Output file format ('png' or 'svg'). */
-  exportFormat: 'png' | 'svg';
+  /** Output file format ('png', 'svg', 'eps', or 'pdf'). */
+  exportFormat: 'png' | 'svg' | 'eps' | 'pdf';
   /**
    * How payload cells are read: 'link' normalises each cell like the Link generator, 'text'
    * encodes it as typed. Defaults to 'link'.

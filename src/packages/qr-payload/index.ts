@@ -61,7 +61,7 @@ export {
 
 // Concrete generator contracts & individual helpers
 export { WifiContract, constructWifiString, hydrateWifiData, wifiPassphraseProblem } from './lib/generators/wifi';
-export { EmailContract, constructEmailString, hydrateEmailData } from './lib/generators/email';
+export { EmailContract, constructEmailString, hydrateEmailData, emailListError, type EmailListErrorOptions } from './lib/generators/email';
 export { VCardContract, constructVCardString, hydrateVCardData, CARD_FIELDS, vCardFieldError } from './lib/generators/vcard';
 export { constructPhoneString, hydratePhoneData, droppedPhoneCharacters } from './lib/generators/phone';
 export { SmsContract, constructSmsString, hydrateSmsData } from './lib/generators/sms';

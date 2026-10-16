@@ -57,6 +57,57 @@ describe('WifiInput enterprise (WPA2-EAP) fields', () => {
     render(<WifiInput data={{ ...enterprise, encryption: WifiEncryption.WPA }} onChange={vi.fn()} />);
     expect(screen.queryByLabelText('EAP Method')).not.toBeInTheDocument();
   });
+
+  it('renders WPA3 only (SAE) option and handles selection', () => {
+    const onChange = vi.fn();
+    const wifiData: WifiData = {
+      ssid: 'WPA3Net',
+      password: 'mypassword',
+      encryption: WifiEncryption.WPA,
+      hidden: false,
+    };
+    render(<WifiInput data={wifiData} onChange={onChange} />);
+
+    const select = screen.getByLabelText('Encryption') as HTMLSelectElement;
+    expect(select).toBeInTheDocument();
+
+    const optionLabels = Array.from(select.options).map((opt) => opt.text);
+    expect(optionLabels).toContain('WPA / WPA2 / WPA3 (most networks)');
+    expect(optionLabels).toContain('WPA3 only (SAE)');
+
+    fireEvent.change(select, { target: { value: WifiEncryption.SAE } });
+    expect(onChange).toHaveBeenLastCalledWith({ encryption: WifiEncryption.SAE });
+  });
+
+  it('displays password field when encryption is WPA3 only (SAE)', () => {
+    const wifiData: WifiData = {
+      ssid: 'WPA3Net',
+      password: 'mypassword',
+      encryption: WifiEncryption.SAE,
+      hidden: false,
+    };
+    render(<WifiInput data={wifiData} onChange={vi.fn()} />);
+
+    expect(screen.getByLabelText('Password')).toBeInTheDocument();
+  });
+
+  it('shows field note warning only when SAE encryption is selected', async () => {
+    const warningText = 'Only for WPA3-only networks. Android phones read this; iPhone cameras may not. Choose WPA / WPA2 / WPA3 unless your router is set to WPA3 only.';
+    const wpaData: WifiData = {
+      ssid: 'MyNet',
+      password: 'pass',
+      encryption: WifiEncryption.WPA,
+      hidden: false,
+    };
+    const { container, rerender } = render(<WifiInput data={wpaData} onChange={vi.fn()} />);
+    expect(screen.queryByText(warningText)).not.toBeInTheDocument();
+
+    const saeData: WifiData = { ...wpaData, encryption: WifiEncryption.SAE };
+    rerender(<WifiInput data={saeData} onChange={vi.fn()} />);
+    expect(screen.getByText(warningText)).toBeInTheDocument();
+    expect(screen.getByLabelText('Encryption')).toHaveAccessibleDescription(warningText);
+    expect((await axe(container)).violations).toEqual([]);
+  });
 });
 
 describe('WifiInput WPA passphrase length validation', () => {
