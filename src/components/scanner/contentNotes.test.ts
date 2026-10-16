@@ -71,6 +71,7 @@ describe('scan summaries for codes that are not links (#1158)', () => {
     const scan = describeScan('WIFI:T:WPA;S:Cafe;P:hunter2;;');
     expect(scan.hasSecret).toBe(true);
     expect(scan.summary.find((entry) => entry.label === 'Password')).toMatchObject({ value: 'hunter2', secret: true });
+    expect(row(scan.text, 'Security')?.value).toBe('WPA/WPA2/WPA3');
     expect(scan.displayText).not.toContain('hunter2');
     expect(scan.shareText).not.toContain('hunter2');
     expect(scan.shareText).toContain('S:Cafe');
@@ -78,6 +79,9 @@ describe('scan summaries for codes that are not links (#1158)', () => {
     expect(scan.cautions).toEqual([]);
     expect(cautionsOf('WIFI:T:nopass;S:Lobby;;')).toMatch(/no password/);
     expect(cautionsOf('WIFI:T:WEP;S:Old;P:12345;;')).toMatch(/WEP/);
+
+    const saeScan = describeScan('WIFI:T:SAE;S:WPA3Net;P:saepassword;;');
+    expect(row(saeScan.text, 'Security')?.value).toBe('WPA3 only (SAE)');
   });
 
   it('keeps an escaped semicolon inside a hidden Wi-Fi password', () => {

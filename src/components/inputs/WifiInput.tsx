@@ -46,15 +46,20 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
           }
         >
           <option value={WifiEncryption.WPA}>
-            WPA / WPA2 (Personal)
+            WPA / WPA2 / WPA3 (most networks)
           </option>
           <option value={WifiEncryption.SAE}>
-            WPA3 Personal (SAE)
+            WPA3 only (SAE)
           </option>
           <option value={WifiEncryption.WEP}>WEP (Legacy)</option>
           <option value={WifiEncryption.WPA2_EAP}>WPA2 Enterprise (EAP)</option>
           <option value={WifiEncryption.NOPASS}>None (Open Network)</option>
         </SelectField>
+        {data.encryption === WifiEncryption.SAE && (
+          <p className="mt-1.5 text-xs text-fg-muted">
+            Only for WPA3-only networks. Android phones read this; iPhone cameras may not. Choose WPA / WPA2 / WPA3 unless your router is set to WPA3 only.
+          </p>
+        )}
       </div>
 
       {data.encryption === WifiEncryption.WPA2_EAP && (

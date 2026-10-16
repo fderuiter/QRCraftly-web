@@ -867,12 +867,21 @@ describe('QRScanner Component', () => {
       await decode('WIFI:T:WPA;S:Cafe guest;P:secret;;');
 
       expect(screen.getByText('Network').nextSibling).toHaveTextContent('Cafe guest');
-      expect(screen.getByText('WPA/WPA2')).toBeInTheDocument();
+      expect(screen.getByText('WPA/WPA2/WPA3')).toBeInTheDocument();
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
       });
       expect(writeText).toHaveBeenCalledWith('WIFI:T:WPA;S:Cafe guest;P:secret;;');
       expect(screen.getByRole('button', { name: 'Copied' })).toBeInTheDocument();
+    });
+
+    it('summarises a WPA3 SAE WiFi code showing WPA3 only (SAE)', async () => {
+      render(<QRScanner />);
+      await settle();
+      await decode('WIFI:T:SAE;S:WPA3Net;P:saepassword;;');
+
+      expect(screen.getByText('Network').nextSibling).toHaveTextContent('WPA3Net');
+      expect(screen.getByText('WPA3 only (SAE)')).toBeInTheDocument();
     });
 
     it('keeps recent results for this tab and reopens them', async () => {
