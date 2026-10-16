@@ -1,7 +1,7 @@
 import React from "react";
 import { type WifiData, WifiEncryption, WifiEapMethod, WifiEapPhase2 } from "../../types";
 import { TextField, SelectField, CheckboxField } from "../ui/FormFields";
-import { CONTAINMENT_PROFILES } from "@/packages/qr-payload";
+import { CONTAINMENT_PROFILES, describeViolation } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
 
 interface WifiInputProps {
@@ -14,8 +14,12 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
     ? "Network Name cannot contain control or zero-width characters."
     : undefined;
 
+  const isWpa = data.encryption === WifiEncryption.WPA || data.encryption === WifiEncryption.WPA2_EAP;
+
   const passwordError = data.password && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(data.password)
     ? "Password cannot contain control or zero-width characters."
+    : isWpa && data.password && data.password.length < 8
+    ? describeViolation("WIFI_PASSWORD_TOO_SHORT_VIOLATION")
     : undefined;
 
   const eapIdentityError = data.eapIdentity && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(data.eapIdentity)

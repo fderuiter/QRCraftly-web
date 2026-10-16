@@ -197,5 +197,16 @@ export const WifiContract: QRGeneratorContract<WifiData> = {
   construct: constructWifiString,
   hydrate: hydrateWifiData,
   matches: (raw: string) => identifyProtocol(raw) === QRType.WIFI,
-  validate: () => [],
+  validate: (raw: string) => {
+    try {
+      const data = hydrateWifiData(raw);
+      const isWpa = data.encryption === WifiEncryption.WPA || data.encryption === WifiEncryption.WPA2_EAP;
+      if (isWpa && data.password && data.password.length > 0 && data.password.length < 8) {
+        return ['WIFI_PASSWORD_TOO_SHORT_VIOLATION'];
+      }
+    } catch {
+      // Control character errors or unparseable payload caught by validatePayload
+    }
+    return [];
+  },
 };

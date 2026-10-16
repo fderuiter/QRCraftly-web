@@ -58,3 +58,61 @@ describe('WifiInput enterprise (WPA2-EAP) fields', () => {
     expect(screen.queryByLabelText('EAP Method')).not.toBeInTheDocument();
   });
 });
+
+describe('WifiInput WPA passphrase length validation', () => {
+  it('displays an inline error when WPA password is shorter than 8 characters', () => {
+    const data: WifiData = {
+      ssid: 'MyNet',
+      password: 'short',
+      encryption: WifiEncryption.WPA,
+      hidden: false,
+    };
+    render(<WifiInput data={data} onChange={vi.fn()} />);
+    expect(screen.getByText('WPA passwords must be at least 8 characters long.')).toBeInTheDocument();
+  });
+
+  it('displays an inline error when WPA2-EAP password is shorter than 8 characters', () => {
+    const data: WifiData = {
+      ssid: 'CorpNet',
+      password: 'short',
+      encryption: WifiEncryption.WPA2_EAP,
+      hidden: false,
+    };
+    render(<WifiInput data={data} onChange={vi.fn()} />);
+    expect(screen.getByText('WPA passwords must be at least 8 characters long.')).toBeInTheDocument();
+  });
+
+  it('does not display an error when WPA password is at least 8 characters', () => {
+    const data: WifiData = {
+      ssid: 'MyNet',
+      password: 'validpass',
+      encryption: WifiEncryption.WPA,
+      hidden: false,
+    };
+    render(<WifiInput data={data} onChange={vi.fn()} />);
+    expect(screen.queryByText('WPA passwords must be at least 8 characters long.')).not.toBeInTheDocument();
+  });
+
+  it('does not display an error when password field is empty', () => {
+    const data: WifiData = {
+      ssid: 'MyNet',
+      password: '',
+      encryption: WifiEncryption.WPA,
+      hidden: false,
+    };
+    render(<WifiInput data={data} onChange={vi.fn()} />);
+    expect(screen.queryByText('WPA passwords must be at least 8 characters long.')).not.toBeInTheDocument();
+  });
+
+  it('bypasses 8-character check for WEP encryption', () => {
+    const data: WifiData = {
+      ssid: 'LegacyNet',
+      password: '12345',
+      encryption: WifiEncryption.WEP,
+      hidden: false,
+    };
+    render(<WifiInput data={data} onChange={vi.fn()} />);
+    expect(screen.queryByText('WPA passwords must be at least 8 characters long.')).not.toBeInTheDocument();
+  });
+});
+
