@@ -17,8 +17,8 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { constructVCardString, hydrateVCardData, VCardContract, vCardFieldError, CARD_FIELDS } from '../index';
-import { QRType } from '@/types';
+import { constructVCardString, hydrateVCardData, VCardContract, vCardFieldError, CARD_FIELDS, cardFieldsFor, VCARD_SOCIAL_FIELDS, socialProfileUrl, type VCardSocialField } from '../index';
+import { QRType, type VCardData } from '@/types';
 
 describe('VCard generator', () => {
   it('constructs and hydrates successfully', () => {
@@ -255,7 +255,7 @@ describe('VCard generator', () => {
     // Empty or undefined values return undefined
     expect(vCardFieldError('firstName', '')).toBeUndefined();
     expect(vCardFieldError('firstName', undefined)).toBeUndefined();
-    expect(CARD_FIELDS.length).toBe(11);
+    expect(CARD_FIELDS.length).toBe(16);
   });
 
   it('supports vCard 2.1, 3.0, and 4.0 versions', () => {
@@ -460,6 +460,317 @@ describe('VCard generator', () => {
     it('still reads the positional DoCoMo form', () => {
       const hydrated = hydrateVCardData('MECARD:N:Lee,Ann;ADR:,,1 Main,Springfield,IL,62701,US;;');
       expect(hydrated).toMatchObject({ street: '1 Main', city: 'Springfield', zip: '62701', country: 'US' });
+    });
+  });
+});
+
+describe('Social profiles (#1470)', () => {
+  const blankCard = (overrides: Partial<VCardData> = {}): VCardData => ({
+    version: '3.0',
+    firstName: '',
+    lastName: '',
+    organization: '',
+    title: '',
+    phone: '',
+    email: '',
+    website: '',
+    street: '',
+    city: '',
+    zip: '',
+    country: '',
+    x: '',
+    linkedin: '',
+    instagram: '',
+    facebook: '',
+    github: '',
+    ...overrides,
+  });
+
+  const fullSocials = {
+    x: 'jane',
+    linkedin: 'jane',
+    instagram: 'jane',
+    facebook: 'jane',
+    github: 'jane',
+  } as const;
+
+  const expectedProfiles: Record<VCardSocialField, string> = {
+    x: 'https://x.com/jane',
+    linkedin: 'https://www.linkedin.com/in/jane',
+    instagram: 'https://www.instagram.com/jane',
+    facebook: 'https://www.facebook.com/jane',
+    github: 'https://github.com/jane',
+  };
+
+  const socialLineTypes = (text: string): string[] =>
+    text
+      .split(/\r\n|\n|\r/)
+      .map((line) => /^URL;TYPE=([a-z]+):/.exec(line)?.[1])
+      .filter((type): type is string => type !== undefined);
+
+  describe('socialProfileUrl', () => {
+    it.each([undefined, '', '   ', '\t\n '])('returns null for blank input %j', (value) => {
+      for (const field of VCARD_SOCIAL_FIELDS) {
+        expect(socialProfileUrl(field, value)).toBeNull();
+      }
+    });
+
+    it.each(VCARD_SOCIAL_FIELDS)('expands a bare handle and an @handle for %s', (field) => {
+      expect(socialProfileUrl(field, 'jane')).toEqual({ url: expectedProfiles[field] });
+      expect(socialProfileUrl(field, '@jane')).toEqual({ url: expectedProfiles[field] });
+    });
+
+    it('trims surrounding whitespace before reading a handle', () => {
+      expect(socialProfileUrl('github', '  @jane  ')).toEqual({ url: 'https://github.com/jane' });
+    });
+
+    it('keeps a full profile link on its network and upgrades it to https', () => {
+      expect(socialProfileUrl('github', 'http://github.com/jane')).toEqual({ url: 'https://github.com/jane' });
+      expect(socialProfileUrl('linkedin', 'linkedin.com/company/acme')).toEqual({
+        url: 'https://linkedin.com/company/acme',
+      });
+      expect(socialProfileUrl('linkedin', 'https://www.linkedin.com/in/jane')).toEqual({
+        url: 'https://www.linkedin.com/in/jane',
+      });
+    });
+
+    it.each([
+      ['x', 'https://twitter.com/jane'],
+      ['x', 'https://www.x.com/jane'],
+      ['facebook', 'https://fb.com/jane'],
+      ['facebook', 'https://m.facebook.com/jane'],
+      ['facebook', 'https://mobile.facebook.com/jane'],
+    ] as const)('accepts the alternate host of %s: %s', (field, typed) => {
+      const result = socialProfileUrl(field, typed);
+      expect(result?.error).toBeUndefined();
+      expect(result?.url).toMatch(/^https:\/\/[^/]+\/jane$/);
+    });
+
+    it.each([
+      ['github', 'https://example.com/jane'],
+      ['github', 'https://github.com.evil.example/jane'],
+      ['linkedin', 'https://example.com/x'],
+      ['x', 'https://instagram.com/jane'],
+    ] as const)('rejects a link that is not on the network host: %s %s', (field, typed) => {
+      expect(socialProfileUrl(field, typed)?.error).toEqual(expect.any(String));
+    });
+
+    it('rejects a host with no path', () => {
+      expect(socialProfileUrl('github', 'https://github.com/')?.error).toEqual(expect.any(String));
+      expect(socialProfileUrl('github', 'https://github.com')?.error).toEqual(expect.any(String));
+    });
+
+    it('does not read a bare host such as github.com as a user name', () => {
+      // `github.com` has no scheme and no slash, so it is read as a handle. Its profile link would
+      // be https://github.com/github.com, a user named after the site itself.
+      expect(socialProfileUrl('github', 'github.com')?.error).toEqual(expect.any(String));
+    });
+
+    it.each(['javascript:alert(1)', 'JavaScript:alert(1)', 'data:text/html,hi', 'vbscript:msgbox(1)'])(
+      'rejects a dangerous scheme: %s',
+      (typed) => {
+        for (const field of VCARD_SOCIAL_FIELDS) {
+          expect(socialProfileUrl(field, typed)?.error).toEqual(expect.any(String));
+        }
+      },
+    );
+
+    it.each(['jane doe', 'ja$ne', 'jane?x', 'jane#x', '@', '@@jane', 'jäne'])(
+      'rejects a handle with invalid characters: %j',
+      (typed) => {
+        expect(socialProfileUrl('github', typed)?.error).toEqual(expect.any(String));
+      },
+    );
+
+    it.each([
+      'https://github.com/jane;x',
+      'https://github.com/jane,x',
+      'github.com/jane;',
+    ])('rejects a link containing ; or , : %s', (typed) => {
+      expect(socialProfileUrl('github', typed)?.error).toEqual(expect.any(String));
+    });
+
+    it('accepts a 100-character handle and rejects 101 characters', () => {
+      const ok = 'a'.repeat(100);
+      const tooLong = 'a'.repeat(101);
+      expect(socialProfileUrl('github', ok)).toEqual({ url: `https://github.com/${ok}` });
+      expect(socialProfileUrl('github', tooLong)?.error).toEqual(expect.any(String));
+    });
+
+    it.each([
+      ['x', 'jane.doe_1-'],
+      ['github', 'https://github.com/jane'],
+      ['linkedin', 'https://www.linkedin.com/in/jane-doe'],
+      ['instagram', 'instagram.com/jane.doe'],
+    ] as const)('is stable: reading its own output for %s %s gives the same url', (field, typed) => {
+      const first = socialProfileUrl(field, typed);
+      expect(first?.url).toBeDefined();
+      expect(socialProfileUrl(field, first?.url)).toEqual(first);
+    });
+
+    it.each(['.', '..'])('gives a stable result for the handle %j', (handle) => {
+      // A dot handle is a valid handle, but the link it becomes is re-parsed by the URL
+      // parser (`https://github.com/..` normalises to the bare host), so reading the output
+      // again must give the same url or an error, never a different url.
+      const first = socialProfileUrl('github', handle);
+      if (first?.url === undefined) {
+        expect(first?.error).toEqual(expect.any(String));
+        return;
+      }
+      expect(socialProfileUrl('github', first.url)).toEqual(first);
+    });
+  });
+
+  describe('vCard output', () => {
+    it.each(['2.1', '3.0', '4.0'] as const)('writes one URL;TYPE line per filled social field in %s', (version) => {
+      const text = constructVCardString(blankCard({ version, website: 'https://example.com', ...fullSocials }));
+      expect(text).toContain('URL;TYPE=x:https://x.com/jane');
+      expect(text).toContain('URL;TYPE=linkedin:https://www.linkedin.com/in/jane');
+      expect(text).toContain('URL;TYPE=instagram:https://www.instagram.com/jane');
+      expect(text).toContain('URL;TYPE=facebook:https://www.facebook.com/jane');
+      expect(text).toContain('URL;TYPE=github:https://github.com/jane');
+      expect(socialLineTypes(text)).toEqual(['x', 'linkedin', 'instagram', 'facebook', 'github']);
+    });
+
+    it.each(['2.1', '3.0', '4.0'] as const)('puts the plain website line before the social lines in %s', (version) => {
+      const text = constructVCardString(blankCard({ version, website: 'https://example.com', github: 'jane' }));
+      const lines = text.split(/\r\n/);
+      const websiteAt = lines.indexOf('URL:https://example.com/');
+      const githubAt = lines.indexOf('URL;TYPE=github:https://github.com/jane');
+      expect(websiteAt).toBeGreaterThanOrEqual(0);
+      expect(githubAt).toBeGreaterThan(websiteAt);
+    });
+
+    it('writes social lines in field order regardless of the order the fields were filled', () => {
+      const text = constructVCardString(
+        blankCard({ github: 'jane', facebook: 'jane', x: 'jane', instagram: 'jane', linkedin: 'jane' }),
+      );
+      expect(socialLineTypes(text)).toEqual(['x', 'linkedin', 'instagram', 'facebook', 'github']);
+    });
+
+    it('writes no social line for blank, whitespace or invalid social values', () => {
+      const text = constructVCardString(
+        blankCard({ firstName: 'Jane', x: '', linkedin: '   ', github: 'https://example.com/jane' }),
+      );
+      expect(socialLineTypes(text)).toEqual([]);
+      expect(text).not.toMatch(/TYPE=github/);
+    });
+
+    it('writes no social line for a card without social values', () => {
+      expect(socialLineTypes(constructVCardString(blankCard({ firstName: 'Jane', website: 'https://example.com' })))).toEqual([]);
+    });
+
+    it('gives a code when only a social field is filled', () => {
+      const text = constructVCardString(blankCard({ github: 'jane' }));
+      expect(text).not.toBe('');
+      expect(socialLineTypes(text)).toEqual(['github']);
+    });
+
+    it('gives no code for a whitespace-only social field', () => {
+      expect(constructVCardString(blankCard({ x: '   ' }))).toBe('');
+    });
+
+    it('never writes social values into a MECard', () => {
+      const text = constructVCardString(
+        blankCard({ version: 'mecard', firstName: 'Jane', lastName: 'Doe', website: 'https://example.com', ...fullSocials }),
+      );
+      expect(text.startsWith('MECARD:')).toBe(true);
+      expect(text).not.toContain('jane');
+      expect(text).not.toContain('x.com');
+      expect(text).not.toContain('github');
+      expect(text).toMatch(/URL:https\\:\/\/example\.com\/;/);
+    });
+
+    it('gives no code for a MECard whose only filled field is a social profile', () => {
+      expect(constructVCardString(blankCard({ version: 'mecard', ...fullSocials }))).toBe('');
+    });
+  });
+
+  describe('hydration', () => {
+    it.each(['2.1', '3.0', '4.0'] as const)('reads each social line back as its profile url in %s', (version) => {
+      const text = constructVCardString(
+        blankCard({ version, firstName: 'Jane', website: 'https://example.com', linkedin: 'jane', github: '@jane' }),
+      );
+      const hydrated = hydrateVCardData(text);
+      expect(hydrated).toMatchObject({
+        version,
+        firstName: 'Jane',
+        website: 'https://example.com/',
+        linkedin: 'https://www.linkedin.com/in/jane',
+        github: 'https://github.com/jane',
+      });
+      expect(hydrated.x ?? '').toBe('');
+      expect(hydrated.instagram ?? '').toBe('');
+      expect(hydrated.facebook ?? '').toBe('');
+    });
+
+    it('round-trips every social field and keeps the website separate', () => {
+      const text = constructVCardString(blankCard({ website: 'https://example.com', ...fullSocials }));
+      const hydrated = hydrateVCardData(text);
+      for (const field of VCARD_SOCIAL_FIELDS) {
+        expect(hydrated[field]).toBe(expectedProfiles[field]);
+      }
+      expect(hydrated.website).toBe('https://example.com/');
+    });
+
+    it('reads a URL;TYPE line with another type, or a type in any case, correctly', () => {
+      const hydrated = hydrateVCardData(
+        'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Jane\r\nURL;TYPE=WORK:https://example.com/\r\nURL;TYPE=GitHub:https://github.com/jane\r\nEND:VCARD',
+      );
+      expect(hydrated.website).toBe('https://example.com/');
+      expect(hydrated.github).toBe('https://github.com/jane');
+    });
+
+    it('gives no social fields when hydrating a MECard', () => {
+      const text = constructVCardString(blankCard({ version: 'mecard', firstName: 'Jane', ...fullSocials }));
+      const hydrated = hydrateVCardData(text);
+      expect(hydrated.version).toBe('mecard');
+      for (const field of VCARD_SOCIAL_FIELDS) {
+        expect(hydrated[field] ?? '').toBe('');
+      }
+      const plain = hydrateVCardData('MECARD:N:Lee,Ann;URL:https://example.com;;');
+      expect(plain.website).toBe('https://example.com');
+      expect(plain).not.toHaveProperty('github');
+    });
+  });
+
+  describe('field rules', () => {
+    it('cardFieldsFor leaves the social fields out of MECard only', () => {
+      for (const field of VCARD_SOCIAL_FIELDS) {
+        expect(cardFieldsFor('mecard')).not.toContain(field);
+        expect(cardFieldsFor('3.0')).toContain(field);
+        expect(cardFieldsFor('4.0')).toContain(field);
+        expect(cardFieldsFor('2.1')).toContain(field);
+      }
+      expect(cardFieldsFor('mecard')).toContain('website');
+    });
+
+    it('vCardFieldError reports a social field whose link is not on its network', () => {
+      expect(vCardFieldError('linkedin', 'https://example.com/x')).toEqual(expect.any(String));
+    });
+
+    it('vCardFieldError accepts blank, whitespace and valid social values', () => {
+      expect(vCardFieldError('github', undefined)).toBeUndefined();
+      expect(vCardFieldError('github', '')).toBeUndefined();
+      expect(vCardFieldError('github', '   ')).toBeUndefined();
+      expect(vCardFieldError('github', 'jane')).toBeUndefined();
+    });
+
+    it('vCardFieldError applies the scheme check only to website and social fields', () => {
+      expect(vCardFieldError('firstName', 'javascript:alert(1)')).toBeUndefined();
+      expect(vCardFieldError('organization', 'javascript:alert(1)')).toBeUndefined();
+      expect(vCardFieldError('website', 'javascript:alert(1)')).toEqual(expect.any(String));
+      expect(vCardFieldError('github', 'javascript:alert(1)')).toEqual(expect.any(String));
+    });
+
+    it('VCardContract.validate flags a dangerous social URL line', () => {
+      const card = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Jane\r\nURL;TYPE=github:javascript:alert(1)\r\nEND:VCARD';
+      expect(VCardContract.validate?.(card)).toEqual(['URI_INJECTION_VIOLATION']);
+    });
+
+    it('VCardContract.validate passes a safe social URL line', () => {
+      const card = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Jane\r\nURL;TYPE=github:https://github.com/jane\r\nEND:VCARD';
+      expect(VCardContract.validate?.(card)).toEqual([]);
     });
   });
 });

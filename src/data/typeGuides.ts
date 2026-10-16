@@ -72,7 +72,7 @@ export const typeGuides: Record<string, TypeGuide> = {
   },
   'vcard-qr-code': {
     intro:
-      'Put your contact details in a QR code. One scan offers to save your name, number, email and company to the phone’s contacts.',
+      'Put your contact details in a QR code. One scan offers to save your name, number, email, company and social profiles to the phone’s contacts.',
     scanned: [
       'The iPhone Camera app and most Android camera apps, or Google Lens, show the contact and offer to save it. The person can check the fields first. No internet connection is needed, because the details are in the code itself.',
       'A saved contact is a copy. If your details change, people who already scanned keep the old ones, so a website you keep up to date is worth adding.',
