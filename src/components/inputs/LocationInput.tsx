@@ -25,6 +25,22 @@ export const LocationInput: React.FC<LocationInputProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
+  const clearGeoError = () => {
+    if (geoError) {
+      setGeoError(null);
+    }
+  };
+
+  const handleLatitudeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    clearGeoError();
+    onChange({ latitude: e.target.value });
+  };
+
+  const handleLongitudeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    clearGeoError();
+    onChange({ longitude: e.target.value });
+  };
+
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
       setGeoError("Geolocation is not supported by your browser.");
@@ -67,7 +83,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         placeholder="-90 to 90 (e.g. 40.7128)"
         maxLength={20}
         value={data.latitude}
-        onChange={(e) => onChange({ latitude: e.target.value })}
+        onChange={handleLatitudeChange}
         error={coordinateError(data.latitude, "latitude") ?? undefined}
       />
       <TextField
@@ -80,7 +96,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         // Longitude has one extra character vs latitude because it has 3 integer digits
         // (-180) versus latitude's 2 (-90), requiring one more character for the sign+digits.
         value={data.longitude}
-        onChange={(e) => onChange({ longitude: e.target.value })}
+        onChange={handleLongitudeChange}
         error={coordinateError(data.longitude, "longitude") ?? undefined}
       />
       <Button
@@ -96,9 +112,31 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         {isLoading ? "Fetching location…" : "Use Current Location"}
       </Button>
       {geoError && (
-        <p role="alert" className="text-xs text-danger">
-          {geoError}
-        </p>
+        <div
+          role="alert"
+          className="flex flex-col gap-2 rounded-lg border border-danger-line bg-danger-soft p-3 text-xs text-danger"
+        >
+          <p>{geoError}</p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="xs"
+              onClick={handleGetCurrentLocation}
+              disabled={isLoading}
+            >
+              Retry
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => setGeoError(null)}
+            >
+              Dismiss
+            </Button>
+          </div>
+        </div>
       )}
     </FormBlock>
   );

@@ -326,6 +326,151 @@ describe('LocationInput component', () => {
     });
   });
 
+  // ─── Error banner actions & manual clear ──────────────────────────────────
+
+  describe('error banner actions and auto-clearing', () => {
+    beforeEach(() => {
+      Object.defineProperty(navigator, 'geolocation', {
+        value: {
+          getCurrentPosition: vi.fn(),
+        },
+        configurable: true,
+        writable: true,
+      });
+    });
+
+    it('clears geolocation error when latitude input changes', async () => {
+      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
+        (_success, errorCb) => errorCb!(geoError(1))
+      );
+
+      renderLocationInput();
+      fireEvent.click(screen.getByRole('button', { name: /use current location/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByLabelText('Latitude'), {
+        target: { value: '40.7128' },
+      });
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('clears geolocation error when longitude input changes', async () => {
+      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
+        (_success, errorCb) => errorCb!(geoError(1))
+      );
+
+      renderLocationInput();
+      fireEvent.click(screen.getByRole('button', { name: /use current location/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByLabelText('Longitude'), {
+        target: { value: '-74.0060' },
+      });
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('clears geolocation error when typing invalid coordinate text', async () => {
+      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
+        (_success, errorCb) => errorCb!(geoError(1))
+      );
+
+      renderLocationInput();
+      fireEvent.click(screen.getByRole('button', { name: /use current location/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByLabelText('Latitude'), {
+        target: { value: 'abc' },
+      });
+
+      expect(screen.queryByText(/location access denied/i)).not.toBeInTheDocument();
+    });
+
+    it('triggers position fetch when Retry button is clicked in the error banner', async () => {
+      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
+        (_success, errorCb) => errorCb!(geoError(1))
+      );
+
+      renderLocationInput();
+      fireEvent.click(screen.getByRole('button', { name: /use current location/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+      });
+
+      const retryButton = screen.getByRole('button', { name: /retry/i });
+      expect(retryButton).toBeInTheDocument();
+
+      const successPosition = {
+        coords: { latitude: 37.7749, longitude: -122.4194, accuracy: 10 },
+      } as GeolocationPosition;
+
+      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
+        (successCb) => successCb(successPosition)
+      );
+
+      fireEvent.click(retryButton);
+
+      await waitFor(() => {
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      });
+    });
+
+    it('updates error message during repeated geolocation failures when Retry is clicked', async () => {
+      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementationOnce(
+        (_success, errorCb) => errorCb!(geoError(1))
+      );
+
+      renderLocationInput();
+      fireEvent.click(screen.getByRole('button', { name: /use current location/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent(/location access denied/i);
+      });
+
+      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementationOnce(
+        (_success, errorCb) => errorCb!(geoError(3))
+      );
+
+      const retryButton = screen.getByRole('button', { name: /retry/i });
+      fireEvent.click(retryButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent(/timed out/i);
+      });
+    });
+
+    it('dismisses error banner when Dismiss button is clicked', async () => {
+      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
+        (_success, errorCb) => errorCb!(geoError(1))
+      );
+
+      renderLocationInput();
+      fireEvent.click(screen.getByRole('button', { name: /use current location/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+      });
+
+      const dismissButton = screen.getByRole('button', { name: /dismiss/i });
+      expect(dismissButton).toBeInTheDocument();
+
+      fireEvent.click(dismissButton);
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
   // ─── Geolocation – unavailable ────────────────────────────────────────────
 
   describe('Use Current Location button – geolocation unavailable', () => {
