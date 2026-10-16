@@ -122,8 +122,10 @@ const decode = (image: RgbaImage, options: { tears?: boolean; carry?: TearCarry 
 
 beforeAll(() => loadOpticalModem());
 
+// Timeouts are about four times each test's run under v8 coverage on a laptop: coverage makes
+// these image simulations about six times slower, and CI's 2-vCPU runners about twice slower again.
 describe('torn captures (ADR 0049)', () => {
-  it('recovers a P6 frame torn at 0.70 to 0.80 of the camera height, where the plain decoder loses most of them', { timeout: 120_000 }, () => {
+  it('recovers a P6 frame torn at 0.70 to 0.80 of the camera height, where the plain decoder loses most of them', { timeout: 240_000 }, () => {
     const plain: number[] = [];
     for (const tear of [0.7, 0.75, 0.8]) {
       const image = torn(10, tear);
@@ -140,7 +142,7 @@ describe('torn captures (ADR 0049)', () => {
     expect(plain).toEqual([0, 0, CAPACITY.blocks]);
   });
 
-  it('finishes frames torn near the middle from two consecutive captures, each giving blocks of two frames', { timeout: 180_000 }, () => {
+  it('finishes frames torn near the middle from two consecutive captures, each giving blocks of two frames', { timeout: 360_000 }, () => {
     for (const tear of [0.5, 0.6]) {
       const tally = new Tally();
       let plain = 0;
@@ -168,7 +170,7 @@ describe('torn captures (ADR 0049)', () => {
     }
   });
 
-  it('cuts on a slant a capture torn on a slant, which no straight cut decodes', { timeout: 240_000 }, () => {
+  it('cuts on a slant a capture torn on a slant, which no straight cut decodes', { timeout: 360_000 }, () => {
     for (const slope of [0.5, -0.5]) {
       const tally = new Tally();
       let carry: TearCarry | undefined;
@@ -187,7 +189,7 @@ describe('torn captures (ADR 0049)', () => {
     }
   });
 
-  it('finds the tear in a capture turned a quarter or upside down', { timeout: 120_000 }, () => {
+  it('finds the tear in a capture turned a quarter or upside down', { timeout: 180_000 }, () => {
     const quarter = new Tally();
     quarter.add(decode(rotate(torn(10, 0.75), 1)));
     expect(quarter.count(10)).toBe(CAPACITY.blocks);
@@ -201,7 +203,7 @@ describe('torn captures (ADR 0049)', () => {
     expect(quarter.wrong + flipped.wrong).toBe(0);
   });
 
-  it('guesses the sequence of a side whose header strip is unreadable, the likelier neighbour first', { timeout: 120_000 }, () => {
+  it('guesses the sequence of a side whose header strip is unreadable, the likelier neighbour first', { timeout: 180_000 }, () => {
     const image = torn(10, 0.75);
     const intact = decode(image);
     expect(intact.ok && intact.tear?.strips).toEqual([10, 11]);
@@ -247,7 +249,7 @@ describe('torn captures (ADR 0049)', () => {
     expect(tally.wrong + control.wrong).toBe(0);
   });
 
-  it('keeps no carry for a frame it only guessed, which would spoil the next capture', { timeout: 120_000 }, () => {
+  it('keeps no carry for a frame it only guessed, which would spoil the next capture', { timeout: 180_000 }, () => {
     // Frame 10 over most of the picture and frame 15, not 11, below it, with the bottom strip unreadable: frame 10
     // decodes, and the guess that the rest is frame 11 is wrong.
     const first = decode(withoutStrip(torn(10, 0.75, 10, 15), true));
@@ -262,7 +264,7 @@ describe('torn captures (ADR 0049)', () => {
     expect(tally.wrong).toBe(0);
   });
 
-  it('places the cut by the capture homography when an external sampler used the module for something else', { timeout: 60_000 }, () => {
+  it('places the cut by the capture homography when an external sampler used the module for something else', { timeout: 90_000 }, () => {
     const image = torn(10, 0.75);
     // A shear: under it, the camera's rows would run diagonally across the grid.
     const sheared = Float32Array.from([1, 0, 0, 0.5, 1, 0, 0, 0, 1]);

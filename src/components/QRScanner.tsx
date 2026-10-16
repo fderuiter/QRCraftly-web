@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Camera, Copy, FileImage, RefreshCw, Upload } from 'lucide-react';
+import { Camera, Copy, FileImage, RefreshCw, Upload, Volume2, VolumeX } from 'lucide-react';
 import {
   useQrScanner,
   type CameraProblemStatus,
   type CameraScanResult,
   type CameraSessionState,
 } from '@/packages/optical-scanner/client';
+import { playChime } from '@/utils/feedback';
 import { Button } from './ui/Button';
 import { ScannerCameraControls } from './ScannerCameraControls';
 import { EmptyState } from './ui/EmptyState';
@@ -245,9 +246,15 @@ export interface QRScannerProps {
  * @param props.autoStartCamera - Open the camera on mount.
  * @returns The scanner.
  */
-export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanSuccess, autoStartCamera = true }) => {
+export const QRScanner: React.FC<QRScannerProps> = ({
+  onEdit,
+  editLabel,
+  onScanSuccess,
+  autoStartCamera = true,
+}) => {
   const [mode, setMode] = useState<'webcam' | 'file'>('webcam');
   const [cameraWanted, setCameraWanted] = useState(autoStartCamera);
+  const [soundOn, setSoundOn] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [fileProcessing, setFileProcessing] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -256,6 +263,14 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
   const [history, setHistory] = useState<ScanDescription[]>(() => sessionHistory);
   const [announcement, setAnnouncement] = useState('');
   const permission = useCameraPermission();
+
+  const soundOnRef = useRef(soundOn);
+
+  const toggleSound = () => {
+    const next = !soundOnRef.current;
+    soundOnRef.current = next;
+    setSoundOn(next);
+  };
 
   const ids = useId();
   const fileErrorId = `${ids}-file-error`;
@@ -297,6 +312,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
     onScanSuccess: (data, found) => {
       if (foundRef.current) return;
       foundRef.current = true;
+      if (soundOnRef.current) playChime();
       if (!prefersReducedMotion() && typeof navigator.vibrate === 'function') navigator.vibrate(30);
       if (!found?.corners) {
         showResult(data);
@@ -674,6 +690,23 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
                 },
               ]}
             />
+            {mode === 'webcam' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                pressed={soundOn}
+                onClick={toggleSound}
+                aria-label="Scan sound"
+                title={soundOn ? 'Mute scan sound' : 'Unmute scan sound'}
+              >
+                {soundOn ? (
+                  <Volume2 className="size-4" aria-hidden="true" />
+                ) : (
+                  <VolumeX className="size-4" aria-hidden="true" />
+                )}
+              </Button>
+            )}
           </div>
           <div className="relative h-[60vh] max-h-160 min-h-72 w-full">
             {mode === 'webcam' ? renderWebcamViewfinder() : renderFileInput()}

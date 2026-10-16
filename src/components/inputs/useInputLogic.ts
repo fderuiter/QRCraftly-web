@@ -17,10 +17,10 @@
 */
 
 import { useState, useRef, useEffect, type ElementType } from "react";
-import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, type EmailData } from "../../types";
+import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, type EmailData, CryptoNetwork } from "../../types";
 import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
-import { CONTAINMENT_PROFILES, emailListError, CARD_FIELDS, vCardFieldError } from "@/packages/qr-payload";
+import { CONTAINMENT_PROFILES, emailListError, CARD_FIELDS, vCardFieldError, paymentAmountError, sepaRefusal } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
 
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
@@ -61,7 +61,15 @@ const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => 
     }
   } else if (type === QRType.PAYMENT) {
     const payment = data as PaymentData;
-    if (payment.address && isDangerousUrl(payment.address)) {
+    const address = payment.network === CryptoNetwork.EPC_SEPA ? (payment.iban || payment.address || '') : (payment.address || '');
+    if (address && isDangerousUrl(address)) {
+      return false;
+    }
+    if (payment.network === CryptoNetwork.EPC_SEPA) {
+      if (sepaRefusal(payment) !== null) {
+        return false;
+      }
+    } else if (paymentAmountError(payment.amount, payment.network)) {
       return false;
     }
   } else if (type === QRType.URL || type === QRType.MEETING || type === QRType.TEXT) {

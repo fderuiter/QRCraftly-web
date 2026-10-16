@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Button } from "../ui/Button";
+import { Alert } from "../ui/Alert";
 import type { LocationData } from "../../types";
 import { TextField } from "../ui/FormFields";
 import { FormBlock } from "../ui/FormBlock";
@@ -24,6 +25,26 @@ export const LocationInput: React.FC<LocationInputProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const locationButtonRef = useRef<HTMLButtonElement>(null);
+
+  const clearGeoError = () => {
+    setGeoError(null);
+  };
+
+  const handleDismissError = () => {
+    setGeoError(null);
+    locationButtonRef.current?.focus();
+  };
+
+  const handleLatitudeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    clearGeoError();
+    onChange({ latitude: e.target.value });
+  };
+
+  const handleLongitudeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    clearGeoError();
+    onChange({ longitude: e.target.value });
+  };
 
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -67,7 +88,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         placeholder="-90 to 90 (e.g. 40.7128)"
         maxLength={20}
         value={data.latitude}
-        onChange={(e) => onChange({ latitude: e.target.value })}
+        onChange={handleLatitudeChange}
         error={coordinateError(data.latitude, "latitude") ?? undefined}
       />
       <TextField
@@ -80,10 +101,11 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         // Longitude has one extra character vs latitude because it has 3 integer digits
         // (-180) versus latitude's 2 (-90), requiring one more character for the sign+digits.
         value={data.longitude}
-        onChange={(e) => onChange({ longitude: e.target.value })}
+        onChange={handleLongitudeChange}
         error={coordinateError(data.longitude, "longitude") ?? undefined}
       />
       <Button
+        ref={locationButtonRef}
         type="button"
         variant="secondary"
         onClick={handleGetCurrentLocation}
@@ -96,9 +118,9 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         {isLoading ? "Fetching location…" : "Use Current Location"}
       </Button>
       {geoError && (
-        <p role="alert" className="text-xs text-danger">
+        <Alert variant="error" onDismiss={handleDismissError}>
           {geoError}
-        </p>
+        </Alert>
       )}
     </FormBlock>
   );

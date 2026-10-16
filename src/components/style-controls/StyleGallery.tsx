@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CircleCheck, Dices, Redo2, TriangleAlert, Undo2 } from 'lucide-react';
 import { type QRConfig, SocialFormat, TemplateStyle } from '../../types';
-import { PATTERNS, PRESET_COLORS } from '../../constants';
+import { PATTERNS, PRESET_COLORS, buildPresetColorPatch } from '../../constants';
 import { getSamplePayload } from '@/packages/qr-payload';
 import { useOptionalQRStore, useOptionalQRStoreSelector } from '../../context/QRContext';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -24,6 +24,7 @@ interface Tile {
   name: string;
   patch: Partial<QRConfig>;
   choice: StyleChoice;
+  preset?: (typeof PRESET_COLORS)[number];
 }
 
 // Thumbnails kept in memory, newest last. The key holds the QR content, so it never leaves this module.
@@ -35,6 +36,8 @@ const choiceOf = (config: QRConfig, patch: Partial<QRConfig>): StyleChoice => ({
   fgColor: patch.fgColor ?? config.fgColor,
   bgColor: patch.bgColor ?? config.bgColor,
   eyeColor: patch.eyeColor ?? config.eyeColor,
+  eyeFrameColor: patch.eyeFrameColor ?? config.eyeFrameColor ?? patch.eyeColor ?? config.eyeColor,
+  eyeBallColor: patch.eyeBallColor ?? config.eyeBallColor ?? patch.eyeColor ?? config.eyeColor,
 });
 
 function getThumbnailCacheId(config: QRConfig, choice: StyleChoice): string {
@@ -156,8 +159,8 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
   const colorTiles = useMemo<Tile[]>(
     () =>
       PRESET_COLORS.map((c) => {
-        const patch = { fgColor: c.fg, bgColor: c.bg, eyeColor: c.eye, eyeFrameColor: c.eye, eyeBallColor: c.eye };
-        return { id: `color:${c.label}`, name: c.label, patch, choice: choiceOf(source, patch) };
+        const patch = buildPresetColorPatch(c, source);
+        return { id: `color:${c.label}`, name: c.label, patch, choice: choiceOf(source, patch), preset: c };
       }),
     [source]
   );
@@ -252,6 +255,10 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
 
   const apply = (tile: Tile) => {
     endPreview();
+    if (tile.preset) {
+      onChange(buildPresetColorPatch(tile.preset, config));
+      return;
+    }
     onChange(tile.patch);
   };
 
@@ -262,7 +269,7 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
   };
 
   const selected = (tiles: Tile[]) =>
-    tiles.find((t) => Object.entries(t.patch).every(([key, value]) => baseLook[key as keyof StyleChoice] === value))?.id ?? '';
+    tiles.find((t) => Object.entries(t.patch).every(([key, value]) => !(key in baseLook) || baseLook[key as keyof StyleChoice] === value))?.id ?? '';
 
   const option = (tile: Tile, kind: 'pattern' | 'color') => {
     const tone = styleScanTone(tile.choice);
