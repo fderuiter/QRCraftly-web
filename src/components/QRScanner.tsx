@@ -6,7 +6,7 @@ import {
   type CameraScanResult,
   type CameraSessionState,
 } from '@/packages/optical-scanner/client';
-import { playChime } from '@/utils/feedback';
+import { playChime, unlockChime } from '@/utils/feedback';
 import { Button } from './ui/Button';
 import { ScannerCameraControls } from './ScannerCameraControls';
 import { EmptyState } from './ui/EmptyState';
@@ -268,6 +268,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
   const toggleSound = () => {
     const next = !soundOnRef.current;
+    // This click is the gesture iOS needs before the chime can play later.
+    if (next) unlockChime();
     soundOnRef.current = next;
     setSoundOn(next);
   };

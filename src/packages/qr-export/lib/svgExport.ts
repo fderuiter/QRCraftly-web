@@ -37,7 +37,7 @@ import { loadMosaicSource } from '@/packages/qr-matrix/mosaic';
  * If conversion fails (e.g. CORS or network error) or the URL is dangerous,
  * it returns null so the image is safely omitted.
  */
-async function toDataUrl(url: string): Promise<string | null> {
+async function toDataUrl(url: string, signal?: AbortSignal): Promise<string | null> {
   if (!url) return null;
 
   // Synchronously retrieve from transparent in-memory cache if available
@@ -85,7 +85,7 @@ async function toDataUrl(url: string): Promise<string | null> {
 
   try {
     // The CSP (connect-src 'self') limits this to same-origin images.
-    const response = await fetch(url, { mode: 'cors' });
+    const response = await fetch(url, { mode: 'cors', signal });
     if (!response.ok) return null;
     
     const blob = await response.blob();
@@ -98,6 +98,7 @@ async function toDataUrl(url: string): Promise<string | null> {
       const sanitized = sanitizeSvg(text);
       const base64 = btoa(unescape(encodeURIComponent(sanitized)));
       const result = `data:image/svg+xml;base64,${base64}`;
+      if (signal?.aborted) return null;
       setCachedAsset(url, result);
       return result;
     }
@@ -108,6 +109,7 @@ async function toDataUrl(url: string): Promise<string | null> {
       reader.onerror = () => reject(new Error('FileReader error'));
       reader.readAsDataURL(blob);
     });
+    if (signal?.aborted) return null;
     if (result) {
       setCachedAsset(url, result);
     }
@@ -116,6 +118,28 @@ async function toDataUrl(url: string): Promise<string | null> {
     // Omit the image if it fails to load
     return null;
   }
+}
+
+/** Whether a logo data URL decodes to a non-empty image. jsdom cannot decode, so it passes there. */
+async function logoDecodes(dataUrl: string): Promise<boolean> {
+  if (typeof document === 'undefined') return true;
+  if (typeof window !== 'undefined' && window.navigator?.userAgent?.includes('jsdom') === true) return true;
+  return new Promise<boolean>((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    let settled = false;
+    const finish = (valid: boolean) => {
+      if (settled) return;
+      settled = true;
+      img.onload = null;
+      img.onerror = null;
+      resolve(valid);
+    };
+    img.onload = () => finish(img.naturalWidth > 0 && img.naturalHeight > 0);
+    img.onerror = () => finish(false);
+    img.src = dataUrl;
+    if (img.complete) finish(img.naturalWidth > 0 && img.naturalHeight > 0);
+  });
 }
 
 /** Result of a pre-flight logo asset check. */
@@ -128,7 +152,8 @@ export interface LogoPreflightResult {
  * Validates availability and readability of configured logo assets (center logo
  * and border logo if enabled) before bulk export batch processing.
  *
- * Enforces a default 3-second timeout for remote asset requests.
+ * Enforces a default 3-second timeout for remote asset requests, covering the download and the
+ * decode; a request still running at the deadline is aborted.
  */
 export async function preflightLogoCheck(
   config: QRConfig,
@@ -155,18 +180,23 @@ export async function preflightLogoCheck(
       };
     }
 
+    // One deadline covers the download and the decode; when it passes, the download is
+    // aborted so a late answer is neither waited on nor cached.
+    const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
+        controller.abort();
         reject(new Error('TIMEOUT'));
       }, timeoutMs);
     });
 
     try {
-      const dataUrl = await Promise.race([
-        toDataUrl(url),
-        timeoutPromise,
-      ]);
+      const loaded = async (): Promise<{ dataUrl: string | null; decodes: boolean }> => {
+        const dataUrl = await toDataUrl(url, controller.signal);
+        return { dataUrl, decodes: dataUrl ? await logoDecodes(dataUrl) : false };
+      };
+      const { dataUrl, decodes } = await Promise.race([loaded(), timeoutPromise]);
       if (timeoutId !== undefined) clearTimeout(timeoutId);
 
       if (!dataUrl) {
@@ -176,34 +206,11 @@ export async function preflightLogoCheck(
         };
       }
 
-      // In browser/JSDOM environments, verify image decoding if element constructor exists
-      if (typeof document !== 'undefined') {
-        const isJsdom = typeof window !== 'undefined' && window.navigator?.userAgent?.includes('jsdom') === true;
-        if (!isJsdom) {
-          const imageDecodes = await new Promise<boolean>((resolve) => {
-            const img = new Image();
-            img.crossOrigin = 'Anonymous';
-            let settled = false;
-            const finish = (valid: boolean) => {
-              if (settled) return;
-              settled = true;
-              img.onload = null;
-              img.onerror = null;
-              resolve(valid);
-            };
-            img.onload = () => finish(img.naturalWidth > 0 && img.naturalHeight > 0);
-            img.onerror = () => finish(false);
-            img.src = dataUrl;
-            if (img.complete) finish(img.naturalWidth > 0 && img.naturalHeight > 0);
-          });
-
-          if (!imageDecodes) {
-            return {
-              ok: false,
-              error: 'Custom logo asset is corrupt or invalid image data. Please check the logo URL or remove the logo before exporting PNG files.',
-            };
-          }
-        }
+      if (!decodes) {
+        return {
+          ok: false,
+          error: 'Custom logo asset is corrupt or invalid image data. Please check the logo URL or remove the logo before exporting PNG files.',
+        };
       }
 
       setCachedAsset(url, dataUrl);

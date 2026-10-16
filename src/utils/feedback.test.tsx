@@ -17,7 +17,7 @@
 */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { playChime, vibrate } from './feedback';
+import { vibrate } from './feedback';
 
 const motion = (reduce: boolean) =>
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: reduce && query.includes('reduce'), addEventListener: vi.fn(), removeEventListener: vi.fn() }));
@@ -49,13 +49,27 @@ describe('feedback', () => {
     expect(() => vibrate([10, 20])).not.toThrow();
   });
 
-  it('plays two generated notes and never needs a file', () => {
-    vi.useFakeTimers();
+  /** A fresh copy of the module, so each test starts with no shared audio context. */
+  const freshFeedback = async () => {
+    vi.resetModules();
+    return import('./feedback');
+  };
+
+  const fakeAudio = () => {
     const start = vi.fn();
     const oscillators: unknown[] = [];
+    const created: FakeContext[] = [];
     class FakeContext {
       currentTime = 0;
       destination = {};
+      state: AudioContextState = 'suspended';
+      resume = vi.fn(() => {
+        this.state = 'running';
+        return Promise.resolve();
+      });
+      constructor() {
+        created.push(this);
+      }
       createOscillator() {
         const node = { type: '', frequency: { value: 0 }, connect: (next: unknown) => next, start, stop: vi.fn() };
         oscillators.push(node);
@@ -66,17 +80,36 @@ describe('feedback', () => {
       }
       close = vi.fn(() => Promise.resolve());
     }
-    vi.stubGlobal('AudioContext', FakeContext);
     Object.defineProperty(window, 'AudioContext', { value: FakeContext, configurable: true });
-    playChime();
+    return { start, oscillators, created };
+  };
+
+  it('plays two generated notes and never needs a file', async () => {
+    const { playChime: chime } = await freshFeedback();
+    const { start, oscillators } = fakeAudio();
+    chime();
     expect(oscillators).toHaveLength(2);
     expect(start).toHaveBeenCalledTimes(2);
-    vi.runAllTimers();
-    vi.useRealTimers();
   });
 
-  it('survives a missing audio API', () => {
+  it('builds one audio context in the sound toggle and reuses it for every chime (#1481)', async () => {
+    const { playChime: chime, unlockChime } = await freshFeedback();
+    const { created, oscillators } = fakeAudio();
+    unlockChime();
+    expect(created).toHaveLength(1);
+    expect(created[0].resume).toHaveBeenCalledTimes(1);
+
+    chime();
+    chime();
+    expect(created).toHaveLength(1);
+    expect(oscillators).toHaveLength(4);
+    expect(created[0].close).not.toHaveBeenCalled();
+  });
+
+  it('survives a missing audio API', async () => {
+    const { playChime: chime, unlockChime } = await freshFeedback();
     Object.defineProperty(window, 'AudioContext', { value: undefined, configurable: true });
-    expect(() => playChime()).not.toThrow();
+    expect(() => unlockChime()).not.toThrow();
+    expect(() => chime()).not.toThrow();
   });
 });

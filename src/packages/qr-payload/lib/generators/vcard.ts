@@ -196,8 +196,10 @@ export const hydrateVCardData = (raw: string): VCardData => {
     }
   });
 
-  // vCard 4.0 makes N optional; take the name from FN when N gave none.
-  if (!result.firstName && !result.lastName && formattedName) {
+  // vCard 4.0 makes N optional; take the name from FN when N gave none. An FN that only
+  // repeats the organisation, email or phone is the generator's fallback, not a name.
+  const fnIsFallback = [result.organization, result.email, result.phone].some((field) => field?.trim() === formattedName);
+  if (!result.firstName && !result.lastName && formattedName && !fnIsFallback) {
     const space = formattedName.lastIndexOf(' ');
     result.firstName = space === -1 ? formattedName : formattedName.substring(0, space).trim();
     result.lastName = space === -1 ? '' : formattedName.substring(space + 1);
