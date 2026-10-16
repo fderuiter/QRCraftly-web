@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Button } from "../ui/Button";
+import { Alert } from "../ui/Alert";
 import type { LocationData } from "../../types";
 import { TextField } from "../ui/FormFields";
 import { FormBlock } from "../ui/FormBlock";
@@ -24,11 +25,15 @@ export const LocationInput: React.FC<LocationInputProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const locationButtonRef = useRef<HTMLButtonElement>(null);
 
   const clearGeoError = () => {
-    if (geoError) {
-      setGeoError(null);
-    }
+    setGeoError(null);
+  };
+
+  const handleDismissError = () => {
+    setGeoError(null);
+    locationButtonRef.current?.focus();
   };
 
   const handleLatitudeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,6 +105,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         error={coordinateError(data.longitude, "longitude") ?? undefined}
       />
       <Button
+        ref={locationButtonRef}
         type="button"
         variant="secondary"
         onClick={handleGetCurrentLocation}
@@ -112,31 +118,9 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         {isLoading ? "Fetching location…" : "Use Current Location"}
       </Button>
       {geoError && (
-        <div
-          role="alert"
-          className="flex flex-col gap-2 rounded-lg border border-danger-line bg-danger-soft p-3 text-xs text-danger"
-        >
-          <p>{geoError}</p>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="xs"
-              onClick={handleGetCurrentLocation}
-              disabled={isLoading}
-            >
-              Retry
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              onClick={() => setGeoError(null)}
-            >
-              Dismiss
-            </Button>
-          </div>
-        </div>
+        <Alert variant="error" onDismiss={handleDismissError}>
+          {geoError}
+        </Alert>
       )}
     </FormBlock>
   );

@@ -21,6 +21,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LocationInput } from './LocationInput';
 import type { LocationData } from '../../types';
 import { announcePolitely } from '../../utils/a11y';
+import { axe } from '../../../tests/utils/axe';
 
 vi.mock('../../utils/a11y', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../utils/a11y')>();
@@ -41,13 +42,13 @@ const renderLocationInput = (
   onChange = vi.fn()
 ) => {
   const data = { ...defaultData, ...overrides };
-  render(<LocationInput data={data} onChange={onChange} />);
-  return { onChange };
+  const view = render(<LocationInput data={data} onChange={onChange} />);
+  return { ...view, onChange };
 };
 
 /** Create a minimal GeolocationPositionError-like object. */
 const geoError = (code: number): GeolocationPositionError =>
-  ({ code, message: '', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 } as GeolocationPositionError);
+  ({ code, message: '', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }) satisfies GeolocationPositionError;
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -339,17 +340,23 @@ describe('LocationInput component', () => {
       });
     });
 
-    it('clears geolocation error when latitude input changes', async () => {
+    const failGeolocation = async (code = 1) => {
       vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
-        (_success, errorCb) => errorCb!(geoError(1))
+        (_success, errorCb) => errorCb!(geoError(code))
       );
 
-      renderLocationInput();
+      const rendered = renderLocationInput();
       fireEvent.click(screen.getByRole('button', { name: /use current location/i }));
 
       await waitFor(() => {
         expect(screen.getByRole('alert')).toBeInTheDocument();
       });
+
+      return rendered;
+    };
+
+    it('clears geolocation error when latitude input changes', async () => {
+      await failGeolocation();
 
       fireEvent.change(screen.getByLabelText('Latitude'), {
         target: { value: '40.7128' },
@@ -359,16 +366,7 @@ describe('LocationInput component', () => {
     });
 
     it('clears geolocation error when longitude input changes', async () => {
-      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
-        (_success, errorCb) => errorCb!(geoError(1))
-      );
-
-      renderLocationInput();
-      fireEvent.click(screen.getByRole('button', { name: /use current location/i }));
-
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument();
-      });
+      await failGeolocation();
 
       fireEvent.change(screen.getByLabelText('Longitude'), {
         target: { value: '-74.0060' },
@@ -377,97 +375,21 @@ describe('LocationInput component', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
-    it('clears geolocation error when typing invalid coordinate text', async () => {
-      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
-        (_success, errorCb) => errorCb!(geoError(1))
-      );
+    it('dismisses error banner when Dismiss button is clicked and returns focus', async () => {
+      await failGeolocation();
 
-      renderLocationInput();
-      fireEvent.click(screen.getByRole('button', { name: /use current location/i }));
-
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument();
-      });
-
-      fireEvent.change(screen.getByLabelText('Latitude'), {
-        target: { value: 'abc' },
-      });
-
-      expect(screen.queryByText(/location access denied/i)).not.toBeInTheDocument();
-    });
-
-    it('triggers position fetch when Retry button is clicked in the error banner', async () => {
-      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
-        (_success, errorCb) => errorCb!(geoError(1))
-      );
-
-      renderLocationInput();
-      fireEvent.click(screen.getByRole('button', { name: /use current location/i }));
-
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument();
-      });
-
-      const retryButton = screen.getByRole('button', { name: /retry/i });
-      expect(retryButton).toBeInTheDocument();
-
-      const successPosition = {
-        coords: { latitude: 37.7749, longitude: -122.4194, accuracy: 10 },
-      } as GeolocationPosition;
-
-      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
-        (successCb) => successCb(successPosition)
-      );
-
-      fireEvent.click(retryButton);
-
-      await waitFor(() => {
-        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-      });
-    });
-
-    it('updates error message during repeated geolocation failures when Retry is clicked', async () => {
-      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementationOnce(
-        (_success, errorCb) => errorCb!(geoError(1))
-      );
-
-      renderLocationInput();
-      fireEvent.click(screen.getByRole('button', { name: /use current location/i }));
-
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toHaveTextContent(/location access denied/i);
-      });
-
-      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementationOnce(
-        (_success, errorCb) => errorCb!(geoError(3))
-      );
-
-      const retryButton = screen.getByRole('button', { name: /retry/i });
-      fireEvent.click(retryButton);
-
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toHaveTextContent(/timed out/i);
-      });
-    });
-
-    it('dismisses error banner when Dismiss button is clicked', async () => {
-      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
-        (_success, errorCb) => errorCb!(geoError(1))
-      );
-
-      renderLocationInput();
-      fireEvent.click(screen.getByRole('button', { name: /use current location/i }));
-
-      await waitFor(() => {
-        expect(screen.getByRole('alert')).toBeInTheDocument();
-      });
-
-      const dismissButton = screen.getByRole('button', { name: /dismiss/i });
+      const dismissButton = screen.getByRole('button', { name: /dismiss alert/i });
       expect(dismissButton).toBeInTheDocument();
 
       fireEvent.click(dismissButton);
 
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /use current location/i })).toHaveFocus();
+    });
+
+    it('passes axe accessibility checks when error banner is visible', async () => {
+      const { container } = await failGeolocation();
+      expect(await axe(container)).toHaveNoViolations();
     });
   });
 
