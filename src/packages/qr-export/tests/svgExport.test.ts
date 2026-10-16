@@ -74,7 +74,7 @@ if (typeof globalThis.DOMParser === 'undefined') {
 
 import { generateQRSvg, PayloadRejectedError, rasterizeSvgToCanvas, validateSvgScannability, preflightLogoCheck } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
-import { QRStyle, type QRConfig, SocialFormat, TemplateStyle, QRType } from '@/types';
+import { EyeShape, QRStyle, type QRConfig, SocialFormat, TemplateStyle, QRType } from '@/types';
 
 function parseAndAssertValidSvg(svgString: string): Document {
   const parser = new DOMParser();
@@ -787,5 +787,23 @@ describe('generateQRSvg', () => {
       expect(result.ok).toBe(false);
       expect(result.error).toContain('invalid or unsafe');
     });
+  });
+});
+
+describe('generateQRSvg eye shapes', () => {
+  const base: QRConfig = { ...DEFAULT_CONFIG };
+
+  it.each(Object.values(EyeShape))('draws the %s eye differently from the pattern eye, without script', async (shape) => {
+    const defaultSvg = await generateQRSvg(base);
+    const shaped = await generateQRSvg({ ...base, eyeFrameShape: shape, eyeBallShape: shape });
+    expect(shaped).not.toBe(defaultSvg);
+    expect(shaped).not.toMatch(/<script/i);
+    parseAndAssertValidSvg(shaped);
+  });
+
+  it('renders the same SVG when both eye shape fields are unset as when they are explicitly undefined', async () => {
+    const unset = await generateQRSvg(base);
+    const explicit = await generateQRSvg({ ...base, eyeFrameShape: undefined, eyeBallShape: undefined });
+    expect(explicit).toBe(unset);
   });
 });

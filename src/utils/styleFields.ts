@@ -7,6 +7,7 @@ import {
   type FramePosition,
   type FrameStyle,
   type ColorStop,
+  EyeShape,
   type GradientType,
   type LogoPaddingStyle,
   type MosaicMode,
@@ -26,6 +27,9 @@ type FieldRule =
   | { kind: 'colorStops' };
 
 const enumOf = (values: readonly string[]): FieldRule => ({ kind: 'enum', values });
+
+/** Frame and ball shapes share one rule; an unset shape means "match the pattern". */
+const EYE_SHAPE_RULE = enumOf(Object.values(EyeShape));
 
 /**
  * Every setting a style file or brand template may carry, with the values each accepts. Anything else in a file
@@ -70,6 +74,8 @@ const STYLE_FIELDS: Partial<Record<keyof QRConfig, FieldRule>> = {
   frameFontFamily: enumOf(FRAME_FONT_FAMILIES),
   eyeFrameColor: { kind: 'color' },
   eyeBallColor: { kind: 'color' },
+  eyeFrameShape: EYE_SHAPE_RULE,
+  eyeBallShape: EYE_SHAPE_RULE,
   mazePathWidth: { kind: 'number', min: 0.1, max: 0.5 },
   mosaicMode: enumOf(['tiles', 'halftone'] satisfies MosaicMode[]),
   mosaicContrast: { kind: 'number', min: 0, max: 1 },
@@ -127,7 +133,8 @@ export function pickStyle(source: Record<string, unknown>): { style: Partial<QRC
   let skipped = 0;
   for (const key of Object.keys(STYLE_FIELDS) as (keyof QRConfig)[]) {
     const rule = STYLE_FIELDS[key];
-    if (!rule || !(key in source)) continue;
+    // An unset field (such as an eye shape left to match the pattern) is absent, not rejected.
+    if (!rule || source[key] === undefined) continue;
     const value = cleanValue(rule, source[key]);
     if (value === undefined) skipped += 1;
     else style[key] = value;

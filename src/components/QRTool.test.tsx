@@ -981,7 +981,8 @@ describe('Generator workspace structure (#795, #802)', { timeout: 20000 }, () =>
 
     fireEvent.click(layout);
     expect(layout).toHaveAttribute('aria-expanded', 'true');
-    const headline = screen.getByRole('radio', { name: /Minimalist template/i });
+    // The section's controls load on first open, then stay mounted.
+    const headline = await screen.findByRole('radio', { name: /Minimalist template/i });
     fireEvent.click(headline);
     const headlineInput = screen.getByLabelText('Template headline');
     fireEvent.change(headlineInput, { target: { value: 'Scan me' } });

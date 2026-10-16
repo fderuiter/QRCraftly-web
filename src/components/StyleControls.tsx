@@ -21,14 +21,11 @@ import React, { createContext, lazy, Suspense, useContext, useEffect, useState }
 import type { QRConfig } from '../types';
 import type { LandingPrimaryAction } from '../data/landingPages';
 import {
-  BorderControls,
-  FrameControls,
   PatternControls,
   ColorControls,
   LogoControls,
   MosaicControls,
   AdvancedControls,
-  LayoutControls,
   BrandTemplateGallery
 } from './style-controls';
 import { Accordion, AccordionItem } from './ui/Accordion';
@@ -39,6 +36,12 @@ import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 // The gallery draws a thumbnail of the person's QR for every look, so it loads (and draws)
 // only once its section is first opened.
 const StyleGallery = lazy(() => import('./style-controls/StyleGallery'));
+
+// No landing page opens Layout & Border, so its three panels load once it is first opened and stay
+// out of every page's first load (#1465).
+const LayoutControls = lazy(() => import('./style-controls/LayoutControls').then((module) => ({ default: module.LayoutControls })));
+const BorderControls = lazy(() => import('./style-controls/BorderControls').then((module) => ({ default: module.BorderControls })));
+const FrameControls = lazy(() => import('./style-controls/FrameControls').then((module) => ({ default: module.FrameControls })));
 
 /**
  * Appearance sections the person has expanded or collapsed during this visit. Held in memory
@@ -94,6 +97,8 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
   const primaryAction = useContext(PresetPrimaryAction);
   const reduceMotion = usePrefersReducedMotion();
   const [galleryOpened, setGalleryOpened] = useState(false);
+  const layoutOpenAtStart = sectionOpenState.get('Layout & Border') ?? presetOpen.includes('Layout & Border');
+  const [layoutOpened, setLayoutOpened] = useState(layoutOpenAtStart);
   // Each press of the call to action counts up, so the section reopens even after the person closed it.
   const [openRequest, setOpenRequest] = useState<{ section: string; count: number } | null>(null);
   const requestFor = (title: string) => (openRequest?.section === title ? openRequest.count : undefined);
@@ -153,16 +158,29 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
       </AccordionItem>
 
       {/* Export layout (social media templates) and border */}
-      <AccordionItem title="Layout & Border" headingLevel={3} defaultOpen={sectionOpenState.get('Layout & Border') ?? presetOpen.includes('Layout & Border')} onOpenChange={rememberSection('Layout & Border')} openRequest={requestFor('Layout & Border')}>
-        <div className="space-y-6 pt-1">
-          <LayoutControls config={config} onChange={onChange} />
-          <div className="border-t border-line pt-5">
-            <BorderControls config={config} onChange={onChange} />
-          </div>
-          <div className="border-t border-line pt-5">
-            <FrameControls config={config} onChange={onChange} />
-          </div>
-        </div>
+      <AccordionItem
+        title="Layout & Border"
+        headingLevel={3}
+        defaultOpen={layoutOpenAtStart}
+        onOpenChange={(open) => {
+          rememberSection('Layout & Border')(open);
+          if (open) setLayoutOpened(true);
+        }}
+        openRequest={requestFor('Layout & Border')}
+      >
+        {layoutOpened && (
+          <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+            <div className="space-y-6 pt-1">
+              <LayoutControls config={config} onChange={onChange} />
+              <div className="border-t border-line pt-5">
+                <BorderControls config={config} onChange={onChange} />
+              </div>
+              <div className="border-t border-line pt-5">
+                <FrameControls config={config} onChange={onChange} />
+              </div>
+            </div>
+          </Suspense>
+        )}
       </AccordionItem>
 
       <AccordionItem title="Logo" headingLevel={3} defaultOpen={sectionOpenState.get('Logo') ?? presetOpen.includes('Logo')} onOpenChange={rememberSection('Logo')} openRequest={requestFor('Logo')}>

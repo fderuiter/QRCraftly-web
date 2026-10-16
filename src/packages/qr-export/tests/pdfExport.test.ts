@@ -31,7 +31,7 @@ if (typeof globalThis.DOMParser === 'undefined') {
 
 import { generateQRPdf, convertSvgToPdf, MissingImageError, PayloadRejectedError } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
-import { QRType } from '@/types';
+import { EyeShape, type QRConfig, QRType } from '@/types';
 
 describe('PDF Vector Export', () => {
   it('generates a valid PDF document with standard structure and xref table', async () => {
@@ -190,3 +190,12 @@ describe('PDF Vector Export', () => {
   });
 });
 
+describe('PDF eye shapes', () => {
+  it('draws a circle frame and a leaf ball differently from the pattern eyes', async () => {
+    const base: QRConfig = { ...DEFAULT_CONFIG };
+    const defaultPdf = await generateQRPdf(base);
+    const shaped = await generateQRPdf({ ...base, eyeFrameShape: EyeShape.CIRCLE, eyeBallShape: EyeShape.LEAF });
+    expect(shaped.length).toBeGreaterThan(0);
+    expect(new TextDecoder().decode(shaped)).not.toBe(new TextDecoder().decode(defaultPdf));
+  });
+});
