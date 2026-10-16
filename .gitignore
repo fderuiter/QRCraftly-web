@@ -46,3 +46,4 @@ quota-report.md
 
 # Rust build output (the committed modules live in src/wasm/)
 crates/target/
+.vitest-reports

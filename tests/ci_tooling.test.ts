@@ -36,7 +36,7 @@ describe('CI triggers and tiers (main.yml, ADR 0050)', () => {
 
   it('lets the plan decide the E2E and Lighthouse tiers', () => {
     expect(jobBlock('plan')).toContain('run: node scripts/ci/ci_plan.js');
-    expect(jobBlock('test')).toContain("if: needs.plan.outputs.unit_tests == 'true'");
+    expect(jobBlock('test-shard')).toContain("if: needs.plan.outputs.unit_tests == 'true'");
     expect(jobBlock('e2e')).toContain("if: needs.plan.outputs.e2e != 'none'");
     expect(jobBlock('e2e')).toContain('pnpm run test:e2e --project=chromium --project=chromium-csp');
     expect(jobBlock('lighthouse')).toContain("if: needs.plan.outputs.lighthouse != 'none'");
@@ -50,6 +50,30 @@ describe('CI triggers and tiers (main.yml, ADR 0050)', () => {
     expect(ci).toContain('if: always()');
     expect(ci).toContain('[ "$PLAN_RESULT" != "success" ]');
     expect(ci).toContain('[ "$result" != "skipped" ]');
+  });
+
+  it('runs unit tests in parallel shards and checks coverage once on the merged reports', () => {
+    const shard = jobBlock('test-shard');
+    expect(shard).toContain('shard: [1, 2, 3]');
+    expect(shard).toContain('fail-fast: false');
+    expect(shard).toContain('VITEST_SHARD_RUN: "true"');
+    expect(shard).toContain('--shard="$SHARD/3" --reporter=blob');
+    expect(shard).toContain('include-hidden-files: true');
+
+    const merge = jobBlock('test');
+    expect(merge).toContain('needs: [plan, test-shard]');
+    expect(merge).toContain("if: ${{ !cancelled() && needs.plan.outputs.unit_tests == 'true' }}");
+    expect(merge).toContain('[ "$SHARDS_RESULT" != "success" ]');
+    expect(merge).toContain('pnpm exec vitest run --merge-reports --coverage');
+    expect(merge).not.toContain('VITEST_SHARD_RUN');
+    expect(read('vite.config.ts')).toContain("thresholds: process.env.VITEST_SHARD_RUN === 'true' ? {} : { ...coverageThresholds }");
+  });
+
+  it('passes the Plan job what it needs to check who approved a bot PR', () => {
+    const plan = jobBlock('plan');
+    expect(plan).toContain('issues: read');
+    expect(plan).toContain('PR_NUMBER: ${{ github.event.pull_request.number }}');
+    expect(plan).toContain('GH_TOKEN: ${{ github.token }}');
   });
 });
 

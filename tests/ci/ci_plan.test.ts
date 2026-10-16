@@ -1,8 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { awaitsApproval, formatPlan, isDocsOnlyFile, planRun } from '../../scripts/ci/ci_plan.js';
+import { approvalIsTrusted, awaitsApproval, formatPlan, isDocsOnlyFile, isGatedPullRequest, planRun, QUICK } from '../../scripts/ci/ci_plan.js';
 import { SAMPLE_ROUTES, sampleUrls } from '../../scripts/ci/lighthouse_sample.js';
 
 const SHA = 'a'.repeat(40);
+const API = 'https://api.github.com/repos/o/r/';
+
+/**
+ * A fetch stand-in that answers GitHub API paths from a table and records every call.
+ * Paths missing from the table answer 404.
+ */
+function fakeFetch(routes: Record<string, unknown>, calls: string[] = []): typeof fetch {
+  return async (input: RequestInfo | URL) => {
+    const url = String(input);
+    calls.push(url);
+    const path = url.startsWith(API) ? url.slice(API.length) : url;
+    if (!(path in routes)) return new Response('{}', { status: 404 });
+    return new Response(JSON.stringify(routes[path]), { status: 200 });
+  };
+}
+
+const labeled = (login: string, type = 'User', name = 'ci-approved') => ({ event: 'labeled', label: { name }, actor: { login, type } });
+const EVENTS = 'issues/7/events?per_page=100&page=1';
 
 describe('scripts/ci/ci_plan.js', () => {
   it('runs Chromium E2E and sampled Lighthouse on a ready pull request', () => {
@@ -61,6 +79,83 @@ describe('scripts/ci/ci_plan.js', () => {
     expect(awaitsApproval({ ...stitch, labels: '' })).toBe(true);
     expect(awaitsApproval({ ...stitch, labels: '["ci-approved"]' })).toBe(false);
     expect(awaitsApproval({ eventName: 'pull_request', author: 'someone', headRef: 'stitch/x', labels: '[]' })).toBe(true);
+  });
+
+  it('runs the quick tier, the same as a draft, while a bot PR waits', () => {
+    expect(QUICK).toEqual({ runChecks: true, codeChanged: true, unitTests: false, e2e: 'none', lighthouse: 'none' });
+    expect(planRun({ eventName: 'pull_request', isDraft: 'true', changedFiles: ['src/App.tsx'] })).toEqual(QUICK);
+    expect(isGatedPullRequest({ eventName: 'pull_request', author: 'google-labs-stitch[bot]', headRef: 'feature' })).toBe(true);
+    expect(isGatedPullRequest({ eventName: 'pull_request', author: 'fderuiter', headRef: 'claude/x' })).toBe(false);
+    expect(isGatedPullRequest({ eventName: 'merge_group', author: 'google-labs-stitch[bot]', headRef: 'stitch/x' })).toBe(false);
+  });
+
+  it('counts ci-approved only when an admin or maintainer added it', async () => {
+    const base = { token: 't', repo: 'o/r', prNumber: '7' };
+    const admin = fakeFetch({
+      [EVENTS]: [labeled('fderuiter')],
+      'collaborators/fderuiter/permission': { permission: 'admin', role_name: 'admin' },
+    });
+    expect(await approvalIsTrusted({ ...base, fetchImpl: admin })).toEqual({ trusted: true, reason: 'added by fderuiter (admin)' });
+
+    const maintainer = fakeFetch({ [EVENTS]: [labeled('m')], 'collaborators/m/permission': { permission: 'write', role_name: 'maintain' } });
+    expect((await approvalIsTrusted({ ...base, fetchImpl: maintainer })).trusted).toBe(true);
+
+    const writer = fakeFetch({ [EVENTS]: [labeled('w')], 'collaborators/w/permission': { permission: 'write', role_name: 'write' } });
+    expect(await approvalIsTrusted({ ...base, fetchImpl: writer })).toEqual({ trusted: false, reason: 'added by w, whose role is write' });
+  });
+
+  it('judges the newest ci-approved event and ignores other labels', async () => {
+    const calls: string[] = [];
+    const fetchImpl = fakeFetch(
+      {
+        [EVENTS]: [labeled('fderuiter'), labeled('google-labs-stitch[bot]', 'Bot', 'stitch:ready'), labeled('google-labs-stitch[bot]', 'Bot')],
+        'collaborators/fderuiter/permission': { permission: 'admin', role_name: 'admin' },
+      },
+      calls,
+    );
+    expect(await approvalIsTrusted({ token: 't', repo: 'o/r', prNumber: '7', fetchImpl })).toEqual({
+      trusted: false,
+      reason: 'google-labs-stitch[bot] is a bot',
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('fails closed on missing input, a missing event or an API error', async () => {
+    const never = fakeFetch({});
+    expect((await approvalIsTrusted({ token: '', repo: 'o/r', prNumber: '7', fetchImpl: never })).trusted).toBe(false);
+    expect((await approvalIsTrusted({ token: 't', repo: 'o/r', prNumber: '', fetchImpl: never })).trusted).toBe(false);
+    expect((await approvalIsTrusted({ token: 't', repo: 'o/r', prNumber: '7 ', fetchImpl: never })).trusted).toBe(false);
+    expect(await approvalIsTrusted({ token: 't', repo: 'o/r', prNumber: '7', fetchImpl: never })).toEqual({
+      trusted: false,
+      reason: 'GET issues/7/events?per_page=100&page=1 returned 404',
+    });
+    const noLabel = fakeFetch({ [EVENTS]: [labeled('fderuiter', 'User', 'bug')] });
+    expect(await approvalIsTrusted({ token: 't', repo: 'o/r', prNumber: '7', fetchImpl: noLabel })).toEqual({
+      trusted: false,
+      reason: 'no ci-approved label event found',
+    });
+    const unknownUser = fakeFetch({ [EVENTS]: [labeled('ghost')] });
+    expect((await approvalIsTrusted({ token: 't', repo: 'o/r', prNumber: '7', fetchImpl: unknownUser })).trusted).toBe(false);
+  });
+
+  it('reads further pages of events when the first one is full', async () => {
+    const filler = Array.from({ length: 100 }, () => ({ event: 'commented', actor: { login: 'x', type: 'User' } }));
+    const fetchImpl = fakeFetch({
+      [EVENTS]: filler,
+      'issues/7/events?per_page=100&page=2': [labeled('fderuiter')],
+      'collaborators/fderuiter/permission': { permission: 'admin', role_name: 'admin' },
+    });
+    expect((await approvalIsTrusted({ token: 't', repo: 'o/r', prNumber: '7', fetchImpl })).trusted).toBe(true);
+  });
+
+  it('fails closed when the events run past the pages it reads', async () => {
+    const full = [...Array.from({ length: 99 }, () => ({ event: 'commented', actor: { login: 'x', type: 'User' } })), labeled('fderuiter')];
+    const routes: Record<string, unknown> = { 'collaborators/fderuiter/permission': { permission: 'admin', role_name: 'admin' } };
+    for (let page = 1; page <= 10; page += 1) routes[`issues/7/events?per_page=100&page=${page}`] = full;
+    expect(await approvalIsTrusted({ token: 't', repo: 'o/r', prNumber: '7', fetchImpl: fakeFetch(routes) })).toEqual({
+      trusted: false,
+      reason: 'more than 1000 issue events',
+    });
   });
 
   it('never holds people, Claude branches or non-PR runs', () => {
