@@ -19,7 +19,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Download, Share2 } from 'lucide-react';
 import { type QRConfig, QRType } from '@/types';
-import { renderWalletCard, walletRefusalReason, WALLET_CARD_TEXT_LIMITS, WALLET_CARD_SIZE } from '@/packages/qr-export';
+import { renderWalletCard, walletRefusalReason, WALLET_CARD_TEXT_LIMITS, WALLET_CARD_SIZE, WalletCardRefusedError } from '@/packages/qr-export';
 import { hydrateWifiData } from '@/packages/qr-payload';
 import { getQRTypeLabel } from '@/data/qrTypeLabels';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -141,6 +141,10 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
       }
       return await toPng(canvas);
     } catch (err) {
+      if (err instanceof WalletCardRefusedError) {
+        addToast({ type: 'error', message: err.message, duration: 6000 });
+        return null;
+      }
       addToast({ type: 'error', message: err instanceof Error ? err.message : 'The wallet card could not be made.', duration: 6000 });
       return null;
     }
