@@ -71,13 +71,11 @@ export const ColorInput: React.FC<ColorInputProps> = ({
     const normalized = normalizeHex(textValue.trim());
     if (normalized) {
       setTextValue(normalized);
-      onChange(normalized);
+      if (normalized !== normalizeHex(value)) onChange(normalized);
     } else {
       setTextValue(displayValue || value);
     }
-    if (onBlur) {
-      onBlur(e);
-    }
+    onBlur?.(e);
   };
 
   const errorId = error ? `${id}-error` : undefined;

@@ -202,11 +202,12 @@ describe('ColorInput Component Accessibility', () => {
       // User blurs input
       fireEvent.blur(textInput);
       expect(textInput.value).toBe('#ff0000');
+      expect(handleChange).not.toHaveBeenCalled();
     });
 
     it('should normalize valid 3-digit shorthand hex string to 6-digit hex code on blur', () => {
       const handleChange = vi.fn();
-      render(
+      const { rerender } = render(
         <ColorInput
           id="test-blur-shorthand"
           label="Shorthand Test"
@@ -221,14 +222,24 @@ describe('ColorInput Component Accessibility', () => {
       fireEvent.change(textInput, { target: { value: '#123' } });
       expect(handleChange).toHaveBeenCalledWith('#112233');
 
+      rerender(
+        <ColorInput
+          id="test-blur-shorthand"
+          label="Shorthand Test"
+          value="#112233"
+          onChange={handleChange}
+        />
+      );
+
       // User blurs input
       fireEvent.blur(textInput);
       expect(textInput.value).toBe('#112233');
+      expect(handleChange).toHaveBeenCalledTimes(1);
     });
 
     it('should normalize valid hex without # and uppercase on blur', () => {
       const handleChange = vi.fn();
-      render(
+      const { rerender } = render(
         <ColorInput
           id="test-blur-format"
           label="Format Test"
@@ -242,8 +253,18 @@ describe('ColorInput Component Accessibility', () => {
       fireEvent.change(textInput, { target: { value: 'ABCDEF' } });
       expect(handleChange).toHaveBeenCalledWith('#abcdef');
 
+      rerender(
+        <ColorInput
+          id="test-blur-format"
+          label="Format Test"
+          value="#abcdef"
+          onChange={handleChange}
+        />
+      );
+
       fireEvent.blur(textInput);
       expect(textInput.value).toBe('#abcdef');
+      expect(handleChange).toHaveBeenCalledTimes(1);
     });
 
     it('should reset displayValue prop when defined and an invalid string is entered on blur', () => {
@@ -266,6 +287,29 @@ describe('ColorInput Component Accessibility', () => {
 
       fireEvent.blur(textInput);
       expect(textInput.value).toBe('#222222');
+      expect(handleChange).not.toHaveBeenCalled();
+    });
+
+    it('should normalize and trigger onChange on blur when input has leading or trailing spaces', () => {
+      const handleChange = vi.fn();
+      render(
+        <ColorInput
+          id="test-blur-whitespace"
+          label="Whitespace Test"
+          value="#000000"
+          onChange={handleChange}
+        />
+      );
+
+      const textInput = screen.getByLabelText('Whitespace Test Hex Code') as HTMLInputElement;
+
+      fireEvent.change(textInput, { target: { value: ' #123 ' } });
+      expect(handleChange).not.toHaveBeenCalled();
+
+      fireEvent.blur(textInput);
+      expect(handleChange).toHaveBeenCalledTimes(1);
+      expect(handleChange).toHaveBeenCalledWith('#112233');
+      expect(textInput.value).toBe('#112233');
     });
 
     it('should invoke optional onBlur callback prop when focus leaves text field', () => {
