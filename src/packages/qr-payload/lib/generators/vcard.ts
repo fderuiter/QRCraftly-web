@@ -27,6 +27,7 @@ import {
   splitCompoundField,
   parseRFCProperties,
 } from '../rfcHelper';
+import { VCARD_SOCIAL_FIELDS, VCARD_SOCIAL_NETWORKS, socialFieldForParams, socialProfileUrl } from '../vcardSocial';
 
 /**
  * Escapes special characters for MECard format.
@@ -182,9 +183,12 @@ export const hydrateVCardData = (raw: string): VCardData => {
       case 'EMAIL':
         result.email = unescapeVCardEvent(value);
         break;
-      case 'URL':
-        result.website = unescapeVCardEvent(value);
+      case 'URL': {
+        // `URL;TYPE=linkedin:` lines are the social profile fields (#1470).
+        const social = socialFieldForParams(params);
+        result[social ?? 'website'] = unescapeVCardEvent(value);
         break;
+      }
       case 'ADR': {
         const adrParts = splitCompoundField(value, ';');
         result.street = unescapeVCardEvent(adrParts[2] || '');
@@ -210,12 +214,26 @@ export const hydrateVCardData = (raw: string): VCardData => {
 
 const isPopulated = (str: string | undefined): boolean => Boolean(str && str.trim().length > 0);
 
+/** The fields MECard carries too. */
+const CONTACT_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country'] as const satisfies readonly (keyof VCardData)[];
+
 /** The fields a visitor types; a card with none of them filled in is empty. */
-export const CARD_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country'] as const satisfies readonly (keyof VCardData)[];
+export const CARD_FIELDS = [...CONTACT_FIELDS, ...VCARD_SOCIAL_FIELDS] as const satisfies readonly (keyof VCardData)[];
+
+/**
+ * The fields a card format carries: MECard has no social profiles, so they are left out (#1470).
+ * @param version - The card format.
+ * @returns The fields to check and encode.
+ */
+export const cardFieldsFor = (version: VCardData['version']): readonly (typeof CARD_FIELDS)[number][] =>
+  version === 'mecard' ? CONTACT_FIELDS : CARD_FIELDS;
+
+const isSocialField = (field: keyof VCardData): field is (typeof VCARD_SOCIAL_FIELDS)[number] =>
+  VCARD_SOCIAL_FIELDS.some((social) => social === field);
 
 /**
  * Validates an individual vCard field for user input errors.
- * Scheme validation (`isDangerousUrl`) is applied ONLY to the `website` field.
+ * Scheme validation (`isDangerousUrl`) is applied ONLY to the `website` and social profile fields.
  * All other plain text fields are checked only for control/hidden characters.
  */
 export const vCardFieldError = (
@@ -223,6 +241,9 @@ export const vCardFieldError = (
   value: string | undefined
 ): string | undefined => {
   if (!value) return undefined;
+  if (isSocialField(field)) {
+    return socialProfileUrl(field, value)?.error;
+  }
   if (field === 'website' && isDangerousUrl(value)) {
     return 'Unsafe URL scheme or malicious protocol detected.';
   }
@@ -237,8 +258,8 @@ export const vCardFieldError = (
  */
 export const constructVCardString = (data: VCardData): string => {
   // An empty card gives no code, so the generator shows its sample state (#1272).
-  if (!data || !CARD_FIELDS.some((field) => isPopulated(data[field]))) return '';
-  const version = data.version || '3.0';
+  const version = data?.version || '3.0';
+  if (!data || !cardFieldsFor(version).some((field) => isPopulated(data[field]))) return '';
 
   if (version === 'mecard') {
     const lastName = escapeMECard(data.lastName);
@@ -312,6 +333,11 @@ export const constructVCardString = (data: VCardData): string => {
   if (isPopulated(phone)) parts.push(prop('TEL', phone));
   if (isPopulated(email)) parts.push(prop('EMAIL', email));
   if (isPopulated(website)) parts.push(`URL:${website}`);
+  // One `URL;TYPE=<network>:` line per profile: iOS and Google Contacts both import extra URL lines.
+  for (const field of VCARD_SOCIAL_FIELDS) {
+    const profile = socialProfileUrl(field, data[field]);
+    if (profile?.url) parts.push(`URL;TYPE=${VCARD_SOCIAL_NETWORKS[field].type}:${profile.url}`);
+  }
 
   if (isPopulated(street) || isPopulated(city) || isPopulated(zip) || isPopulated(country)) {
     parts.push(prop('ADR', `;;${street};${city};;${zip};${country}`));

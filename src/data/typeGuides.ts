@@ -72,7 +72,7 @@ export const typeGuides: Record<string, TypeGuide> = {
   },
   'vcard-qr-code': {
     intro:
-      'Put your contact details in a QR code. One scan offers to save your name, number, email and company to the phone’s contacts.',
+      'Put your contact details in a QR code. One scan offers to save your name, number, email, company and social profiles to the phone’s contacts.',
     scanned: [
       'The iPhone Camera app and most Android camera apps, or Google Lens, show the contact and offer to save it. The person can check the fields first. No internet connection is needed, because the details are in the code itself.',
       'A saved contact is a copy. If your details change, people who already scanned keep the old ones, so a website you keep up to date is worth adding.',
@@ -236,9 +236,9 @@ export const typeGuides: Record<string, TypeGuide> = {
   },
   'payment-qr-code': {
     intro:
-      'Make a QR code that asks for a payment: a Bitcoin, Ethereum, Solana or Litecoin request, a SEPA bank transfer, or a PayPal, Venmo or Cash App link.',
+      'Make a QR code that asks for a payment: a Bitcoin, Ethereum, Solana or Litecoin request, a SEPA bank transfer, a UPI payment in India, or a PayPal, Venmo or Cash App link.',
     scanned: [
-      'A crypto code opens a payment screen in a wallet app that supports that network. A SEPA code fills in a transfer in banking apps that read EPC codes. PayPal, Venmo and Cash App codes are links that open the app or website.',
+      'A crypto code opens a payment screen in a wallet app that supports that network. A SEPA code fills in a transfer in banking apps that read EPC codes. A UPI code opens the payment screen in a UPI app such as Google Pay, PhonePe, Paytm or BHIM. PayPal, Venmo and Cash App codes are links that open the app or website.',
       'Nothing is paid by scanning. The payer checks the details and approves the payment in their own app.',
     ],
     useCases: [
