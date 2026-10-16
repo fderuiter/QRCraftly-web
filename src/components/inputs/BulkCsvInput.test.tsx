@@ -255,6 +255,66 @@ describe('BulkCsvInput Component', () => {
     });
   });
 
+  it('generates ZIP batch and triggers file download for valid CSV rows in EPS format', async () => {
+    const convertEpsSpy = vi.spyOn(qrExport, 'convertSvgToEps');
+    const csvContent = 'URL,Name\nhttps://example.com/1,Code1\nhttps://example.com/2,Code2';
+
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent,
+      payloadColumn: 'URL',
+      filenameColumn: 'Name',
+      exportFormat: 'eps',
+      fileName: 'urls.csv',
+    };
+
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+
+    const generateBtn = screen.getByRole('button', { name: 'Generate Batch' });
+    fireEvent.click(generateBtn);
+
+    await waitFor(() => {
+      expect(downloadManager.triggerFileDownload).toHaveBeenCalledWith(
+        expect.any(Uint8Array),
+        'urls-qrcodes.zip',
+        'application/zip'
+      );
+    });
+    expect(convertEpsSpy).toHaveBeenCalledTimes(2);
+    expect(zipEntryNames(downloadedZip())).toEqual(['Code1.eps', 'Code2.eps']);
+    convertEpsSpy.mockRestore();
+  });
+
+  it('generates ZIP batch and triggers file download for valid CSV rows in PDF format', async () => {
+    const convertPdfSpy = vi.spyOn(qrExport, 'convertSvgToPdf');
+    const csvContent = 'URL,Name\nhttps://example.com/1,Code1\nhttps://example.com/2,Code2';
+
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent,
+      payloadColumn: 'URL',
+      filenameColumn: 'Name',
+      exportFormat: 'pdf',
+      fileName: 'urls.csv',
+    };
+
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+
+    const generateBtn = screen.getByRole('button', { name: 'Generate Batch' });
+    fireEvent.click(generateBtn);
+
+    await waitFor(() => {
+      expect(downloadManager.triggerFileDownload).toHaveBeenCalledWith(
+        expect.any(Uint8Array),
+        'urls-qrcodes.zip',
+        'application/zip'
+      );
+    });
+    expect(convertPdfSpy).toHaveBeenCalledTimes(2);
+    expect(zipEntryNames(downloadedZip())).toEqual(['Code1.pdf', 'Code2.pdf']);
+    convertPdfSpy.mockRestore();
+  });
+
   it('skips rows with dangerous payloads, lists them, and still zips the rest (#1152)', async () => {
     const csvContent = [
       'URL,Name',
@@ -396,16 +456,50 @@ describe('BulkCsvInput Component', () => {
     expect(onChange).toHaveBeenCalledWith({ exportResolution: 2000 });
   });
 
-  it('hides resolution selector when SVG format is active', () => {
-    const data: BulkCsvData = {
+  it('hides resolution selector when vector formats (SVG, EPS, PDF) are active', () => {
+    const dataSvg: BulkCsvData = {
       ...initialData,
       csvContent: 'URL,Name\nhttps://example.com/1,Code1',
       exportFormat: 'svg',
     };
-
-    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
-
+    const { rerender } = renderWithProvider(<BulkCsvInput data={dataSvg} onChange={vi.fn()} />);
     expect(screen.queryByLabelText('PNG Width')).not.toBeInTheDocument();
+
+    const dataEps: BulkCsvData = { ...dataSvg, exportFormat: 'eps' };
+    rerender(
+      <QRProvider>
+        <BulkCsvInput data={dataEps} onChange={vi.fn()} />
+      </QRProvider>
+    );
+    expect(screen.queryByLabelText('PNG Width')).not.toBeInTheDocument();
+
+    const dataPdf: BulkCsvData = { ...dataSvg, exportFormat: 'pdf' };
+    rerender(
+      <QRProvider>
+        <BulkCsvInput data={dataPdf} onChange={vi.fn()} />
+      </QRProvider>
+    );
+    expect(screen.queryByLabelText('PNG Width')).not.toBeInTheDocument();
+  });
+
+  it('updates export format when EPS or PDF is selected in the format dropdown', () => {
+    const onChange = vi.fn();
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent: 'URL,Name\nhttps://example.com/1,Code1',
+      exportFormat: 'png',
+    };
+
+    renderWithProvider(<BulkCsvInput data={data} onChange={onChange} />);
+
+    const formatSelect = screen.getByLabelText('Image Format') as HTMLSelectElement;
+    expect(formatSelect).toBeInTheDocument();
+
+    fireEvent.change(formatSelect, { target: { value: 'eps' } });
+    expect(onChange).toHaveBeenCalledWith({ exportFormat: 'eps' });
+
+    fireEvent.change(formatSelect, { target: { value: 'pdf' } });
+    expect(onChange).toHaveBeenCalledWith({ exportFormat: 'pdf' });
   });
 
   it('passes configured resolution to rasterizeSvgToCanvas during PNG batch generation', async () => {

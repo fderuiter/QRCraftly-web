@@ -73,7 +73,7 @@ Please email [fpderuiter+qrcraftly@gmail.com](mailto:fpderuiter+qrcraftly@gmail.
   - Data leaks (e.g., data being sent to a server).
   - XSS vulnerabilities.
   - Improper configuration of the client-side generator (including vCard 2.1, 3.0, 4.0, and MECard formats).
-  - Bulk CSV processing (including the link or plain text content type), custom PNG export resolution settings, & batch ZIP generation privacy boundary violations.
+  - Bulk CSV processing (including link/text content types and PNG/SVG/EPS/PDF export formats), custom PNG export resolution settings, & batch ZIP generation privacy boundary violations.
 - **Out of Scope:**
   - Physical security of the user's device.
   - Browser-level vulnerabilities.

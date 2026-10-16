@@ -47,7 +47,7 @@ import { Modal } from '../ui/Modal';
 import { SelectField } from '../ui/FormFields';
 import { useToast } from '../ui/Toast';
 import { useQRStoreSelector } from '@/context/QRContext';
-import { generateQRSvg, rasterizeSvgToCanvas, preflightLogoCheck, SOCIAL_DIMENSIONS } from '@/packages/qr-export';
+import { generateQRSvg, rasterizeSvgToCanvas, preflightLogoCheck, SOCIAL_DIMENSIONS, convertSvgToEps, convertSvgToPdf } from '@/packages/qr-export';
 import { QrEncodeError } from '@/packages/qr-matrix';
 import { validateConfig, describeViolation } from '@/packages/qr-payload';
 import { triggerFileDownload } from '@/utils/downloadManager';
@@ -90,7 +90,7 @@ function parseContent(csvContent: string): ParseOutcome {
 }
 
 function isExportFormat(value: string): value is BulkCsvData['exportFormat'] {
-  return value === 'png' || value === 'svg';
+  return value === 'png' || value === 'svg' || value === 'eps' || value === 'pdf';
 }
 
 function isContentType(value: string): value is BulkContentType {
@@ -331,6 +331,10 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
           if (exportFormat === 'png') {
             const canvas = await rasterizeSvgToCanvas(svgString, pngWidth, pngHeight);
             entryData = await canvasToPngBytes(canvas);
+          } else if (exportFormat === 'eps') {
+            entryData = await convertSvgToEps(svgString);
+          } else if (exportFormat === 'pdf') {
+            entryData = await convertSvgToPdf(svgString);
           }
           const stem = sanitizeFileStem(row[filenameCol] ?? '', `qr_${rowNumber}`);
           entries.push({ name: allocateFileName(stem, exportFormat, usedNames), data: entryData });
@@ -550,6 +554,8 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
             >
               <option value="png">PNG Image</option>
               <option value="svg">SVG Vector Image</option>
+              <option value="eps">EPS Vector</option>
+              <option value="pdf">PDF Vector</option>
             </SelectField>
 
             {exportFormat === 'png' && (
