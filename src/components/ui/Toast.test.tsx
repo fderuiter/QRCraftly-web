@@ -225,4 +225,37 @@ describe('Toast Timing and Interactive Controls', () => {
     });
     expect(screen.queryByText('Test message')).not.toBeInTheDocument();
   });
+
+  it('should dismiss toast when pressing Escape key on focused notification', () => {
+    const documentEscapeHandler = vi.fn();
+    document.addEventListener('keydown', documentEscapeHandler);
+
+    render(
+      <ToastProvider>
+        <TestComponent />
+      </ToastProvider>
+    );
+
+    fireEvent.click(screen.getByText('Show Toast'));
+    const toastElement = screen.getByText('Test message').closest('[role="status"]') as HTMLElement;
+    expect(toastElement).toBeInTheDocument();
+
+    // Focus toast item using native .focus()
+    act(() => {
+      toastElement.focus();
+    });
+
+    // Press Escape and advance timers for exit slide-out animation
+    act(() => {
+      fireEvent.keyDown(toastElement, { key: 'Escape' });
+      vi.advanceTimersByTime(300);
+    });
+
+    // Verify event propagation was stopped
+    expect(documentEscapeHandler).not.toHaveBeenCalled();
+
+    expect(screen.queryByText('Test message')).not.toBeInTheDocument();
+
+    document.removeEventListener('keydown', documentEscapeHandler);
+  });
 });
