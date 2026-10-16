@@ -77,13 +77,17 @@ GitHub Actions triggers the consolidated CI pipeline on the PR:
 
 1. `setup`: Node.js 22.22.2 (from `.nvmrc`; `package.json` `engines` requires `^22.22.2 || >=24.15.0`), pnpm 11.1.3 toolchain verification.
 2. `static-validation`: Storage privacy AST audit, UI catalog checks, markdown audit, TypeScript compiler (`tsc --noEmit`), package boundaries (`scripts/check_boundaries.js`), ESLint, Knip, contrast checks, Prettier, code duplication check, ShellCheck, secret scanner, and Semgrep.
-3. `test`: Vitest unit tests with strict coverage thresholds (`scripts/ci/coverage_thresholds.json`). `scripts/ci/coverage_summary.js` writes the totals, and on pull requests each changed file's uncovered lines, to the run's summary page.
+3. `test-shard` and `test`: Vitest unit tests split into three shards that run in parallel; `test` merges their reports and checks the coverage thresholds (`scripts/ci/coverage_thresholds.json`) once, on the whole suite. `scripts/ci/coverage_summary.js` writes the totals, and on pull requests each changed file's uncovered lines, to the run's summary page.
 4. `build`: Production build verification and bundle size budgets. Uploads `dist` as a short-lived artifact.
 5. `wasm-reproducible`: `cargo fmt`, Clippy and the Rust tests, then rebuilds the WebAssembly modules and checks they match the committed `src/wasm/*.wasm` files.
 6. `lighthouse`: Lighthouse CI audits of every pre-rendered page in that `dist`, three runs per page with the median run asserted (performance at least 0.9).
 7. `e2e`: Downloads the `build` job's `dist` and runs Playwright cross-browser tests across Chromium, Firefox, and WebKit against `vite preview` (no second build), then `pnpm run test:e2e:dev` checks that the Vite development server hydrates without runtime errors.
 8. `dependency-audit`: `pnpm audit --audit-level=high`, reported as its own check. No other job depends on it, so a newly published upstream advisory never skips the checks above, but it does block the merge through `CI`.
 9. `ci`: the aggregate **`CI`** check. It passes only when jobs 1 to 8 all succeed, and it is the check the `main` ruleset requires.
+
+#### Refreshing visual baselines
+
+The screenshots in `e2e/visual-regression.spec.ts-snapshots/` must come from a CI runner, because fonts and rendering differ on every other machine. When a change moves the layout on purpose, add the `update-snapshots` label to the pull request (or run **Update Visual Baselines** by hand on the branch). The `update-snapshots.yml` workflow runs only the visual spec with `--update-snapshots` for Chromium, Firefox and WebKit and commits the changed baselines to the branch. GitHub holds the CI runs for that bot commit until a maintainer approves them on the PR's Checks tab. Add `full-e2e` before the `update-snapshots` label, because CI reads the labels from the push event, so that Firefox and WebKit are checked before the merge.
 
 ### Step 5: Ephemeral Branch Preview Verification
 

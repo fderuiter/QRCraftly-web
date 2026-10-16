@@ -1,7 +1,15 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { useInputLogic, clearRetainedInputStates } from "./useInputLogic";
-import { type QRConfig, QRType, QRStyle, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from "../../types";
+import {
+  type QRConfig,
+  QRType,
+  QRStyle,
+  QRErrorCorrectionLevel,
+  SocialFormat,
+  TemplateStyle,
+  CryptoNetwork,
+} from "../../types";
 
 const createMockConfig = (type: QRType, value: string): QRConfig => ({
   value,
@@ -19,12 +27,12 @@ const createMockConfig = (type: QRType, value: string): QRConfig => ({
   isBorderEnabled: false,
   borderSize: 0.05,
   borderColor: "#000000",
-  borderStyle: "none" as any,
+  borderStyle: "solid",
   borderText: "",
-  borderTextPosition: "bottom" as any,
+  borderTextPosition: "bottom-center",
   borderTextColor: "#000000",
   borderLogoUrl: null,
-  borderLogoPosition: "bottom-right" as any,
+  borderLogoPosition: "bottom-right",
   socialFormat: SocialFormat.SQUARE_1_1,
   templateStyle: TemplateStyle.NONE,
 });
@@ -123,7 +131,7 @@ describe("useInputLogic", () => {
     );
 
     // Initial SSID state
-    expect((result.current.inputProps.data as any).ssid).toBe("MyWiFi");
+    expect(result.current.inputProps.data).toMatchObject({ ssid: "MyWiFi" });
 
     // Change to include invalid control character
     act(() => {
@@ -148,7 +156,7 @@ describe("useInputLogic", () => {
       { initialProps: { cfg: config } }
     );
 
-    expect((result.current.inputProps.data as any).url).toBe("https://example.com");
+    expect(result.current.inputProps.data).toMatchObject({ url: "https://example.com" });
 
     // Change URL to a dangerous javascript URI
     act(() => {
@@ -164,6 +172,55 @@ describe("useInputLogic", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("should validate vCard inputs locally, allow plain text schemes, block control chars and dangerous website URLs, and propagate clean edits", () => {
+    const config = createMockConfig(QRType.VCARD, "BEGIN:VCARD\r\nVERSION:3.0\r\nN:Doe;Jane;;;\r\nFN:Jane Doe\r\nEND:VCARD");
+    const onChange = vi.fn();
+
+    const { result } = renderHook(
+      ({ cfg }) => useInputLogic(cfg, onChange),
+      { initialProps: { cfg: config } }
+    );
+
+    // Initial first name state
+    expect(result.current.inputProps.data).toMatchObject({ firstName: "Jane" });
+
+    // Change title to contain a colon/scheme (Javascript: The Good Parts) -> valid
+    act(() => {
+      result.current.inputProps.onChange({ title: "Javascript: The Good Parts" });
+    });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    // Change email to contain control characters -> blocked
+    act(() => {
+      result.current.inputProps.onChange({ email: "jane\x00@example.com" });
+    });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(onChange).toHaveBeenCalledTimes(1); // blocked
+
+    // Change website to contain a dangerous scheme -> blocked
+    act(() => {
+      result.current.inputProps.onChange({ website: "javascript:alert(1)" });
+    });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(onChange).toHaveBeenCalledTimes(1); // blocked
+
+    // Positive control: after refused edits, a clean edit must call onChange
+    act(() => {
+      result.current.inputProps.onChange({ email: "jane@example.com", website: "https://example.com" });
+    });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(onChange).toHaveBeenCalledTimes(2);
+  });
+
   it("should preserve newly normalized URL state and push constructed value when swapping tabs", () => {
     const config = createMockConfig(QRType.URL, "http://google.com/");
     const onChange = vi.fn();
@@ -174,7 +231,7 @@ describe("useInputLogic", () => {
     );
 
     // Initial state is normalized url
-    expect((result.current.inputProps.data as any).url).toBe("http://google.com/");
+    expect(result.current.inputProps.data).toMatchObject({ url: "http://google.com/" });
 
     // Simulate tab swap: QRContext updates type to TEXT and value to empty string
     const textConfig = createMockConfig(QRType.TEXT, "");
@@ -182,7 +239,7 @@ describe("useInputLogic", () => {
 
     // The local state of URL should remain preserved in useInputLogic's inputStates under URL key,
     // and we should now be looking at TEXT state
-    expect((result.current.inputProps.data as any).text).toBe("");
+    expect(result.current.inputProps.data).toMatchObject({ text: "" });
 
     // Simulate switching back to URL: QRContext updates type back to URL and value to empty string
     const backToUrlConfig = createMockConfig(QRType.URL, "");
@@ -211,7 +268,7 @@ describe("useInputLogic", () => {
     act(() => {
       wifiHook.current.inputProps.onChange({ ssid: "MyOfficeWiFi", password: "SecretPassword" });
     });
-    expect((wifiHook.current.inputProps.data as any).ssid).toBe("MyOfficeWiFi");
+    expect(wifiHook.current.inputProps.data).toMatchObject({ ssid: "MyOfficeWiFi" });
     unmountWifi(); // User navigates away from WiFi route
 
     // Route 3: User returns to URL generator route (which starts with default config)
@@ -266,6 +323,174 @@ describe("useInputLogic", () => {
 
     // Should fall back to default initial state rather than old custom value
     expect(freshHook.current.inputProps.data).toEqual({ url: "https://qrcraftly.com" });
+  });
+
+  describe("payment validation and refusal state", () => {
+    it("emits refused state and blocks onChange when payment amount validation fails", () => {
+      const config = createMockConfig(QRType.PAYMENT, "");
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useInputLogic(config, onChange, onRefusedChange)
+      );
+
+      // Set SEPA network and an invalid amount with 3 decimal places
+      act(() => {
+        result.current.inputProps.onChange({
+          network: CryptoNetwork.EPC_SEPA,
+          iban: "DE89370400440532013000",
+          name: "Jane Doe",
+          amount: "12.345",
+        });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(onRefusedChange).toHaveBeenCalledWith(true);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("does not trigger refusal for advisory SEPA IBAN checksum warnings when name is present", () => {
+      const config = createMockConfig(QRType.PAYMENT, "");
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useInputLogic(config, onChange, onRefusedChange)
+      );
+
+      // DE88370400440532013000 has an invalid mod-97 checksum
+      act(() => {
+        result.current.inputProps.onChange({
+          network: CryptoNetwork.EPC_SEPA,
+          iban: "DE88370400440532013000",
+          name: "Jane Doe",
+        });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(onRefusedChange).toHaveBeenLastCalledWith(false);
+      expect(onChange).toHaveBeenCalledWith({
+        value: "BCD\n002\n1\nSCT\n\nJane Doe\nDE88370400440532013000",
+      });
+    });
+
+    it("keeps all-blank or whitespace-only SEPA form empty and not refused", () => {
+      const config = createMockConfig(QRType.PAYMENT, "");
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useInputLogic(config, onChange, onRefusedChange)
+      );
+
+      act(() => {
+        result.current.inputProps.onChange({
+          network: CryptoNetwork.EPC_SEPA,
+          iban: "   ",
+          name: "   ",
+          amount: "   ",
+          bic: "   ",
+          label: "   ",
+        });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(onRefusedChange).toHaveBeenLastCalledWith(false);
+      expect(onChange).toHaveBeenCalledWith({
+        value: "",
+      });
+    });
+
+    it("emits refused state and blocks onChange when SEPA beneficiary name is missing", () => {
+      const config = createMockConfig(QRType.PAYMENT, "");
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useInputLogic(config, onChange, onRefusedChange)
+      );
+
+      act(() => {
+        result.current.inputProps.onChange({
+          network: CryptoNetwork.EPC_SEPA,
+          iban: "DE89370400440532013000",
+          name: "",
+        });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(onRefusedChange).toHaveBeenCalledWith(true);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("generates payment payload without refusal when details are valid", () => {
+      const config = createMockConfig(QRType.PAYMENT, "");
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useInputLogic(config, onChange, onRefusedChange)
+      );
+
+      act(() => {
+        result.current.inputProps.onChange({
+          network: CryptoNetwork.EPC_SEPA,
+          iban: "DE89370400440532013000",
+          name: "Jane Doe",
+          amount: "12.50",
+        });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(onRefusedChange).toHaveBeenLastCalledWith(false);
+      expect(onChange).toHaveBeenCalledWith({
+        value: "BCD\n002\n1\nSCT\n\nJane Doe\nDE89370400440532013000\nEUR12.50",
+      });
+    });
+
+    it("does not trigger input refusal for advisory crypto checksum warnings", () => {
+      const config = createMockConfig(QRType.PAYMENT, "");
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useInputLogic(config, onChange, onRefusedChange)
+      );
+
+      // Address with invalid checksum
+      act(() => {
+        result.current.inputProps.onChange({
+          network: CryptoNetwork.BITCOIN,
+          address: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfN",
+          amount: "0.1",
+        });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(onRefusedChange).toHaveBeenLastCalledWith(false);
+      expect(onChange).toHaveBeenCalledWith({
+        value: "bitcoin:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfN?amount=0.1",
+      });
+    });
   });
 });
 

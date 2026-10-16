@@ -53,6 +53,10 @@ describe('ColorControls', () => {
       eyeFrameColor: '#38bdf8',
       eyeBallColor: '#38bdf8',
       gradientType: 'none',
+      gradientColorStops: [
+        { offset: 0, color: '#f8fafc' },
+        { offset: 1, color: '#3b82f6' },
+      ],
     });
   });
 
@@ -205,5 +209,65 @@ describe('ColorControls', () => {
         { offset: 1, color: '#0000ff' },
       ],
     });
+  });
+
+  it('resets stale gradient color stops when selecting a preset theme', () => {
+    const handleChange = vi.fn();
+    const configWithStaleGradient = {
+      ...DEFAULT_CONFIG,
+      fgColor: '#ff0000',
+      bgColor: '#ffffff',
+      gradientType: 'none' as const,
+      gradientColorStops: [
+        { offset: 0, color: '#ff0000' },
+        { offset: 1, color: '#00ff00' },
+      ],
+    };
+
+    render(<ColorControls config={configWithStaleGradient} onChange={handleChange} />);
+
+    // Click Slate preset (fg: '#334155')
+    fireEvent.click(screen.getByRole('radio', { name: /select slate theme/i }));
+
+    expect(handleChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fgColor: '#334155',
+        gradientType: 'none',
+        gradientColorStops: [
+          { offset: 0, color: '#334155' },
+          { offset: 1, color: '#00ff00' },
+        ],
+      })
+    );
+  });
+
+  it('synchronizes start color stop with fgColor when switching fill mode to linear', () => {
+    const handleChange = vi.fn();
+    const configWithStaleStops = {
+      ...DEFAULT_CONFIG,
+      fgColor: '#334155',
+      bgColor: '#f8fafc',
+      gradientType: 'none' as const,
+      gradientColorStops: [
+        { offset: 0, color: '#ff0000' },
+        { offset: 1, color: '#00ff00' },
+      ],
+    };
+
+    render(<ColorControls config={configWithStaleStops} onChange={handleChange} />);
+
+    const fillModeTrack = screen.getByRole('radiogroup', { name: /fill mode/i });
+    const linearRadio = within(fillModeTrack).getByRole('radio', { name: /linear/i });
+    fireEvent.click(linearRadio);
+
+    expect(handleChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gradientType: 'linear',
+        gradientColorStops: [
+          { offset: 0, color: '#334155' },
+          { offset: 1, color: '#00ff00' },
+        ],
+      })
+    );
   });
 });

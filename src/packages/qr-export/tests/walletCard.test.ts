@@ -38,8 +38,8 @@ function modulesOf(value: string) {
   return qrEncoder.create(value, { errorCorrectionLevel: 'M' }).modules;
 }
 
-/** Paints a plan into an RGBA buffer (text is skipped; only the rectangles matter for decoding). */
-function rasterize(plan: WalletCardPlan) {
+/** A context that paints rectangles into an RGBA buffer (text is skipped; only the rectangles matter for decoding). */
+function rasterContext(plan: WalletCardPlan) {
   const data = new Uint8ClampedArray(plan.width * plan.height * 4);
   let fill = '#ffffff';
   const ctx: WalletCardContext = {
@@ -58,9 +58,51 @@ function rasterize(plan: WalletCardPlan) {
       for (let row = y; row < y + h; row++) data.fill(level, (row * plan.width + x) * 4, (row * plan.width + x + w) * 4);
     },
   } as WalletCardContext;
+  const pixels = () => {
+    for (let i = 3; i < data.length; i += 4) data[i] = 255;
+    return data;
+  };
+  return { ctx, pixels };
+}
+
+/** Paints a plan into an RGBA buffer with `paintWalletCard`. */
+function rasterize(plan: WalletCardPlan) {
+  const { ctx, pixels } = rasterContext(plan);
   paintWalletCard(ctx, plan);
-  for (let i = 3; i < data.length; i += 4) data[i] = 255;
-  return data;
+  return pixels();
+}
+
+/** Paints a plan the old way, one `moduleSize` square per dark module, as the reference. */
+function rasterizeReference(plan: WalletCardPlan) {
+  const { ctx, pixels } = rasterContext(plan);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, plan.width, plan.height);
+  ctx.fillStyle = '#000000';
+  const { modules, moduleSize, originX, originY } = plan;
+  for (let row = 0; row < modules.size; row++) {
+    for (let col = 0; col < modules.size; col++) {
+      if (modules.get(row, col)) ctx.fillRect(originX + col * moduleSize, originY + row * moduleSize, moduleSize, moduleSize);
+    }
+  }
+  return pixels();
+}
+
+function countDarkRuns(modules: WalletCardPlan['modules']): number {
+  let runs = 0;
+  for (let r = 0; r < modules.size; r++) {
+    let inRun = false;
+    for (let c = 0; c < modules.size; c++) {
+      if (modules.get(r, c)) {
+        if (!inRun) {
+          inRun = true;
+          runs++;
+        }
+      } else {
+        inRun = false;
+      }
+    }
+  }
+  return runs;
 }
 
 describe('Wallet card (ADR 0048)', () => {
@@ -113,5 +155,33 @@ describe('Wallet card (ADR 0048)', () => {
     expect(walletRefusalReason(QRType.BULK_CSV)).not.toBeNull();
     expect(walletRefusalReason(QRType.WIFI)).toBeNull();
     expect(walletRefusalReason(QRType.URL)).toBeNull();
+  });
+
+  it('consolidates dark module runs into single fillRect calls and produces pixel-identical output', () => {
+    const shortPlan = planWalletCard(modulesOf('https://qrcraftly.com'), { title: 'QRCraftly' }, measure);
+    const shortBuffer = rasterize(shortPlan);
+    const shortRefBuffer = rasterizeReference(shortPlan);
+    expect(Buffer.from(shortBuffer.buffer).equals(Buffer.from(shortRefBuffer.buffer))).toBe(true);
+
+    const largePlan = planWalletCard(modulesOf('A'.repeat(1900)), { title: 'Large QR Code', subtitle: 'Version 30+' }, measure);
+    expect(largePlan.modules.size).toBeGreaterThanOrEqual(137);
+    const largeBuffer = rasterize(largePlan);
+    const largeRefBuffer = rasterizeReference(largePlan);
+    expect(Buffer.from(largeBuffer.buffer).equals(Buffer.from(largeRefBuffer.buffer))).toBe(true);
+
+    let fillRectCount = 0;
+    const ctx: WalletCardContext = {
+      fillStyle: '',
+      font: '',
+      textAlign: 'center',
+      textBaseline: 'alphabetic',
+      fillText: () => undefined,
+      fillRect: () => {
+        fillRectCount++;
+      },
+    };
+    paintWalletCard(ctx, shortPlan);
+    const moduleFillRects = fillRectCount - 1;
+    expect(moduleFillRects).toBe(countDarkRuns(shortPlan.modules));
   });
 });
