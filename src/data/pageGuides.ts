@@ -27,9 +27,9 @@ import type { RelatedPage } from './relatedPages';
  */
 export const PAGE_GUIDES: Readonly<Record<string, readonly string[]>> = {
   index: ['why-qr-codes-stop-working', 'static-vs-dynamic-qr-codes', 'how-to-print-a-qr-code-that-scans'],
-  'free-forever': ['why-qr-codes-stop-working', 'static-vs-dynamic-qr-codes'],
+  'free-forever': ['qr-code-without-subscription', 'why-qr-codes-stop-working', 'static-vs-dynamic-qr-codes'],
   'pdf-qr-code': ['why-qr-codes-stop-working', 'static-vs-dynamic-qr-codes'],
-  'menu-qr-code': ['how-to-print-a-qr-code-that-scans', 'why-qr-codes-stop-working'],
+  'menu-qr-code': ['qr-code-without-subscription', 'how-to-print-a-qr-code-that-scans', 'why-qr-codes-stop-working'],
   'google-review-qr-code': ['static-vs-dynamic-qr-codes', 'how-to-print-a-qr-code-that-scans'],
   'qr-code-with-logo': ['qr-code-error-correction-explained', 'how-to-print-a-qr-code-that-scans'],
   'mosaic-qr-code': ['qr-code-error-correction-explained', 'how-to-print-a-qr-code-that-scans'],
@@ -38,6 +38,7 @@ export const PAGE_GUIDES: Readonly<Record<string, readonly string[]>> = {
   'qr-code-scanner': ['qr-code-scams-quishing', 'why-qr-codes-stop-working'],
   'qr-code-checker': ['qr-code-scams-quishing', 'how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained'],
   arcade: ['qr-code-error-correction-explained'],
+  'qr-code-size-calculator': ['how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained'],
   'wifi-qr-code': ['how-to-print-a-qr-code-that-scans', 'qr-code-scams-quishing'],
   'vcard-qr-code': ['how-to-print-a-qr-code-that-scans', 'static-vs-dynamic-qr-codes'],
   'email-qr-code': ['static-vs-dynamic-qr-codes', 'why-qr-codes-stop-working'],
@@ -48,7 +49,7 @@ export const PAGE_GUIDES: Readonly<Record<string, readonly string[]>> = {
   'location-qr-code': ['how-to-print-a-qr-code-that-scans', 'static-vs-dynamic-qr-codes'],
   'meeting-qr-code': ['why-qr-codes-stop-working', 'static-vs-dynamic-qr-codes'],
   'social-qr-code': ['static-vs-dynamic-qr-codes', 'how-to-print-a-qr-code-that-scans'],
-  'static-qr-code-generator': ['static-vs-dynamic-qr-codes', 'why-qr-codes-stop-working'],
+  'static-qr-code-generator': ['qr-code-without-subscription', 'static-vs-dynamic-qr-codes', 'why-qr-codes-stop-working'],
   'svg-qr-code': ['how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained'],
 };
 

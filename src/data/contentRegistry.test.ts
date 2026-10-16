@@ -82,12 +82,12 @@ describe('Content Registry Validation', () => {
     const validSchemaTypes = Object.values(SchemaType);
     const validSchemaCategories = Object.values(SchemaCategory);
 
-    // Verify exactly 29 registered pages exist and are fully populated (the two retired games
+    // Verify exactly 30 registered pages exist and are fully populated (the two retired games
     // were consolidated into "arcade"; their routes live in legacyRouteRegistry; "free-forever"
     // is the no-ads pledge page; "qr-code-scanner" is the standalone scanner; the static and SVG
-    // landing pages joined on 2026-10-13)
+    // landing pages joined on 2026-10-13; the size calculator on 2026-10-16)
     const registryKeys = Object.keys(contentRegistry);
-    expect(registryKeys.length).toBe(29);
+    expect(registryKeys.length).toBe(30);
 
     registryKeys.forEach((key) => {
       const tool = contentRegistry[key];
@@ -151,7 +151,7 @@ describe('Content Registry Validation', () => {
 
   it('should generate valid WebApplication, HowTo, and FAQPage schemas for all promoted standalone public tools', async () => {
     const { generateSchema } = await import('../utils/schemaGenerator');
-    const promotedTools = ['arcade', 'security'];
+    const promotedTools = ['arcade'];
 
     promotedTools.forEach((toolId) => {
       const tool = contentRegistry[toolId];
@@ -173,6 +173,17 @@ describe('Content Registry Validation', () => {
       const faqEntity = graph.find((g: any) => g['@type'] === 'FAQPage');
       expect(faqEntity, `Tool '${toolId}' must generate an FAQPage schema`).toBeDefined();
     });
+  });
+
+  it('describes the security page as a page about the project, not as an app', async () => {
+    const { generateSchema } = await import('../utils/schemaGenerator');
+    const graph = generateSchema({ ...contentRegistry.security, ...pageCopy('security') }, 'https://qrcraftly.com', '/security')['@graph'];
+    const types = graph.map((node: { '@type': unknown }) => node['@type']);
+
+    expect(types).toContain('AboutPage');
+    expect(types).toContain('FAQPage');
+    expect(types).not.toContain('HowTo');
+    expect(types.flat()).not.toContain('WebApplication');
   });
 
   it('should enforce mandatory Open Graph image attributes on all tool and auxiliary items', () => {

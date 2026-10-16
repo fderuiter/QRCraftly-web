@@ -70,7 +70,7 @@ export const LANDING_PRESETS: Readonly<Record<string, LandingPreset>> = {
 };
 
 /** Registry ids of every landing page, with the checker last, in the order they are listed. */
-export const LANDING_PAGE_IDS: readonly string[] = [...Object.keys(LANDING_PRESETS), 'qr-code-checker'];
+export const LANDING_PAGE_IDS: readonly string[] = [...Object.keys(LANDING_PRESETS), 'qr-code-checker', 'qr-code-size-calculator'];
 
 /** A static example picture in a landing page's gallery. */
 export interface LandingGalleryImage {

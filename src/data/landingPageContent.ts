@@ -534,6 +534,44 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'The SVG is written in your browser. QRCraftly never sees your content, and the file contains only the code’s shapes.',
     },
   },
+  'qr-code-size-calculator': {
+    howTo: {
+      name: 'How to Work Out the Size of a QR Code',
+      description: 'Find the printed width a QR code needs in three steps.',
+      steps: [
+        { name: 'Paste the content', text: 'Type or paste the exact link or text the code will hold. Longer content makes a denser code that needs more room.' },
+        { name: 'Pick the error correction', text: 'Use M for a plain code, and Q or H if the code will carry a logo or face wear.' },
+        { name: 'Set the scan distance', text: 'Slide to how far away people will stand. The calculator shows the width to print, and how far common sizes scan from.' },
+      ],
+    },
+    faqs: [
+      {
+        question: 'What is the minimum size for a QR code?',
+        answer:
+          'There is no single minimum, because it depends on how much the code holds. A short link printed at about 2 cm (0.8 in) wide, margin included, scans from a hand’s length on a good printer. Below that, the squares get smaller than about 0.4 mm and most printers blur them together. A long link or a contact card needs more room.',
+      },
+      {
+        question: 'How big should a QR code be on a poster or sign?',
+        answer:
+          'Roughly one tenth of the scan distance. A sign read from 2 m (about 6.5 ft) away wants a code about 20 cm (8 in) wide. Dense codes need a little more and sparse ones a little less, which is why the calculator measures your actual content.',
+      },
+      {
+        question: 'How big should a QR code be on a business card?',
+        answer:
+          'About 2 to 2.5 cm (0.8 to 1 in) wide, margin included, for a short link. A full contact card holds far more data, so test it at the size you plan, or put a short link on the card instead.',
+      },
+      {
+        question: 'Does the white margin count?',
+        answer:
+          'Yes. The width here is the whole printed square, including the blank border of four squares on every side. Readers need that border to find the code, so do not crop it to make the code look bigger.',
+      },
+      {
+        question: 'Is this exact?',
+        answer:
+          'No. It is a planning estimate from the ten-times rule of thumb, adjusted for how dense your code is and its error correction. Lighting, the phone, glare and print quality all matter, so always scan a printed proof before printing a batch.',
+      },
+    ],
+  },
   'qr-code-checker': {
     howTo: {
       name: 'How to Check a QR Code',

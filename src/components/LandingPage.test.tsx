@@ -82,7 +82,7 @@ describe('landing pages that preset the generator (#1035, #1037)', () => {
   it('links each landing page to the next ones and has accurate metadata', () => {
     clearRetainedAppearance();
     renderLanding('pdf-qr-code');
-    expect(screen.getByRole('link', { name: 'Image QR Code Generator' })).toHaveAttribute('href', '/mosaic-qr-code');
+    expect(screen.getByRole('link', { name: 'Static QR Code Generator' })).toHaveAttribute('href', '/static-qr-code-generator');
     const meta = getMetadataForPath('/pdf-qr-code');
     expect(meta.title).toMatch(/PDF QR Code/);
     expect(meta.description).toMatch(/do not host/);
