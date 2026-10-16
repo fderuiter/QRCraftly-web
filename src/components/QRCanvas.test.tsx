@@ -18,13 +18,14 @@
 
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach, onTestFinished, type Mock } from 'vitest';
-import QRCanvas from './QRCanvas';
+import QRCanvas, { calculateCanvasDimensions } from './QRCanvas';
 import { DEFAULT_CONFIG } from '../constants';
 import {
   QRStyle,
   type LogoPaddingStyle,
   QRErrorCorrectionLevel,
   SocialFormat,
+  TemplateStyle,
   QRType,
   type QRConfig,
 } from '../types';
@@ -1674,5 +1675,76 @@ describe('QRCanvas matrix worker failure', () => {
     } finally {
       restoreRuntime();
     }
+  });
+});
+
+describe('calculateCanvasDimensions', () => {
+  it('calculates correct dimensions for default square formats with default ratio of 1', () => {
+    const config = {
+      templateStyle: TemplateStyle.NONE,
+      socialFormat: SocialFormat.SQUARE_1_1,
+    };
+    const dims = calculateCanvasDimensions(config, 1024, 1);
+    expect(dims).toEqual({
+      useTemplate: false,
+      displayWidth: 1024,
+      displayHeight: 1024,
+      pixelWidth: 1024,
+      pixelHeight: 1024,
+      pixelRatio: 1,
+    });
+  });
+
+  it('calculates correct dimensions for custom pixel ratio', () => {
+    const config = {
+      templateStyle: TemplateStyle.NONE,
+      socialFormat: SocialFormat.SQUARE_1_1,
+    };
+    const dims = calculateCanvasDimensions(config, 512, 2.5);
+    expect(dims).toEqual({
+      useTemplate: false,
+      displayWidth: 512,
+      displayHeight: 512,
+      pixelWidth: 1280,
+      pixelHeight: 1280,
+      pixelRatio: 2.5,
+    });
+  });
+
+  it('calculates correct dimensions for social template formats (Portrait 4:5)', () => {
+    const config = {
+      templateStyle: TemplateStyle.NONE,
+      socialFormat: SocialFormat.PORTRAIT_4_5,
+    };
+    const dims = calculateCanvasDimensions(config, 1024, 2);
+    expect(dims.useTemplate).toBe(true);
+    expect(dims.displayWidth).toBe(1024);
+    expect(dims.displayHeight).toBe(1280);
+    expect(dims.pixelWidth).toBe(2048);
+    expect(dims.pixelHeight).toBe(2560);
+    expect(dims.pixelRatio).toBe(2);
+  });
+
+  it('calculates correct dimensions when template style is set even with square format', () => {
+    const config = {
+      templateStyle: TemplateStyle.MINIMALIST,
+      socialFormat: SocialFormat.SQUARE_1_1,
+    };
+    const dims = calculateCanvasDimensions(config, 1024, 1);
+    expect(dims.useTemplate).toBe(true);
+    expect(dims.displayWidth).toBe(1024);
+    expect(dims.displayHeight).toBe(1024);
+  });
+
+  it('falls back to window.devicePixelRatio or 1 when customPixelRatio is omitted', () => {
+    const config = {
+      templateStyle: TemplateStyle.NONE,
+      socialFormat: SocialFormat.SQUARE_1_1,
+    };
+    const dims = calculateCanvasDimensions(config, 800);
+    const expectedRatio = typeof window !== 'undefined' && window?.devicePixelRatio ? window.devicePixelRatio || 1 : 1;
+    expect(dims.pixelRatio).toBe(expectedRatio);
+    expect(dims.pixelWidth).toBe(800 * expectedRatio);
+    expect(dims.pixelHeight).toBe(800 * expectedRatio);
   });
 });
