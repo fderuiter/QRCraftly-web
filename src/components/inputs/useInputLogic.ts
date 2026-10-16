@@ -20,7 +20,7 @@ import { useState, useRef, useEffect, type ElementType } from "react";
 import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, CryptoNetwork } from "../../types";
 import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
-import { CONTAINMENT_PROFILES, paymentAmountError, isValidIban } from "@/packages/qr-payload";
+import { CONTAINMENT_PROFILES, paymentAmountError, sepaRefusal } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
 
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
@@ -50,18 +50,12 @@ const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => 
     if (address && isDangerousUrl(address)) {
       return false;
     }
-    if (paymentAmountError(payment.amount, payment.network)) {
-      return false;
-    }
     if (payment.network === CryptoNetwork.EPC_SEPA) {
-      const iban = (payment.iban || payment.address || '').trim();
-      const name = (payment.name || '').trim();
-      if (iban && !isValidIban(iban)) {
+      if (sepaRefusal(payment) !== null) {
         return false;
       }
-      if ((iban || name || (payment.amount && payment.amount.trim())) && (!iban || !name)) {
-        return false;
-      }
+    } else if (paymentAmountError(payment.amount, payment.network)) {
+      return false;
     }
   } else if (type === QRType.URL || type === QRType.MEETING || type === QRType.TEXT) {
     if (findBlockingViolation(type, data as UrlData | MeetingData | TextData)) {

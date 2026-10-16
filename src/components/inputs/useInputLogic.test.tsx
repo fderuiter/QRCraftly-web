@@ -296,7 +296,7 @@ describe("useInputLogic", () => {
       expect(onChange).not.toHaveBeenCalled();
     });
 
-    it("emits refused state and blocks onChange when SEPA IBAN is invalid", () => {
+    it("does not trigger refusal for advisory SEPA IBAN checksum warnings when name is present", () => {
       const config = createMockConfig(QRType.PAYMENT, "");
       const onChange = vi.fn();
       const onRefusedChange = vi.fn();
@@ -318,8 +318,40 @@ describe("useInputLogic", () => {
         vi.advanceTimersByTime(200);
       });
 
-      expect(onRefusedChange).toHaveBeenCalledWith(true);
-      expect(onChange).not.toHaveBeenCalled();
+      expect(onRefusedChange).toHaveBeenLastCalledWith(false);
+      expect(onChange).toHaveBeenCalledWith({
+        value: "BCD\n002\n1\nSCT\n\nJane Doe\nDE88370400440532013000",
+      });
+    });
+
+    it("keeps all-blank or whitespace-only SEPA form empty and not refused", () => {
+      const config = createMockConfig(QRType.PAYMENT, "");
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useInputLogic(config, onChange, onRefusedChange)
+      );
+
+      act(() => {
+        result.current.inputProps.onChange({
+          network: CryptoNetwork.EPC_SEPA,
+          iban: "   ",
+          name: "   ",
+          amount: "   ",
+          bic: "   ",
+          label: "   ",
+        });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(onRefusedChange).toHaveBeenLastCalledWith(false);
+      expect(onChange).toHaveBeenCalledWith({
+        value: "",
+      });
     });
 
     it("emits refused state and blocks onChange when SEPA beneficiary name is missing", () => {

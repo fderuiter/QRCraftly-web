@@ -17,8 +17,8 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { constructPaymentString, hydratePaymentData, PaymentContract } from '../index';
-import { CryptoNetwork, QRType } from '@/types';
+import { constructPaymentString, hydratePaymentData, PaymentContract, sepaRefusal } from '../index';
+import { CryptoNetwork, QRType, type PaymentData } from '@/types';
 
 describe('Payment generator', () => {
   it('constructs and hydrates successfully', () => {
@@ -133,7 +133,7 @@ describe('Payment generator', () => {
       expect(lines[10]).toBe('B'.repeat(140));
     });
 
-    it('returns empty payload when IBAN checksum is invalid', () => {
+    it('generates payment payload even when IBAN checksum is invalid', () => {
       const sepaData = {
         network: CryptoNetwork.EPC_SEPA,
         address: 'DE88370400440532013000', // Invalid checksum
@@ -141,7 +141,9 @@ describe('Payment generator', () => {
         amount: '10.00',
         label: '',
       };
-      expect(constructPaymentString(sepaData)).toBe('');
+      expect(constructPaymentString(sepaData)).toBe(
+        'BCD\n002\n1\nSCT\n\nJane Doe\nDE88370400440532013000\nEUR10.00'
+      );
     });
 
     it('returns empty payload when beneficiary name is missing', () => {
@@ -173,6 +175,76 @@ describe('Payment generator', () => {
         label: '',
       };
       expect(constructPaymentString(exceedLimit)).toBe('');
+    });
+  });
+
+  describe('sepaRefusal', () => {
+    it('returns null for empty or whitespace-only SEPA data', () => {
+      const emptyData: PaymentData = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: '   ',
+        iban: '   ',
+        name: '   ',
+        amount: '   ',
+        bic: '   ',
+        label: '   ',
+      };
+      expect(sepaRefusal(emptyData)).toBeNull();
+    });
+
+    it('returns SEPA_NAME_VIOLATION when IBAN is present but name is missing', () => {
+      const data: PaymentData = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: 'DE89370400440532013000',
+        name: '',
+        amount: '',
+        label: '',
+      };
+      expect(sepaRefusal(data)).toBe('SEPA_NAME_VIOLATION');
+    });
+
+    it('returns SEPA_NAME_VIOLATION when name is present but IBAN is missing', () => {
+      const data: PaymentData = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: '',
+        name: 'Jane Doe',
+        amount: '',
+        label: '',
+      };
+      expect(sepaRefusal(data)).toBe('SEPA_NAME_VIOLATION');
+    });
+
+    it('returns PAYMENT_AMOUNT_VIOLATION when amount is invalid', () => {
+      const data: PaymentData = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: 'DE89370400440532013000',
+        name: 'Jane Doe',
+        amount: '10.123',
+        label: '',
+      };
+      expect(sepaRefusal(data)).toBe('PAYMENT_AMOUNT_VIOLATION');
+    });
+
+    it('returns null when IBAN checksum is invalid but name and amount are valid', () => {
+      const data: PaymentData = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: 'DE88370400440532013000', // Invalid checksum
+        name: 'Jane Doe',
+        amount: '10.00',
+        label: '',
+      };
+      expect(sepaRefusal(data)).toBeNull();
+    });
+
+    it('returns null for complete valid SEPA data', () => {
+      const data: PaymentData = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: 'DE89370400440532013000',
+        name: 'Jane Doe',
+        amount: '10.00',
+        label: '',
+      };
+      expect(sepaRefusal(data)).toBeNull();
     });
   });
 
