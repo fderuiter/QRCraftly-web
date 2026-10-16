@@ -6,7 +6,7 @@ import { Upload, X, Square, Circle, Minus } from 'lucide-react';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
 import { useImageUpload } from '../../hooks/useImageUpload';
-import { SYSTEM_LIMITS, DEFAULT_CONFIG } from '../../constants';
+import { SYSTEM_LIMITS } from '../../constants';
 import { MIN_LOGO_BACKING_PADDING } from '@/packages/qr-matrix';
 import { PRESET_LOGOS, PRESET_LOGO_CATEGORIES, type PresetCategory } from '../../constants/presetLogos';
 import { SegmentedControl } from '../ui/SegmentedControl';
@@ -65,21 +65,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
       <div className="mb-3 flex items-center justify-between">
         <h4 className="text-sm font-semibold text-fg-soft">Logo</h4>
         {config.logoUrl && (
-          <Button
-            variant="error"
-            size="xs"
-            onClick={() => {
-              onChange({
-                logoUrl: null,
-                logoPaddingStyle: DEFAULT_CONFIG.logoPaddingStyle,
-                logoPadding: DEFAULT_CONFIG.logoPadding,
-                logoBackgroundColor: DEFAULT_CONFIG.logoBackgroundColor,
-                logoSize: DEFAULT_CONFIG.logoSize,
-              });
-              setError(null);
-              notifyUndo('Logo removed');
-            }}
-          >
+          <Button variant="error" size="xs" onClick={() => { onChange({ logoUrl: null }); setError(null); notifyUndo('Logo removed'); }}>
             <X className="size-3.5" aria-hidden="true" /> Remove
           </Button>
         )}

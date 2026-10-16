@@ -48,34 +48,3 @@ describe('LogoControls preset categories (#1366)', () => {
     expect(within(panel).getAllByRole('button')).toHaveLength(socialCount);
   });
 });
-
-describe('LogoControls logo removal', () => {
-  it('resets logoUrl and auxiliary logo parameters to default values when Remove is clicked', () => {
-    const onChange = vi.fn();
-    const customConfig = {
-      ...DEFAULT_CONFIG,
-      logoUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-      logoPaddingStyle: 'circle' as const,
-      logoPadding: 3,
-      logoBackgroundColor: '#ff0000',
-      logoSize: 0.28,
-    };
-
-    render(
-      <ToastProvider>
-        <LogoControls config={customConfig} onChange={onChange} />
-      </ToastProvider>
-    );
-
-    const removeButton = screen.getByRole('button', { name: /remove/i });
-    fireEvent.click(removeButton);
-
-    expect(onChange).toHaveBeenCalledWith({
-      logoUrl: null,
-      logoPaddingStyle: DEFAULT_CONFIG.logoPaddingStyle,
-      logoPadding: DEFAULT_CONFIG.logoPadding,
-      logoBackgroundColor: DEFAULT_CONFIG.logoBackgroundColor,
-      logoSize: DEFAULT_CONFIG.logoSize,
-    });
-  });
-});

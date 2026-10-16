@@ -191,13 +191,7 @@ describe('StyleControls Component', () => {
 
     const removeButton = screen.getByText('Remove');
     await user.click(removeButton);
-    expect(mockOnChange).toHaveBeenCalledWith({
-      logoUrl: null,
-      logoPaddingStyle: DEFAULT_CONFIG.logoPaddingStyle,
-      logoPadding: DEFAULT_CONFIG.logoPadding,
-      logoBackgroundColor: DEFAULT_CONFIG.logoBackgroundColor,
-      logoSize: DEFAULT_CONFIG.logoSize,
-    });
+    expect(mockOnChange).toHaveBeenCalledWith({ logoUrl: null });
   });
 
   it('changes logo padding style', async () => {
@@ -980,13 +974,7 @@ describe('Preset Logo Gallery', () => {
     const removeBtn = screen.getByRole('button', { name: /Remove/i });
     await user.click(removeBtn);
 
-    expect(mockOnChange).toHaveBeenCalledWith({
-      logoUrl: null,
-      logoPaddingStyle: DEFAULT_CONFIG.logoPaddingStyle,
-      logoPadding: DEFAULT_CONFIG.logoPadding,
-      logoBackgroundColor: DEFAULT_CONFIG.logoBackgroundColor,
-      logoSize: DEFAULT_CONFIG.logoSize,
-    });
+    expect(mockOnChange).toHaveBeenCalledWith({ logoUrl: null });
   });
 });
 
