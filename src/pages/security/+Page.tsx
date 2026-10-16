@@ -169,7 +169,7 @@ export default function Page() {
           <ArticleHeading id="summary">
             <span id="summary-title">What happens to your data</span>
           </ArticleHeading>
-          <PrivacyPromiseGrid items={SUMMARY} columns={2} className="mb-10" />
+          <PrivacyPromiseGrid items={SUMMARY} columns={2} />
           <RequestCounter />
         </section>
 

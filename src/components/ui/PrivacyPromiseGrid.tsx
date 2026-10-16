@@ -1,4 +1,5 @@
 import React from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { mergeClasses } from './styles';
 
 /**
@@ -6,7 +7,7 @@ import { mergeClasses } from './styles';
  */
 export interface PrivacyPromiseItem {
   /** Icon component to render at the start of the card item. */
-  icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>;
+  icon: LucideIcon;
   /** Primary title of the promise card. */
   title: string;
   /** Secondary explanatory text of the promise card. */
@@ -18,10 +19,10 @@ export interface PrivacyPromiseItem {
  */
 export interface PrivacyPromiseGridProps {
   /** List of promise items to display in the grid. */
-  items: readonly PrivacyPromiseItem[] | PrivacyPromiseItem[];
+  items: readonly PrivacyPromiseItem[];
   /** Number of columns on small screens and above (2 or 3). Defaults to 3. */
   columns?: 2 | 3;
-  /** Accessible label for the list element. Defaults to "Privacy". */
+  /** Accessible label for the list element. */
   ariaLabel?: string;
   /** Additional CSS class names to apply to the grid container. */
   className?: string;
@@ -39,7 +40,7 @@ export interface PrivacyPromiseGridProps {
 export function PrivacyPromiseGrid({
   items,
   columns = 3,
-  ariaLabel = 'Privacy',
+  ariaLabel,
   className,
 }: PrivacyPromiseGridProps) {
   const columnClass = columns === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3';
