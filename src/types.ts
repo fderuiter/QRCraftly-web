@@ -452,6 +452,7 @@ export const CryptoNetwork = {
   SOLANA: 'solana',
   LITECOIN: 'litecoin',
   EPC_SEPA: 'epc_sepa',
+  UPI: 'upi',
   PAYPAL: 'paypal',
   VENMO: 'venmo',
   CASH_APP: 'cash_app',

@@ -20,7 +20,7 @@ import { useState, useRef, useEffect, type ElementType } from "react";
 import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, type EmailData, CryptoNetwork } from "../../types";
 import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
-import { CONTAINMENT_PROFILES, emailListError, CARD_FIELDS, vCardFieldError, paymentAmountError, sepaRefusal } from "@/packages/qr-payload";
+import { CONTAINMENT_PROFILES, emailListError, CARD_FIELDS, vCardFieldError, paymentRefusal } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
 
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
@@ -65,11 +65,7 @@ const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => 
     if (address && isDangerousUrl(address)) {
       return false;
     }
-    if (payment.network === CryptoNetwork.EPC_SEPA) {
-      if (sepaRefusal(payment) !== null) {
-        return false;
-      }
-    } else if (paymentAmountError(payment.amount, payment.network)) {
+    if (paymentRefusal(payment) !== null) {
       return false;
     }
   } else if (type === QRType.URL || type === QRType.MEETING || type === QRType.TEXT) {

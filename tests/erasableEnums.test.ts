@@ -26,7 +26,7 @@ const EXPECTED = {
   WifiEapPhase2: [WifiEapPhase2, { NONE: '', MSCHAPV2: 'MSCHAPV2', GTC: 'GTC', PAP: 'PAP' }],
   QRErrorCorrectionLevel: [QRErrorCorrectionLevel, { L: 'L', M: 'M', Q: 'Q', H: 'H' }],
   CalendarProvider: [CalendarProvider, { ICAL: 'ical', GOOGLE: 'google', OUTLOOK: 'outlook', OFFICE365: 'office365', YAHOO: 'yahoo' }],
-  CryptoNetwork: [CryptoNetwork, { BITCOIN: 'bitcoin', ETHEREUM: 'ethereum', SOLANA: 'solana', LITECOIN: 'litecoin', EPC_SEPA: 'epc_sepa', PAYPAL: 'paypal', VENMO: 'venmo', CASH_APP: 'cash_app', CUSTOM: 'custom' }],
+  CryptoNetwork: [CryptoNetwork, { BITCOIN: 'bitcoin', ETHEREUM: 'ethereum', SOLANA: 'solana', LITECOIN: 'litecoin', EPC_SEPA: 'epc_sepa', UPI: 'upi', PAYPAL: 'paypal', VENMO: 'venmo', CASH_APP: 'cash_app', CUSTOM: 'custom' }],
   SocialPlatform: [SocialPlatform, { INSTAGRAM: 'instagram', TWITTER: 'twitter', TIKTOK: 'tiktok', LINKEDIN: 'linkedin', YOUTUBE: 'youtube', FACEBOOK: 'facebook', WHATSAPP: 'whatsapp', GITHUB: 'github' }],
   SocialFormat: [SocialFormat, { SQUARE_1_1: '1:1', PORTRAIT_4_5: '4:5', STORY_9_16: '9:16' }],
   TemplateStyle: [TemplateStyle, { NONE: 'none', MINIMALIST: 'minimalist', GRADIENT_BLUR: 'gradient_blur', SOLID_FRAME: 'solid_frame', WIFI_CARD: 'wifi_card' }],
