@@ -77,4 +77,16 @@ test.describe('QR Arcade', () => {
     await expect(page.getByRole('textbox', { name: 'Target QR content' })).toHaveValue(payload);
     await expect(page.getByRole('button', { name: 'Use my generator design' })).toBeVisible();
   });
+
+  test('displays error alert with retry button when WASM encoder fails to load and recovers on retry', async ({ page }) => {
+    await page.route('**/*qr-encode*.wasm', (route) => route.abort('failed'));
+    await page.goto('/arcade');
+    await expect(page.getByTestId('arcade-error-fallback')).toBeVisible();
+    await expect(page.getByTestId('arcade-retry-button')).toBeVisible();
+    await expect(page.getByText('QR Encoder Initialization Failed')).toBeVisible();
+
+    await page.unroute('**/*qr-encode*.wasm');
+    await page.getByTestId('arcade-retry-button').click();
+    await expect(page.getByTestId('arcade-blaster-canvas')).toBeVisible();
+  });
 });

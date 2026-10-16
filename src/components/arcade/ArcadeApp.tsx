@@ -17,9 +17,12 @@
 */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Gamepad2 } from 'lucide-react';
+import { Gamepad2, RotateCw } from 'lucide-react';
 import { ARCADE_MODES, type ArcadeMode, arcadeModeHref, blankTargetMatrix, buildTargetMatrix, parseArcadeMode } from '@/packages/arcade';
+import { Alert } from '@/components/ui/Alert';
+import { ArcadeSkeleton } from './ArcadeSkeleton';
 import { BlasterMode } from './BlasterMode';
+import { Button } from '@/components/ui/Button';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { SimulatorMode } from './SimulatorMode';
 import { TargetSettings } from './TargetSettings';
@@ -55,8 +58,6 @@ function useModeParam(): [ArcadeMode, (mode: ArcadeMode) => void] {
   return [mode, setMode];
 }
 
-const ignore = () => {};
-
 /**
  * The QR Arcade & Durability Lab: mode switcher, shared target state and the active mode.
  * @returns The arcade.
@@ -64,9 +65,19 @@ const ignore = () => {};
 export function ArcadeApp() {
   const [mode, setMode] = useModeParam();
   const { target, updateTarget, resetToGenerator, hasGeneratorDesign } = useArcadeTarget();
-  const encoder = useQrEncoder();
+  const { encoder, isLoading, error, retry } = useQrEncoder();
   const [announcement, setAnnouncement] = useState('');
   const announce = useCallback((message: string) => setAnnouncement(message), []);
+
+  useEffect(() => {
+    if (isLoading) {
+      announce('Loading QR encoder...');
+    } else if (encoder) {
+      announce('QR encoder loaded.');
+    } else if (error) {
+      announce('Failed to load QR encoder.');
+    }
+  }, [isLoading, encoder, error, announce]);
 
   const changeMode = (next: ArcadeMode) => {
     setMode(next);
@@ -122,15 +133,35 @@ export function ArcadeApp() {
 
       <div id={PANEL_ID} role="tabpanel" aria-labelledby={tabId(mode)}>
         <p className="sr-only">{activeMode.description}</p>
-        {/* Until the encoder loads, the mode shows a blank board so the page keeps its layout; it is
-            inert and silent until the real target is built, which re-scans it. */}
-        <div inert={!encoder} aria-busy={!encoder} data-testid={encoder ? undefined : 'arcade-loading'}>
-          {mode === 'blaster' ? (
-            <BlasterMode target={target} encoder={encoder} settings={settings} announce={encoder ? announce : ignore} />
-          ) : (
-            <SimulatorMode target={target} encoder={encoder} settings={settings} announce={encoder ? announce : ignore} />
-          )}
-        </div>
+        {isLoading || (!encoder && !error) ? (
+          <div aria-busy="true" data-testid="arcade-loading">
+            <ArcadeSkeleton settings={settings} />
+          </div>
+        ) : error ? (
+          <div className="mx-auto max-w-xl px-4 py-8" data-testid="arcade-error-fallback">
+            <Alert variant="error" title="QR Encoder Initialization Failed">
+              <div className="mt-2 space-y-3">
+                <p className="text-sm">
+                  Failed to load the QR encoder module. Please check your connection and click retry to load again.
+                </p>
+                <div>
+                  <Button variant="primary" size="sm" onClick={retry} data-testid="arcade-retry-button">
+                    <RotateCw className="mr-1.5 size-4" aria-hidden="true" />
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            </Alert>
+          </div>
+        ) : (
+          <div>
+            {mode === 'blaster' ? (
+              <BlasterMode target={target} encoder={encoder} settings={settings} announce={announce} />
+            ) : (
+              <SimulatorMode target={target} encoder={encoder} settings={settings} announce={announce} />
+            )}
+          </div>
+        )}
       </div>
 
       <div role="status" aria-live="polite" className="sr-only" data-testid="arcade-announcer">
@@ -139,3 +170,4 @@ export function ArcadeApp() {
     </div>
   );
 }
+

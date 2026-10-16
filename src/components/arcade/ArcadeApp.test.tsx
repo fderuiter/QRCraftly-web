@@ -17,12 +17,14 @@
 */
 
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QRProvider } from '@/context/QRContext';
 import { QRErrorCorrectionLevel, QRType } from '@/types';
 import { clearStagedArcadeTarget, stageArcadeTarget } from '@/packages/arcade/handoff';
 import { ArcadeApp } from './ArcadeApp';
+import { setQrCanvasRuntime } from '@/utils/qrCanvasRuntime';
+import { useQrEncoder } from '@/hooks/useQrEncoder';
 
 vi.mock('vike/client/router', () => ({ navigate: vi.fn(() => Promise.resolve()) }));
 
@@ -416,3 +418,135 @@ describe('Responsive ergonomics (#926)', () => {
     expect(screen.getByTestId('arcade-simulator-canvas').style.touchAction).toBe('none');
   });
 });
+
+describe('Arcade Studio initialization loading skeleton and error fallback', () => {
+  const mockEncoder = {
+    create: () => ({
+      modules: { size: 21, data: new Uint8Array(441), get: () => false },
+      version: 1,
+      errorCorrectionLevel: 'M',
+      maskPattern: 0,
+      dataBits: 10,
+      segments: [],
+    }),
+  };
+
+  it('useQrEncoder hook exposes loading status, error status, and a retry function', async () => {
+    let resolveEncoder: (val: any) => void = () => undefined;
+    let rejectEncoder: (err: any) => void = () => undefined;
+
+    const fakePromise = new Promise((res, rej) => {
+      resolveEncoder = res;
+      rejectEncoder = rej;
+    });
+
+    let callCount = 0;
+    const restore = setQrCanvasRuntime({
+      loadEncoder: () => {
+        callCount++;
+        if (callCount === 1) return fakePromise;
+        return Promise.resolve(mockEncoder as any);
+      },
+    });
+
+    try {
+      const { result } = renderHook(() => useQrEncoder());
+      expect(result.current.isLoading).toBe(true);
+      expect(result.current.encoder).toBeNull();
+      expect(result.current.error).toBeNull();
+
+      // Simulate failure
+      await act(async () => {
+        rejectEncoder(new Error('Failed to load WASM module'));
+      });
+
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.encoder).toBeNull();
+      expect(result.current.error).toEqual(new Error('Failed to load WASM module'));
+
+      // Invoke retry
+      await act(async () => {
+        result.current.retry();
+      });
+
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.encoder).not.toBeNull();
+      expect(result.current.error).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  it('renders skeleton loading placeholders and updates live region when encoder load is pending', async () => {
+    let resolveEncoder: (val: any) => void = () => undefined;
+    const pendingPromise = new Promise<any>((res) => {
+      resolveEncoder = res;
+    });
+
+    const restore = setQrCanvasRuntime({
+      loadEncoder: () => pendingPromise,
+    });
+
+    try {
+      render(<ArcadeApp />);
+
+      expect(screen.getByTestId('arcade-loading')).toBeInTheDocument();
+      expect(screen.getByTestId('arcade-loading')).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getByTestId('arcade-announcer')).toHaveTextContent('Loading QR encoder...');
+
+      // Resolve encoder
+      await act(async () => {
+        resolveEncoder(mockEncoder);
+      });
+
+      await waitFor(() => expect(screen.queryByTestId('arcade-loading')).not.toBeInTheDocument());
+      expect(screen.getByTestId('arcade-blaster-canvas')).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('renders an error alert with a retry button when QR encoder load fails and recovers on retry', async () => {
+    let attempts = 0;
+    let resolveSecond: (val: any) => void = () => undefined;
+
+    const restore = setQrCanvasRuntime({
+      loadEncoder: () => {
+        attempts++;
+        if (attempts === 1) {
+          return Promise.reject(new Error('WASM binary corrupted in transit'));
+        }
+        return new Promise((res) => {
+          resolveSecond = res;
+        });
+      },
+    });
+
+    try {
+      render(<ArcadeApp />);
+
+      await waitFor(() => expect(screen.getByTestId('arcade-error-fallback')).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByTestId('arcade-announcer')).toHaveTextContent('Failed to load QR encoder.'));
+      expect(screen.getByText(/QR Encoder Initialization Failed/)).toBeInTheDocument();
+
+      const retryBtn = screen.getByTestId('arcade-retry-button');
+      expect(retryBtn).toBeInTheDocument();
+
+      // Click retry
+      fireEvent.click(retryBtn);
+
+      await waitFor(() => expect(screen.getByTestId('arcade-loading')).toBeInTheDocument());
+      expect(screen.getByTestId('arcade-announcer')).toHaveTextContent('Loading QR encoder...');
+
+      // Complete second attempt
+      await act(async () => {
+        resolveSecond(mockEncoder);
+      });
+
+      await waitFor(() => expect(screen.getByTestId('arcade-blaster-canvas')).toBeInTheDocument());
+    } finally {
+      restore();
+    }
+  });
+});
+

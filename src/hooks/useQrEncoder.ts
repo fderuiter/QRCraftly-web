@@ -16,36 +16,82 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { QrEncoder } from '@/packages/qr-matrix';
 import { getQrCanvasRuntime } from '@/utils/qrCanvasRuntime';
 
+export interface UseQrEncoderResult {
+  /** The main-thread encoder, or null if loading or failed. */
+  encoder: QrEncoder | null;
+  /** True while the encoder module initialization is in progress. */
+  isLoading: boolean;
+  /** Error object if module load failed, or null otherwise. */
+  error: Error | null;
+  /** Clears the error state and re-attempts loading the encoder. */
+  retry: () => void;
+}
+
 /**
  * The main-thread QR encoder, from the same runtime `QRCanvas` uses.
- * @returns The encoder, or null until it has loaded (always null during pre-rendering).
+ * Exposes loading status, error status, and a retry function.
+ * @returns The encoder state object.
  */
-export function useQrEncoder(): QrEncoder | null {
-  const [encoder, setEncoder] = useState<QrEncoder | null>(() => {
-    // Pre-rendering has no encoder to fetch; the effect below reports a failed load in the browser.
-    if (typeof window === 'undefined') return null;
-    const loaded = getQrCanvasRuntime().loadEncoder();
-    if (!(loaded instanceof Promise)) return loaded;
-    loaded.catch(() => undefined);
-    return null;
-  });
+export function useQrEncoder(): UseQrEncoderResult {
+  const [attempt, setAttempt] = useState(0);
+
+  const [state, setState] = useState<{
+    encoder: QrEncoder | null;
+    isLoading: boolean;
+    error: Error | null;
+  }>(() => ({
+    encoder: null,
+    isLoading: typeof window !== 'undefined',
+    error: null,
+  }));
+
+  const retry = useCallback(() => {
+    setState({ encoder: null, isLoading: true, error: null });
+    setAttempt((c) => c + 1);
+  }, []);
 
   useEffect(() => {
-    if (encoder) return;
+    if (typeof window === 'undefined') return;
+
     let live = true;
-    Promise.resolve(getQrCanvasRuntime().loadEncoder())
+    let res: QrEncoder | Promise<QrEncoder>;
+    try {
+      res = getQrCanvasRuntime().loadEncoder();
+    } catch (err: unknown) {
+      const errorObj = err instanceof Error ? err : new Error(typeof err === 'string' ? err : 'The QR encoder did not load.');
+      console.warn('The QR encoder did not load:', err);
+      setState({ encoder: null, isLoading: false, error: errorObj });
+      return;
+    }
+
+    if (!(res instanceof Promise)) {
+      setState({ encoder: res, isLoading: false, error: null });
+      return;
+    }
+
+    res
       .then((loaded) => {
-        if (live) setEncoder(loaded);
+        if (live) {
+          setState({ encoder: loaded, isLoading: false, error: null });
+        }
       })
-      .catch((error: unknown) => console.warn('The QR encoder did not load:', error));
+      .catch((err: unknown) => {
+        if (live) {
+          const errorObj = err instanceof Error ? err : new Error(typeof err === 'string' ? err : 'The QR encoder did not load.');
+          console.warn('The QR encoder did not load:', err);
+          setState({ encoder: null, isLoading: false, error: errorObj });
+        }
+      });
+
     return () => {
       live = false;
     };
-  }, [encoder]);
+  }, [attempt]);
 
-  return encoder;
+  return { ...state, retry };
 }
+
