@@ -17,6 +17,7 @@
 */
 
 
+import { concatBytes } from '@/utils/bytes';
 import { sha256 } from '@/utils/sha256';
 import { SESSION_ID_BYTES } from './frame';
 import { KEY_SECRET_BYTES } from './words';
@@ -55,16 +56,6 @@ export function generateSalt(): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(SALT_BYTES));
 }
 
-function concat(...parts: Uint8Array[]): Uint8Array {
-  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
-  return out;
-}
-
 /**
  * HMAC-SHA-256 (RFC 2104). Written over the synchronous SHA-256 so a receiver can check a session
  * ID inside its synchronous frame parser; the tests compare it with Web Crypto.
@@ -77,7 +68,7 @@ export function hmacSha256(key: Uint8Array, message: Uint8Array): Uint8Array {
   block.set(key.length > HASH_BLOCK_BYTES ? sha256(key) : key);
   const inner = block.map((byte) => byte ^ 0x36);
   const outer = block.map((byte) => byte ^ 0x5c);
-  return sha256(concat(outer, sha256(concat(inner, message))));
+  return sha256(concatBytes([outer, sha256(concatBytes([inner, message]))]));
 }
 
 /**
@@ -89,7 +80,7 @@ export function hmacSha256(key: Uint8Array, message: Uint8Array): Uint8Array {
  */
 export function hkdfSha256(secret: Uint8Array, salt: Uint8Array, info: Uint8Array): Uint8Array {
   const pseudoRandomKey = hmacSha256(salt, secret);
-  return hmacSha256(pseudoRandomKey, concat(info, new Uint8Array([1])));
+  return hmacSha256(pseudoRandomKey, concatBytes([info, new Uint8Array([1])]));
 }
 
 /**

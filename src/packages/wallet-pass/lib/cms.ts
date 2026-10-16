@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { algorithm, concatBytes, contextTag, integer, octetString, oid, sequence, setOf, time } from './der';
+import { concatBytes } from '@/utils/bytes';
+import { algorithm, contextTag, integer, octetString, oid, sequence, setOf, time } from './der';
 import type { CertificateInfo } from './certificate';
 
 /** Object identifiers for a detached CMS SignedData (RFC 5652) with SHA-256 and RSA. */

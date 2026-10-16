@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { concatBytes } from '@/utils/bytes';
 import type { QRConfig } from '@/types';
 import { generateQRSvg } from './svgExport';
 import { type ModuleRenderOptions } from '@/packages/qr-matrix';
@@ -147,13 +148,7 @@ class PdfWriter {
     const entries = this.offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
     this.write(`xref\n0 ${this.offsets.length + 1}\n0000000000 65535 f \n${entries}`);
     this.write(`trailer\n<< /Size ${this.offsets.length + 1} /Root ${root} 0 R /Info ${info} 0 R >>\nstartxref\n${start}\n%%EOF\n`);
-    const out = new Uint8Array(this.length);
-    let at = 0;
-    for (const chunk of this.chunks) {
-      out.set(chunk, at);
-      at += chunk.length;
-    }
-    return out;
+    return concatBytes(this.chunks);
   }
 }
 
