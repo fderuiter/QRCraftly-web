@@ -1,8 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import type { VCardData } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
-import { vCardFieldError } from "@/packages/qr-payload";
+import { vCardFieldError, VCARD_SOCIAL_FIELDS, VCARD_SOCIAL_NETWORKS } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
 import {
   GRID_TWO_COLUMNS_CLASSES,
@@ -26,6 +26,9 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
   const cityError = vCardFieldError("city", data.city);
   const zipError = vCardFieldError("zip", data.zip);
   const countryError = vCardFieldError("country", data.country);
+  // A half-typed profile link is not yet on its network's host, so its error waits for blur (#1435).
+  const [blurredSocials, setBlurredSocials] = useState<ReadonlySet<string>>(() => new Set());
+  const isMeCard = data.version === "mecard";
 
   return (
     <FormBlock legend="Contact Details (vCard)">
@@ -133,6 +136,34 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         aria-describedby={hintsId("vcard-website")}
       />
       {!websiteError && <LinkHints fieldId="vcard-website" address={data.website} />}
+
+      <FormBlock legend="Social Profiles" isSubFieldset={true}>
+        {isMeCard ? (
+          <p className="text-xs text-fg-muted">Social profiles are saved in vCard formats only. MECard leaves them out.</p>
+        ) : (
+          <div className={GRID_TWO_COLUMNS_CLASSES}>
+            {VCARD_SOCIAL_FIELDS.map((field) => {
+              const network = VCARD_SOCIAL_NETWORKS[field];
+              return (
+                <TextField
+                  key={field}
+                  id={`vcard-${field}`}
+                  name={field}
+                  label={network.name}
+                  contextualLabel="Optional"
+                  autoComplete="off"
+                  maxLength={2048}
+                  placeholder={`@user or ${network.hosts[0]}/…`}
+                  value={data[field] || ""}
+                  onChange={(e) => onChange({ [field]: e.target.value })}
+                  onBlur={() => setBlurredSocials((prev) => new Set(prev).add(field))}
+                  error={blurredSocials.has(field) ? vCardFieldError(field, data[field]) : undefined}
+                />
+              );
+            })}
+          </div>
+        )}
+      </FormBlock>
 
       <FormBlock legend="Address" isSubFieldset={true}>
         <div className={SUB_CONTAINER_SPACING_CLASSES}>
