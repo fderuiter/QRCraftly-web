@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Camera, Copy, FileImage, RefreshCw, Upload } from 'lucide-react';
+import { Camera, Copy, FileImage, RefreshCw, Upload, Volume2, VolumeX } from 'lucide-react';
 import {
   useQrScanner,
   type CameraProblemStatus,
   type CameraScanResult,
   type CameraSessionState,
 } from '@/packages/optical-scanner/client';
+import { playChime } from '@/utils/feedback';
 import { Button } from './ui/Button';
 import { ScannerCameraControls } from './ScannerCameraControls';
 import { EmptyState } from './ui/EmptyState';
@@ -232,6 +233,8 @@ export interface QRScannerProps {
    * click). The standalone page passes false and waits for "Start camera".
    */
   autoStartCamera?: boolean;
+  /** Whether audio feedback chime is enabled on scan capture (default true). */
+  enableAudio?: boolean;
 }
 
 /**
@@ -243,11 +246,29 @@ export interface QRScannerProps {
  * @param props.editLabel - Label of the edit action.
  * @param props.onScanSuccess - Called with every decoded text.
  * @param props.autoStartCamera - Open the camera on mount.
+ * @param props.enableAudio - Whether sound feedback is enabled by default.
  * @returns The scanner.
  */
-export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanSuccess, autoStartCamera = true }) => {
+export const QRScanner: React.FC<QRScannerProps> = ({
+  onEdit,
+  editLabel,
+  onScanSuccess,
+  autoStartCamera = true,
+  enableAudio = true,
+}) => {
   const [mode, setMode] = useState<'webcam' | 'file'>('webcam');
   const [cameraWanted, setCameraWanted] = useState(autoStartCamera);
+  const [soundOn, setSoundOn] = useState<boolean>(() => {
+    try {
+      const stored = typeof window !== 'undefined' ? window.localStorage.getItem('qrcraftly:scanner-sound') : null;
+      if (stored !== null) {
+        return stored === 'true';
+      }
+    } catch {
+      // Ignore storage errors in restricted contexts (e.g., private browsing)
+    }
+    return enableAudio;
+  });
   const [fileError, setFileError] = useState<string | null>(null);
   const [fileProcessing, setFileProcessing] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -256,6 +277,23 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
   const [history, setHistory] = useState<ScanDescription[]>(() => sessionHistory);
   const [announcement, setAnnouncement] = useState('');
   const permission = useCameraPermission();
+
+  const soundOnRef = useRef(soundOn);
+  useEffect(() => {
+    soundOnRef.current = soundOn;
+  }, [soundOn]);
+
+  const toggleSound = () => {
+    setSoundOn((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem('qrcraftly:scanner-sound', String(next));
+      } catch {
+        // Ignore storage errors
+      }
+      return next;
+    });
+  };
 
   const ids = useId();
   const fileErrorId = `${ids}-file-error`;
@@ -297,6 +335,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
     onScanSuccess: (data, found) => {
       if (foundRef.current) return;
       foundRef.current = true;
+      if (soundOnRef.current) playChime();
       if (!prefersReducedMotion() && typeof navigator.vibrate === 'function') navigator.vibrate(30);
       if (!found?.corners) {
         showResult(data);
@@ -674,6 +713,19 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onEdit, editLabel, onScanS
                 },
               ]}
             />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleSound}
+              aria-label={soundOn ? 'Mute scan sound' : 'Unmute scan sound'}
+              title={soundOn ? 'Mute scan sound' : 'Unmute scan sound'}
+            >
+              {soundOn ? (
+                <Volume2 className="size-4" aria-hidden="true" />
+              ) : (
+                <VolumeX className="size-4" aria-hidden="true" />
+              )}
+            </Button>
           </div>
           <div className="relative h-[60vh] max-h-160 min-h-72 w-full">
             {mode === 'webcam' ? renderWebcamViewfinder() : renderFileInput()}

@@ -16,6 +16,7 @@ const repoRoot = path.join(__dirname, '..');
 export const ALLOWED_STORAGE_KEYS = new Set([
   'qrcraftly:theme',
   'qrcraftly:brand-templates',
+  'qrcraftly:scanner-sound',
   '__test__'
 ]);
 

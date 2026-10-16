@@ -4,8 +4,17 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react';
 import { QRScanner, clearScanHistory } from './QRScanner';
 import { useQrScanner, type UseQrScannerOptions } from '@/packages/optical-scanner/client';
+import { playChime } from '@/utils/feedback';
 import { fakeQrRead } from '../../tests/utils/fakeQrRead';
 import { axe } from '../../tests/utils/axe';
+
+vi.mock('@/utils/feedback', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/feedback')>();
+  return {
+    ...actual,
+    playChime: vi.fn(),
+  };
+});
 
 // The real hook and Camera Session run against a fake camera; the spy only records the options
 // so a test can deliver a decoded code.
@@ -1067,6 +1076,85 @@ describe('QRScanner Component', () => {
       await settle();
       expect(screen.getByRole('alert')).toHaveTextContent('Camera Access Denied');
       expect(await axe(denied.container)).toHaveNoViolations();
+    });
+  });
+
+  describe('audio feedback and toggle control', () => {
+    beforeEach(() => {
+      window.localStorage.clear();
+      vi.mocked(playChime).mockClear();
+    });
+
+    it('renders audio toggle button and defaults sound to on when enableAudio is true', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} enableAudio={true} />);
+      await settle();
+      const button = screen.getByRole('button', { name: 'Mute scan sound' });
+      expect(button).toBeInTheDocument();
+    });
+
+    it('renders sound muted when enableAudio prop is false', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} enableAudio={false} />);
+      await settle();
+      const button = screen.getByRole('button', { name: 'Unmute scan sound' });
+      expect(button).toBeInTheDocument();
+    });
+
+    it('toggles sound state and persists choice in localStorage when clicked', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+      const toggleBtn = screen.getByRole('button', { name: 'Mute scan sound' });
+
+      await act(async () => {
+        fireEvent.click(toggleBtn);
+      });
+      expect(screen.getByRole('button', { name: 'Unmute scan sound' })).toBeInTheDocument();
+      expect(window.localStorage.getItem('qrcraftly:scanner-sound')).toBe('false');
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Unmute scan sound' }));
+      });
+      expect(screen.getByRole('button', { name: 'Mute scan sound' })).toBeInTheDocument();
+      expect(window.localStorage.getItem('qrcraftly:scanner-sound')).toBe('true');
+    });
+
+    it('initializes sound state from localStorage preference when present', async () => {
+      window.localStorage.setItem('qrcraftly:scanner-sound', 'false');
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} enableAudio={true} />);
+      await settle();
+      expect(screen.getByRole('button', { name: 'Unmute scan sound' })).toBeInTheDocument();
+    });
+
+    it('invokes playChime on camera scan success when sound is enabled', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} enableAudio={true} />);
+      await settle();
+
+      await decode('https://example.com/audio-test');
+      expect(playChime).toHaveBeenCalledTimes(1);
+      expect(mockOnScanSuccess).toHaveBeenCalledWith('https://example.com/audio-test');
+    });
+
+    it('does not invoke playChime on camera scan success when sound is muted', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} enableAudio={false} />);
+      await settle();
+
+      await decode('https://example.com/no-audio-test');
+      expect(playChime).not.toHaveBeenCalled();
+      expect(mockOnScanSuccess).toHaveBeenCalledWith('https://example.com/no-audio-test');
+    });
+
+    it('handles localStorage errors gracefully without throwing', async () => {
+      const originalGetItem = window.localStorage.getItem;
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('SecurityError: Access is denied');
+      });
+
+      await act(async () => {
+        render(<QRScanner onScanSuccess={mockOnScanSuccess} enableAudio={true} />);
+      });
+      await settle();
+
+      expect(screen.getByRole('button', { name: 'Mute scan sound' })).toBeInTheDocument();
+      window.localStorage.getItem = originalGetItem;
     });
   });
 });
