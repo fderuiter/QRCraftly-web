@@ -16,9 +16,20 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { QRConfig, FramePosition, FrameIcon } from '@/types';
+import type { QRConfig, FramePosition, FrameIcon, FrameFontFamily } from '@/types';
 import type { LayoutMetrics } from './utils';
 import { drawRoundRect } from './canvasHelpers';
+
+/**
+ * CSS system font stacks for frame typography choices.
+ */
+export const FRAME_FONT_STACKS: Record<FrameFontFamily, string> = {
+  'sans-serif': 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  'serif': 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
+  'monospace': 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+  'display': 'Impact, "Arial Black", "Trebuchet MS", ui-sans-serif, system-ui, sans-serif',
+  'cursive': '"Brush Script MT", "Comic Sans MS", cursive',
+};
 
 /**
  * Standard vector path data for frame CTA badge icons (24x24 viewBox).
@@ -250,7 +261,13 @@ export function renderFrame(
     const iconSize = Math.min(availableHeight * 0.5, 28);
     const fontSize = Math.max(12, Math.round(availableHeight * 0.38));
 
-    ctx.font = `bold ${fontSize}px sans-serif`;
+    const fontFamilyKey: FrameFontFamily =
+      config.frameFontFamily && FRAME_FONT_STACKS[config.frameFontFamily]
+        ? config.frameFontFamily
+        : 'sans-serif';
+    const fontStack = FRAME_FONT_STACKS[fontFamilyKey];
+
+    ctx.font = `bold ${fontSize}px ${fontStack}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = textColor;

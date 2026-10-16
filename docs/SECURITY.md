@@ -25,7 +25,7 @@ The owner confirms the repository settings that code cannot check: Dependabot al
 
 ## Privacy & Compliance
 
-This application is designed with a "Privacy First" architecture. Please refer to [COMPLIANCE.md](public/COMPLIANCE.md) for detailed information on how this application handles data and aligns with regulations like HIPAA.
+This application is designed with a "Privacy First" architecture. Please refer to [COMPLIANCE.md](public/COMPLIANCE.md) for detailed information on how this application handles data, typography choices (`frameFontFamily`), and aligns with regulations like HIPAA.
 
 ## Content Security Policy (CSP)
 

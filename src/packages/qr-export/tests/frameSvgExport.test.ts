@@ -53,4 +53,20 @@ describe('SVG Export with Frame Shapes & CTA Badges', () => {
     expect(svg).toContain('path');
     expect(svg).toContain('text');
   });
+
+  it('embeds configured frameFontFamily font stack in SVG text element', async () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      frameStyle: 'pill',
+      frameText: 'CODE OVERLAY',
+      frameFontFamily: 'monospace',
+      framePosition: 'bottom',
+    };
+
+    const svg = await generateQRSvg(config);
+
+    expect(svg).toContain('CODE OVERLAY');
+    expect(svg).toContain('monospace');
+    expect(svg).toContain('Courier New');
+  });
 });

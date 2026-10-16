@@ -61,6 +61,7 @@ export const DEFAULT_CONFIG = {
   frameBgColor: '#000000',
   framePosition: 'bottom' as const,
   frameIcon: 'none' as const,
+  frameFontFamily: 'sans-serif' as const,
 };
 
 /**

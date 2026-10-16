@@ -17,7 +17,7 @@
 */
 
 import React, { useMemo } from 'react';
-import type { QRConfig, FrameStyle, FramePosition, FrameIcon } from '../../types';
+import type { QRConfig, FrameStyle, FramePosition, FrameIcon, FrameFontFamily } from '../../types';
 import { SelectField, TextField } from '../ui/FormFields';
 import { ColorInput } from '../ui/ColorInput';
 import { getContrastRatio } from '../../utils/colorUtils';
@@ -104,6 +104,20 @@ export const FrameControls: React.FC<FrameControlsProps> = ({ config, onChange }
               value={config.frameText || ''}
               onChange={(e) => onChange({ frameText: e.target.value })}
             />
+
+            {/* Typography Selector */}
+            <SelectField
+              id="frame-font-family"
+              label="Badge Font"
+              value={config.frameFontFamily || 'sans-serif'}
+              onChange={(e) => onChange({ frameFontFamily: e.target.value as FrameFontFamily })}
+            >
+              <option value="sans-serif">Sans Serif</option>
+              <option value="serif">Serif</option>
+              <option value="monospace">Monospace</option>
+              <option value="display">Display</option>
+              <option value="cursive">Cursive</option>
+            </SelectField>
 
             {/* Color Inputs */}
             <div className="grid grid-cols-2 gap-4 pt-1">

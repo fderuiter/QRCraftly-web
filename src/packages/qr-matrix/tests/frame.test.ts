@@ -74,4 +74,43 @@ describe('Frame Matrix & Layout Rendering', () => {
     const layout = calculateLayout(config, 512, 29);
     expect(() => renderFrame(mockCtx, config, 512, layout)).not.toThrow();
   });
+
+  it('applies configured frameFontFamily to canvas font property', () => {
+    const mockCtx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      scale: vi.fn(),
+      rotate: vi.fn(),
+      beginPath: vi.fn(),
+      closePath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      quadraticCurveTo: vi.fn(),
+      bezierCurveTo: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      fillRect: vi.fn(),
+      fillText: vi.fn(),
+      measureText: vi.fn().mockReturnValue({ width: 50 }),
+      fillStyle: '',
+      strokeStyle: '',
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+    } as unknown as CanvasRenderingContext2D;
+
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      frameStyle: 'pill',
+      frameText: 'SCAN ME',
+      frameFontFamily: 'serif',
+    };
+
+    const layout = calculateLayout(config, 512, 29);
+    renderFrame(mockCtx, config, 512, layout);
+
+    expect(mockCtx.font).toContain('serif');
+    expect(mockCtx.font).toContain('Georgia');
+  });
 });
