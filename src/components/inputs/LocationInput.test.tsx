@@ -468,4 +468,42 @@ describe('LocationInput component', () => {
       expect(screen.queryByText(/must be/)).not.toBeInTheDocument();
     });
   });
+
+  describe('half-typed coordinates', () => {
+    it.each(['-', '+', '.', '40.', '-74.', '  -  '])('shows no error for %j while it is typed, and does after the field is left', (value) => {
+      renderLocationInput({ latitude: value });
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      fireEvent.blur(screen.getByLabelText(/Latitude/));
+      expect(screen.getByText(/Latitude must be a number/)).toBeInTheDocument();
+    });
+
+    it('still flags at once a value that cannot become a coordinate', () => {
+      renderLocationInput({ longitude: 'abc' });
+      expect(screen.getByText(/Longitude must be a number/)).toBeInTheDocument();
+    });
+
+    it('shows nothing for a blank field, before or after it is left', () => {
+      renderLocationInput({ latitude: '   ' });
+      fireEvent.blur(screen.getByLabelText(/Latitude/));
+      expect(screen.queryByText(/must be/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('a position that arrives after the form is gone', () => {
+    it('does not write into the form or announce anything', () => {
+      let deliver: PositionCallback = () => {};
+      Object.defineProperty(navigator, 'geolocation', {
+        value: { getCurrentPosition: vi.fn((success: PositionCallback) => { deliver = success; }) },
+        configurable: true,
+        writable: true,
+      });
+      const { unmount, onChange } = renderLocationInput();
+      fireEvent.click(screen.getByTestId('use-current-location'));
+      unmount();
+      const coords = { latitude: 40.7128, longitude: -74.006, accuracy: 1, altitude: null, altitudeAccuracy: null, heading: null, speed: null, toJSON: () => ({}) };
+      deliver({ coords, timestamp: 0, toJSON: () => ({}) });
+      expect(onChange).not.toHaveBeenCalled();
+      expect(announcePolitely).not.toHaveBeenCalled();
+    });
+  });
 });

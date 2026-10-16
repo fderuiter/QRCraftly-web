@@ -14,6 +14,31 @@ function renderOptions(format: DownloadFormat = 'png', size = 2048) {
 }
 
 describe('ExportOptions (#1052)', () => {
+  it('keeps the custom width field while a preset width such as 512 is typed into it', () => {
+    let size = 1000;
+    const onSizeChange = vi.fn((next: number) => {
+      size = next;
+    });
+    const props = { id: 'opts', format: 'png' as const, filename: 'f', copySvgBusy: false, onFormatChange: vi.fn(), onFilenameChange: vi.fn(), onCopySvg: vi.fn(), onWallet: vi.fn(), onSizeChange };
+    const { rerender } = render(<ExportOptions {...props} size={size} />);
+    for (const typed of ['5', '51', '512']) {
+      const field = screen.getByLabelText('Width in pixels');
+      field.focus();
+      fireEvent.change(field, { target: { value: typed } });
+      rerender(<ExportOptions {...props} size={size} />);
+    }
+    const field = screen.getByLabelText('Width in pixels');
+    expect(field).toHaveValue(512);
+    expect(document.activeElement).toBe(field);
+    expect(screen.getByRole('radio', { name: 'Custom' })).toHaveAttribute('aria-checked', 'true');
+
+    // Picking a preset still leaves Custom.
+    fireEvent.click(screen.getByRole('radio', { name: 'Print' }));
+    rerender(<ExportOptions {...props} size={size} />);
+    expect(screen.queryByLabelText('Width in pixels')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Print' })).toHaveAttribute('aria-checked', 'true');
+  });
+
   it('has no axe violations and reports each choice', async () => {
     const { container, onFormatChange, onSizeChange, onFilenameChange, onCopySvg, onWallet } = renderOptions();
     expect(await axe(container)).toHaveNoViolations();

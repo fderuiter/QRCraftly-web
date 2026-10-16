@@ -102,7 +102,8 @@ export function buildPresetColorPatch(
   config?: Partial<QRConfig>
 ): Partial<QRConfig> {
   const currentStops = config?.gradientColorStops;
-  const stop1 = (currentStops && currentStops[1]?.color) ?? DEFAULT_GRADIENT_END_COLOR;
+  // The end colour is the last stop, also for an imported gradient with more than two.
+  const stop1 = currentStops?.[currentStops.length - 1]?.color ?? DEFAULT_GRADIENT_END_COLOR;
   return {
     fgColor: preset.fg,
     bgColor: preset.bg,

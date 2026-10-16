@@ -60,8 +60,9 @@ export const ColorInput: React.FC<ColorInputProps> = ({
     const newVal = e.target.value;
     setTextValue(newVal);
 
-    // Validate and trigger change if valid hex
-    const normalized = normalizeHex(newVal);
+    // Only a full six-digit value goes live while typing: "#c0f" on the way to "#c0ffee" would flash
+    // purple, and "bad" would read as #bbaadd. Shorthand is still taken when the field is left.
+    const normalized = /^#?[0-9a-f]{6}$/i.test(newVal.trim()) ? normalizeHex(newVal) : null;
     if (normalized) {
       onChange(normalized);
     }

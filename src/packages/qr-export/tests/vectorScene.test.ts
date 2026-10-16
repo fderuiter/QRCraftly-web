@@ -83,6 +83,10 @@ describe('vector scene reader (#1359)', () => {
 
   it('measures Helvetica text and keeps only Latin-1 characters', () => {
     expect(toLatin1Codes('Aé中')).toEqual([65, 0xe9, 63]);
+    // WinAnsi's dashes, curly quotes, bullet and euro sign are drawn, not replaced by `?`.
+    expect(toLatin1Codes('– — ‘’ “” • € …')).toEqual([0x96, 32, 0x97, 32, 0x91, 0x92, 32, 0x93, 0x94, 32, 0x95, 32, 0x80, 32, 0x85]);
+    expect(textWidth(toLatin1Codes('—'), 10, false)).toBe(10);
+    expect(textWidth(toLatin1Codes('“'), 10, true)).toBe(5);
     expect(textWidth(toLatin1Codes('HI'), 10, false)).toBe(10);
     expect(textWidth(toLatin1Codes('é'), 10, false)).toBe(textWidth(toLatin1Codes('e'), 10, false));
   });

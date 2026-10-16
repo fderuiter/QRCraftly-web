@@ -296,7 +296,15 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
     if (exportFormat === 'png' && (currentConfig.logoUrl || (currentConfig.isBorderEnabled && currentConfig.borderLogoUrl))) {
       const logoCheck = await preflightLogoCheck(currentConfig, { timeoutMs: 3000 });
-      if (run.cancelled) return;
+      if (run.cancelled) {
+        // Canceled while the logo was checked: close the progress dialog, which the loop below never opened.
+        if (runRef.current === run) {
+          runRef.current = null;
+          setIsGenerating(false);
+        }
+        if (!run.unmounted) addToast({ type: 'info', message: 'Batch canceled. No ZIP was made.', duration: 4000 });
+        return;
+      }
       if (!logoCheck.ok) {
         setIsGenerating(false);
         runRef.current = null;

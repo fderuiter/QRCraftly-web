@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button } from "../ui/Button";
 import { Alert } from "../ui/Alert";
 import type { LocationData } from "../../types";
@@ -19,6 +19,16 @@ const GEOLOCATION_ERROR_MESSAGES: Record<number, string> = {
   3: "Location request timed out. Please try again.",
 };
 
+/** A sign, a dot or digits ending in a dot: still being typed, so not wrong yet. */
+const isUnfinishedNumber = (value: string): boolean => /^[+-]?\d*\.?$/.test(value.trim());
+
+/**
+ * The coordinate's message for the field: shown at once for a value that cannot become valid,
+ * and only after the field is left for one that is still half typed.
+ */
+const shownCoordinateError = (value: string, axis: "latitude" | "longitude", left: boolean): string | undefined =>
+  !left && isUnfinishedNumber(value) ? undefined : (coordinateError(value, axis) ?? undefined);
+
 export const LocationInput: React.FC<LocationInputProps> = ({
   data,
   onChange,
@@ -26,6 +36,16 @@ export const LocationInput: React.FC<LocationInputProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const locationButtonRef = useRef<HTMLButtonElement>(null);
+  const [latitudeLeft, setLatitudeLeft] = useState(false);
+  const [longitudeLeft, setLongitudeLeft] = useState(false);
+  // A position that arrives after the form is gone must not rewrite the form it no longer shows.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const clearGeoError = () => {
     setGeoError(null);
@@ -57,6 +77,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (!mountedRef.current) return;
         setIsLoading(false);
         setGeoError(null);
         // Rounded to six decimals (about 10 cm), so `String()` never writes exponent form.
@@ -68,6 +89,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         announcePolitely("Location coordinates populated");
       },
       (err) => {
+        if (!mountedRef.current) return;
         setIsLoading(false);
         setGeoError(
           GEOLOCATION_ERROR_MESSAGES[err.code] ??
@@ -89,7 +111,8 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         maxLength={20}
         value={data.latitude}
         onChange={handleLatitudeChange}
-        error={coordinateError(data.latitude, "latitude") ?? undefined}
+        onBlur={() => setLatitudeLeft(true)}
+        error={shownCoordinateError(data.latitude, "latitude", latitudeLeft)}
       />
       <TextField
         id="location-longitude"
@@ -102,7 +125,8 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         // (-180) versus latitude's 2 (-90), requiring one more character for the sign+digits.
         value={data.longitude}
         onChange={handleLongitudeChange}
-        error={coordinateError(data.longitude, "longitude") ?? undefined}
+        onBlur={() => setLongitudeLeft(true)}
+        error={shownCoordinateError(data.longitude, "longitude", longitudeLeft)}
       />
       <Button
         ref={locationButtonRef}
