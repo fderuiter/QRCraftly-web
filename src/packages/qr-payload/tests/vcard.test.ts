@@ -496,9 +496,9 @@ describe('Social profiles (#1470)', () => {
 
   const expectedProfiles: Record<VCardSocialField, string> = {
     x: 'https://x.com/jane',
-    linkedin: 'https://www.linkedin.com/in/jane',
-    instagram: 'https://www.instagram.com/jane',
-    facebook: 'https://www.facebook.com/jane',
+    linkedin: 'https://linkedin.com/in/jane',
+    instagram: 'https://instagram.com/jane',
+    facebook: 'https://facebook.com/jane',
     github: 'https://github.com/jane',
   };
 
@@ -625,9 +625,9 @@ describe('Social profiles (#1470)', () => {
     it.each(['2.1', '3.0', '4.0'] as const)('writes one URL;TYPE line per filled social field in %s', (version) => {
       const text = constructVCardString(blankCard({ version, website: 'https://example.com', ...fullSocials }));
       expect(text).toContain('URL;TYPE=x:https://x.com/jane');
-      expect(text).toContain('URL;TYPE=linkedin:https://www.linkedin.com/in/jane');
-      expect(text).toContain('URL;TYPE=instagram:https://www.instagram.com/jane');
-      expect(text).toContain('URL;TYPE=facebook:https://www.facebook.com/jane');
+      expect(text).toContain('URL;TYPE=linkedin:https://linkedin.com/in/jane');
+      expect(text).toContain('URL;TYPE=instagram:https://instagram.com/jane');
+      expect(text).toContain('URL;TYPE=facebook:https://facebook.com/jane');
       expect(text).toContain('URL;TYPE=github:https://github.com/jane');
       expect(socialLineTypes(text)).toEqual(['x', 'linkedin', 'instagram', 'facebook', 'github']);
     });
@@ -696,7 +696,7 @@ describe('Social profiles (#1470)', () => {
         version,
         firstName: 'Jane',
         website: 'https://example.com/',
-        linkedin: 'https://www.linkedin.com/in/jane',
+        linkedin: 'https://linkedin.com/in/jane',
         github: 'https://github.com/jane',
       });
       expect(hydrated.x ?? '').toBe('');
