@@ -375,7 +375,7 @@ export const identifyProtocol = (raw: string): QRType | null => {
   if (lower.startsWith('wifi:')) return QRType.WIFI;
   if (/begin:vcard/i.test(trimmed) || /^mecard:/i.test(trimmed)) return QRType.VCARD;
   if (/begin:v(event|calendar)/i.test(trimmed)) return QRType.EVENT;
-  if (/^(bitcoin|ethereum|litecoin|solana):/i.test(trimmed)) return QRType.PAYMENT;
+  if (/^(bitcoin|ethereum|litecoin|solana|upi):/i.test(trimmed) || /^upi:\/\/pay/i.test(trimmed)) return QRType.PAYMENT;
   if (/^BCD\r?\n/i.test(trimmed)) return QRType.PAYMENT;
   if (/^(https?:\/\/)?(www\.)?(paypal\.me|cash\.app|venmo\.com)\//i.test(trimmed)) return QRType.PAYMENT;
 
@@ -383,7 +383,7 @@ export const identifyProtocol = (raw: string): QRType | null => {
 
   if (parsed) {
     if (parsed.scheme === 'wifi') return QRType.WIFI;
-    if (/^(bitcoin|ethereum|litecoin|solana)$/i.test(parsed.scheme)) return QRType.PAYMENT;
+    if (/^(bitcoin|ethereum|litecoin|solana|upi)$/i.test(parsed.scheme)) return QRType.PAYMENT;
     if (PROTOCOL_PREFIXES.MAIL.includes(parsed.scheme + ':')) return QRType.EMAIL;
     if (parsed.scheme === 'matmsg') return QRType.EMAIL;
     if (PROTOCOL_PREFIXES.TEL.includes(parsed.scheme + ':')) return QRType.PHONE;

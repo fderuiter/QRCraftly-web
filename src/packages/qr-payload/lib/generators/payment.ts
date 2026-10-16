@@ -101,6 +101,7 @@ const AMOUNT_DECIMALS: Partial<Record<CryptoNetwork, number>> = {
   [CryptoNetwork.SOLANA]: 9,
   [CryptoNetwork.ETHEREUM]: WEI_DECIMALS,
   [CryptoNetwork.EPC_SEPA]: 2,
+  [CryptoNetwork.UPI]: 2,
   [CryptoNetwork.PAYPAL]: 2,
   [CryptoNetwork.VENMO]: 2,
   [CryptoNetwork.CASH_APP]: 2,
@@ -232,6 +233,25 @@ export const constructPaymentString = (data: PaymentData): string => {
     return url;
   }
 
+  if (data.network === CryptoNetwork.UPI) {
+    const vpa = (data.address || '').trim();
+    if (!vpa) return '';
+    const params: string[] = [`pa=${encodeURIComponent(vpa)}`];
+    if (data.name && data.name.trim()) {
+      params.push(`pn=${encodeURIComponent(data.name.trim())}`);
+    }
+    if (data.amount && data.amount.trim()) {
+      params.push(`am=${encodeURIComponent(data.amount.trim())}`);
+      params.push('cu=INR');
+    }
+    if (data.label && data.label.trim()) {
+      params.push(`tn=${encodeURIComponent(data.label.trim())}`);
+    }
+    const url = `upi://pay?${params.join('&')}`;
+    if (isDangerousUrl(url)) return '';
+    return url;
+  }
+
   // Known crypto networks
   const validCryptoNetworks = [
     CryptoNetwork.BITCOIN,
@@ -357,6 +377,32 @@ export const hydratePaymentData = (raw: string): PaymentData => {
       amount,
       label: '',
     };
+  }
+
+  if (/^upi:(?:\/\/)?pay/i.test(raw) || /^upi:/i.test(raw)) {
+    const qIndex = raw.indexOf('?');
+    const queryString = qIndex !== -1 ? raw.substring(qIndex + 1) : '';
+    const params = new Map<string, string>();
+    if (queryString) {
+      new URLSearchParams(queryString).forEach((value, key) => {
+        if (!params.has(key.toLowerCase())) params.set(key.toLowerCase(), value);
+      });
+    }
+    const pa = params.get('pa') || '';
+    const pn = params.get('pn');
+    const am = params.get('am') || '';
+    const tn = params.get('tn') || params.get('note') || '';
+
+    const upiResult: PaymentData = {
+      network: CryptoNetwork.UPI,
+      address: safeDecodeURIComponent(pa),
+      amount: safeDecodeURIComponent(am),
+      label: safeDecodeURIComponent(tn),
+    };
+    if (pn !== null && pn !== undefined) {
+      upiResult.name = safeDecodeURIComponent(pn);
+    }
+    return upiResult;
   }
 
   // 3. Known crypto networks

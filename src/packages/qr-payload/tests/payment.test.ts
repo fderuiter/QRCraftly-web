@@ -199,6 +199,76 @@ describe('Payment generator', () => {
     });
   });
 
+  describe('UPI payment preset', () => {
+    it('constructs and hydrates standard upi://pay URI', () => {
+      const upiData = {
+        network: CryptoNetwork.UPI,
+        address: 'merchant@upi',
+        name: 'Jane Doe',
+        amount: '250.50',
+        label: 'Dinner Payment',
+      };
+      const str = constructPaymentString(upiData);
+      expect(str).toBe('upi://pay?pa=merchant%40upi&pn=Jane%20Doe&am=250.50&cu=INR&tn=Dinner%20Payment');
+
+      const hydrated = hydratePaymentData(str);
+      expect(hydrated).toEqual(upiData);
+    });
+
+    it('constructs minimal UPI string with address only', () => {
+      const upiData = {
+        network: CryptoNetwork.UPI,
+        address: 'store@okaxis',
+        amount: '',
+        label: '',
+      };
+      const str = constructPaymentString(upiData);
+      expect(str).toBe('upi://pay?pa=store%40okaxis');
+
+      const hydrated = hydratePaymentData(str);
+      expect(hydrated.network).toBe(CryptoNetwork.UPI);
+      expect(hydrated.address).toBe('store@okaxis');
+      expect(hydrated.amount).toBe('');
+      expect(hydrated.label).toBe('');
+    });
+
+    it('returns empty string if VPA (address) is missing', () => {
+      const upiData = {
+        network: CryptoNetwork.UPI,
+        address: '  ',
+        name: 'Jane Doe',
+        amount: '100',
+        label: 'Test',
+      };
+      expect(constructPaymentString(upiData)).toBe('');
+    });
+
+    it('handles query parameter percent-encoding for special characters', () => {
+      const upiData = {
+        network: CryptoNetwork.UPI,
+        address: 'user@bank',
+        name: 'John & Jane Co.',
+        amount: '10.00',
+        label: 'Order #123 & Test',
+      };
+      const str = constructPaymentString(upiData);
+      expect(str).toBe('upi://pay?pa=user%40bank&pn=John%20%26%20Jane%20Co.&am=10.00&cu=INR&tn=Order%20%23123%20%26%20Test');
+
+      const hydrated = hydratePaymentData(str);
+      expect(hydrated).toEqual(upiData);
+    });
+
+    it('hydrates raw upi: URI format', () => {
+      const raw = 'upi://pay?pa=payee@icici&pn=Payee&am=500&cu=INR&tn=Rent';
+      const hydrated = hydratePaymentData(raw);
+      expect(hydrated.network).toBe(CryptoNetwork.UPI);
+      expect(hydrated.address).toBe('payee@icici');
+      expect(hydrated.name).toBe('Payee');
+      expect(hydrated.amount).toBe('500');
+      expect(hydrated.label).toBe('Rent');
+    });
+  });
+
   it('implements PaymentContract correctly and validates raw strings', () => {
     expect(PaymentContract.type).toBe(QRType.PAYMENT);
     expect(PaymentContract.matches('bitcoin:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa')).toBe(true);
@@ -206,6 +276,7 @@ describe('Payment generator', () => {
     expect(PaymentContract.matches('https://paypal.me/johndoe')).toBe(true);
     expect(PaymentContract.matches('https://cash.app/$johndoe')).toBe(true);
     expect(PaymentContract.matches('https://venmo.com/u/johndoe')).toBe(true);
+    expect(PaymentContract.matches('upi://pay?pa=merchant@upi')).toBe(true);
     expect(PaymentContract.matches('random')).toBe(false);
 
     // Empty validation

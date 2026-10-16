@@ -45,6 +45,11 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
           label: "IBAN",
           placeholder: "e.g. DE89370400440532013000",
         };
+      case CryptoNetwork.UPI:
+        return {
+          label: "UPI ID / VPA",
+          placeholder: "e.g. merchant@upi",
+        };
       case CryptoNetwork.PAYPAL:
         return {
           label: "PayPal Handle / Username",
@@ -89,6 +94,7 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
         <option value={CryptoNetwork.SOLANA}>Solana (SOL)</option>
         <option value={CryptoNetwork.LITECOIN}>Litecoin (LTC)</option>
         <option value={CryptoNetwork.EPC_SEPA}>SEPA Credit Transfer (EPC QR)</option>
+        <option value={CryptoNetwork.UPI}>UPI (Unified Payments Interface)</option>
         <option value={CryptoNetwork.PAYPAL}>PayPal</option>
         <option value={CryptoNetwork.VENMO}>Venmo</option>
         <option value={CryptoNetwork.CASH_APP}>Cash App</option>
@@ -140,11 +146,24 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
         </>
       )}
 
+      {data.network === CryptoNetwork.UPI && (
+        <TextField
+          id="payment-name"
+          label="Payee Name"
+          contextualLabel="Optional"
+          type="text"
+          maxLength={70}
+          placeholder="e.g. Jane Doe"
+          value={data.name || ""}
+          onChange={(e) => onChange({ name: e.target.value })}
+        />
+      )}
+
       {data.network !== CryptoNetwork.CUSTOM && (
         <>
           <TextField
             id="payment-amount"
-            label={data.network === CryptoNetwork.EPC_SEPA ? "Amount (EUR)" : "Amount"}
+            label={data.network === CryptoNetwork.EPC_SEPA ? "Amount (EUR)" : data.network === CryptoNetwork.UPI ? "Amount (INR)" : "Amount"}
             contextualLabel="Optional"
             type="number"
             step="any"
