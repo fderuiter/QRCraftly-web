@@ -63,6 +63,67 @@ function rasterize(plan: WalletCardPlan) {
   return data;
 }
 
+/** Paints a plan using individual 1x1-module fillRect calls for each dark module. */
+function rasterizeReference(plan: WalletCardPlan) {
+  const data = new Uint8ClampedArray(plan.width * plan.height * 4);
+  let fill = '#ffffff';
+  const ctx: WalletCardContext = {
+    set fillStyle(value: string) {
+      fill = value;
+    },
+    get fillStyle() {
+      return fill;
+    },
+    font: '',
+    textAlign: 'center',
+    textBaseline: 'alphabetic',
+    fillText: () => undefined,
+    fillRect: (x: number, y: number, w: number, h: number) => {
+      const level = fill === '#000000' ? 0 : 255;
+      for (let row = y; row < y + h; row++) data.fill(level, (row * plan.width + x) * 4, (row * plan.width + x + w) * 4);
+    },
+  } as WalletCardContext;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, plan.width, plan.height);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  for (const line of plan.lines) {
+    ctx.font = line.font;
+    ctx.fillStyle = line.color;
+    ctx.fillText(line.text, line.x, line.y);
+  }
+  ctx.fillStyle = '#000000';
+  const { modules, moduleSize, originX, originY } = plan;
+  for (let row = 0; row < modules.size; row++) {
+    for (let col = 0; col < modules.size; col++) {
+      if (modules.get(row, col)) {
+        ctx.fillRect(originX + col * moduleSize, originY + row * moduleSize, moduleSize, moduleSize);
+      }
+    }
+  }
+  for (let i = 3; i < data.length; i += 4) data[i] = 255;
+  return data;
+}
+
+function countDarkRuns(modules: WalletCardPlan['modules']): number {
+  let runs = 0;
+  for (let r = 0; r < modules.size; r++) {
+    let inRun = false;
+    for (let c = 0; c < modules.size; c++) {
+      if (modules.get(r, c)) {
+        if (!inRun) {
+          inRun = true;
+          runs++;
+        }
+      } else {
+        inRun = false;
+      }
+    }
+  }
+  return runs;
+}
+
 describe('Wallet card (ADR 0048)', () => {
   it('draws a plain code that our reader decodes', async () => {
     const value = 'WIFI:T:WPA;S:Home Network;P:correct horse battery staple;;';
@@ -115,16 +176,19 @@ describe('Wallet card (ADR 0048)', () => {
     expect(walletRefusalReason(QRType.URL)).toBeNull();
   });
 
-  it('consolidates dark module runs into fewer fillRect calls', () => {
-    const modules = modulesOf('https://qrcraftly.com');
-    const plan = planWalletCard(modules, {}, measure);
+  it('consolidates dark module runs into single fillRect calls and produces pixel-identical output', () => {
+    const shortPlan = planWalletCard(modulesOf('https://qrcraftly.com'), { title: 'QRCraftly' }, measure);
+    const shortBuffer = rasterize(shortPlan);
+    const shortRefBuffer = rasterizeReference(shortPlan);
+    expect(Buffer.from(shortBuffer.buffer).equals(Buffer.from(shortRefBuffer.buffer))).toBe(true);
+
+    const largePlan = planWalletCard(modulesOf('A'.repeat(1900)), { title: 'Large QR Code', subtitle: 'Version 30+' }, measure);
+    expect(largePlan.modules.size).toBeGreaterThanOrEqual(137);
+    const largeBuffer = rasterize(largePlan);
+    const largeRefBuffer = rasterizeReference(largePlan);
+    expect(Buffer.from(largeBuffer.buffer).equals(Buffer.from(largeRefBuffer.buffer))).toBe(true);
+
     let fillRectCount = 0;
-    let darkModuleCount = 0;
-    for (let r = 0; r < modules.size; r++) {
-      for (let c = 0; c < modules.size; c++) {
-        if (modules.get(r, c)) darkModuleCount++;
-      }
-    }
     const ctx: WalletCardContext = {
       fillStyle: '',
       font: '',
@@ -135,9 +199,8 @@ describe('Wallet card (ADR 0048)', () => {
         fillRectCount++;
       },
     };
-    paintWalletCard(ctx, plan);
-    // Subtract 1 for the background fillRect call
+    paintWalletCard(ctx, shortPlan);
     const moduleFillRects = fillRectCount - 1;
-    expect(moduleFillRects).toBeLessThan(darkModuleCount * 0.5);
+    expect(moduleFillRects).toBe(countDarkRuns(shortPlan.modules));
   });
 });

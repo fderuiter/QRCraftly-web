@@ -180,16 +180,14 @@ export function paintWalletCard(ctx: WalletCardContext, plan: WalletCardPlan): v
   const { modules, moduleSize, originX, originY } = plan;
   for (let row = 0; row < modules.size; row++) {
     let runStart = -1;
-    for (let col = 0; col < modules.size; col++) {
-      if (modules.get(row, col)) {
+    for (let col = 0; col <= modules.size; col++) {
+      const isDark = col < modules.size && modules.get(row, col);
+      if (isDark) {
         if (runStart < 0) runStart = col;
       } else if (runStart >= 0) {
         ctx.fillRect(originX + runStart * moduleSize, originY + row * moduleSize, (col - runStart) * moduleSize, moduleSize);
         runStart = -1;
       }
-    }
-    if (runStart >= 0) {
-      ctx.fillRect(originX + runStart * moduleSize, originY + row * moduleSize, (modules.size - runStart) * moduleSize, moduleSize);
     }
   }
 }
