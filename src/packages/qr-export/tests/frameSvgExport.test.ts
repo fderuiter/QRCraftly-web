@@ -66,7 +66,8 @@ describe('SVG Export with Frame Shapes & CTA Badges', () => {
     const svg = await generateQRSvg(config);
 
     expect(svg).toContain('CODE OVERLAY');
-    expect(svg).toContain('monospace');
-    expect(svg).toContain('Courier New');
+    expect(svg).toContain(
+      'font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, &quot;Liberation Mono&quot;, &quot;Courier New&quot;, monospace"'
+    );
   });
 });

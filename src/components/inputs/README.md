@@ -52,7 +52,7 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
 
 ## Frame Controls & Call-to-Action Badges
 
-Frame shapes (`frameStyle`), call-to-action text (`frameText`), positions (`framePosition`), icons (`frameIcon`), typography font families (`frameFontFamily`), and color selections are configured via `FrameControls.tsx`. The CTA text input is validated against control and BiDi characters via `validateConfig()`, checked for WCAG AA text contrast, and preserved across brand template applications.
+Frame shapes (`frameStyle`), call-to-action text (`frameText`), positions (`framePosition`), icons (`frameIcon`), typography font families (`frameFontFamily` from `FRAME_FONT_FAMILIES`), and color selections are configured via `FrameControls.tsx`. The CTA text input is validated against control and BiDi characters via `validateConfig()`, checked for WCAG AA text contrast, and preserved across brand template applications.
 
 ## Adding a New Input Type
 

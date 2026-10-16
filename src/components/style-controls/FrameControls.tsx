@@ -17,12 +17,27 @@
 */
 
 import React, { useMemo } from 'react';
-import type { QRConfig, FrameStyle, FramePosition, FrameIcon, FrameFontFamily } from '../../types';
+import {
+  type QRConfig,
+  type FrameStyle,
+  type FramePosition,
+  type FrameIcon,
+  type FrameFontFamily,
+  FRAME_FONT_FAMILIES,
+} from '../../types';
 import { SelectField, TextField } from '../ui/FormFields';
 import { ColorInput } from '../ui/ColorInput';
 import { getContrastRatio } from '../../utils/colorUtils';
 import { MIN_CONTRAST_THRESHOLD } from '../../constants';
 import { ContrastBadge } from './ContrastWarning';
+
+const FRAME_FONT_OPTIONS: ReadonlyArray<{ value: FrameFontFamily; label: string }> = [
+  { value: 'sans-serif', label: 'Sans Serif' },
+  { value: 'serif', label: 'Serif' },
+  { value: 'monospace', label: 'Monospace' },
+  { value: 'display', label: 'Display' },
+  { value: 'cursive', label: 'Cursive' },
+] as const;
 
 interface FrameControlsProps {
   config: QRConfig;
@@ -106,18 +121,28 @@ export const FrameControls: React.FC<FrameControlsProps> = ({ config, onChange }
             />
 
             {/* Typography Selector */}
-            <SelectField
-              id="frame-font-family"
-              label="Badge Font"
-              value={config.frameFontFamily || 'sans-serif'}
-              onChange={(e) => onChange({ frameFontFamily: e.target.value as FrameFontFamily })}
-            >
-              <option value="sans-serif">Sans Serif</option>
-              <option value="serif">Serif</option>
-              <option value="monospace">Monospace</option>
-              <option value="display">Display</option>
-              <option value="cursive">Cursive</option>
-            </SelectField>
+            <div>
+              <SelectField
+                id="frame-font-family"
+                label="Badge Font"
+                value={config.frameFontFamily || 'sans-serif'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (FRAME_FONT_FAMILIES.includes(val as FrameFontFamily)) {
+                    onChange({ frameFontFamily: val as FrameFontFamily });
+                  }
+                }}
+              >
+                {FRAME_FONT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </SelectField>
+              <p className="mt-1 text-xs text-fg-muted">
+                PDF and EPS exports always use Helvetica.
+              </p>
+            </div>
 
             {/* Color Inputs */}
             <div className="grid grid-cols-2 gap-4 pt-1">

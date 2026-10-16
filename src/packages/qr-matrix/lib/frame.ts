@@ -262,7 +262,7 @@ export function renderFrame(
     const fontSize = Math.max(12, Math.round(availableHeight * 0.38));
 
     const fontFamilyKey: FrameFontFamily =
-      config.frameFontFamily && FRAME_FONT_STACKS[config.frameFontFamily]
+      config.frameFontFamily && Object.hasOwn(FRAME_FONT_STACKS, config.frameFontFamily)
         ? config.frameFontFamily
         : 'sans-serif';
     const fontStack = FRAME_FONT_STACKS[fontFamilyKey];

@@ -247,7 +247,7 @@ export interface QRConfig {
   framePosition?: FramePosition;
   /** Optional icon to display inside the frame badge. */
   frameIcon?: FrameIcon;
-  /** Typography font family family for the frame badge text. */
+  /** Typography font family for the frame badge text. */
   frameFontFamily?: FrameFontFamily;
   /** Type of gradient fill applied to QR code modules ('none', 'linear', or 'radial'). */
   gradientType?: GradientType;
@@ -273,9 +273,20 @@ export type FramePosition = 'bottom' | 'top' | 'left' | 'right';
 export type FrameIcon = 'none' | 'scan' | 'camera' | 'star' | 'heart' | 'info' | 'phone';
 
 /**
+ * Available typography font family choices for the outer frame CTA badge.
+ */
+export const FRAME_FONT_FAMILIES = [
+  'sans-serif',
+  'serif',
+  'monospace',
+  'display',
+  'cursive',
+] as const;
+
+/**
  * Defines the typography font family for the outer frame CTA badge text.
  */
-export type FrameFontFamily = 'sans-serif' | 'serif' | 'monospace' | 'display' | 'cursive';
+export type FrameFontFamily = (typeof FRAME_FONT_FAMILIES)[number];
 
 /**
  * Mosaic QR layout (ADR 0019).

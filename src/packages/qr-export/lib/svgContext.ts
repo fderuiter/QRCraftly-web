@@ -520,8 +520,9 @@ export class SvgContext {
       }
     }
 
+    const parsedFont = this._parseFont(this.font);
     this._elements.push(
-      `<text x="${this._n(tx)}" y="${this._n(ty)}" fill="${fill}" font="${this._escapeAttr(this.font)}" text-anchor="${anchor}" dominant-baseline="${baseline}"${textLengthAttr}>${this._escapeText(text)}</text>`
+      `<text x="${this._n(tx)}" y="${this._n(ty)}" fill="${fill}" font-family="${this._escapeAttr(parsedFont.fontFamily)}" font-size="${this._n(parsedFont.fontSize)}" font-weight="${parsedFont.fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}"${textLengthAttr}>${this._escapeText(text)}</text>`
     );
   }
 
@@ -683,5 +684,17 @@ export class SvgContext {
 
   private _escapeText(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  private _parseFont(fontStr: string): { fontFamily: string; fontSize: number; fontWeight: string } {
+    const trimmed = fontStr ? fontStr.trim() : '';
+    const match = /^(?:(bold|[1-9]00|normal|italic|oblique)\s+)?(\d+(?:\.\d+)?)(?:px|pt|em|rem)?\s+(.+)$/i.exec(trimmed);
+    if (match) {
+      const weight = match[1] ? match[1].toLowerCase() : 'normal';
+      const size = parseFloat(match[2]) || 16;
+      const family = match[3].trim();
+      return { fontFamily: family, fontSize: size, fontWeight: weight };
+    }
+    return { fontFamily: trimmed || 'sans-serif', fontSize: 16, fontWeight: 'normal' };
   }
 }
