@@ -71,7 +71,7 @@ describe('schemaGenerator', () => {
     expect(app).toBeDefined();
     expect(app.name).toBe(dummyContent.name);
     expect(app.applicationCategory).toBe('UtilitiesApplication');
-    expect(app.featureList).toBe('WPA, WPA2');
+    expect(app.featureList).toEqual(['WPA', 'WPA2']);
     // Real package version, no placeholder publish date.
     expect(app.softwareVersion).toBe(__APP_VERSION__);
     expect(app.softwareVersion).not.toBe('0.1.0');

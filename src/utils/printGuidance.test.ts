@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { QRErrorCorrectionLevel } from '../types';
-import { MIN_MODULE_MM, formatDistance, getPrintGuidance, moduleSizeMm } from './printGuidance';
+import { MIN_MODULE_MM, formatDistance, formatDistanceBoth, formatWidth, getPrintGuidance, moduleSizeMm, widthForDistance } from './printGuidance';
 
 describe('print guidance', () => {
   it('measures a module from the printed width, quiet zone included', () => {
@@ -61,5 +61,27 @@ describe('print guidance', () => {
   it('formats distances in centimetres or metres', () => {
     expect(formatDistance(45.4)).toBe('45 cm');
     expect(formatDistance(240)).toBe('2.4 m');
+  });
+
+  it('gives back the width that scans from a distance, the reverse of the distance estimate', () => {
+    const width = widthForDistance(100, 33, QRErrorCorrectionLevel.M);
+    expect(width).toBeCloseTo(10, 5);
+    expect(getPrintGuidance(width, 33, QRErrorCorrectionLevel.M).distanceCm).toBeCloseTo(100, 5);
+  });
+
+  it('never advises a width with modules too small to print, even for a phone held close', () => {
+    const width = widthForDistance(1, 57, QRErrorCorrectionLevel.M);
+    expect(getPrintGuidance(width, 57, QRErrorCorrectionLevel.M).tooSmall).toBe(false);
+    expect(widthForDistance(0, 57, QRErrorCorrectionLevel.M)).toBe(widthForDistance(-5, 57, QRErrorCorrectionLevel.M));
+  });
+
+  it('formats widths in centimetres and inches, rounded up', () => {
+    expect(formatWidth(2.54)).toBe('2.6 cm (1 in)');
+    expect(formatWidth(10)).toBe('10 cm (4 in)');
+  });
+
+  it('formats distances in metric and feet', () => {
+    expect(formatDistanceBoth(30.48)).toBe('30 cm (1.0 ft)');
+    expect(formatDistanceBoth(240)).toBe('2.4 m (7.9 ft)');
   });
 });

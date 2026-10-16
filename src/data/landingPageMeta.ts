@@ -168,6 +168,21 @@ export const landingPageMeta: Record<string, LandingMeta> = {
       'Made in your browser and never uploaded',
     ],
   },
+  'qr-code-size-calculator': {
+    name: 'QR Code Size Calculator',
+    seoTitle: 'QR Code Size Calculator: Print Size by Distance | QRCraftly',
+    heading: 'QR Code Size Calculator',
+    description:
+      'Work out how big to print a QR code so phones scan it from your chosen distance, in cm and inches, from the real code your link makes. Free.',
+    imageAlt: 'The QRCraftly QR code size calculator showing the printed width needed for a chosen scan distance',
+    features: [
+      'Printed width for any scan distance, in centimetres and inches',
+      'Measures the real code your content makes, not a rule of thumb alone',
+      'Scan distances for common sizes, from stickers to posters',
+      'Warns when squares print too small for most printers',
+      'Runs entirely in your browser, with nothing uploaded',
+    ],
+  },
   'qr-code-checker': {
     name: 'QR Code Checker',
     seoTitle: 'QR Code Checker: Test If a QR Code Scans | QRCraftly',
