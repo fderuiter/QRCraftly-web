@@ -132,6 +132,48 @@ describe('Payment generator', () => {
       // Label truncated to 140 chars
       expect(lines[10]).toBe('B'.repeat(140));
     });
+
+    it('returns empty payload when IBAN checksum is invalid', () => {
+      const sepaData = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: 'DE88370400440532013000', // Invalid checksum
+        name: 'Jane Doe',
+        amount: '10.00',
+        label: '',
+      };
+      expect(constructPaymentString(sepaData)).toBe('');
+    });
+
+    it('returns empty payload when beneficiary name is missing', () => {
+      const sepaData = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: 'DE89370400440532013000',
+        name: '',
+        amount: '10.00',
+        label: '',
+      };
+      expect(constructPaymentString(sepaData)).toBe('');
+    });
+
+    it('returns empty payload when SEPA amount exceeds limit or decimal rules', () => {
+      const invalidDecimal = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: 'DE89370400440532013000',
+        name: 'Jane Doe',
+        amount: '10.123',
+        label: '',
+      };
+      expect(constructPaymentString(invalidDecimal)).toBe('');
+
+      const exceedLimit = {
+        network: CryptoNetwork.EPC_SEPA,
+        address: 'DE89370400440532013000',
+        name: 'Jane Doe',
+        amount: '1000000000.00',
+        label: '',
+      };
+      expect(constructPaymentString(exceedLimit)).toBe('');
+    });
   });
 
   describe('PayPal payment preset', () => {

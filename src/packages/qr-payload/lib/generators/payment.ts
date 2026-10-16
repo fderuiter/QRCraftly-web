@@ -19,6 +19,7 @@
 import { type PaymentData, CryptoNetwork, QRType, type QRGeneratorContract } from '@/types';
 import { isDangerousUrl, sanitizeInput, REGEX_STRICT_CONTROL_CHARS } from '@/utils/security';
 import { identifyProtocol, safeDecodeURIComponent } from '../protocol';
+import { isValidIban } from '../iban';
 
 /** Number of wei in one ether (10^18), as used by EIP-681 `value=`. */
 const WEI_DECIMALS = 18;
@@ -163,8 +164,8 @@ export const constructPaymentString = (data: PaymentData): string => {
     const bic = epcText(data.bic, 11).toUpperCase();
     const label = epcText(data.label, 140);
     const amount = (data.amount || '').trim().replace(/^EUR/i, '');
-    // The beneficiary name and IBAN are mandatory (EPC069-12), and a bad amount is refused.
-    if (!iban || !name || paymentAmountError(amount, CryptoNetwork.EPC_SEPA)) return '';
+    // The beneficiary name and IBAN are mandatory (EPC069-12), and a bad amount or IBAN is refused.
+    if (!iban || !isValidIban(iban) || !name || paymentAmountError(amount, CryptoNetwork.EPC_SEPA)) return '';
     const amountStr = amount ? `EUR${Number(amount).toFixed(2)}` : '';
 
     const lines = [
@@ -423,6 +424,15 @@ export const PaymentContract: QRGeneratorContract<PaymentData> = {
     const data = hydratePaymentData(raw);
     if (paymentAmountError(data.amount, data.network)) {
       violations.push('PAYMENT_AMOUNT_VIOLATION');
+    }
+    if (data.network === CryptoNetwork.EPC_SEPA) {
+      const iban = cleanIban(data.iban || data.address || '');
+      if (iban && !isValidIban(iban)) {
+        violations.push('SEPA_IBAN_VIOLATION');
+      }
+      if ((iban || data.amount) && !(data.name || '').trim()) {
+        violations.push('SEPA_NAME_VIOLATION');
+      }
     }
     return violations;
   },

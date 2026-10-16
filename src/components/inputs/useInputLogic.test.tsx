@@ -1,7 +1,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { useInputLogic, clearRetainedInputStates } from "./useInputLogic";
-import { type QRConfig, QRType, QRStyle, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from "../../types";
+import { type QRConfig, QRType, QRStyle, QRErrorCorrectionLevel, SocialFormat, TemplateStyle, CryptoNetwork } from "../../types";
 
 const createMockConfig = (type: QRType, value: string): QRConfig => ({
   value,
@@ -266,6 +266,142 @@ describe("useInputLogic", () => {
 
     // Should fall back to default initial state rather than old custom value
     expect(freshHook.current.inputProps.data).toEqual({ url: "https://qrcraftly.com" });
+  });
+
+  describe("payment validation and refusal state", () => {
+    it("emits refused state and blocks onChange when payment amount validation fails", () => {
+      const config = createMockConfig(QRType.PAYMENT, "");
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useInputLogic(config, onChange, onRefusedChange)
+      );
+
+      // Set SEPA network and an invalid amount with 3 decimal places
+      act(() => {
+        result.current.inputProps.onChange({
+          network: CryptoNetwork.EPC_SEPA,
+          iban: "DE89370400440532013000",
+          name: "Jane Doe",
+          amount: "12.345",
+        });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(onRefusedChange).toHaveBeenCalledWith(true);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("emits refused state and blocks onChange when SEPA IBAN is invalid", () => {
+      const config = createMockConfig(QRType.PAYMENT, "");
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useInputLogic(config, onChange, onRefusedChange)
+      );
+
+      // DE88370400440532013000 has an invalid mod-97 checksum
+      act(() => {
+        result.current.inputProps.onChange({
+          network: CryptoNetwork.EPC_SEPA,
+          iban: "DE88370400440532013000",
+          name: "Jane Doe",
+        });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(onRefusedChange).toHaveBeenCalledWith(true);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("emits refused state and blocks onChange when SEPA beneficiary name is missing", () => {
+      const config = createMockConfig(QRType.PAYMENT, "");
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useInputLogic(config, onChange, onRefusedChange)
+      );
+
+      act(() => {
+        result.current.inputProps.onChange({
+          network: CryptoNetwork.EPC_SEPA,
+          iban: "DE89370400440532013000",
+          name: "",
+        });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(onRefusedChange).toHaveBeenCalledWith(true);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("generates payment payload without refusal when details are valid", () => {
+      const config = createMockConfig(QRType.PAYMENT, "");
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useInputLogic(config, onChange, onRefusedChange)
+      );
+
+      act(() => {
+        result.current.inputProps.onChange({
+          network: CryptoNetwork.EPC_SEPA,
+          iban: "DE89370400440532013000",
+          name: "Jane Doe",
+          amount: "12.50",
+        });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(onRefusedChange).toHaveBeenLastCalledWith(false);
+      expect(onChange).toHaveBeenCalledWith({
+        value: "BCD\n002\n1\nSCT\n\nJane Doe\nDE89370400440532013000\nEUR12.50",
+      });
+    });
+
+    it("does not trigger input refusal for advisory crypto checksum warnings", () => {
+      const config = createMockConfig(QRType.PAYMENT, "");
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+
+      const { result } = renderHook(() =>
+        useInputLogic(config, onChange, onRefusedChange)
+      );
+
+      // Address with invalid checksum
+      act(() => {
+        result.current.inputProps.onChange({
+          network: CryptoNetwork.BITCOIN,
+          address: "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfN",
+          amount: "0.1",
+        });
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(onRefusedChange).toHaveBeenLastCalledWith(false);
+      expect(onChange).toHaveBeenCalledWith({
+        value: "bitcoin:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfN?amount=0.1",
+      });
+    });
   });
 });
 
