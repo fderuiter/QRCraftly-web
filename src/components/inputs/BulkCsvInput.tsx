@@ -47,7 +47,15 @@ import { Modal } from '../ui/Modal';
 import { SelectField } from '../ui/FormFields';
 import { useToast } from '../ui/Toast';
 import { useQRStoreSelector } from '@/context/QRContext';
-import { generateQRSvg, rasterizeSvgToCanvas, preflightLogoCheck, SOCIAL_DIMENSIONS, MissingImageError } from '@/packages/qr-export';
+import {
+  generateQRSvg,
+  rasterizeSvgToCanvas,
+  preflightLogoCheck,
+  SOCIAL_DIMENSIONS,
+  MissingImageError,
+  convertSvgToEps,
+  convertSvgToPdf,
+} from '@/packages/qr-export';
 import { QrEncodeError } from '@/packages/qr-matrix';
 import { validateConfig, describeViolation } from '@/packages/qr-payload';
 import { triggerFileDownload } from '@/utils/downloadManager';
@@ -311,14 +319,6 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       const usedNames = new Set<string>();
       let remoteLogoOmitted = false;
 
-      let epsConverter: (typeof import('@/packages/qr-export'))['convertSvgToEps'] | undefined;
-      let pdfConverter: (typeof import('@/packages/qr-export'))['convertSvgToPdf'] | undefined;
-      if (exportFormat === 'eps' || exportFormat === 'pdf') {
-        const qrExportModule = await import('@/packages/qr-export');
-        epsConverter = qrExportModule.convertSvgToEps;
-        pdfConverter = qrExportModule.convertSvgToPdf;
-      }
-
       for (let i = 0; i < targetRows.length; i++) {
         const row = targetRows[i];
         const rowNumber = rowNumbers[report.validRowIndices[i]] ?? report.validRowIndices[i] + 1;
@@ -339,15 +339,16 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
           if (exportFormat === 'png') {
             const canvas = await rasterizeSvgToCanvas(svgString, pngWidth, pngHeight);
             entryData = await canvasToPngBytes(canvas);
-          } else if (exportFormat === 'eps' && epsConverter) {
-            entryData = await epsConverter(svgString);
-          } else if (exportFormat === 'pdf' && pdfConverter) {
-            entryData = await pdfConverter(svgString);
+          } else if (exportFormat === 'eps') {
+            entryData = await convertSvgToEps(svgString);
+          } else if (exportFormat === 'pdf') {
+            entryData = await convertSvgToPdf(svgString);
           }
           const stem = sanitizeFileStem(row[filenameCol] ?? '', `qr_${rowNumber}`);
           entries.push({ name: allocateFileName(stem, exportFormat, usedNames), data: entryData });
         } catch (err) {
-          if (err instanceof MissingImageError || (err instanceof Error && err.name === 'MissingImageError')) {
+          if (err instanceof MissingImageError) {
+            // Stop the batch because the same custom logo fails vector conversion on every row.
             addToast({
               type: 'error',
               message: "The logo couldn't be embedded in EPS/PDF files. Upload the logo again, or choose PNG or SVG.",
