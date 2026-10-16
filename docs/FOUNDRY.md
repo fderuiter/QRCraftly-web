@@ -58,10 +58,34 @@ Each replacement moves through these stages in order. The scorecard below record
 
 ### Kept
 
-These are foundations, kept by decision (Fred, 2026-10-04). The effort to replace each is in #1175.
+These are foundations, kept by decision (Fred, 2026-10-04). Every remaining dependency and third-party action is listed here with the effort it would take to build our own. Scale: S is under 1 day, M about 1 day, L 1–2 weeks, XL 1–3 months, XXL a team-year or more. The reasoning behind each estimate is in #1175.
 
-- **Browser runtime:** React, React DOM, Vike, Vike React and `lucide-react`.
-- **Build:** Vite, TypeScript, Tailwind and PostCSS.
-- **Tests:** Vitest with coverage, jsdom, Testing Library React and user-event, Playwright, axe-core and `@axe-core/playwright`. `dom-accessibility-api` (already pulled in by Testing Library) computes accessible names and descriptions for our DOM matchers.
-- **Lint:** ESLint core with the TypeScript, React, React Hooks, JSX a11y and JSDoc plugins, Prettier and Knip.
-- **Hosting and CI:** Wrangler, Lighthouse CI, Semgrep and GitHub's own actions. Scorecard and CodeQL left when the repository went private ([ADR 0050](./adr/0050-ci-tiers-for-a-private-repository.md)).
+| Package                                                 | Kind            | Decision                                         | Effort to replace                                    |
+| ------------------------------------------------------- | --------------- | ------------------------------------------------ | ---------------------------------------------------- |
+| `react`, `react-dom`                                    | runtime         | Foundation, keep                                 | XL (compatible runtime) or XXL (signals rewrite)     |
+| `vike`, `vike-react`                                    | runtime         | Foundation, keep                                 | L                                                    |
+| `lucide-react`                                          | runtime         | Foundation, keep (#1180)                         | S–M                                                  |
+| `@types/react`, `@types/react-dom`                      | dev, types only | Foundation, keep; they go with React             | Not sensible: they track React's own API             |
+| `@types/node`                                           | dev, types only | Foundation, keep; types for our Node scripts     | Not sensible: they track Node's own API              |
+| `vite`, `typescript`                                    | dev             | Foundation, keep                                 | XXL                                                  |
+| `tailwindcss`, `@tailwindcss/postcss`, `postcss`        | dev             | Foundation, keep                                 | L                                                    |
+| `vitest`, `@vitest/coverage-v8`                         | dev             | Foundation, keep                                 | XL                                                   |
+| `jsdom`                                                 | dev             | Foundation, keep                                 | XXL                                                  |
+| `@testing-library/react`, `@testing-library/user-event` | dev             | Foundation, keep                                 | M–L                                                  |
+| `dom-accessibility-api`                                 | dev             | Foundation, keep; names for our DOM matchers     | L (an accessible-name engine)                        |
+| `@playwright/test`                                      | dev             | Foundation, keep                                 | XXL                                                  |
+| `axe-core`                                              | dev             | Foundation, keep                                 | XL                                                   |
+| `@axe-core/playwright`                                  | dev             | Foundation, keep (#1187)                         | S                                                    |
+| `eslint`, `@eslint/js`, `typescript-eslint`             | dev             | Foundation, keep; our own rules plug into ESLint | XL                                                   |
+| `eslint-plugin-react`, `eslint-plugin-react-hooks`      | dev             | Foundation, keep                                 | M                                                    |
+| `eslint-plugin-jsx-a11y`                                | dev             | Foundation, keep                                 | L                                                    |
+| `eslint-plugin-jsdoc`                                   | dev             | Foundation, keep                                 | S–M                                                  |
+| `prettier`                                              | dev             | Foundation, keep                                 | XL                                                   |
+| `knip`                                                  | dev             | Foundation, keep                                 | L                                                    |
+| `wrangler`                                              | dev             | Foundation, keep                                 | L, but not sensible: Workers Builds runs it          |
+| Semgrep (installed by CI, not a package)                | CI tool         | Foundation, keep                                 | XL                                                   |
+| `pnpm/action-setup`                                     | GitHub Action   | Keep for now; possible small win                 | S (`corepack enable` and the `packageManager` field) |
+| `treosh/lighthouse-ci-action`                           | GitHub Action   | Keep for now; possible small win                 | S (call the Lighthouse CI CLI in a `run:` step)      |
+| GitHub's own actions (`actions/*`)                      | GitHub Action   | Foundation, keep                                 | Not sensible                                         |
+
+Scorecard and CodeQL left when the repository went private ([ADR 0050](./adr/0050-ci-tiers-for-a-private-repository.md)).
