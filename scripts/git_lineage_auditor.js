@@ -16,7 +16,8 @@ export const MAPPING = {
   'src/colors.json': 'docs/public/STYLE_GUIDE.md',
   'src/packages/scannability/worker.ts': 'docs/public/SCALING.md',
   'src/utils/security.ts': 'docs/SECURITY.md',
-  '.github/rulesets/main.json': '.github/rulesets/README.md'
+  '.github/rulesets/main.json': '.github/rulesets/README.md',
+  '.github/rulesets/main-merge-queue.json': '.github/rulesets/README.md'
 };
 
 /**
