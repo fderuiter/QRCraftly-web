@@ -84,7 +84,7 @@ export const BLOCKED_EXPORT_MESSAGE = "This code contains a script or data link 
  */
 const blockedExport = (
   config: QRConfig,
-  format: 'png' | 'jpeg' | 'webp' | 'svg' | 'eps' | 'pdf' | 'clipboard' | 'share' | 'svg-copy' | 'html-embed',
+  format: 'png' | 'jpeg' | 'webp' | 'svg' | 'eps' | 'pdf' | 'clipboard' | 'share',
 ): ExportStatus | null =>
   isDangerousUrl(config.value) ? { success: false, format, error: new Error(BLOCKED_EXPORT_MESSAGE) } : null;
 
@@ -114,12 +114,10 @@ export interface AssetOptions extends ExportOptions {
   size?: number;
   /** File name without extension; defaults to `<type>-qr-code-qrcraftly-<date>`. */
   filename?: string;
-  /** HTML embed snippet format for html-embed export. Defaults to 'data-uri'. */
-  embedFormat?: 'data-uri' | 'inline-svg';
 }
 
 /** Every export the hook performs. `svg-copy` copies the SVG markup as text. */
-export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'svg' | 'eps' | 'pdf' | 'clipboard' | 'share' | 'svg-copy' | 'html-embed';
+export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'svg' | 'eps' | 'pdf' | 'clipboard' | 'share' | 'svg-copy';
 
 /**
  * Draws the code for `config` at `size` pixels wide for a raster export. It renders from the
@@ -182,8 +180,6 @@ export interface UseQRDownloadReturn {
   handleShare: (options?: AssetOptions) => Promise<ExportStatus>;
   /** Copies QR code image to system clipboard. */
   handleCopy: (options?: AssetOptions) => Promise<ExportStatus>;
-  /** Copies publish-ready HTML embed code snippet (Data URI or inline SVG) to clipboard. */
-  handleCopyHtmlEmbed: (options?: AssetOptions) => Promise<ExportStatus>;
 }
 
 /**
@@ -504,31 +500,6 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
   }, [buildSvg, config]);
 
   /**
-   * Copies HTML embed code snippet (Data URI or inline SVG) to the clipboard.
-   * Escapes special characters inside Data URIs to prevent broken HTML syntax when pasted into web content editors.
-   * @param options - Optional export options including embedFormat ('data-uri' | 'inline-svg').
-   */
-  const handleCopyHtmlEmbed = useCallback(async (options?: AssetOptions): Promise<ExportStatus> => {
-    const blocked = blockedExport(config, 'html-embed');
-    if (blocked) return blocked;
-    try {
-      const built = await buildSvg(options);
-      if (!built) return { success: false, format: 'html-embed', error: scanValidationFailed() };
-
-      const embedFormat = options?.embedFormat ?? 'data-uri';
-      const snippet =
-        embedFormat === 'inline-svg'
-          ? built.svg
-          : `<img src="data:image/svg+xml;utf8,${encodeURIComponent(built.svg)}" alt="QR Code" />`;
-
-      await navigator.clipboard.writeText(snippet);
-      return { success: true, format: 'html-embed', logoOmitted: built.logoOmitted };
-    } catch (err) {
-      return { success: false, format: 'html-embed', error: describeExportError(err, config) };
-    }
-  }, [buildSvg, config]);
-
-  /**
    * Unified QR export engine seam that coordinates all asset exports.
    * Evaluates scannability bypass policies, formats files, handles fallbacks,
    * and dispatches downloads/shares behind a single interface.
@@ -556,15 +527,13 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
           return handleShare(options);
         case 'svg-copy':
           return handleCopySvg(options);
-        case 'html-embed':
-          return handleCopyHtmlEmbed(options);
         default:
           return { success: false, format, error: new Error(`Unsupported export format: ${format}`) };
       }
     },
-    [downloadToDevice, handleSaveAs, handleSaveSvg, handleSaveEps, handleSavePdf, handleCopy, handleShare, handleCopySvg, handleCopyHtmlEmbed]
+    [downloadToDevice, handleSaveAs, handleSaveSvg, handleSaveEps, handleSavePdf, handleCopy, handleShare, handleCopySvg]
   );
 
-  return { exportAsset, downloadToDevice, handleSaveAs, handleSaveSvg, handleSaveEps, handleSavePdf, handleShare, handleCopy, handleCopyHtmlEmbed };
+  return { exportAsset, downloadToDevice, handleSaveAs, handleSaveSvg, handleSaveEps, handleSavePdf, handleShare, handleCopy };
 
 }

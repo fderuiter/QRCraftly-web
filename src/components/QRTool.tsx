@@ -26,7 +26,7 @@ import { DEFAULT_CONFIG, SYSTEM_LIMITS } from '@/constants';
 import { type QRConfig, SocialFormat, QRStyle, QRErrorCorrectionLevel, QRType } from '@/types';
 import QRCanvas from '@/components/QRCanvas';
 import { Download, Share2, ChevronDown, CircleHelp, Copy, Check, AlertTriangle } from 'lucide-react';
-import { ExportOptions as DownloadOptions, FORMAT_LABELS, clampSize, type DownloadFormat, type HtmlEmbedFormat } from './ExportOptions';
+import { ExportOptions as DownloadOptions, FORMAT_LABELS, clampSize, type DownloadFormat } from './ExportOptions';
 import { usePopoverDismiss } from '@/hooks/usePopoverDismiss';
 import { Modal } from './ui/Modal';
 import { useLeadingDebounce } from '@/hooks/useDebounce';
@@ -282,14 +282,9 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
     });
   }, [addToast]);
 
-  const exportWith = (
-    target: ExportFormat,
-    buttonRef: React.RefObject<HTMLButtonElement | null>,
-    message: string,
-    extraOptions?: AssetOptions
-  ) => {
+  const exportWith = (target: ExportFormat, buttonRef: React.RefObject<HTMLButtonElement | null>, message: string) => {
     const run = async (options?: AssetOptions) => {
-      const result = await exportAsset(target, { ...extraOptions, ...options, size: clampSize(size), filename });
+      const result = await exportAsset(target, { ...options, size: clampSize(size), filename });
       if (result.error?.name === SCAN_VALIDATION_ERROR && !options?.allowUnsafe) {
         // The finished image failed the scan check: offer the same choice as the pre-flight gate
         // instead of a raw error (#1255).
@@ -309,8 +304,6 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   };
   const onCopy = () => exportWith('clipboard', copyButtonRef, 'Copied');
   const onCopySvg = () => exportWith('svg-copy', optionsButtonRef, 'SVG code copied');
-  const onCopyHtmlEmbed = (embedFormat: HtmlEmbedFormat) =>
-    exportWith('html-embed', optionsButtonRef, 'HTML snippet copied', { embedFormat });
   const onShare = () => exportWith('share', shareButtonRef, 'Shared');
   const copied = done?.format === 'clipboard';
   const commandActions = {
@@ -538,8 +531,6 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                         onFilenameChange={setCustomFilename}
                         onCopySvg={onCopySvg}
                         copySvgBusy={busyExport === 'svg-copy'}
-                        onCopyHtmlEmbed={onCopyHtmlEmbed}
-                        copyHtmlEmbedBusy={busyExport === 'html-embed'}
                         onWallet={onWallet}
                      />
                    )}
