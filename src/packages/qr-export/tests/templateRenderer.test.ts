@@ -59,20 +59,34 @@ describe('SOCIAL_DIMENSIONS', () => {
 // drawWithTemplate – verifies drawQRInternal is called with correct bounding box
 // ---------------------------------------------------------------------------
 
+interface MockCtx extends CanvasRenderingContext2D {
+  _calls: Array<{ method: string; args: number[] }>;
+  _fillStyleHistory: string[];
+  _strokeStyleHistory: string[];
+  _filledCalls: Array<{ text: string; font: string }>;
+}
+
+function getFilledTexts(ctx: CanvasRenderingContext2D): string[] {
+  return vi.mocked(ctx.fillText).mock.calls.map((call) => String(call[0]));
+}
+
 /**
  * Builds a minimal mock 2D context that records translate/scale calls and
  * satisfies the subset used by drawWithTemplate.
  */
-function makeMockCtx() {
+function makeMockCtx(): MockCtx {
   const calls: Array<{ method: string; args: number[] }> = [];
   const fillStyleHistory: string[] = [];
   const strokeStyleHistory: string[] = [];
+  const filledCalls: Array<{ text: string; font: string }> = [];
 
   let _fillStyle = '';
   let _strokeStyle = '';
+  let _font = '10px sans-serif';
 
   const ctx = {
     _calls: calls,
+    _filledCalls: filledCalls,
     get _fillStyleHistory() { return fillStyleHistory; },
     get _strokeStyleHistory() { return strokeStyleHistory; },
     clearRect: vi.fn(),
@@ -85,9 +99,15 @@ function makeMockCtx() {
     restore: vi.fn(() => calls.push({ method: 'restore', args: [] })),
     translate: vi.fn((x: number, y: number) => calls.push({ method: 'translate', args: [x, y] })),
     scale: vi.fn((sx: number, sy: number) => calls.push({ method: 'scale', args: [sx, sy] })),
-    fillText: vi.fn(),
+    fillText: vi.fn((text: string) => {
+      filledCalls.push({ text: String(text), font: _font });
+    }),
     strokeText: vi.fn(),
-    measureText: vi.fn().mockReturnValue({ width: 50 }),
+    measureText: vi.fn().mockImplementation((text: string) => {
+      const match = _font.match(/(\d+(?:\.\d+)?)px/);
+      const fontSize = match ? parseFloat(match[1]) : 16;
+      return { width: String(text).length * fontSize * 0.55 } as TextMetrics;
+    }),
     // Path methods required by the safe-zone rounded rect
     beginPath: vi.fn(),
     moveTo: vi.fn(),
@@ -103,12 +123,13 @@ function makeMockCtx() {
     get strokeStyle() { return _strokeStyle; },
     set strokeStyle(v: string) { _strokeStyle = v; strokeStyleHistory.push(v); },
     lineWidth: 1,
-    font: '',
+    get font() { return _font; },
+    set font(v: string) { _font = v; },
     textAlign: '',
     textBaseline: '',
-  } as unknown as CanvasRenderingContext2D;
+  };
 
-  return ctx;
+  return ctx as unknown as MockCtx;
 }
 
 /** Minimal QRModules stub */
@@ -600,7 +621,7 @@ describe('drawWithTemplate – transparent background', () => {
     drawWithTemplate(ctx, modules, config, null, null, 1080, 1920, modules.size);
 
     // Safe zone rounded rect should be filled with #ffffff
-    expect((ctx as any)._fillStyleHistory).toContain('#ffffff');
+    expect(ctx._fillStyleHistory).toContain('#ffffff');
   });
 });
 
@@ -622,7 +643,7 @@ describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
 
     drawWithTemplate(ctx, modules, config, null, null, 1080, 1350, modules.size);
 
-    const filledTexts = (ctx.fillText as any).mock.calls.map((call: any[]) => call[0]);
+    const filledTexts = getFilledTexts(ctx);
     expect(filledTexts).toContain('Connect to Wi-Fi');
     expect(filledTexts).toContain('NETWORK');
     expect(filledTexts).toContain('CafeGuest');
@@ -643,12 +664,12 @@ describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
 
     drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
 
-    const filledTexts = (ctx.fillText as any).mock.calls.map((call: any[]) => call[0]);
+    const filledTexts = getFilledTexts(ctx);
     expect(filledTexts).toContain('FreeCafe');
     expect(filledTexts).toContain('No password needed');
   });
 
-  it('falls back to templateHeadline and templateSubtext for non-Wi-Fi payloads', () => {
+  it('draws no "Connect to Wi-Fi" text and draws headline exactly once for URL-type config with WIFI_CARD', () => {
     const config: QRConfig = {
       ...(DEFAULT_CONFIG as QRConfig),
       type: QRType.URL,
@@ -663,9 +684,83 @@ describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
 
     drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
 
-    const filledTexts = (ctx.fillText as any).mock.calls.map((call: any[]) => call[0]);
-    expect(filledTexts).toContain('Welcome to Our Cafe');
+    const filledTexts = getFilledTexts(ctx);
+    expect(filledTexts).not.toContain('Connect to Wi-Fi');
+    expect(filledTexts).not.toContain('NETWORK');
+    expect(filledTexts.filter((text) => text === 'Welcome to Our Cafe')).toHaveLength(1);
     expect(filledTexts).toContain('Table 5 Menu');
+  });
+
+  it('does not say "No password needed" for WPA2_EAP enterprise networks with no password', () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      type: QRType.WIFI,
+      value: 'WIFI:S:CorpNet;T:WPA2-EAP;E:PEAP;I:user@corp;;',
+      templateStyle: TemplateStyle.WIFI_CARD,
+      socialFormat: SocialFormat.SQUARE_1_1,
+    };
+    const ctx = makeMockCtx();
+    const modules = makeModules();
+
+    drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
+
+    const filledTexts = getFilledTexts(ctx);
+    expect(filledTexts).not.toContain('No password needed');
+    expect(filledTexts).toContain('SIGN-IN');
+    expect(filledTexts).toContain('Sign in with your network account');
+  });
+
+  it('draws a 63-character password at a smaller font size than an 8-character one', () => {
+    const shortConfig: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      type: QRType.WIFI,
+      value: 'WIFI:S:MyNet;P:12345678;T:WPA;;',
+      templateStyle: TemplateStyle.WIFI_CARD,
+      socialFormat: SocialFormat.SQUARE_1_1,
+    };
+    const longConfig: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      type: QRType.WIFI,
+      value: 'WIFI:S:MyNet;P:123456789012345678901234567890123456789012345678901234567890123;T:WPA;;',
+      templateStyle: TemplateStyle.WIFI_CARD,
+      socialFormat: SocialFormat.SQUARE_1_1,
+    };
+
+    const shortCtx = makeMockCtx();
+    const longCtx = makeMockCtx();
+    const modules = makeModules();
+
+    drawWithTemplate(shortCtx, modules, shortConfig, null, null, 1080, 1080, modules.size);
+    drawWithTemplate(longCtx, modules, longConfig, null, null, 1080, 1080, modules.size);
+
+    const shortCall = shortCtx._filledCalls.find((c) => c.text === '12345678');
+    const longCall = longCtx._filledCalls.find((c) => c.text.startsWith('1234567890'));
+
+    expect(shortCall).toBeDefined();
+    expect(longCall).toBeDefined();
+
+    const shortFontSize = parseFloat(shortCall!.font.match(/(\d+(?:\.\d+)?)px/)![1]);
+    const longFontSize = parseFloat(longCall!.font.match(/(\d+(?:\.\d+)?)px/)![1]);
+
+    expect(longFontSize).toBeLessThan(shortFontSize);
+  });
+
+  it('displays an escaped SSID unescaped on the card', () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      type: QRType.WIFI,
+      value: 'WIFI:S:Cafe\\;Guest;P:pass123;T:WPA;;',
+      templateStyle: TemplateStyle.WIFI_CARD,
+      socialFormat: SocialFormat.SQUARE_1_1,
+    };
+    const ctx = makeMockCtx();
+    const modules = makeModules();
+
+    drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
+
+    const filledTexts = getFilledTexts(ctx);
+    expect(filledTexts).toContain('Cafe;Guest');
+    expect(filledTexts).not.toContain('Cafe\\;Guest');
   });
 
   it('correctly serializes Wi-Fi card elements via SvgContext for vector SVG export', () => {

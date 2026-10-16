@@ -20,7 +20,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LayoutControls } from './LayoutControls';
 import { DEFAULT_CONFIG } from '../../constants';
-import { type QRConfig, TemplateStyle } from '../../types';
+import { type QRConfig, QRType, TemplateStyle } from '../../types';
+import { axe } from '../../../tests/utils/axe';
 
 describe('LayoutControls - Contrast Warnings', () => {
   const mockOnChange = vi.fn();
@@ -156,9 +157,10 @@ describe('LayoutControls - Contrast Warnings', () => {
     expect(mockOnChange).toHaveBeenCalledWith({ templateHeadline: 'New Scan' });
   });
 
-  it('allows selecting the Wi-Fi Card template option', () => {
+  it('allows selecting the Wi-Fi Card template option when type is WIFI', () => {
     const config: QRConfig = {
       ...(DEFAULT_CONFIG as QRConfig),
+      type: QRType.WIFI,
       templateStyle: TemplateStyle.NONE,
     };
 
@@ -169,6 +171,29 @@ describe('LayoutControls - Contrast Warnings', () => {
 
     fireEvent.click(wifiCardButton);
     expect(mockOnChange).toHaveBeenCalledWith({ templateStyle: TemplateStyle.WIFI_CARD });
+  });
+
+  it('hides the Wi-Fi Card tile for non-Wi-Fi types', () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      type: QRType.URL,
+      templateStyle: TemplateStyle.NONE,
+    };
+
+    render(<LayoutControls config={config} onChange={mockOnChange} />);
+
+    expect(screen.queryByRole('radio', { name: /Select Wi-Fi Card template/i })).not.toBeInTheDocument();
+  });
+
+  it('has no axe violations', async () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      type: QRType.WIFI,
+      templateStyle: TemplateStyle.WIFI_CARD,
+    };
+
+    const { container } = render(<LayoutControls config={config} onChange={mockOnChange} />);
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('has toggle switch programmatic names dynamically matching the visual state text ("Custom" or "Inherit")', () => {
