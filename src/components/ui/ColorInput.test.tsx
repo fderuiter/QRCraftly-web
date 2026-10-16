@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { axe } from '../../../tests/utils/axe';
 import { describe, it, expect, vi } from 'vitest';
 import { ColorInput } from './ColorInput';
@@ -177,5 +177,114 @@ describe('ColorInput Component Accessibility', () => {
       />
     );
     expect(screen.getByLabelText('Hex Code')).toBeInTheDocument();
+  });
+
+  describe('Blur validation and state reset', () => {
+    it('should reset text input to active valid color prop when blurred with an invalid hex string', () => {
+      const handleChange = vi.fn();
+      render(
+        <ColorInput
+          id="test-blur-invalid"
+          label="Blur Test"
+          value="#ff0000"
+          onChange={handleChange}
+        />
+      );
+
+      const textInput = screen.getByLabelText('Blur Test Hex Code') as HTMLInputElement;
+      expect(textInput.value).toBe('#ff0000');
+
+      // User types invalid string
+      fireEvent.change(textInput, { target: { value: 'invalid-hex' } });
+      expect(textInput.value).toBe('invalid-hex');
+      expect(handleChange).not.toHaveBeenCalled();
+
+      // User blurs input
+      fireEvent.blur(textInput);
+      expect(textInput.value).toBe('#ff0000');
+    });
+
+    it('should normalize valid 3-digit shorthand hex string to 6-digit hex code on blur', () => {
+      const handleChange = vi.fn();
+      render(
+        <ColorInput
+          id="test-blur-shorthand"
+          label="Shorthand Test"
+          value="#ff0000"
+          onChange={handleChange}
+        />
+      );
+
+      const textInput = screen.getByLabelText('Shorthand Test Hex Code') as HTMLInputElement;
+
+      // User types shorthand hex
+      fireEvent.change(textInput, { target: { value: '#123' } });
+      expect(handleChange).toHaveBeenCalledWith('#112233');
+
+      // User blurs input
+      fireEvent.blur(textInput);
+      expect(textInput.value).toBe('#112233');
+    });
+
+    it('should normalize valid hex without # and uppercase on blur', () => {
+      const handleChange = vi.fn();
+      render(
+        <ColorInput
+          id="test-blur-format"
+          label="Format Test"
+          value="#000000"
+          onChange={handleChange}
+        />
+      );
+
+      const textInput = screen.getByLabelText('Format Test Hex Code') as HTMLInputElement;
+
+      fireEvent.change(textInput, { target: { value: 'ABCDEF' } });
+      expect(handleChange).toHaveBeenCalledWith('#abcdef');
+
+      fireEvent.blur(textInput);
+      expect(textInput.value).toBe('#abcdef');
+    });
+
+    it('should reset displayValue prop when defined and an invalid string is entered on blur', () => {
+      const handleChange = vi.fn();
+      render(
+        <ColorInput
+          id="test-blur-display"
+          label="Display Value Test"
+          value="#111111"
+          displayValue="#222222"
+          onChange={handleChange}
+        />
+      );
+
+      const textInput = screen.getByLabelText('Display Value Test Hex Code') as HTMLInputElement;
+      expect(textInput.value).toBe('#222222');
+
+      fireEvent.change(textInput, { target: { value: 'notahex' } });
+      expect(textInput.value).toBe('notahex');
+
+      fireEvent.blur(textInput);
+      expect(textInput.value).toBe('#222222');
+    });
+
+    it('should invoke optional onBlur callback prop when focus leaves text field', () => {
+      const handleChange = vi.fn();
+      const handleBlur = vi.fn();
+      render(
+        <ColorInput
+          id="test-blur-callback"
+          label="Callback Test"
+          value="#333333"
+          onChange={handleChange}
+          onBlur={handleBlur}
+        />
+      );
+
+      const textInput = screen.getByLabelText('Callback Test Hex Code');
+      fireEvent.blur(textInput);
+
+      expect(handleBlur).toHaveBeenCalledTimes(1);
+    });
   });
 });

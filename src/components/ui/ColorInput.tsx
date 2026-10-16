@@ -18,6 +18,7 @@ interface ColorInputProps {
   disabled?: boolean;
   error?: string;
   hideLabel?: boolean;
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
 }
 
 export const ColorInput: React.FC<ColorInputProps> = ({
@@ -31,6 +32,7 @@ export const ColorInput: React.FC<ColorInputProps> = ({
   disabled = false,
   error,
   hideLabel = false,
+  onBlur,
 }) => {
   const [textValue, setTextValue] = useState(displayValue || value);
   const textValueRef = useRef(textValue);
@@ -65,6 +67,19 @@ export const ColorInput: React.FC<ColorInputProps> = ({
     }
   };
 
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const normalized = normalizeHex(textValue.trim());
+    if (normalized) {
+      setTextValue(normalized);
+      onChange(normalized);
+    } else {
+      setTextValue(displayValue || value);
+    }
+    if (onBlur) {
+      onBlur(e);
+    }
+  };
+
   const errorId = error ? `${id}-error` : undefined;
   const swatch = (
     <input
@@ -96,6 +111,7 @@ export const ColorInput: React.FC<ColorInputProps> = ({
           type="text"
           value={textValue}
           onChange={handleTextChange}
+          onBlur={handleBlur}
           disabled={disabled}
           className={mergeClasses(
             "w-24 rounded border border-transparent bg-transparent px-1 py-0.5 font-mono text-sm text-fg-muted transition-colors hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-50",
