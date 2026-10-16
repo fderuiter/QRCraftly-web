@@ -34,6 +34,22 @@ describe('Wifi generator', () => {
     expect(hydrated).toEqual(data);
   });
 
+  it('constructs and hydrates WPA3 SAE networks correctly', () => {
+    const data = {
+      ssid: 'WPA3 Network',
+      password: 'saepassword',
+      encryption: WifiEncryption.SAE,
+      hidden: false,
+      eapIdentity: '',
+    };
+    const str = constructWifiString(data);
+    expect(str).toBe('WIFI:T:SAE;S:WPA3 Network;P:saepassword;;');
+    const hydrated = hydrateWifiData(str);
+    expect(hydrated.encryption).toBe(WifiEncryption.SAE);
+    expect(hydrated.ssid).toBe('WPA3 Network');
+    expect(hydrated.password).toBe('saepassword');
+  });
+
   it('hydrates unknown fields or non-wifi strings', () => {
     const result = hydrateWifiData('random');
     expect(result.ssid).toBe('');

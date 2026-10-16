@@ -867,7 +867,7 @@ describe('QRScanner Component', () => {
       await decode('WIFI:T:WPA;S:Cafe guest;P:secret;;');
 
       expect(screen.getByText('Network').nextSibling).toHaveTextContent('Cafe guest');
-      expect(screen.getByText('WPA/WPA2/WPA3')).toBeInTheDocument();
+      expect(screen.getByText('WPA/WPA2')).toBeInTheDocument();
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
       });

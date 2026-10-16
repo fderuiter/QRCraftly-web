@@ -57,4 +57,37 @@ describe('WifiInput enterprise (WPA2-EAP) fields', () => {
     render(<WifiInput data={{ ...enterprise, encryption: WifiEncryption.WPA }} onChange={vi.fn()} />);
     expect(screen.queryByLabelText('EAP Method')).not.toBeInTheDocument();
   });
+
+  it('renders WPA3 Personal (SAE) option and handles selection', () => {
+    const onChange = vi.fn();
+    const wifiData: WifiData = {
+      ssid: 'WPA3Net',
+      password: 'mypassword',
+      encryption: WifiEncryption.WPA,
+      hidden: false,
+    };
+    render(<WifiInput data={wifiData} onChange={onChange} />);
+
+    const select = screen.getByLabelText('Encryption') as HTMLSelectElement;
+    expect(select).toBeInTheDocument();
+
+    const optionLabels = Array.from(select.options).map((opt) => opt.text);
+    expect(optionLabels).toContain('WPA / WPA2 (Personal)');
+    expect(optionLabels).toContain('WPA3 Personal (SAE)');
+
+    fireEvent.change(select, { target: { value: WifiEncryption.SAE } });
+    expect(onChange).toHaveBeenLastCalledWith({ encryption: WifiEncryption.SAE });
+  });
+
+  it('displays password field when encryption is WPA3 Personal (SAE)', () => {
+    const wifiData: WifiData = {
+      ssid: 'WPA3Net',
+      password: 'mypassword',
+      encryption: WifiEncryption.SAE,
+      hidden: false,
+    };
+    render(<WifiInput data={wifiData} onChange={vi.fn()} />);
+
+    expect(screen.getByLabelText('Password')).toBeInTheDocument();
+  });
 });

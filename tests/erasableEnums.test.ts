@@ -19,7 +19,7 @@ import { SchemaCategory, SchemaType, StrategicValueCategory, TargetPersona } fro
 const EXPECTED = {
   QRStyle: [QRStyle, { STANDARD: 'standard', MODERN: 'modern', SWISS: 'swiss', FLUID: 'fluid', CIRCUIT: 'circuit', HIVE: 'hive', GRUNGE: 'grunge', STARBURST: 'starburst' }],
   QRType: [QRType, { URL: 'URL', TEXT: 'TEXT', WIFI: 'WIFI', EVENT: 'EVENT', EMAIL: 'EMAIL', VCARD: 'VCARD', PHONE: 'PHONE', SMS: 'SMS', PAYMENT: 'PAYMENT', LOCATION: 'LOCATION', MEETING: 'MEETING', SOCIAL: 'SOCIAL', BULK_CSV: 'BULK_CSV' }],
-  WifiEncryption: [WifiEncryption, { WPA: 'WPA', WEP: 'WEP', NOPASS: 'nopass', WPA2_EAP: 'WPA2-EAP' }],
+  WifiEncryption: [WifiEncryption, { WPA: 'WPA', WEP: 'WEP', NOPASS: 'nopass', WPA2_EAP: 'WPA2-EAP', SAE: 'SAE' }],
   WifiEapMethod: [WifiEapMethod, { PEAP: 'PEAP', TTLS: 'TTLS', TLS: 'TLS', PWD: 'PWD' }],
   WifiEapPhase2: [WifiEapPhase2, { NONE: '', MSCHAPV2: 'MSCHAPV2', GTC: 'GTC', PAP: 'PAP' }],
   QRErrorCorrectionLevel: [QRErrorCorrectionLevel, { L: 'L', M: 'M', Q: 'Q', H: 'H' }],

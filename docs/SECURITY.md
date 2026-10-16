@@ -190,7 +190,7 @@ How this is enforced:
 - The CSP sets `default-src 'self'` and `connect-src 'self'`, so the browser itself refuses other origins.
 - `scripts/bundle_ast_audit.js` allows `fetch` only at reviewed call sites and refuses `WebSocket`, `XMLHttpRequest` and `sendBeacon`; `scripts/emitted_asset_audit.js` refuses resources from other origins in the built HTML and CSS (see Supply Chain).
 - Every Playwright test runs behind `e2e/fixtures.ts`, which fails the test on any request to another origin (a person's click to another site aside) and on any request that is not a `GET` or `HEAD` or carries a body.
-- `e2e/network-privacy.spec.ts` types a unique secret into the link, text and Wi-Fi generators and downloads the codes, and scans a picture that holds one; `e2e/file-transfer.spec.ts` sends a file whose name and bytes hold one. Each test fails if the secret appears in any request, even to this site, or if any request has a query string. The same spec checks that the QR code checker still reads a picture after the server has gone.
+- `e2e/network-privacy.spec.ts` types a unique secret into the link, text and Wi-Fi (including WPA, WPA3 SAE, WEP, and EAP) generators and downloads the codes, and scans a picture that holds one; `e2e/file-transfer.spec.ts` sends a file whose name and bytes hold one. Each test fails if the secret appears in any request, even to this site, or if any request has a query string. The same spec checks that the QR code checker still reads a picture after the server has gone.
 
 ## No Server API
 

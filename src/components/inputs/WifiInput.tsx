@@ -46,7 +46,10 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
           }
         >
           <option value={WifiEncryption.WPA}>
-            WPA / WPA2 / WPA3 (Standard)
+            WPA / WPA2 (Personal)
+          </option>
+          <option value={WifiEncryption.SAE}>
+            WPA3 Personal (SAE)
           </option>
           <option value={WifiEncryption.WEP}>WEP (Legacy)</option>
           <option value={WifiEncryption.WPA2_EAP}>WPA2 Enterprise (EAP)</option>
