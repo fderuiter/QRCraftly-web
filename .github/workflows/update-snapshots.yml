@@ -7,8 +7,10 @@ name: Update Visual Baselines
 # Two ways to run it, both on a branch, never on main:
 # - add the `update-snapshots` label to a pull request from this repository;
 # - run it by hand on a branch (Actions > Update Visual Baselines > Run workflow).
-# It commits the changed baselines to that branch. A commit pushed with GITHUB_TOKEN does
-# not start CI, so push again or mark the PR ready for review to get CI on the new commit.
+# It commits the changed baselines to that branch. GitHub holds the CI runs for that bot
+# commit as "action required": a maintainer approves them on the PR's Checks tab (or with
+# POST /repos/{owner}/{repo}/actions/runs/{id}/approve). Add `full-e2e` before the label,
+# because CI reads the labels from the push event.
 # Only the visual spec runs (a few minutes), not the whole E2E suite (ADR 0050).
 on:
   pull_request:

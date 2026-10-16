@@ -47,7 +47,7 @@ describe('CI triggers and tiers (main.yml, ADR 0050)', () => {
   it('fails the CI aggregate on a failed plan or job but passes planned skips', () => {
     const ci = jobBlock('ci');
     expect(ci).toMatch(/needs: \[plan, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse\]/);
-    expect(ci).toContain('if: always()');
+    expect(ci).toContain('if: ${{ !cancelled() }}');
     expect(ci).toContain('[ "$PLAN_RESULT" != "success" ]');
     expect(ci).toContain('[ "$result" != "skipped" ]');
   });
@@ -238,6 +238,14 @@ describe('post-merge production check (#1217)', () => {
     expect(job).toContain('EXPECTED_COMMIT: ${{ github.sha }}');
     expect(job).toContain('run: bash scripts/ci/wait_for_deploy.sh');
     expect(job).not.toContain('continue-on-error');
+  });
+});
+
+describe('runner queue hygiene', () => {
+  it('cancels superseded PR Title runs', () => {
+    const title = read('.github/workflows/pr-title.yml');
+    expect(title).toContain('group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}');
+    expect(title).toContain('cancel-in-progress: true');
   });
 });
 
