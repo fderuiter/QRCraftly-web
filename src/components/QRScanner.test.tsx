@@ -4,8 +4,17 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react';
 import { QRScanner, clearScanHistory } from './QRScanner';
 import { useQrScanner, type UseQrScannerOptions } from '@/packages/optical-scanner/client';
+import { playChime } from '@/utils/feedback';
 import { fakeQrRead } from '../../tests/utils/fakeQrRead';
 import { axe } from '../../tests/utils/axe';
+
+vi.mock('@/utils/feedback', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/feedback')>();
+  return {
+    ...actual,
+    playChime: vi.fn(),
+  };
+});
 
 // The real hook and Camera Session run against a fake camera; the spy only records the options
 // so a test can deliver a decoded code.
@@ -1067,6 +1076,112 @@ describe('QRScanner Component', () => {
       await settle();
       expect(screen.getByRole('alert')).toHaveTextContent('Camera Access Denied');
       expect(await axe(denied.container)).toHaveNoViolations();
+    });
+  });
+
+  describe('audio feedback and toggle control', () => {
+    beforeEach(() => {
+      vi.mocked(playChime).mockClear();
+    });
+
+    it('renders scan sound toggle button starting unpressed in camera mode', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+      const button = screen.getByRole('button', { name: 'Scan sound' });
+      expect(button).toBeInTheDocument();
+      expect(button).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('hides scan sound toggle button in image mode', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+      expect(screen.getByRole('button', { name: 'Scan sound' })).toBeInTheDocument();
+
+      const imageTab = screen.getByRole('radio', { name: 'Image' });
+      await act(async () => {
+        fireEvent.click(imageTab);
+      });
+      expect(screen.queryByRole('button', { name: 'Scan sound' })).not.toBeInTheDocument();
+    });
+
+    it('toggles sound state on click without writing to localStorage', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+      const toggleBtn = screen.getByRole('button', { name: 'Scan sound' });
+      expect(toggleBtn).toHaveAttribute('aria-pressed', 'false');
+
+      await act(async () => {
+        fireEvent.click(toggleBtn);
+      });
+      expect(toggleBtn).toHaveAttribute('aria-pressed', 'true');
+      expect(window.localStorage.getItem('qrcraftly:scanner-sound')).toBeNull();
+
+      await act(async () => {
+        fireEvent.click(toggleBtn);
+      });
+      expect(toggleBtn).toHaveAttribute('aria-pressed', 'false');
+      expect(window.localStorage.getItem('qrcraftly:scanner-sound')).toBeNull();
+    });
+
+    it('does not invoke playChime on camera scan success when sound is off', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+
+      await decode('https://example.com/no-audio-test');
+      expect(playChime).not.toHaveBeenCalled();
+      expect(mockOnScanSuccess).toHaveBeenCalledWith('https://example.com/no-audio-test');
+    });
+
+    it('invokes playChime on camera scan success when sound is toggled on', async () => {
+      const { container } = render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+
+      const toggleBtn = screen.getByRole('button', { name: 'Scan sound' });
+      await act(async () => {
+        fireEvent.click(toggleBtn);
+      });
+      expect(await axe(container)).toHaveNoViolations();
+
+      await decode('https://example.com/audio-test');
+      expect(playChime).toHaveBeenCalledTimes(1);
+      expect(mockOnScanSuccess).toHaveBeenCalledWith('https://example.com/audio-test');
+    });
+
+    it('does not invoke playChime on image mode scan reads', async () => {
+      globalThis.mockWorkerControl.setInterceptor((msg, worker) => {
+        setTimeout(() => {
+          worker.dispatchMessage({
+            status: 'pass',
+            sequenceId: msg.sequenceId,
+            decodedData: 'https://example.com/image-read',
+            buffer: msg.buffer || new ArrayBuffer(0),
+          });
+        }, 0);
+      });
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+
+      const toggleBtn = screen.getByRole('button', { name: 'Scan sound' });
+      await act(async () => {
+        fireEvent.click(toggleBtn);
+      });
+
+      const imageTab = screen.getByRole('radio', { name: 'Image' });
+      await act(async () => {
+        fireEvent.click(imageTab);
+      });
+
+      qrRead.mockReturnValue([fakeQrRead('https://example.com/image-read')]);
+      const mockFile = new File(['mock content'], 'qr.png', { type: 'image/png' });
+      const fileInput = screen.getByLabelText(/upload qr code image file/i);
+      await act(async () => {
+        fireEvent.change(fileInput, { target: { files: [mockFile] } });
+      });
+
+      await waitFor(() => {
+        expect(mockOnScanSuccess).toHaveBeenCalledWith('https://example.com/image-read');
+      });
+      expect(playChime).not.toHaveBeenCalled();
     });
   });
 });

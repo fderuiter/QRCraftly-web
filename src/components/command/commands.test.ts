@@ -65,6 +65,30 @@ describe('buildCommands', () => {
     commands.find((c) => c.id === 'reset-colors')?.run();
     expect(store.updateConfig).toHaveBeenCalledTimes(3);
   });
+
+  it('preserves the gradient end color when applying a color preset command', () => {
+    const { value, store } = host({}, {
+      config: {
+        ...DEFAULT_CONFIG,
+        gradientType: 'linear',
+        gradientColorStops: [
+          { offset: 0, color: '#000000' },
+          { offset: 1, color: '#00ff00' },
+        ],
+      },
+    });
+    const commands = buildCommands(value);
+    commands.find((c) => c.id === 'colors-Slate')?.run();
+    expect(store.updateConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fgColor: '#334155',
+        gradientColorStops: [
+          { offset: 0, color: '#334155' },
+          { offset: 1, color: '#00ff00' },
+        ],
+      })
+    );
+  });
 });
 
 describe('filterCommands', () => {
