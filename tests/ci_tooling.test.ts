@@ -36,7 +36,7 @@ describe('CI triggers and tiers (main.yml, ADR 0050)', () => {
 
   it('lets the plan decide the E2E and Lighthouse tiers', () => {
     expect(jobBlock('plan')).toContain('run: node scripts/ci/ci_plan.js');
-    expect(jobBlock('test')).toContain("if: needs.plan.outputs.unit_tests == 'true'");
+    expect(jobBlock('test-shard')).toContain("if: needs.plan.outputs.unit_tests == 'true'");
     expect(jobBlock('e2e')).toContain("if: needs.plan.outputs.e2e != 'none'");
     expect(jobBlock('e2e')).toContain('pnpm run test:e2e --project=chromium --project=chromium-csp');
     expect(jobBlock('lighthouse')).toContain("if: needs.plan.outputs.lighthouse != 'none'");
@@ -47,9 +47,33 @@ describe('CI triggers and tiers (main.yml, ADR 0050)', () => {
   it('fails the CI aggregate on a failed plan or job but passes planned skips', () => {
     const ci = jobBlock('ci');
     expect(ci).toMatch(/needs: \[plan, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse\]/);
-    expect(ci).toContain('if: always()');
+    expect(ci).toContain('if: ${{ !cancelled() }}');
     expect(ci).toContain('[ "$PLAN_RESULT" != "success" ]');
     expect(ci).toContain('[ "$result" != "skipped" ]');
+  });
+
+  it('runs unit tests in parallel shards and checks coverage once on the merged reports', () => {
+    const shard = jobBlock('test-shard');
+    expect(shard).toContain('shard: [1, 2, 3]');
+    expect(shard).toContain('fail-fast: false');
+    expect(shard).toContain('VITEST_SHARD_RUN: "true"');
+    expect(shard).toContain('--shard="$SHARD/3" --reporter=blob');
+    expect(shard).toContain('include-hidden-files: true');
+
+    const merge = jobBlock('test');
+    expect(merge).toContain('needs: [plan, test-shard]');
+    expect(merge).toContain("if: ${{ !cancelled() && needs.plan.outputs.unit_tests == 'true' }}");
+    expect(merge).toContain('[ "$SHARDS_RESULT" != "success" ]');
+    expect(merge).toContain('pnpm exec vitest run --merge-reports --coverage');
+    expect(merge).not.toContain('VITEST_SHARD_RUN');
+    expect(read('vite.config.ts')).toContain("thresholds: process.env.VITEST_SHARD_RUN === 'true' ? {} : { ...coverageThresholds }");
+  });
+
+  it('passes the Plan job what it needs to check who approved a bot PR', () => {
+    const plan = jobBlock('plan');
+    expect(plan).toContain('issues: read');
+    expect(plan).toContain('PR_NUMBER: ${{ github.event.pull_request.number }}');
+    expect(plan).toContain('GH_TOKEN: ${{ github.token }}');
   });
 });
 
@@ -238,5 +262,32 @@ describe('post-merge production check (#1217)', () => {
     expect(job).toContain('EXPECTED_COMMIT: ${{ github.sha }}');
     expect(job).toContain('run: bash scripts/ci/wait_for_deploy.sh');
     expect(job).not.toContain('continue-on-error');
+  });
+});
+
+describe('runner queue hygiene', () => {
+  it('cancels superseded PR Title runs', () => {
+    const title = read('.github/workflows/pr-title.yml');
+    expect(title).toContain('group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}');
+    expect(title).toContain('cancel-in-progress: true');
+  });
+});
+
+describe('visual baseline refresh (#1426)', () => {
+  const workflow = read('.github/workflows/update-snapshots.yml');
+
+  it('runs from a label or by hand, and never on main or a fork PR', () => {
+    expect(workflow).toMatch(/pull_request:\n\s+types: \[labeled\]/);
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain("github.ref != 'refs/heads/main'");
+    expect(workflow).toContain("github.event.label.name == 'update-snapshots'");
+    expect(workflow).toContain('github.event.pull_request.head.repo.full_name == github.repository');
+  });
+
+  it('runs only the visual spec and commits only its baselines', () => {
+    expect(workflow).toContain('pnpm exec playwright test e2e/visual-regression.spec.ts');
+    expect(workflow).toContain('--update-snapshots');
+    expect(workflow).toContain('git add e2e/visual-regression.spec.ts-snapshots');
+    expect(workflow).not.toMatch(/git add (-A|\.|--all)/);
   });
 });
