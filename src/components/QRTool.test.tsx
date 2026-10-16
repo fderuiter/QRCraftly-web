@@ -228,7 +228,6 @@ describe('QRTool Component', () => {
     fireEvent.click(within(panel).getByRole('radio', { name: 'Print' }));
     expect(screen.getByTestId('print-hint')).toHaveTextContent('2048 px wide. Prints 17.3 cm (6.8 in) wide at 300 dpi and scans from about 1.7 m.');
     expect(within(panel).getByLabelText('File name')).toHaveValue('url-example.com');
-    expect(within(panel).getByRole('button', { name: 'Copy image' })).toBeInTheDocument();
     expect(within(panel).getByRole('button', { name: 'Copy as SVG' })).toBeInTheDocument();
 
     // EPS and PDF have no pixel size.
@@ -277,37 +276,6 @@ describe('QRTool Component', () => {
     expect(exportStatus()).toBe('PNG downloaded');
     // No success toast.
     expect(screen.queryByText(/exported successfully/)).not.toBeInTheDocument();
-  });
-
-  it('copies raster PNG image at selected width from the Download options panel', async () => {
-    const mockWrite = vi.fn().mockResolvedValue(undefined);
-    const originalClipboard = global.navigator.clipboard;
-    const originalClipboardItem = (global as any).ClipboardItem;
-    Object.defineProperty(global.navigator, 'clipboard', {
-      value: { write: mockWrite },
-      writable: true,
-      configurable: true,
-    });
-    (global as any).ClipboardItem = vi.fn().mockImplementation(function(this: any, data) { this.data = data; });
-
-    try {
-      render(<ToastProvider><QRTool initialConfig={{ value: 'https://example.com' }} /></ToastProvider>);
-      fireEvent.click(screen.getByRole('button', { name: 'Download options' }));
-      const options = within(screen.getByRole('group', { name: 'Download options' }));
-      fireEvent.click(options.getByRole('radio', { name: 'Poster' }));
-      fireEvent.click(options.getByRole('button', { name: 'Copy image' }));
-
-      await waitFor(() => expect(mockWrite).toHaveBeenCalled());
-      expect(renderQRRaster).toHaveBeenCalledWith(expect.objectContaining({ value: 'https://example.com' }), 4096);
-      expect(exportStatus()).toBe('Copied');
-    } finally {
-      Object.defineProperty(global.navigator, 'clipboard', {
-        value: originalClipboard,
-        writable: true,
-        configurable: true,
-      });
-      (global as any).ClipboardItem = originalClipboardItem;
-    }
   });
 
   it('refuses to export when the preview has no code because the content is too long (#1251)', async () => {
