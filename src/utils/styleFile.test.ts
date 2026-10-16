@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CONFIG } from '../constants';
-import { type QRConfig, QRStyle, QRType } from '../types';
+import { EyeShape, type QRConfig, QRStyle, QRType } from '../types';
+import { pickStyle } from './styleFields';
 import { MAX_STYLE_FILE_BYTES, parseStyleFile, serializeStyle, STYLE_FILE_FORMAT } from './styleFile';
 
 const config = (overrides: Partial<QRConfig> = {}): QRConfig => ({ ...DEFAULT_CONFIG, ...overrides });
@@ -60,5 +61,31 @@ describe('style file', () => {
   it('accepts transparent only for the background', () => {
     const parsed = parseStyleFile(JSON.stringify({ format: STYLE_FILE_FORMAT, version: 1, style: { bgColor: 'transparent', fgColor: 'transparent' } }));
     expect(parsed.ok && parsed.style).toEqual({ bgColor: 'transparent' });
+  });
+
+  it('round-trips the eye frame and ball shapes', () => {
+    const parsed = parseStyleFile(serializeStyle(config({ eyeFrameShape: EyeShape.LEAF, eyeBallShape: EyeShape.CIRCLE })));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.skipped).toBe(0);
+    expect(parsed.style).toEqual(expect.objectContaining({ eyeFrameShape: 'leaf', eyeBallShape: 'circle' }));
+  });
+
+  it('rejects unknown eye shape values and counts them as skipped', () => {
+    const parsed = parseStyleFile(
+      JSON.stringify({ format: STYLE_FILE_FORMAT, version: 1, style: { eyeFrameShape: 'star', eyeBallShape: 42, fgColor: '#000000' } })
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.style).toEqual({ fgColor: '#000000' });
+    expect(parsed.skipped).toBe(2);
+  });
+
+  it('leaves out unset eye shapes and reports no skips for them', () => {
+    const text = serializeStyle(config({ eyeFrameShape: undefined, eyeBallShape: undefined }));
+    expect(text).not.toMatch(/eyeFrameShape|eyeBallShape/);
+    expect(JSON.parse(text).style).not.toHaveProperty('eyeFrameShape');
+
+    expect(pickStyle({ eyeFrameShape: undefined, eyeBallShape: undefined })).toEqual({ style: {}, skipped: 0 });
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CalendarProvider,
   CryptoNetwork,
+  EyeShape,
   QRErrorCorrectionLevel,
   QRStyle,
   QRType,
@@ -17,6 +18,7 @@ import { SchemaCategory, SchemaType, StrategicValueCategory, TargetPersona } fro
 // The former string enums, member by member, in declaration order, as they were before ADR 0045
 // turned them into `as const` objects. Stored brand templates and URLs carry these values.
 const EXPECTED = {
+  EyeShape: [EyeShape, { SQUARE: 'square', ROUNDED: 'rounded', CIRCLE: 'circle', LEAF: 'leaf' }],
   QRStyle: [QRStyle, { STANDARD: 'standard', MODERN: 'modern', SWISS: 'swiss', FLUID: 'fluid', CIRCUIT: 'circuit', HIVE: 'hive', GRUNGE: 'grunge', STARBURST: 'starburst' }],
   QRType: [QRType, { URL: 'URL', TEXT: 'TEXT', WIFI: 'WIFI', EVENT: 'EVENT', EMAIL: 'EMAIL', VCARD: 'VCARD', PHONE: 'PHONE', SMS: 'SMS', PAYMENT: 'PAYMENT', LOCATION: 'LOCATION', MEETING: 'MEETING', SOCIAL: 'SOCIAL', BULK_CSV: 'BULK_CSV' }],
   WifiEncryption: [WifiEncryption, { WPA: 'WPA', WEP: 'WEP', NOPASS: 'nopass', WPA2_EAP: 'WPA2-EAP', SAE: 'SAE' }],

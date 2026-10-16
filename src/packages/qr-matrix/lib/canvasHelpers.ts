@@ -15,7 +15,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { QRStyle } from '@/types';
+import { EyeShape, QRStyle } from '@/types';
 import { seedRandom } from './prng';
 
 /**
@@ -43,17 +43,101 @@ export const clampCornerRadius = (r: number, w: number, h: number): number => {
  * @param r The corner radius.
  */
 export const drawRoundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
-  const safeR = clampCornerRadius(r, w, h);
-  ctx.moveTo(x + safeR, y);
-  ctx.lineTo(x + w - safeR, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + safeR);
-  ctx.lineTo(x + w, y + h - safeR);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - safeR, y + h);
-  ctx.lineTo(x + safeR, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - safeR);
-  ctx.lineTo(x, y + safeR);
-  ctx.quadraticCurveTo(x, y, x + safeR, y);
+  drawCornerRect(ctx, x, y, w, h, [r, r, r, r]);
+};
+
+/**
+ * Draws a rectangle whose corners each have their own radius.
+ * @param ctx The canvas context.
+ * @param x The top-left x coordinate.
+ * @param y The top-left y coordinate.
+ * @param w The width of the rectangle.
+ * @param h The height of the rectangle.
+ * @param radii The top-left, top-right, bottom-right and bottom-left corner radii.
+ */
+export const drawCornerRect = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radii: readonly [number, number, number, number]
+) => {
+  const [tl, tr, br, bl] = radii.map((r) => clampCornerRadius(r, w, h));
+  ctx.moveTo(x + tl, y);
+  ctx.lineTo(x + w - tr, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + tr);
+  ctx.lineTo(x + w, y + h - br);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+  ctx.lineTo(x + bl, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - bl);
+  ctx.lineTo(x, y + tl);
+  ctx.quadraticCurveTo(x, y, x + tl, y);
   ctx.closePath();
+};
+
+/** One of the three finder eyes, by the corner it sits in. */
+export interface EyePosition {
+  /** Names the eye; it seeds the Grunge scribble, so each eye keeps its own shape. */
+  id: 'top-left' | 'top-right' | 'bottom-left';
+  /** Whether the eye sits in the right-hand column of eyes. */
+  atRight: boolean;
+  /** Whether the eye sits in the bottom row of eyes. */
+  atBottom: boolean;
+}
+
+/** The three finder eyes. Every renderer and check that walks the eyes uses this list. */
+export const EYE_POSITIONS: readonly EyePosition[] = [
+  { id: 'top-left', atRight: false, atBottom: false },
+  { id: 'top-right', atRight: true, atBottom: false },
+  { id: 'bottom-left', atRight: false, atBottom: true },
+];
+
+/**
+ * Corner radius of the circle and leaf eyes, as a share of the side. A true circle (0.5) cuts so
+ * far into the corners that our decoder loses the finder at 4 to 5 px per module; 0.45, drawn with
+ * quadratic corners, still reads as a circle and decodes at every size eyeShapes.test.ts covers.
+ */
+const EYE_CURVE_RATIO = 0.45;
+
+/**
+ * Traces the outline of an eye shape as a new subpath.
+ * @param ctx The canvas context.
+ * @param shape The eye shape.
+ * @param x Top-left x coordinate of the square the shape fills.
+ * @param y Top-left y coordinate of the square the shape fills.
+ * @param side Side length of that square.
+ * @param roundRadius Corner radius of the rounded shape.
+ * @param eye The eye being drawn. A leaf points its two sharp corners along the diagonal
+ * that runs through the code's centre, so the three leaves mirror each other.
+ */
+const traceEyeShape = (
+  ctx: CanvasRenderingContext2D,
+  shape: EyeShape,
+  x: number,
+  y: number,
+  side: number,
+  roundRadius: number,
+  eye: EyePosition
+) => {
+  switch (shape) {
+    case EyeShape.ROUNDED:
+      drawRoundRect(ctx, x, y, side, side, roundRadius);
+      break;
+    case EyeShape.CIRCLE:
+      drawRoundRect(ctx, x, y, side, side, side * EYE_CURVE_RATIO);
+      break;
+    case EyeShape.LEAF: {
+      const r = side * EYE_CURVE_RATIO;
+      const sharpOnMainDiagonal = eye.atRight === eye.atBottom;
+      drawCornerRect(ctx, x, y, side, side, sharpOnMainDiagonal ? [0, r, 0, r] : [r, 0, r, 0]);
+      break;
+    }
+    case EyeShape.SQUARE:
+    default:
+      ctx.rect(x, y, side, side);
+      break;
+  }
 };
 
 const HEX_OFFSETS = Array.from({ length: 6 }, (_, i) => {
@@ -355,13 +439,33 @@ export const drawEyeFrame = (
   cellSize: number,
   style: QRStyle,
   eyeColor: string,
-  bgColor: string
+  bgColor: string,
+  shape?: EyeShape,
+  eye: EyePosition = EYE_POSITIONS[0]
 ) => {
   ctx.fillStyle = eyeColor;
 
   const cx = x + size / 2;
   const cy = y + size / 2;
   const inner = size - 2 * cellSize;
+
+  // A chosen eye shape replaces the pattern's frame; the ring stays one module wide.
+  if (shape) {
+    ctx.beginPath();
+    traceEyeShape(ctx, shape, x, y, size, cellSize * 1.5, eye);
+    if (bgColor === 'transparent') {
+      traceEyeShape(ctx, shape, x + cellSize, y + cellSize, inner, cellSize * 0.8, eye);
+      ctx.fill('evenodd');
+      return;
+    }
+    ctx.fill();
+    ctx.fillStyle = bgColor;
+    ctx.beginPath();
+    traceEyeShape(ctx, shape, x + cellSize, y + cellSize, inner, cellSize * 0.8, eye);
+    ctx.fill();
+    ctx.fillStyle = eyeColor;
+    return;
+  }
 
   // A transparent hole paints nothing, so the frame is drawn as a ring (outer and inner
   // outline in one even-odd path) and the hole stays see-through.
@@ -457,12 +561,21 @@ export const drawEyeball = (
   style: QRStyle,
   eyeColor: string,
   bgColor: string,
-  eyeId = 'top-left'
+  eyeId = 'top-left',
+  shape?: EyeShape,
+  eye: EyePosition = EYE_POSITIONS[0]
 ) => {
   ctx.fillStyle = eyeColor;
 
   const cx = x + size / 2;
   const cy = y + size / 2;
+
+  if (shape) {
+    ctx.beginPath();
+    traceEyeShape(ctx, shape, x + 2 * cellSize, y + 2 * cellSize, 3 * cellSize, cellSize * 0.5, eye);
+    ctx.fill();
+    return;
+  }
 
   switch (style) {
     case QRStyle.MODERN:

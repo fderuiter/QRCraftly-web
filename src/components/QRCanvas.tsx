@@ -809,6 +809,8 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     config.eyeColor,
     config.eyeFrameColor,
     config.eyeBallColor,
+    config.eyeFrameShape,
+    config.eyeBallShape,
     config.frameStyle,
     config.frameText,
     config.frameBgColor,

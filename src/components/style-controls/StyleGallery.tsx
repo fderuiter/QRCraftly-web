@@ -40,7 +40,8 @@ const choiceOf = (config: QRConfig, patch: Partial<QRConfig>): StyleChoice => ({
   eyeBallColor: patch.eyeBallColor ?? config.eyeBallColor ?? patch.eyeColor ?? config.eyeColor,
 });
 
-function getThumbnailCacheId(config: QRConfig, choice: StyleChoice): string {
+/** The config a thumbnail is drawn from, and the key its picture is cached under. */
+function thumbnailFor(config: QRConfig, choice: StyleChoice): { thumbConfig: QRConfig; cacheId: string } {
   const value = config.value.trim() ? config.value : getSamplePayload(config.type);
   const thumbConfig: QRConfig = {
     ...config,
@@ -57,12 +58,13 @@ function getThumbnailCacheId(config: QRConfig, choice: StyleChoice): string {
     animationValues: undefined,
     isAnimating: false,
   };
-  return JSON.stringify([thumbConfig.type, value, thumbConfig.errorCorrectionLevel, choice]);
+  // Eye shapes are drawn on every thumbnail, so a new shape needs new thumbnails.
+  const cacheId = JSON.stringify([thumbConfig.type, value, thumbConfig.errorCorrectionLevel, choice, config.eyeFrameShape ?? null, config.eyeBallShape ?? null]);
+  return { thumbConfig, cacheId };
 }
 
 function getCachedThumbnail(config: QRConfig, choice: StyleChoice): string | undefined {
-  const cacheId = getThumbnailCacheId(config, choice);
-  return thumbnailCache.get(cacheId);
+  return thumbnailCache.get(thumbnailFor(config, choice).cacheId);
 }
 
 const yieldToMain = (): Promise<void> => {
@@ -84,23 +86,7 @@ const yieldToMain = (): Promise<void> => {
  * @returns A data URL for an `<img>`.
  */
 async function renderThumbnail(config: QRConfig, choice: StyleChoice): Promise<string> {
-  const value = config.value.trim() ? config.value : getSamplePayload(config.type);
-  const thumbConfig: QRConfig = {
-    ...config,
-    ...choice,
-    value,
-    logoUrl: null,
-    borderLogoUrl: null,
-    mosaicImageUrl: null,
-    backgroundImageUrl: null,
-    isBorderEnabled: false,
-    isMazeEnabled: false,
-    socialFormat: SocialFormat.SQUARE_1_1,
-    templateStyle: TemplateStyle.NONE,
-    animationValues: undefined,
-    isAnimating: false,
-  };
-  const cacheId = JSON.stringify([thumbConfig.type, value, thumbConfig.errorCorrectionLevel, choice]);
+  const { thumbConfig, cacheId } = thumbnailFor(config, choice);
   const cached = thumbnailCache.get(cacheId);
   if (cached) return cached;
   const { generateQRSvg } = await import('@/packages/qr-export');
