@@ -64,4 +64,42 @@ test.describe('Location QR type', () => {
     // A valid QR code should be rendered (the image name drops "nothing entered yet")
     await expect(page.getByRole('img', { name: 'QR code for Location', exact: true })).toBeVisible();
   });
+
+  test('geolocation error banner shows Dismiss control and clears on manual edit', async ({ page }) => {
+    // Override navigator.geolocation to simulate permission denied
+    await page.evaluate(() => {
+      navigator.geolocation.getCurrentPosition = (_success, error) => {
+        if (error) {
+          error({
+            code: 1,
+            message: 'User denied Geolocation',
+            PERMISSION_DENIED: 1,
+            POSITION_UNAVAILABLE: 2,
+            TIMEOUT: 3,
+          } satisfies GeolocationPositionError);
+        }
+      };
+    });
+
+    await page.getByTestId('use-current-location').click();
+
+    const alert = page.getByRole('group', { name: 'Geo-Location' }).getByRole('alert');
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText('Location access denied');
+
+    const dismissBtn = alert.getByRole('button', { name: 'Dismiss alert' });
+    await expect(dismissBtn).toBeVisible();
+
+    // Click Dismiss -> clears error
+    await dismissBtn.click();
+    await expect(alert).not.toBeVisible();
+
+    // Re-trigger error
+    await page.getByTestId('use-current-location').click();
+    await expect(alert).toBeVisible();
+
+    // Type in Latitude -> clears error
+    await page.getByLabel('Latitude').fill('40.7128');
+    await expect(alert).not.toBeVisible();
+  });
 });
