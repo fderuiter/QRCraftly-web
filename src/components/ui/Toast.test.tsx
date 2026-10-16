@@ -226,25 +226,10 @@ describe('Toast Timing and Interactive Controls', () => {
     expect(screen.queryByText('Test message')).not.toBeInTheDocument();
   });
 
-  it('should render toast container with symmetric mobile layout classes', () => {
-    const { container } = render(
-      <ToastProvider>
-        <TestComponent />
-      </ToastProvider>
-    );
+  it('should dismiss toast when pressing Escape key on focused notification', () => {
+    const documentEscapeHandler = vi.fn();
+    document.addEventListener('keydown', documentEscapeHandler);
 
-    fireEvent.click(screen.getByText('Show Toast'));
-
-    const toastContainer = container.querySelector('div.fixed');
-    expect(toastContainer).toBeInTheDocument();
-    expect(toastContainer?.className).toContain('bottom-4');
-    expect(toastContainer?.className).toMatch(/inset-x-4|left-4/);
-    expect(toastContainer?.className).toContain('md:left-auto');
-    expect(toastContainer?.className).toContain('md:right-4');
-    expect(toastContainer?.className).toContain('md:bottom-4');
-  });
-
-  it('should immediately dismiss toast when pressing Escape key on focused notification', () => {
     render(
       <ToastProvider>
         <TestComponent />
@@ -252,15 +237,25 @@ describe('Toast Timing and Interactive Controls', () => {
     );
 
     fireEvent.click(screen.getByText('Show Toast'));
-    const toastElement = screen.getByText('Test message').closest('[role="status"]');
+    const toastElement = screen.getByText('Test message').closest('[role="status"]') as HTMLElement;
     expect(toastElement).toBeInTheDocument();
 
-    // Focus toast item
-    fireEvent.focus(toastElement!);
+    // Focus toast item using native .focus()
+    act(() => {
+      toastElement.focus();
+    });
 
-    // Press Escape
-    fireEvent.keyDown(toastElement!, { key: 'Escape' });
+    // Press Escape and advance timers for exit slide-out animation
+    act(() => {
+      fireEvent.keyDown(toastElement, { key: 'Escape' });
+      vi.advanceTimersByTime(300);
+    });
+
+    // Verify event propagation was stopped
+    expect(documentEscapeHandler).not.toHaveBeenCalled();
 
     expect(screen.queryByText('Test message')).not.toBeInTheDocument();
+
+    document.removeEventListener('keydown', documentEscapeHandler);
   });
 });

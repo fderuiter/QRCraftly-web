@@ -113,7 +113,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
   return (
     <ToastContext.Provider value={{ addToast, removeToast }}>
       {children}
-      <div className="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col items-center gap-2 md:right-4 md:bottom-4 md:left-auto md:items-end">
+      <div className="pointer-events-none fixed right-28 bottom-24 left-4 z-50 flex flex-col items-center gap-2 md:right-4 md:bottom-4 md:left-auto md:items-end">
         {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
         ))}
@@ -165,6 +165,7 @@ const ToastItem = (props: { toast: ToastMessage; onRemove: (id: string) => void 
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           onRemove(toast.id);
+          event.stopPropagation();
         }
       }}
       className={mergeClasses("pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border p-4 shadow-overlay data-closed:pointer-events-none motion-safe:animate-slide-in motion-safe:data-closed:animate-slide-out", colors)}
