@@ -89,6 +89,7 @@ export const TOOL_LINKS: readonly (readonly [label: string, href: string])[] = [
   ['Receive a File', '/file-transfer/receive'],
   ['QR Arcade', '/arcade'],
   ['QR Code Checker', '/qr-code-checker'],
+  ['QR Code Size Calculator', '/qr-code-size-calculator'],
 ];
 
 /** Help pages, listed in the mobile site menu and in the footer's Company column. */

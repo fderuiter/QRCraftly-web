@@ -100,8 +100,9 @@ export function generateSchema(
   const typeValue = toolContent.schemaType || "WebApplication";
   const categoryValue = toolContent.schemaCategory || "UtilitiesApplication";
 
-  // Only the features the page shows; the value-proposition and persona labels are internal.
-  const featureList = (toolContent.features || []).join(", ");
+  // Only the features the page shows; the value-proposition and persona labels are internal. One
+  // value per feature, because a feature's own commas would split a joined list in the wrong places.
+  const featureList = [...(toolContent.features || [])];
 
   const appEntity: JsonLdObject = {
     "@type": typeValue,

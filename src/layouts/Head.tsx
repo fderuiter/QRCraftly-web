@@ -85,7 +85,7 @@ export default function HeadDefault() {
       "@id": `${resolvedDomain}/#organization`,
       "name": "QRCraftly",
       "url": resolvedDomain,
-      "logo": `${resolvedDomain}/favicon.png`,
+      "logo": `${resolvedDomain}/icon-512x512.png`,
       "description": "Privacy-focused, client-side QR code generator.",
       "slogan": "Free. Private. No ads.",
       "foundingDate": "2025"

@@ -57,6 +57,34 @@ export function moduleSizeMm(widthCm: number, moduleCount: number): number {
 }
 
 /**
+ * How much a code's density changes the ten-times rule: a denser code needs a nearer phone.
+ * @param moduleCount - Modules per side of the QR matrix.
+ * @returns The factor, between 0.5 and 1.2.
+ */
+function densityFactor(moduleCount: number): number {
+  return Math.min(1.2, Math.max(0.5, Math.sqrt(REFERENCE_MODULES / Math.max(1, moduleCount))));
+}
+
+/**
+ * Smallest printed width that keeps modules at {@link MIN_MODULE_MM}.
+ * @param moduleCount - Modules per side of the QR matrix.
+ * @returns The width in centimetres, quiet zone included.
+ */
+function minWidthCm(moduleCount: number): number {
+  return (MIN_MODULE_MM * (Math.max(1, moduleCount) + QUIET_ZONE_MODULES)) / 10;
+}
+
+/**
+ * How many times its own width a code scans from, for its density and error correction.
+ * @param moduleCount - Modules per side of the QR matrix.
+ * @param errorLevel - Error correction level of the code.
+ * @returns The ratio of scan distance to printed width.
+ */
+function reachRatio(moduleCount: number, errorLevel: QRErrorCorrectionLevel): number {
+  return DISTANCE_RULE * densityFactor(moduleCount) * ERROR_LEVEL_FACTOR[errorLevel];
+}
+
+/**
  * Estimates how far away a phone can scan a printed code and whether it is printed too small.
  * It starts from about ten times the width and adjusts for the module count (a denser code needs
  * a nearer phone) and the error correction level. It is an estimate for planning, not a promise;
@@ -67,14 +95,25 @@ export function moduleSizeMm(widthCm: number, moduleCount: number): number {
  * @returns Module size, scan distance and the minimum size.
  */
 export function getPrintGuidance(widthCm: number, moduleCount: number, errorLevel: QRErrorCorrectionLevel): PrintGuidance {
-  const density = Math.min(1.2, Math.max(0.5, Math.sqrt(REFERENCE_MODULES / Math.max(1, moduleCount))));
   const moduleMm = moduleSizeMm(widthCm, moduleCount);
   return {
     moduleMm,
-    distanceCm: widthCm * DISTANCE_RULE * density * ERROR_LEVEL_FACTOR[errorLevel],
+    distanceCm: widthCm * reachRatio(moduleCount, errorLevel),
     tooSmall: moduleMm < MIN_MODULE_MM,
-    minWidthCm: (MIN_MODULE_MM * (Math.max(1, moduleCount) + QUIET_ZONE_MODULES)) / 10,
+    minWidthCm: minWidthCm(moduleCount),
   };
+}
+
+/**
+ * The reverse of {@link getPrintGuidance}: the printed width a code needs to scan from a given
+ * distance, never below the width that keeps modules printable.
+ * @param distanceCm - Distance the phone will be from the code, in centimetres.
+ * @param moduleCount - Modules per side of the QR matrix.
+ * @param errorLevel - Error correction level of the code.
+ * @returns The width in centimetres, quiet zone included.
+ */
+export function widthForDistance(distanceCm: number, moduleCount: number, errorLevel: QRErrorCorrectionLevel): number {
+  return Math.max(Math.max(0, distanceCm) / reachRatio(moduleCount, errorLevel), minWidthCm(moduleCount));
 }
 
 /**
@@ -85,4 +124,29 @@ export function getPrintGuidance(widthCm: number, moduleCount: number, errorLeve
 export function formatDistance(cm: number): string {
   if (cm < 100) return `${Math.round(cm)} cm`;
   return `${(cm / 100).toFixed(1)} m`;
+}
+
+/** Centimetres in an inch. */
+const CM_PER_INCH = 2.54;
+
+/**
+ * Formats a printed width in both centimetres and inches, rounded up so a print never comes out
+ * smaller than advised.
+ * @param cm - Width in centimetres.
+ * @returns For example "2.5 cm (1 in)".
+ */
+export function formatWidth(cm: number): string {
+  const metric = Math.ceil(cm * 10) / 10;
+  const inches = Math.ceil((cm / CM_PER_INCH) * 10) / 10;
+  return `${metric} cm (${inches} in)`;
+}
+
+/**
+ * Formats a scan distance in both metric and feet.
+ * @param cm - Distance in centimetres.
+ * @returns For example "45 cm (1.5 ft)" or "2.4 m (7.9 ft)".
+ */
+export function formatDistanceBoth(cm: number): string {
+  const feet = (cm / CM_PER_INCH / 12).toFixed(1);
+  return `${formatDistance(cm)} (${feet} ft)`;
 }

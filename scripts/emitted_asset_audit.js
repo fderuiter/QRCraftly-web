@@ -71,6 +71,11 @@ export const REVIEWED_HOSTS = {
   'consumer.ftc.gov': 'Scam-reporting links in the safety guide',
   'www.ic3.gov': 'Scam-reporting links in the safety guide',
   'support.qr-code-generator.com': 'Source cited in a guide',
+  'www.uniqode.com': 'Source cited in the no-subscription guide',
+  'www.scanova.io': 'Source cited in the no-subscription guide',
+  'help.qr.io': 'Source cited in the no-subscription guide',
+  'www.qrcode-tiger.com': 'Source cited in the no-subscription guide',
+  'me-qr.com': 'Source cited in the no-subscription guide',
 };
 
 const EXTERNAL_URL = /^\s*(?:[a-z][a-z0-9+.-]*:)?\/\//i;

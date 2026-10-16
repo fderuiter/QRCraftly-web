@@ -444,7 +444,7 @@ export const guides: Guide[] = [
         supports: 'A QR code can lead anywhere, which is why a third-party address in the middle deserves scrutiny.',
       },
     ],
-    related: ['why-qr-codes-stop-working'],
+    related: ['why-qr-codes-stop-working', 'qr-code-without-subscription'],
   },
   {
     slug: 'how-to-print-a-qr-code-that-scans',
@@ -455,7 +455,7 @@ export const guides: Guide[] = [
       'The size, quiet zone, contrast and file format that decide whether a printed QR code scans, with a checklist you can run before you send anything to print.',
     lead: 'Most QR codes that fail in the real world fail because of how they were printed, not how they were made. Four things decide it: how big the code is, the empty margin around it, the contrast of the squares, and what the paper or surface does to them. Here is how to get each one right before you print a thousand copies.',
     datePublished: '2026-10-03',
-    dateModified: '2026-10-03',
+    dateModified: '2026-10-16',
     sections: [
       {
         id: 'short-answer',
@@ -493,7 +493,7 @@ export const guides: Guide[] = [
           },
           {
             type: 'p',
-            text: 'These are starting points, not guarantees, and a rough rule of thumb is a code about one tenth as wide as the scanning distance. Shorten the address if you need a smaller code: a short, plain address makes a simpler code than a long one with tracking parameters on the end.',
+            text: 'These are starting points, not guarantees, and a rough rule of thumb is a code about one tenth as wide as the scanning distance. Shorten the address if you need a smaller code: a short, plain address makes a simpler code than a long one with tracking parameters on the end. The [QR code size calculator](/qr-code-size-calculator) measures the code your own content makes and gives the width for any distance, in centimetres and inches.',
           },
         ],
       },
@@ -797,6 +797,173 @@ export const guides: Guide[] = [
       },
     ],
     related: ['static-vs-dynamic-qr-codes', 'why-qr-codes-stop-working'],
+  },
+  {
+    slug: 'qr-code-without-subscription',
+    title: 'How to make a QR code without a subscription',
+    shortTitle: 'QR codes without a subscription',
+    seoTitle: 'QR Code Without a Subscription: What to Check | QRCraftly',
+    description:
+      'Need a QR code without a subscription? Static codes need no plan and keep working while their link does. Here is how to check a generator first.',
+    lead: 'A static QR code needs no subscription. It holds your address directly, so it keeps working for as long as that page does. Subscriptions usually come from dynamic codes, which route every scan through the vendor’s own server.',
+    datePublished: '2026-10-16',
+    dateModified: '2026-10-16',
+    sections: [
+      {
+        id: 'short-answer',
+        heading: 'The short answer',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Yes. A static QR code holds your web address, or other content, directly in its pattern. Nobody has to be paid for it to keep working, and no service has to forward each scan. It works for as long as the destination it points to stays up.',
+          },
+          {
+            type: 'p',
+            text: 'The subscription problem comes from a different type of code. A dynamic code holds a short address on the generator’s own domain, and the generator forwards each scan to your page. If the plan lapses, that forwarding can stop. So when a generator asks for a monthly fee, the first question is whether the code it makes is static or dynamic.',
+          },
+        ],
+      },
+      {
+        id: 'why-subscriptions',
+        heading: 'Why some generators charge monthly',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Dynamic codes cost the generator something to run, and they give you features that static codes cannot. Each scan passes through the generator’s servers, where it can be counted, and the destination can be changed from a dashboard at any time. Those features are the reason a subscription exists, and they are genuinely useful. If you need scan counts, or you need to change the destination after printing, a dynamic code may be the right tool.',
+          },
+          {
+            type: 'ul',
+            items: [
+              'Scan counts. The generator records each scan, so you can see how many people used the code and when.',
+              'A vendor domain. The code points to a short address on the generator’s domain, which is what lets you change where it leads.',
+              'An editable destination. You can point the same printed code at a new page from the dashboard, without printing again.',
+            ],
+          },
+          {
+            type: 'p',
+            text: 'Static codes give up those three things. They cannot tell you how many people scanned them, and once printed, the destination is fixed. If the address changes, the code has to be replaced. A workaround is to point the static code at an address on your own domain, then change where that address leads. Scans are still not counted, but you keep the ability to redirect without a code provider in the middle. [Static vs dynamic QR codes](/guides/static-vs-dynamic-qr-codes) sets out the trade-offs in more detail.',
+          },
+        ],
+      },
+      {
+        id: 'what-vendors-say',
+        heading: 'What some generators say',
+        blocks: [
+          {
+            type: 'table',
+            caption: 'What some generators say happens when a trial or plan ends (checked 16 October 2026)',
+            head: ['Generator', 'Dynamic codes when the trial or plan ends', 'Static codes'],
+            rows: [
+              [
+                'Uniqode (formerly Beaconstac)',
+                '“Once your free trial expires, any dynamic QR Codes you created will become inactive.”',
+                '“static QR Codes are permanent, they will continue to work”',
+              ],
+              [
+                'Scanova',
+                'Dynamic codes “will stop working once the free trial ends”',
+                '“work forever without any ongoing cost”',
+              ],
+              [
+                'qr.io',
+                '“Dynamic QR Codes will be paused” when the 7-day trial ends, and reactivated on upgrade',
+                '“do not expire and will work forever”',
+              ],
+              [
+                'QR TIGER',
+                '“If your plan expires, it will stop working.”',
+                '“Our static QR codes do not expire.”',
+              ],
+              [
+                'ME-QR',
+                'Codes keep working after a subscription ends, but “ads will be shown again” after a scan',
+                '“our QR codes do not have a time limit”, though a code made without an account “will be blocked and removed unless scanned within 365 days”',
+              ],
+            ],
+          },
+          {
+            type: 'p',
+            text: 'These are each company’s own words from its own pages. They change, so read the current page before you rely on it. The links are in the sources below.',
+          },
+        ],
+      },
+      {
+        id: 'checklist',
+        heading: 'Before you sign up: five questions to ask',
+        blocks: [
+          {
+            type: 'ol',
+            items: [
+              'Is the code static or dynamic? If the generator does not say, assume it is dynamic until you have checked.',
+              'Does the code hold my address, or the vendor’s short link? Make a test code and scan it with your phone. If the address shown is on the generator’s domain, it is dynamic.',
+              'What happens to the code if I stop paying or the trial ends? Look for the answer in the terms or the FAQ, not only on the sales page.',
+              'Do I need an account to download it? If you must sign up before you can get the file, check whether the download is free.',
+              'Is there a scan limit? Some plans cap the number of scans or codes, so check the limit before you print a large run.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'make-one',
+        heading: 'How to make one without a subscription',
+        blocks: [
+          {
+            type: 'p',
+            text: 'QRCraftly makes static codes only, so the code you make here holds your address and nothing else. There is no account to create, no subscription and no ads. The code is made in your browser, and nothing you type is uploaded.',
+          },
+          {
+            type: 'p',
+            text: 'To make one, use the [free QR code generator](/). For a plain address, the [static QR code generator](/static-qr-code-generator) is the direct route. If a print shop needs a vector file, the [SVG download](/svg-qr-code) gives you one that scales without blur. For a restaurant, the [menu QR code](/menu-qr-code) page covers table cards and menu links.',
+          },
+          {
+            type: 'p',
+            text: 'Before you print in quantity, scan a printed proof with a phone and run a photo of it through the [QR code checker](/qr-code-checker). The checker shows what the code holds, so you can confirm it points at the address you meant.',
+          },
+        ],
+      },
+      {
+        id: 'already-stuck',
+        heading: 'If you already have a dynamic code that stopped',
+        blocks: [
+          {
+            type: 'p',
+            text: 'First check the account. Reactivating the subscription usually brings back the same printed code, because the code itself never changed. If you cannot reactivate, or the provider has closed, the printed code cannot be repaired. Make a new static code that points at your page, and replace the old one wherever it appears.',
+          },
+          {
+            type: 'p',
+            text: 'For the full list of reasons a code stops working, read [Why QR codes stop working](/guides/why-qr-codes-stop-working).',
+          },
+        ],
+      },
+    ],
+    sources: [
+      {
+        label: 'Uniqode, Pricing and FAQ',
+        url: 'https://www.uniqode.com/pricing',
+        supports: 'The trial-expiry and static-code wording quoted in the table above.',
+      },
+      {
+        label: 'Scanova, Pricing',
+        url: 'https://www.scanova.io/pricing',
+        supports: 'The trial-end and static-code wording quoted in the table above.',
+      },
+      {
+        label: 'qr.io, Help: what happens to my QR codes and account when the free trial expires',
+        url: 'https://help.qr.io/en/articles/6977506-what-happens-to-my-qr-codes-and-account-when-the-free-trial-expires',
+        supports: 'The pause-and-reactivate wording for dynamic codes, and the static-code wording quoted in the table above.',
+      },
+      {
+        label: 'QR TIGER, Homepage',
+        url: 'https://www.qrcode-tiger.com/',
+        supports: 'The plan-expiry and static-code wording quoted in the table above.',
+      },
+      {
+        label: 'ME-QR, FAQ',
+        url: 'https://me-qr.com/faq',
+        supports: 'The post-subscription, time-limit and 365-day inactivity wording quoted in the table above.',
+      },
+    ],
+    related: ['static-vs-dynamic-qr-codes', 'why-qr-codes-stop-working', 'how-to-print-a-qr-code-that-scans'],
   },
 ];
 
