@@ -106,6 +106,8 @@ describe('the receiver keeps a transfer in progress', () => {
       await waitFor(() => expect(result.current.keyAccepted).toBe(true));
     }
     await feed(result, stream, 2, third);
+    // The transfer is in progress once the worker has read the manifest; the wallet code must come after that.
+    await waitFor(() => expect(result.current.manifest).not.toBeNull());
     await show(result, WALLET_CODE);
     await waitFor(() => expect(result.current.bcurProgress).toBeNull());
     expect(result.current.bcur).toBeNull();
