@@ -21,6 +21,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { EmailInput } from './EmailInput';
 import type { EmailData } from '../../types';
+import { hydrateEmailData } from '@/packages/qr-payload';
 
 describe('EmailInput', () => {
   const mockOnChange = vi.fn();
@@ -44,8 +45,7 @@ describe('EmailInput', () => {
     expect(emailInput.value).toBe('');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
-    const results = await axe(container);
-    expect(results.violations).toEqual([]);
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('calls onChange when user types in inputs', () => {
@@ -61,13 +61,13 @@ describe('EmailInput', () => {
     expect(mockOnChange).toHaveBeenCalledWith({ bcc: 'bcc@example.com' });
   });
 
-  it('displays validation error for invalid recipient email', () => {
+  it('displays validation error naming bad entry for invalid recipient email', () => {
     const data: EmailData = { ...defaultData, email: 'invalid-email' };
     render(<EmailInput data={data} onChange={mockOnChange} />);
 
     const alerts = screen.getAllByRole('alert');
     expect(alerts).toHaveLength(1);
-    expect(alerts[0]).toHaveTextContent('Invalid email address structure.');
+    expect(alerts[0]).toHaveTextContent('"invalid-email" is not an email address. Separate several addresses with commas.');
   });
 
   it('displays validation error for invalid CC email', () => {
@@ -75,15 +75,15 @@ describe('EmailInput', () => {
     render(<EmailInput data={data} onChange={mockOnChange} />);
 
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('Invalid email address structure.');
+    expect(alert).toHaveTextContent('"invalid-cc" is not an email address. Separate several addresses with commas.');
   });
 
-  it('displays validation error for invalid BCC email', () => {
+  it('displays validation error for invalid BCC email in address list', () => {
     const data: EmailData = { ...defaultData, email: 'valid@example.com', bcc: 'valid@example.com, invalid-bcc' };
     render(<EmailInput data={data} onChange={mockOnChange} />);
 
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('Invalid email address structure.');
+    expect(alert).toHaveTextContent('"invalid-bcc" is not an email address. Separate several addresses with commas.');
   });
 
   it('does not display errors for valid single and comma-separated email lists', () => {
@@ -106,4 +106,86 @@ describe('EmailInput', () => {
     rerender(<EmailInput data={{ ...defaultData, email: '' }} onChange={mockOnChange} />);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  it('handles whitespace-only fields without error when no other fields are filled', () => {
+    const data: EmailData = {
+      email: '   ',
+      cc: '   ',
+      bcc: '   ',
+      subject: '   ',
+      body: '   ',
+    };
+    render(<EmailInput data={data} onChange={mockOnChange} />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows an error on To field when To is blank but Subject or Body is filled', () => {
+    const data: EmailData = {
+      email: '   ',
+      cc: '',
+      bcc: '',
+      subject: 'Important Subject',
+      body: '',
+    };
+    render(<EmailInput data={data} onChange={mockOnChange} />);
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Add at least one recipient address.');
+  });
+
+  it('allows trailing commas in address lists as valid', () => {
+    const data: EmailData = {
+      email: 'a@b.co,',
+      cc: 'cc@example.com,',
+      bcc: '',
+      subject: '',
+      body: '',
+    };
+    render(<EmailInput data={data} onChange={mockOnChange} />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows error for semicolon-separated lists', () => {
+    const data: EmailData = {
+      email: 'a@b.co; c@d.co',
+      cc: '',
+      bcc: '',
+      subject: '',
+      body: '',
+    };
+    render(<EmailInput data={data} onChange={mockOnChange} />);
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('"a@b.co; c@d.co" is not an email address. Separate several addresses with commas.');
+  });
+
+  it('renders a form hydrated from an existing mailto: value', () => {
+    const mailto = 'mailto:user@example.com?cc=cc%40example.com&subject=Hello&body=World';
+    const hydrated = hydrateEmailData(mailto);
+    render(<EmailInput data={hydrated} onChange={mockOnChange} />);
+
+    expect((screen.getByLabelText('Email Address') as HTMLInputElement).value).toBe('user@example.com');
+    expect((screen.getByLabelText('CC') as HTMLInputElement).value).toBe('cc@example.com');
+    expect((screen.getByLabelText('Subject') as HTMLInputElement).value).toBe('Hello');
+    expect((screen.getByLabelText('Body') as HTMLTextAreaElement).value).toBe('World');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('passes accessibility check in error state and sets aria-invalid and aria-describedby', async () => {
+    const data: EmailData = { ...defaultData, email: 'not-an-email' };
+    const { container } = render(<EmailInput data={data} onChange={mockOnChange} />);
+
+    const emailInput = screen.getByLabelText('Email Address') as HTMLInputElement;
+    expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('"not-an-email" is not an email address. Separate several addresses with commas.');
+
+    const errorId = alert.id;
+    expect(errorId).toBeTruthy();
+    expect(emailInput.getAttribute('aria-describedby')).toContain(errorId);
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
 });
+

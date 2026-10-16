@@ -2,29 +2,21 @@ import React from "react";
 import type { EmailData } from "../../types";
 import { TextField, TextAreaField } from "../ui/FormFields";
 import { CONTAINER_SPACING_CLASSES } from "../ui/styles";
-import { CONTAINMENT_PROFILES, describeViolation } from "@/packages/qr-payload";
+import { emailListError } from "@/packages/qr-payload";
 
 interface EmailInputProps {
   data: EmailData;
   onChange: (updates: Partial<EmailData>) => void;
 }
 
-const isValidEmailList = (value?: string): boolean => {
-  if (!value) return true;
-  const addresses = value.split(',').map((addr) => addr.trim()).filter(Boolean);
-  return addresses.every((addr) => CONTAINMENT_PROFILES.EMAIL.test(addr));
-};
-
 export const EmailInput: React.FC<EmailInputProps> = ({ data, onChange }) => {
-  const emailError = !isValidEmailList(data.email)
-    ? describeViolation('EMAIL_STRUCTURE_VIOLATION')
-    : undefined;
-  const ccError = !isValidEmailList(data.cc)
-    ? describeViolation('EMAIL_STRUCTURE_VIOLATION')
-    : undefined;
-  const bccError = !isValidEmailList(data.bcc)
-    ? describeViolation('EMAIL_STRUCTURE_VIOLATION')
-    : undefined;
+  const hasOtherContent = Boolean(
+    data.cc?.trim() || data.bcc?.trim() || data.subject?.trim() || data.body?.trim()
+  );
+
+  const emailError = emailListError(data.email, { required: hasOtherContent }) ?? undefined;
+  const ccError = emailListError(data.cc) ?? undefined;
+  const bccError = emailListError(data.bcc) ?? undefined;
 
   return (
     <div className={CONTAINER_SPACING_CLASSES}>

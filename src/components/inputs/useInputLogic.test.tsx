@@ -1,7 +1,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { useInputLogic, clearRetainedInputStates } from "./useInputLogic";
-import { type QRConfig, QRType, QRStyle, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from "../../types";
+import { type QRConfig, QRType, QRStyle, QRErrorCorrectionLevel, SocialFormat, TemplateStyle, type EmailData, type WifiData, type UrlData, type TextData } from "../../types";
 
 const createMockConfig = (type: QRType, value: string): QRConfig => ({
   value,
@@ -123,7 +123,7 @@ describe("useInputLogic", () => {
     );
 
     // Initial SSID state
-    expect((result.current.inputProps.data as any).ssid).toBe("MyWiFi");
+    expect((result.current.inputProps.data as WifiData).ssid).toBe("MyWiFi");
 
     // Change to include invalid control character
     act(() => {
@@ -148,7 +148,7 @@ describe("useInputLogic", () => {
       { initialProps: { cfg: config } }
     );
 
-    expect((result.current.inputProps.data as any).url).toBe("https://example.com");
+    expect((result.current.inputProps.data as UrlData).url).toBe("https://example.com");
 
     // Change URL to a dangerous javascript URI
     act(() => {
@@ -174,7 +174,7 @@ describe("useInputLogic", () => {
       { initialProps: { cfg: config } }
     );
 
-    expect((result.current.inputProps.data as any).email).toBe("user@example.com");
+    expect((result.current.inputProps.data as EmailData).email).toBe("user@example.com");
 
     // Change email to malformed email address
     act(() => {
@@ -213,7 +213,9 @@ describe("useInputLogic", () => {
       vi.advanceTimersByTime(200);
     });
 
-    expect(onChange).toHaveBeenCalled();
+    expect(onChange).toHaveBeenLastCalledWith({
+      value: "mailto:user@example.com?cc=cc1%40example.com%2C%20cc2%40example.com&bcc=bcc%40example.com&subject=&body=",
+    });
     expect(onRefusedChange).toHaveBeenLastCalledWith(false);
   });
 
@@ -227,7 +229,7 @@ describe("useInputLogic", () => {
     );
 
     // Initial state is normalized url
-    expect((result.current.inputProps.data as any).url).toBe("http://google.com/");
+    expect((result.current.inputProps.data as UrlData).url).toBe("http://google.com/");
 
     // Simulate tab swap: QRContext updates type to TEXT and value to empty string
     const textConfig = createMockConfig(QRType.TEXT, "");
@@ -235,7 +237,7 @@ describe("useInputLogic", () => {
 
     // The local state of URL should remain preserved in useInputLogic's inputStates under URL key,
     // and we should now be looking at TEXT state
-    expect((result.current.inputProps.data as any).text).toBe("");
+    expect((result.current.inputProps.data as TextData).text).toBe("");
 
     // Simulate switching back to URL: QRContext updates type back to URL and value to empty string
     const backToUrlConfig = createMockConfig(QRType.URL, "");
@@ -264,7 +266,7 @@ describe("useInputLogic", () => {
     act(() => {
       wifiHook.current.inputProps.onChange({ ssid: "MyOfficeWiFi", password: "SecretPassword" });
     });
-    expect((wifiHook.current.inputProps.data as any).ssid).toBe("MyOfficeWiFi");
+    expect((wifiHook.current.inputProps.data as WifiData).ssid).toBe("MyOfficeWiFi");
     unmountWifi(); // User navigates away from WiFi route
 
     // Route 3: User returns to URL generator route (which starts with default config)
