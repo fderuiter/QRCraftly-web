@@ -15,6 +15,11 @@ updates:
       day: "sunday"
       time: "00:00"
       timezone: "UTC"
+    # requirements.txt only installs Semgrep for CI. Semgrep pins mcp exactly
+    # (mcp==1.29.0 in 1.180.0 and 1.181.0), so an mcp update can never resolve and the
+    # update job fails. Bumping semgrep brings mcp along; drop this once it no longer pins.
+    ignore:
+      - dependency-name: "mcp"
 
   - package-ecosystem: "npm"
     directory: "/"

@@ -98,6 +98,58 @@ function crossfadeFrom(canvas: HTMLCanvasElement): () => void {
 }
 
 /**
+ * Interface representing the computed dimensions and pixel scaling properties for a canvas.
+ */
+interface CanvasDimensions {
+  useTemplate: boolean;
+  displayWidth: number;
+  displayHeight: number;
+  pixelWidth: number;
+  pixelHeight: number;
+  pixelRatio: number;
+}
+
+/**
+ * Calculates display dimensions and physical pixel dimensions for a canvas based on
+ * template configuration, base display size, and device pixel ratio.
+ *
+ * @param config - Configuration object containing template style and social format options.
+ * @param size - Base display resolution size in CSS pixels.
+ * @param customPixelRatio - Optional explicit pixel ratio. If omitted, defaults to window.devicePixelRatio or 1.
+ * @returns Object containing template status, display dimensions, pixel dimensions, and resolved pixel ratio.
+ */
+export function calculateCanvasDimensions(
+  config: Pick<QRConfig, 'templateStyle' | 'socialFormat'>,
+  size: number,
+  customPixelRatio?: number
+): CanvasDimensions {
+  const pixelRatio =
+    customPixelRatio ??
+    (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
+
+  const useTemplate =
+    config.templateStyle !== TemplateStyle.NONE ||
+    config.socialFormat !== SocialFormat.SQUARE_1_1;
+
+  const displayWidth = size;
+  let displayHeight = size;
+
+  if (useTemplate) {
+    const { width: fw, height: fh } = SOCIAL_DIMENSIONS[config.socialFormat];
+    displayHeight = Math.round((size * fh) / fw);
+  }
+
+  return {
+    useTemplate,
+    displayWidth,
+    displayHeight,
+    pixelWidth: displayWidth * pixelRatio,
+    pixelHeight: displayHeight * pixelRatio,
+    pixelRatio,
+  };
+}
+
+/**
  * Props for the QRCanvas component.
  */
 interface QRCanvasProps {
@@ -273,26 +325,10 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const activeSize = size;
-    const pixelRatio = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
-
     // Fixed canvas dimensions at initialization to prevent buffer resets/flickering
-    const useTemplate =
-      configRef.current.templateStyle !== TemplateStyle.NONE ||
-      configRef.current.socialFormat !== SocialFormat.SQUARE_1_1;
-
-    const displayWidth = activeSize;
-    let displayHeight = activeSize;
-
-    if (useTemplate) {
-      const { width: fw, height: fh } = SOCIAL_DIMENSIONS[configRef.current.socialFormat];
-      displayHeight = Math.round(activeSize * fh / fw);
-      canvas.width = displayWidth * pixelRatio;
-      canvas.height = displayHeight * pixelRatio;
-    } else {
-      canvas.width = displayWidth * pixelRatio;
-      canvas.height = displayHeight * pixelRatio;
-    }
+    const dims = calculateCanvasDimensions(configRef.current, size);
+    canvas.width = dims.pixelWidth;
+    canvas.height = dims.pixelHeight;
 
     let animationFrameId: number;
     let lastFrameTime = performance.now();
@@ -317,21 +353,19 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
             const currentConfig = configRef.current;
             const currentLogoImg = logoImgRef.current;
             const currentBorderLogoImg = borderLogoImgRef.current;
-            const currentUseTemplate =
-              currentConfig.templateStyle !== TemplateStyle.NONE ||
-              currentConfig.socialFormat !== SocialFormat.SQUARE_1_1;
+            const currentDims = calculateCanvasDimensions(currentConfig, size, dims.pixelRatio);
 
-            if (currentUseTemplate) {
+            if (currentDims.useTemplate) {
               ctx.save();
-              ctx.scale(pixelRatio, pixelRatio);
+              ctx.scale(dims.pixelRatio, dims.pixelRatio);
               drawWithTemplate(
                 ctx as unknown as CanvasRenderingContext2D,
                 frame.modules,
                 currentConfig,
                 currentLogoImg,
                 currentBorderLogoImg,
-                displayWidth,
-                displayHeight,
+                dims.displayWidth,
+                dims.displayHeight,
                 frame.modules.size,
                 false,
                 computedMazeDataRef.current
@@ -344,7 +378,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
                 currentConfig,
                 currentLogoImg,
                 currentBorderLogoImg,
-                activeSize,
+                size,
                 computedMazeDataRef.current
               );
             }
@@ -505,25 +539,9 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const currentConfig = configRef.current;
-    const currentSize = sizeRef.current;
-
-    const activeSize = currentSize;
-    const pixelRatio = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
-
-    const useTemplate =
-      currentConfig.templateStyle !== TemplateStyle.NONE ||
-      currentConfig.socialFormat !== SocialFormat.SQUARE_1_1;
-
-    if (useTemplate) {
-      const { width: fw, height: fh } = SOCIAL_DIMENSIONS[currentConfig.socialFormat];
-      const displayHeight = Math.round(activeSize * fh / fw);
-      canvas.width = activeSize * pixelRatio;
-      canvas.height = displayHeight * pixelRatio;
-    } else {
-      canvas.width = activeSize * pixelRatio;
-      canvas.height = activeSize * pixelRatio;
-    }
+    const dims = calculateCanvasDimensions(configRef.current, sizeRef.current);
+    canvas.width = dims.pixelWidth;
+    canvas.height = dims.pixelHeight;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   }, []);
@@ -544,23 +562,14 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     const currentOnRendered = onRenderedRef.current;
     const currentSize = sizeRef.current;
 
-    const activeSize = currentSize;
-    const pixelRatio = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+    const dims = calculateCanvasDimensions(currentConfig, currentSize);
 
-    const useTemplate =
-      currentConfig.templateStyle !== TemplateStyle.NONE ||
-      currentConfig.socialFormat !== SocialFormat.SQUARE_1_1;
+    canvas.width = dims.pixelWidth;
+    canvas.height = dims.pixelHeight;
 
-    if (useTemplate) {
-      const { width: fw, height: fh } = SOCIAL_DIMENSIONS[currentConfig.socialFormat];
-      const displayWidth = activeSize;
-      const displayHeight = Math.round(activeSize * fh / fw);
-
-      canvas.width = displayWidth * pixelRatio;
-      canvas.height = displayHeight * pixelRatio;
-
+    if (dims.useTemplate) {
       ctx.save();
-      ctx.scale(pixelRatio, pixelRatio);
+      ctx.scale(dims.pixelRatio, dims.pixelRatio);
 
       drawWithTemplate(
         ctx as unknown as CanvasRenderingContext2D,
@@ -568,8 +577,8 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
         currentConfig,
         currentLogoImg,
         currentBorderLogoImg,
-        displayWidth,
-        displayHeight,
+        dims.displayWidth,
+        dims.displayHeight,
         modules.size,
         false,
         computedMazeDataRef.current
@@ -577,9 +586,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
 
       ctx.restore();
     } else {
-      canvas.width = activeSize * pixelRatio;
-      canvas.height = activeSize * pixelRatio;
-      drawQR(ctx, modules, currentConfig, currentLogoImg, currentBorderLogoImg, activeSize, computedMazeDataRef.current);
+      drawQR(ctx, modules, currentConfig, currentLogoImg, currentBorderLogoImg, currentSize, computedMazeDataRef.current);
     }
     settleCrossfade();
 
