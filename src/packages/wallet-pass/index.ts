@@ -66,6 +66,7 @@ export {
   readOid,
   sequence,
   setOf,
+  TAG,
   time,
   utf8String,
   type DerNode,
