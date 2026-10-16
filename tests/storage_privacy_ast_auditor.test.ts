@@ -67,7 +67,6 @@ describe('Pre-Build Storage Privacy AST Auditor Guardrail', () => {
       expect(ALLOWED_STORAGE_KEYS.has('qrcraftly:dynamic-consent-accepted')).toBe(false);
       expect(ALLOWED_STORAGE_KEYS.has('qrcraftly:theme')).toBe(true);
       expect(ALLOWED_STORAGE_KEYS.has('qrcraftly:brand-templates')).toBe(true);
-      expect(ALLOWED_STORAGE_KEYS.has('qrcraftly:scanner-sound')).toBe(true);
       expect(ALLOWED_STORAGE_KEYS.has('__test__')).toBe(true);
     });
 
@@ -75,7 +74,6 @@ describe('Pre-Build Storage Privacy AST Auditor Guardrail', () => {
       expect([...ALLOWED_STORAGE_KEYS].sort()).toEqual([
         '__test__',
         'qrcraftly:brand-templates',
-        'qrcraftly:scanner-sound',
         'qrcraftly:theme',
       ]);
     });

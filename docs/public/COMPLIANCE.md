@@ -42,7 +42,7 @@ What is never part of a request:
 
 - **HTTPS.** Every connection to the site uses HTTPS.
 - **Nothing in the address bar.** User input is never put in URL query parameters (such as `?data=...`), so it cannot end up in browser history, proxy logs or server logs.
-- **Storage allowlist.** Before every build, `scripts/storage_privacy_ast_auditor.js` checks every use of persistent browser storage against an allowlist: `qrcraftly:theme` (light, dark or system), `qrcraftly:brand-templates`, `qrcraftly:scanner-sound` and the `__test__` probe key. Anything else fails the build.
+- **Storage allowlist.** Before every build, `scripts/storage_privacy_ast_auditor.js` checks every use of persistent browser storage against an allowlist: `qrcraftly:theme` (light, dark or system), `qrcraftly:brand-templates` and the `__test__` probe key. Anything else fails the build.
 - **No unreviewed network calls.** The site's Content Security Policy lets the browser connect only to QRCraftly itself, and `scripts/bundle_ast_audit.js` fails the build if shipped code gains a network call that has not been reviewed.
 
 ## Private file transfers

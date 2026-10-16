@@ -1085,56 +1085,47 @@ describe('QRScanner Component', () => {
       vi.mocked(playChime).mockClear();
     });
 
-    it('renders audio toggle button and defaults sound to on when enableAudio is true', async () => {
-      render(<QRScanner onScanSuccess={mockOnScanSuccess} enableAudio={true} />);
-      await settle();
-      const button = screen.getByRole('button', { name: 'Mute scan sound' });
-      expect(button).toBeInTheDocument();
-    });
-
-    it('renders sound muted when enableAudio prop is false', async () => {
-      render(<QRScanner onScanSuccess={mockOnScanSuccess} enableAudio={false} />);
-      await settle();
-      const button = screen.getByRole('button', { name: 'Unmute scan sound' });
-      expect(button).toBeInTheDocument();
-    });
-
-    it('toggles sound state and persists choice in localStorage when clicked', async () => {
+    it('renders scan sound toggle button starting unpressed in camera mode', async () => {
       render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
       await settle();
-      const toggleBtn = screen.getByRole('button', { name: 'Mute scan sound' });
+      const button = screen.getByRole('button', { name: 'Scan sound' });
+      expect(button).toBeInTheDocument();
+      expect(button).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('hides scan sound toggle button in image mode', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+      expect(screen.getByRole('button', { name: 'Scan sound' })).toBeInTheDocument();
+
+      const imageTab = screen.getByRole('radio', { name: 'Image' });
+      await act(async () => {
+        fireEvent.click(imageTab);
+      });
+      expect(screen.queryByRole('button', { name: 'Scan sound' })).not.toBeInTheDocument();
+    });
+
+    it('toggles sound state on click without writing to localStorage', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+      const toggleBtn = screen.getByRole('button', { name: 'Scan sound' });
+      expect(toggleBtn).toHaveAttribute('aria-pressed', 'false');
 
       await act(async () => {
         fireEvent.click(toggleBtn);
       });
-      expect(screen.getByRole('button', { name: 'Unmute scan sound' })).toBeInTheDocument();
-      expect(window.localStorage.getItem('qrcraftly:scanner-sound')).toBe('false');
+      expect(toggleBtn).toHaveAttribute('aria-pressed', 'true');
+      expect(window.localStorage.getItem('qrcraftly:scanner-sound')).toBeNull();
 
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Unmute scan sound' }));
+        fireEvent.click(toggleBtn);
       });
-      expect(screen.getByRole('button', { name: 'Mute scan sound' })).toBeInTheDocument();
-      expect(window.localStorage.getItem('qrcraftly:scanner-sound')).toBe('true');
+      expect(toggleBtn).toHaveAttribute('aria-pressed', 'false');
+      expect(window.localStorage.getItem('qrcraftly:scanner-sound')).toBeNull();
     });
 
-    it('initializes sound state from localStorage preference when present', async () => {
-      window.localStorage.setItem('qrcraftly:scanner-sound', 'false');
-      render(<QRScanner onScanSuccess={mockOnScanSuccess} enableAudio={true} />);
-      await settle();
-      expect(screen.getByRole('button', { name: 'Unmute scan sound' })).toBeInTheDocument();
-    });
-
-    it('invokes playChime on camera scan success when sound is enabled', async () => {
-      render(<QRScanner onScanSuccess={mockOnScanSuccess} enableAudio={true} />);
-      await settle();
-
-      await decode('https://example.com/audio-test');
-      expect(playChime).toHaveBeenCalledTimes(1);
-      expect(mockOnScanSuccess).toHaveBeenCalledWith('https://example.com/audio-test');
-    });
-
-    it('does not invoke playChime on camera scan success when sound is muted', async () => {
-      render(<QRScanner onScanSuccess={mockOnScanSuccess} enableAudio={false} />);
+    it('does not invoke playChime on camera scan success when sound is off', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
       await settle();
 
       await decode('https://example.com/no-audio-test');
@@ -1142,19 +1133,42 @@ describe('QRScanner Component', () => {
       expect(mockOnScanSuccess).toHaveBeenCalledWith('https://example.com/no-audio-test');
     });
 
-    it('handles localStorage errors gracefully without throwing', async () => {
-      const originalGetItem = window.localStorage.getItem;
-      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-        throw new Error('SecurityError: Access is denied');
+    it('invokes playChime on camera scan success when sound is toggled on', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+
+      const toggleBtn = screen.getByRole('button', { name: 'Scan sound' });
+      await act(async () => {
+        fireEvent.click(toggleBtn);
       });
 
+      await decode('https://example.com/audio-test');
+      expect(playChime).toHaveBeenCalledTimes(1);
+      expect(mockOnScanSuccess).toHaveBeenCalledWith('https://example.com/audio-test');
+    });
+
+    it('does not invoke playChime on image mode scan reads', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+
+      const toggleBtn = screen.getByRole('button', { name: 'Scan sound' });
       await act(async () => {
-        render(<QRScanner onScanSuccess={mockOnScanSuccess} enableAudio={true} />);
+        fireEvent.click(toggleBtn);
+      });
+
+      const imageTab = screen.getByRole('radio', { name: 'Image' });
+      await act(async () => {
+        fireEvent.click(imageTab);
+      });
+
+      const mockFile = new File(['mock content'], 'qr.png', { type: 'image/png' });
+      const fileInput = screen.getByLabelText(/upload qr code image file/i);
+      await act(async () => {
+        fireEvent.change(fileInput, { target: { files: [mockFile] } });
       });
       await settle();
 
-      expect(screen.getByRole('button', { name: 'Mute scan sound' })).toBeInTheDocument();
-      window.localStorage.getItem = originalGetItem;
+      expect(playChime).not.toHaveBeenCalled();
     });
   });
 });
