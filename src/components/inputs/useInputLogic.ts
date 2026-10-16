@@ -41,8 +41,26 @@ const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => 
     }
   } else if (type === QRType.VCARD) {
     const vcard = data as VCardData;
-    if (vcard.website && isDangerousUrl(vcard.website)) {
-      return false;
+    const fields: (keyof VCardData)[] = [
+      'firstName',
+      'lastName',
+      'organization',
+      'title',
+      'phone',
+      'email',
+      'website',
+      'street',
+      'city',
+      'zip',
+      'country',
+    ];
+    for (const field of fields) {
+      const val = vcard[field];
+      if (typeof val === 'string' && val) {
+        if (isDangerousUrl(val) || CONTAINMENT_PROFILES.TEXT_NO_CONTROL.test(val)) {
+          return false;
+        }
+      }
     }
   } else if (type === QRType.PAYMENT) {
     const payment = data as PaymentData;

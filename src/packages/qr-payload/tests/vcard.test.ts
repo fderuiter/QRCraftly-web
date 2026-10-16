@@ -216,8 +216,32 @@ describe('VCard generator', () => {
     // URL with parameter but no colon, should have no violations
     expect(VCardContract.validate?.('BEGIN:VCARD\nURL;TYPE=WORK\nEND:VCARD')).toEqual([]);
 
-    // MECard contract matching and URL validation
-    expect(VCardContract.matches('MECARD:N:Doe,John;')).toBe(true);
+    // Dangerous URL in non-website fields (TEL, EMAIL, N, ORG, etc.)
+    expect(VCardContract.validate?.('BEGIN:VCARD\nTEL:javascript:alert(1)\nEND:VCARD')).toEqual([
+      'URI_INJECTION_VIOLATION',
+    ]);
+    expect(VCardContract.validate?.('BEGIN:VCARD\nEMAIL:javascript:alert(1)\nEND:VCARD')).toEqual([
+      'URI_INJECTION_VIOLATION',
+    ]);
+    expect(VCardContract.validate?.('BEGIN:VCARD\nORG:javascript:alert(1)\nEND:VCARD')).toEqual([
+      'URI_INJECTION_VIOLATION',
+    ]);
+
+    // Control characters in non-website fields
+    expect(VCardContract.validate?.('BEGIN:VCARD\nN:Doe\x00;John;;;\nEND:VCARD')).toEqual([
+      'Payload contains invalid control or zero-width characters',
+    ]);
+    expect(VCardContract.validate?.('BEGIN:VCARD\nORG:Acme\x07Corp\nEND:VCARD')).toEqual([
+      'Payload contains invalid control or zero-width characters',
+    ]);
+
+    // MECard non-website field validations
+    expect(VCardContract.validate?.('MECARD:N:Doe,John;TEL:javascript:alert(1);')).toEqual([
+      'URI_INJECTION_VIOLATION',
+    ]);
+    expect(VCardContract.validate?.('MECARD:N:Doe\x00,John;TEL:123;')).toEqual([
+      'Payload contains invalid control or zero-width characters',
+    ]);
     expect(VCardContract.validate?.('MECARD:N:Doe,John;URL:javascript:alert(1);')).toEqual([
       'URI_INJECTION_VIOLATION',
     ]);

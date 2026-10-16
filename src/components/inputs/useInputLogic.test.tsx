@@ -164,6 +164,46 @@ describe("useInputLogic", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("should validate vCard inputs locally and block onChange propagation if non-website fields contain dangerous URLs or control characters", () => {
+    const config = createMockConfig(QRType.VCARD, "BEGIN:VCARD\r\nVERSION:3.0\r\nN:Doe;Jane;;;\r\nFN:Jane Doe\r\nEND:VCARD");
+    const onChange = vi.fn();
+
+    const { result } = renderHook(
+      ({ cfg }) => useInputLogic(cfg, onChange),
+      { initialProps: { cfg: config } }
+    );
+
+    // Initial first name state
+    expect((result.current.inputProps.data as any).firstName).toBe("Jane");
+
+    // Change firstName to contain a dangerous scheme
+    act(() => {
+      result.current.inputProps.onChange({ firstName: "javascript:alert(1)" });
+    });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(onChange).not.toHaveBeenCalled();
+
+    // Change email to contain control characters
+    act(() => {
+      result.current.inputProps.onChange({ firstName: "Jane", email: "jane\x00@example.com" });
+    });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(onChange).not.toHaveBeenCalled();
+
+    // Change phone to contain a dangerous scheme
+    act(() => {
+      result.current.inputProps.onChange({ email: "jane@example.com", phone: "javascript:alert(1)" });
+    });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("should preserve newly normalized URL state and push constructed value when swapping tabs", () => {
     const config = createMockConfig(QRType.URL, "http://google.com/");
     const onChange = vi.fn();

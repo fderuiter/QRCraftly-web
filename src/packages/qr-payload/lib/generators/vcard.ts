@@ -19,7 +19,7 @@
 import { type VCardData, QRType, type QRGeneratorContract } from '@/types';
 import { normalizeUrl } from '@/utils/url';
 import { isDangerousUrl } from '@/utils/security';
-import { identifyProtocol } from '../protocol';
+import { identifyProtocol, CONTAINMENT_PROFILES } from '../protocol';
 import {
   escapeVCardEvent,
   unescapeVCardEvent,
@@ -317,28 +317,27 @@ export const VCardContract: QRGeneratorContract<VCardData> = {
       for (const part of parts) {
         const colonIdx = part.indexOf(':');
         if (colonIdx > 0) {
-          const key = part.substring(0, colonIdx).toUpperCase();
-          if (key === 'URL') {
-            const val = unescapeMECard(part.substring(colonIdx + 1)).trim();
-            if (isDangerousUrl(val)) {
-              violations.push('URI_INJECTION_VIOLATION');
-              break;
-            }
+          const val = unescapeMECard(part.substring(colonIdx + 1)).trim();
+          if (isDangerousUrl(val)) {
+            violations.push('URI_INJECTION_VIOLATION');
+          }
+          if (CONTAINMENT_PROFILES.TEXT_NO_CONTROL.test(val)) {
+            violations.push('Payload contains invalid control or zero-width characters');
           }
         }
       }
     } else {
       const properties = parseRFCProperties(raw);
-      for (const { key, value } of properties) {
-        if (key === 'URL') {
-          const vcardUrl = value.trim();
-          if (isDangerousUrl(vcardUrl)) {
-            violations.push('URI_INJECTION_VIOLATION');
-            break;
-          }
+      for (const { value } of properties) {
+        const val = value.trim();
+        if (isDangerousUrl(val)) {
+          violations.push('URI_INJECTION_VIOLATION');
+        }
+        if (CONTAINMENT_PROFILES.TEXT_NO_CONTROL.test(val)) {
+          violations.push('Payload contains invalid control or zero-width characters');
         }
       }
     }
-    return violations;
+    return Array.from(new Set(violations));
   },
 };

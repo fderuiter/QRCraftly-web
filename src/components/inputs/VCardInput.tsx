@@ -3,6 +3,7 @@ import type { VCardData } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
 import { isDangerousUrl } from "../../utils/security";
+import { CONTAINMENT_PROFILES } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
 import {
   GRID_TWO_COLUMNS_CLASSES,
@@ -14,10 +15,29 @@ interface VCardInputProps {
   onChange: (updates: Partial<VCardData>) => void;
 }
 
+const getFieldError = (value: string | undefined): string | undefined => {
+  if (!value) return undefined;
+  if (isDangerousUrl(value)) {
+    return "Unsafe URL scheme or malicious protocol detected.";
+  }
+  if (CONTAINMENT_PROFILES.TEXT_NO_CONTROL.test(value)) {
+    return "Contains invalid control or zero-width characters.";
+  }
+  return undefined;
+};
+
 export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
-  const websiteError = data.website && isDangerousUrl(data.website)
-    ? "Unsafe URL scheme or malicious protocol detected."
-    : undefined;
+  const firstNameError = getFieldError(data.firstName);
+  const lastNameError = getFieldError(data.lastName);
+  const phoneError = getFieldError(data.phone);
+  const emailError = getFieldError(data.email);
+  const orgError = getFieldError(data.organization);
+  const titleError = getFieldError(data.title);
+  const websiteError = getFieldError(data.website);
+  const streetError = getFieldError(data.street);
+  const cityError = getFieldError(data.city);
+  const zipError = getFieldError(data.zip);
+  const countryError = getFieldError(data.country);
 
   return (
     <FormBlock legend="Contact Details (vCard)">
@@ -45,6 +65,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           placeholder="e.g. Jane"
           value={data.firstName}
           onChange={(e) => onChange({ firstName: e.target.value })}
+          error={firstNameError}
         />
         <TextField
           id="vcard-lastname"
@@ -55,6 +76,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           placeholder="e.g. Doe"
           value={data.lastName}
           onChange={(e) => onChange({ lastName: e.target.value })}
+          error={lastNameError}
         />
       </div>
 
@@ -69,6 +91,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           placeholder="+1 555 000 0000"
           value={data.phone}
           onChange={(e) => onChange({ phone: e.target.value })}
+          error={phoneError}
         />
         <TextField
           id="vcard-email"
@@ -80,6 +103,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           placeholder="name@example.com"
           value={data.email}
           onChange={(e) => onChange({ email: e.target.value })}
+          error={emailError}
         />
       </div>
 
@@ -92,6 +116,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         placeholder="e.g. Acme Corp"
         value={data.organization}
         onChange={(e) => onChange({ organization: e.target.value })}
+        error={orgError}
       />
 
       <TextField
@@ -103,6 +128,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         placeholder="e.g. Software Engineer"
         value={data.title}
         onChange={(e) => onChange({ title: e.target.value })}
+        error={titleError}
       />
 
       <TextField
@@ -131,6 +157,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
             placeholder="Street"
             value={data.street}
             onChange={(e) => onChange({ street: e.target.value })}
+            error={streetError}
           />
           <div className={GRID_TWO_COLUMNS_CLASSES}>
             <TextField
@@ -142,6 +169,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               placeholder="City"
               value={data.city}
               onChange={(e) => onChange({ city: e.target.value })}
+              error={cityError}
             />
             <TextField
               id="vcard-zip"
@@ -152,6 +180,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               placeholder="ZIP"
               value={data.zip}
               onChange={(e) => onChange({ zip: e.target.value })}
+              error={zipError}
             />
             <TextField
               id="vcard-country"
@@ -162,6 +191,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               placeholder="Country"
               value={data.country}
               onChange={(e) => onChange({ country: e.target.value })}
+              error={countryError}
             />
           </div>
         </div>
