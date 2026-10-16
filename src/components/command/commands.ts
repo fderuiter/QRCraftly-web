@@ -1,5 +1,5 @@
 import { QRErrorCorrectionLevel } from '../../types';
-import { DEFAULT_CONFIG, PATTERNS, PRESET_COLORS } from '../../constants';
+import { DEFAULT_CONFIG, PATTERNS, PRESET_COLORS, buildPresetColorPatch } from '../../constants';
 import type { QRStore } from '../../context/QRContext';
 import type { DownloadFormat } from '../ExportOptions';
 import { surpriseStyle } from '../../utils/styleGallery';
@@ -93,20 +93,8 @@ export function buildCommands(host: CommandHost): Command[] {
       group: 'Colors',
       keywords: 'theme palette preset',
       run: () => {
-        const currentStops = store.getState().config.gradientColorStops;
-        const stop1 = (currentStops && currentStops[1]?.color) ?? '#3b82f6';
-        store.updateConfig({
-          fgColor: preset.fg,
-          bgColor: preset.bg,
-          eyeColor: preset.eye,
-          eyeFrameColor: preset.eye,
-          eyeBallColor: preset.eye,
-          gradientType: 'none',
-          gradientColorStops: [
-            { offset: 0, color: preset.fg },
-            { offset: 1, color: stop1 },
-          ],
-        });
+        const config = store.getState().config;
+        store.updateConfig(buildPresetColorPatch(preset, config));
         notifyUndo(`${preset.label} colors applied`);
       },
     });

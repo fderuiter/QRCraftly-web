@@ -18,7 +18,7 @@ import { getPublicDomain } from "./utils/metadataEngine";
 */
 
 
-import { QRStyle, QRType, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from './types';
+import { QRStyle, QRType, QRErrorCorrectionLevel, SocialFormat, TemplateStyle, type QRConfig } from './types';
 
 /**
  * The default configuration settings for the QR code generator.
@@ -87,6 +87,31 @@ import colorsData from './colors.json' with { type: 'json' };
  * Each preset defines background, foreground, and eye colors.
  */
 export const PRESET_COLORS = colorsData.presets;
+
+/**
+ * Builds a patch object for applying a color preset, keeping gradient stops synchronized.
+ * @param preset - Foreground, background, and eye colors from a preset theme.
+ * @param config - Current configuration to preserve existing end gradient color.
+ * @returns Partial QRConfig updates for the preset colors and synchronized gradient stops.
+ */
+export function buildPresetColorPatch(
+  preset: { fg: string; bg: string; eye: string },
+  config?: Partial<QRConfig>
+): Partial<QRConfig> {
+  const currentStops = config?.gradientColorStops;
+  const stop1 = (currentStops && currentStops[1]?.color) ?? '#3b82f6';
+  return {
+    fgColor: preset.fg,
+    bgColor: preset.bg,
+    eyeColor: preset.eye,
+    eyeFrameColor: preset.eye,
+    eyeBallColor: preset.eye,
+    gradientColorStops: [
+      { offset: 0, color: preset.fg },
+      { offset: 1, color: stop1 },
+    ],
+  };
+}
 
 /**
  * Centralized system limits to keep user interface, validation rules,

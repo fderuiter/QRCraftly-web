@@ -134,4 +134,45 @@ describe('StyleGallery', () => {
 
     expect(rendersDuringGeneration).toBeLessThanOrEqual(2);
   });
+
+  it('preserves end gradient color and marks applied tile as selected in linear mode', async () => {
+    let storeHandle!: ReturnType<typeof useQRStore>;
+    function HarnessWithLinear({ onStore }: { onStore: (store: ReturnType<typeof useQRStore>) => void }) {
+      const store = useQRStore();
+      onStore(store);
+      const config = useQRStoreSelector((s) => s.config);
+      return <StyleGallery config={config} onChange={store.updateConfig} />;
+    }
+
+    render(
+      <ToastProvider>
+        <QRProvider>
+          <HarnessWithLinear onStore={(s) => {
+            storeHandle = s;
+          }} />
+        </QRProvider>
+      </ToastProvider>
+    );
+
+    act(() => {
+      storeHandle.updateConfig({
+        gradientType: 'linear',
+        gradientColorStops: [
+          { offset: 0, color: '#000000' },
+          { offset: 1, color: '#00ff00' },
+        ],
+      });
+    });
+
+    const slateTile = screen.getByRole('radio', { name: /Slate color/i });
+    await userEvent.click(slateTile);
+
+    const config = storeHandle.getState().config;
+    expect(config.gradientType).toBe('linear');
+    expect(config.gradientColorStops).toEqual([
+      { offset: 0, color: '#334155' },
+      { offset: 1, color: '#00ff00' },
+    ]);
+    expect(screen.getByRole('radio', { name: /Slate color/i })).toHaveAttribute('aria-checked', 'true');
+  });
 });

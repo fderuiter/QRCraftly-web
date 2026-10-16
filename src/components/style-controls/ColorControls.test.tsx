@@ -241,21 +241,33 @@ describe('ColorControls', () => {
     );
   });
 
-  it('immediately displays synchronized preset color as gradient start color when toggling fill mode', () => {
+  it('synchronizes start color stop with fgColor when switching fill mode to linear', () => {
     const handleChange = vi.fn();
-    const configWithPreset = {
+    const configWithStaleStops = {
       ...DEFAULT_CONFIG,
       fgColor: '#334155',
       bgColor: '#f8fafc',
-      gradientType: 'linear' as const,
+      gradientType: 'none' as const,
       gradientColorStops: [
-        { offset: 0, color: '#334155' },
-        { offset: 1, color: '#3b82f6' },
+        { offset: 0, color: '#ff0000' },
+        { offset: 1, color: '#00ff00' },
       ],
     };
 
-    render(<ColorControls config={configWithPreset} onChange={handleChange} />);
+    render(<ColorControls config={configWithStaleStops} onChange={handleChange} />);
 
-    expect(screen.getByLabelText(/^start color$/i)).toHaveValue('#334155');
+    const fillModeTrack = screen.getByRole('radiogroup', { name: /fill mode/i });
+    const linearRadio = within(fillModeTrack).getByRole('radio', { name: /linear/i });
+    fireEvent.click(linearRadio);
+
+    expect(handleChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gradientType: 'linear',
+        gradientColorStops: [
+          { offset: 0, color: '#334155' },
+          { offset: 1, color: '#00ff00' },
+        ],
+      })
+    );
   });
 });

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { GradientType, QRConfig } from '../../types';
-import { PRESET_COLORS, MIN_CONTRAST_THRESHOLD } from '../../constants';
+import { PRESET_COLORS, MIN_CONTRAST_THRESHOLD, buildPresetColorPatch } from '../../constants';
 import { getContrastRatio } from '../../utils/colorUtils';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
@@ -87,18 +87,9 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
         onChange={(label) => {
           const preset = PRESET_COLORS.find((p) => p.label === label);
           if (preset) {
-            const updatedStops = [
-              { offset: 0, color: preset.fg },
-              { offset: 1, color: stop1Color },
-            ];
             onChange({
-              fgColor: preset.fg,
-              bgColor: preset.bg,
-              eyeColor: preset.eye,
-              eyeFrameColor: preset.eye,
-              eyeBallColor: preset.eye,
+              ...buildPresetColorPatch(preset, config),
               gradientType: 'none',
-              gradientColorStops: updatedStops,
             });
           }
         }}
@@ -135,8 +126,8 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
               onChange({ gradientType: 'none' });
             } else {
               const updatedStops = [
-                { offset: 0, color: config.fgColor || colorStops[0]?.color || '#000000' },
-                { offset: 1, color: colorStops[1]?.color ?? '#3b82f6' },
+                { offset: 0, color: config.fgColor },
+                { offset: 1, color: stop1Color },
               ];
               onChange({
                 gradientType: type,

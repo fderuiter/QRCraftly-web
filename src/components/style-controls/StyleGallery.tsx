@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CircleCheck, Dices, Redo2, TriangleAlert, Undo2 } from 'lucide-react';
 import { type QRConfig, SocialFormat, TemplateStyle } from '../../types';
-import { PATTERNS, PRESET_COLORS } from '../../constants';
+import { PATTERNS, PRESET_COLORS, buildPresetColorPatch } from '../../constants';
 import { getSamplePayload } from '@/packages/qr-payload';
 import { useOptionalQRStore, useOptionalQRStoreSelector } from '../../context/QRContext';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -35,6 +35,8 @@ const choiceOf = (config: QRConfig, patch: Partial<QRConfig>): StyleChoice => ({
   fgColor: patch.fgColor ?? config.fgColor,
   bgColor: patch.bgColor ?? config.bgColor,
   eyeColor: patch.eyeColor ?? config.eyeColor,
+  eyeFrameColor: patch.eyeFrameColor ?? config.eyeFrameColor ?? patch.eyeColor ?? config.eyeColor,
+  eyeBallColor: patch.eyeBallColor ?? config.eyeBallColor ?? patch.eyeColor ?? config.eyeColor,
 });
 
 function getThumbnailCacheId(config: QRConfig, choice: StyleChoice): string {
@@ -162,11 +164,6 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
           eyeColor: c.eye,
           eyeFrameColor: c.eye,
           eyeBallColor: c.eye,
-          gradientType: 'none' as const,
-          gradientColorStops: [
-            { offset: 0, color: c.fg },
-            { offset: 1, color: '#3b82f6' },
-          ],
         };
         return { id: `color:${c.label}`, name: c.label, patch, choice: choiceOf(source, patch) };
       }),
@@ -263,6 +260,13 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
 
   const apply = (tile: Tile) => {
     endPreview();
+    if (tile.id.startsWith('color:')) {
+      const preset = PRESET_COLORS.find((c) => `color:${c.label}` === tile.id);
+      if (preset) {
+        onChange(buildPresetColorPatch(preset, config));
+        return;
+      }
+    }
     onChange(tile.patch);
   };
 
