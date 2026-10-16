@@ -85,6 +85,10 @@ GitHub Actions triggers the consolidated CI pipeline on the PR:
 8. `dependency-audit`: `pnpm audit --audit-level=high`, reported as its own check. No other job depends on it, so a newly published upstream advisory never skips the checks above, but it does block the merge through `CI`.
 9. `ci`: the aggregate **`CI`** check. It passes only when jobs 1 to 8 all succeed, and it is the check the `main` ruleset requires.
 
+#### Refreshing visual baselines
+
+The screenshots in `e2e/visual-regression.spec.ts-snapshots/` must come from a CI runner, because fonts and rendering differ on every other machine. When a change moves the layout on purpose, add the `update-snapshots` label to the pull request (or run **Update Visual Baselines** by hand on the branch). The `update-snapshots.yml` workflow runs only the visual spec with `--update-snapshots` for Chromium, Firefox and WebKit and commits the changed baselines to the branch. GitHub holds the CI runs for that bot commit until a maintainer approves them on the PR's Checks tab. Add `full-e2e` before the `update-snapshots` label, because CI reads the labels from the push event, so that Firefox and WebKit are checked before the merge.
+
 ### Step 5: Ephemeral Branch Preview Verification
 
 Cloudflare Workers Builds automatically detects the PR branch and deploys an ephemeral preview to:

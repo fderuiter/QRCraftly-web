@@ -542,10 +542,12 @@ jobs:
   # no longer reports. It is also what auto-merge waits on (see RELEASING.md).
   # A job the plan skipped (E2E on a draft, the build on a docs-only PR) counts as a
   # pass; a failed or cancelled job, or a plan that did not succeed, fails it.
+  # It skips a run that was cancelled as a whole (a newer push superseded it), so a
+  # superseded run does not wait in the runner queue just to report a failure.
   ci:
     name: CI
     needs: [plan, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse]
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
