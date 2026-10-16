@@ -8,6 +8,10 @@ on:
   pull_request:
     branches: [main]
     types: [opened, edited, reopened, synchronize]
+  # The ruleset requires `PR Title` on merge-queue groups too. The title was checked on
+  # the pull request before it could join the queue, so the group run only reports it.
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -20,8 +24,13 @@ jobs:
     steps:
       - name: Check the title is a Conventional Commit
         env:
+          EVENT_NAME: ${{ github.event_name }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
+          if [[ "$EVENT_NAME" == "merge_group" ]]; then
+            echo "OK: titles were checked on each pull request before it joined the merge queue."
+            exit 0
+          fi
           pattern='^(feat|fix|perf|refactor|docs|chore|test|ci|build|style|revert)(\([a-z0-9._/-]+\))?!?: .+'
           if [[ "$PR_TITLE" =~ $pattern ]]; then
             echo "OK: $PR_TITLE"
