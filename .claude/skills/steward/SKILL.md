@@ -47,6 +47,17 @@ The required checks are `CI`, `PR Title` and `Workers Builds: qrcraftly`.
 - **Never** enable auto-merge on, or merge, a `chore(release): vX.Y.Z` PR. A maintainer merges those by hand.
 - No admin bypass of the `main` ruleset.
 
+## Merge conflicts
+
+- Merge `main` into the branch; never rebase or force-push a branch you did not create.
+- Regenerate lockfiles, `docs/public/UI_CATALOG.md` (`pnpm run docs:sync`) and other generated files with their tools, never by hand.
+- When both sides changed the same logic, keep both behaviours if they are compatible. If keeping one loses the other, stop and ask the PR's owner.
+- Re-run the local checks before pushing the merge.
+
+## Merge queue
+
+GitHub's merge queue needs an organization-owned repository, so it is not on yet ([ADR 0051](../../../docs/adr/0051-merge-queue-readiness.md)). The workflows already run on `merge_group`. Once `.github/rulesets/main-merge-queue.json` is imported, auto-merge adds a PR to the queue, branches no longer need updating, and a PR that fails in the queue is removed from it: fix it and enable auto-merge again.
+
 ## After the merge
 
 Check that `main`'s `CI` run (including **Verify Production Deployment**) and the `Workers Builds: qrcraftly` check pass on the merge commit before merging the next PR. `curl -s https://qrcraftly.com/version.json` shows which commit production serves. If production broke, roll back in Cloudflare first, then fix forward with a PR (see `RELEASING.md`).
