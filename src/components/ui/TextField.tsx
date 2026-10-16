@@ -48,8 +48,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(
               TEXT_FIELD_CLASSES,
               error && ERROR_INPUT_CLASSES,
               showPasswordToggle && 'pr-10',
-              inputClassName,
-              className
+              inputClassName
             )}
             aria-invalid={!!error}
             {...props}
