@@ -17,7 +17,7 @@
 */
 
 import { useState, useRef, useEffect, type ElementType } from "react";
-import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData } from "../../types";
+import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, type EmailData } from "../../types";
 import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
 import { CONTAINMENT_PROFILES } from "@/packages/qr-payload";
@@ -38,6 +38,26 @@ const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => 
     }
     if (wifi.eapIdentity && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(wifi.eapIdentity)) {
       return false;
+    }
+  } else if (type === QRType.EMAIL) {
+    const emailData = data as EmailData;
+    if (emailData.email) {
+      const addresses = emailData.email.split(',').map((addr) => addr.trim()).filter(Boolean);
+      if (addresses.some((addr) => !CONTAINMENT_PROFILES.EMAIL.test(addr))) {
+        return false;
+      }
+    }
+    if (emailData.cc) {
+      const addresses = emailData.cc.split(',').map((addr) => addr.trim()).filter(Boolean);
+      if (addresses.some((addr) => !CONTAINMENT_PROFILES.EMAIL.test(addr))) {
+        return false;
+      }
+    }
+    if (emailData.bcc) {
+      const addresses = emailData.bcc.split(',').map((addr) => addr.trim()).filter(Boolean);
+      if (addresses.some((addr) => !CONTAINMENT_PROFILES.EMAIL.test(addr))) {
+        return false;
+      }
     }
   } else if (type === QRType.VCARD) {
     const vcard = data as VCardData;

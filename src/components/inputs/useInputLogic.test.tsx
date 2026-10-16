@@ -164,6 +164,59 @@ describe("useInputLogic", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("should validate Email input locally and block onChange propagation if email, CC, or BCC is invalid", () => {
+    const config = createMockConfig(QRType.EMAIL, "mailto:user@example.com?subject=&body=");
+    const onChange = vi.fn();
+    const onRefusedChange = vi.fn();
+
+    const { result } = renderHook(
+      ({ cfg }) => useInputLogic(cfg, onChange, onRefusedChange),
+      { initialProps: { cfg: config } }
+    );
+
+    expect((result.current.inputProps.data as any).email).toBe("user@example.com");
+
+    // Change email to malformed email address
+    act(() => {
+      result.current.inputProps.onChange({ email: "invalid-email" });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    // Validation should fail, block onChange, and notify onRefusedChange(true)
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onRefusedChange).toHaveBeenCalledWith(true);
+
+    // Change CC to invalid address list
+    act(() => {
+      result.current.inputProps.onChange({ email: "user@example.com", cc: "cc1@example.com, not-an-email" });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(onRefusedChange).toHaveBeenCalledWith(true);
+
+    // Change to valid emails in recipient, CC, and BCC
+    act(() => {
+      result.current.inputProps.onChange({
+        email: "user@example.com",
+        cc: "cc1@example.com, cc2@example.com",
+        bcc: "bcc@example.com",
+      });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(onChange).toHaveBeenCalled();
+    expect(onRefusedChange).toHaveBeenLastCalledWith(false);
+  });
+
   it("should preserve newly normalized URL state and push constructed value when swapping tabs", () => {
     const config = createMockConfig(QRType.URL, "http://google.com/");
     const onChange = vi.fn();
