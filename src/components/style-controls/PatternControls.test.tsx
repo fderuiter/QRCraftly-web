@@ -65,12 +65,13 @@ describe('PatternControls', () => {
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 
-  it('renders the eye frame and ball shape groups inside the pattern controls', () => {
+  it('loads the eye frame and ball shape groups inside the pattern controls', async () => {
     render(<PatternControls config={DEFAULT_CONFIG} onChange={vi.fn()} />);
 
     const patternControls = screen.getByRole('heading', { name: 'Pattern Style' }).parentElement;
     expect(patternControls).not.toBeNull();
-    expect(patternControls).toContainElement(screen.getByRole('radiogroup', { name: 'Eye frame shape' }));
+    // The groups are code-split and load after the first render.
+    expect(patternControls).toContainElement(await screen.findByRole('radiogroup', { name: 'Eye frame shape' }));
     expect(patternControls).toContainElement(screen.getByRole('radiogroup', { name: 'Eye ball shape' }));
   });
 });

@@ -1,10 +1,17 @@
-import React from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import type { QRConfig, QRStyle } from '../../types';
 import { PATTERNS, LOW_RELIABILITY_PATTERNS } from '../../constants';
 import { PatternModule } from '../ui/PatternModule';
 import { Alert } from '../ui/Alert';
 import { SegmentedControl } from '../ui/SegmentedControl';
-import { EyeShapeControls } from './EyeShapeControls';
+import { Skeleton } from '../ui/Skeleton';
+
+// Code-split and drawn after hydration: the eye shape tiles would otherwise add their markup and
+// script to every generator page's first load, which sits at the per-page budget.
+const EyeShapeControls = lazy(() => import('./EyeShapeControls').then((module) => ({ default: module.EyeShapeControls })));
+
+/** A stand-in the height of the eye shape section, so the panel does not jump when it loads. */
+const EyeShapePlaceholder = () => <Skeleton className="mt-5 h-52 w-full" />;
 
 interface PatternControlsProps {
   config: QRConfig;
@@ -13,6 +20,10 @@ interface PatternControlsProps {
 
 export const PatternControls: React.FC<PatternControlsProps> = ({ config, onChange }) => {
   const isLowReliability = LOW_RELIABILITY_PATTERNS.includes(config.style);
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   return (
     <div>
@@ -48,7 +59,13 @@ export const PatternControls: React.FC<PatternControlsProps> = ({ config, onChan
         }))}
       />
 
-      <EyeShapeControls config={config} onChange={onChange} />
+      {isMounted ? (
+        <Suspense fallback={<EyeShapePlaceholder />}>
+          <EyeShapeControls config={config} onChange={onChange} />
+        </Suspense>
+      ) : (
+        <EyeShapePlaceholder />
+      )}
     </div>
   );
 };
