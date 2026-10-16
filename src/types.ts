@@ -373,6 +373,16 @@ export interface VCardData {
   zip: string;
   /** The country of the contact. */
   country: string;
+  /** X handle or profile link (vCard only). */
+  x?: string;
+  /** LinkedIn handle or profile link (vCard only). */
+  linkedin?: string;
+  /** Instagram handle or profile link (vCard only). */
+  instagram?: string;
+  /** Facebook handle or profile link (vCard only). */
+  facebook?: string;
+  /** GitHub handle or profile link (vCard only). */
+  github?: string;
 }
 
 /**

@@ -370,6 +370,7 @@ export const contentRegistry: Record<string, ToolContent> = {
     "features": [
       "Saves your contact with one scan",
       "vCard 2.1, 3.0, 4.0 and MECARD",
+      "X, LinkedIn, Instagram, Facebook and GitHub links",
       "Made in your browser"
     ],
     "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
