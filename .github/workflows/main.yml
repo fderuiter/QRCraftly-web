@@ -40,6 +40,9 @@ jobs:
     permissions:
       contents: read
       actions: read # the nightly run compares main with the last successful nightly run
+      statuses: write # the Stitch review status (ADR 0051)
+      issues: read # who added ci-approved to a Stitch PR (ADR 0051)
+      pull-requests: read
     outputs:
       run_checks: ${{ steps.plan.outputs.run_checks }}
       code_changed: ${{ steps.plan.outputs.code_changed }}
@@ -74,7 +77,32 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.sha }}
           LAST_NIGHTLY_SHA: ${{ steps.last-nightly.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: node scripts/ci/ci_plan.js
+
+      # Required by the ruleset. Pending (never failure) on a Stitch PR until a maintainer
+      # adds ci-approved, so the review itself never shows as a red check for Stitch to
+      # "fix"; success everywhere else. If posting fails the status stays missing, which still
+      # blocks the merge, so the step may fail without failing the plan.
+      - name: Report the Stitch review status
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          AWAITING_APPROVAL: ${{ steps.plan.outputs.awaiting_approval }}
+        run: |
+          if [ "$AWAITING_APPROVAL" = "true" ]; then
+            state=pending
+            description="Waiting for a maintainer to review this bot PR and add ci-approved"
+          else
+            state=success
+            description="No review pending"
+          fi
+          gh api --method POST "repos/$REPO/statuses/$SHA" -f state="$state" -f context="Stitch review" -f description="$description"
 
   # Runs in parallel with the other jobs (none of them depends on it), so a new
   # upstream advisory never skips lint, tests or build. The CI aggregate requires it.
@@ -151,13 +179,19 @@ jobs:
       - name: Test Semgrep rules
         run: semgrep --test --config semgrep.yml tests/semgrep/semgrep.tsx --metrics=off --disable-version-check
 
-  # JOB 3: Unit Tests
-  test:
-    name: Unit Tests
+  # JOB 3: Unit Tests, split into shards that run in parallel. Each shard writes a
+  # Vitest blob report with its coverage; `Unit Tests` merges them and checks the
+  # coverage floors once, on the whole suite.
+  test-shard:
+    name: Unit Tests (shard ${{ matrix.shard }}/3)
     needs: plan
     if: needs.plan.outputs.unit_tests == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -166,7 +200,54 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
 
-      - run: pnpm exec vitest run --coverage
+      - name: Run this shard's tests
+        env:
+          SHARD: ${{ matrix.shard }}
+          VITEST_COVERAGE: "true"
+          VITEST_SHARD_RUN: "true"
+        run: pnpm exec vitest run --coverage --shard="$SHARD/3" --reporter=blob --outputFile=".vitest-reports/blob-$SHARD-3.json"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vitest-blob-${{ matrix.shard }}
+          path: .vitest-reports/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  test:
+    name: Unit Tests
+    needs: [plan, test-shard]
+    if: ${{ !cancelled() && needs.plan.outputs.unit_tests == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # A failed shard fails this job, so the CI aggregate never reads it as skipped.
+      - name: Require every shard to pass
+        env:
+          SHARDS_RESULT: ${{ needs.test-shard.result }}
+        run: |
+          if [ "$SHARDS_RESULT" != "success" ]; then
+            echo "::error::A unit test shard finished with '$SHARDS_RESULT'."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+
+      - name: Download the shard reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: vitest-blob-*
+          path: .vitest-reports/
+          merge-multiple: true
+
+      - name: Merge reports and check coverage
+        run: pnpm exec vitest run --merge-reports --coverage
         env:
           VITEST_COVERAGE: "true"
 
@@ -461,10 +542,12 @@ jobs:
   # no longer reports. It is also what auto-merge waits on (see RELEASING.md).
   # A job the plan skipped (E2E on a draft, the build on a docs-only PR) counts as a
   # pass; a failed or cancelled job, or a plan that did not succeed, fails it.
+  # It skips a run that was cancelled as a whole (a newer push superseded it), so a
+  # superseded run does not wait in the runner queue just to report a failure.
   ci:
     name: CI
     needs: [plan, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse]
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -484,8 +567,7 @@ jobs:
             exit 1
           fi
           if [ "$AWAITING_APPROVAL" = "true" ]; then
-            echo "::error::This bot PR has not been reviewed yet. A maintainer adds the ci-approved label, then updates the branch to run CI."
-            exit 1
+            echo "::notice::Bot PR not reviewed yet, so only the quick checks ran. The required Stitch review status stays pending until a maintainer adds ci-approved and updates the branch."
           fi
           for result in $NEEDS_RESULTS; do
             if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then

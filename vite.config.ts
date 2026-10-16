@@ -174,7 +174,9 @@ export default defineConfig(({ command }) => {
           // branches 73.1%, functions 86.1%, lines 81.4%. The floors live in a
           // JSON file so the CI coverage summary (scripts/ci/coverage_summary.js)
           // shows the same numbers without parsing this config.
-          thresholds: { ...coverageThresholds },
+          // A CI shard (VITEST_SHARD_RUN) measures only its share of the tests, so the
+          // floors are checked once, when the shards' reports are merged.
+          thresholds: process.env.VITEST_SHARD_RUN === 'true' ? {} : { ...coverageThresholds },
           // Measure the logic layers: shared utilities and the deep-module
           // packages. Components, hooks and pages are exercised by the jsdom
           // project and Playwright but not gated here.

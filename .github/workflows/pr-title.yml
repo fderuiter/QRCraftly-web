@@ -16,6 +16,11 @@ on:
 permissions:
   contents: read
 
+# Bots edit titles and push in bursts; only the newest event per PR needs a runner.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   conventional-title:
     name: PR Title

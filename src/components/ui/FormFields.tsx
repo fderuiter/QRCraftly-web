@@ -53,8 +53,7 @@ export const TextAreaField: React.FC<TextAreaFieldProps> = ({
         className={mergeClasses(
           TEXT_AREA_CLASSES,
           error && ERROR_INPUT_CLASSES,
-          inputClassName,
-          className
+          inputClassName
         )}
         value={value}
         aria-invalid={!!error}
@@ -104,8 +103,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({
         className={mergeClasses(
           SELECT_CLASSES,
           error && ERROR_INPUT_CLASSES,
-          inputClassName,
-          className
+          inputClassName
         )} 
         aria-invalid={!!error}
         {...props}
