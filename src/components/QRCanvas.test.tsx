@@ -21,6 +21,7 @@ import { vi, describe, it, expect, beforeEach, afterEach, onTestFinished, type M
 import QRCanvas, { calculateCanvasDimensions } from './QRCanvas';
 import { DEFAULT_CONFIG } from '../constants';
 import {
+  EyeShape,
   QRStyle,
   type LogoPaddingStyle,
   QRErrorCorrectionLevel,
@@ -833,6 +834,21 @@ describe('QRCanvas Rendering Logic Extended', () => {
      await waitFor(() => {
          // Grunge uses drawRoughRect (rotate) and drawScribble (rotate + loop)
          expect(mockContext.rotate).toHaveBeenCalled();
+     });
+  });
+
+  it('repaints when only an eye shape changes (#1465)', async () => {
+     const squareConfig: QRConfig = { ...DEFAULT_CONFIG, style: QRStyle.STANDARD };
+     const { rerender } = render(<QRCanvas config={squareConfig} />);
+     await waitFor(() => {
+       expect(mockContext.fillRect).toHaveBeenCalledWith(0, 0, 1024, 1024);
+     });
+     expect(mockContext.quadraticCurveTo).not.toHaveBeenCalled();
+
+     rerender(<QRCanvas config={{ ...squareConfig, eyeFrameShape: EyeShape.LEAF }} />);
+
+     await waitFor(() => {
+       expect(mockContext.quadraticCurveTo).toHaveBeenCalled();
      });
   });
 

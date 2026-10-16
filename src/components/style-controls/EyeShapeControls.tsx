@@ -51,7 +51,7 @@ const EyeShapePicker: React.FC<EyeShapePickerProps> = ({ label, part, config, va
                 <PatternModule key={i} style={config.style} />
               ))}
             </span>
-            <span className="leading-tight">Pattern</span>
+            <span className="text-xs leading-tight">Pattern</span>
           </>
         ),
       },
@@ -67,7 +67,7 @@ const EyeShapePicker: React.FC<EyeShapePickerProps> = ({ label, part, config, va
                 <path d={SHAPE_PATHS[shape]} fill="currentColor" transform="translate(6 6) scale(0.5)" />
               )}
             </svg>
-            <span className="leading-tight">{SHAPE_LABELS[shape]}</span>
+            <span className="text-xs leading-tight">{SHAPE_LABELS[shape]}</span>
           </>
         ),
       })),
