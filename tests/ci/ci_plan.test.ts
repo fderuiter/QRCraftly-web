@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPlan, isDocsOnlyFile, planRun } from '../../scripts/ci/ci_plan.js';
+import { awaitsApproval, formatPlan, isDocsOnlyFile, planRun } from '../../scripts/ci/ci_plan.js';
 import { SAMPLE_ROUTES, sampleUrls } from '../../scripts/ci/lighthouse_sample.js';
 
 const SHA = 'a'.repeat(40);
@@ -52,6 +52,30 @@ describe('scripts/ci/ci_plan.js', () => {
       unitTests: false,
       e2e: 'none',
       lighthouse: 'none',
+    });
+  });
+
+  it('holds Stitch PRs until a maintainer adds the ci-approved label', () => {
+    const stitch = { eventName: 'pull_request', author: 'google-labs-stitch[bot]', headRef: 'stitch/fix-toast' };
+    expect(awaitsApproval({ ...stitch, labels: '["bug"]' })).toBe(true);
+    expect(awaitsApproval({ ...stitch, labels: '' })).toBe(true);
+    expect(awaitsApproval({ ...stitch, labels: '["ci-approved"]' })).toBe(false);
+    expect(awaitsApproval({ eventName: 'pull_request', author: 'someone', headRef: 'stitch/x', labels: '[]' })).toBe(true);
+  });
+
+  it('never holds people, Claude branches or non-PR runs', () => {
+    expect(awaitsApproval({ eventName: 'pull_request', author: 'fderuiter', headRef: 'claude/project-thread-x', labels: '[]' })).toBe(false);
+    expect(awaitsApproval({ eventName: 'merge_group', author: '', headRef: 'stitch/x' })).toBe(false);
+    expect(awaitsApproval({ eventName: 'schedule' })).toBe(false);
+  });
+
+  it('runs the ready-PR tier on a merge-queue group', () => {
+    expect(planRun({ eventName: 'merge_group', isDraft: '', changedFiles: null })).toEqual({
+      runChecks: true,
+      codeChanged: true,
+      unitTests: true,
+      e2e: 'pr',
+      lighthouse: 'sample',
     });
   });
 
