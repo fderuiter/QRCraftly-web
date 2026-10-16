@@ -112,4 +112,4 @@ These parameters are controlled via `AdvancedControls.tsx`.
 
 ## Template Export Configuration
 
-Template export options in `QRConfig` include `templateStyle`, optional `templateHeadline`/`templateSubtext`, color overrides (`templateBgColor`, `templateTextColor`), and `templateQrScale`.
+Template export options in `QRConfig` include `templateStyle`, optional `templateHeadline`/`templateSubtext`, color overrides (`templateBgColor`, `templateTextColor`), and `templateQrScale`. The Wi-Fi Card style (`TemplateStyle.WIFI_CARD`) is offered only for Wi-Fi codes; it reads the network name and password from the current Wi-Fi payload when it draws, and any other code type falls back to the solid frame.

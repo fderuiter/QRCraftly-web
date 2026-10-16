@@ -27,7 +27,7 @@ const EXPECTED = {
   CryptoNetwork: [CryptoNetwork, { BITCOIN: 'bitcoin', ETHEREUM: 'ethereum', SOLANA: 'solana', LITECOIN: 'litecoin', EPC_SEPA: 'epc_sepa', PAYPAL: 'paypal', VENMO: 'venmo', CASH_APP: 'cash_app', CUSTOM: 'custom' }],
   SocialPlatform: [SocialPlatform, { INSTAGRAM: 'instagram', TWITTER: 'twitter', TIKTOK: 'tiktok', LINKEDIN: 'linkedin', YOUTUBE: 'youtube', FACEBOOK: 'facebook', WHATSAPP: 'whatsapp', GITHUB: 'github' }],
   SocialFormat: [SocialFormat, { SQUARE_1_1: '1:1', PORTRAIT_4_5: '4:5', STORY_9_16: '9:16' }],
-  TemplateStyle: [TemplateStyle, { NONE: 'none', MINIMALIST: 'minimalist', GRADIENT_BLUR: 'gradient_blur', SOLID_FRAME: 'solid_frame' }],
+  TemplateStyle: [TemplateStyle, { NONE: 'none', MINIMALIST: 'minimalist', GRADIENT_BLUR: 'gradient_blur', SOLID_FRAME: 'solid_frame', WIFI_CARD: 'wifi_card' }],
   SchemaType: [SchemaType, { SoftwareApplication: 'SoftwareApplication', WebApplication: 'WebApplication', AboutPage: 'AboutPage', FAQPage: 'FAQPage', HowTo: 'HowTo' }],
   SchemaCategory: [SchemaCategory, { UtilitiesApplication: 'UtilitiesApplication', BusinessApplication: 'BusinessApplication', SocialNetworkingApplication: 'SocialNetworkingApplication', TravelApplication: 'TravelApplication', DeveloperApplication: 'DeveloperApplication' }],
   TargetPersona: [TargetPersona, { HealthcareLegal: 'Healthcare & Legal', SecurityConsciousEnterprise: 'Security-Conscious Enterprise' }],
