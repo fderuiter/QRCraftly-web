@@ -19,7 +19,7 @@
 import { type VCardData, QRType, type QRGeneratorContract } from '@/types';
 import { normalizeUrl } from '@/utils/url';
 import { isDangerousUrl } from '@/utils/security';
-import { identifyProtocol } from '../protocol';
+import { identifyProtocol, CONTAINMENT_PROFILES } from '../protocol';
 import {
   escapeVCardEvent,
   unescapeVCardEvent,
@@ -209,7 +209,26 @@ export const hydrateVCardData = (raw: string): VCardData => {
 const isPopulated = (str: string | undefined): boolean => Boolean(str && str.trim().length > 0);
 
 /** The fields a visitor types; a card with none of them filled in is empty. */
-const CARD_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country'] as const satisfies readonly (keyof VCardData)[];
+export const CARD_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country'] as const satisfies readonly (keyof VCardData)[];
+
+/**
+ * Validates an individual vCard field for user input errors.
+ * Scheme validation (`isDangerousUrl`) is applied ONLY to the `website` field.
+ * All other plain text fields are checked only for control/hidden characters.
+ */
+export const vCardFieldError = (
+  field: keyof VCardData,
+  value: string | undefined
+): string | undefined => {
+  if (!value) return undefined;
+  if (field === 'website' && isDangerousUrl(value)) {
+    return 'Unsafe URL scheme or malicious protocol detected.';
+  }
+  if (CONTAINMENT_PROFILES.TEXT_NO_CONTROL.test(value)) {
+    return 'Contains invalid control or zero-width characters.';
+  }
+  return undefined;
+};
 
 /**
  * Constructs the contact payload string (vCard 2.1, 3.0, 4.0, or MECard).
