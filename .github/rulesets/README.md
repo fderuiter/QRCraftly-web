@@ -13,6 +13,7 @@ Applies to the default branch, `main`, which is the only long-lived branch and d
 - **Required status checks** (`integration_id` 15368 is GitHub Actions):
   - **CI**: the aggregate job in `.github/workflows/main.yml`. It succeeds only when Plan, Dependency Audit, Consolidated Static Validation, Unit Tests, WebAssembly Reproducible Build, E2E Tests, Build and Lighthouse all succeed or were skipped by the plan (for example E2E on a draft PR). Requiring one aggregate check means renaming or adding jobs never leaves a PR waiting on a check that no longer reports.
   - **PR Title**: `.github/workflows/pr-title.yml`, which enforces Conventional Commit titles.
+  - **Stitch review**: a commit status the `Plan` job of `main.yml` posts. It is `success` on every PR except an unreviewed Google Labs Stitch PR, where it stays `pending` until a maintainer adds the `ci-approved` label and updates the branch ([ADR 0051](../../docs/adr/0051-merge-queue-readiness.md)). Pending rather than failing, because Stitch tries to fix any red check on its PRs.
   - **Workers Builds: qrcraftly**: Cloudflare's build of the PR branch. It has no `integration_id`, so any app reporting that name satisfies it. If Cloudflare ever renames the check, update it here.
 - **No code scanning rules.** The repository is private, and CodeQL and Code Quality need paid GitHub security products there, so a `code_scanning` or `code_quality` rule would block every merge ([ADR 0050](../../docs/adr/0050-ci-tiers-for-a-private-repository.md)). Semgrep, the secret scanner and `pnpm audit` run in `CI` instead.
 - **Branches must be up to date** with `main` before merging (`strict_required_status_checks_policy: true`), so every merge was tested against exactly what it lands on. The project prefers fewer, larger PRs, so re-running CI after a rebase is an acceptable cost.
@@ -47,7 +48,7 @@ Ruleset names are unique, so to bring the live `main` ruleset in line with `main
 curl -s https://api.github.com/repos/fderuiter/QRCraftly-web/rules/branches/main
 ```
 
-It should list `required_status_checks` with the three checks above and `"required_approving_review_count": 0`.
+It should list `required_status_checks` with the four checks above and `"required_approving_review_count": 0`.
 
 ## Format
 
