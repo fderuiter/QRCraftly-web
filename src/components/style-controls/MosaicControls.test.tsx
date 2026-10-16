@@ -58,7 +58,10 @@ describe('MosaicControls', () => {
     expect(onChange).toHaveBeenCalledWith({ mosaicContrast: 0.8 });
 
     await user.click(screen.getByRole('button', { name: 'Remove mosaic image' }));
-    expect(onChange).toHaveBeenCalledWith({ mosaicImageUrl: null });
+    expect(onChange).toHaveBeenCalledWith({
+      mosaicImageUrl: null,
+      errorCorrectionLevel: DEFAULT_CONFIG.errorCorrectionLevel,
+    });
   });
 
   it('has no accessibility violations with and without an image', async () => {

@@ -23,7 +23,7 @@ import { RangeInput } from '../ui/RangeInput';
 import { type QRConfig, QRErrorCorrectionLevel, type MosaicMode } from '../../types';
 import { Grid3x3, LayoutGrid, Upload, X } from 'lucide-react';
 import { useImageUpload } from '../../hooks/useImageUpload';
-import { SYSTEM_LIMITS } from '../../constants';
+import { SYSTEM_LIMITS, DEFAULT_CONFIG } from '../../constants';
 import { combineIds } from '../../utils/a11y';
 import { DEFAULT_MOSAIC_OPTIONS } from '@/packages/qr-matrix/mosaic';
 
@@ -69,7 +69,10 @@ export const MosaicControls: React.FC<MosaicControlsProps> = ({ config, onChange
           <Button
             variant="error"
             size="xs"
-            onClick={() => { onChange({ mosaicImageUrl: null }); setError(null); }}
+            onClick={() => {
+              onChange({ mosaicImageUrl: null, errorCorrectionLevel: DEFAULT_CONFIG.errorCorrectionLevel });
+              setError(null);
+            }}
             aria-label="Remove mosaic image"
           >
             <X className="size-3.5" aria-hidden="true" /> Remove
