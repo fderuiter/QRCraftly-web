@@ -19,7 +19,7 @@
 import React from 'react';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { Square, Smartphone } from 'lucide-react';
-import { type QRConfig, SocialFormat, TemplateStyle } from '../../types';
+import { type QRConfig, QRType, SocialFormat, TemplateStyle } from '../../types';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
 import { TextField } from '../ui/FormFields';
@@ -63,6 +63,7 @@ const TEMPLATE_OPTIONS: Array<{ id: TemplateStyle; label: string }> = [
   { id: TemplateStyle.MINIMALIST, label: 'Minimalist' },
   { id: TemplateStyle.GRADIENT_BLUR, label: 'Gradient' },
   { id: TemplateStyle.SOLID_FRAME, label: 'Solid Frame' },
+  { id: TemplateStyle.WIFI_CARD, label: 'Wi-Fi Card' },
 ];
 
 /**
@@ -70,6 +71,12 @@ const TEMPLATE_OPTIONS: Array<{ id: TemplateStyle; label: string }> = [
  * style applied to the QR code canvas.
  */
 export const LayoutControls: React.FC<LayoutControlsProps> = ({ config, onChange }) => {
+  React.useEffect(() => {
+    if (config.templateStyle === TemplateStyle.WIFI_CARD && config.type !== QRType.WIFI) {
+      onChange({ templateStyle: TemplateStyle.SOLID_FRAME });
+    }
+  }, [config.templateStyle, config.type, onChange]);
+
   const showTextInputs = config.templateStyle !== TemplateStyle.NONE;
   const showAdvanced = config.templateStyle !== TemplateStyle.NONE;
 
@@ -116,10 +123,10 @@ export const LayoutControls: React.FC<LayoutControlsProps> = ({ config, onChange
         <SegmentedControl<TemplateStyle>
           appearance="tiles"
           labelledBy="template-style-label"
-          className="grid-cols-2"
+          className="grid-cols-2 sm:grid-cols-3"
           value={config.templateStyle}
           onChange={(templateStyle) => onChange({ templateStyle })}
-          options={TEMPLATE_OPTIONS.map((opt) => ({
+          options={TEMPLATE_OPTIONS.filter((opt) => opt.id !== TemplateStyle.WIFI_CARD || config.type === QRType.WIFI).map((opt) => ({
             value: opt.id,
             ariaLabel: `Select ${opt.label} template`,
             label: opt.label,
@@ -131,17 +138,19 @@ export const LayoutControls: React.FC<LayoutControlsProps> = ({ config, onChange
       {showTextInputs && (
         <div className="mt-4 space-y-2">
           <TextField
-            placeholder="Headline (e.g. Scan Me!)"
+            placeholder={config.templateStyle === TemplateStyle.WIFI_CARD ? 'Headline (e.g. Connect to Wi-Fi)' : 'Headline (e.g. Scan Me!)'}
             value={config.templateHeadline ?? ''}
             onChange={(e) => onChange({ templateHeadline: e.target.value })}
             aria-label="Template headline"
           />
-          <TextField
-            placeholder="Subtext (e.g. @yourhandle)"
-            value={config.templateSubtext ?? ''}
-            onChange={(e) => onChange({ templateSubtext: e.target.value })}
-            aria-label="Template subtext"
-          />
+          {config.templateStyle !== TemplateStyle.WIFI_CARD && (
+            <TextField
+              placeholder="Subtext (e.g. @yourhandle)"
+              value={config.templateSubtext ?? ''}
+              onChange={(e) => onChange({ templateSubtext: e.target.value })}
+              aria-label="Template subtext"
+            />
+          )}
         </div>
       )}
 

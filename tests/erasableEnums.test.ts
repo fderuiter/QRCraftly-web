@@ -19,7 +19,7 @@ import { SchemaCategory, SchemaType, StrategicValueCategory, TargetPersona } fro
 const EXPECTED = {
   QRStyle: [QRStyle, { STANDARD: 'standard', MODERN: 'modern', SWISS: 'swiss', FLUID: 'fluid', CIRCUIT: 'circuit', HIVE: 'hive', GRUNGE: 'grunge', STARBURST: 'starburst' }],
   QRType: [QRType, { URL: 'URL', TEXT: 'TEXT', WIFI: 'WIFI', EVENT: 'EVENT', EMAIL: 'EMAIL', VCARD: 'VCARD', PHONE: 'PHONE', SMS: 'SMS', PAYMENT: 'PAYMENT', LOCATION: 'LOCATION', MEETING: 'MEETING', SOCIAL: 'SOCIAL', BULK_CSV: 'BULK_CSV' }],
-  WifiEncryption: [WifiEncryption, { WPA: 'WPA', WEP: 'WEP', NOPASS: 'nopass', WPA2_EAP: 'WPA2-EAP' }],
+  WifiEncryption: [WifiEncryption, { WPA: 'WPA', WEP: 'WEP', NOPASS: 'nopass', WPA2_EAP: 'WPA2-EAP', SAE: 'SAE' }],
   WifiEapMethod: [WifiEapMethod, { PEAP: 'PEAP', TTLS: 'TTLS', TLS: 'TLS', PWD: 'PWD' }],
   WifiEapPhase2: [WifiEapPhase2, { NONE: '', MSCHAPV2: 'MSCHAPV2', GTC: 'GTC', PAP: 'PAP' }],
   QRErrorCorrectionLevel: [QRErrorCorrectionLevel, { L: 'L', M: 'M', Q: 'Q', H: 'H' }],
@@ -27,7 +27,7 @@ const EXPECTED = {
   CryptoNetwork: [CryptoNetwork, { BITCOIN: 'bitcoin', ETHEREUM: 'ethereum', SOLANA: 'solana', LITECOIN: 'litecoin', EPC_SEPA: 'epc_sepa', UPI: 'upi', PAYPAL: 'paypal', VENMO: 'venmo', CASH_APP: 'cash_app', CUSTOM: 'custom' }],
   SocialPlatform: [SocialPlatform, { INSTAGRAM: 'instagram', TWITTER: 'twitter', TIKTOK: 'tiktok', LINKEDIN: 'linkedin', YOUTUBE: 'youtube', FACEBOOK: 'facebook', WHATSAPP: 'whatsapp', GITHUB: 'github' }],
   SocialFormat: [SocialFormat, { SQUARE_1_1: '1:1', PORTRAIT_4_5: '4:5', STORY_9_16: '9:16' }],
-  TemplateStyle: [TemplateStyle, { NONE: 'none', MINIMALIST: 'minimalist', GRADIENT_BLUR: 'gradient_blur', SOLID_FRAME: 'solid_frame' }],
+  TemplateStyle: [TemplateStyle, { NONE: 'none', MINIMALIST: 'minimalist', GRADIENT_BLUR: 'gradient_blur', SOLID_FRAME: 'solid_frame', WIFI_CARD: 'wifi_card' }],
   SchemaType: [SchemaType, { SoftwareApplication: 'SoftwareApplication', WebApplication: 'WebApplication', AboutPage: 'AboutPage', FAQPage: 'FAQPage', HowTo: 'HowTo' }],
   SchemaCategory: [SchemaCategory, { UtilitiesApplication: 'UtilitiesApplication', BusinessApplication: 'BusinessApplication', SocialNetworkingApplication: 'SocialNetworkingApplication', TravelApplication: 'TravelApplication', DeveloperApplication: 'DeveloperApplication' }],
   TargetPersona: [TargetPersona, { HealthcareLegal: 'Healthcare & Legal', SecurityConsciousEnterprise: 'Security-Conscious Enterprise' }],
