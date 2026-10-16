@@ -33,7 +33,7 @@ vi.mock('@/packages/qr-export', async (original) => {
     ...actual,
     renderWalletCard: vi.fn(async (config: QRConfig) => {
       const refusal = actual.walletRefusalReason(config.type);
-      if (refusal) throw new actual.WalletCardRefusedError(refusal);
+      if (refusal) throw new Error(refusal);
       return {
         width: 1080,
         height: 1920,

@@ -43,6 +43,32 @@ function zipEntryNames(bytes: Uint8Array): string[] {
   return names;
 }
 
+/** Lists entry names and text contents in the central directory of a stored ZIP archive. */
+function zipEntries(bytes: Uint8Array): { name: string; content: string }[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const end = bytes.length - 22;
+  const count = view.getUint16(end + 10, true);
+  let pos = view.getUint32(end + 16, true);
+  const entries: { name: string; content: string }[] = [];
+  for (let i = 0; i < count; i++) {
+    const nameLen = view.getUint16(pos + 28, true);
+    const extraLen = view.getUint16(pos + 30, true);
+    const commentLen = view.getUint16(pos + 32, true);
+    const name = new TextDecoder().decode(bytes.subarray(pos + 46, pos + 46 + nameLen));
+    const localOffset = view.getUint32(pos + 42, true);
+
+    const localNameLen = view.getUint16(localOffset + 26, true);
+    const localExtraLen = view.getUint16(localOffset + 28, true);
+    const dataSize = view.getUint32(localOffset + 18, true);
+    const dataStart = localOffset + 30 + localNameLen + localExtraLen;
+    const content = new TextDecoder().decode(bytes.subarray(dataStart, dataStart + dataSize));
+    entries.push({ name, content });
+
+    pos += 46 + nameLen + extraLen + commentLen;
+  }
+  return entries;
+}
+
 function downloadedZip(): Uint8Array {
   const call = vi.mocked(downloadManager.triggerFileDownload).mock.calls[0];
   expect(call).toBeDefined();
@@ -127,14 +153,14 @@ describe('BulkCsvInput Component', () => {
     expect(screen.getByText('test-batch.csv')).toBeInTheDocument();
     expect(screen.getByText('2 rows found • 2 columns detected')).toBeInTheDocument();
 
-    const payloadSelect = screen.getByLabelText('Content Column') as HTMLSelectElement;
-    expect(payloadSelect.value).toBe('URL');
+    const payloadSelect = screen.getByLabelText('Content Column');
+    expect(payloadSelect).toHaveValue('URL');
 
-    const filenameSelect = screen.getByLabelText('File Name Column') as HTMLSelectElement;
-    expect(filenameSelect.value).toBe('Name');
+    const filenameSelect = screen.getByLabelText('File Name Column');
+    expect(filenameSelect).toHaveValue('Name');
 
-    const formatSelect = screen.getByLabelText('Image Format') as HTMLSelectElement;
-    expect(formatSelect.value).toBe('png');
+    const formatSelect = screen.getByLabelText('Image Format');
+    expect(formatSelect).toHaveValue('png');
   });
 
   it('lists unusual addresses without leaving them out (#1159)', () => {
@@ -253,6 +279,97 @@ describe('BulkCsvInput Component', () => {
         'application/zip'
       );
     });
+  });
+
+  it('generates ZIP batch and triggers file download for valid CSV rows in EPS format', async () => {
+    const convertEpsSpy = vi.spyOn(qrExport, 'convertSvgToEps');
+    const csvContent = 'URL,Name\nhttps://example.com/1,Code1\nhttps://example.com/2,Code2';
+
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent,
+      payloadColumn: 'URL',
+      filenameColumn: 'Name',
+      exportFormat: 'eps',
+      fileName: 'urls.csv',
+    };
+
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+
+    const generateBtn = screen.getByRole('button', { name: 'Generate Batch' });
+    fireEvent.click(generateBtn);
+
+    await waitFor(() => {
+      expect(downloadManager.triggerFileDownload).toHaveBeenCalledWith(
+        expect.any(Uint8Array),
+        'urls-qrcodes.zip',
+        'application/zip'
+      );
+    });
+    expect(convertEpsSpy).toHaveBeenCalledTimes(2);
+    const epsEntries = zipEntries(downloadedZip());
+    expect(epsEntries.map((e) => e.name)).toEqual(['Code1.eps', 'Code2.eps']);
+    expect(epsEntries[0].content).toMatch(/^%!PS-Adobe-3\.0 EPSF-3\.0/);
+    expect(epsEntries[1].content).toMatch(/^%!PS-Adobe-3\.0 EPSF-3\.0/);
+    convertEpsSpy.mockRestore();
+  });
+
+  it('generates ZIP batch and triggers file download for valid CSV rows in PDF format', async () => {
+    const convertPdfSpy = vi.spyOn(qrExport, 'convertSvgToPdf');
+    const csvContent = 'URL,Name\nhttps://example.com/1,Code1\nhttps://example.com/2,Code2';
+
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent,
+      payloadColumn: 'URL',
+      filenameColumn: 'Name',
+      exportFormat: 'pdf',
+      fileName: 'urls.csv',
+    };
+
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+
+    const generateBtn = screen.getByRole('button', { name: 'Generate Batch' });
+    fireEvent.click(generateBtn);
+
+    await waitFor(() => {
+      expect(downloadManager.triggerFileDownload).toHaveBeenCalledWith(
+        expect.any(Uint8Array),
+        'urls-qrcodes.zip',
+        'application/zip'
+      );
+    });
+    expect(convertPdfSpy).toHaveBeenCalledTimes(2);
+    const pdfEntries = zipEntries(downloadedZip());
+    expect(pdfEntries.map((e) => e.name)).toEqual(['Code1.pdf', 'Code2.pdf']);
+    expect(pdfEntries[0].content).toMatch(/^%PDF-/);
+    expect(pdfEntries[1].content).toMatch(/^%PDF-/);
+    convertPdfSpy.mockRestore();
+  });
+
+  it('stops batch, creates no ZIP, and shows error toast when MissingImageError is thrown during vector conversion', async () => {
+    const convertEpsSpy = vi.spyOn(qrExport, 'convertSvgToEps').mockRejectedValue(new qrExport.MissingImageError());
+    const csvContent = 'URL,Name\nhttps://example.com/1,Code1\nhttps://example.com/2,Code2';
+
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent,
+      payloadColumn: 'URL',
+      filenameColumn: 'Name',
+      exportFormat: 'eps',
+    };
+
+    renderWithToasts(<BulkCsvInput data={data} onChange={vi.fn()} />);
+
+    const generateBtn = screen.getByRole('button', { name: 'Generate Batch' });
+    fireEvent.click(generateBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/The logo couldn't be embedded in EPS\/PDF files/i);
+    });
+
+    expect(downloadManager.triggerFileDownload).not.toHaveBeenCalled();
+    convertEpsSpy.mockRestore();
   });
 
   it('skips rows with dangerous payloads, lists them, and still zips the rest (#1152)', async () => {
@@ -388,24 +505,58 @@ describe('BulkCsvInput Component', () => {
 
     renderWithProvider(<BulkCsvInput data={data} onChange={onChange} />);
 
-    const resSelect = screen.getByLabelText('PNG Width') as HTMLSelectElement;
+    const resSelect = screen.getByLabelText('PNG Width');
     expect(resSelect).toBeInTheDocument();
-    expect(resSelect.value).toBe('1000');
+    expect(resSelect).toHaveValue('1000');
 
     fireEvent.change(resSelect, { target: { value: '2000' } });
     expect(onChange).toHaveBeenCalledWith({ exportResolution: 2000 });
   });
 
-  it('hides resolution selector when SVG format is active', () => {
-    const data: BulkCsvData = {
+  it('hides resolution selector when vector formats (SVG, EPS, PDF) are active', () => {
+    const dataSvg: BulkCsvData = {
       ...initialData,
       csvContent: 'URL,Name\nhttps://example.com/1,Code1',
       exportFormat: 'svg',
     };
-
-    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
-
+    const { rerender } = renderWithProvider(<BulkCsvInput data={dataSvg} onChange={vi.fn()} />);
     expect(screen.queryByLabelText('PNG Width')).not.toBeInTheDocument();
+
+    const dataEps: BulkCsvData = { ...dataSvg, exportFormat: 'eps' };
+    rerender(
+      <QRProvider>
+        <BulkCsvInput data={dataEps} onChange={vi.fn()} />
+      </QRProvider>
+    );
+    expect(screen.queryByLabelText('PNG Width')).not.toBeInTheDocument();
+
+    const dataPdf: BulkCsvData = { ...dataSvg, exportFormat: 'pdf' };
+    rerender(
+      <QRProvider>
+        <BulkCsvInput data={dataPdf} onChange={vi.fn()} />
+      </QRProvider>
+    );
+    expect(screen.queryByLabelText('PNG Width')).not.toBeInTheDocument();
+  });
+
+  it('updates export format when EPS or PDF is selected in the format dropdown', () => {
+    const onChange = vi.fn();
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent: 'URL,Name\nhttps://example.com/1,Code1',
+      exportFormat: 'png',
+    };
+
+    renderWithProvider(<BulkCsvInput data={data} onChange={onChange} />);
+
+    const formatSelect = screen.getByLabelText('Image Format');
+    expect(formatSelect).toBeInTheDocument();
+
+    fireEvent.change(formatSelect, { target: { value: 'eps' } });
+    expect(onChange).toHaveBeenCalledWith({ exportFormat: 'eps' });
+
+    fireEvent.change(formatSelect, { target: { value: 'pdf' } });
+    expect(onChange).toHaveBeenCalledWith({ exportFormat: 'pdf' });
   });
 
   it('passes configured resolution to rasterizeSvgToCanvas during PNG batch generation', async () => {
@@ -479,7 +630,7 @@ describe('BulkCsvInput Component', () => {
       contentType: 'text',
     };
     renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
-    expect((screen.getByLabelText('Content Type') as HTMLSelectElement).value).toBe('text');
+    expect(screen.getByLabelText('Content Type')).toHaveValue('text');
     fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
     await waitFor(() => expect(downloadManager.triggerFileDownload).toHaveBeenCalled());
     expect(encodedValues(svgSpy)).toEqual(['BEGIN:VCARD\nFN:Jane Doe\nEND:VCARD', 'Order no. 5', 'john.doe@example.com']);
@@ -719,7 +870,7 @@ describe('BulkCsvInput Component', () => {
         });
 
         await waitFor(() => {
-          expect(screen.getByRole('alert')).toHaveTextContent(/Remote logo asset could not be loaded/i);
+          expect(screen.getByRole('alert')).toHaveTextContent(/The logo was left out of these codes/i);
         });
       } finally {
         global.fetch = originalFetch;
