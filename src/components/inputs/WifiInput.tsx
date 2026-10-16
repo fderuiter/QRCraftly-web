@@ -113,7 +113,7 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
           autoComplete="off"
           type="password"
           placeholder="Network password"
-          maxLength={64}
+          maxLength={63}
           value={data.password}
           onChange={(e) => onChange({ password: e.target.value })}
           onBlur={() => setPasswordBlurred(true)}

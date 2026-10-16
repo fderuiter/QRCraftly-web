@@ -60,19 +60,24 @@ describe('WifiInput enterprise (WPA2-EAP) fields', () => {
 });
 
 describe('WifiInput WPA passphrase length validation', () => {
-  it('does not display warning initially, but displays warning after blur when WPA password is shorter than 8 characters', () => {
+  it('does not display warning initially, but displays warning after blur when WPA password is shorter than 8 characters', async () => {
     const data: WifiData = {
       ssid: 'MyNet',
       password: 'short',
       encryption: WifiEncryption.WPA,
       hidden: false,
     };
-    render(<WifiInput data={data} onChange={vi.fn()} />);
+    const { container, rerender } = render(<WifiInput data={data} onChange={vi.fn()} />);
     const warningMsg = "WPA passwords are 8 to 63 characters. Phones can't join with this one.";
     expect(screen.queryByText(warningMsg)).not.toBeInTheDocument();
 
     fireEvent.blur(screen.getByLabelText('Password'));
     expect(screen.getByText(warningMsg)).toBeInTheDocument();
+    expect(screen.getByLabelText('Password')).toHaveAttribute('aria-invalid', 'true');
+    expect((await axe(container)).violations).toEqual([]);
+
+    rerender(<WifiInput data={{ ...data, password: 'longenough' }} onChange={vi.fn()} />);
+    expect(screen.queryByText(warningMsg)).not.toBeInTheDocument();
   });
 
   it('does not display warning for WPA2-EAP password shorter than 8 characters even after blur', () => {

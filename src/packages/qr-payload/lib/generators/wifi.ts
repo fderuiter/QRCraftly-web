@@ -192,8 +192,13 @@ export const constructWifiString = (data: WifiData): string => {
   return `WIFI:${parts.join(';')};;`;
 };
 
+/**
+ * Says why a WPA-Personal password can never join, or `undefined` when it can. A passphrase is
+ * 8 to 63 characters; a raw key is exactly 64 hex digits. Enterprise, WEP and open networks
+ * have no such rule.
+ */
 export const wifiPassphraseProblem = (
-  encryption: WifiEncryption | string | undefined,
+  encryption: WifiEncryption,
   password: string | undefined
 ): string | undefined => {
   if (encryption !== WifiEncryption.WPA || !password) {
