@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { constructVCardString, hydrateVCardData, VCardContract } from '../index';
+import { constructVCardString, hydrateVCardData, VCardContract, vCardFieldError, CARD_FIELDS } from '../index';
 import { QRType } from '@/types';
 
 describe('VCard generator', () => {
@@ -222,6 +222,40 @@ describe('VCard generator', () => {
       'URI_INJECTION_VIOLATION',
     ]);
     expect(VCardContract.validate?.('MECARD:N:Doe,John;URL:https://example.com;')).toEqual([]);
+  });
+
+  it('validates individual vCard fields using vCardFieldError', () => {
+    // Website field validates scheme and control characters
+    expect(vCardFieldError('website', 'javascript:alert(1)')).toBe(
+      'Unsafe URL scheme or malicious protocol detected.'
+    );
+    expect(vCardFieldError('website', 'https://example.com')).toBeUndefined();
+    expect(vCardFieldError('website', 'https://example.com\x00')).toBe(
+      'Contains invalid control or zero-width characters.'
+    );
+
+    // Plain text fields allow colons / scheme-like titles but refuse control characters
+    expect(vCardFieldError('title', 'Javascript: The Good Parts')).toBeUndefined();
+    expect(vCardFieldError('organization', 'Data: I/O Labs')).toBeUndefined();
+    expect(vCardFieldError('firstName', 'About:Us Inc')).toBeUndefined();
+    expect(vCardFieldError('phone', '+1 (555) 000-0000')).toBeUndefined();
+    expect(vCardFieldError('email', 'user@example.com')).toBeUndefined();
+
+    // Plain text fields refuse control characters
+    expect(vCardFieldError('title', 'Software\x00Engineer')).toBe(
+      'Contains invalid control or zero-width characters.'
+    );
+    expect(vCardFieldError('organization', 'Acme\x07Corp')).toBe(
+      'Contains invalid control or zero-width characters.'
+    );
+    expect(vCardFieldError('firstName', 'Jane\x00')).toBe(
+      'Contains invalid control or zero-width characters.'
+    );
+
+    // Empty or undefined values return undefined
+    expect(vCardFieldError('firstName', '')).toBeUndefined();
+    expect(vCardFieldError('firstName', undefined)).toBeUndefined();
+    expect(CARD_FIELDS.length).toBe(11);
   });
 
   it('supports vCard 2.1, 3.0, and 4.0 versions', () => {
