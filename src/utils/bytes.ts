@@ -21,7 +21,7 @@
  * @param parts - Uint8Array chunks to concatenate.
  * @returns A new Uint8Array containing all bytes from parts in sequence.
  */
-export function concatBytes(parts: readonly Uint8Array[]): Uint8Array {
+export function concatBytes(parts: readonly Uint8Array[]): Uint8Array<ArrayBuffer> {
   const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
   const out = new Uint8Array(totalLength);
   let offset = 0;

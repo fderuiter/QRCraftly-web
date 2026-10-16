@@ -25,6 +25,7 @@
  * code does not wait on a fetch after typing begins. Tests and scripts that need
  * it synchronously can call {@link createQrEncoder} on an instance.
  */
+import { concatBytes } from '@/utils/bytes';
 import { WASM_STATUS, WasmModuleError, compileWasmUrl, instantiateWasm, type WasmInstance } from '@/packages/wasm-runtime';
 import type { QRErrorCorrectionLevel, QRModules } from '@/types';
 
@@ -171,14 +172,7 @@ function buildRequest(value: string | readonly QrSegmentInput[], options: QrEnco
   } else {
     throw new QrEncodeError('invalid', 'Invalid data');
   }
-  const bodyLength = parts.reduce((sum, part) => sum + part.length, 0);
-  const request = new Uint8Array(head.length + bodyLength);
-  request.set(head);
-  let at = head.length;
-  for (const part of parts) {
-    request.set(part, at);
-    at += part.length;
-  }
+  const request = concatBytes([Uint8Array.from(head), ...parts]);
   return { request, bodyStart: head.length };
 }
 

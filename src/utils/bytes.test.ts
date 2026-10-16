@@ -53,7 +53,7 @@ describe('concatBytes', () => {
     expect(result).toEqual(new Uint8Array([1, 2, 3]));
   });
 
-  it('preserves typed array immutability', () => {
+  it('creates a new array that does not alias input buffers', () => {
     const chunk1 = new Uint8Array([100, 101]);
     const chunk2 = new Uint8Array([102, 103]);
 
