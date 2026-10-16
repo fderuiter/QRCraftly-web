@@ -74,12 +74,8 @@ export function readDer(data: Uint8Array, offset = 0): DerNode {
   return { tag, value: data.subarray(start, end), bytes: data.subarray(offset, end) };
 }
 
-const childrenCache = new WeakMap<DerNode, DerNode[]>();
-
 /** Reads the elements inside a constructed element (a SEQUENCE, SET or explicit tag). */
 export function readChildren(node: DerNode): DerNode[] {
-  const cached = childrenCache.get(node);
-  if (cached) return cached;
   const children: DerNode[] = [];
   let offset = 0;
   while (offset < node.value.length) {
@@ -87,7 +83,6 @@ export function readChildren(node: DerNode): DerNode[] {
     children.push(child);
     offset += child.bytes.length;
   }
-  childrenCache.set(node, children);
   return children;
 }
 
