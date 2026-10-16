@@ -13,6 +13,9 @@
  *   validation and unit tests only (docs/public/ and docs/SECURITY.md are
  *   compiled into the /security page, so they count as code).
  * - pull_request from a release/ branch, or labelled `full-e2e`: the full tier.
+ * - merge_group (the merge queue, ADR 0051): the ready-PR tier. Every PR in the
+ *   group already passed its own PR run, so the group run checks only that the
+ *   PRs still pass together on the newest main.
  * - schedule (nightly on main): the full tier, or nothing at all when main has
  *   not moved since the last successful nightly run.
  * - workflow_dispatch: the PR tier, or the full tier when `full` is true.
@@ -78,6 +81,8 @@ export function planRun({ eventName = '', isDraft = '', headRef = '', labels = '
   if (eventName === 'workflow_dispatch') {
     return fullInput === 'true' ? FULL : PR;
   }
+
+  if (eventName === 'merge_group') return PR;
 
   if (eventName !== 'pull_request') return FULL;
 

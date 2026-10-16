@@ -55,6 +55,16 @@ describe('scripts/ci/ci_plan.js', () => {
     });
   });
 
+  it('runs the ready-PR tier on a merge-queue group', () => {
+    expect(planRun({ eventName: 'merge_group', isDraft: '', changedFiles: null })).toEqual({
+      runChecks: true,
+      codeChanged: true,
+      unitTests: true,
+      e2e: 'pr',
+      lighthouse: 'sample',
+    });
+  });
+
   it('runs the PR tier on a manual run unless full is asked for', () => {
     expect(planRun({ eventName: 'workflow_dispatch', fullInput: 'false' }).e2e).toBe('pr');
     expect(planRun({ eventName: 'workflow_dispatch', fullInput: 'true' }).e2e).toBe('full');

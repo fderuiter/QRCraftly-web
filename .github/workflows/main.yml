@@ -5,10 +5,14 @@ name: CI/CD Pipeline
 # on release PRs and on PRs labelled `full-e2e`. Pushes to main do not re-run CI: the
 # ruleset requires PRs to be up to date and squash-merges them, so the commit that
 # lands is the tree its PR already tested. deploy-verify.yml checks the deploy instead.
+# merge_group runs the ready-PR tier on each merge-queue group, so the `CI` check the
+# ruleset requires also reports there once the merge queue is on (ADR 0051).
 on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
   schedule:
     - cron: '0 7 * * *' # Nightly full tier on main, 2am US Central (CDT)
   workflow_dispatch:
