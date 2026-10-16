@@ -354,6 +354,16 @@ export interface VCardData {
   zip: string;
   /** The country of the contact. */
   country: string;
+  /** Optional Twitter / X handle or URL. */
+  twitter?: string;
+  /** Optional LinkedIn handle or URL. */
+  linkedin?: string;
+  /** Optional Instagram handle or URL. */
+  instagram?: string;
+  /** Optional Facebook handle or URL. */
+  facebook?: string;
+  /** Optional GitHub handle or URL. */
+  github?: string;
 }
 
 /**

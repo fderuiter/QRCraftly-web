@@ -35,6 +35,11 @@ describe('VCard generator', () => {
       city: 'Anytown',
       zip: '12345',
       country: 'USA',
+      twitter: '',
+      linkedin: '',
+      instagram: '',
+      facebook: '',
+      github: '',
     };
     const str = constructVCardString(data);
     const hydrated = hydrateVCardData(str);
@@ -56,6 +61,11 @@ describe('VCard generator', () => {
       city: '',
       zip: '',
       country: '',
+      twitter: '',
+      linkedin: '',
+      instagram: '',
+      facebook: '',
+      github: '',
     });
   });
 
@@ -426,6 +436,99 @@ describe('VCard generator', () => {
     it('still reads the positional DoCoMo form', () => {
       const hydrated = hydrateVCardData('MECARD:N:Lee,Ann;ADR:,,1 Main,Springfield,IL,62701,US;;');
       expect(hydrated).toMatchObject({ street: '1 Main', city: 'Springfield', zip: '62701', country: 'US' });
+    });
+  });
+
+  describe('Social Profiles in vCard and MECard', () => {
+    const socialData = {
+      firstName: 'Alice',
+      lastName: 'Smith',
+      organization: 'Tech Inc',
+      title: 'Developer',
+      phone: '+15551234567',
+      email: 'alice@example.com',
+      website: 'https://alice.example.com',
+      street: '',
+      city: '',
+      zip: '',
+      country: '',
+      twitter: '@alice_dev',
+      linkedin: 'https://linkedin.com/in/alicesmith',
+      instagram: '@alice_photos',
+      facebook: 'https://facebook.com/alice.smith',
+      github: 'alicesmith',
+    };
+
+    it('constructs and hydrates X-SOCIALPROFILE across vCard 3.0, 4.0, 2.1, and MECard formats', () => {
+      const vcardVersions: Array<'2.1' | '3.0' | '4.0'> = ['3.0', '4.0', '2.1'];
+
+      for (const version of vcardVersions) {
+        const payload = constructVCardString({ ...socialData, version });
+
+        expect(payload).toContain('X-SOCIALPROFILE;type=twitter:@alice_dev');
+        expect(payload).toContain('X-SOCIALPROFILE;type=linkedin:https://linkedin.com/in/alicesmith');
+        expect(payload).toContain('X-SOCIALPROFILE;type=instagram:@alice_photos');
+        expect(payload).toContain('X-SOCIALPROFILE;type=facebook:https://facebook.com/alice.smith');
+        expect(payload).toContain('X-SOCIALPROFILE;type=github:alicesmith');
+
+        const hydrated = hydrateVCardData(payload);
+        expect(hydrated.twitter).toBe('@alice_dev');
+        expect(hydrated.linkedin).toBe('https://linkedin.com/in/alicesmith');
+        expect(hydrated.instagram).toBe('@alice_photos');
+        expect(hydrated.facebook).toBe('https://facebook.com/alice.smith');
+        expect(hydrated.github).toBe('alicesmith');
+      }
+
+      // MECard escapes colons in URL values
+      const mecardPayload = constructVCardString({ ...socialData, version: 'mecard' });
+      expect(mecardPayload).toContain('X-SOCIALPROFILE;type=twitter:@alice_dev;');
+      expect(mecardPayload).toContain('X-SOCIALPROFILE;type=linkedin:https\\://linkedin.com/in/alicesmith;');
+      expect(mecardPayload).toContain('X-SOCIALPROFILE;type=github:alicesmith;');
+
+      const mecardHydrated = hydrateVCardData(mecardPayload);
+      expect(mecardHydrated.twitter).toBe('@alice_dev');
+      expect(mecardHydrated.linkedin).toBe('https://linkedin.com/in/alicesmith');
+      expect(mecardHydrated.instagram).toBe('@alice_photos');
+      expect(mecardHydrated.facebook).toBe('https://facebook.com/alice.smith');
+      expect(mecardHydrated.github).toBe('alicesmith');
+    });
+
+    it('populates card string when only social profile fields are filled', () => {
+      const onlySocial = {
+        firstName: '',
+        lastName: '',
+        organization: '',
+        title: '',
+        phone: '',
+        email: '',
+        website: '',
+        street: '',
+        city: '',
+        zip: '',
+        country: '',
+        github: 'octocat',
+      };
+
+      const payload = constructVCardString(onlySocial);
+      expect(payload).not.toBe('');
+      expect(payload).toContain('X-SOCIALPROFILE;type=github:octocat');
+
+      const hydrated = hydrateVCardData(payload);
+      expect(hydrated.github).toBe('octocat');
+    });
+
+    it('hydrates X-SOCIALPROFILE with type=x alias mapped to twitter', () => {
+      const raw = `BEGIN:VCARD\r\nVERSION:3.0\r\nN:Doe;John;;;\r\nFN:John Doe\r\nX-SOCIALPROFILE;type=x:@johndoe\r\nEND:VCARD`;
+      const hydrated = hydrateVCardData(raw);
+      expect(hydrated.twitter).toBe('@johndoe');
+    });
+
+    it('detects dangerous URL schemes in X-SOCIALPROFILE during validation', () => {
+      const dangerousVCard = `BEGIN:VCARD\r\nVERSION:3.0\r\nN:Doe;John;;;\r\nFN:John Doe\r\nX-SOCIALPROFILE;type=twitter:javascript:alert(1)\r\nEND:VCARD`;
+      expect(VCardContract.validate?.(dangerousVCard)).toEqual(['URI_INJECTION_VIOLATION']);
+
+      const dangerousMECard = `MECARD:N:Doe,John;X-SOCIALPROFILE;type=linkedin:javascript:alert(1);;`;
+      expect(VCardContract.validate?.(dangerousMECard)).toEqual(['URI_INJECTION_VIOLATION']);
     });
   });
 });

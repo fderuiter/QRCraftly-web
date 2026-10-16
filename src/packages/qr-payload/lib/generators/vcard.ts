@@ -58,6 +58,8 @@ const escapeVCard21 = (str: string | undefined): string => {
   return str.replace(/\\/g, '\\\\').replace(/\r\n|\r|\n/g, ' ').replace(/;/g, '\\;');
 };
 
+export const SOCIAL_FIELDS = ['twitter', 'linkedin', 'instagram', 'facebook', 'github'] as const satisfies readonly (keyof VCardData)[];
+
 /**
  * Hydrates VCardData from a raw string (vCard or MECard format).
  */
@@ -75,6 +77,11 @@ export const hydrateVCardData = (raw: string): VCardData => {
     city: '',
     zip: '',
     country: '',
+    twitter: '',
+    linkedin: '',
+    instagram: '',
+    facebook: '',
+    github: '',
   };
 
   if (!raw || typeof raw !== 'string') return result;
@@ -92,6 +99,26 @@ export const hydrateVCardData = (raw: string): VCardData => {
 
       const key = segment.substring(0, colonIndex).toUpperCase();
       const val = segment.substring(colonIndex + 1);
+
+      if (key.startsWith('TYPE=')) {
+        let platform = key.substring(5).toLowerCase();
+        if (platform === 'x') platform = 'twitter';
+        if ((SOCIAL_FIELDS as readonly string[]).includes(platform)) {
+          result[platform as typeof SOCIAL_FIELDS[number]] = unescapeMECard(val);
+        }
+        return;
+      }
+      if (key.includes('X-SOCIALPROFILE')) {
+        const typeMatch = key.match(/TYPE=([A-Z0-9_-]+)/i);
+        if (typeMatch) {
+          let platform = typeMatch[1].toLowerCase();
+          if (platform === 'x') platform = 'twitter';
+          if ((SOCIAL_FIELDS as readonly string[]).includes(platform)) {
+            result[platform as typeof SOCIAL_FIELDS[number]] = unescapeMECard(val);
+          }
+        }
+        return;
+      }
 
       switch (key) {
         case 'N': {
@@ -185,6 +212,17 @@ export const hydrateVCardData = (raw: string): VCardData => {
       case 'URL':
         result.website = unescapeVCardEvent(value);
         break;
+      case 'X-SOCIALPROFILE': {
+        const typeMatch = params.match(/;TYPE=([^;:\s\n]+)/i);
+        if (typeMatch) {
+          let platform = typeMatch[1].toLowerCase();
+          if (platform === 'x') platform = 'twitter';
+          if ((SOCIAL_FIELDS as readonly string[]).includes(platform)) {
+            result[platform as typeof SOCIAL_FIELDS[number]] = unescapeVCardEvent(value);
+          }
+        }
+        break;
+      }
       case 'ADR': {
         const adrParts = splitCompoundField(value, ';');
         result.street = unescapeVCardEvent(adrParts[2] || '');
@@ -209,7 +247,7 @@ export const hydrateVCardData = (raw: string): VCardData => {
 const isPopulated = (str: string | undefined): boolean => Boolean(str && str.trim().length > 0);
 
 /** The fields a visitor types; a card with none of them filled in is empty. */
-const CARD_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country'] as const satisfies readonly (keyof VCardData)[];
+const CARD_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country', 'twitter', 'linkedin', 'instagram', 'facebook', 'github'] as const satisfies readonly (keyof VCardData)[];
 
 /**
  * Constructs the contact payload string (vCard 2.1, 3.0, 4.0, or MECard).
@@ -248,6 +286,14 @@ export const constructVCardString = (data: VCardData): string => {
     // positional form (`,,1 Main,X,,,`) would show its stray commas (#1367).
     const address = [street, city, zip, country].filter(isPopulated).join(', ');
     if (address) parts.push(`ADR:${address};`);
+
+    SOCIAL_FIELDS.forEach((field) => {
+      const val = escapeMECard(data[field]);
+      if (isPopulated(val)) {
+        parts.push(`X-SOCIALPROFILE;type=${field}:${val};`);
+      }
+    });
+
     parts.push(';');
     return parts.join('');
   }
@@ -296,6 +342,14 @@ export const constructVCardString = (data: VCardData): string => {
     parts.push(prop('ADR', `;;${street};${city};;${zip};${country}`));
   }
 
+  SOCIAL_FIELDS.forEach((field) => {
+    const rawVal = data[field];
+    if (isPopulated(rawVal)) {
+      const val = escape(rawVal);
+      parts.push(prop(`X-SOCIALPROFILE;type=${field}`, val));
+    }
+  });
+
   parts.push('END:VCARD');
 
   return foldString(parts.join('\r\n'));
@@ -318,7 +372,7 @@ export const VCardContract: QRGeneratorContract<VCardData> = {
         const colonIdx = part.indexOf(':');
         if (colonIdx > 0) {
           const key = part.substring(0, colonIdx).toUpperCase();
-          if (key === 'URL') {
+          if (key === 'URL' || key.startsWith('TYPE=') || key.includes('X-SOCIALPROFILE')) {
             const val = unescapeMECard(part.substring(colonIdx + 1)).trim();
             if (isDangerousUrl(val)) {
               violations.push('URI_INJECTION_VIOLATION');
@@ -330,7 +384,7 @@ export const VCardContract: QRGeneratorContract<VCardData> = {
     } else {
       const properties = parseRFCProperties(raw);
       for (const { key, value } of properties) {
-        if (key === 'URL') {
+        if (key === 'URL' || key === 'X-SOCIALPROFILE') {
           const vcardUrl = value.trim();
           if (isDangerousUrl(vcardUrl)) {
             violations.push('URI_INJECTION_VIOLATION');

@@ -19,6 +19,22 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
     ? "Unsafe URL scheme or malicious protocol detected."
     : undefined;
 
+  const twitterError = data.twitter && isDangerousUrl(data.twitter)
+    ? "Unsafe URL scheme or malicious protocol detected."
+    : undefined;
+  const linkedinError = data.linkedin && isDangerousUrl(data.linkedin)
+    ? "Unsafe URL scheme or malicious protocol detected."
+    : undefined;
+  const instagramError = data.instagram && isDangerousUrl(data.instagram)
+    ? "Unsafe URL scheme or malicious protocol detected."
+    : undefined;
+  const facebookError = data.facebook && isDangerousUrl(data.facebook)
+    ? "Unsafe URL scheme or malicious protocol detected."
+    : undefined;
+  const githubError = data.github && isDangerousUrl(data.github)
+    ? "Unsafe URL scheme or malicious protocol detected."
+    : undefined;
+
   return (
     <FormBlock legend="Contact Details (vCard)">
       <SelectField
@@ -162,6 +178,68 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               placeholder="Country"
               value={data.country}
               onChange={(e) => onChange({ country: e.target.value })}
+            />
+          </div>
+        </div>
+      </FormBlock>
+
+      <FormBlock legend="Social Profiles" isSubFieldset={true}>
+        <div className={SUB_CONTAINER_SPACING_CLASSES}>
+          <div className={GRID_TWO_COLUMNS_CLASSES}>
+            <TextField
+              id="vcard-twitter"
+              name="twitter"
+              label="Twitter / X"
+              autoComplete="off"
+              maxLength={2048}
+              placeholder="@username or URL"
+              value={data.twitter || ""}
+              onChange={(e) => onChange({ twitter: e.target.value })}
+              error={twitterError}
+            />
+            <TextField
+              id="vcard-linkedin"
+              name="linkedin"
+              label="LinkedIn"
+              autoComplete="off"
+              maxLength={2048}
+              placeholder="@username or profile URL"
+              value={data.linkedin || ""}
+              onChange={(e) => onChange({ linkedin: e.target.value })}
+              error={linkedinError}
+            />
+            <TextField
+              id="vcard-instagram"
+              name="instagram"
+              label="Instagram"
+              autoComplete="off"
+              maxLength={2048}
+              placeholder="@username or profile URL"
+              value={data.instagram || ""}
+              onChange={(e) => onChange({ instagram: e.target.value })}
+              error={instagramError}
+            />
+            <TextField
+              id="vcard-facebook"
+              name="facebook"
+              label="Facebook"
+              autoComplete="off"
+              maxLength={2048}
+              placeholder="username or page URL"
+              value={data.facebook || ""}
+              onChange={(e) => onChange({ facebook: e.target.value })}
+              error={facebookError}
+            />
+            <TextField
+              id="vcard-github"
+              name="github"
+              label="GitHub"
+              autoComplete="off"
+              maxLength={2048}
+              placeholder="@username or profile URL"
+              value={data.github || ""}
+              onChange={(e) => onChange({ github: e.target.value })}
+              error={githubError}
             />
           </div>
         </div>
