@@ -166,24 +166,19 @@ function findPackageDir(name: string, fromDir: string): string | undefined {
  */
 export function resolvePackageDirs(names: readonly string[], root: string): Map<string, string> {
   const found = new Map<string, string>();
-  const foundFromRoot = new Set<string>();
   const bases = [root];
   let progress = true;
   while (progress) {
     progress = false;
     for (const name of names) {
-      if (found.has(name) && !foundFromRoot.has(name)) continue;
-      for (const base of [...bases].reverse()) {
+      if (found.has(name)) continue;
+      for (const base of bases) {
         const dir = findPackageDir(name, base);
         if (dir) {
-          if (!found.has(name) || (foundFromRoot.has(name) && base !== root)) {
-            found.set(name, dir);
-            if (base === root) foundFromRoot.add(name);
-            else foundFromRoot.delete(name);
-            bases.push(dir);
-            progress = true;
-            break;
-          }
+          found.set(name, dir);
+          bases.push(dir);
+          progress = true;
+          break;
         }
       }
     }
@@ -408,12 +403,7 @@ export function checkShipped(seen: Seen, unknown: ReadonlySet<string>, root: str
     if (new Set(bundledDirs).size > 1) {
       problems.push(`${name} ships in more than one copy (${bundledDirs.join(', ')}); deduplicate it so the page names the right version.`);
     } else if (bundledDirs.length === 1 && resolved.get(name) !== bundledDirs[0]) {
-      const resDir = resolved.get(name);
-      const resPkg = resDir && fs.existsSync(path.join(resDir, 'package.json')) ? (JSON.parse(fs.readFileSync(path.join(resDir, 'package.json'), 'utf8')) as { name?: string; version?: string }) : null;
-      const bunPkg = fs.existsSync(path.join(bundledDirs[0], 'package.json')) ? (JSON.parse(fs.readFileSync(path.join(bundledDirs[0], 'package.json'), 'utf8')) as { name?: string; version?: string }) : null;
-      if (!resPkg || !bunPkg || resPkg.version !== bunPkg.version) {
-        problems.push(`${name}: the bundle uses ${bundledDirs[0]} but the acknowledgements page would describe ${resDir ?? 'nothing'}.`);
-      }
+      problems.push(`${name}: the bundle uses ${bundledDirs[0]} but the acknowledgements page would describe ${resolved.get(name) ?? 'nothing'}.`);
     }
   }
   return problems;

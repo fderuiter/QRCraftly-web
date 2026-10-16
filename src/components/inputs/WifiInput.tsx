@@ -3,6 +3,10 @@ import { type WifiData, WifiEncryption, WifiEapMethod, WifiEapPhase2 } from "../
 import { TextField, SelectField, CheckboxField } from "../ui/FormFields";
 import { CONTAINMENT_PROFILES } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
+import { FieldNotes, hintsId } from "./FieldHints";
+
+const SAE_NOTE =
+  "Only for WPA3-only networks. Android phones read this; iPhone cameras may not. Choose WPA / WPA2 / WPA3 unless your router is set to WPA3 only.";
 
 interface WifiInputProps {
   data: WifiData;
@@ -44,6 +48,7 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
           onChange={(e) =>
             onChange({ encryption: e.target.value as WifiEncryption })
           }
+          aria-describedby={hintsId("wifi-encryption")}
         >
           <option value={WifiEncryption.WPA}>
             WPA / WPA2 / WPA3 (most networks)
@@ -55,11 +60,7 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
           <option value={WifiEncryption.WPA2_EAP}>WPA2 Enterprise (EAP)</option>
           <option value={WifiEncryption.NOPASS}>None (Open Network)</option>
         </SelectField>
-        {data.encryption === WifiEncryption.SAE && (
-          <p className="mt-1.5 text-xs text-fg-muted">
-            Only for WPA3-only networks. Android phones read this; iPhone cameras may not. Choose WPA / WPA2 / WPA3 unless your router is set to WPA3 only.
-          </p>
-        )}
+        <FieldNotes fieldId="wifi-encryption" notes={data.encryption === WifiEncryption.SAE ? [SAE_NOTE] : []} />
       </div>
 
       {data.encryption === WifiEncryption.WPA2_EAP && (

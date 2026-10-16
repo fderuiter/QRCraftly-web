@@ -91,7 +91,7 @@ describe('WifiInput enterprise (WPA2-EAP) fields', () => {
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
   });
 
-  it('shows field note warning only when SAE encryption is selected', () => {
+  it('shows field note warning only when SAE encryption is selected', async () => {
     const warningText = 'Only for WPA3-only networks. Android phones read this; iPhone cameras may not. Choose WPA / WPA2 / WPA3 unless your router is set to WPA3 only.';
     const wpaData: WifiData = {
       ssid: 'MyNet',
@@ -99,11 +99,13 @@ describe('WifiInput enterprise (WPA2-EAP) fields', () => {
       encryption: WifiEncryption.WPA,
       hidden: false,
     };
-    const { rerender } = render(<WifiInput data={wpaData} onChange={vi.fn()} />);
+    const { container, rerender } = render(<WifiInput data={wpaData} onChange={vi.fn()} />);
     expect(screen.queryByText(warningText)).not.toBeInTheDocument();
 
     const saeData: WifiData = { ...wpaData, encryption: WifiEncryption.SAE };
     rerender(<WifiInput data={saeData} onChange={vi.fn()} />);
     expect(screen.getByText(warningText)).toBeInTheDocument();
+    expect(screen.getByLabelText('Encryption')).toHaveAccessibleDescription(warningText);
+    expect((await axe(container)).violations).toEqual([]);
   });
 });
