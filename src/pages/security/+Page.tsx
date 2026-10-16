@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CloudCog, CloudUpload, Cookie, MonitorSmartphone, ShieldCheck } from 'lucide-react';
 import { SanitizedHtml } from '@/components/ui/SanitizedHtml';
+import { PrivacyPromiseGrid } from '@/components/ui/PrivacyPromiseGrid';
 import docsManifest from 'virtual:docs-manifest';
 import { AccordionItem } from '@/components/ui/Accordion';
 import { ButtonLink } from '@/components/ui/Button';
@@ -168,17 +169,7 @@ export default function Page() {
           <ArticleHeading id="summary">
             <span id="summary-title">What happens to your data</span>
           </ArticleHeading>
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {SUMMARY.map(({ icon: Icon, title, text }) => (
-              <li key={title} className="flex gap-3 rounded-xl border border-line bg-surface p-4">
-                <Icon className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
-                <div>
-                  <p className="font-semibold text-fg">{title}</p>
-                  <p className="text-sm text-fg-muted">{text}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <PrivacyPromiseGrid items={SUMMARY} columns={2} className="mb-10" />
           <RequestCounter />
         </section>
 
