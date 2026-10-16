@@ -21,8 +21,10 @@
  * - workflow_dispatch: the PR tier, or the full tier when `full` is true.
  *
  * - pull_request from a bot that opens PRs unasked (Google Labs Stitch): nothing
- *   at all until a maintainer adds the `ci-approved` label, and `CI` fails
- *   until then, so a bot PR with auto-merge on cannot merge unreviewed. The
+ *   at all until a maintainer adds the `ci-approved` label. `CI` passes, but the
+ *   required `Stitch review` status stays pending until then, so a bot PR with
+ *   auto-merge on cannot merge unreviewed and the bot sees no red check to
+ *   "fix". The
  *   label is read on the next push or ready-for-review event, so approving is
  *   "add the label, then update the branch".
  *
