@@ -60,7 +60,7 @@ export {
 } from './lib/rfcHelper';
 
 // Concrete generator contracts & individual helpers
-export { WifiContract, constructWifiString, hydrateWifiData } from './lib/generators/wifi';
+export { WifiContract, constructWifiString, hydrateWifiData, wifiPassphraseProblem } from './lib/generators/wifi';
 export { EmailContract, constructEmailString, hydrateEmailData } from './lib/generators/email';
 export { VCardContract, constructVCardString, hydrateVCardData, CARD_FIELDS, vCardFieldError } from './lib/generators/vcard';
 export { constructPhoneString, hydratePhoneData, droppedPhoneCharacters } from './lib/generators/phone';
