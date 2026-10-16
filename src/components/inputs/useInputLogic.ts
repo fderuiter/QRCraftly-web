@@ -20,7 +20,7 @@ import { useState, useRef, useEffect, type ElementType } from "react";
 import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData } from "../../types";
 import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
-import { CONTAINMENT_PROFILES } from "@/packages/qr-payload";
+import { CONTAINMENT_PROFILES, CARD_FIELDS, vCardFieldError } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
 
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
@@ -41,25 +41,9 @@ const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => 
     }
   } else if (type === QRType.VCARD) {
     const vcard = data as VCardData;
-    const fields: (keyof VCardData)[] = [
-      'firstName',
-      'lastName',
-      'organization',
-      'title',
-      'phone',
-      'email',
-      'website',
-      'street',
-      'city',
-      'zip',
-      'country',
-    ];
-    for (const field of fields) {
-      const val = vcard[field];
-      if (typeof val === 'string' && val) {
-        if (isDangerousUrl(val) || CONTAINMENT_PROFILES.TEXT_NO_CONTROL.test(val)) {
-          return false;
-        }
+    for (const field of CARD_FIELDS) {
+      if (vCardFieldError(field, vcard[field])) {
+        return false;
       }
     }
   } else if (type === QRType.PAYMENT) {

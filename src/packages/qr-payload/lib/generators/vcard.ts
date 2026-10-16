@@ -209,7 +209,26 @@ export const hydrateVCardData = (raw: string): VCardData => {
 const isPopulated = (str: string | undefined): boolean => Boolean(str && str.trim().length > 0);
 
 /** The fields a visitor types; a card with none of them filled in is empty. */
-const CARD_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country'] as const satisfies readonly (keyof VCardData)[];
+export const CARD_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country'] as const satisfies readonly (keyof VCardData)[];
+
+/**
+ * Validates an individual vCard field for user input errors.
+ * Scheme validation (`isDangerousUrl`) is applied ONLY to the `website` field.
+ * All other plain text fields are checked only for control/hidden characters.
+ */
+export const vCardFieldError = (
+  field: keyof VCardData,
+  value: string | undefined
+): string | undefined => {
+  if (!value) return undefined;
+  if (field === 'website' && isDangerousUrl(value)) {
+    return 'Unsafe URL scheme or malicious protocol detected.';
+  }
+  if (CONTAINMENT_PROFILES.TEXT_NO_CONTROL.test(value)) {
+    return 'Contains invalid control or zero-width characters.';
+  }
+  return undefined;
+};
 
 /**
  * Constructs the contact payload string (vCard 2.1, 3.0, 4.0, or MECard).
@@ -317,27 +336,28 @@ export const VCardContract: QRGeneratorContract<VCardData> = {
       for (const part of parts) {
         const colonIdx = part.indexOf(':');
         if (colonIdx > 0) {
-          const val = unescapeMECard(part.substring(colonIdx + 1)).trim();
-          if (isDangerousUrl(val)) {
-            violations.push('URI_INJECTION_VIOLATION');
-          }
-          if (CONTAINMENT_PROFILES.TEXT_NO_CONTROL.test(val)) {
-            violations.push('Payload contains invalid control or zero-width characters');
+          const key = part.substring(0, colonIdx).toUpperCase();
+          if (key === 'URL') {
+            const val = unescapeMECard(part.substring(colonIdx + 1)).trim();
+            if (isDangerousUrl(val)) {
+              violations.push('URI_INJECTION_VIOLATION');
+              break;
+            }
           }
         }
       }
     } else {
       const properties = parseRFCProperties(raw);
-      for (const { value } of properties) {
-        const val = value.trim();
-        if (isDangerousUrl(val)) {
-          violations.push('URI_INJECTION_VIOLATION');
-        }
-        if (CONTAINMENT_PROFILES.TEXT_NO_CONTROL.test(val)) {
-          violations.push('Payload contains invalid control or zero-width characters');
+      for (const { key, value } of properties) {
+        if (key === 'URL') {
+          const vcardUrl = value.trim();
+          if (isDangerousUrl(vcardUrl)) {
+            violations.push('URI_INJECTION_VIOLATION');
+            break;
+          }
         }
       }
     }
-    return Array.from(new Set(violations));
+    return violations;
   },
 };

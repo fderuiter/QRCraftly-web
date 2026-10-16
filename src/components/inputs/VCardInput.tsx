@@ -2,8 +2,7 @@ import React from "react";
 import type { VCardData } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
-import { isDangerousUrl } from "../../utils/security";
-import { CONTAINMENT_PROFILES } from "@/packages/qr-payload";
+import { vCardFieldError } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
 import {
   GRID_TWO_COLUMNS_CLASSES,
@@ -15,29 +14,18 @@ interface VCardInputProps {
   onChange: (updates: Partial<VCardData>) => void;
 }
 
-const getFieldError = (value: string | undefined): string | undefined => {
-  if (!value) return undefined;
-  if (isDangerousUrl(value)) {
-    return "Unsafe URL scheme or malicious protocol detected.";
-  }
-  if (CONTAINMENT_PROFILES.TEXT_NO_CONTROL.test(value)) {
-    return "Contains invalid control or zero-width characters.";
-  }
-  return undefined;
-};
-
 export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
-  const firstNameError = getFieldError(data.firstName);
-  const lastNameError = getFieldError(data.lastName);
-  const phoneError = getFieldError(data.phone);
-  const emailError = getFieldError(data.email);
-  const orgError = getFieldError(data.organization);
-  const titleError = getFieldError(data.title);
-  const websiteError = getFieldError(data.website);
-  const streetError = getFieldError(data.street);
-  const cityError = getFieldError(data.city);
-  const zipError = getFieldError(data.zip);
-  const countryError = getFieldError(data.country);
+  const firstNameError = vCardFieldError("firstName", data.firstName);
+  const lastNameError = vCardFieldError("lastName", data.lastName);
+  const phoneError = vCardFieldError("phone", data.phone);
+  const emailError = vCardFieldError("email", data.email);
+  const orgError = vCardFieldError("organization", data.organization);
+  const titleError = vCardFieldError("title", data.title);
+  const websiteError = vCardFieldError("website", data.website);
+  const streetError = vCardFieldError("street", data.street);
+  const cityError = vCardFieldError("city", data.city);
+  const zipError = vCardFieldError("zip", data.zip);
+  const countryError = vCardFieldError("country", data.country);
 
   return (
     <FormBlock legend="Contact Details (vCard)">
