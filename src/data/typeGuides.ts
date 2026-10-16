@@ -236,9 +236,9 @@ export const typeGuides: Record<string, TypeGuide> = {
   },
   'payment-qr-code': {
     intro:
-      'Make a QR code that asks for a payment: a Bitcoin, Ethereum, Solana or Litecoin request, a SEPA bank transfer, or a PayPal, Venmo or Cash App link.',
+      'Make a QR code that asks for a payment: a Bitcoin, Ethereum, Solana or Litecoin request, a SEPA bank transfer, a UPI payment in India, or a PayPal, Venmo or Cash App link.',
     scanned: [
-      'A crypto code opens a payment screen in a wallet app that supports that network. A SEPA code fills in a transfer in banking apps that read EPC codes. PayPal, Venmo and Cash App codes are links that open the app or website.',
+      'A crypto code opens a payment screen in a wallet app that supports that network. A SEPA code fills in a transfer in banking apps that read EPC codes. A UPI code opens the payment screen in a UPI app such as Google Pay, PhonePe, Paytm or BHIM. PayPal, Venmo and Cash App codes are links that open the app or website.',
       'Nothing is paid by scanning. The payer checks the details and approves the payment in their own app.',
     ],
     useCases: [

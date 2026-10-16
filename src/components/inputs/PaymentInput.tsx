@@ -3,7 +3,7 @@ import { type PaymentData, CryptoNetwork } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { isDangerousUrl } from "../../utils/security";
 import { FormBlock } from "../ui/FormBlock";
-import { checkCryptoAddress, isValidIban, paymentAmountError } from "@/packages/qr-payload";
+import { checkCryptoAddress, isValidIban, paymentAmountError, upiVpaError, UPI_NAME_MAX_LENGTH } from "@/packages/qr-payload";
 
 interface PaymentInputProps {
   data: PaymentData;
@@ -27,6 +27,9 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
   const currentAddress = data.network === CryptoNetwork.EPC_SEPA ? (data.iban || data.address || "") : data.address;
   // Checksums fail on every half-typed address, so they are judged once the field is left.
   const [addressLeft, setAddressLeft] = useState(false);
+  const isUpi = data.network === CryptoNetwork.UPI;
+  // The payee-name error waits until the field is left, so it does not fire while the name is typed (#1435).
+  const [nameBlurred, setNameBlurred] = useState(false);
 
   const addressError = currentAddress && isDangerousUrl(currentAddress)
     ? "Unsafe URL scheme or malicious protocol detected."
@@ -42,7 +45,9 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
           data.network === CryptoNetwork.EPC_SEPA &&
           !isValidIban(currentAddress)
         ? "This IBAN does not pass its checksum or format check. Double-check for typos."
-        : undefined;
+        : isUpi
+          ? upiVpaError(currentAddress) ?? undefined
+          : undefined;
 
   const getAddressConfig = () => {
     switch (data.network) {
@@ -50,6 +55,11 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
         return {
           label: "IBAN",
           placeholder: "e.g. DE89370400440532013000",
+        };
+      case CryptoNetwork.UPI:
+        return {
+          label: "UPI ID",
+          placeholder: "e.g. jane@okaxis",
         };
       case CryptoNetwork.PAYPAL:
         return {
@@ -95,6 +105,7 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
         <option value={CryptoNetwork.SOLANA}>Solana (SOL)</option>
         <option value={CryptoNetwork.LITECOIN}>Litecoin (LTC)</option>
         <option value={CryptoNetwork.EPC_SEPA}>SEPA Credit Transfer (EPC QR)</option>
+        <option value={CryptoNetwork.UPI}>UPI (India)</option>
         <option value={CryptoNetwork.PAYPAL}>PayPal</option>
         <option value={CryptoNetwork.VENMO}>Venmo</option>
         <option value={CryptoNetwork.CASH_APP}>Cash App</option>
@@ -147,11 +158,26 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
         </>
       )}
 
+      {isUpi && (
+        <TextField
+          id="payment-name"
+          label="Payee Name"
+          type="text"
+          maxLength={UPI_NAME_MAX_LENGTH}
+          placeholder="e.g. Jane Doe"
+          value={data.name || ""}
+          onChange={(e) => onChange({ name: e.target.value })}
+          onBlur={() => setNameBlurred(true)}
+          required
+          error={nameBlurred && !(data.name || "").trim() ? "A UPI payment code needs the payee's name." : undefined}
+        />
+      )}
+
       {data.network !== CryptoNetwork.CUSTOM && (
         <>
           <TextField
             id="payment-amount"
-            label={data.network === CryptoNetwork.EPC_SEPA ? "Amount (EUR)" : "Amount"}
+            label={data.network === CryptoNetwork.EPC_SEPA ? "Amount (EUR)" : isUpi ? "Amount (INR)" : "Amount"}
             contextualLabel="Optional"
             type="number"
             step="any"

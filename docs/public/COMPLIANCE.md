@@ -35,7 +35,7 @@ QRCraftly has no analytics, telemetry, diagnostics or logs of its own. The site 
 
 What is never part of a request:
 
-- Anything you type, including email CC and BCC addresses, Wi-Fi passwords (WPA3-only networks included) and WPA2-Enterprise identity fields, and payment details such as crypto addresses, IBANs and payment handles.
+- Anything you type, including email CC and BCC addresses, Wi-Fi passwords (WPA3-only networks included) and WPA2-Enterprise identity fields, and payment details such as crypto addresses, IBANs, UPI IDs and payment handles.
 - The QR codes and files you make.
 - Diagnostics. Scan and scannability failures are handled on your device and not reported.
 
