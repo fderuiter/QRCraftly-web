@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { TextField } from './ui/TextField';
 import { WifiInput } from './inputs/WifiInput';
@@ -105,6 +105,8 @@ describe('Accessible Inline Validation and Accessible Fields', () => {
     };
 
     render(<PaymentInput data={{ ...mockData, name: 'Jane Doe' }} onChange={() => {}} />);
+    // The checksum is judged once the field is left, not while the IBAN is typed.
+    fireEvent.blur(screen.getByLabelText('IBAN'));
 
     const errorAlert = screen.getByRole('alert');
     expect(errorAlert).toHaveTextContent('This IBAN does not pass its checksum or format check. Double-check for typos.');

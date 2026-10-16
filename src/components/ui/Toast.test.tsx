@@ -258,4 +258,56 @@ describe('Toast Timing and Interactive Controls', () => {
 
     document.removeEventListener('keydown', documentEscapeHandler);
   });
+
+  it('hands focus back to where it was when a focused toast is closed', () => {
+    render(
+      <ToastProvider>
+        <TestComponent />
+      </ToastProvider>
+    );
+    const trigger = screen.getByText('Show Toast');
+    act(() => {
+      trigger.focus();
+    });
+    fireEvent.click(trigger);
+    const toastElement = screen.getByText('Test message').closest('[role="status"]') as HTMLElement;
+    act(() => {
+      toastElement.focus();
+    });
+    act(() => {
+      fireEvent.keyDown(toastElement, { key: 'Escape' });
+      vi.advanceTimersByTime(300);
+    });
+    expect(document.activeElement).toBe(trigger);
+
+    // The close button does the same.
+    fireEvent.click(trigger);
+    act(() => {
+      screen.getByRole('button', { name: 'Close notification' }).focus();
+    });
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Close notification' }));
+      vi.advanceTimersByTime(300);
+    });
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('leaves focus alone when a toast closes while focus is elsewhere', () => {
+    render(
+      <ToastProvider>
+        <TestComponent />
+        <input aria-label="Other field" />
+      </ToastProvider>
+    );
+    fireEvent.click(screen.getByText('Show Toast'));
+    const other = screen.getByLabelText('Other field');
+    act(() => {
+      other.focus();
+    });
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
+    expect(screen.queryByText('Test message')).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(other);
+  });
 });

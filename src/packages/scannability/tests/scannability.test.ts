@@ -22,6 +22,7 @@ import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { evaluateScannability, performScannabilityCheck } from '../checker';
 import { type QRConfig, QRType, QRErrorCorrectionLevel, QRStyle, SocialFormat, TemplateStyle } from '@/types';
 import { DEFAULT_CONFIG } from '@/constants';
+import { renderCorpusFrame } from '../../../../tests/utils/scannerCorpus';
 
 const getBaseConfig = (): QRConfig => ({
   type: QRType.TEXT,
@@ -142,6 +143,19 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
         health: { score: 75, warnings: ['Pattern complexity'], criticalWarnings: [] },
       });
       expect(lowScoreRisk).toBe('caution');
+    });
+  });
+
+  describe('performScannabilityCheck on a transparent background', () => {
+    it('reads clear pixels as the white paper the code is printed on, not as black', () => {
+      const frame = renderCorpusFrame({ text: 'https://qrcraftly.com', width: 400, height: 400, modulePx: 8 });
+      const clear = frame.data.slice();
+      for (let i = 0; i < clear.length; i += 4) {
+        if (clear[i] > 128) clear.set([0, 0, 0, 0], i);
+        else if (clear[i] < 128) clear.set([0, 0, 0, 255], i);
+      }
+      expect(performScannabilityCheck(qrReader, { data: frame.data, width: 400, height: 400 }, 400, 400).success).toBe(true);
+      expect(performScannabilityCheck(qrReader, { data: clear, width: 400, height: 400 }, 400, 400).success).toBe(true);
     });
   });
 

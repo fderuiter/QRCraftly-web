@@ -31,6 +31,7 @@ import {
   type SceneImage,
   type ScenePath,
   type SceneText,
+  winAnsiExtraPuts,
 } from './vectorScene';
 import { alphaToMask, decodeSceneImages, deflate, MissingImageError, type RasterImage, type VectorExportOptions } from './vectorImages';
 
@@ -41,11 +42,13 @@ const STRING_BYTES = 32000;
 
 /**
  * Re-encodes Helvetica to Latin-1 so accented text prints as typed (#1362). Codes 39, 45 and 96
- * follow WinAnsi (PDF) rather than ISOLatin1Encoding's quoteright, minus and quoteleft.
+ * follow WinAnsi (PDF) rather than ISOLatin1Encoding's quoteright, minus and quoteleft, and
+ * 0x80-0x9F get WinAnsi's dashes, curly quotes and euro sign, so EPS and PDF print the same text.
+ * Built on use: a module-level call would keep the vector writers in the generator's first-load chunk.
  */
-const FONT_PROLOG = ['Helvetica', 'Helvetica-Bold'].map(
+const fontProlog = (): string[] => ['Helvetica', 'Helvetica-Bold'].map(
   (name) =>
-    `/${name} findfont dup length dict begin { 1 index /FID ne { def } { pop pop } ifelse } forall /Encoding ISOLatin1Encoding 256 array copy dup 45 /hyphen put dup 39 /quotesingle put dup 96 /grave put def currentdict end /QR${name} exch definefont pop`
+    `/${name} findfont dup length dict begin { 1 index /FID ne { def } { pop pop } ifelse } forall /Encoding ISOLatin1Encoding 256 array copy dup 45 /hyphen put dup 39 /quotesingle put dup 96 /grave put ${winAnsiExtraPuts()} def currentdict end /QR${name} exch definefont pop`
 );
 
 const hex = (bytes: Uint8Array): string => {
@@ -168,7 +171,7 @@ export async function convertSvgToEps(svgString: string, options: VectorExportOp
     '%%Pages: 1',
     '%%EndComments',
     '%%BeginProlog',
-    ...FONT_PROLOG,
+    ...fontProlog(),
     '%%EndProlog',
     '%%Page: 1 1',
     `${8 + imageCount * 8} dict begin`,
