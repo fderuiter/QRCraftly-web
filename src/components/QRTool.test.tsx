@@ -223,12 +223,13 @@ describe('QRTool Component', () => {
     expect(options).toHaveAttribute('aria-expanded', 'true');
 
     const panel = screen.getByRole('group', { name: 'Download options' });
-    expect(within(panel).getAllByRole('radio').map((r) => r.textContent)).toEqual(['PNG', 'SVG', 'EPS', 'PDF', 'JPEG', 'WebP', 'Screen', 'Print', 'Poster', 'Custom']);
+    expect(within(panel).getAllByRole('radio').map((r) => r.textContent)).toEqual(['PNG', 'SVG', 'EPS', 'PDF', 'JPEG', 'WebP', 'Screen', 'Print', 'Poster', 'Custom', 'Data URI', 'Inline SVG']);
     fireEvent.click(within(panel).getByRole('radio', { name: 'PNG' }));
     fireEvent.click(within(panel).getByRole('radio', { name: 'Print' }));
     expect(screen.getByTestId('print-hint')).toHaveTextContent('2048 px wide. Prints 17.3 cm (6.8 in) wide at 300 dpi and scans from about 1.7 m.');
     expect(within(panel).getByLabelText('File name')).toHaveValue('url-example.com');
     expect(within(panel).getByRole('button', { name: 'Copy as SVG' })).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Copy HTML' })).toBeInTheDocument();
 
     // EPS and PDF have no pixel size.
     fireEvent.click(within(panel).getByRole('radio', { name: 'EPS' }));
