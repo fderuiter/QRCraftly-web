@@ -19,7 +19,7 @@
 import { useState, useRef, useEffect, type ElementType } from "react";
 import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData } from "../../types";
 import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
-import { isDangerousUrl } from "../../utils/security";
+import { isDangerousUrl, hasAnyDangerousUrl } from "../../utils/security";
 import { CONTAINMENT_PROFILES } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
 
@@ -41,14 +41,7 @@ const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => 
     }
   } else if (type === QRType.VCARD) {
     const vcard = data as VCardData;
-    if (
-      (vcard.website && isDangerousUrl(vcard.website)) ||
-      (vcard.twitter && isDangerousUrl(vcard.twitter)) ||
-      (vcard.linkedin && isDangerousUrl(vcard.linkedin)) ||
-      (vcard.instagram && isDangerousUrl(vcard.instagram)) ||
-      (vcard.facebook && isDangerousUrl(vcard.facebook)) ||
-      (vcard.github && isDangerousUrl(vcard.github))
-    ) {
+    if (hasAnyDangerousUrl(vcard.website, vcard.twitter, vcard.linkedin, vcard.instagram, vcard.facebook, vcard.github)) {
       return false;
     }
   } else if (type === QRType.PAYMENT) {

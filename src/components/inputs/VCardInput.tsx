@@ -2,7 +2,7 @@ import React from "react";
 import type { VCardData } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
-import { isDangerousUrl } from "../../utils/security";
+import { getUrlSchemeError } from "../../utils/security";
 import { FormBlock } from "../ui/FormBlock";
 import {
   GRID_TWO_COLUMNS_CLASSES,
@@ -14,26 +14,16 @@ interface VCardInputProps {
   onChange: (updates: Partial<VCardData>) => void;
 }
 
-export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
-  const websiteError = data.website && isDangerousUrl(data.website)
-    ? "Unsafe URL scheme or malicious protocol detected."
-    : undefined;
+const SOCIAL_FIELD_CONFIGS = [
+  { id: "vcard-twitter", key: "twitter", label: "Twitter / X", placeholder: "@username or URL" },
+  { id: "vcard-linkedin", key: "linkedin", label: "LinkedIn", placeholder: "@username or profile URL" },
+  { id: "vcard-instagram", key: "instagram", label: "Instagram", placeholder: "@username or profile URL" },
+  { id: "vcard-facebook", key: "facebook", label: "Facebook", placeholder: "username or page URL" },
+  { id: "vcard-github", key: "github", label: "GitHub", placeholder: "@username or profile URL" },
+] as const satisfies readonly { id: string; key: keyof VCardData; label: string; placeholder: string }[];
 
-  const twitterError = data.twitter && isDangerousUrl(data.twitter)
-    ? "Unsafe URL scheme or malicious protocol detected."
-    : undefined;
-  const linkedinError = data.linkedin && isDangerousUrl(data.linkedin)
-    ? "Unsafe URL scheme or malicious protocol detected."
-    : undefined;
-  const instagramError = data.instagram && isDangerousUrl(data.instagram)
-    ? "Unsafe URL scheme or malicious protocol detected."
-    : undefined;
-  const facebookError = data.facebook && isDangerousUrl(data.facebook)
-    ? "Unsafe URL scheme or malicious protocol detected."
-    : undefined;
-  const githubError = data.github && isDangerousUrl(data.github)
-    ? "Unsafe URL scheme or malicious protocol detected."
-    : undefined;
+export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
+  const websiteError = getUrlSchemeError(data.website);
 
   return (
     <FormBlock legend="Contact Details (vCard)">
@@ -186,61 +176,20 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
       <FormBlock legend="Social Profiles" isSubFieldset={true}>
         <div className={SUB_CONTAINER_SPACING_CLASSES}>
           <div className={GRID_TWO_COLUMNS_CLASSES}>
-            <TextField
-              id="vcard-twitter"
-              name="twitter"
-              label="Twitter / X"
-              autoComplete="off"
-              maxLength={2048}
-              placeholder="@username or URL"
-              value={data.twitter || ""}
-              onChange={(e) => onChange({ twitter: e.target.value })}
-              error={twitterError}
-            />
-            <TextField
-              id="vcard-linkedin"
-              name="linkedin"
-              label="LinkedIn"
-              autoComplete="off"
-              maxLength={2048}
-              placeholder="@username or profile URL"
-              value={data.linkedin || ""}
-              onChange={(e) => onChange({ linkedin: e.target.value })}
-              error={linkedinError}
-            />
-            <TextField
-              id="vcard-instagram"
-              name="instagram"
-              label="Instagram"
-              autoComplete="off"
-              maxLength={2048}
-              placeholder="@username or profile URL"
-              value={data.instagram || ""}
-              onChange={(e) => onChange({ instagram: e.target.value })}
-              error={instagramError}
-            />
-            <TextField
-              id="vcard-facebook"
-              name="facebook"
-              label="Facebook"
-              autoComplete="off"
-              maxLength={2048}
-              placeholder="username or page URL"
-              value={data.facebook || ""}
-              onChange={(e) => onChange({ facebook: e.target.value })}
-              error={facebookError}
-            />
-            <TextField
-              id="vcard-github"
-              name="github"
-              label="GitHub"
-              autoComplete="off"
-              maxLength={2048}
-              placeholder="@username or profile URL"
-              value={data.github || ""}
-              onChange={(e) => onChange({ github: e.target.value })}
-              error={githubError}
-            />
+            {SOCIAL_FIELD_CONFIGS.map(({ id, key, label, placeholder }) => (
+              <TextField
+                key={id}
+                id={id}
+                name={key}
+                label={label}
+                autoComplete="off"
+                maxLength={2048}
+                placeholder={placeholder}
+                value={data[key] || ""}
+                onChange={(e) => onChange({ [key]: e.target.value })}
+                error={getUrlSchemeError(data[key])}
+              />
+            ))}
           </div>
         </div>
       </FormBlock>

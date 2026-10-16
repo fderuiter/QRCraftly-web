@@ -209,9 +209,23 @@ export const hydrateVCardData = (raw: string): VCardData => {
       case 'EMAIL':
         result.email = unescapeVCardEvent(value);
         break;
-      case 'URL':
-        result.website = unescapeVCardEvent(value);
+      case 'URL': {
+        const urlVal = unescapeVCardEvent(value);
+        const typeMatch = params.match(/;TYPE=([^;:\s\n]+)/i);
+        if (typeMatch) {
+          let platform = typeMatch[1].toLowerCase().replace(/^x-/, '');
+          if (platform === 'x') platform = 'twitter';
+          if ((SOCIAL_FIELDS as readonly string[]).includes(platform)) {
+            const key = platform as typeof SOCIAL_FIELDS[number];
+            if (!result[key]) {
+              result[key] = urlVal;
+            }
+            break;
+          }
+        }
+        result.website = urlVal;
         break;
+      }
       case 'X-SOCIALPROFILE': {
         const typeMatch = params.match(/;TYPE=([^;:\s\n]+)/i);
         if (typeMatch) {
@@ -245,6 +259,26 @@ export const hydrateVCardData = (raw: string): VCardData => {
 };
 
 const isPopulated = (str: string | undefined): boolean => Boolean(str && str.trim().length > 0);
+
+const toProfileUrl = (field: string, val: string): string => {
+  const trimmed = val.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const handle = trimmed.replace(/^@/, '');
+  switch (field) {
+    case 'twitter':
+      return `https://x.com/${handle}`;
+    case 'linkedin':
+      return `https://linkedin.com/in/${handle}`;
+    case 'instagram':
+      return `https://instagram.com/${handle}`;
+    case 'facebook':
+      return `https://facebook.com/${handle}`;
+    case 'github':
+      return `https://github.com/${handle}`;
+    default:
+      return trimmed;
+  }
+};
 
 /** The fields a visitor types; a card with none of them filled in is empty. */
 const CARD_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country', 'twitter', 'linkedin', 'instagram', 'facebook', 'github'] as const satisfies readonly (keyof VCardData)[];
@@ -287,12 +321,7 @@ export const constructVCardString = (data: VCardData): string => {
     const address = [street, city, zip, country].filter(isPopulated).join(', ');
     if (address) parts.push(`ADR:${address};`);
 
-    SOCIAL_FIELDS.forEach((field) => {
-      const val = escapeMECard(data[field]);
-      if (isPopulated(val)) {
-        parts.push(`X-SOCIALPROFILE;type=${field}:${val};`);
-      }
-    });
+    // Note: MECard specification has no X-SOCIALPROFILE property (scanners/readers won't parse it).
 
     parts.push(';');
     return parts.join('');
@@ -344,9 +373,13 @@ export const constructVCardString = (data: VCardData): string => {
 
   SOCIAL_FIELDS.forEach((field) => {
     const rawVal = data[field];
-    if (isPopulated(rawVal)) {
+    if (rawVal && isPopulated(rawVal)) {
       const val = escape(rawVal);
+      // Apple / iOS social profile property
       parts.push(prop(`X-SOCIALPROFILE;type=${field}`, val));
+      // Android / RFC standard vCard URL property for cross-platform compatibility
+      const profileUrl = escape(toProfileUrl(field, rawVal));
+      parts.push(prop(`URL;TYPE=${field}`, profileUrl));
     }
   });
 

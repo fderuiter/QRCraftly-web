@@ -479,18 +479,9 @@ describe('VCard generator', () => {
         expect(hydrated.github).toBe('alicesmith');
       }
 
-      // MECard escapes colons in URL values
+      // MECard spec has no X-SOCIALPROFILE property (scanners won't parse it)
       const mecardPayload = constructVCardString({ ...socialData, version: 'mecard' });
-      expect(mecardPayload).toContain('X-SOCIALPROFILE;type=twitter:@alice_dev;');
-      expect(mecardPayload).toContain('X-SOCIALPROFILE;type=linkedin:https\\://linkedin.com/in/alicesmith;');
-      expect(mecardPayload).toContain('X-SOCIALPROFILE;type=github:alicesmith;');
-
-      const mecardHydrated = hydrateVCardData(mecardPayload);
-      expect(mecardHydrated.twitter).toBe('@alice_dev');
-      expect(mecardHydrated.linkedin).toBe('https://linkedin.com/in/alicesmith');
-      expect(mecardHydrated.instagram).toBe('@alice_photos');
-      expect(mecardHydrated.facebook).toBe('https://facebook.com/alice.smith');
-      expect(mecardHydrated.github).toBe('alicesmith');
+      expect(mecardPayload).not.toContain('X-SOCIALPROFILE');
     });
 
     it('populates card string when only social profile fields are filled', () => {

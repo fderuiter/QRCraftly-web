@@ -27,7 +27,7 @@ if (typeof globalThis.DOMParser === 'undefined') {
   globalThis.Node = dom.window.Node;
 }
 
-import { isDangerousUrl, safeJsonLdStringify, cleanPhoneNumber, sanitizeInput, validateImageUpload, sanitizeSvg, escapeHtml } from './security';
+import { isDangerousUrl, getUrlSchemeError, hasAnyDangerousUrl, safeJsonLdStringify, cleanPhoneNumber, sanitizeInput, validateImageUpload, sanitizeSvg, escapeHtml } from './security';
 
 describe('Security Utils', () => {
   describe('isDangerousUrl', () => {
@@ -93,6 +93,28 @@ describe('Security Utils', () => {
 
     it('returns false for undefined url', () => {
       expect(isDangerousUrl(undefined)).toBe(false);
+    });
+  });
+
+  describe('getUrlSchemeError', () => {
+    it('returns error message for dangerous URLs', () => {
+      expect(getUrlSchemeError('javascript:alert(1)')).toBe('Unsafe URL scheme or malicious protocol detected.');
+    });
+
+    it('returns undefined for safe URLs or empty/undefined input', () => {
+      expect(getUrlSchemeError('https://example.com')).toBeUndefined();
+      expect(getUrlSchemeError('')).toBeUndefined();
+      expect(getUrlSchemeError(undefined)).toBeUndefined();
+    });
+  });
+
+  describe('hasAnyDangerousUrl', () => {
+    it('returns true if any URL in the list is dangerous', () => {
+      expect(hasAnyDangerousUrl('https://example.com', 'javascript:alert(1)', 'http://test.com')).toBe(true);
+    });
+
+    it('returns false if all URLs are safe or undefined', () => {
+      expect(hasAnyDangerousUrl('https://example.com', undefined, 'http://test.com')).toBe(false);
     });
   });
 

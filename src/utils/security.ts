@@ -66,6 +66,26 @@ export const isDangerousUrl = (url: string | undefined): boolean => {
 };
 
 /**
+ * Returns an error message if the URL contains a dangerous scheme or malicious protocol, else undefined.
+ *
+ * @param url The input URL string.
+ * @returns Error message string or undefined if safe/empty.
+ */
+export const getUrlSchemeError = (url: string | undefined): string | undefined => {
+  return url && isDangerousUrl(url) ? "Unsafe URL scheme or malicious protocol detected." : undefined;
+};
+
+/**
+ * Checks whether any of the provided URL inputs contain a dangerous scheme or malicious protocol.
+ *
+ * @param urls Array/list of candidate URL strings.
+ * @returns True if at least one URL is dangerous, false otherwise.
+ */
+export const hasAnyDangerousUrl = (...urls: (string | undefined)[]): boolean => {
+  return urls.some((url) => isDangerousUrl(url));
+};
+
+/**
  * Escapes HTML meta-characters to prevent DOM-XSS and HTML injection.
  * Replaces &, <, >, ", and ' with their corresponding HTML entity equivalents.
  *
