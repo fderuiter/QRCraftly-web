@@ -92,8 +92,9 @@ describe('StyleControls Component', () => {
     fireEvent.change(fgHexInput, { target: { value: '#123456' } });
     expect(mockOnChange).toHaveBeenCalledWith({ fgColor: '#123456' });
 
-    // Test 3-digit hex expansion
+    // Test 3-digit hex expansion (shorthand is taken when the field is left)
     fireEvent.change(fgHexInput, { target: { value: '#abc' } });
+    fireEvent.blur(fgHexInput);
     expect(mockOnChange).toHaveBeenCalledWith({ fgColor: '#aabbcc' });
 
     // Test invalid hex (should not trigger onChange)

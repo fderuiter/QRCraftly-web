@@ -25,13 +25,18 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
   onChange,
 }) => {
   const currentAddress = data.network === CryptoNetwork.EPC_SEPA ? (data.iban || data.address || "") : data.address;
+  // Checksums fail on every half-typed address, so they are judged once the field is left.
+  const [addressLeft, setAddressLeft] = useState(false);
   const isUpi = data.network === CryptoNetwork.UPI;
-  // UPI errors wait until the field is left, so they do not fire while the ID or name is typed (#1435).
-  const [addressBlurred, setAddressBlurred] = useState(false);
+  // The payee-name error waits until the field is left, so it does not fire while the name is typed (#1435).
   const [nameBlurred, setNameBlurred] = useState(false);
 
   const addressError = currentAddress && isDangerousUrl(currentAddress)
     ? "Unsafe URL scheme or malicious protocol detected."
+    : !currentAddress && data.network === CryptoNetwork.EPC_SEPA && (data.name || "").trim()
+      ? "A SEPA transfer code needs the beneficiary's IBAN."
+    : !addressLeft
+      ? undefined
     : currentAddress &&
         isCryptoNetwork(data.network) &&
         checkCryptoAddress(data.network, currentAddress) === "invalid"
@@ -40,7 +45,7 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
           data.network === CryptoNetwork.EPC_SEPA &&
           !isValidIban(currentAddress)
         ? "This IBAN does not pass its checksum or format check. Double-check for typos."
-        : isUpi && addressBlurred
+        : isUpi
           ? upiVpaError(currentAddress) ?? undefined
           : undefined;
 
@@ -123,7 +128,7 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
             onChange({ address: val });
           }
         }}
-        onBlur={() => setAddressBlurred(true)}
+        onBlur={() => setAddressLeft(true)}
         error={addressError}
       />
 

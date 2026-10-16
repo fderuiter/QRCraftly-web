@@ -33,6 +33,11 @@ class FakeOffscreenCanvas {
 
   getContext() {
     return {
+      fillStyle: '#000000',
+      // Only white fills are drawn, which is all the decoder asks for.
+      fillRect: (_x: number, _y: number, w: number, h: number) => {
+        this.pixels.fill(255, 0, w * h * 4);
+      },
       drawImage: (image: FakeBitmap, _dx: number, _dy: number, dw: number, dh: number) => {
         FakeOffscreenCanvas.drawn.push(`${dw}x${dh}`);
         for (let y = 0; y < dh; y++) {
@@ -40,7 +45,11 @@ class FakeOffscreenCanvas {
           for (let x = 0; x < dw; x++) {
             const sx = Math.floor((x * image.width) / dw);
             const from = (sy * image.width + sx) * 4;
-            this.pixels.set(image.data.subarray(from, from + 4), (y * dw + x) * 4);
+            const to = (y * dw + x) * 4;
+            // Source-over, as a canvas draws: clear pixels keep what is underneath.
+            const alpha = image.data[from + 3] / 255;
+            for (let c = 0; c < 3; c++) this.pixels[to + c] = image.data[from + c] * alpha + this.pixels[to + c] * (1 - alpha);
+            this.pixels[to + 3] = 255;
           }
         }
       },
@@ -110,6 +119,22 @@ describe('image file scanning in the worker', () => {
 
     expect(response).toMatchObject({ status: 'pass', decodedData: TEXT });
     expect(FakeOffscreenCanvas.drawn).toEqual(['800x600']);
+  });
+
+  it('reads a transparent PNG, where only the dark modules are opaque, as dark on white', async () => {
+    const shot = renderCorpusFrame({ text: TEXT, width: 800, height: 600 });
+    const clear = shot.data.slice();
+    // Light modules become clear black, as a transparent-background export stores them, and dark ones
+    // opaque black: read without compositing, every module would be black.
+    for (let i = 0; i < clear.length; i += 4) {
+      if (clear[i] > 128) clear.set([0, 0, 0, 0], i);
+      else if (clear[i] < 128) clear.set([0, 0, 0, 255], i);
+    }
+    bitmap = { width: shot.width, height: shot.height, data: clear, close: vi.fn() };
+
+    const response = await postAndWait(worker, { type: 'scan-file', file: new Blob(['png']), sequenceId: 11 });
+
+    expect(response).toMatchObject({ status: 'pass', decodedData: TEXT });
   });
 
   it('reports a file the browser cannot read as an image', async () => {

@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { useState } from 'react';
 import { Code, ShieldCheck, Wallet } from 'lucide-react';
 import { Button } from './ui/Button';
 import { SegmentedControl } from './ui/SegmentedControl';
@@ -98,7 +99,10 @@ interface ExportOptionsProps {
  * @returns The options panel.
  */
 export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, filename, onFilenameChange, onCopySvg, copySvgBusy, onWallet }: ExportOptionsProps) {
-  const preset = (Object.keys(SIZE_PRESETS) as (keyof typeof SIZE_PRESETS)[]).find((key) => SIZE_PRESETS[key] === size) ?? 'custom';
+  const matchedPreset = (Object.keys(SIZE_PRESETS) as (keyof typeof SIZE_PRESETS)[]).find((key) => SIZE_PRESETS[key] === size);
+  // Custom stays chosen while the width is typed, even through 512 or 2048, so the field keeps focus.
+  const [customChosen, setCustomChosen] = useState(matchedPreset === undefined);
+  const preset: SizePreset = customChosen ? 'custom' : (matchedPreset ?? 'custom');
   const sizeError = preset === 'custom' && size > MAX_SIZE ? `The largest width is ${MAX_SIZE} pixels.` : undefined;
   return (
     <div
@@ -127,7 +131,10 @@ export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, 
             <SegmentedControl<SizePreset>
               labelledBy={`${id}-size`}
               value={preset}
-              onChange={(next) => onSizeChange(next === 'custom' ? 1000 : SIZE_PRESETS[next])}
+              onChange={(next) => {
+                setCustomChosen(next === 'custom');
+                onSizeChange(next === 'custom' ? 1000 : SIZE_PRESETS[next]);
+              }}
               options={[
                 { value: 'screen', label: 'Screen' },
                 { value: 'print', label: 'Print' },

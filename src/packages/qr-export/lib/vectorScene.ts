@@ -276,21 +276,66 @@ const BASELINE_SHIFT: Record<string, number> = {
 };
 
 /**
- * Converts text to Latin-1 codes, the encoding both writers select for Helvetica
- * (`ISOLatin1Encoding` in EPS, `WinAnsiEncoding` in PDF, which agree on these codes).
+ * The WinAnsi characters between 0x80 and 0x9F that Helvetica draws (dashes, curly quotes, the euro sign):
+ * character, code, glyph name for the EPS encoding, and width in Helvetica and Helvetica-Bold.
+ */
+const WIN_ANSI_EXTRAS: readonly (readonly [string, number, string, number, number])[] = [
+  ['€', 0x80, 'Euro', 556, 556],
+  ['‚', 0x82, 'quotesinglbase', 222, 278],
+  ['ƒ', 0x83, 'florin', 556, 556],
+  ['„', 0x84, 'quotedblbase', 333, 500],
+  ['…', 0x85, 'ellipsis', 1000, 1000],
+  ['†', 0x86, 'dagger', 556, 556],
+  ['‡', 0x87, 'daggerdbl', 556, 556],
+  ['ˆ', 0x88, 'circumflex', 333, 333],
+  ['‰', 0x89, 'perthousand', 1000, 1000],
+  ['Š', 0x8a, 'Scaron', 667, 667],
+  ['‹', 0x8b, 'guilsinglleft', 333, 333],
+  ['Œ', 0x8c, 'OE', 1000, 1000],
+  ['Ž', 0x8e, 'Zcaron', 611, 611],
+  ['‘', 0x91, 'quoteleft', 222, 278],
+  ['’', 0x92, 'quoteright', 222, 278],
+  ['“', 0x93, 'quotedblleft', 333, 500],
+  ['”', 0x94, 'quotedblright', 333, 500],
+  ['•', 0x95, 'bullet', 350, 350],
+  ['–', 0x96, 'endash', 556, 556],
+  ['—', 0x97, 'emdash', 1000, 1000],
+  ['˜', 0x98, 'tilde', 333, 333],
+  ['™', 0x99, 'trademark', 1000, 1000],
+  ['š', 0x9a, 'scaron', 500, 556],
+  ['›', 0x9b, 'guilsinglright', 333, 333],
+  ['œ', 0x9c, 'oe', 944, 944],
+  ['ž', 0x9e, 'zcaron', 500, 500],
+  ['Ÿ', 0x9f, 'Ydieresis', 667, 667],
+];
+
+// Searched on use rather than prebuilt: nothing here runs when the module loads, so the bundler can
+// keep the vector writers out of the generator's first-load chunk (see `fontProlog` in epsExport.ts).
+const winAnsiByChar = (codePoint: number) => WIN_ANSI_EXTRAS.find(([ch]) => ch.codePointAt(0) === codePoint);
+const winAnsiByCode = (code: number) => WIN_ANSI_EXTRAS.find((extra) => extra[1] === code);
+
+/** `code /glyph put` pairs that give an ISOLatin1 font the WinAnsi extras, for the EPS font prolog. */
+export const winAnsiExtraPuts = (): string => WIN_ANSI_EXTRAS.map(([, code, glyph]) => `dup ${code} /${glyph} put`).join(' ');
+
+/**
+ * Converts text to WinAnsi codes, the encoding both writers select for Helvetica
+ * (`WinAnsiEncoding` in PDF; ISOLatin1Encoding plus the WinAnsi extras in EPS).
  * @param text - Text to encode.
- * @returns One code per character; characters outside Latin-1 become `?`.
+ * @returns One code per character; characters Helvetica cannot draw become `?`.
  */
 export function toLatin1Codes(text: string): number[] {
   return Array.from(text, (ch) => {
     const code = ch.codePointAt(0) ?? 63;
-    return code >= 32 && code <= 126 ? code : code >= 0xa0 && code <= 0xff ? code : 63;
+    if ((code >= 32 && code <= 126) || (code >= 0xa0 && code <= 0xff)) return code;
+    return winAnsiByChar(code)?.[1] ?? 63;
   });
 }
 
 const widthOf = (code: number, bold: boolean): number => {
   const table = bold ? HELVETICA_BOLD_WIDTHS : HELVETICA_WIDTHS;
   if (code >= 32 && code <= 126) return table[code - 32];
+  const extra = winAnsiByCode(code);
+  if (extra) return extra[bold ? 4 : 3];
   // Accented letters take the width of their base letter.
   const base = String.fromCharCode(code).normalize('NFD').charCodeAt(0);
   return base >= 32 && base <= 126 ? table[base - 32] : 556;
