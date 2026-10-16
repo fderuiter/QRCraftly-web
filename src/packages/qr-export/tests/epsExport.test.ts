@@ -31,7 +31,7 @@ if (typeof globalThis.DOMParser === 'undefined') {
 
 import { generateQREps, convertSvgToEps, MissingImageError, PayloadRejectedError } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
-import { QRType } from '@/types';
+import { EyeShape, type QRConfig, QRType } from '@/types';
 
 describe('EPS Vector Export', () => {
   it('generates a valid EPS document with standard headers and footer', async () => {
@@ -127,3 +127,12 @@ describe('EPS Vector Export', () => {
   });
 });
 
+describe('EPS eye shapes', () => {
+  it('draws a circle frame and a leaf ball differently from the pattern eyes', async () => {
+    const base: QRConfig = { ...DEFAULT_CONFIG };
+    const defaultEps = await generateQREps(base);
+    const shaped = await generateQREps({ ...base, eyeFrameShape: EyeShape.CIRCLE, eyeBallShape: EyeShape.LEAF });
+    expect(shaped.length).toBeGreaterThan(0);
+    expect(shaped).not.toBe(defaultEps);
+  });
+});

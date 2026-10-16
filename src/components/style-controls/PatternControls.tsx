@@ -4,6 +4,7 @@ import { PATTERNS, LOW_RELIABILITY_PATTERNS } from '../../constants';
 import { PatternModule } from '../ui/PatternModule';
 import { Alert } from '../ui/Alert';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { EyeShapeControls } from './EyeShapeControls';
 
 interface PatternControlsProps {
   config: QRConfig;
@@ -46,6 +47,8 @@ export const PatternControls: React.FC<PatternControlsProps> = ({ config, onChan
           ),
         }))}
       />
+
+      <EyeShapeControls config={config} onChange={onChange} />
     </div>
   );
 };

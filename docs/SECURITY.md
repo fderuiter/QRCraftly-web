@@ -124,6 +124,10 @@ Maze overlay configurations in `types.ts` (e.g., `isMazeEnabled`, `isMazeBridges
 
 Finder pattern color properties in `types.ts` (`eyeFrameColor` and `eyeBallColor`) are statically typed visual parameters. They allow distinct outer frame and inner eyeball styling while falling back safely to `eyeColor`.
 
+## Eye Shapes
+
+`eyeFrameShape` and `eyeBallShape` in `types.ts` take one of the fixed `EyeShape` values (`square`, `rounded`, `circle`, `leaf`). Style files and brand templates accept only those values (`src/utils/styleFields.ts`); anything else is skipped. An unset shape draws the eye exactly as the module pattern does. Shapes are drawn on the device like every other part of the code, and the scannability check decodes the result.
+
 ## Custom Frame Shapes and CTA Badges
 
 Custom frame shape and call-to-action (CTA) badge configurations in `types.ts` (e.g., `frameStyle`, `frameText`, `frameTextColor`, `frameBgColor`, `framePosition`, `frameIcon`) are strictly statically typed. The `frameText` field is validated via `validateConfig()` to reject control or BiDi characters, sanitized client-side without external persistence, and checked for minimum WCAG AA contrast (>= 4.5:1) in real time.

@@ -17,7 +17,7 @@
 */
 
 import type { QRConfig } from '@/types';
-import { drawEyeFrame, drawEyeball } from './canvasHelpers';
+import { drawEyeFrame, drawEyeball, EYE_POSITIONS, type EyePosition } from './canvasHelpers';
 import { type ModuleRenderOptions, sampleCellLuminances } from './modules';
 import { getLuminance } from '@/utils/colorUtils';
 
@@ -54,7 +54,9 @@ export const renderEyes = (
     }
   }
 
-  const drawEyePattern = (r: number, c: number, eyeId: string) => {
+  const drawEyePattern = (eye: EyePosition) => {
+    const r = eye.atBottom ? moduleCount - 7 : 0;
+    const c = eye.atRight ? moduleCount - 7 : 0;
     const x = drawX + c * cellSize;
     const y = drawY + r * cellSize;
     const size = 7 * cellSize;
@@ -93,7 +95,9 @@ export const renderEyes = (
       cellSize,
       config.style,
       frameColor,
-      holeColor
+      holeColor,
+      config.eyeFrameShape,
+      eye
     );
 
     drawEyeball(
@@ -105,13 +109,13 @@ export const renderEyes = (
       config.style,
       ballColor,
       holeColor,
-      eyeId
+      eye.id,
+      config.eyeBallShape,
+      eye
     );
   };
 
   // Draw Eyes (Last to ensure they overlap nicely if needed)
-  drawEyePattern(0, 0, 'top-left');
-  drawEyePattern(0, moduleCount - 7, 'top-right');
-  drawEyePattern(moduleCount - 7, 0, 'bottom-left');
+  EYE_POSITIONS.forEach(drawEyePattern);
 };
 

@@ -15,7 +15,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { PatternControls } from './PatternControls';
 import { DEFAULT_CONFIG } from '../../constants';
@@ -31,7 +31,8 @@ describe('PatternControls', () => {
     expect(group).toBeInTheDocument();
 
     // Check radios have aria-labels
-    const radios = screen.getAllByRole('radio');
+    // Scoped to the pattern group: the eye shape groups add their own radios to the page.
+    const radios = within(group).getAllByRole('radio');
     radios.forEach(radio => {
       expect(radio).toHaveAttribute('aria-label');
       expect(radio.getAttribute('aria-label')).toMatch(/select .* pattern/i);
@@ -62,5 +63,14 @@ describe('PatternControls', () => {
 
     rerender(<PatternControls config={DEFAULT_CONFIG} onChange={handleChange} />);
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
+  });
+
+  it('renders the eye frame and ball shape groups inside the pattern controls', () => {
+    render(<PatternControls config={DEFAULT_CONFIG} onChange={vi.fn()} />);
+
+    const patternControls = screen.getByRole('heading', { name: 'Pattern Style' }).parentElement;
+    expect(patternControls).not.toBeNull();
+    expect(patternControls).toContainElement(screen.getByRole('radiogroup', { name: 'Eye frame shape' }));
+    expect(patternControls).toContainElement(screen.getByRole('radiogroup', { name: 'Eye ball shape' }));
   });
 });

@@ -34,6 +34,18 @@ export const QRStyle = {
 export type QRStyle = (typeof QRStyle)[keyof typeof QRStyle];
 
 /**
+ * A shape for a finder eye's outer frame or inner ball, chosen apart from the module pattern.
+ * A config without one draws the eye the way its pattern does.
+ */
+export const EyeShape = {
+  SQUARE: 'square',
+  ROUNDED: 'rounded',
+  CIRCLE: 'circle',
+  LEAF: 'leaf',
+} as const;
+export type EyeShape = (typeof EyeShape)[keyof typeof EyeShape];
+
+/**
  * Defines the type of data encoded in the QR code.
  */
 export const QRType = {
@@ -165,6 +177,10 @@ export interface QRConfig {
   eyeFrameColor?: string;
   /** Optional independent color for the inner eyeballs. Falls back to eyeColor. */
   eyeBallColor?: string;
+  /** Optional shape for the outer eye frames. Without one, the frames follow `style`. */
+  eyeFrameShape?: EyeShape;
+  /** Optional shape for the inner eyeballs. Without one, the balls follow `style`. */
+  eyeBallShape?: EyeShape;
   /** The error correction level. */
   errorCorrectionLevel: QRErrorCorrectionLevel;
   /** Whether to draw a border around the QR code. */
