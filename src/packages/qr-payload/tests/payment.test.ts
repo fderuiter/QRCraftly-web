@@ -203,7 +203,7 @@ describe('Payment generator', () => {
       expect(sepaRefusal(data)).toBe('SEPA_NAME_VIOLATION');
     });
 
-    it('returns SEPA_NAME_VIOLATION when name is present but IBAN is missing', () => {
+    it('returns SEPA_IBAN_VIOLATION when name is present but IBAN is missing', () => {
       const data: PaymentData = {
         network: CryptoNetwork.EPC_SEPA,
         address: '',
@@ -211,7 +211,7 @@ describe('Payment generator', () => {
         amount: '',
         label: '',
       };
-      expect(sepaRefusal(data)).toBe('SEPA_NAME_VIOLATION');
+      expect(sepaRefusal(data)).toBe('SEPA_IBAN_VIOLATION');
     });
 
     it('returns PAYMENT_AMOUNT_VIOLATION when amount is invalid', () => {

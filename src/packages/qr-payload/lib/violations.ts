@@ -31,6 +31,7 @@ const VIOLATION_MESSAGES: Record<string, string> = {
   DELIMITER_VIOLATION:
     'Part of this email code is not encoded: a "?", "&" or ";" ends a field early, or it has a field other than To, Cc, Bcc, Subject and Body.',
   PAYMENT_AMOUNT_VIOLATION: 'The payment amount must be a plain number, within the decimal places its network allows.',
+  SEPA_IBAN_VIOLATION: 'A SEPA transfer code needs an IBAN.',
   SEPA_NAME_VIOLATION: "A SEPA transfer code needs the beneficiary's name.",
   SMS_PHONE_STRUCTURE_VIOLATION: 'SMS phone number contains invalid characters, letters, or line-breaks.',
 };

@@ -411,7 +411,7 @@ export const hydratePaymentData = (raw: string): PaymentData => {
 };
 
 /**
- * Checks if SEPA payment data contains a refusal violation (bad amount or missing required beneficiary name/IBAN).
+ * Checks if SEPA payment data contains a refusal violation (bad amount, or a missing IBAN or beneficiary name).
  * An all-blank or whitespace-only SEPA form is considered empty, not refused.
  * @param data - Payment input data.
  * @returns Violation code string or null if valid/empty.
@@ -435,7 +435,11 @@ export const sepaRefusal = (data: PaymentData): string | null => {
     return 'PAYMENT_AMOUNT_VIOLATION';
   }
 
-  if (!name || !iban) {
+  if (!iban) {
+    return 'SEPA_IBAN_VIOLATION';
+  }
+
+  if (!name) {
     return 'SEPA_NAME_VIOLATION';
   }
 
