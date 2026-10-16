@@ -40,6 +40,7 @@ jobs:
     permissions:
       contents: read
       actions: read # the nightly run compares main with the last successful nightly run
+      statuses: write # the Stitch review status (ADR 0051)
     outputs:
       run_checks: ${{ steps.plan.outputs.run_checks }}
       code_changed: ${{ steps.plan.outputs.code_changed }}
@@ -75,6 +76,28 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
           LAST_NIGHTLY_SHA: ${{ steps.last-nightly.outputs.sha }}
         run: node scripts/ci/ci_plan.js
+
+      # Required by the ruleset. Pending (never failure) on a Stitch PR until a maintainer
+      # adds ci-approved, so Stitch, which tries to fix red checks, has nothing to "fix";
+      # success everywhere else. If posting fails the status stays missing, which still
+      # blocks the merge, so the step may fail without failing the plan.
+      - name: Report the Stitch review status
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          AWAITING_APPROVAL: ${{ steps.plan.outputs.awaiting_approval }}
+        run: |
+          if [ "$AWAITING_APPROVAL" = "true" ]; then
+            state=pending
+            description="Waiting for a maintainer to review this bot PR and add ci-approved"
+          else
+            state=success
+            description="No review pending"
+          fi
+          gh api --method POST "repos/$REPO/statuses/$SHA" -f state="$state" -f context="Stitch review" -f description="$description"
 
   # Runs in parallel with the other jobs (none of them depends on it), so a new
   # upstream advisory never skips lint, tests or build. The CI aggregate requires it.
@@ -486,8 +509,7 @@ jobs:
             exit 1
           fi
           if [ "$AWAITING_APPROVAL" = "true" ]; then
-            echo "::error::This bot PR has not been reviewed yet. A maintainer adds the ci-approved label, then updates the branch to run CI."
-            exit 1
+            echo "::notice::Bot PR not reviewed yet, so no checks ran. The required Stitch review status stays pending until a maintainer adds ci-approved and updates the branch."
           fi
           for result in $NEEDS_RESULTS; do
             if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
