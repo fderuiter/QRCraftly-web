@@ -175,4 +175,28 @@ describe('StyleGallery', () => {
     ]);
     expect(screen.getByRole('radio', { name: /Slate color/i })).toHaveAttribute('aria-checked', 'true');
   });
+
+  it('previews updated gradient stops when hovering a color tile in linear mode', () => {
+    const { store } = setup();
+
+    act(() => {
+      store().updateConfig({
+        gradientType: 'linear',
+        gradientColorStops: [
+          { offset: 0, color: '#000000' },
+          { offset: 1, color: '#00ff00' },
+        ],
+      });
+    });
+
+    const slateTile = screen.getByRole('radio', { name: /Slate color/i });
+    fireEvent.pointerOver(slateTile, { pointerType: 'mouse' });
+
+    const activeConfig = store().getState().config;
+    expect(activeConfig.fgColor).toBe('#334155');
+    expect(activeConfig.gradientColorStops).toEqual([
+      { offset: 0, color: '#334155' },
+      { offset: 1, color: '#00ff00' },
+    ]);
+  });
 });

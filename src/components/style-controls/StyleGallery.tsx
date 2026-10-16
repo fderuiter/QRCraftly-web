@@ -24,6 +24,7 @@ interface Tile {
   name: string;
   patch: Partial<QRConfig>;
   choice: StyleChoice;
+  preset?: (typeof PRESET_COLORS)[number];
 }
 
 // Thumbnails kept in memory, newest last. The key holds the QR content, so it never leaves this module.
@@ -158,14 +159,8 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
   const colorTiles = useMemo<Tile[]>(
     () =>
       PRESET_COLORS.map((c) => {
-        const patch = {
-          fgColor: c.fg,
-          bgColor: c.bg,
-          eyeColor: c.eye,
-          eyeFrameColor: c.eye,
-          eyeBallColor: c.eye,
-        };
-        return { id: `color:${c.label}`, name: c.label, patch, choice: choiceOf(source, patch) };
+        const patch = buildPresetColorPatch(c, source);
+        return { id: `color:${c.label}`, name: c.label, patch, choice: choiceOf(source, patch), preset: c };
       }),
     [source]
   );
@@ -260,12 +255,9 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
 
   const apply = (tile: Tile) => {
     endPreview();
-    if (tile.id.startsWith('color:')) {
-      const preset = PRESET_COLORS.find((c) => `color:${c.label}` === tile.id);
-      if (preset) {
-        onChange(buildPresetColorPatch(preset, config));
-        return;
-      }
+    if (tile.preset) {
+      onChange(buildPresetColorPatch(tile.preset, config));
+      return;
     }
     onChange(tile.patch);
   };
@@ -277,7 +269,7 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
   };
 
   const selected = (tiles: Tile[]) =>
-    tiles.find((t) => Object.entries(t.patch).every(([key, value]) => baseLook[key as keyof StyleChoice] === value))?.id ?? '';
+    tiles.find((t) => Object.entries(t.patch).every(([key, value]) => !(key in baseLook) || baseLook[key as keyof StyleChoice] === value))?.id ?? '';
 
   const option = (tile: Tile, kind: 'pattern' | 'color') => {
     const tone = styleScanTone(tile.choice);

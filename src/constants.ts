@@ -88,6 +88,8 @@ import colorsData from './colors.json' with { type: 'json' };
  */
 export const PRESET_COLORS = colorsData.presets;
 
+export const DEFAULT_GRADIENT_END_COLOR = '#3b82f6';
+
 /**
  * Builds a patch object for applying a color preset, keeping gradient stops synchronized.
  * @param preset - Foreground, background, and eye colors from a preset theme.
@@ -99,7 +101,7 @@ export function buildPresetColorPatch(
   config?: Partial<QRConfig>
 ): Partial<QRConfig> {
   const currentStops = config?.gradientColorStops;
-  const stop1 = (currentStops && currentStops[1]?.color) ?? '#3b82f6';
+  const stop1 = (currentStops && currentStops[1]?.color) ?? DEFAULT_GRADIENT_END_COLOR;
   return {
     fgColor: preset.fg,
     bgColor: preset.bg,

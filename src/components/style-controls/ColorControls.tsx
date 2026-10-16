@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { GradientType, QRConfig } from '../../types';
-import { PRESET_COLORS, MIN_CONTRAST_THRESHOLD, buildPresetColorPatch } from '../../constants';
+import { PRESET_COLORS, MIN_CONTRAST_THRESHOLD, buildPresetColorPatch, DEFAULT_GRADIENT_END_COLOR } from '../../constants';
 import { getContrastRatio } from '../../utils/colorUtils';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
@@ -43,11 +43,11 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
     ? config.gradientColorStops
     : [
         { offset: 0, color: config.fgColor || '#000000' },
-        { offset: 1, color: '#3b82f6' },
+        { offset: 1, color: DEFAULT_GRADIENT_END_COLOR },
       ];
 
   const stop0Color = colorStops[0]?.color ?? config.fgColor;
-  const stop1Color = colorStops[1]?.color ?? '#3b82f6';
+  const stop1Color = colorStops[1]?.color ?? DEFAULT_GRADIENT_END_COLOR;
 
   const contrastRatios = useMemo(() => {
     const bgForContrast = config.bgColor === 'transparent' ? '#ffffff' : config.bgColor;
