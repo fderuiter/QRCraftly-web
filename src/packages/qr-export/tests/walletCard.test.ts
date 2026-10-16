@@ -38,8 +38,8 @@ function modulesOf(value: string) {
   return qrEncoder.create(value, { errorCorrectionLevel: 'M' }).modules;
 }
 
-/** Paints a plan into an RGBA buffer (text is skipped; only the rectangles matter for decoding). */
-function rasterize(plan: WalletCardPlan) {
+/** A context that paints rectangles into an RGBA buffer (text is skipped; only the rectangles matter for decoding). */
+function rasterContext(plan: WalletCardPlan) {
   const data = new Uint8ClampedArray(plan.width * plan.height * 4);
   let fill = '#ffffff';
   const ctx: WalletCardContext = {
@@ -58,52 +58,33 @@ function rasterize(plan: WalletCardPlan) {
       for (let row = y; row < y + h; row++) data.fill(level, (row * plan.width + x) * 4, (row * plan.width + x + w) * 4);
     },
   } as WalletCardContext;
-  paintWalletCard(ctx, plan);
-  for (let i = 3; i < data.length; i += 4) data[i] = 255;
-  return data;
+  const pixels = () => {
+    for (let i = 3; i < data.length; i += 4) data[i] = 255;
+    return data;
+  };
+  return { ctx, pixels };
 }
 
-/** Paints a plan using individual 1x1-module fillRect calls for each dark module. */
-function rasterizeReference(plan: WalletCardPlan) {
-  const data = new Uint8ClampedArray(plan.width * plan.height * 4);
-  let fill = '#ffffff';
-  const ctx: WalletCardContext = {
-    set fillStyle(value: string) {
-      fill = value;
-    },
-    get fillStyle() {
-      return fill;
-    },
-    font: '',
-    textAlign: 'center',
-    textBaseline: 'alphabetic',
-    fillText: () => undefined,
-    fillRect: (x: number, y: number, w: number, h: number) => {
-      const level = fill === '#000000' ? 0 : 255;
-      for (let row = y; row < y + h; row++) data.fill(level, (row * plan.width + x) * 4, (row * plan.width + x + w) * 4);
-    },
-  } as WalletCardContext;
+/** Paints a plan into an RGBA buffer with `paintWalletCard`. */
+function rasterize(plan: WalletCardPlan) {
+  const { ctx, pixels } = rasterContext(plan);
+  paintWalletCard(ctx, plan);
+  return pixels();
+}
 
+/** Paints a plan the old way, one `moduleSize` square per dark module, as the reference. */
+function rasterizeReference(plan: WalletCardPlan) {
+  const { ctx, pixels } = rasterContext(plan);
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, plan.width, plan.height);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  for (const line of plan.lines) {
-    ctx.font = line.font;
-    ctx.fillStyle = line.color;
-    ctx.fillText(line.text, line.x, line.y);
-  }
   ctx.fillStyle = '#000000';
   const { modules, moduleSize, originX, originY } = plan;
   for (let row = 0; row < modules.size; row++) {
     for (let col = 0; col < modules.size; col++) {
-      if (modules.get(row, col)) {
-        ctx.fillRect(originX + col * moduleSize, originY + row * moduleSize, moduleSize, moduleSize);
-      }
+      if (modules.get(row, col)) ctx.fillRect(originX + col * moduleSize, originY + row * moduleSize, moduleSize, moduleSize);
     }
   }
-  for (let i = 3; i < data.length; i += 4) data[i] = 255;
-  return data;
+  return pixels();
 }
 
 function countDarkRuns(modules: WalletCardPlan['modules']): number {
