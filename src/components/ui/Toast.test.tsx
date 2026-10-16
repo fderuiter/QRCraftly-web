@@ -225,4 +225,42 @@ describe('Toast Timing and Interactive Controls', () => {
     });
     expect(screen.queryByText('Test message')).not.toBeInTheDocument();
   });
+
+  it('should render toast container with symmetric mobile layout classes', () => {
+    const { container } = render(
+      <ToastProvider>
+        <TestComponent />
+      </ToastProvider>
+    );
+
+    fireEvent.click(screen.getByText('Show Toast'));
+
+    const toastContainer = container.querySelector('div.fixed');
+    expect(toastContainer).toBeInTheDocument();
+    expect(toastContainer?.className).toContain('bottom-4');
+    expect(toastContainer?.className).toMatch(/inset-x-4|left-4/);
+    expect(toastContainer?.className).toContain('md:left-auto');
+    expect(toastContainer?.className).toContain('md:right-4');
+    expect(toastContainer?.className).toContain('md:bottom-4');
+  });
+
+  it('should immediately dismiss toast when pressing Escape key on focused notification', () => {
+    render(
+      <ToastProvider>
+        <TestComponent />
+      </ToastProvider>
+    );
+
+    fireEvent.click(screen.getByText('Show Toast'));
+    const toastElement = screen.getByText('Test message').closest('[role="status"]');
+    expect(toastElement).toBeInTheDocument();
+
+    // Focus toast item
+    fireEvent.focus(toastElement!);
+
+    // Press Escape
+    fireEvent.keyDown(toastElement!, { key: 'Escape' });
+
+    expect(screen.queryByText('Test message')).not.toBeInTheDocument();
+  });
 });
