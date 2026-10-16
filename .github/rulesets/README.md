@@ -21,6 +21,17 @@ Applies to the default branch, `main`, which is the only long-lived branch and d
 
 These required checks are also what auto-merge waits for, so the ruleset must be imported before **Allow auto-merge** is turned on. Without it, an auto-merge PR would merge as soon as it is opened.
 
+### `main-merge-queue.json`: Protect main, with a merge queue
+
+The same ruleset as `main.json`, ready for the day the repository can use GitHub's merge queue ([ADR 0051](../../docs/adr/0051-merge-queue-readiness.md)). GitHub offers merge queues only to repositories owned by an organization (public, or private on GitHub Enterprise Cloud), so it cannot be imported while the repository belongs to a personal account. Until then `main.json` stays live and Claude's merge train does the queue's job.
+
+It differs from `main.json` in two places:
+
+- **Merge queue** (`merge_queue`): squash merges, up to **5 groups built at once**, up to 5 PRs merged in one push, no waiting for a minimum group, **only green PRs merge** (`ALLGREEN`), and a 90-minute timeout for the checks.
+- **Branches need not be up to date** (`strict_required_status_checks_policy: false`). The queue tests each PR on top of the newest `main` and the PRs ahead of it, so updating branches by hand would only re-run CI.
+
+`CI` and `PR Title` report on queue groups because `main.yml` and `pr-title.yml` also run on `merge_group`. `Workers Builds: qrcraftly` only reports if Cloudflare builds the queue's `gh-readonly-queue/main/*` branches. After importing, watch the first queued PR: if that check never appears on its group, remove it from this file's required checks (the `CI` Build job runs the same `pnpm build`) and import again.
+
 ### `tags.json`: Protect release tags
 
 Applies to `refs/tags/v*`.
@@ -43,7 +54,7 @@ It should list `required_status_checks` with the three checks above and `"requir
 Each file is a single raw JSON object (`{ ... }`), never an array, so it can be imported through the GitHub UI or the REST API. Check the syntax before importing:
 
 ```bash
-node -e "for (const f of ['main','tags']) JSON.parse(require('fs').readFileSync('.github/rulesets/' + f + '.json'))"
+node -e "for (const f of ['main','main-merge-queue','tags']) JSON.parse(require('fs').readFileSync('.github/rulesets/' + f + '.json'))"
 ```
 
 ## Keeping them in sync
