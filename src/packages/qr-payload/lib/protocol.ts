@@ -63,11 +63,12 @@ const HANDLE_PATTERN = /^[A-Za-z0-9_.-]+$/;
  *
  * For WhatsApp (`wa.me`), a query is accepted only when its only key is `text` and its
  * decoded value is non-blank, at most 256 characters, and equal to its own `trim()`.
- * @param parsed - The parsed `http`/`https` URL.
+ * @param parsed - The parsed URL; only `https` links can be profiles.
  * @returns The platform and handle, or `null`.
  */
 export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null => {
-  if (parsed.scheme !== 'http' && parsed.scheme !== 'https') return null;
+  // The Social form writes https links, so an http one stays a Website code to keep its scheme.
+  if (parsed.scheme !== 'https') return null;
   if (parsed.path.includes('#')) return null;
 
   const [rawHost, ...rest] = parsed.path.split('/');

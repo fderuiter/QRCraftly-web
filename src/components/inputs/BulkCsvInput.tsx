@@ -177,10 +177,14 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     return validateConfig(cfg).map(describeViolation);
   }, []);
 
+  // The row check reads only the design text (each row brings its own value and type), so
+  // colour or size changes don't re-check every row.
+  const { borderText, templateHeadline, templateSubtext, frameText } = currentConfig;
   const preflightReport = useMemo(() => {
     if (rows.length === 0 || !payloadCol) return null;
-    return categorizeCsvRows(rows, payloadCol, currentConfig, validateRowConfig, { contentType, rowNumbers });
-  }, [rows, payloadCol, currentConfig, validateRowConfig, contentType, rowNumbers]);
+    const designText = { borderText, templateHeadline, templateSubtext, frameText };
+    return categorizeCsvRows(rows, payloadCol, designText, validateRowConfig, { contentType, rowNumbers });
+  }, [rows, payloadCol, borderText, templateHeadline, templateSubtext, frameText, validateRowConfig, contentType, rowNumbers]);
 
   // The preview row is left out of the ZIP: say so beside the preview, with the same reason.
   const previewProblem = useMemo(() => {

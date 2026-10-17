@@ -462,6 +462,23 @@ describe('VCard generator', () => {
       expect(hydrated).toMatchObject({ street: '1 Main', city: 'Springfield', zip: '62701', country: 'US' });
     });
   });
+  describe('a card with no person name (#1481)', () => {
+    it.each([
+      ['phone', 'TEL:+15550100', '+15550100'],
+      ['email', 'EMAIL:info@example.com', 'info@example.com'],
+      ['organisation', 'ORG:Acme Inc', 'Acme Inc'],
+    ])('keeps an FN that repeats the %s out of First Name', (_field, line, fn) => {
+      const hydrated = hydrateVCardData(['BEGIN:VCARD', 'VERSION:4.0', 'N:;;;;', `FN:${fn}`, line, 'END:VCARD'].join('\r\n'));
+      expect(hydrated.firstName).toBe('');
+      expect(hydrated.lastName).toBe('');
+      expect(constructVCardString(hydrated)).toContain('N:;;;;');
+    });
+
+    it('still takes a real name from FN when N is empty', () => {
+      const hydrated = hydrateVCardData('BEGIN:VCARD\r\nVERSION:4.0\r\nN:;;;;\r\nFN:Ann Lee\r\nTEL:+15550100\r\nEND:VCARD');
+      expect(hydrated).toMatchObject({ firstName: 'Ann', lastName: 'Lee', phone: '+15550100' });
+    });
+  });
 });
 
 describe('Social profiles (#1470)', () => {

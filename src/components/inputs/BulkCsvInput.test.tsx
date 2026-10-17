@@ -17,16 +17,23 @@
 */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BulkCsvInput } from './BulkCsvInput';
 import { LazyBulkCsvInput } from './LazyBulkCsvInput';
 import { type BulkCsvData, SocialFormat } from '@/types';
-import { QRProvider } from '@/context/QRContext';
+import { QRProvider, useQRStore, type QRStore } from '@/context/QRContext';
 import { ToastProvider } from '../ui/Toast';
 import * as downloadManager from '@/utils/downloadManager';
 import * as qrExport from '@/packages/qr-export';
+import * as bulkCsv from '@/packages/bulk-csv';
 import { MAX_BULK_CSV_ROWS, SAMPLE_CSV_TEMPLATE } from '@/packages/bulk-csv';
+
+// The real row check, wrapped so a test can count how often it runs.
+vi.mock('@/packages/bulk-csv', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/packages/bulk-csv')>();
+  return { ...actual, categorizeCsvRows: vi.fn(actual.categorizeCsvRows) };
+});
 
 /** Lists the entry names in the central directory of a stored ZIP archive. */
 function zipEntryNames(bytes: Uint8Array): string[] {
@@ -899,5 +906,32 @@ describe('BulkCsvInput Component', () => {
       expect(downloadManager.triggerFileDownload).not.toHaveBeenCalled();
       spyPreflight.mockRestore();
     });
+  });
+});
+
+describe('BulkCsvInput preflight (#1481)', () => {
+  it('re-checks the rows only when design text changes, not on colour or size changes', () => {
+    const store: { current: QRStore | null } = { current: null };
+    const Capture = () => {
+      store.current = useQRStore();
+      return null;
+    };
+    const csvContent = 'url,name\nhttps://example.com,one\nhttps://example.org,two\n';
+    renderWithProvider(
+      <>
+        <Capture />
+        <BulkCsvInput data={{ csvContent, payloadColumn: 'url', filenameColumn: 'name', exportFormat: 'png' }} onChange={vi.fn()} />
+      </>
+    );
+    const categorize = vi.mocked(bulkCsv.categorizeCsvRows);
+    const before = categorize.mock.calls.length;
+    expect(before).toBeGreaterThan(0);
+
+    act(() => store.current?.updateConfig({ fgColor: '#123456' }));
+    act(() => store.current?.updateConfig({ logoSize: 0.3 }));
+    expect(categorize.mock.calls.length).toBe(before);
+
+    act(() => store.current?.updateConfig({ frameText: 'Scan me' }));
+    expect(categorize.mock.calls.length).toBe(before + 1);
   });
 });

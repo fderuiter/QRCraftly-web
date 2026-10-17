@@ -758,6 +758,26 @@ describe('generateQRSvg', () => {
       }
     });
 
+    it('aborts the logo download when the deadline passes (#1481)', async () => {
+      const originalFetch = global.fetch;
+      const signals: AbortSignal[] = [];
+      const hangingFetch: typeof fetch = (_input, init) => {
+        if (init?.signal) signals.push(init.signal);
+        return new Promise<Response>(() => {});
+      };
+      global.fetch = vi.fn(hangingFetch);
+
+      try {
+        const config: QRConfig = { ...DEFAULT_CONFIG, logoUrl: 'https://example.com/slow-abort-logo.png' };
+        const result = await preflightLogoCheck(config, { timeoutMs: 20 });
+        expect(result.error).toContain('timed out');
+        expect(signals).toHaveLength(1);
+        expect(signals[0].aborted).toBe(true);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
     it('rejects dangerous logo URLs', async () => {
       const config: QRConfig = {
         ...(DEFAULT_CONFIG as QRConfig),

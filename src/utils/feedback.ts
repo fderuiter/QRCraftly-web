@@ -37,11 +37,35 @@ export function vibrate(pattern: number | number[]): void {
  * Plays a short two-note chime made on the spot with Web Audio. No audio file is loaded. Callers
  * only use it after the person turned sound on.
  */
-export function playChime(): void {
-  const Context = typeof window !== 'undefined' ? (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) : undefined;
+type AudioContextClass = typeof AudioContext;
+
+const audioContextClass = (): AudioContextClass | undefined =>
+  typeof window !== 'undefined' ? (window.AudioContext ?? (window as unknown as { webkitAudioContext?: AudioContextClass }).webkitAudioContext) : undefined;
+
+/** One context for every chime, so a scan never builds audio from the camera callback. */
+let chimeContext: AudioContext | null = null;
+
+/**
+ * Creates or resumes the shared chime context. Call it from the click that turns sound on:
+ * iOS Safari lets audio start only inside a user gesture, and a camera frame is not one.
+ */
+export function unlockChime(): void {
+  const Context = audioContextClass();
   if (!Context) return;
   try {
-    const ctx = new Context();
+    chimeContext ??= new Context();
+    if (chimeContext.state === 'suspended') void chimeContext.resume();
+  } catch {
+    // Audio is a nicety; a blocked or missing audio device must never break a scan.
+  }
+}
+
+export function playChime(): void {
+  if (!chimeContext) unlockChime();
+  const ctx = chimeContext;
+  if (!ctx) return;
+  try {
+    if (ctx.state === 'suspended') void ctx.resume();
     const start = ctx.currentTime;
     [660, 880].forEach((frequency, index) => {
       const oscillator = ctx.createOscillator();
@@ -55,7 +79,6 @@ export function playChime(): void {
       oscillator.start(start + index * 0.14);
       oscillator.stop(start + index * 0.14 + 0.32);
     });
-    window.setTimeout(() => void ctx.close(), 900);
   } catch {
     // Audio is a nicety; a blocked or missing audio device must never break a transfer.
   }
