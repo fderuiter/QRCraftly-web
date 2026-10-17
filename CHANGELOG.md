@@ -9,6 +9,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-17
+
+### Features
+
+- feat(generator): shape the finder eyes' frame and ball apart from the pattern (#1488) (`e18953e`)
+- feat(seo): QR code size calculator, no-subscription guide and schema fixes (#1483) (`dbc06c2`)
+- feat(vcard): add X, LinkedIn, Instagram, Facebook and GitHub profile fields (#1484) (`6fe4dcf`)
+- feat(payment): add a UPI preset that builds static upi://pay codes (#1479) (`9231a45`)
+- feat: land reviewed Stitch batch 5 (email validation, WhatsApp message, frame fonts, bulk EPS/PDF, Wi-Fi card, WPA3) (#1477) (`21ded9a`)
+
+### Bug Fixes
+
+- fix: tidy the Stitch quality-pass leftovers (vCard and social round trips, bulk preflight, scan chime) (#1487) (`34c7ad2`)
+- fix: polish what Stitch landed (frames, transparent codes, typing errors, focus, bulk cancel, PDF/EPS text) (#1485) (`ec02662`)
+- fix: land reviewed Stitch batch 4 (gradient stops, Wi-Fi password warning, location retry, privacy grid, scan chime, SEPA refusal) (#1476) (`2ccf7fb`)
+- fix: land reviewed Stitch batch 3 (vCard checks, toast Escape, export width, canvas, wallet fillRect) (#1473) (`473eebc`)
+- fix(ui): add blur validation and state reset to ColorInput (#1434) (`016be5e`)
+- fix(ui): restrict className prop to outer field wrapper containers (#1433) (`78adea0`)
+
+### Maintenance
+
+- test(optical-transfer): wait for the manifest before showing the wallet code (#1489) (`1273ab3`)
+- refactor(utils): consolidate byte concatenation into shared bytes utility module (#1457) (`13101de`)
+- test(optical-modem): give the image-simulation tests room under coverage (#1475) (`adb0d7d`)
+- ci: shard unit tests, run quick checks on unreviewed Stitch PRs, trust only maintainer approvals (#1474) (`c20230f`)
+- ci: refresh visual baselines on CI and stop superseded runs queueing (#1443) (`326ca51`)
+- ci: keep unreviewed Stitch PRs pending instead of failing (#1472) (`9d12fa3`)
+
+---
+
+## [0.13.0] - 2026-10-16
+
+### Features
+
+- feat(bulk-csv): add pre-flight logo asset validation and error isolation (#1429) (`c2e7032`)
+- feat(seo): static and SVG QR code pages, install button and guide links (#1424) (`e51b57b`)
+- feat(ui): UI/UX overhaul: clearer generator, fixes with every warning, one consistent visual system (#1425) (`70b149e`)
+- feat(optical-modem): cut torn captures on a slant for a phone held upright (#1423) (`c77aa02`)
+- feat(optical-modem): Ultra Mono, a black-and-white 4K profile for phones that smear colour (#1422) (`86963bd`)
+- feat(copy): closed-source wording, a contact address and search fixes (#1420) (`9065fea`)
+- feat(optical-modem): torn-capture recovery, a robust large-grid finder and phone camera effects in the simulator (#1419) (`f17a89a`)
+- feat(generator): move signed wallet passes into a developer section (#1418) (`e12f17b`)
+- feat(generator): Google Wallet passes signed in the browser with your own issuer (#1417) (`0794779`)
+- feat(generator): sign Apple Wallet passes in the browser with your own certificate (#1416) (`84f9d32`)
+- feat(generator): Wallet card image for phone wallets (#1415) (`fd95df3`)
+- feat(content): honest About and Security copy, guide links, sitemap dates and share image sizes (#1392) (`d0b9f80`)
+
+### Bug Fixes
+
+- fix(content): plain template blurbs, clearer messages and screen-reader names, US spelling (#1407) (`009f2c6`)
+- fix(generator): draw the Grunge eyes the same way every time (#1400) (`d4473fb`)
+- fix(test): run the sitemap lastmod check on Node type stripping, not tsx (#1398) (`c8f5092`)
+- fix(generator): current scan verdict, faithful EPS/PDF export, MECARD address and Stitch UI lapses (#1390) (`c10c244`)
+
+### Performance
+
+- perf(optical-modem): tracked fiducial search, 1080p and 4K profiles and a ceiling bench (#1414) (`68ec87f`)
+
+### Maintenance
+
+- docs(agents): add rules from Stitch PR reviews (#1468) (`0ce7614`)
+- ci: hold Stitch PRs for review and prepare main for a merge queue (#1461) (`1dd6fb0`)
+- docs(foundry): list every kept dependency with its decision and effort (#1430) (`bfd8a19`)
+- ci: tiered CI for the private repository (#1421) (`94a2015`)
+- chore(deps): bump CI tooling (artifact actions, codeql upload-sarif, semgrep) (#1405) (`7776a33`)
+- ci(release): weekly release preview, uncached version.json and explained deploy timeouts (#1399) (`852a2c2`)
+- refactor: own duplicate checker, package-boundary checker and Tailwind class rule (#1396) (`1c5c976`)
+- refactor: own git hooks, Markdown parser and Node type stripping (#1395) (`62911f4`)
+- refactor: replace six test, CI and lint packages with our own code (#1393) (`9c0e9a1`)
+
+---
+
 ## [0.12.0] - 2026-10-10
 
 ### Features
