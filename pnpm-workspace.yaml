@@ -40,20 +40,12 @@ minimumReleaseAgeExclude:
   - '@esbuild/win32-x64@0.28.1'
   - esbuild@0.28.1
 
+# Each override says why it exists. Remove one when `pnpm audit` stays clean without it: the
+# 2026-10-19 review dropped twelve that no longer changed what resolves (the tree passed
+# `pnpm audit` with none of them), including an undici pin that held jsdom below the ^8 it asks for.
 overrides:
+  # One esbuild for Wrangler (which pins 0.28.1) and Vite, so a single build-script package is
+  # allowed in `allowBuilds` and released early in `minimumReleaseAgeExclude` above.
   esbuild: 0.28.1
-  ws: ">=8.21.0"
-  vite: ">=6.4.3"
-  undici: ">=7.29.1 <8"
-  "js-yaml": "^4.3.2"
-  postcss: "^8.5.22"
-  brace-expansion: "^5.0.12"
-  # minimatch@3 (ESLint 9 + react/jsx-a11y plugins) calls the CJS function export of brace-expansion 1.x.
-  "minimatch@3>brace-expansion": "^1.1.21"
-  nanoid: "^3.3.18"
-  sharp: "^0.35.4"
-  browserslist: "^4.28.7"
-  "@babel/core": "^7.29.1"
-  source-map-js: "^1.2.2"
-  smol-toml: "^1.8.1"
-  postcss-selector-parser: "^7.1.6"
+  # GHSA-wq5f-xc86-pv6w (librsvg in sharp < 0.35.5); Miniflare pins 0.35.4.
+  sharp: "^0.35.5"
