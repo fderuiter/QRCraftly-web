@@ -117,7 +117,9 @@ describe('VCardInput social profile fields (#1470)', () => {
 
   it('renders profile photo input and expectation hint in vCard 3.0 mode, and hides it in MECard mode', () => {
     const { rerender } = render(<VCardInput data={blankCard({ version: '3.0' })} onChange={vi.fn()} />);
-    expect(screen.getByRole('textbox', { name: /Profile Photo URL/i })).toBeInTheDocument();
+    const photoInput = screen.getByRole('textbox', { name: /Profile Photo URL/i });
+    expect(photoInput).toBeInTheDocument();
+    expect(photoInput).toHaveAttribute('aria-describedby', expect.stringContaining('vcard-photo-hint'));
     expect(screen.getByText(/Some phones don't load linked photos/i)).toBeInTheDocument();
 
     rerender(<VCardInput data={blankCard({ version: 'mecard' })} onChange={vi.fn()} />);

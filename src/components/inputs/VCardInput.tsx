@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { VCardData } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
+import { combineIds } from "@/utils/a11y";
 import { vCardFieldError, VCARD_SOCIAL_FIELDS, VCARD_SOCIAL_NETWORKS } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
 import {
@@ -151,9 +152,9 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
             value={data.photo || ""}
             onChange={(e) => onChange({ photo: e.target.value })}
             error={photoError}
-            aria-describedby={hintsId("vcard-photo")}
+            aria-describedby={combineIds("vcard-photo-hint", hintsId("vcard-photo"))}
           />
-          <p className="mt-1 text-xs text-fg-muted">Some phones don't load linked photos.</p>
+          <p id="vcard-photo-hint" className="mt-1 text-xs text-fg-muted">Some phones don't load linked photos.</p>
           {!photoError && <LinkHints fieldId="vcard-photo" address={data.photo || ""} />}
         </>
       )}
