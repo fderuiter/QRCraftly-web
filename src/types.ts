@@ -391,6 +391,8 @@ export interface VCardData {
   zip: string;
   /** The country of the contact. */
   country: string;
+  /** Profile photo image URL (vCard photo avatar). */
+  photo?: string;
   /** X handle or profile link (vCard only). */
   x?: string;
   /** LinkedIn handle or profile link (vCard only). */

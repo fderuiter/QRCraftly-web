@@ -58,6 +58,9 @@ describe('CI triggers and tiers (main.yml, ADR 0050)', () => {
     expect(shard).toContain('fail-fast: false');
     expect(shard).toContain('VITEST_SHARD_RUN: "true"');
     expect(shard).toContain('--shard="$SHARD/3" --reporter=blob');
+    // A failing shard names its test in the log and as a PR annotation (#1482).
+    expect(shard).toContain('--reporter=dot --reporter=github-actions');
+    expect(shard).toContain('--outputFile.blob=');
     expect(shard).toContain('include-hidden-files: true');
 
     const merge = jobBlock('test');
@@ -123,7 +126,22 @@ describe('package.json hygiene', () => {
   it('keeps pnpm overrides in pnpm-workspace.yaml', () => {
     const workspace = read('pnpm-workspace.yaml');
     expect(workspace).toMatch(/^overrides:/m);
-    expect(workspace).toContain('browserslist:');
+    expect(workspace).toContain('sharp: "^0.35.5"');
+  });
+
+  it('gives every pnpm override a comment saying why it exists', () => {
+    const lines = read('pnpm-workspace.yaml').split(/\r?\n/);
+    const start = lines.indexOf('overrides:');
+    const block: string[] = [];
+    for (const line of lines.slice(start + 1)) {
+      if (line !== '' && !line.startsWith(' ')) break;
+      block.push(line);
+    }
+    const entries = block.flatMap((line, i) => (/^ {2}[^#\s]/.test(line) ? [i] : []));
+    expect(entries.length).toBeGreaterThan(0);
+    for (const i of entries) {
+      expect(block[i - 1], `override "${block[i].trim()}" needs a comment line above it`).toMatch(/^ {2}#/);
+    }
   });
 });
 

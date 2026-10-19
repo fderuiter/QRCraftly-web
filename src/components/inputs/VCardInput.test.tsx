@@ -115,6 +115,16 @@ describe('VCardInput social profile fields (#1470)', () => {
     expect(screen.getByText(/vCard formats only/i)).toBeInTheDocument();
   });
 
+  it('renders profile photo input and expectation hint in vCard 3.0 mode, and hides it in MECard mode', () => {
+    const { rerender } = render(<VCardInput data={blankCard({ version: '3.0' })} onChange={vi.fn()} />);
+    expect(screen.getByRole('textbox', { name: /Profile Photo URL/i })).toBeInTheDocument();
+    expect(screen.getByText(/Some phones don't load linked photos/i)).toBeInTheDocument();
+
+    rerender(<VCardInput data={blankCard({ version: 'mecard' })} onChange={vi.fn()} />);
+    expect(screen.queryByRole('textbox', { name: /Profile Photo URL/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Some phones don't load linked photos/i)).not.toBeInTheDocument();
+  });
+
   it('passes the axe check in vCard 3.0 with blank and filled social fields', async () => {
     const blank = render(<VCardInput data={blankCard()} onChange={vi.fn()} />);
     expect((await axe(blank.container)).violations).toEqual([]);

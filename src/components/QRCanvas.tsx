@@ -17,137 +17,22 @@
 */
 
 import React, { useEffect, useLayoutEffect, useRef, useCallback, useState, useMemo } from 'react';
-import { type QRConfig, SocialFormat, TemplateStyle, type QRModules } from '../types';
-import { drawQR, drawQRInternal } from '../utils/qrRenderer';
-import { drawWithTemplate, SOCIAL_DIMENSIONS } from '@/packages/qr-export';
+import { type QRConfig, SocialFormat, type QRModules } from '../types';
+import { drawWithTemplate } from '@/packages/qr-export';
 import { useImage } from '../hooks/useImage';
 import { validateConfig, describeViolation } from '@/packages/qr-payload';
 import { Alert } from './ui/Alert';
 import { useOptionalQRStoreSelector } from '../context/QRContext';
 import { loadMosaicSource } from '@/packages/qr-matrix/mosaic';
-import {
-  generateMaze,
-  getMazeCacheKey,
-  storeMaze,
-  isMazeWorkerRequest,
-  assertMazeWorkerResponse,
-  type MazeData,
-} from '@/packages/qr-matrix/maze';
-import { buildMatrix, QrEncodeError, type QrEncoder } from '@/packages/qr-matrix';
+import { buildMatrix, drawQR, QrEncodeError, type QrEncoder } from '@/packages/qr-matrix';
 import { getQrCanvasRuntime } from '../utils/qrCanvasRuntime';
-import { motionAllowed } from '../hooks/usePresence';
 import { tooLongMessage, type PreviewFailure } from '../utils/previewFailure';
 import { getQrTypeLabel } from '../utils/a11y';
-
-/** Length of the preview crossfade in ms (#1054). */
-const CROSSFADE_MS = 150;
-/** The ghost canvas that fades a preview's previous frame out, kept for reuse: allocating a new
- * backing store for every change costs more than the copy into it. */
-const ghosts = new WeakMap<HTMLCanvasElement, { canvas: HTMLCanvasElement; animation: Animation | null }>();
-
-/**
- * Crossfades the preview when the QR or its design changes: copies the current frame into a
- * ghost canvas laid over the preview and fades the ghost out, while the caller draws the new
- * frame on the real canvas straight away (the correct frame is never delayed). Skipped under
- * reduced motion, for the first frame, when the frame size changes and without the Web
- * Animations API. The ghost leaves the page when the fade ends, leaving today's render.
- * @param canvas - The preview canvas, before it is redrawn.
- * @returns Call it after drawing: it drops the fade when the frame size changed.
- */
-function crossfadeFrom(canvas: HTMLCanvasElement): () => void {
-  const previous = ghosts.get(canvas);
-  previous?.animation?.cancel();
-  previous?.canvas.remove();
-  const container = canvas.parentElement;
-  const none = () => {};
-  if (!container || canvas.width === 0 || canvas.height === 0 || !motionAllowed()) return none;
-  const ghost = previous?.canvas ?? document.createElement('canvas');
-  if (typeof ghost.animate !== 'function') return none;
-  // Setting a size reallocates the canvas even when it is unchanged, so only a new size is set.
-  if (ghost.width !== canvas.width) ghost.width = canvas.width;
-  if (ghost.height !== canvas.height) ghost.height = canvas.height;
-  const ctx = ghost.getContext('2d');
-  if (!ctx) return none;
-  try {
-    ctx.clearRect(0, 0, ghost.width, ghost.height);
-    ctx.drawImage(canvas, 0, 0);
-  } catch {
-    return none;
-  }
-  ghost.setAttribute('aria-hidden', 'true');
-  ghost.className = 'pointer-events-none absolute inset-0 size-full';
-  container.appendChild(ghost);
-  const entry: { canvas: HTMLCanvasElement; animation: Animation | null } = { canvas: ghost, animation: null };
-  ghosts.set(canvas, entry);
-  const animation = ghost.animate([{ opacity: 1 }, { opacity: 0 }], {
-    duration: CROSSFADE_MS,
-    easing: 'cubic-bezier(0.2, 0, 0, 1)',
-    fill: 'forwards',
-  });
-  entry.animation = animation;
-  animation.onfinish = () => {
-    ghost.remove();
-    entry.animation = null;
-  };
-  return () => {
-    if (canvas.width !== ghost.width || canvas.height !== ghost.height) {
-      animation.cancel();
-      ghost.remove();
-    }
-  };
-}
-
-/**
- * Interface representing the computed dimensions and pixel scaling properties for a canvas.
- */
-interface CanvasDimensions {
-  useTemplate: boolean;
-  displayWidth: number;
-  displayHeight: number;
-  pixelWidth: number;
-  pixelHeight: number;
-  pixelRatio: number;
-}
-
-/**
- * Calculates display dimensions and physical pixel dimensions for a canvas based on
- * template configuration, base display size, and device pixel ratio.
- *
- * @param config - Configuration object containing template style and social format options.
- * @param size - Base display resolution size in CSS pixels.
- * @param customPixelRatio - Optional explicit pixel ratio. If omitted, defaults to window.devicePixelRatio or 1.
- * @returns Object containing template status, display dimensions, pixel dimensions, and resolved pixel ratio.
- */
-export function calculateCanvasDimensions(
-  config: Pick<QRConfig, 'templateStyle' | 'socialFormat'>,
-  size: number,
-  customPixelRatio?: number
-): CanvasDimensions {
-  const pixelRatio =
-    customPixelRatio ??
-    (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
-
-  const useTemplate =
-    config.templateStyle !== TemplateStyle.NONE ||
-    config.socialFormat !== SocialFormat.SQUARE_1_1;
-
-  const displayWidth = size;
-  let displayHeight = size;
-
-  if (useTemplate) {
-    const { width: fw, height: fh } = SOCIAL_DIMENSIONS[config.socialFormat];
-    displayHeight = Math.round((size * fh) / fw);
-  }
-
-  return {
-    useTemplate,
-    displayWidth,
-    displayHeight,
-    pixelWidth: displayWidth * pixelRatio,
-    pixelHeight: displayHeight * pixelRatio,
-    pixelRatio,
-  };
-}
+import { calculateCanvasDimensions } from './qr-canvas/canvasDimensions';
+import { crossfadeFrom } from './qr-canvas/crossfade';
+import { scheduleVirtualRender, type RenderedInfo, type ScheduledRender } from './qr-canvas/virtualRender';
+import { useMazeData } from './qr-canvas/useMazeData';
+import { useQrAnimation } from './qr-canvas/useQrAnimation';
 
 /**
  * Props for the QRCanvas component.
@@ -160,7 +45,7 @@ interface QRCanvasProps {
   /** Optional CSS class names to apply to the canvas element. */
   className?: string;
   /** Optional callback fired when rendering is complete. */
-  onRendered?: (info: { moduleCount: number; virtualImageData?: ImageData; virtualImageBitmap?: ImageBitmap }) => void;
+  onRendered?: (info: RenderedInfo) => void;
   /** Optional callback fired when the preview cannot draw a code, with the reason (#1251). */
   onRenderFailed?: (reason: PreviewFailure) => void;
   /** Sequence of string values representing animated QR frames. If omitted, falls back to config.animationValues. */
@@ -241,23 +126,17 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     };
   }, [activeConfig.mosaicImageUrl]);
 
-  // Animation states and refs to ensure we can read latest visual styles without rebuilding/restarting loop
-  const cachedFramesRef = useRef<{ value: string; modules: QRModules }[]>([]);
-  const isAnimatingRef = useRef(activeIsAnimating);
+  // The latest config and images, read by stable paint callbacks without rebuilding them.
   const configRef = useRef(activeConfig);
   const logoImgRef = useRef(logoImg);
   const borderLogoImgRef = useRef(borderLogoImg);
-
-  useEffect(() => {
-    isAnimatingRef.current = activeIsAnimating;
-  }, [activeIsAnimating]);
 
   const onRenderedRef = useRef(onRendered);
   const onRenderFailedRef = useRef(onRenderFailed);
   // Set when the content does not fit the chosen error-correction level, so the preview can say so.
   const [isTooLong, setIsTooLong] = useState(false);
   const sizeRef = useRef(size);
-  const virtualRenderTimerRef = useRef<{ cancel: () => void } | null>(null);
+  const virtualRenderTimerRef = useRef<ScheduledRender | null>(null);
 
   useEffect(() => {
     return () => {
@@ -279,258 +158,28 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     sizeRef.current = size;
   });
 
-  // Pre-calculate and cache the complete sequence of QR frame matrices before starting loop
-  useEffect(() => {
-    if (!activeAnimationValues || activeAnimationValues.length === 0) {
-      cachedFramesRef.current = [];
-      return;
-    }
-
-    let isMounted = true;
-    Promise.resolve(getQrCanvasRuntime().loadEncoder()).then((QRCode) => {
-      if (!isMounted) return;
-      try {
-        const cached = activeAnimationValues.map((val, index) => {
-          try {
-            const modules = buildMatrix(
-              { type: config.type, value: val, errorCorrectionLevel: config.errorCorrectionLevel },
-              QRCode
-            );
-            return { value: val, modules };
-          } catch (e) {
-            // Log the frame position and error kind only, never the frame content (#1268).
-            console.warn(`QR precompute failed for frame ${index + 1}:`, e instanceof Error ? e.name : typeof e);
-            return null;
-          }
-        }).filter((frame): frame is { value: string; modules: QRModules } => frame !== null);
-        cachedFramesRef.current = cached;
-      } catch (err) {
-        console.error("Precomputing matrices failed:", err);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      cachedFramesRef.current = [];
-    };
-  }, [activeAnimationValues, config.type, config.errorCorrectionLevel]);
-
-  // Direct canvas animation loop using requestAnimationFrame, bypassing React updates
-  useEffect(() => {
-    if (!activeIsAnimating) return;
-
-    const canvas = localCanvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Fixed canvas dimensions at initialization to prevent buffer resets/flickering
-    const dims = calculateCanvasDimensions(configRef.current, size);
-    canvas.width = dims.pixelWidth;
-    canvas.height = dims.pixelHeight;
-
-    let animationFrameId: number;
-    let lastFrameTime = performance.now();
-    let currentFrameIdx = 0;
-    const fps = activeAnimationFps || 30;
-    const frameInterval = 1000 / fps;
-
-    const loop = (now: number) => {
-      if (!isAnimatingRef.current) return;
-
-      const elapsed = now - lastFrameTime;
-
-      if (elapsed >= frameInterval) {
-        lastFrameTime = now - (elapsed % frameInterval);
-
-        const frames = cachedFramesRef.current;
-        if (frames && frames.length > 0) {
-          const frame = frames[currentFrameIdx % frames.length];
-          if (frame && frame.modules) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const currentConfig = configRef.current;
-            const currentLogoImg = logoImgRef.current;
-            const currentBorderLogoImg = borderLogoImgRef.current;
-            const currentDims = calculateCanvasDimensions(currentConfig, size, dims.pixelRatio);
-
-            if (currentDims.useTemplate) {
-              ctx.save();
-              ctx.scale(dims.pixelRatio, dims.pixelRatio);
-              drawWithTemplate(
-                ctx as unknown as CanvasRenderingContext2D,
-                frame.modules,
-                currentConfig,
-                currentLogoImg,
-                currentBorderLogoImg,
-                dims.displayWidth,
-                dims.displayHeight,
-                frame.modules.size,
-                false,
-                computedMazeDataRef.current
-              );
-              ctx.restore();
-            } else {
-              drawQR(
-                ctx,
-                frame.modules,
-                currentConfig,
-                currentLogoImg,
-                currentBorderLogoImg,
-                size,
-                computedMazeDataRef.current
-              );
-            }
-
-            // Sample the onRendered triggers or completely pause them to avoid main thread blocking
-            if (onRendered && currentFrameIdx % 60 === 0) {
-              onRendered({ moduleCount: frame.modules.size });
-            }
-
-            currentFrameIdx++;
-          }
-        }
-      }
-
-      animationFrameId = requestAnimationFrame(loop);
-    };
-
-    animationFrameId = requestAnimationFrame(loop);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [activeIsAnimating, size, activeAnimationFps, onRendered]);
-
   // Web Worker setup and configuration calculation
   const workerRef = useRef<Worker | null>(null);
   const sequenceIdRef = useRef<number>(0);
   const lastModulesRef = useRef<QRModules | null>(null);
   const isWorkerFallbackRef = useRef<boolean>(false);
 
-  const mazeWorkerRef = useRef<Worker | null>(null);
-  const mazeSequenceIdRef = useRef<number>(0);
-  const isMazeWorkerFallbackRef = useRef<boolean>(false);
-  const mazeCacheKeyRef = useRef<string | null>(null);
-  const [computedMazeData, setComputedMazeData] = useState<MazeData | null>(null);
-  const computedMazeDataRef = useRef<MazeData | null>(null);
+  const { mazeData: computedMazeData, mazeDataRef: computedMazeDataRef, requestMaze: requestMazeCalculation } = useMazeData(configRef);
 
-  useLayoutEffect(() => {
-    computedMazeDataRef.current = computedMazeData;
-  }, [computedMazeData]);
-
-  const initMazeWorker = useCallback(() => {
-    if (isMazeWorkerFallbackRef.current) return;
-
-    if (mazeWorkerRef.current) {
-      mazeWorkerRef.current.terminate();
-      mazeWorkerRef.current = null;
-    }
-
-    try {
-      const worker = getQrCanvasRuntime().createMazeWorker();
-      if (!worker) {
-        isMazeWorkerFallbackRef.current = true;
-        return;
-      }
-
-      worker.onmessage = (e) => {
-        // Strictly validate message format at runtime
-        assertMazeWorkerResponse(e.data);
-
-        const { status, sequenceId, mazeData, error } = e.data;
-        if (sequenceId !== mazeSequenceIdRef.current) {
-          return;
-        }
-
-        if (status === 'success' && mazeData) {
-          setComputedMazeData(mazeData);
-          if (mazeCacheKeyRef.current) {
-            storeMaze(mazeCacheKeyRef.current, mazeData);
-          }
-        } else {
-          console.warn("Background maze calculation failed:", error);
-        }
-      };
-
-      worker.onerror = (e) => {
-        console.error("Maze background worker error, restarting:", e);
-        // Crash recovery: terminate current process and spin up replacement
-        initMazeWorker();
-      };
-
-      mazeWorkerRef.current = worker;
-    } catch (err) {
-      console.warn("Failed to initialize background maze worker, falling back:", err);
-      isMazeWorkerFallbackRef.current = true;
-    }
-  }, []);
-
-  useEffect(() => {
-    initMazeWorker();
-    return () => {
-      if (mazeWorkerRef.current) {
-        mazeWorkerRef.current.terminate();
-        mazeWorkerRef.current = null;
-      }
-    };
-  }, [initMazeWorker]);
-
-  // Reads the config from its ref so this callback, and everything built on it, stays stable:
-  // otherwise every config change would recreate the matrix worker and re-request the matrix.
-  const requestMazeCalculation = useCallback((modules: QRModules) => {
-    const activeConfig = configRef.current;
-    if (!activeConfig.isMazeEnabled) {
-      setComputedMazeData(null);
-      return;
-    }
-
-    mazeSequenceIdRef.current += 1;
-    const currentSeqId = mazeSequenceIdRef.current;
-
-    const size = modules.size;
-    mazeCacheKeyRef.current = getMazeCacheKey(activeConfig, size, modules);
-    const matrix = new Uint8Array(size * size);
-    for (let r = 0; r < size; r++) {
-      for (let c = 0; c < size; c++) {
-        matrix[r * size + c] = modules.get(r, c) ? 1 : 0;
-      }
-    }
-
-    if (mazeWorkerRef.current && !isMazeWorkerFallbackRef.current) {
-      const requestPayload = {
-        size,
-        matrix,
-        config: activeConfig,
-        sequenceId: currentSeqId,
-      };
-
-      // Strict validation before posting
-      if (!isMazeWorkerRequest(requestPayload)) {
-        throw new Error('Invalid MazeWorkerRequest payload built on main thread');
-      }
-
-      mazeWorkerRef.current.postMessage(requestPayload);
-    } else {
-      // Fallback: run pathfinding on the main thread during idle time
-      const runner = () => {
-        if (currentSeqId !== mazeSequenceIdRef.current) return;
-        try {
-          const mazeData = generateMaze(modules, activeConfig, size);
-          setComputedMazeData(mazeData);
-        } catch (e) {
-          console.warn("Main thread fallback maze generation failed:", e);
-        }
-      };
-
-      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-        window.requestIdleCallback(runner);
-      } else {
-        setTimeout(runner, 0);
-      }
-    }
-  }, []);
+  useQrAnimation({
+    canvasRef: localCanvasRef,
+    isAnimating: activeIsAnimating,
+    values: activeAnimationValues,
+    fps: activeAnimationFps,
+    size,
+    type: config.type,
+    errorCorrectionLevel: config.errorCorrectionLevel,
+    configRef,
+    logoImgRef,
+    borderLogoImgRef,
+    mazeDataRef: computedMazeDataRef,
+    onRendered,
+  });
 
   const clearCanvasAndResize = useCallback(() => {
     const canvas = localCanvasRef.current;
@@ -572,7 +221,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
       ctx.scale(dims.pixelRatio, dims.pixelRatio);
 
       drawWithTemplate(
-        ctx as unknown as CanvasRenderingContext2D,
+        ctx,
         modules,
         currentConfig,
         currentLogoImg,
@@ -591,82 +240,17 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     settleCrossfade();
 
     if (currentOnRendered) {
-      const runVirtualRender = () => {
-        try {
-          const virtualSize = Math.max(512, Math.min(1024, (modules.size + 8) * 10));
-          let vCanvas: HTMLCanvasElement | OffscreenCanvas;
-
-          if (typeof OffscreenCanvas !== 'undefined') {
-            vCanvas = new OffscreenCanvas(virtualSize, virtualSize);
-          } else {
-            vCanvas = document.createElement('canvas');
-            vCanvas.width = virtualSize;
-            vCanvas.height = virtualSize;
-          }
-
-          const vCtx = vCanvas.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D | null;
-          if (!vCtx || typeof vCtx.fillRect !== 'function' || typeof vCtx.clearRect !== 'function') {
-            currentOnRendered({ moduleCount: modules.size });
-            return;
-          }
-
-          vCtx.clearRect(0, 0, virtualSize, virtualSize);
-          drawQRInternal(
-            vCtx as unknown as CanvasRenderingContext2D,
-            modules,
-            currentConfig,
-            currentLogoImg,
-            currentBorderLogoImg,
-            virtualSize,
-            modules.size,
-            true,
-            computedMazeDataRef.current
-          );
-
-          if (typeof globalThis.createImageBitmap === 'function') {
-            createImageBitmap(vCanvas).then((imageBitmap) => {
-              currentOnRendered({ moduleCount: modules.size, virtualImageBitmap: imageBitmap });
-            }).catch((err) => {
-              console.error("createImageBitmap failed in virtual render:", err);
-              const imageData = vCtx.getImageData(0, 0, virtualSize, virtualSize);
-              currentOnRendered({ moduleCount: modules.size, virtualImageData: imageData });
-            });
-          } else {
-            const imageData = vCtx.getImageData(0, 0, virtualSize, virtualSize);
-            currentOnRendered({ moduleCount: modules.size, virtualImageData: imageData });
-            if (vCanvas) {
-              vCanvas.width = 0;
-              vCanvas.height = 0;
-            }
-          }
-        } catch (err) {
-          console.error("Virtual rendering failed:", err);
-          currentOnRendered({ moduleCount: modules.size });
-        }
-      };
-
-      if (virtualRenderTimerRef.current) {
-        virtualRenderTimerRef.current.cancel();
-        virtualRenderTimerRef.current = null;
-      }
-
-      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-        const handle = window.requestIdleCallback(runVirtualRender, { timeout: 100 });
-        virtualRenderTimerRef.current = {
-          cancel: () => {
-            if (typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
-              window.cancelIdleCallback(handle);
-            }
-          },
-        };
-      } else {
-        const handle = setTimeout(runVirtualRender, 50);
-        virtualRenderTimerRef.current = {
-          cancel: () => clearTimeout(handle),
-        };
-      }
+      virtualRenderTimerRef.current?.cancel();
+      virtualRenderTimerRef.current = scheduleVirtualRender({
+        modules,
+        config: currentConfig,
+        logoImg: currentLogoImg,
+        borderLogoImg: currentBorderLogoImg,
+        mazeData: computedMazeDataRef.current,
+        onRendered: currentOnRendered,
+      });
     }
-  }, []);
+  }, [computedMazeDataRef]);
 
   const paintMatrix = useCallback((modules: QRModules) => {
     requestMazeCalculation(modules);

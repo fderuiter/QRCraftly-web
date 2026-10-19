@@ -18,7 +18,8 @@
 
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach, onTestFinished, type Mock } from 'vitest';
-import QRCanvas, { calculateCanvasDimensions } from './QRCanvas';
+import QRCanvas from './QRCanvas';
+import { calculateCanvasDimensions } from './qr-canvas/canvasDimensions';
 import { DEFAULT_CONFIG } from '../constants';
 import {
   EyeShape,
