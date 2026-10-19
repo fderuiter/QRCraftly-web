@@ -40,8 +40,8 @@ describe('previewRow', () => {
   });
 
   it('re-throws non-CsvParseError errors in previewRow', async () => {
-    const bulkCsvModule = await import('../index');
-    const spy = vi.spyOn(bulkCsvModule, 'parseCsv').mockImplementationOnce(() => {
+    const csvModule = await import('../lib/csv');
+    const spy = vi.spyOn(csvModule, 'parseCsv').mockImplementationOnce(() => {
       throw new TypeError('Unexpected runtime exception');
     });
     expect(() => previewRow('a,b\n1,2', 'a')).toThrow(TypeError);
