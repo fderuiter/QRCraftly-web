@@ -22,6 +22,9 @@ description: How to drive a QRCraftly pull request to merged. Use when opening a
 
 - The title is a Conventional Commit (`fix(scanner): handle empty frames`). It becomes the squash commit and drives the version bump, so pick `feat` versus `fix` deliberately.
 - The base is always `main`. There is no `dev` branch.
+- Open it as a draft and keep it there until it is done. CI minutes are metered ([ADR 0050](../../../docs/adr/0050-ci-tiers-for-a-private-repository.md)): drafts skip unit tests, E2E and Lighthouse, and ready PRs run Chromium E2E only.
+- Add the `full-e2e` label when the change may behave differently in Firefox or WebKit (and on a release PR whose branch does not start with `release/`). Add it before the push or ready toggle that should use it: `main.yml` does not run on `labeled`, so a label added later changes nothing until the next push or draft-to-ready toggle.
+- Write one closing keyword per issue (`Closes #12. Closes #13.`). In `Closes #12, #13` GitHub closes only #12.
 - Prefer one complete, tested PR over a chain of small ones. Every merge deploys to production.
 
 ## Getting it green
@@ -33,6 +36,8 @@ The required checks are `CI`, `PR Title` and `Workers Builds: qrcraftly`.
 - **`Workers Builds: qrcraftly` red**: the Cloudflare build runs `pnpm run build`; reproduce it with `pnpm build`.
 - **Bundle size**: CI runs `pnpm run check-bundle-size` after the build. Shrink the change rather than raising the budget.
 - Never skip, disable or quarantine a test, push an empty commit, or close and reopen a PR to re-trigger CI.
+
+- **Visual baselines**: screenshots taken locally or in a cloud session never match CI's fonts. For a PR that moves layout on purpose, add `full-e2e`, then the `update-snapshots` label; `.github/workflows/update-snapshots.yml` commits refreshed baselines to the branch. CI runs on that bot commit wait as `action_required` until a maintainer approves them.
 
 ## Reviews
 
