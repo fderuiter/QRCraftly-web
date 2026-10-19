@@ -18,8 +18,12 @@ Node 22 and pnpm 11 are preinstalled in the cloud container; Chromium is at
 pnpm install --frozen-lockfile
 ```
 
-It warns `Unsupported engine` on Node 22.22.0 (`.nvmrc` wants 22.22.2).
-Install, dev, build, tests and the TypeScript scripts all worked anyway.
+In a cloud session the SessionStart hook (`.claude/hooks/session-start.sh`)
+has already done this: it installs the Node version `.nvmrc` pins with nvm,
+runs the install, builds the Playwright browser shim from Gotchas and sets
+`PLAYWRIGHT_BROWSERS_PATH` to it, installs the pinned Rust toolchain, Semgrep
+and ShellCheck. Without the hook, Node 22.22.0 warns `Unsupported engine`
+(`.nvmrc` wants 22.22.2), but everything still works.
 
 ## Run (agent path)
 
@@ -128,7 +132,8 @@ Run the tests for the files you touched:
 pnpm exec vitest run src/packages/qr-payload/tests/wifi.test.ts src/components/inputs/WifiInput.test.tsx
 ```
 
-Playwright e2e needs the browser shim from Gotchas. With a build already in
+Playwright e2e needs the browser shim from Gotchas (the hook sets
+`PLAYWRIGHT_BROWSERS_PATH` to one; drop that variable below if so). With a build already in
 `dist/`, it starts `pnpm preview` itself and stops it afterwards:
 
 ```bash
