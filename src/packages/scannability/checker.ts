@@ -40,6 +40,7 @@ export interface ScannabilityEvaluation {
 
 export interface EvaluateScannabilityOptions {
   moduleCount?: number;
+  quietZoneModules?: number;
 }
 
 /**
@@ -58,7 +59,8 @@ export function evaluateScannability(
   config: QRConfig,
   options: EvaluateScannabilityOptions = {}
 ): ScannabilityEvaluation {
-  const result = performScannabilityCheck(reader, source, source.width, source.height, options.moduleCount);
+  const quietZoneModules = options.quietZoneModules ?? config.quietZoneModules ?? 4;
+  const result = performScannabilityCheck(reader, source, source.width, source.height, options.moduleCount, quietZoneModules);
 
   const localMetrics =
     result.localContrastViolations !== undefined

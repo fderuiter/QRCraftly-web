@@ -17,6 +17,7 @@ export function isWorkerRequest(data: unknown): data is {
   height: number;
   configId?: string | null;
   moduleCount?: number;
+  quietZoneModules?: number;
 } {
   if (typeof data !== 'object' || data === null) return false;
   const d = data as Record<string, unknown>;
@@ -35,6 +36,7 @@ export function isWorkerRequest(data: unknown): data is {
   if (typeof d.height !== 'number' || isNaN(d.height) || d.height <= 0) return false;
   if (d.configId !== undefined && d.configId !== null && typeof d.configId !== 'string') return false;
   if (d.moduleCount !== undefined && d.moduleCount !== null && (typeof d.moduleCount !== 'number' || isNaN(d.moduleCount) || d.moduleCount <= 0)) return false;
+  if (d.quietZoneModules !== undefined && d.quietZoneModules !== null && (typeof d.quietZoneModules !== 'number' || isNaN(d.quietZoneModules) || d.quietZoneModules < 0)) return false;
   return true;
 }
 
@@ -81,6 +83,9 @@ export function assertWorkerRequest(data: unknown): asserts data is WorkerReques
   }
   if (d.moduleCount !== undefined && d.moduleCount !== null && (typeof d.moduleCount !== 'number' || isNaN(d.moduleCount) || d.moduleCount <= 0)) {
     throw new Error('Worker request moduleCount must be a positive number');
+  }
+  if (d.quietZoneModules !== undefined && d.quietZoneModules !== null && (typeof d.quietZoneModules !== 'number' || isNaN(d.quietZoneModules) || d.quietZoneModules < 0)) {
+    throw new Error('Worker request quietZoneModules must be a non-negative number');
   }
 }
 

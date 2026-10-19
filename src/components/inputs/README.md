@@ -99,6 +99,7 @@ The centralized configuration in `src/types.ts` also contains parameters for gen
 - `mazeColor`: Sets maze path color.
 - `mazePathWidth`: Controls maze path width.
 - `showMazeSolution`: Toggles solved path visibility.
+- `quietZoneModules`: Controls the quiet zone margin around the QR matrix in modules (2 to 10, default 4).
 
 These parameters are controlled via `AdvancedControls.tsx`.
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel } from '../src/types';
 import { getStyleAdaptiveMazePathWidth, getMazeCacheKey, renderMaze } from '../src/packages/qr-matrix/maze';
-import { drawQRInternal } from '../src/utils/qrRenderer';
+import { drawQRInternal } from '../src/packages/qr-matrix';
 import * as scannabilityChecker from '@/packages/scannability/checker';
 import { qrReader } from './fixtures/qrReader';
 import { qrEncoder as QRCode } from './fixtures/qrEncoder';
