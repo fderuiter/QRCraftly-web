@@ -22,6 +22,9 @@ description: How to drive a QRCraftly pull request to merged. Use when opening a
 
 - The title is a Conventional Commit (`fix(scanner): handle empty frames`). It becomes the squash commit and drives the version bump, so pick `feat` versus `fix` deliberately.
 - The base is always `main`. There is no `dev` branch.
+- Open it as a draft and keep it there until it is done. CI minutes are metered ([ADR 0050](../../../docs/adr/0050-ci-tiers-for-a-private-repository.md)): drafts skip unit tests, E2E and Lighthouse, and ready PRs run Chromium E2E only.
+- Add the `full-e2e` label when the change may behave differently in Firefox or WebKit (and on a release PR whose branch does not start with `release/`). Add it before the push or ready toggle that should use it: `main.yml` does not run on `labeled`, so a label added later changes nothing until the next push or draft-to-ready toggle.
+- Write one closing keyword per issue (`Closes #12. Closes #13.`). In `Closes #12, #13` GitHub closes only #12.
 - Prefer one complete, tested PR over a chain of small ones. Every merge deploys to production.
 
 ## Getting it green
@@ -34,6 +37,8 @@ The required checks are `CI`, `PR Title` and `Workers Builds: qrcraftly`.
 - **Bundle size**: CI runs `pnpm run check-bundle-size` after the build. Shrink the change rather than raising the budget.
 - Never skip, disable or quarantine a test, push an empty commit, or close and reopen a PR to re-trigger CI.
 
+- **Visual baselines**: screenshots taken locally or in a cloud session never match CI's fonts. For a PR that moves layout on purpose, add `full-e2e`, then the `update-snapshots` label; `.github/workflows/update-snapshots.yml` commits refreshed baselines to the branch. CI runs on that bot commit wait as `action_required` until a maintainer approves them.
+
 ## Reviews
 
 - Fix small, local review asks (nits, renames, an added test) and push.
@@ -43,8 +48,9 @@ The required checks are `CI`, `PR Title` and `Workers Builds: qrcraftly`.
 ## Merging
 
 - Merge only when every required check is green on the current head. Local checks alone never justify a merge.
-- Enable auto-merge (squash) on a PR you opened once it is complete; GitHub merges it when the checks pass.
-- **Never** enable auto-merge on, or merge, a `chore(release): vX.Y.Z` PR. A maintainer merges those by hand.
+- The maintainer merges. Never merge a PR or enable auto-merge on one unless the maintainer has said so in words for that PR ([ADR 0020](../../../docs/adr/0020-trunk-based-releases-on-main.md), amendment).
+- Once the PR is complete and every required check is green on the current head, mark it ready for review and tell the maintainer it is ready. Remember that marking a PR ready starts the full CI tier, so let that run finish green before saying so.
+- **Never** enable auto-merge on, or merge, a `chore(release): vX.Y.Z` PR, even when asked to merge others. A maintainer merges those by hand.
 - No admin bypass of the `main` ruleset.
 
 ## Merge conflicts
@@ -56,7 +62,7 @@ The required checks are `CI`, `PR Title` and `Workers Builds: qrcraftly`.
 
 ## Merge queue
 
-GitHub's merge queue needs an organization-owned repository, so it is not on yet ([ADR 0051](../../../docs/adr/0051-merge-queue-readiness.md)). The workflows already run on `merge_group`. Once `.github/rulesets/main-merge-queue.json` is imported, auto-merge adds a PR to the queue, branches no longer need updating, and a PR that fails in the queue is removed from it: fix it and enable auto-merge again.
+GitHub's merge queue needs an organization-owned repository, so it is not on yet ([ADR 0051](../../../docs/adr/0051-merge-queue-readiness.md)). The workflows already run on `merge_group`. Once `.github/rulesets/main-merge-queue.json` is imported, auto-merge adds a PR to the queue, branches no longer need updating, and a PR that fails in the queue is removed from it: fix it and tell the maintainer, who re-queues it.
 
 ## After the merge
 
