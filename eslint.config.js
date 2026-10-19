@@ -47,8 +47,7 @@ export default tseslint.config(
       ".vike/**",
       ".agents/**",
       // Agent worktrees are copies of the repository, not part of it.
-      ".claude/**",
-      ".jules/**"
+      ".claude/**"
     ]
   },
   js.configs.recommended,
