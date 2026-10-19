@@ -90,10 +90,15 @@ describe('style file', () => {
   });
 
   it('rejects quietZoneModules below 2 and accepts valid range', () => {
-    const invalid = parseStyleFile(
+    const invalidZero = parseStyleFile(
+      JSON.stringify({ format: STYLE_FILE_FORMAT, version: 1, style: { quietZoneModules: 0 } })
+    );
+    expect(invalidZero.ok).toBe(false);
+
+    const invalidOne = parseStyleFile(
       JSON.stringify({ format: STYLE_FILE_FORMAT, version: 1, style: { quietZoneModules: 1 } })
     );
-    expect(invalid.ok).toBe(false);
+    expect(invalidOne.ok).toBe(false);
 
     const valid = parseStyleFile(
       JSON.stringify({ format: STYLE_FILE_FORMAT, version: 1, style: { quietZoneModules: 2, fgColor: '#000000' } })
