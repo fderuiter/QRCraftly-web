@@ -48,8 +48,9 @@ The required checks are `CI`, `PR Title` and `Workers Builds: qrcraftly`.
 ## Merging
 
 - Merge only when every required check is green on the current head. Local checks alone never justify a merge.
-- Enable auto-merge (squash) on a PR you opened once it is complete; GitHub merges it when the checks pass.
-- **Never** enable auto-merge on, or merge, a `chore(release): vX.Y.Z` PR. A maintainer merges those by hand.
+- The maintainer merges. Never merge a PR or enable auto-merge on one unless the maintainer has said so in words for that PR ([ADR 0020](../../../docs/adr/0020-trunk-based-releases-on-main.md), amendment).
+- Once the PR is complete and every required check is green on the current head, mark it ready for review and tell the maintainer it is ready. Remember that marking a PR ready starts the full CI tier, so let that run finish green before saying so.
+- **Never** enable auto-merge on, or merge, a `chore(release): vX.Y.Z` PR, even when asked to merge others. A maintainer merges those by hand.
 - No admin bypass of the `main` ruleset.
 
 ## Merge conflicts
@@ -61,7 +62,7 @@ The required checks are `CI`, `PR Title` and `Workers Builds: qrcraftly`.
 
 ## Merge queue
 
-GitHub's merge queue needs an organization-owned repository, so it is not on yet ([ADR 0051](../../../docs/adr/0051-merge-queue-readiness.md)). The workflows already run on `merge_group`. Once `.github/rulesets/main-merge-queue.json` is imported, auto-merge adds a PR to the queue, branches no longer need updating, and a PR that fails in the queue is removed from it: fix it and enable auto-merge again.
+GitHub's merge queue needs an organization-owned repository, so it is not on yet ([ADR 0051](../../../docs/adr/0051-merge-queue-readiness.md)). The workflows already run on `merge_group`. Once `.github/rulesets/main-merge-queue.json` is imported, auto-merge adds a PR to the queue, branches no longer need updating, and a PR that fails in the queue is removed from it: fix it and tell the maintainer, who re-queues it.
 
 ## After the merge
 
