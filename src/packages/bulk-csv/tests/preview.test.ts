@@ -60,4 +60,23 @@ describe('pickColumn', () => {
     expect(pickColumn(['Product', 'Landing page'], FILENAME_COLUMN_WORDS, 'Product')).toBe('Landing page');
     expect(pickColumn(['url'], FILENAME_COLUMN_WORDS, 'url')).toBe('url');
   });
+
+  it('matches expanded header aliases like member_id, promo_link, customer_url, target, and destination', () => {
+    expect(pickColumn(['member_id', 'notes'], PAYLOAD_COLUMN_WORDS)).toBe('member_id');
+    expect(pickColumn(['promo_link', 'title'], PAYLOAD_COLUMN_WORDS)).toBe('promo_link');
+    expect(pickColumn(['customer_url', 'id'], PAYLOAD_COLUMN_WORDS)).toBe('customer_url');
+    expect(pickColumn(['target', 'label'], PAYLOAD_COLUMN_WORDS)).toBe('target');
+    expect(pickColumn(['destination', 'sku'], PAYLOAD_COLUMN_WORDS)).toBe('destination');
+  });
+
+  it('performs fallback sample inspection when headers do not match known keywords', () => {
+    const sampleRows = [
+      { ColA: 'Member_101', ColB: 'https://example.com/promo/101' },
+      { ColA: 'Member_102', ColB: 'https://example.com/promo/102' },
+    ];
+    // ColB contains URLs, so it should be picked as payload column over ColA
+    expect(pickColumn(['ColA', 'ColB'], PAYLOAD_COLUMN_WORDS, '', sampleRows)).toBe('ColB');
+    // For filename column excluding ColB, ColA with plain text should be picked
+    expect(pickColumn(['ColA', 'ColB'], FILENAME_COLUMN_WORDS, 'ColB', sampleRows)).toBe('ColA');
+  });
 });

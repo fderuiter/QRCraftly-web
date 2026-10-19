@@ -59,7 +59,7 @@ import {
 import { QrEncodeError } from '@/packages/qr-matrix';
 import { validateConfig, describeViolation } from '@/packages/qr-payload';
 import { triggerFileDownload } from '@/utils/downloadManager';
-import { FileSpreadsheet, Upload, Download, Loader2 } from 'lucide-react';
+import { FileSpreadsheet, Upload, Download, Loader2, Sparkles, ArrowLeftRight } from 'lucide-react';
 
 export interface BulkCsvInputProps {
   data: BulkCsvData;
@@ -161,10 +161,22 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
   const payloadCol = columns.includes(data.payloadColumn)
     ? data.payloadColumn
-    : pickColumn(columns, PAYLOAD_COLUMN_WORDS);
+    : pickColumn(columns, PAYLOAD_COLUMN_WORDS, '', rows);
   const filenameCol = columns.includes(data.filenameColumn)
     ? data.filenameColumn
-    : pickColumn(columns, FILENAME_COLUMN_WORDS, payloadCol);
+    : pickColumn(columns, FILENAME_COLUMN_WORDS, payloadCol, rows);
+
+  const autoPayloadCol = useMemo(
+    () => pickColumn(columns, PAYLOAD_COLUMN_WORDS, '', rows),
+    [columns, rows]
+  );
+  const autoFilenameCol = useMemo(
+    () => pickColumn(columns, FILENAME_COLUMN_WORDS, payloadCol, rows),
+    [columns, rows, payloadCol]
+  );
+
+  const isPayloadAutoMatched = !data.payloadColumn || data.payloadColumn === autoPayloadCol;
+  const isFilenameAutoMatched = !data.filenameColumn || data.filenameColumn === autoFilenameCol;
   const exportFormat = data.exportFormat || 'png';
   const contentType: BulkContentType = data.contentType ?? 'link';
   const rowCount = rows.length;
@@ -532,33 +544,121 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
             </Alert>
           )}
 
+          {/* Column Mapping Section */}
+          <div className="space-y-4 rounded-xl border border-line bg-surface-sunken p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle pb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-fg">Column Mapping</h3>
+                <p className="text-xs text-fg-muted">Match your CSV columns to QR code content and file names</p>
+              </div>
+              {columns.length > 1 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onChange({ payloadColumn: filenameCol, filenameColumn: payloadCol })}
+                  className="flex items-center gap-1.5 text-xs"
+                  aria-label="Swap payload and filename columns"
+                  title="Swap Content and File Name columns"
+                >
+                  <ArrowLeftRight className="size-3.5" aria-hidden="true" />
+                  Swap Columns
+                </Button>
+              )}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2 rounded-lg border border-line bg-surface p-3.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold tracking-wider text-accent-strong uppercase">QR Content</span>
+                  {isPayloadAutoMatched ? (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong"
+                      data-testid="payload-auto-matched-badge"
+                    >
+                      <Sparkles className="size-3" aria-hidden="true" />
+                      Auto-matched
+                    </span>
+                  ) : (
+                    <span
+                      className="inline-flex items-center rounded-full border border-line bg-surface-sunken px-2 py-0.5 text-xs font-medium text-fg-muted"
+                      data-testid="payload-mapped-badge"
+                    >
+                      Mapped
+                    </span>
+                  )}
+                </div>
+
+                <SelectField
+                  id="bulk-payload-column"
+                  label="Content Column"
+                  value={payloadCol}
+                  onChange={(e) => onChange({ payloadColumn: e.target.value })}
+                >
+                  {columns.map((col) => (
+                    <option key={col} value={col}>
+                      {col}
+                    </option>
+                  ))}
+                </SelectField>
+
+                {rows[0]?.[payloadCol] !== undefined && (
+                  <div className="rounded bg-surface-sunken p-2 text-xs text-fg-muted" data-testid="bulk-payload-sample-preview">
+                    <span className="mb-0.5 block text-xs font-medium tracking-wider text-fg-soft uppercase">Sample Cell</span>
+                    <p className="truncate font-mono text-xs text-fg" title={rows[0][payloadCol]}>
+                      {rows[0][payloadCol] || <span className="text-fg-muted italic">(empty)</span>}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-line bg-surface p-3.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold tracking-wider text-fg-soft uppercase">File Name</span>
+                  {isFilenameAutoMatched ? (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong"
+                      data-testid="filename-auto-matched-badge"
+                    >
+                      <Sparkles className="size-3" aria-hidden="true" />
+                      Auto-matched
+                    </span>
+                  ) : (
+                    <span
+                      className="inline-flex items-center rounded-full border border-line bg-surface-sunken px-2 py-0.5 text-xs font-medium text-fg-muted"
+                      data-testid="filename-mapped-badge"
+                    >
+                      Mapped
+                    </span>
+                  )}
+                </div>
+
+                <SelectField
+                  id="bulk-filename-column"
+                  label="File Name Column"
+                  value={filenameCol}
+                  onChange={(e) => onChange({ filenameColumn: e.target.value })}
+                >
+                  {columns.map((col) => (
+                    <option key={col} value={col}>
+                      {col}
+                    </option>
+                  ))}
+                </SelectField>
+
+                {rows[0]?.[filenameCol] !== undefined && (
+                  <div className="rounded bg-surface-sunken p-2 text-xs text-fg-muted" data-testid="bulk-filename-sample-preview">
+                    <span className="mb-0.5 block text-xs font-medium tracking-wider text-fg-soft uppercase">Sample Cell</span>
+                    <p className="truncate font-mono text-xs text-fg" title={rows[0][filenameCol]}>
+                      {rows[0][filenameCol] || <span className="text-fg-muted italic">(empty)</span>}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
-            <SelectField
-              id="bulk-payload-column"
-              label="Content Column"
-              value={payloadCol}
-              onChange={(e) => onChange({ payloadColumn: e.target.value })}
-            >
-              {columns.map((col) => (
-                <option key={col} value={col}>
-                  {col}
-                </option>
-              ))}
-            </SelectField>
-
-            <SelectField
-              id="bulk-filename-column"
-              label="File Name Column"
-              value={filenameCol}
-              onChange={(e) => onChange({ filenameColumn: e.target.value })}
-            >
-              {columns.map((col) => (
-                <option key={col} value={col}>
-                  {col}
-                </option>
-              ))}
-            </SelectField>
-
             <SelectField
               id="bulk-content-type"
               label="Content Type"

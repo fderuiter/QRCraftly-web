@@ -20,32 +20,128 @@ import { CsvParseError, MAX_BULK_CSV_ROWS, parseCsv, type CsvRow } from './csv';
 import { encodeBulkCell, type BulkContentType } from './payload';
 
 /** Header words that usually mark the QR content column. */
-export const PAYLOAD_COLUMN_WORDS: readonly string[] = ['url', 'urls', 'uri', 'link', 'links', 'href', 'website', 'payload', 'data', 'qr', 'content'];
+export const PAYLOAD_COLUMN_WORDS: readonly string[] = [
+  'url',
+  'urls',
+  'uri',
+  'link',
+  'links',
+  'href',
+  'website',
+  'payload',
+  'data',
+  'qr',
+  'content',
+  'member_id',
+  'member',
+  'promo_link',
+  'promo',
+  'customer_url',
+  'customer',
+  'target',
+  'destination',
+  'campaign',
+  'redirect',
+  'endpoint',
+  'path',
+];
 /** Header words that usually mark a per-row file name column. */
 export const FILENAME_COLUMN_WORDS: readonly string[] = ['name', 'filename', 'file', 'id', 'label', 'title', 'sku'];
 
-/** Splits a header into lowercase words: `Video URL`, `video_url` and `videoUrl` all give `video`, `url`. */
+/** Regex pattern to detect candidate cells containing URLs, URIs, or structured QR payloads. */
+const PAYLOAD_CELL_PATTERN = /^(https?:\/\/|www\.|mailto:|tel:|sms:|wifi:|geo:|vcard|BEGIN:VCARD)|:\/\//i;
+
+/**
+ * Checks sample rows for URL or payload characteristics.
+ */
+function isPayloadCell(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  return PAYLOAD_CELL_PATTERN.test(trimmed) || /\.[a-z]{2,}(\/|\?|#|$)/i.test(trimmed);
+}
+
+/** Splits a header into lowercase words and normalized tokens. */
 function headerWords(header: string): string[] {
-  return header
+  const normalized = header.toLowerCase().trim();
+  const rawClean = normalized.replace(/[^\p{L}\p{N}]+/gu, '');
+  const rawUnderscore = normalized.replace(/[^\p{L}\p{N}]+/gu, '_');
+  const splitWords = header
     .replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, '$1 $2')
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
     .filter(Boolean);
+
+  const set = new Set<string>();
+  if (normalized) set.add(normalized);
+  if (rawClean) set.add(rawClean);
+  if (rawUnderscore) set.add(rawUnderscore);
+  for (const word of splitWords) {
+    set.add(word);
+  }
+  return Array.from(set);
 }
 
 /**
  * Picks the first column whose header contains one of `words` as a whole word, so `Video URL`
- * counts as a link column and not as an `id` column. Falls back to the first column that is not
- * `exclude`, then to `exclude` itself when it is the only column.
+ * counts as a link column and not as an `id` column.
+ * If headers do not match known keywords and sample `rows` are provided, does fallback inspection
+ * of cell values to find the best candidate.
+ * Falls back to the first column that is not `exclude`, then to `exclude` itself when it is the only column.
  * @param columns Header names.
  * @param words Preferred header words, lowercase.
  * @param exclude A column already used for something else, such as the payload column.
+ * @param rows Sample data rows for fallback cell inspection.
  * @returns The chosen column, or `''` when there are no columns.
  */
-export function pickColumn(columns: string[], words: readonly string[], exclude = ''): string {
+export function pickColumn(columns: string[], words: readonly string[], exclude = '', rows: CsvRow[] = []): string {
   const candidates = columns.filter((col) => col !== exclude);
   const match = candidates.find((col) => headerWords(col).some((word) => words.includes(word)));
-  return match ?? candidates[0] ?? columns[0] ?? '';
+  if (match) return match;
+
+  if (rows.length > 0 && candidates.length > 0) {
+    const sampleRows = rows.slice(0, 10);
+    if (words === PAYLOAD_COLUMN_WORDS) {
+      let bestCandidate = candidates[0];
+      let maxPayloadMatches = -1;
+      for (const col of candidates) {
+        let matches = 0;
+        for (const row of sampleRows) {
+          const val = row[col];
+          if (typeof val === 'string' && isPayloadCell(val)) {
+            matches++;
+          }
+        }
+        if (matches > maxPayloadMatches) {
+          maxPayloadMatches = matches;
+          bestCandidate = col;
+        }
+      }
+      if (maxPayloadMatches > 0) {
+        return bestCandidate;
+      }
+    } else if (words === FILENAME_COLUMN_WORDS) {
+      let bestCandidate = candidates[0];
+      let maxFilenameScore = -1;
+      for (const col of candidates) {
+        let score = 0;
+        for (const row of sampleRows) {
+          const val = row[col];
+          if (typeof val === 'string' && val.trim() !== '' && !isPayloadCell(val)) {
+            score++;
+          }
+        }
+        if (score > maxFilenameScore) {
+          maxFilenameScore = score;
+          bestCandidate = col;
+        }
+      }
+      if (maxFilenameScore > 0) {
+        return bestCandidate;
+      }
+    }
+  }
+
+  return candidates[0] ?? columns[0] ?? '';
 }
 
 /**
@@ -87,7 +183,9 @@ export function previewRow(csvContent: string, payloadColumn: string, contentTyp
     if (err instanceof CsvParseError) return null;
     throw err;
   }
-  const column = table.headers.includes(payloadColumn) ? payloadColumn : pickColumn(table.headers, PAYLOAD_COLUMN_WORDS);
+  const column = table.headers.includes(payloadColumn)
+    ? payloadColumn
+    : pickColumn(table.headers, PAYLOAD_COLUMN_WORDS, '', table.rows);
   if (!column) return null;
   const index = table.rows.findIndex((row) => hasPayload(row, column));
   if (index === -1) return null;
