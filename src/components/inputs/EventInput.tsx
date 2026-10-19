@@ -19,8 +19,6 @@ export const COMMON_TIMEZONES = [
   { value: "America/Chicago", label: "Central Time (America/Chicago)" },
   { value: "America/Denver", label: "Mountain Time (America/Denver)" },
   { value: "America/Los_Angeles", label: "Pacific Time (America/Los_Angeles)" },
-  { value: "America/Anchorage", label: "Alaska Time (America/Anchorage)" },
-  { value: "Pacific/Honolulu", label: "Hawaii Time (Pacific/Honolulu)" },
   { value: "Europe/London", label: "London (Europe/London)" },
   { value: "Europe/Paris", label: "Paris (Europe/Paris)" },
   { value: "Europe/Berlin", label: "Berlin (Europe/Berlin)" },
@@ -31,7 +29,7 @@ export const COMMON_TIMEZONES = [
 ];
 
 /** Fallback list of major IANA timezones used when Intl.supportedValuesOf is unavailable. */
-const FALLBACK_TIMEZONES = [
+export const FALLBACK_TIMEZONES = [
   "America/Anchorage",
   "America/Argentina/Buenos_Aires",
   "America/Chicago",
@@ -81,7 +79,6 @@ export function getSupportedTimezones(): string[] {
  * "UTC" -> "UTC"
  */
 export function formatTimezoneLabel(tz: string): string {
-  if (!tz) return "Floating / Local Time";
   if (tz === "UTC") return "UTC";
 
   const parts = tz.split("/");

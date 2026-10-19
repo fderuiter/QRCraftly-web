@@ -21,7 +21,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { hydrateRoot } from 'react-dom/client';
 import { describe, it, expect, vi } from 'vitest';
-import { EventInput, formatTimezoneLabel, toggleAllDay, webCalendarNotes } from './EventInput';
+import { EventInput, FALLBACK_TIMEZONES, formatTimezoneLabel, toggleAllDay, webCalendarNotes } from './EventInput';
 import { CalendarProvider, type EventData } from '../../types';
 
 const event: EventData = {
@@ -66,7 +66,6 @@ describe('EventInput', () => {
   });
 
   it('formats timezone display labels correctly', () => {
-    expect(formatTimezoneLabel('')).toBe('Floating / Local Time');
     expect(formatTimezoneLabel('UTC')).toBe('UTC');
     expect(formatTimezoneLabel('Europe/Amsterdam')).toBe('Amsterdam (Europe/Amsterdam)');
     expect(formatTimezoneLabel('Asia/Dubai')).toBe('Dubai (Asia/Dubai)');
@@ -104,6 +103,31 @@ describe('EventInput', () => {
     expect(screen.getByRole('option', { name: 'Eastern Time (America/New_York)' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Central Time (America/Chicago)' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Pacific Time (America/Los_Angeles)' })).toBeInTheDocument();
+  });
+
+  it('uses the fallback list on initial pre-render and expands to full IANA list after mount', () => {
+    // 1. Server pre-render uses the fallback list of 26 timezones
+    const htmlString = renderToString(<EventInput data={event} onChange={vi.fn()} />);
+    expect(htmlString).toContain('label="All Timezones"');
+    // Non-fallback timezone like Africa/Accra is NOT present in server HTML
+    expect(htmlString).not.toContain('Africa/Accra');
+    // Fallback timezone like Europe/Amsterdam IS present
+    expect(htmlString).toContain('Amsterdam (Europe/Amsterdam)');
+
+    // 2. Client render mounts and useEffect expands to full IANA timezone list
+    render(<EventInput data={event} onChange={vi.fn()} />);
+    expect(screen.getByRole('option', { name: 'Accra (Africa/Accra)' })).toBeInTheDocument();
+  });
+
+  it('keeps selected data.timezone in the list on both passes', () => {
+    const customEvent: EventData = { ...event, timezone: 'Africa/Casablanca' };
+    const htmlString = renderToString(<EventInput data={customEvent} onChange={vi.fn()} />);
+    expect(htmlString).toContain('Casablanca (Africa/Casablanca)');
+
+    render(<EventInput data={customEvent} onChange={vi.fn()} />);
+    const select = screen.getByLabelText('Timezone') as HTMLSelectElement;
+    expect(select.value).toBe('Africa/Casablanca');
+    expect(screen.getByRole('option', { name: 'Casablanca (Africa/Casablanca)' })).toBeInTheDocument();
   });
 
   it('produces server-rendered HTML matching initial client fallback tree to prevent hydration mismatch', () => {
