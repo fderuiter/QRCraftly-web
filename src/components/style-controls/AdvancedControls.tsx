@@ -7,7 +7,6 @@ import { type QRConfig, QRErrorCorrectionLevel } from '../../types';
 interface AdvancedControlsProps {
   config: QRConfig;
   onChange: (updates: Partial<QRConfig>) => void;
-  defaultOpen?: boolean;
 }
 
 const LEVELS = [
@@ -17,8 +16,8 @@ const LEVELS = [
   { id: QRErrorCorrectionLevel.H, label: 'High (~30%)', desc: 'Best for logos' },
 ];
 
-export const AdvancedControls: React.FC<AdvancedControlsProps> = ({ config, onChange, defaultOpen }) => (
-  <AccordionItem title="Advanced Mode" headingLevel={3} panelId="advanced-settings-panel" defaultOpen={defaultOpen}>
+export const AdvancedControls: React.FC<AdvancedControlsProps> = ({ config, onChange }) => (
+  <AccordionItem title="Advanced Mode" headingLevel={3} panelId="advanced-settings-panel">
     <div className="space-y-4">
       <div>
         <span id="ecc-level-label" className="mb-2 block text-sm font-medium text-fg-muted">
@@ -53,7 +52,7 @@ export const AdvancedControls: React.FC<AdvancedControlsProps> = ({ config, onCh
         <RangeInput
           id="quiet-zone-modules"
           label="Quiet Zone Margin (modules)"
-          min={0}
+          min={2}
           max={10}
           step={1}
           value={config.quietZoneModules ?? 4}

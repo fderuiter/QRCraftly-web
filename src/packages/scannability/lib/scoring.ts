@@ -90,6 +90,12 @@ export function calculateScannabilityHealth(
     }
   }
 
+  const quietZone = config.quietZoneModules ?? 4;
+  if (quietZone < 4) {
+    score -= 15;
+    warnings.push('Quiet zone is below recommended 4 modules');
+  }
+
   return {
     score: Math.max(0, Math.min(100, score)),
     warnings,

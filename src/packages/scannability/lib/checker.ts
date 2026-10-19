@@ -92,19 +92,21 @@ const CAMERA_READ: QrReadOptions = { inverted: true, global: true, half: true };
  * @param frame - Pixels to evaluate.
  * @param moduleCount - QR modules per side; enables the localized contrast audit.
  * @param scratch - Optional reusable buffers for the optical simulation.
+ * @param quietZoneModules - Quiet zone margin in modules.
  * @returns A generator whose return value is the check result.
  */
 export function* scannabilitySteps(
   reader: QrReader,
   frame: PixelFrame,
   moduleCount?: number,
-  scratch?: OpticalScratchBuffers
+  scratch?: OpticalScratchBuffers,
+  quietZoneModules?: number
 ): Generator<void, ScannabilityResult, void> {
   // 0. Localized module contrast audit
   let localContrastViolations = 0;
   let minLocalContrast = 21;
   if (moduleCount && moduleCount > 0) {
-    const audit = auditModuleContrast(frame, moduleCount);
+    const audit = auditModuleContrast(frame, moduleCount, quietZoneModules);
     localContrastViolations = audit.violations;
     minLocalContrast = audit.minContrast;
   }
@@ -151,9 +153,10 @@ export function performScannabilityCheck(
   imageData: PixelFrame,
   width: number,
   height: number,
-  moduleCount?: number
+  moduleCount?: number,
+  quietZoneModules?: number
 ): ScannabilityResult {
-  const steps = scannabilitySteps(reader, { data: imageData.data, width, height }, moduleCount);
+  const steps = scannabilitySteps(reader, { data: imageData.data, width, height }, moduleCount, undefined, quietZoneModules);
   let step = steps.next();
   while (!step.done) step = steps.next();
   return step.value;

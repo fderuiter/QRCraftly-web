@@ -72,15 +72,16 @@ describe('QR Renderer Utils', () => {
       expect(result.drawSize + 2 * (result.quietPx + result.borderPx)).toBeCloseTo(100, 9);
     });
 
-    it('supports 0 modules quiet zone margin when specified in config', () => {
-      const config = { ...DEFAULT_CONFIG, quietZoneModules: 0, isBorderEnabled: false };
+    it('supports 2 modules quiet zone margin when specified in config', () => {
+      const config = { ...DEFAULT_CONFIG, quietZoneModules: 2, isBorderEnabled: false };
+      const cell = 100 / 29;
       expectLayout(calculateLayout(config, 100, 25), {
-        drawX: 0,
-        drawY: 0,
-        drawSize: 100,
-        cellSize: 4,
+        drawX: 2 * cell,
+        drawY: 2 * cell,
+        drawSize: 25 * cell,
+        cellSize: cell,
         borderPx: 0,
-        quietPx: 0,
+        quietPx: 2 * cell,
       });
     });
 
