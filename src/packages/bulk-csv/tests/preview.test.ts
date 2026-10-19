@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { describe, it, expect } from 'vitest';
-import { previewRow, pickColumn, PAYLOAD_COLUMN_WORDS, FILENAME_COLUMN_WORDS } from '../index';
+import { describe, it, expect, vi } from 'vitest';
+import { previewRow, pickColumn, hasPayload, PAYLOAD_COLUMN_WORDS, FILENAME_COLUMN_WORDS } from '../index';
 
 describe('previewRow', () => {
   it('returns the first row that has a payload, with its position', () => {
@@ -37,6 +37,15 @@ describe('previewRow', () => {
     expect(previewRow('', 'url')).toBeNull();
     expect(previewRow('url\n', 'url')).toBeNull();
     expect(previewRow('url\n"unterminated', 'url')).toBeNull();
+  });
+
+  it('re-throws non-CsvParseError errors in previewRow', async () => {
+    const bulkCsvModule = await import('../index');
+    const spy = vi.spyOn(bulkCsvModule, 'parseCsv').mockImplementationOnce(() => {
+      throw new TypeError('Unexpected runtime exception');
+    });
+    expect(() => previewRow('a,b\n1,2', 'a')).toThrow(TypeError);
+    spy.mockRestore();
   });
 });
 
@@ -94,5 +103,34 @@ describe('pickColumn', () => {
     const copiedFilenameWords = [...FILENAME_COLUMN_WORDS];
     expect(pickColumn(['ColA', 'ColB'], copiedPayloadWords, { rows: sampleRows })).toBe('ColB');
     expect(pickColumn(['ColA', 'ColB'], copiedFilenameWords, { exclude: 'ColB', rows: sampleRows })).toBe('ColA');
+  });
+
+  it('handles unknown words and zero-match sample inspection fallbacks', () => {
+    // Unknown words where kind is undefined and no matching headers
+    expect(pickColumn(['ColA', 'ColB'], ['unknown_word'])).toBe('ColA');
+
+    // Kind payload but no sample cells match payload pattern
+    const plainRows = [{ ColA: 'plain text 1', ColB: 'plain text 2' }];
+    expect(pickColumn(['ColA', 'ColB'], ['unknown'], { rows: plainRows, kind: 'payload' })).toBe('ColA');
+
+    // Kind filename where all sample cells are payloads or empty/non-string
+    const urlRows = [
+      { ColA: 'https://example.com', ColB: '   ', ColC: 123 as unknown as string },
+    ];
+    expect(pickColumn(['ColA', 'ColB'], ['unknown'], { rows: urlRows, kind: 'filename' })).toBe('ColA');
+  });
+
+  it('handles empty candidates or empty column arrays gracefully', () => {
+    expect(pickColumn([], [])).toBe('');
+    expect(pickColumn(['onlyCol'], ['word'], { exclude: 'onlyCol' })).toBe('onlyCol');
+  });
+});
+
+describe('hasPayload', () => {
+  it('identifies valid payload values and rejects missing, non-string, or blank cells', () => {
+    expect(hasPayload({ col: '  https://example.com  ' }, 'col')).toBe(true);
+    expect(hasPayload({ col: '   ' }, 'col')).toBe(false);
+    expect(hasPayload({}, 'col')).toBe(false);
+    expect(hasPayload({ col: 123 as unknown as string }, 'col')).toBe(false);
   });
 });
