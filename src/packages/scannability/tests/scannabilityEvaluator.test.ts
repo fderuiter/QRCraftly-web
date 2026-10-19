@@ -187,7 +187,7 @@ function createHarness(overrides: Partial<ScannabilityEvaluatorConfig> = {}) {
     bitmapToPixels: vi.fn((bitmap: ImageBitmap) => frameOf(bitmap.width, bitmap.height)),
   };
 
-  const runCheck = vi.fn<(frame: PixelFrame, moduleCount?: number) => ScannabilityResult>(
+  const runCheck = vi.fn<(frame: PixelFrame, moduleCount?: number, quietZoneModules?: number) => ScannabilityResult>(
     () => ({ success: true, physicalReady: true })
   );
   const onFail = vi.fn<(errorType: string) => void>();
@@ -400,7 +400,7 @@ describe('Scannability Health Evaluator (headless)', () => {
       expect(h.runCheck).not.toHaveBeenCalled();
       h.clock.advance(1);
 
-      expect(h.runCheck).toHaveBeenCalledWith(frame, 21);
+      expect(h.runCheck).toHaveBeenCalledWith(frame, 21, 4);
       await expect(answer).resolves.toMatchObject({ status: 'physical-pass', workerRecoveryActive: true });
     });
 
@@ -413,7 +413,7 @@ describe('Scannability Health Evaluator (headless)', () => {
       h.clock.advance(1500);
 
       expect(h.frames.readPixels).toHaveBeenCalled();
-      expect(h.runCheck).toHaveBeenCalledWith(expect.objectContaining({ width: 20, height: 20 }), undefined);
+      expect(h.runCheck).toHaveBeenCalledWith(expect.objectContaining({ width: 20, height: 20 }), undefined, 4);
     });
 
     it('fails when the watchdog finds no pixels to evaluate', () => {
@@ -474,7 +474,7 @@ describe('Scannability Health Evaluator (headless)', () => {
       h.clock.advance(100);
 
       expect(h.frames.bitmapToPixels).toHaveBeenCalledWith(bitmap);
-      expect(h.runCheck).toHaveBeenCalledWith(expect.objectContaining({ width: 10 }), 21);
+      expect(h.runCheck).toHaveBeenCalledWith(expect.objectContaining({ width: 10 }), 21, 4);
       expect(bitmap.close).toHaveBeenCalledTimes(1);
       expect(h.onFail).toHaveBeenCalledWith('NOT_FOUND');
       await expect(answer).resolves.toMatchObject({ status: 'fail' });

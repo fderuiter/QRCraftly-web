@@ -25,7 +25,7 @@ export interface LayoutMetrics {
   cellSize: number;
   /** Thickness of the decorative border band (0 when the border is off). */
   borderPx: number;
-  /** Width of the light quiet zone between the border and the modules: always 4 modules. */
+  /** Width of the light quiet zone between the border and the modules. */
   quietPx: number;
 }
 
@@ -42,9 +42,9 @@ export const calculateLayout = (
   displaySize: number,
   moduleCount: number
 ): LayoutMetrics => {
-  // Outside in: border band, a light quiet zone of 4 modules, then the modules. The border
-  // never replaces the quiet zone, so a dark border cannot stop the code scanning (#1249).
-  const quietZoneModules = 4;
+  // Outside in: border band, a light quiet zone of quietZoneModules (default 4), then the modules.
+  // The border never replaces the quiet zone, so a dark border cannot stop the code scanning (#1249).
+  const quietZoneModules = config.quietZoneModules ?? 4;
   const borderPx = config.isBorderEnabled && config.borderSize > 0 ? displaySize * config.borderSize : 0;
 
   const hasFrame = config.frameStyle && config.frameStyle !== 'none';
