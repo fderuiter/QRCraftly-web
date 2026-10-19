@@ -272,6 +272,8 @@ export interface QRConfig {
   gradientColorStops?: ColorStop[];
   /** Angle in degrees for linear gradient fill (0 to 360). */
   gradientAngle?: number;
+  /** Quiet zone margin around the QR matrix in modules (0 to 10). Defaults to 4. */
+  quietZoneModules?: number;
 }
 
 /**

@@ -71,6 +71,33 @@ describe('QR Renderer Utils', () => {
       expect(result.drawX).toBeCloseTo(30 + 4 * result.cellSize, 9);
       expect(result.drawSize + 2 * (result.quietPx + result.borderPx)).toBeCloseTo(100, 9);
     });
+
+    it('supports 0 modules quiet zone margin when specified in config', () => {
+      const config = { ...DEFAULT_CONFIG, quietZoneModules: 0, isBorderEnabled: false };
+      expectLayout(calculateLayout(config, 100, 25), {
+        drawX: 0,
+        drawY: 0,
+        drawSize: 100,
+        cellSize: 4,
+        borderPx: 0,
+        quietPx: 0,
+      });
+    });
+
+    it('calculates custom quiet zone margin (e.g., 8 modules)', () => {
+      const config = { ...DEFAULT_CONFIG, quietZoneModules: 8, isBorderEnabled: false };
+      // 100 px displaySize, 20 modules matrix, quietZoneModules = 8
+      // moduleCount + quietZoneModules * 2 = 20 + 16 = 36 modules
+      const cell = 100 / 36;
+      expectLayout(calculateLayout(config, 100, 20), {
+        drawX: 8 * cell,
+        drawY: 8 * cell,
+        drawSize: 20 * cell,
+        cellSize: cell,
+        borderPx: 0,
+        quietPx: 8 * cell,
+      });
+    });
   });
 
   describe('getLogoMetrics', () => {

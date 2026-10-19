@@ -79,6 +79,7 @@ const STYLE_FIELDS: Partial<Record<keyof QRConfig, FieldRule>> = {
   mazePathWidth: { kind: 'number', min: 0.1, max: 0.5 },
   mosaicMode: enumOf(['tiles', 'halftone'] satisfies MosaicMode[]),
   mosaicContrast: { kind: 'number', min: 0, max: 1 },
+  quietZoneModules: { kind: 'number', min: 0, max: 10 },
 };
 
 /**
