@@ -23,3 +23,7 @@ ADR 0018 kept two long-lived branches: `dev` for integration and staging, and `m
 - A version tag labels what production already runs; it does not gate the deploy. If production ever needs to be gated on tags, GitHub Actions would have to deploy with `wrangler` and a Cloudflare API token instead of Workers Builds.
 - The `dev-qrcraftly` staging URL is gone. Changes are checked on their PR preview URL before merging.
 - This supersedes ADR 0018 points 2, 3, 4 and 7 and the `dev`/`main` split in ADRs 0011, 0012 and 0013. ADR 0018's decisions on Cloudflare-owned deploys, the aggregate `CI` check, tag-driven publishing and rollback still stand.
+
+## Amendment (2026-10-19)
+
+Point 5 no longer lets a Claude thread turn on auto-merge by itself. The maintainer merges every PR, by hand or with auto-merge. A Claude thread marks its PR ready for review once it is complete and green, and merges it or turns on auto-merge only when the maintainer says so in words for that PR. Auto-merge cannot tell whether the previous merge has finished deploying, and every merge goes to production.
