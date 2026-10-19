@@ -91,23 +91,14 @@ export interface PickColumnOptions {
  * Falls back to the first column that is not `exclude`, then to `exclude` itself when it is the only column.
  * @param columns Header names.
  * @param words Preferred header words in priority order, lowercase.
- * @param excludeOrOptions Excluded column name or options object with exclude, rows, and kind.
- * @param rowsArg Sample data rows for fallback cell inspection when excludeOrOptions is string.
- * @param kindArg Column kind for fallback cell inspection when excludeOrOptions is string.
+ * @param options Options object containing exclude column, sample rows, and column kind.
  * @returns The chosen column, or `''` when there are no columns.
  */
 export function pickColumn(
   columns: string[],
   words: readonly string[],
-  excludeOrOptions: string | PickColumnOptions = '',
-  rowsArg: CsvRow[] = [],
-  kindArg?: 'payload' | 'filename'
+  options: PickColumnOptions = {}
 ): string {
-  const options: PickColumnOptions =
-    typeof excludeOrOptions === 'object' && excludeOrOptions !== null
-      ? excludeOrOptions
-      : { exclude: excludeOrOptions, rows: rowsArg, kind: kindArg };
-
   const exclude = options.exclude ?? '';
   const rows = options.rows ?? [];
   const kind =

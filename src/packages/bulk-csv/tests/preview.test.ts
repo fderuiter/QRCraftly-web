@@ -50,15 +50,15 @@ describe('pickColumn', () => {
 
   it('matches whole words, not substrings (#1291)', () => {
     expect(pickColumn(['Video URL', 'Title'], PAYLOAD_COLUMN_WORDS)).toBe('Video URL');
-    expect(pickColumn(['Video URL', 'Title'], FILENAME_COLUMN_WORDS, 'Video URL')).toBe('Title');
+    expect(pickColumn(['Video URL', 'Title'], FILENAME_COLUMN_WORDS, { exclude: 'Video URL' })).toBe('Title');
     expect(pickColumn(['Name', 'Metadata', 'URL'], PAYLOAD_COLUMN_WORDS)).toBe('URL');
-    expect(pickColumn(['Guide link', 'Name'], FILENAME_COLUMN_WORDS, 'Guide link')).toBe('Name');
+    expect(pickColumn(['Guide link', 'Name'], FILENAME_COLUMN_WORDS, { exclude: 'Guide link' })).toBe('Name');
     expect(pickColumn(['product_id', 'landingPageUrl'], PAYLOAD_COLUMN_WORDS)).toBe('landingPageUrl');
   });
 
   it('never picks the excluded column while another one exists', () => {
-    expect(pickColumn(['Product', 'Landing page'], FILENAME_COLUMN_WORDS, 'Product')).toBe('Landing page');
-    expect(pickColumn(['url'], FILENAME_COLUMN_WORDS, 'url')).toBe('url');
+    expect(pickColumn(['Product', 'Landing page'], FILENAME_COLUMN_WORDS, { exclude: 'Product' })).toBe('Landing page');
+    expect(pickColumn(['url'], FILENAME_COLUMN_WORDS, { exclude: 'url' })).toBe('url');
   });
 
   it('matches expanded header aliases like promo_link, customer_url, target, and destination', () => {
