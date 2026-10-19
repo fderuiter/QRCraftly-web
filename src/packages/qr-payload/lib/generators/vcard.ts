@@ -200,7 +200,11 @@ export const hydrateVCardData = (raw: string): VCardData => {
       }
       case 'PHOTO': {
         let photoVal = unescapeVCardEvent(value).trim();
-        photoVal = photoVal.replace(/^VALUE=uri:/i, '').replace(/^uri:/i, '');
+        photoVal = photoVal
+          .replace(/^VALUE=uri:/i, '')
+          .replace(/^VALUE=URL:/i, '')
+          .replace(/^uri:/i, '')
+          .replace(/^URL:/i, '');
         result.photo = photoVal;
         break;
       }
@@ -341,7 +345,9 @@ export const constructVCardString = (data: VCardData): string => {
   if (isPopulated(phone)) parts.push(prop('TEL', phone));
   if (isPopulated(email)) parts.push(prop('EMAIL', email));
   if (isPopulated(website)) parts.push(`URL:${website}`);
-  if (isPopulated(normalizedPhoto)) parts.push(`PHOTO;VALUE=uri:${normalizedPhoto}`);
+  if (isPopulated(normalizedPhoto)) {
+    parts.push(is21 ? `PHOTO;VALUE=URL:${normalizedPhoto}` : `PHOTO;VALUE=uri:${normalizedPhoto}`);
+  }
   // One `URL;TYPE=<network>:` line per profile: iOS and Google Contacts both import extra URL lines.
   for (const field of VCARD_SOCIAL_FIELDS) {
     const profile = socialProfileUrl(field, data[field]);
@@ -388,7 +394,11 @@ export const VCardContract: QRGeneratorContract<VCardData> = {
       for (const { key, value } of properties) {
         if (key === 'URL' || key === 'PHOTO') {
           let vcardUrl = value.trim();
-          vcardUrl = vcardUrl.replace(/^VALUE=uri:/i, '').replace(/^uri:/i, '');
+          vcardUrl = vcardUrl
+            .replace(/^VALUE=uri:/i, '')
+            .replace(/^VALUE=URL:/i, '')
+            .replace(/^uri:/i, '')
+            .replace(/^URL:/i, '');
           if (isDangerousUrl(vcardUrl)) {
             violations.push('URI_INJECTION_VIOLATION');
             break;

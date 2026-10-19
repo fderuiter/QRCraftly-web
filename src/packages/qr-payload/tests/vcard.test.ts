@@ -795,7 +795,31 @@ describe('Social profiles (#1470)', () => {
 });
 
 describe('Photo avatar field', () => {
-  it.each(['2.1', '3.0', '4.0'] as const)(
+  it('serializes PHOTO;VALUE=URL:<url> in vCard version 2.1', () => {
+    const data = {
+      version: '2.1' as const,
+      firstName: 'Jane',
+      lastName: 'Doe',
+      organization: '',
+      title: '',
+      phone: '',
+      email: '',
+      website: '',
+      street: '',
+      city: '',
+      zip: '',
+      country: '',
+      photo: 'https://example.com/avatar.jpg',
+    };
+    const vcardStr = constructVCardString(data);
+    expect(vcardStr).toContain('PHOTO;VALUE=URL:https://example.com/avatar.jpg');
+
+    const hydrated = hydrateVCardData(vcardStr);
+    expect(hydrated.photo).toBe('https://example.com/avatar.jpg');
+    expect(hydrated.version).toBe('2.1');
+  });
+
+  it.each(['3.0', '4.0'] as const)(
     'serializes PHOTO;VALUE=uri:<url> in vCard version %s',
     (version) => {
       const data = {
@@ -818,6 +842,7 @@ describe('Photo avatar field', () => {
 
       const hydrated = hydrateVCardData(vcardStr);
       expect(hydrated.photo).toBe('https://example.com/avatar.jpg');
+      expect(hydrated.version).toBe(version);
     }
   );
 
@@ -842,6 +867,9 @@ describe('Photo avatar field', () => {
   });
 
   it('hydrates photo from various PHOTO line formats', () => {
+    const photoLine21 = 'BEGIN:VCARD\r\nVERSION:2.1\r\nN:Doe;Jane;;;\r\nFN:Jane Doe\r\nPHOTO;VALUE=URL:https://example.com/avatar.jpg\r\nEND:VCARD';
+    expect(hydrateVCardData(photoLine21).photo).toBe('https://example.com/avatar.jpg');
+
     const photoLine1 = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Jane Doe\r\nPHOTO;VALUE=uri:https://example.com/avatar.jpg\r\nEND:VCARD';
     expect(hydrateVCardData(photoLine1).photo).toBe('https://example.com/avatar.jpg');
 
@@ -853,6 +881,9 @@ describe('Photo avatar field', () => {
 
     const photoLine4 = 'BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane Doe\r\nPHOTO:uri:https://example.com/avatar.jpg\r\nEND:VCARD';
     expect(hydrateVCardData(photoLine4).photo).toBe('https://example.com/avatar.jpg');
+
+    const photoLine5 = 'BEGIN:VCARD\r\nVERSION:2.1\r\nFN:Jane Doe\r\nPHOTO;VALUE=URL:https://example.com/avatar.jpg\r\nEND:VCARD';
+    expect(hydrateVCardData(photoLine5).photo).toBe('https://example.com/avatar.jpg');
   });
 
   it('omits PHOTO field for MECard payloads', () => {

@@ -138,20 +138,25 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
       />
       {!websiteError && <LinkHints fieldId="vcard-website" address={data.website} />}
 
-      <TextField
-        id="vcard-photo"
-        name="photo"
-        label="Profile Photo URL"
-        autoComplete="url"
-        type="url"
-        maxLength={2048}
-        placeholder="https://example.com/avatar.jpg"
-        value={data.photo || ""}
-        onChange={(e) => onChange({ photo: e.target.value })}
-        error={photoError}
-        aria-describedby={hintsId("vcard-photo")}
-      />
-      {!photoError && <LinkHints fieldId="vcard-photo" address={data.photo || ""} />}
+      {!isMeCard && (
+        <>
+          <TextField
+            id="vcard-photo"
+            name="photo"
+            label="Profile Photo URL"
+            autoComplete="url"
+            type="url"
+            maxLength={2048}
+            placeholder="https://example.com/avatar.jpg"
+            value={data.photo || ""}
+            onChange={(e) => onChange({ photo: e.target.value })}
+            error={photoError}
+            aria-describedby={hintsId("vcard-photo")}
+          />
+          <p className="mt-1 text-xs text-fg-muted">Some phones don't load linked photos.</p>
+          {!photoError && <LinkHints fieldId="vcard-photo" address={data.photo || ""} />}
+        </>
+      )}
 
       <FormBlock legend="Social Profiles" isSubFieldset={true}>
         {isMeCard ? (
