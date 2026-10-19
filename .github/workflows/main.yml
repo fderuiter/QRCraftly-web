@@ -176,7 +176,9 @@ jobs:
           SHARD: ${{ matrix.shard }}
           VITEST_COVERAGE: "true"
           VITEST_SHARD_RUN: "true"
-        run: pnpm exec vitest run --coverage --shard="$SHARD/3" --reporter=blob --outputFile=".vitest-reports/blob-$SHARD-3.json"
+        # The blob report feeds the merge job; `dot` and `github-actions` print the failing
+        # test's name and assertion in this log and annotate its line on the PR (#1482).
+        run: pnpm exec vitest run --coverage --shard="$SHARD/3" --reporter=blob --reporter=dot --reporter=github-actions --outputFile.blob=".vitest-reports/blob-$SHARD-3.json"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -199,7 +201,7 @@ jobs:
           SHARDS_RESULT: ${{ needs.test-shard.result }}
         run: |
           if [ "$SHARDS_RESULT" != "success" ]; then
-            echo "::error::A unit test shard finished with '$SHARDS_RESULT'."
+            echo "::error::A unit test shard finished with '$SHARDS_RESULT'. Open the failed 'Unit Tests (shard N/3)' job: its log and the PR annotations name the failing test."
             exit 1
           fi
 
