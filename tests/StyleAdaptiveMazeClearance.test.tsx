@@ -5,7 +5,7 @@ import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel } from '../src/t
 import { getStyleAdaptiveMazePathWidth, getMazeCacheKey, renderMaze } from '../src/packages/qr-matrix/maze';
 import { TargetSettings } from '../src/components/arcade/TargetSettings';
 import type { ArcadeTarget } from '../src/packages/arcade/handoff';
-import { drawQRInternal } from '../src/utils/qrRenderer';
+import { drawQRInternal } from '../src/packages/qr-matrix';
 import * as scannabilityChecker from '@/packages/scannability/checker';
 import { qrReader } from './fixtures/qrReader';
 import { qrEncoder as QRCode } from './fixtures/qrEncoder';

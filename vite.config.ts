@@ -168,24 +168,27 @@ export default defineConfig(({ command }) => {
         coverage: {
           reporter: ['text', 'json-summary', 'json'],
           reportOnFailure: true,
-          // Floors set just under the measured totals for the scope below; raise
-          // them as coverage improves, never lower them to make a PR pass.
-          // Measured on dev when this scope was introduced: statements 80.4%,
-          // branches 73.1%, functions 86.1%, lines 81.4%. The floors live in a
+          // Floors set just under the measured totals; raise them as coverage improves,
+          // never lower them to make a PR pass. Besides the global floors, each layer has
+          // its own (a glob key), so well-covered logic cannot hide an untested component.
+          // Measured on main 2026-10-19 when the UI joined the gate (lines / branches):
+          // logic 93.8 / 84.5, components 89.7 / 82.3 (88.9 / 82.9 without the arcade, which
+          // is being removed), hooks 92.6 / 76.8, pages 64.2 / 60.6. The floors live in a
           // JSON file so the CI coverage summary (scripts/ci/coverage_summary.js)
-          // shows the same numbers without parsing this config.
+          // shows the same numbers, layer by layer, without parsing this config.
           // A CI shard (VITEST_SHARD_RUN) measures only its share of the tests, so the
           // floors are checked once, when the shards' reports are merged.
           thresholds: process.env.VITEST_SHARD_RUN === 'true' ? {} : { ...coverageThresholds },
-          // Measure the logic layers: shared utilities and the deep-module
-          // packages. Components, hooks and pages are exercised by the jsdom
-          // project and Playwright but not gated here.
+          // Measure everything that ships: utilities, packages, components, hooks and pages.
           include: [
             'src/utils/**/*.ts',
-            'src/packages/**/*.ts',
+            'src/packages/**/*.{ts,tsx}',
+            'src/components/**/*.{ts,tsx}',
+            'src/hooks/**/*.ts',
+            'src/pages/**/*.{ts,tsx}',
           ],
           exclude: [
-            '**/*.test.ts',
+            '**/*.test.{ts,tsx}',
             '**/*.d.ts',
           ],
         }
