@@ -57,12 +57,13 @@ export function auditModuleContrast(
   let drawWidth = width;
   let drawHeight = height;
 
-  if (margin !== undefined && margin > 0) {
-    const borderPx = (margin * width) / (moduleCount + 2 * margin);
-    drawX = borderPx;
-    drawY = borderPx;
-    drawWidth = width - 2 * borderPx;
-    drawHeight = height - 2 * borderPx;
+  if (margin !== undefined && margin >= 0) {
+    const minDim = Math.min(width, height);
+    const borderPx = (margin * minDim) / (moduleCount + 2 * margin);
+    drawX = (width - (minDim - 2 * borderPx)) / 2;
+    drawY = (height - (minDim - 2 * borderPx)) / 2;
+    drawWidth = minDim - 2 * borderPx;
+    drawHeight = drawWidth;
   } else if (margin === undefined && width > moduleCount) {
     const isTightMatrix = width % moduleCount === 0 && width % (moduleCount + 8) !== 0;
     if (!isTightMatrix) {

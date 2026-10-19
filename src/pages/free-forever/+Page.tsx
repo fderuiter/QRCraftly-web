@@ -83,7 +83,7 @@ export default function Page() {
 
         <section
           aria-labelledby="pledge-commitment"
-          className="mb-12 rounded-2xl border border-teal-100 bg-teal-50 p-8 text-center md:p-12 dark:border-teal-800/40 dark:bg-teal-900/20"
+          className="mb-12 rounded-2xl border border-accent-line bg-accent-soft p-8 text-center md:p-12"
         >
           <h2 id="pledge-commitment" className="mb-4 text-2xl font-bold text-fg">Ads or nothing? Nothing.</h2>
           <p className="mx-auto max-w-2xl text-lg leading-relaxed text-fg-soft">{PLEDGE_COMMITMENT}</p>

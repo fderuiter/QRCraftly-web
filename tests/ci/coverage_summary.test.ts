@@ -9,6 +9,8 @@ import {
   capBytes,
   changedFilesTable,
   escapeCell,
+  globToRegExp,
+  layersTable,
   toRanges,
   uncoveredLines,
 } from '../../scripts/ci/coverage_summary.js';
@@ -79,6 +81,45 @@ describe('scripts/ci/coverage_summary.js', () => {
     expect(md).toContain('| Statements | 79.00% | 79 / 100 | 80% | ❌ |');
     expect(md).toContain('| Branches | 72.00% | 72 / 100 | 72% | ✅ |');
     expect(md).not.toContain('Changed files');
+  });
+
+  it('adds a layer table that sums each glob layer and marks the one below its floor', () => {
+    const md = buildSummary({
+      coverageDir,
+      root: tmp,
+      thresholds: { ...THRESHOLDS, 'src/utils/**': { lines: 60, branches: 50 }, 'src/hooks/**': { lines: 90 } },
+      changed: null,
+    });
+    expect(md).toContain('### Layers');
+    // a.ts (1/4 lines, 0/2 branches) and the odd file (4/4, 2/2) sum to 5/8 lines and 2/4 branches.
+    expect(md).toContain('| src/utils/\\*\\* | 62.50% (floor 60%) | 62.50% | 100.00% | 50.00% (floor 50%) | ✅ |');
+    // A layer with no files counts as fully covered rather than failing on 0 / 0.
+    expect(md).toContain('| src/hooks/\\*\\* | 100.00% (floor 90%) | 100.00% | 100.00% | 100.00% | ✅ |');
+  });
+
+  it('marks a layer below any of its floors', () => {
+    const summaries = { 'src/pages/a.tsx': fileSummary([1, 2], [1, 2]) };
+    expect(layersTable(summaries, { 'src/pages/**': { lines: 40, branches: 60 } })).toContain('| ❌ |');
+  });
+
+  it('leaves the layer table out when the thresholds have no layers', () => {
+    expect(layersTable({}, THRESHOLDS)).toBe('');
+    expect(buildSummary({ coverageDir, root: tmp, thresholds: THRESHOLDS, changed: null })).not.toContain('Layers');
+  });
+
+  it('matches coverage globs the way the thresholds file uses them', () => {
+    const logic = globToRegExp('src/{utils,packages}/**/*.ts');
+    expect(logic.test('src/utils/a.ts')).toBe(true);
+    expect(logic.test('src/packages/qr-export/lib/svgExport.ts')).toBe(true);
+    expect(logic.test('src/packages/x/View.tsx')).toBe(false);
+    expect(logic.test('src/components/a.ts')).toBe(false);
+    expect(logic.test('src/utilsX/a.ts')).toBe(false);
+    const ui = globToRegExp('src/components/**');
+    expect(ui.test('src/components/inputs/BulkCsvInput.tsx')).toBe(true);
+    expect(ui.test('src/componentsX/a.tsx')).toBe(false);
+    expect(globToRegExp('src/*.ts').test('src/a/b.ts')).toBe(false);
+    expect(globToRegExp('src/a+b.ts').test('src/a+b.ts')).toBe(true);
+    expect(globToRegExp('src/{a.ts').test('src/{a.ts')).toBe(true);
   });
 
   it('lists only changed files that are in the coverage data, with uncovered ranges', () => {
@@ -164,6 +205,8 @@ describe('scripts/ci/coverage_summary.js', () => {
     });
     const written = fs.readFileSync(summaryFile, 'utf8');
     expect(written.startsWith('earlier step\n## Coverage')).toBe(true);
-    expect(written).toContain('| Functions | 90.00% | 90 / 100 | 85% | ✅ |');
+    expect(written).toContain('| Functions | 90.00% | 90 / 100 | 88% | ✅ |');
+    // The real thresholds file has per-layer floors, so the layer table is written too.
+    expect(written).toContain('### Layers');
   });
 });

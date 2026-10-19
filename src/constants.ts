@@ -62,6 +62,7 @@ export const DEFAULT_CONFIG = {
   framePosition: 'bottom' as const,
   frameIcon: 'none' as const,
   frameFontFamily: 'sans-serif' as const,
+  quietZoneModules: 4,
 };
 
 /**

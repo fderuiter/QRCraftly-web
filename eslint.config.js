@@ -6,6 +6,7 @@ import jsdoc from "eslint-plugin-jsdoc";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import { NODE_GLOBALS, COMMONJS_GLOBALS } from "./eslint/node-globals.js";
 import qrcraftly from "./eslint/rules/index.js";
+import { LEGACY_TYPE_ASSERTION_FILES } from "./eslint/legacy-type-assertions.js";
 
 // Unit/integration tests and their support code (Vitest + Testing Library).
 const TEST_FILES = [
@@ -47,8 +48,7 @@ export default tseslint.config(
       ".vike/**",
       ".agents/**",
       // Agent worktrees are copies of the repository, not part of it.
-      ".claude/**",
-      ".jules/**"
+      ".claude/**"
     ]
   },
   js.configs.recommended,
@@ -125,6 +125,15 @@ export default tseslint.config(
       react: {
         version: "detect"
       }
+    }
+  },
+  {
+    // No loose type assertions in app code (AGENTS.md); `as const` stays allowed. Older files
+    // are listed in eslint/legacy-type-assertions.js until they are cleaned up.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: [...TEST_FILES, ...LEGACY_TYPE_ASSERTION_FILES],
+    rules: {
+      "@typescript-eslint/consistent-type-assertions": ["error", { assertionStyle: "never" }]
     }
   },
   {

@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { calculateScannabilityHealth, getExportRiskPolicy } from '../index';
+import { calculateScannabilityHealth, getExportRiskPolicy, auditModuleContrast } from '../index';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { evaluateScannability, performScannabilityCheck } from '../checker';
 import { type QRConfig, QRType, QRErrorCorrectionLevel, QRStyle, SocialFormat, TemplateStyle } from '@/types';
@@ -137,6 +137,26 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       expect(healthH.score).toBe(100);
       expect(healthH.warnings).not.toContain('Low error correction with logo');
     });
+
+    it('deducts score and warns when quiet zone margin is below 4 modules', () => {
+      const config: QRConfig = {
+        ...getBaseConfig(),
+        quietZoneModules: 2,
+      };
+      const health = calculateScannabilityHealth(config);
+      expect(health.score).toBe(85);
+      expect(health.warnings).toContain('Quiet zone is narrower than the recommended 4 modules');
+    });
+
+    it('does not warn when quiet zone margin is 4 or higher', () => {
+      const config: QRConfig = {
+        ...getBaseConfig(),
+        quietZoneModules: 4,
+      };
+      const health = calculateScannabilityHealth(config);
+      expect(health.score).toBe(100);
+      expect(health.warnings).not.toContain('Quiet zone is narrower than the recommended 4 modules');
+    });
   });
 
   describe('getExportRiskPolicy', () => {
@@ -206,6 +226,68 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       expect(assessment).toHaveProperty('exportRisk');
       expect(assessment).toHaveProperty('result');
       expect(assessment.health.score).toBe(100);
+    });
+  });
+
+  describe('auditModuleContrast and quiet zone margins', () => {
+    it('respects quiet zone margin parameter at 2 modules', () => {
+      const moduleCount = 21;
+      const margin = 2;
+      const cellSize = 10;
+      const width = (moduleCount + 2 * margin) * cellSize;
+      const height = width;
+      const data = new Uint8ClampedArray(width * height * 4);
+      data.fill(255); // white background
+
+      // Draw a black module at matrix cell (0,0) located at pixel offset margin * cellSize
+      const startX = margin * cellSize;
+      const startY = margin * cellSize;
+      for (let y = startY; y < startY + cellSize; y++) {
+        for (let x = startX; x < startX + cellSize; x++) {
+          const idx = (y * width + x) * 4;
+          data[idx] = 0;
+          data[idx + 1] = 0;
+          data[idx + 2] = 0;
+          data[idx + 3] = 255;
+        }
+      }
+
+      const audit = auditModuleContrast({ data, width, height }, moduleCount, margin);
+      expect(audit.violations).toBe(0);
+
+      const frame = { data, width, height };
+      const res = performScannabilityCheck(qrReader, frame, width, height, moduleCount, margin);
+      expect(res.localContrastViolations).toBe(0);
+    });
+
+    it('respects quiet zone margin parameter at 8 modules', () => {
+      const moduleCount = 21;
+      const margin = 8;
+      const cellSize = 10;
+      const width = (moduleCount + 2 * margin) * cellSize;
+      const height = width;
+      const data = new Uint8ClampedArray(width * height * 4);
+      data.fill(255); // white background
+
+      // Draw a black module at matrix cell (0,0) located at pixel offset margin * cellSize
+      const startX = margin * cellSize;
+      const startY = margin * cellSize;
+      for (let y = startY; y < startY + cellSize; y++) {
+        for (let x = startX; x < startX + cellSize; x++) {
+          const idx = (y * width + x) * 4;
+          data[idx] = 0;
+          data[idx + 1] = 0;
+          data[idx + 2] = 0;
+          data[idx + 3] = 255;
+        }
+      }
+
+      const audit = auditModuleContrast({ data, width, height }, moduleCount, margin);
+      expect(audit.violations).toBe(0);
+
+      const frame = { data, width, height };
+      const res = performScannabilityCheck(qrReader, frame, width, height, moduleCount, margin);
+      expect(res.localContrastViolations).toBe(0);
     });
   });
 });

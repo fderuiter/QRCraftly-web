@@ -6,6 +6,8 @@
  * and appends Markdown to $GITHUB_STEP_SUMMARY:
  * - totals for lines, statements, functions and branches against the floors in
  *   `scripts/ci/coverage_thresholds.json` (the same file vite.config.ts reads);
+ * - each layer with its own floors in that file (a glob key such as `src/components/**`),
+ *   so a layer that drops below its floor shows which one it is;
  * - on pull requests, each changed source file with its line and branch
  *   percentages and its uncovered line ranges.
  *
@@ -37,6 +39,8 @@ const METRICS = /** @type {const} */ (['lines', 'statements', 'functions', 'bran
  * @typedef {Record<'lines' | 'statements' | 'functions' | 'branches', Metric>} FileSummary
  * @typedef {{ start: { line: number }, end: { line: number } }} Span
  * @typedef {{ statementMap: Record<string, Span>, s: Record<string, number> }} FileCoverage
+ * @typedef {Partial<Record<'lines' | 'statements' | 'functions' | 'branches', number>>} Floors
+ * @typedef {Record<string, number | Floors>} Thresholds Vitest's shape: global floors, plus floors per glob.
  */
 
 /**
@@ -130,19 +134,85 @@ export function uncoveredLines(file) {
 /**
  * The totals table.
  * @param {FileSummary} total
- * @param {Partial<Record<string, number>>} thresholds
+ * @param {Thresholds} thresholds
  * @returns {string}
  */
 export function totalsTable(total, thresholds) {
   const rows = ['| Metric | Coverage | Covered / total | Floor | Status |', '| --- | ---: | ---: | ---: | :---: |'];
   for (const metric of METRICS) {
     const value = total[metric];
-    const floor = thresholds[metric];
+    const raw = thresholds[metric];
+    const floor = typeof raw === 'number' ? raw : undefined;
     const pct = typeof value.pct === 'number' ? value.pct : 100;
     const status = floor === undefined ? '' : pct >= floor ? '✅' : '❌';
     const floorText = floor === undefined ? '-' : `${floor}%`;
     const name = metric[0].toUpperCase() + metric.slice(1);
     rows.push(`| ${name} | ${formatPct(value.pct)} | ${value.covered} / ${value.total} | ${floorText} | ${status} |`);
+  }
+  return rows.join('\n');
+}
+
+/**
+ * Turns a coverage glob into a regular expression over POSIX repo paths. Supports what the
+ * thresholds file uses: `**` (any depth), `*` (within one segment) and `{a,b}` alternatives.
+ * @param {string} glob
+ * @returns {RegExp}
+ */
+export function globToRegExp(glob) {
+  let out = '';
+  for (let i = 0; i < glob.length; i++) {
+    const ch = glob[i];
+    if (ch === '*' && glob[i + 1] === '*') {
+      i += 1;
+      if (glob[i + 1] === '/') {
+        i += 1;
+        out += '(?:.*/)?';
+      } else {
+        out += '.*';
+      }
+    } else if (ch === '*') {
+      out += '[^/]*';
+    } else if (ch === '{') {
+      const end = glob.indexOf('}', i);
+      if (end === -1) {
+        out += '\\{';
+        continue;
+      }
+      out += `(?:${glob.slice(i + 1, end).split(',').map((part) => part.replace(/[.+?^$()|[\]\\]/g, '\\$&')).join('|')})`;
+      i = end;
+    } else {
+      out += ch.replace(/[.+?^$()|[\]\\{}]/g, '\\$&');
+    }
+  }
+  return new RegExp(`^${out}$`);
+}
+
+/**
+ * One row per layer that has its own floors (a glob key in the thresholds), with the layer's
+ * coverage summed over its files. Empty when the thresholds have no layers.
+ * @param {Record<string, FileSummary>} summaries keyed by repo path
+ * @param {Thresholds} thresholds
+ * @returns {string}
+ */
+export function layersTable(summaries, thresholds) {
+  const layers = Object.entries(thresholds).filter(
+    /** @returns {entry is [string, Floors]} */ (entry) => typeof entry[1] === 'object' && entry[1] !== null,
+  );
+  if (layers.length === 0) return '';
+  const rows = ['| Layer | Lines | Statements | Functions | Branches | Status |', '| --- | ---: | ---: | ---: | ---: | :---: |'];
+  for (const [glob, floors] of layers) {
+    const pattern = globToRegExp(glob);
+    const files = Object.entries(summaries).filter(([file]) => pattern.test(file));
+    let ok = true;
+    const cells = METRICS.map((metric) => {
+      const covered = files.reduce((sum, [, s]) => sum + s[metric].covered, 0);
+      const total = files.reduce((sum, [, s]) => sum + s[metric].total, 0);
+      const pct = total === 0 ? 100 : Math.round((covered / total) * 10000) / 100;
+      const floor = floors[metric];
+      if (floor !== undefined && pct < floor) ok = false;
+      return floor === undefined ? formatPct(pct) : `${formatPct(pct)} (floor ${floor}%)`;
+    });
+    rows.push(`| ${escapeCell(glob)} | ${cells.join(' | ')} | ${ok ? '✅' : '❌'} |`);
   }
   return rows.join('\n');
 }
@@ -192,7 +262,7 @@ export function capBytes(text, limit = SUMMARY_LIMIT_BYTES) {
 
 /**
  * Builds the whole summary.
- * @param {{ coverageDir: string, root?: string, thresholds: Partial<Record<string, number>>, changed: string[] | null }} options
+ * @param {{ coverageDir: string, root?: string, thresholds: Thresholds, changed: string[] | null }} options
  * @returns {string}
  */
 export function buildSummary({ coverageDir, root = REPO_ROOT, thresholds, changed }) {
@@ -216,6 +286,8 @@ export function buildSummary({ coverageDir, root = REPO_ROOT, thresholds, change
   for (const [file, value] of Object.entries(finalJson)) details[toRepoPath(file, root)] = value;
 
   const parts = ['## Coverage', '', totalsTable(summaryJson.total, thresholds), ''];
+  const layers = layersTable(summaries, thresholds);
+  if (layers) parts.push('### Layers', '', layers, '');
   if (changed) {
     parts.push('### Changed files', '', changedFilesTable(changed, summaries, details), '');
   }
@@ -224,7 +296,7 @@ export function buildSummary({ coverageDir, root = REPO_ROOT, thresholds, change
 
 function main() {
   const coverageDir = path.resolve(process.env.COVERAGE_DIR || path.join(REPO_ROOT, 'coverage'));
-  const thresholds = /** @type {Partial<Record<string, number>>} */ (readJson(THRESHOLDS_PATH) ?? {});
+  const thresholds = /** @type {Thresholds} */ (readJson(THRESHOLDS_PATH) ?? {});
   const eventName = process.env.EVENT_NAME ?? '';
   let changed = null;
   if (eventName === 'pull_request') {
