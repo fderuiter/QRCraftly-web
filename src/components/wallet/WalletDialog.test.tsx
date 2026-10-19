@@ -17,11 +17,10 @@
 */
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { DEFAULT_CONFIG } from '@/constants';
 import { type QRConfig, QRType } from '@/types';
-import * as scannabilityChecker from '@/packages/scannability/checker';
 import { ToastProvider } from '../ui/Toast';
 import WalletDialog, { suggestWalletTitle, WALLET_SCAN_FAILED } from './WalletDialog';
 
@@ -45,6 +44,7 @@ vi.mock('@/packages/qr-export', async (original) => {
     }),
   };
 });
+vi.mock('@/packages/scannability/checker', () => ({ performScannabilityCheck: () => ({ success: scan.success }) }));
 vi.mock('@/packages/qr-decode', () => ({ loadQrReader: async () => ({}) }));
 vi.mock('@/utils/downloadManager', () => ({ triggerFileDownload: download }));
 
@@ -62,22 +62,6 @@ describe('WalletDialog (ADR 0048)', () => {
   beforeEach(() => {
     scan.success = true;
     download.mockClear();
-    vi.spyOn(scannabilityChecker, 'performScannabilityCheck').mockImplementation(() => ({
-      success: scan.success,
-      physicalReady: scan.success,
-      overallContrast: 1,
-      minLocalContrast: 1,
-      isolatedModules: 0,
-      finderPatternIntact: scan.success,
-      alignmentPatternIntact: scan.success,
-      timingPatternIntact: scan.success,
-      formatInfoIntact: scan.success,
-      versionInfoIntact: scan.success,
-    }));
-  });
-
-  afterAll(() => {
-    vi.restoreAllMocks();
   });
 
   it('has no axe violations, shows a preview and downloads the card', async () => {
