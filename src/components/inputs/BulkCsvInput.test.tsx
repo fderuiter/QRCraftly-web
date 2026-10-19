@@ -168,6 +168,12 @@ describe('BulkCsvInput Component', () => {
 
     const formatSelect = screen.getByLabelText('Image Format');
     expect(formatSelect).toHaveValue('png');
+
+    // Accessibility test: aria-describedby linkage
+    expect(payloadSelect).toHaveAttribute('aria-describedby', 'bulk-payload-column-desc');
+    expect(filenameSelect).toHaveAttribute('aria-describedby', 'bulk-filename-column-desc');
+    expect(document.getElementById('bulk-payload-column-desc')).toHaveTextContent('Auto-matched column choice');
+    expect(document.getElementById('bulk-filename-column-desc')).toHaveTextContent('Auto-matched column choice');
   });
 
   it('lists unusual addresses without leaving them out (#1159)', () => {

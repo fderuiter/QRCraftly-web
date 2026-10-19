@@ -161,17 +161,17 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
   const payloadCol = columns.includes(data.payloadColumn)
     ? data.payloadColumn
-    : pickColumn(columns, PAYLOAD_COLUMN_WORDS, '', rows);
+    : pickColumn(columns, PAYLOAD_COLUMN_WORDS, { exclude: '', rows, kind: 'payload' });
   const filenameCol = columns.includes(data.filenameColumn)
     ? data.filenameColumn
-    : pickColumn(columns, FILENAME_COLUMN_WORDS, payloadCol, rows);
+    : pickColumn(columns, FILENAME_COLUMN_WORDS, { exclude: payloadCol, rows, kind: 'filename' });
 
   const autoPayloadCol = useMemo(
-    () => pickColumn(columns, PAYLOAD_COLUMN_WORDS, '', rows),
+    () => pickColumn(columns, PAYLOAD_COLUMN_WORDS, { exclude: '', rows, kind: 'payload' }),
     [columns, rows]
   );
   const autoFilenameCol = useMemo(
-    () => pickColumn(columns, FILENAME_COLUMN_WORDS, payloadCol, rows),
+    () => pickColumn(columns, FILENAME_COLUMN_WORDS, { exclude: payloadCol, rows, kind: 'filename' }),
     [columns, rows, payloadCol]
   );
 
@@ -593,6 +593,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
                   id="bulk-payload-column"
                   label="Content Column"
                   value={payloadCol}
+                  aria-describedby="bulk-payload-column-desc"
                   onChange={(e) => onChange({ payloadColumn: e.target.value })}
                 >
                   {columns.map((col) => (
@@ -601,6 +602,9 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
                     </option>
                   ))}
                 </SelectField>
+                <span id="bulk-payload-column-desc" className="sr-only">
+                  {isPayloadAutoMatched ? 'Auto-matched column choice' : 'Manually mapped column choice'}
+                </span>
 
                 {rows[0]?.[payloadCol] !== undefined && (
                   <div className="rounded bg-surface-sunken p-2 text-xs text-fg-muted" data-testid="bulk-payload-sample-preview">
@@ -637,6 +641,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
                   id="bulk-filename-column"
                   label="File Name Column"
                   value={filenameCol}
+                  aria-describedby="bulk-filename-column-desc"
                   onChange={(e) => onChange({ filenameColumn: e.target.value })}
                 >
                   {columns.map((col) => (
@@ -645,6 +650,9 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
                     </option>
                   ))}
                 </SelectField>
+                <span id="bulk-filename-column-desc" className="sr-only">
+                  {isFilenameAutoMatched ? 'Auto-matched column choice' : 'Manually mapped column choice'}
+                </span>
 
                 {rows[0]?.[filenameCol] !== undefined && (
                   <div className="rounded bg-surface-sunken p-2 text-xs text-fg-muted" data-testid="bulk-filename-sample-preview">

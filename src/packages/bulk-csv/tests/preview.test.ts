@@ -61,22 +61,27 @@ describe('pickColumn', () => {
     expect(pickColumn(['url'], FILENAME_COLUMN_WORDS, 'url')).toBe('url');
   });
 
-  it('matches expanded header aliases like member_id, promo_link, customer_url, target, and destination', () => {
-    expect(pickColumn(['member_id', 'notes'], PAYLOAD_COLUMN_WORDS)).toBe('member_id');
+  it('matches expanded header aliases like promo_link, customer_url, target, and destination', () => {
     expect(pickColumn(['promo_link', 'title'], PAYLOAD_COLUMN_WORDS)).toBe('promo_link');
     expect(pickColumn(['customer_url', 'id'], PAYLOAD_COLUMN_WORDS)).toBe('customer_url');
     expect(pickColumn(['target', 'label'], PAYLOAD_COLUMN_WORDS)).toBe('target');
     expect(pickColumn(['destination', 'sku'], PAYLOAD_COLUMN_WORDS)).toBe('destination');
   });
 
-  it('performs fallback sample inspection when headers do not match known keywords', () => {
+  it('ranks strong URL/link header words above secondary header words regardless of column order', () => {
+    expect(pickColumn(['Customer', 'URL'], PAYLOAD_COLUMN_WORDS)).toBe('URL');
+    expect(pickColumn(['Member Name', 'Link'], PAYLOAD_COLUMN_WORDS)).toBe('Link');
+    expect(pickColumn(['Campaign', 'URL'], PAYLOAD_COLUMN_WORDS)).toBe('URL');
+  });
+
+  it('performs fallback sample inspection with explicit options object and kind', () => {
     const sampleRows = [
       { ColA: 'Member_101', ColB: 'https://example.com/promo/101' },
       { ColA: 'Member_102', ColB: 'https://example.com/promo/102' },
     ];
-    // ColB contains URLs, so it should be picked as payload column over ColA
-    expect(pickColumn(['ColA', 'ColB'], PAYLOAD_COLUMN_WORDS, '', sampleRows)).toBe('ColB');
-    // For filename column excluding ColB, ColA with plain text should be picked
-    expect(pickColumn(['ColA', 'ColB'], FILENAME_COLUMN_WORDS, 'ColB', sampleRows)).toBe('ColA');
+    // ColB contains URLs, so it should be picked as payload column over ColA when kind is 'payload'
+    expect(pickColumn(['ColA', 'ColB'], PAYLOAD_COLUMN_WORDS, { rows: sampleRows, kind: 'payload' })).toBe('ColB');
+    // For filename column excluding ColB, ColA with plain text should be picked when kind is 'filename'
+    expect(pickColumn(['ColA', 'ColB'], FILENAME_COLUMN_WORDS, { exclude: 'ColB', rows: sampleRows, kind: 'filename' })).toBe('ColA');
   });
 });

@@ -32,18 +32,14 @@ export const PAYLOAD_COLUMN_WORDS: readonly string[] = [
   'data',
   'qr',
   'content',
-  'member_id',
-  'member',
   'promo_link',
-  'promo',
   'customer_url',
-  'customer',
   'target',
   'destination',
   'campaign',
   'redirect',
   'endpoint',
-  'path',
+  'promo',
 ];
 /** Header words that usually mark a per-row file name column. */
 export const FILENAME_COLUMN_WORDS: readonly string[] = ['name', 'filename', 'file', 'id', 'label', 'title', 'sku'];
@@ -81,26 +77,71 @@ function headerWords(header: string): string[] {
   return Array.from(set);
 }
 
+/** Options for column selection heuristics. */
+export interface PickColumnOptions {
+  exclude?: string;
+  rows?: CsvRow[];
+  kind?: 'payload' | 'filename';
+}
+
 /**
- * Picks the first column whose header contains one of `words` as a whole word, so `Video URL`
- * counts as a link column and not as an `id` column.
+ * Picks the column whose header matches the highest-priority word in `words`.
  * If headers do not match known keywords and sample `rows` are provided, does fallback inspection
- * of cell values to find the best candidate.
+ * of cell values according to `kind` ('payload' | 'filename').
  * Falls back to the first column that is not `exclude`, then to `exclude` itself when it is the only column.
  * @param columns Header names.
- * @param words Preferred header words, lowercase.
- * @param exclude A column already used for something else, such as the payload column.
- * @param rows Sample data rows for fallback cell inspection.
+ * @param words Preferred header words in priority order, lowercase.
+ * @param excludeOrOptions Excluded column name or options object with exclude, rows, and kind.
+ * @param rowsArg Sample data rows for fallback cell inspection when excludeOrOptions is string.
+ * @param kindArg Column kind for fallback cell inspection when excludeOrOptions is string.
  * @returns The chosen column, or `''` when there are no columns.
  */
-export function pickColumn(columns: string[], words: readonly string[], exclude = '', rows: CsvRow[] = []): string {
+export function pickColumn(
+  columns: string[],
+  words: readonly string[],
+  excludeOrOptions: string | PickColumnOptions = '',
+  rowsArg: CsvRow[] = [],
+  kindArg?: 'payload' | 'filename'
+): string {
+  const options: PickColumnOptions =
+    typeof excludeOrOptions === 'object' && excludeOrOptions !== null
+      ? excludeOrOptions
+      : { exclude: excludeOrOptions, rows: rowsArg, kind: kindArg };
+
+  const exclude = options.exclude ?? '';
+  const rows = options.rows ?? [];
+  const kind =
+    options.kind ??
+    (words === PAYLOAD_COLUMN_WORDS
+      ? 'payload'
+      : words === FILENAME_COLUMN_WORDS
+        ? 'filename'
+        : undefined);
+
   const candidates = columns.filter((col) => col !== exclude);
-  const match = candidates.find((col) => headerWords(col).some((word) => words.includes(word)));
-  if (match) return match;
+  if (candidates.length === 0) return columns[0] ?? '';
+
+  let bestCandidate: string | null = null;
+  let bestWordIndex = Infinity;
+
+  for (const col of candidates) {
+    const tokens = headerWords(col);
+    for (const token of tokens) {
+      const index = words.indexOf(token);
+      if (index !== -1 && index < bestWordIndex) {
+        bestWordIndex = index;
+        bestCandidate = col;
+      }
+    }
+  }
+
+  if (bestCandidate !== null) {
+    return bestCandidate;
+  }
 
   if (rows.length > 0 && candidates.length > 0) {
     const sampleRows = rows.slice(0, 10);
-    if (words === PAYLOAD_COLUMN_WORDS) {
+    if (kind === 'payload') {
       let bestCandidate = candidates[0];
       let maxPayloadMatches = -1;
       for (const col of candidates) {
@@ -119,7 +160,7 @@ export function pickColumn(columns: string[], words: readonly string[], exclude 
       if (maxPayloadMatches > 0) {
         return bestCandidate;
       }
-    } else if (words === FILENAME_COLUMN_WORDS) {
+    } else if (kind === 'filename') {
       let bestCandidate = candidates[0];
       let maxFilenameScore = -1;
       for (const col of candidates) {
@@ -185,7 +226,7 @@ export function previewRow(csvContent: string, payloadColumn: string, contentTyp
   }
   const column = table.headers.includes(payloadColumn)
     ? payloadColumn
-    : pickColumn(table.headers, PAYLOAD_COLUMN_WORDS, '', table.rows);
+    : pickColumn(table.headers, PAYLOAD_COLUMN_WORDS, { exclude: '', rows: table.rows, kind: 'payload' });
   if (!column) return null;
   const index = table.rows.findIndex((row) => hasPayload(row, column));
   if (index === -1) return null;
