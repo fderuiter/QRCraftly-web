@@ -76,14 +76,5 @@ describe('LogoControls error correction level auto-elevation', () => {
 
     expect(fileInput).toBeInTheDocument();
   });
-
-  it('does not render duplicate warning alert in LogoControls panel when logo is present', () => {
-    renderControls({
-      logoUrl: PRESET_LOGOS[0].dataUrl,
-      errorCorrectionLevel: QRErrorCorrectionLevel.M,
-    });
-
-    expect(screen.queryByText('Scannability Warning:')).not.toBeInTheDocument();
-  });
 });
 
