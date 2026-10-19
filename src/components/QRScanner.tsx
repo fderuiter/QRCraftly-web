@@ -76,7 +76,7 @@ export function clearScanHistory(): void {
   sessionHistory = [];
 }
 
-const FORMULA_START = /^[=+\-\t\r@]/;
+const FORMULA_START = /^[=+\-@\t\r]/;
 
 /**
  * Escapes a single string field for RFC 4180 CSV text.
@@ -88,7 +88,7 @@ const FORMULA_START = /^[=+\-\t\r@]/;
  */
 export function escapeCsvField(field: string): string {
   const safe = FORMULA_START.test(field) ? `'${field}` : field;
-  return /["\r\n,]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
+  return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
 /**

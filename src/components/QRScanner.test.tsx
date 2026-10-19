@@ -1207,12 +1207,30 @@ describe('QRScanner Component', () => {
     });
 
     it('neutralises CSV formula injection characters (=, +, -, @, \\t, \\r)', () => {
-      expect(escapeCsvField('=HYPERLINK("https://evil.example","Click")')).toBe('"' + "'=HYPERLINK(" + '""' + 'https://evil.example' + '""' + ',' + '""' + 'Click' + '""' + ')' + '"');
+      // Testing each of the six leading formula characters explicitly
+      // 1. Equals sign (=)
+      expect(escapeCsvField('=')).toBe("'=");
       expect(escapeCsvField("=cmd|' /C calc'!A0")).toBe("'=cmd|' /C calc'!A0");
+      expect(escapeCsvField('=HYPERLINK("https://evil.example","Click")')).toBe('"' + "'=HYPERLINK(" + '""' + 'https://evil.example' + '""' + ',' + '""' + 'Click' + '""' + ')' + '"');
+
+      // 2. Plus sign (+)
+      expect(escapeCsvField('+')).toBe("'+");
       expect(escapeCsvField('+100')).toBe("'+100");
+
+      // 3. Minus sign (-)
+      expect(escapeCsvField('-')).toBe("'-");
       expect(escapeCsvField('-50')).toBe("'-50");
+
+      // 4. At sign (@)
+      expect(escapeCsvField('@')).toBe("'@");
       expect(escapeCsvField('@SUM(A1:A10)')).toBe("'@SUM(A1:A10)");
+
+      // 5. Tab character (\t)
+      expect(escapeCsvField('\t')).toBe("'\t");
       expect(escapeCsvField('\tTAB_PREFIX')).toBe("'\tTAB_PREFIX");
+
+      // 6. Carriage return character (\r)
+      expect(escapeCsvField('\r')).toBe("\"'\r\"");
       expect(escapeCsvField('\rCARRIAGE_RETURN_PREFIX')).toBe("\"'\rCARRIAGE_RETURN_PREFIX\"");
     });
 
