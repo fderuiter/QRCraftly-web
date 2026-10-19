@@ -49,7 +49,7 @@ Prefer fewer, larger PRs that each carry a complete, tested change, over many sm
 1. Branch from `main` with a standard prefix: `feat/`, `fix/`, `docs/`, `refactor/`, `chore/`, `agent/`. A Claude session works on the `claude/` branch it is given.
 2. Open a PR into `main`. Give it a [Conventional Commit](https://www.conventionalcommits.org/) title, such as `fix(scanner): handle empty frames`. The `PR Title` check enforces this.
 3. Check the change on the branch preview URL, and wait for every required check to pass: `CI`, `PR Title` and `Workers Builds: qrcraftly`. If `main` moved, update the branch and let the checks run again. Nothing merges on a red or stale PR, admins included.
-4. Turn on **auto-merge (squash)** once the PR is ready, or merge with **Squash and merge** yourself. The PR title becomes the commit subject on `main`, which is what the changelog and version bump are built from.
+4. The maintainer turns on **auto-merge (squash)** once the PR is ready, or merges with **Squash and merge**. Claude threads mark their PR ready for review when it is green and wait for the maintainer's go-ahead; they never merge or turn on auto-merge by themselves. The PR title becomes the commit subject on `main`, which is what the changelog and version bump are built from.
 5. Cloudflare deploys it to production. The `Verify Production Deployment` workflow (`deploy-verify.yml`) is the post-merge check: it waits up to 15 minutes for `/version.json` on `https://qrcraftly.fpderuiter.workers.dev/` to report the merged commit, fails with an error annotation and the last response's status, headers and body start if it does not, and otherwise runs the smoke tests against it. Nobody needs to check the deploy by hand; a red `Verify Production Deployment` run on `main` is the signal.
 
 ### CI tiers
@@ -68,11 +68,11 @@ Run `pnpm run lint`, `pnpm test` and, for navigation, rendering or input changes
 
 Auto-merge lets a PR merge itself the moment it is green, so nobody has to come back and press the button.
 
-- **Turn it on per PR** once the change is complete: **Enable auto-merge → Squash and merge** on the PR page, or `gh pr merge <number> --auto --squash`. Claude threads turn it on for the PRs they open.
+- **Turn it on per PR** once the change is complete: **Enable auto-merge → Squash and merge** on the PR page, or `gh pr merge <number> --auto --squash`. The maintainer turns it on; a Claude thread does so only when the maintainer asks in words for that PR.
 - GitHub then merges when every required check passes: `CI` (dependency audit, static validation, unit tests, WebAssembly build, build, and the E2E and Lighthouse tier the plan picked), `PR Title` and `Workers Builds: qrcraftly`. A red check leaves the PR open; push a fix and it merges when the checks go green.
-- **Up to date first.** `main` requires branches to be current, and GitHub does not update them for you. When another PR merges first, press **Update branch** (or merge `main` in); CI runs again and the PR merges when it passes. Claude threads do this when they get the base-changed notice.
+- **Up to date first.** `main` requires branches to be current, and GitHub does not update them for you. When another PR merges first, press **Update branch** (or merge `main` in); CI runs again and the PR merges when it passes. Claude threads do this for their own PRs when they get the base-changed notice.
 - **Never on release PRs.** A `chore(release): vX.Y.Z` PR publishes a version, so a maintainer merges it by hand.
-- Enable it as a person (the button, `gh`, or a Claude thread acting for you), not from a workflow using `GITHUB_TOKEN`. GitHub does not start workflows from pushes made with that token, so the production smoke test and the Release workflow would never run after the merge.
+- Enable it as a person (the button, `gh`, or a Claude thread you asked to), not from a workflow using `GITHUB_TOKEN`. GitHub does not start workflows from pushes made with that token, so the production smoke test and the Release workflow would never run after the merge.
 
 ### How titles map to versions
 

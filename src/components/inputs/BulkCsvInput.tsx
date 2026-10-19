@@ -23,20 +23,23 @@ import {
   parseCsv,
   decodeCsvBytes,
   createZip,
-  sanitizeFileStem,
-  allocateFileName,
   CsvParseError,
   MAX_BULK_CSV_ROWS,
   MAX_BULK_CSV_CHARS,
   type CsvTable,
-  type ZipEntry,
   previewRow,
   pickColumn,
   PAYLOAD_COLUMN_WORDS,
   FILENAME_COLUMN_WORDS,
   SAMPLE_CSV_TEMPLATE,
   categorizeCsvRows,
+  runBatch,
+  batchRows,
+  batchZipName,
+  batchPngSize,
+  skippedFromReport,
   type BulkContentType,
+  type SkippedRow,
 } from '@/packages/bulk-csv';
 import { BulkCsvPreflightSummary } from './BulkCsvPreflightSummary';
 import { BulkCsvRowPreview } from './BulkCsvRowPreview';
@@ -64,13 +67,6 @@ import { FileSpreadsheet, Upload, Download, Loader2 } from 'lucide-react';
 export interface BulkCsvInputProps {
   data: BulkCsvData;
   onChange: (updates: Partial<BulkCsvData>) => void;
-}
-
-/** A row left out of the batch: its payload failed the single generator's checks, or it could not be drawn. */
-interface SkippedRow {
-  /** Data row number as a spreadsheet shows it (blank lines counted, the header not). */
-  rowNumber: number;
-  reason: string;
 }
 
 /** Row count above which the main-thread processing warning is shown. */
@@ -274,17 +270,14 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
     const report =
       preflightReport || categorizeCsvRows(rows, payloadCol, currentConfig, validateRowConfig, { contentType, rowNumbers });
-    const targetRows = report.validRows;
-    const skipped: SkippedRow[] = report.invalidDetails
-      .filter((d) => d.category === 'unsafe')
-      .map((d) => ({ rowNumber: d.rowNumber, reason: d.reason || '' }));
-    setSkippedRows(skipped);
+    const preflightSkipped = skippedFromReport(report);
+    setSkippedRows(preflightSkipped);
 
-    if (targetRows.length === 0) {
+    if (report.validRows.length === 0) {
       addToast({
         type: 'error',
         message:
-          skipped.length > 0
+          preflightSkipped.length > 0
             ? 'None of the rows can be used, so no ZIP was made. The list says why.'
             : 'No valid rows found to generate QR codes.',
         duration: 5000,
@@ -296,7 +289,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     runRef.current = run;
     setIsGenerating(true);
     setCompletedCount(0);
-    setTotalCount(targetRows.length);
+    setTotalCount(report.validRows.length);
 
     if (exportFormat === 'png' && (currentConfig.logoUrl || (currentConfig.isBorderEnabled && currentConfig.borderLogoUrl))) {
       const logoCheck = await preflightLogoCheck(currentConfig, { timeoutMs: 3000 });
@@ -322,70 +315,56 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     }
 
     // PNGs keep the design's shape: the chosen resolution is the width, the height follows the format.
-    const format = SOCIAL_DIMENSIONS[currentConfig.socialFormat] ?? { width: 1, height: 1 };
-    const pngWidth = data.exportResolution || 1000;
-    const pngHeight = Math.round((pngWidth * format.height) / format.width);
+    const png = batchPngSize(data.exportResolution || 1000, SOCIAL_DIMENSIONS[currentConfig.socialFormat] ?? { width: 1, height: 1 });
+    let remoteLogoOmitted = false;
+    // Each row encodes its checked, previewed string as is (the Text type adds no further rewriting).
+    const render = async (payload: string) => {
+      const svgString = await generateQRSvg(
+        { ...currentConfig, value: payload, type: QRType.TEXT },
+        {
+          onLogoOmitted: () => {
+            remoteLogoOmitted = true;
+          },
+        }
+      );
+      if (exportFormat === 'png') return canvasToPngBytes(await rasterizeSvgToCanvas(svgString, png.width, png.height));
+      if (exportFormat === 'eps') return convertSvgToEps(svgString);
+      if (exportFormat === 'pdf') return convertSvgToPdf(svgString);
+      return svgString;
+    };
 
     try {
-      const entries: ZipEntry[] = [];
-      const usedNames = new Set<string>();
-      let remoteLogoOmitted = false;
+      const result = await runBatch(batchRows(report, filenameCol, rowNumbers), {
+        format: exportFormat,
+        render,
+        // The same custom logo fails vector conversion on every row, so that stops the batch.
+        stopOn: (err) => err instanceof MissingImageError,
+        // Any other row that cannot be drawn (too long, an image that never loads) costs that row only.
+        describeFailure: (err) => describeRowFailure(err, currentConfig.errorCorrectionLevel),
+        isCancelled: () => run.cancelled,
+        onProgress: (done, drawSkipped) => {
+          setCompletedCount(done);
+          if (drawSkipped.length > 0) setSkippedRows([...preflightSkipped, ...drawSkipped]);
+        },
+      });
+      const skippedCount = preflightSkipped.length + result.skipped.length;
+      if (!run.unmounted && result.skipped.length > 0) setSkippedRows([...preflightSkipped, ...result.skipped]);
 
-      for (let i = 0; i < targetRows.length; i++) {
-        const row = targetRows[i];
-        const rowNumber = rowNumbers[report.validRowIndices[i]] ?? report.validRowIndices[i] + 1;
-        // The checked, previewed string, encoded as is (the Text type adds no further rewriting).
-        const rowConfig: QRConfig = {
-          ...currentConfig,
-          value: report.validPayloads[i],
-          type: QRType.TEXT,
-        };
-
-        try {
-          const svgString = await generateQRSvg(rowConfig, {
-            onLogoOmitted: () => {
-              remoteLogoOmitted = true;
-            },
-          });
-          let entryData: ZipEntry['data'] = svgString;
-          if (exportFormat === 'png') {
-            const canvas = await rasterizeSvgToCanvas(svgString, pngWidth, pngHeight);
-            entryData = await canvasToPngBytes(canvas);
-          } else if (exportFormat === 'eps') {
-            entryData = await convertSvgToEps(svgString);
-          } else if (exportFormat === 'pdf') {
-            entryData = await convertSvgToPdf(svgString);
-          }
-          const stem = sanitizeFileStem(row[filenameCol] ?? '', `qr_${rowNumber}`);
-          entries.push({ name: allocateFileName(stem, exportFormat, usedNames), data: entryData });
-        } catch (err) {
-          if (err instanceof MissingImageError) {
-            // Stop the batch because the same custom logo fails vector conversion on every row.
-            addToast({
-              type: 'error',
-              message: "The logo couldn't be embedded in EPS/PDF files. Upload the logo again, or choose PNG or SVG.",
-              duration: 5000,
-            });
-            return;
-          }
-          // One row that cannot be drawn (too long, an image that never loads) costs that row only.
-          skipped.push({ rowNumber, reason: describeRowFailure(err, currentConfig.errorCorrectionLevel) });
-          setSkippedRows([...skipped]);
-        }
-
-        if (run.cancelled) break;
-        setCompletedCount(i + 1);
-        // Yield to the main thread so the progress dialog can repaint.
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        if (run.cancelled) break;
+      if (result.stoppedBy) {
+        addToast({
+          type: 'error',
+          message: "The logo couldn't be embedded in EPS/PDF files. Upload the logo again, or choose PNG or SVG.",
+          duration: 5000,
+        });
+        return;
       }
 
-      if (run.cancelled) {
+      if (result.cancelled) {
         if (!run.unmounted) addToast({ type: 'info', message: 'Batch canceled. No ZIP was made.', duration: 4000 });
         return;
       }
 
-      if (entries.length === 0) {
+      if (result.entries.length === 0) {
         addToast({
           type: 'error',
           message: 'None of the rows could be drawn as QR codes, so no ZIP was made. The list says why.',
@@ -394,10 +373,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
         return;
       }
 
-      const zipFileName = data.fileName
-        ? `${sanitizeFileStem(data.fileName.replace(/\.[^/.]+$/, ''), 'qr-codes')}-qrcodes.zip`
-        : 'qr-codes-batch.zip';
-      triggerFileDownload(createZip(entries), zipFileName, 'application/zip');
+      triggerFileDownload(createZip(result.entries), batchZipName(data.fileName), 'application/zip');
 
       if (remoteLogoOmitted) {
         addToast({
@@ -406,12 +382,13 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
           duration: 5000,
         });
       } else {
+        const made = plural(result.entries.length, 'QR code', 'QR codes');
         addToast({
           type: 'success',
           message:
-            skipped.length > 0
-              ? `Downloaded a ZIP with ${plural(entries.length, 'QR code', 'QR codes')}. ${plural(skipped.length, 'row was', 'rows were')} left out.`
-              : `Downloaded a ZIP with ${plural(entries.length, 'QR code', 'QR codes')}.`,
+            skippedCount > 0
+              ? `Downloaded a ZIP with ${made}. ${plural(skippedCount, 'row was', 'rows were')} left out.`
+              : `Downloaded a ZIP with ${made}.`,
           duration: 5000,
         });
       }

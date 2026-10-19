@@ -1,6 +1,7 @@
 import React from 'react';
 import { AccordionItem } from '../ui/Accordion';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { RangeInput } from '../ui/RangeInput';
 import { type QRConfig, QRErrorCorrectionLevel } from '../../types';
 
 interface AdvancedControlsProps {
@@ -44,6 +45,22 @@ export const AdvancedControls: React.FC<AdvancedControlsProps> = ({ config, onCh
         />
         <p className="mt-2 text-xs text-fg-muted">
           Higher levels allow the QR code to be scanned even if damaged or covered (e.g., by a logo), but result in a denser code.
+        </p>
+      </div>
+
+      <div>
+        <RangeInput
+          id="quiet-zone-modules"
+          label="Quiet Zone Margin (modules)"
+          min={2}
+          max={10}
+          step={1}
+          value={config.quietZoneModules ?? 4}
+          onChange={(quietZoneModules) => onChange({ quietZoneModules })}
+          formatValue={(val) => `${val} modules`}
+        />
+        <p className="mt-2 text-xs text-fg-muted">
+          Quiet zone (margin) around the QR matrix. ISO specification recommends at least 4 modules for reliable scanning. Applies to image exports (wallet cards retain a fixed 4-module quiet zone).
         </p>
       </div>
     </div>

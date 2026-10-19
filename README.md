@@ -224,7 +224,7 @@ Before every commit, our own pre-commit hook (`.githooks/pre-commit`) formats an
 4. **Keep docs in step.** Run `pnpm run docs:sync` after changing shared UI or a public doc, and record a new architectural decision as an ADR ([docs-maintenance.md](docs/agents/docs-maintenance.md)).
 5. **Check locally:** `pnpm run lint` and `pnpm exec vitest run`; add `pnpm build` and `pnpm test:e2e` when you touch the build, routing, rendering or input flows.
 6. **Open a pull request against `main`** with a [Conventional Commits](https://www.conventionalcommits.org/) title (`feat(scanner): …`, `fix: …`, `docs: …`). The title becomes the squash commit and drives the next version. Fill in the PR template.
-7. **Merge on green.** The required checks are `CI`, `PR Title` and `Workers Builds: qrcraftly`, on a branch that is up to date with `main`. Enable auto-merge (squash) once the PR is complete. Prefer fewer, larger, fully tested PRs, because every merge deploys.
+7. **Merge on green.** The required checks are `CI`, `PR Title` and `Workers Builds: qrcraftly`, on a branch that is up to date with `main`. The maintainer merges, by hand or with auto-merge (squash); Claude sessions mark a PR ready and wait for the maintainer's go-ahead. Prefer fewer, larger, fully tested PRs, because every merge deploys.
 
 **Dependencies:** Dependabot proposes npm updates daily and GitHub Actions updates weekly, grouped to keep the noise down; security fixes come on their own. A new dev dependency or third-party Action needs a one-line reason in the PR and a row in the [FOUNDRY.md](docs/FOUNDRY.md) scorecard. When a package that ships to the browser is added or removed, the build fails until you run `pnpm run licenses:sync` and check its licence.
 

@@ -91,6 +91,8 @@ export interface ScannabilityCheckRequest {
   imageBitmap?: ImageBitmap;
   /** QR modules per side, enabling the localized contrast audit. */
   moduleCount?: number;
+  /** Quiet zone margin in modules. */
+  quietZoneModules?: number;
 }
 
 /** The single answer: everything a caller needs to show or gate on Scannability Health. */
@@ -118,7 +120,7 @@ export interface ScannabilityEvaluatorConfig {
   /** Frame reader; defaults to `createImageBitmap` and 2D canvases. */
   frames?: ScannabilityFrameReader;
   /** Main-thread check; defaults to the same step sequence the worker runs, loaded on first use. */
-  runCheck?: (frame: PixelFrame, moduleCount?: number) => ScannabilityResult;
+  runCheck?: (frame: PixelFrame, moduleCount?: number, quietZoneModules?: number) => ScannabilityResult;
 }
 
 /**
@@ -151,6 +153,7 @@ interface Flight {
   seq: number;
   request: ScannabilityCheckRequest;
   moduleCount: number | undefined;
+  quietZoneModules: number | undefined;
 }
 
 /**
@@ -204,7 +207,7 @@ const defaultFrameReader: ScannabilityFrameReader = {
   bitmapToPixels: drawBitmap,
 };
 
-type RunCheck = (frame: PixelFrame, moduleCount?: number) => ScannabilityResult;
+type RunCheck = (frame: PixelFrame, moduleCount?: number, quietZoneModules?: number) => ScannabilityResult;
 
 let defaultRunCheck: Promise<RunCheck> | null = null;
 
@@ -218,7 +221,7 @@ function loadDefaultRunCheck(): Promise<RunCheck> {
     .then(([{ performScannabilityCheck }, { loadQrReader }]) => loadQrReader().then((reader) => ({ performScannabilityCheck, reader })))
     .then(
       ({ performScannabilityCheck, reader }): RunCheck =>
-        (frame, moduleCount) => performScannabilityCheck(reader, frame, frame.width, frame.height, moduleCount)
+        (frame, moduleCount, quietZoneModules) => performScannabilityCheck(reader, frame, frame.width, frame.height, moduleCount, quietZoneModules)
     )
     .catch((error: unknown) => {
       defaultRunCheck = null;
@@ -460,12 +463,13 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
     retiring = { owner, handle: clock.setTimeout(finishRetire, SCANNABILITY_WATCHDOG_MS) };
   }
 
-  function post(owner: ScannabilityWorkerHandle, seq: number, moduleCount: number | undefined, frame: PixelFrame | ImageBitmap, size: ScannabilityCanvas) {
+  function post(owner: ScannabilityWorkerHandle, seq: number, moduleCount: number | undefined, quietZoneModules: number | undefined, frame: PixelFrame | ImageBitmap, size: ScannabilityCanvas) {
     const base = {
       width: size.width,
       height: size.height,
       configId: String(seq),
       moduleCount,
+      quietZoneModules,
     };
     if ('data' in frame) {
       const request = { ...base, imageData: frame };
@@ -601,7 +605,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
         return;
       }
       try {
-        post(owner, sequence, flight?.moduleCount, pixels, pixels);
+        post(owner, sequence, flight?.moduleCount, flight?.quietZoneModules, pixels, pixels);
         armWatchdog(sequence);
       } catch (err) {
         dispatchFailed(sequence, err);
@@ -635,19 +639,19 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
       conclude(seq, 'fail');
       return;
     }
-    runOnMainThread(seq, pixels, current?.moduleCount, false);
+    runOnMainThread(seq, pixels, current?.moduleCount, current?.quietZoneModules, false);
   }
 
   // --- main-thread path ------------------------------------------------------
 
-  function runOnMainThread(seq: number, pixels: PixelFrame, moduleCount: number | undefined, workerHealthy: boolean) {
+  function runOnMainThread(seq: number, pixels: PixelFrame, moduleCount: number | undefined, quietZoneModules: number | undefined, workerHealthy: boolean) {
     if (!isCurrent(seq)) return;
     if (injectedRunCheck) {
-      finishOnMainThread(seq, () => injectedRunCheck(pixels, moduleCount), workerHealthy);
+      finishOnMainThread(seq, () => injectedRunCheck(pixels, moduleCount, quietZoneModules), workerHealthy);
       return;
     }
     loadDefaultRunCheck().then(
-      (runCheck) => finishOnMainThread(seq, () => runCheck(pixels, moduleCount), workerHealthy),
+      (runCheck) => finishOnMainThread(seq, () => runCheck(pixels, moduleCount, quietZoneModules), workerHealthy),
       (err: unknown) =>
         finishOnMainThread(
           seq,
@@ -693,7 +697,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
         conclude(seq, 'fail');
         return;
       }
-      runOnMainThread(seq, pixels, current.moduleCount, true);
+      runOnMainThread(seq, pixels, current.moduleCount, current.quietZoneModules, true);
     } finally {
       releaseImageHandle(request.imageBitmap);
     }
@@ -710,7 +714,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
       return;
     }
     try {
-      post(owner, seq, current.moduleCount, pixels, pixels);
+      post(owner, seq, current.moduleCount, current.quietZoneModules, pixels, pixels);
     } catch (err) {
       dispatchFailed(seq, err);
     }
@@ -747,7 +751,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
           return;
         }
         try {
-          post(owner, seq, current.moduleCount, bitmap, size);
+          post(owner, seq, current.moduleCount, current.quietZoneModules, bitmap, size);
         } catch (err) {
           dispatchFailed(seq, err, bitmap);
         }
@@ -787,6 +791,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
       seq,
       request,
       moduleCount: positive(request.moduleCount) ?? positive(options.getModuleCount?.()),
+      quietZoneModules: request.quietZoneModules ?? config.quietZoneModules ?? 4,
     };
     flight = current;
     const answer = new Promise<ScannabilityAssessment | null>((resolve) => pending.set(seq, resolve));
@@ -811,7 +816,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
         return answer;
       }
       try {
-        post(owner, seq, current.moduleCount, pixels, pixels);
+        post(owner, seq, current.moduleCount, current.quietZoneModules, pixels, pixels);
       } catch (err) {
         dispatchFailed(seq, err);
       }
@@ -820,7 +825,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
 
     if (imageBitmap) {
       try {
-        post(owner, seq, current.moduleCount, imageBitmap, imageBitmap);
+        post(owner, seq, current.moduleCount, current.quietZoneModules, imageBitmap, imageBitmap);
       } catch (err) {
         dispatchFailed(seq, err, imageBitmap);
       }
@@ -829,7 +834,7 @@ export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig
 
     if (imageData) {
       try {
-        post(owner, seq, current.moduleCount, imageData, imageData);
+        post(owner, seq, current.moduleCount, current.quietZoneModules, imageData, imageData);
       } catch (err) {
         dispatchFailed(seq, err);
       }

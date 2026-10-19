@@ -88,4 +88,24 @@ describe('style file', () => {
 
     expect(pickStyle({ eyeFrameShape: undefined, eyeBallShape: undefined })).toEqual({ style: {}, skipped: 0 });
   });
+
+  it('rejects quietZoneModules below 2 and accepts valid range', () => {
+    const invalidZero = parseStyleFile(
+      JSON.stringify({ format: STYLE_FILE_FORMAT, version: 1, style: { quietZoneModules: 0 } })
+    );
+    expect(invalidZero.ok).toBe(false);
+
+    const invalidOne = parseStyleFile(
+      JSON.stringify({ format: STYLE_FILE_FORMAT, version: 1, style: { quietZoneModules: 1 } })
+    );
+    expect(invalidOne.ok).toBe(false);
+
+    const valid = parseStyleFile(
+      JSON.stringify({ format: STYLE_FILE_FORMAT, version: 1, style: { quietZoneModules: 2, fgColor: '#000000' } })
+    );
+    expect(valid.ok).toBe(true);
+    if (valid.ok) {
+      expect(valid.style.quietZoneModules).toBe(2);
+    }
+  });
 });
