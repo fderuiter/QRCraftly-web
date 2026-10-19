@@ -76,6 +76,7 @@ export const hydrateVCardData = (raw: string): VCardData => {
     city: '',
     zip: '',
     country: '',
+    photo: '',
   };
 
   if (!raw || typeof raw !== 'string') return result;
@@ -197,6 +198,12 @@ export const hydrateVCardData = (raw: string): VCardData => {
         result.country = unescapeVCardEvent(adrParts[6] || '');
         break;
       }
+      case 'PHOTO': {
+        let photoVal = unescapeVCardEvent(value).trim();
+        photoVal = photoVal.replace(/^VALUE=uri:/i, '').replace(/^uri:/i, '');
+        result.photo = photoVal;
+        break;
+      }
     }
   });
 
@@ -215,25 +222,25 @@ export const hydrateVCardData = (raw: string): VCardData => {
 const isPopulated = (str: string | undefined): boolean => Boolean(str && str.trim().length > 0);
 
 /** The fields MECard carries too. */
-const CONTACT_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country'] as const satisfies readonly (keyof VCardData)[];
+const CONTACT_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country', 'photo'] as const satisfies readonly (keyof VCardData)[];
 
 /** The fields a visitor types; a card with none of them filled in is empty. */
 export const CARD_FIELDS = [...CONTACT_FIELDS, ...VCARD_SOCIAL_FIELDS] as const satisfies readonly (keyof VCardData)[];
 
 /**
- * The fields a card format carries: MECard has no social profiles, so they are left out (#1470).
+ * The fields a card format carries: MECard has no social profiles or photo avatar, so they are left out (#1470).
  * @param version - The card format.
  * @returns The fields to check and encode.
  */
 export const cardFieldsFor = (version: VCardData['version']): readonly (typeof CARD_FIELDS)[number][] =>
-  version === 'mecard' ? CONTACT_FIELDS : CARD_FIELDS;
+  version === 'mecard' ? CONTACT_FIELDS.filter((field) => field !== 'photo') : CARD_FIELDS;
 
 const isSocialField = (field: keyof VCardData): field is (typeof VCARD_SOCIAL_FIELDS)[number] =>
   VCARD_SOCIAL_FIELDS.some((social) => social === field);
 
 /**
  * Validates an individual vCard field for user input errors.
- * Scheme validation (`isDangerousUrl`) is applied ONLY to the `website` and social profile fields.
+ * Scheme validation (`isDangerousUrl`) is applied ONLY to the `website`, `photo`, and social profile fields.
  * All other plain text fields are checked only for control/hidden characters.
  */
 export const vCardFieldError = (
@@ -244,7 +251,7 @@ export const vCardFieldError = (
   if (isSocialField(field)) {
     return socialProfileUrl(field, value)?.error;
   }
-  if (field === 'website' && isDangerousUrl(value)) {
+  if ((field === 'website' || field === 'photo') && isDangerousUrl(value)) {
     return 'Unsafe URL scheme or malicious protocol detected.';
   }
   if (CONTAINMENT_PROFILES.TEXT_NO_CONTROL.test(value)) {
@@ -310,6 +317,7 @@ export const constructVCardString = (data: VCardData): string => {
   // Normalize URL first to handle spaces/protocols
   const normalizedWebsite = normalizeUrl(data.website);
   const website = normalizedWebsite;
+  const normalizedPhoto = normalizeUrl(data.photo);
 
   const street = escape(data.street);
   const city = escape(data.city);
@@ -333,6 +341,7 @@ export const constructVCardString = (data: VCardData): string => {
   if (isPopulated(phone)) parts.push(prop('TEL', phone));
   if (isPopulated(email)) parts.push(prop('EMAIL', email));
   if (isPopulated(website)) parts.push(`URL:${website}`);
+  if (isPopulated(normalizedPhoto)) parts.push(`PHOTO;VALUE=uri:${normalizedPhoto}`);
   // One `URL;TYPE=<network>:` line per profile: iOS and Google Contacts both import extra URL lines.
   for (const field of VCARD_SOCIAL_FIELDS) {
     const profile = socialProfileUrl(field, data[field]);
@@ -377,8 +386,9 @@ export const VCardContract: QRGeneratorContract<VCardData> = {
     } else {
       const properties = parseRFCProperties(raw);
       for (const { key, value } of properties) {
-        if (key === 'URL') {
-          const vcardUrl = value.trim();
+        if (key === 'URL' || key === 'PHOTO') {
+          let vcardUrl = value.trim();
+          vcardUrl = vcardUrl.replace(/^VALUE=uri:/i, '').replace(/^uri:/i, '');
           if (isDangerousUrl(vcardUrl)) {
             violations.push('URI_INJECTION_VIOLATION');
             break;

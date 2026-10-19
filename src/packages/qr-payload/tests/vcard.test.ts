@@ -39,7 +39,7 @@ describe('VCard generator', () => {
     const str = constructVCardString(data);
     const hydrated = hydrateVCardData(str);
     // website gets a trailing slash due to normalization
-    expect(hydrated).toEqual({ ...data, website: 'https://example.com/' });
+    expect(hydrated).toEqual({ ...data, website: 'https://example.com/', photo: '' });
   });
 
   it('handles empty values or non-vcard strings', () => {
@@ -56,6 +56,7 @@ describe('VCard generator', () => {
       city: '',
       zip: '',
       country: '',
+      photo: '',
     });
   });
 
@@ -255,7 +256,7 @@ describe('VCard generator', () => {
     // Empty or undefined values return undefined
     expect(vCardFieldError('firstName', '')).toBeUndefined();
     expect(vCardFieldError('firstName', undefined)).toBeUndefined();
-    expect(CARD_FIELDS.length).toBe(16);
+    expect(CARD_FIELDS.length).toBe(17);
   });
 
   it('supports vCard 2.1, 3.0, and 4.0 versions', () => {
@@ -495,6 +496,7 @@ describe('Social profiles (#1470)', () => {
     city: '',
     zip: '',
     country: '',
+    photo: '',
     x: '',
     linkedin: '',
     instagram: '',
@@ -789,5 +791,139 @@ describe('Social profiles (#1470)', () => {
       const card = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Jane\r\nURL;TYPE=github:https://github.com/jane\r\nEND:VCARD';
       expect(VCardContract.validate?.(card)).toEqual([]);
     });
+  });
+});
+
+describe('Photo avatar field', () => {
+  it.each(['2.1', '3.0', '4.0'] as const)(
+    'serializes PHOTO;VALUE=uri:<url> in vCard version %s',
+    (version) => {
+      const data = {
+        version,
+        firstName: 'Jane',
+        lastName: 'Doe',
+        organization: '',
+        title: '',
+        phone: '',
+        email: '',
+        website: '',
+        street: '',
+        city: '',
+        zip: '',
+        country: '',
+        photo: 'https://example.com/avatar.jpg',
+      };
+      const vcardStr = constructVCardString(data);
+      expect(vcardStr).toContain('PHOTO;VALUE=uri:https://example.com/avatar.jpg');
+
+      const hydrated = hydrateVCardData(vcardStr);
+      expect(hydrated.photo).toBe('https://example.com/avatar.jpg');
+    }
+  );
+
+  it('normalizes photo URL before serializing', () => {
+    const data = {
+      version: '3.0' as const,
+      firstName: 'Jane',
+      lastName: 'Doe',
+      organization: '',
+      title: '',
+      phone: '',
+      email: '',
+      website: '',
+      street: '',
+      city: '',
+      zip: '',
+      country: '',
+      photo: 'example.com/avatar.jpg',
+    };
+    const vcardStr = constructVCardString(data);
+    expect(vcardStr).toContain('PHOTO;VALUE=uri:https://example.com/avatar.jpg');
+  });
+
+  it('hydrates photo from various PHOTO line formats', () => {
+    const photoLine1 = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Jane Doe\r\nPHOTO;VALUE=uri:https://example.com/avatar.jpg\r\nEND:VCARD';
+    expect(hydrateVCardData(photoLine1).photo).toBe('https://example.com/avatar.jpg');
+
+    const photoLine2 = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Jane Doe\r\nPHOTO:https://example.com/avatar.jpg\r\nEND:VCARD';
+    expect(hydrateVCardData(photoLine2).photo).toBe('https://example.com/avatar.jpg');
+
+    const photoLine3 = 'BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane Doe\r\nPHOTO:VALUE=uri:https://example.com/avatar.jpg\r\nEND:VCARD';
+    expect(hydrateVCardData(photoLine3).photo).toBe('https://example.com/avatar.jpg');
+
+    const photoLine4 = 'BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane Doe\r\nPHOTO:uri:https://example.com/avatar.jpg\r\nEND:VCARD';
+    expect(hydrateVCardData(photoLine4).photo).toBe('https://example.com/avatar.jpg');
+  });
+
+  it('omits PHOTO field for MECard payloads', () => {
+    const data = {
+      version: 'mecard' as const,
+      firstName: 'Jane',
+      lastName: 'Doe',
+      organization: '',
+      title: '',
+      phone: '+15550100',
+      email: '',
+      website: '',
+      street: '',
+      city: '',
+      zip: '',
+      country: '',
+      photo: 'https://example.com/avatar.jpg',
+    };
+    const mecardStr = constructVCardString(data);
+    expect(mecardStr).toContain('MECARD:');
+    expect(mecardStr).not.toContain('PHOTO');
+    expect(mecardStr).not.toContain('avatar.jpg');
+
+    const hydrated = hydrateVCardData(mecardStr);
+    expect(hydrated.photo).toBe('');
+  });
+
+  it('returns empty string if photo is the only filled field on MECard', () => {
+    const data = {
+      version: 'mecard' as const,
+      firstName: '',
+      lastName: '',
+      organization: '',
+      title: '',
+      phone: '',
+      email: '',
+      website: '',
+      street: '',
+      city: '',
+      zip: '',
+      country: '',
+      photo: 'https://example.com/avatar.jpg',
+    };
+    expect(constructVCardString(data)).toBe('');
+  });
+
+  it('validates photo field errors using vCardFieldError and VCardContract.validate', () => {
+    // Valid photo URLs return undefined
+    expect(vCardFieldError('photo', 'https://example.com/avatar.jpg')).toBeUndefined();
+    expect(vCardFieldError('photo', '')).toBeUndefined();
+    expect(vCardFieldError('photo', undefined)).toBeUndefined();
+
+    // Malicious protocols are detected
+    expect(vCardFieldError('photo', 'javascript:alert(1)')).toBe(
+      'Unsafe URL scheme or malicious protocol detected.'
+    );
+
+    // Control characters are detected
+    expect(vCardFieldError('photo', 'https://example.com/avatar.jpg\x00')).toBe(
+      'Contains invalid control or zero-width characters.'
+    );
+
+    // VCardContract.validate flags dangerous PHOTO URIs
+    const dangerousCard1 = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Jane\r\nPHOTO;VALUE=uri:javascript:alert(1)\r\nEND:VCARD';
+    expect(VCardContract.validate?.(dangerousCard1)).toEqual(['URI_INJECTION_VIOLATION']);
+
+    const dangerousCard2 = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Jane\r\nPHOTO:javascript:alert(1)\r\nEND:VCARD';
+    expect(VCardContract.validate?.(dangerousCard2)).toEqual(['URI_INJECTION_VIOLATION']);
+
+    // VCardContract.validate passes safe PHOTO URIs
+    const safeCard = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Jane\r\nPHOTO;VALUE=uri:https://example.com/avatar.jpg\r\nEND:VCARD';
+    expect(VCardContract.validate?.(safeCard)).toEqual([]);
   });
 });
