@@ -247,7 +247,7 @@ describe('CI builds the app once', () => {
 
 describe('post-merge production check (#1217)', () => {
   it('waits for workers.dev to serve the merged commit after every push to main', () => {
-    const job = jobBlock('verify-staging', '.github/workflows/deploy-verify.yml');
+    const job = jobBlock('verify-production', '.github/workflows/deploy-verify.yml');
     expect(job).toContain('name: Verify Production Deployment');
     expect(read('.github/workflows/deploy-verify.yml')).toMatch(/push:\n\s+branches: \[main\]/);
     expect(job).toContain("if: github.ref == 'refs/heads/main'");

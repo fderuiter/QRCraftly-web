@@ -79,7 +79,6 @@ const SCHEMA_PAGE_IDS: ReadonlySet<string> = new Set([
   ...LANDING_PAGE_IDS,
   'qr-code-scanner',
   'about',
-  'arcade',
   'file-transfer',
   'free-forever',
   'security',

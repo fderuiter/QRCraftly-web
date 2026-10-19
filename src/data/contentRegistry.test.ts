@@ -82,12 +82,12 @@ describe('Content Registry Validation', () => {
     const validSchemaTypes = Object.values(SchemaType);
     const validSchemaCategories = Object.values(SchemaCategory);
 
-    // Verify exactly 30 registered pages exist and are fully populated (the two retired games
-    // were consolidated into "arcade"; their routes live in legacyRouteRegistry; "free-forever"
+    // Verify exactly 29 registered pages exist and are fully populated (the retired arcade and
+    // game routes live in legacyRouteRegistry; "free-forever"
     // is the no-ads pledge page; "qr-code-scanner" is the standalone scanner; the static and SVG
     // landing pages joined on 2026-10-13; the size calculator on 2026-10-16)
     const registryKeys = Object.keys(contentRegistry);
-    expect(registryKeys.length).toBe(30);
+    expect(registryKeys.length).toBe(29);
 
     registryKeys.forEach((key) => {
       const tool = contentRegistry[key];
@@ -151,7 +151,7 @@ describe('Content Registry Validation', () => {
 
   it('should generate valid WebApplication, HowTo, and FAQPage schemas for all promoted standalone public tools', async () => {
     const { generateSchema } = await import('../utils/schemaGenerator');
-    const promotedTools = ['arcade'];
+    const promotedTools = ['qr-code-checker', 'qr-code-size-calculator', 'file-transfer'];
 
     promotedTools.forEach((toolId) => {
       const tool = contentRegistry[toolId];
@@ -207,13 +207,14 @@ describe('Content Registry Validation', () => {
     });
   });
 
-  it('records the retired game routes as redirects to the arcade', () => {
+  it('records the retired arcade and game routes as redirects to the QR code checker', () => {
+    expect(contentRegistry['arcade']).toBeUndefined();
     expect(contentRegistry['game']).toBeUndefined();
     expect(contentRegistry['destroy-the-qr']).toBeUndefined();
-    expect(Object.keys(legacyRouteRegistry).sort()).toEqual(['destroy-the-qr', 'game']);
+    expect(Object.keys(legacyRouteRegistry).sort()).toEqual(['arcade', 'destroy-the-qr', 'game']);
     for (const entry of Object.values(legacyRouteRegistry)) {
-      expect(entry.canonicalPath).toBe('/arcade');
-      expect(entry.redirectTo).toMatch(/^\/arcade\?mode=(blaster|simulator)$/);
+      expect(entry.canonicalPath).toBe('/qr-code-checker');
+      expect(entry.redirectTo).toBe('/qr-code-checker');
       expect(hasValidOgImage(entry)).toBe(true);
     }
   });

@@ -155,7 +155,7 @@ test.describe('File transfer workspaces on phones (#796)', () => {
 });
 
 /** Primary destinations every page must reach, as visible link names. */
-const PRIMARY_LINKS = [/^Create QR$/, /^File Transfer/, /^Arcade$/, /^About$/, /^Security$/];
+const PRIMARY_LINKS = [/^Create QR$/, /^File Transfer/, /^About$/, /^Security$/];
 
 test.describe('One app shell on every route (#1049)', () => {
   test.describe('desktop 1440px', () => {
@@ -181,7 +181,7 @@ test.describe('One app shell on every route (#1049)', () => {
       for (const scheme of ['light', 'dark'] as const) {
         await page.emulateMedia({ colorScheme: scheme });
         const backgrounds = new Set<string>();
-        for (const route of ['/', '/about', '/security', '/arcade', '/file-transfer', '/this-page-does-not-exist']) {
+        for (const route of ['/', '/about', '/security', '/file-transfer', '/this-page-does-not-exist']) {
           await gotoHydrated(page, route);
           backgrounds.add(await page.getByTestId('app-shell').evaluate((el) => getComputedStyle(el).backgroundColor));
         }
@@ -229,14 +229,11 @@ test.describe('One app shell on every route (#1049)', () => {
 });
 
 test.describe('Retired routes (#1049)', () => {
-  for (const [legacy, mode] of [
-    ['/game', 'simulator'],
-    ['/destroy-the-qr', 'blaster'],
-  ] as const) {
+  for (const legacy of ['/arcade', '/game', '/destroy-the-qr']) {
     test(`${legacy} has no page of its own and redirects through _redirects`, async ({ request }) => {
       const response = await request.get(legacy, { maxRedirects: 0 });
       expect(response.status()).toBe(301);
-      expect(response.headers()['location']).toBe(`/arcade?mode=${mode}`);
+      expect(response.headers()['location']).toBe('/qr-code-checker');
     });
   }
 

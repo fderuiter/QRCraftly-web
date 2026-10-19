@@ -40,7 +40,7 @@ describe('getShareImageSize', () => {
 
   it('matches the fallback image file in public/', () => {
     expect(pngSize('public/og-image.png')).toEqual({ width: FALLBACK_SHARE_IMAGE_WIDTH, height: FALLBACK_SHARE_IMAGE_HEIGHT });
-    expect(getShareImageSize('/og-image.png?type=arcade')).toEqual(pngSize('public/og-image.png'));
+    expect(getShareImageSize('/og-image.png?type=wifi')).toEqual(pngSize('public/og-image.png'));
   });
 
   it('knows the size of every image a page declares', () => {

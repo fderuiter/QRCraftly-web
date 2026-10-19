@@ -70,7 +70,7 @@ Bulk generation is limited to 500 rows and 2 MiB. Each cell is read as a link (n
 
 ### Blocked results
 
-If a scanned code is a dangerous scheme (same `isDangerousUrl` check), the result sheet shows "Blocked QR code" with no link and only a Copy action (`src/components/scanner/describeScan.ts`, `ScanResultSheet.tsx`). The checker page and the arcade use the same check.
+If a scanned code is a dangerous scheme (same `isDangerousUrl` check), the result sheet shows "Blocked QR code" with no link and only a Copy action (`src/components/scanner/describeScan.ts`, `ScanResultSheet.tsx`). The checker page uses the same check.
 
 ### Only web links can be opened
 

@@ -3,11 +3,10 @@ import { GENERATOR_FOOTER_LINKS, HELP_LINKS, PRIMARY_NAV_ITEMS, QR_TYPE_ROUTES, 
 import { QRType } from '@/types';
 
 describe('primary navigation model', () => {
-  it('contains the five primary destinations in order', () => {
+  it('contains the four primary destinations in order', () => {
     expect(PRIMARY_NAV_ITEMS.map((item) => item.label)).toEqual([
       'Create QR',
       'File Transfer',
-      'Arcade',
       'About',
       'Security',
     ]);
@@ -38,7 +37,7 @@ describe('primary navigation model', () => {
     expect(getCurrentPrimaryNavId('/file-transfer/receive')).toBe('transfer');
     expect(getCurrentPrimaryNavId('/about?x=1')).toBe('about');
     expect(getCurrentPrimaryNavId('/security#privacy')).toBe('security');
-    expect(getCurrentPrimaryNavId('/arcade')).toBe('arcade');
+    expect(getCurrentPrimaryNavId('/arcade')).toBeUndefined();
     expect(getCurrentPrimaryNavId('/game')).toBeUndefined();
   });
 

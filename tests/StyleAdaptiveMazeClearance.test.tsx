@@ -1,10 +1,6 @@
-import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent, screen } from '@testing-library/react';
 import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel } from '../src/types';
 import { getStyleAdaptiveMazePathWidth, getMazeCacheKey, renderMaze } from '../src/packages/qr-matrix/maze';
-import { TargetSettings } from '../src/components/arcade/TargetSettings';
-import type { ArcadeTarget } from '../src/packages/arcade/handoff';
 import { drawQRInternal } from '../src/utils/qrRenderer';
 import * as scannabilityChecker from '@/packages/scannability/checker';
 import { qrReader } from './fixtures/qrReader';
@@ -60,43 +56,7 @@ describe('Style-Adaptive Maze Clearance and Masking Suite', () => {
     });
   });
 
-  describe('2. UI Slider in TargetSettings Panel', () => {
-    const baseTarget: ArcadeTarget = {
-      payload: 'https://qrcraftly.com/maze-test',
-      ecc: 'H',
-      fgColor: '#000000',
-      bgColor: '#ffffff',
-      eyeColor: '#000000',
-      isMazeEnabled: true,
-      mazeColor: '#3b82f6',
-      isMazeBridgesEnabled: true,
-      showMazeSolution: false,
-    };
-
-    it('renders the maze corridor path width range slider when maze overlay is enabled', () => {
-      const onChange = vi.fn();
-      render(<TargetSettings target={baseTarget} onChange={onChange} onResetToGenerator={vi.fn()} hasGeneratorDesign={true} />);
-
-      const slider = screen.getByLabelText(/maze path width/i) as HTMLInputElement;
-      expect(slider).not.toBeNull();
-      expect(slider.type).toBe('range');
-      expect(slider.min).toBe('0.1');
-      expect(slider.max).toBe('0.5');
-      expect(slider.step).toBe('0.01');
-    });
-
-    it('triggers onChange with updated mazePathWidth when user drags slider', () => {
-      const onChange = vi.fn();
-      render(<TargetSettings target={baseTarget} onChange={onChange} onResetToGenerator={vi.fn()} hasGeneratorDesign={true} />);
-
-      const slider = screen.getByLabelText(/maze path width/i);
-      fireEvent.change(slider, { target: { value: '0.35' } });
-
-      expect(onChange).toHaveBeenCalledWith({ mazePathWidth: 0.35 });
-    });
-  });
-
-  describe('3. Logical Routing Decoupling & Cache Invariance', () => {
+  describe('2. Logical Routing Decoupling & Cache Invariance', () => {
     it('maintains identical maze cache key when mazePathWidth or mazeColor changes', () => {
       const key1 = getMazeCacheKey({ ...baseConfig, mazePathWidth: 0.15, mazeColor: '#3b82f6' }, 21);
       const key2 = getMazeCacheKey({ ...baseConfig, mazePathWidth: 0.40, mazeColor: '#ef4444' }, 21);
@@ -105,7 +65,7 @@ describe('Style-Adaptive Maze Clearance and Masking Suite', () => {
     });
   });
 
-  describe('4. Canvas Halo Masking & Zero Overlapping Pixels Analysis', () => {
+  describe('3. Canvas Halo Masking & Zero Overlapping Pixels Analysis', () => {
     const stylesToTest = [
       QRStyle.STARBURST,
       QRStyle.HIVE,
@@ -160,7 +120,7 @@ describe('Style-Adaptive Maze Clearance and Masking Suite', () => {
     });
   });
 
-  describe('5. Mobile Binarization and Optical Scannability Checks', () => {
+  describe('4. Mobile Binarization and Optical Scannability Checks', () => {
     const stylesToTest = [
       QRStyle.STARBURST,
       QRStyle.HIVE,

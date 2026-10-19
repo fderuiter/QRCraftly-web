@@ -1,8 +1,11 @@
-# Retired game routes now live in the QR Arcade (see src/data/contentRegistry.ts legacyRouteRegistry).
-/destroy-the-qr /arcade?mode=blaster 301
-/destroy-the-qr/ /arcade?mode=blaster 301
-/game /arcade?mode=simulator 301
-/game/ /arcade?mode=simulator 301
+# The QR Arcade and its older game routes were retired (#1486); the QR code checker is the
+# closest remaining tool (see src/data/contentRegistry.ts legacyRouteRegistry).
+/arcade /qr-code-checker 301
+/arcade/ /qr-code-checker 301
+/destroy-the-qr /qr-code-checker 301
+/destroy-the-qr/ /qr-code-checker 301
+/game /qr-code-checker 301
+/game/ /qr-code-checker 301
 # Dynamic QR codes were removed (#1088); the old dashboard sends visitors to the generator.
 /dynamic-dashboard / 301
 /dynamic-dashboard/ / 301

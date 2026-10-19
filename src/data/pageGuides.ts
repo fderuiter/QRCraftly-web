@@ -37,7 +37,6 @@ export const PAGE_GUIDES: Readonly<Record<string, readonly string[]>> = {
   'payment-qr-code': ['qr-code-scams-quishing'],
   'qr-code-scanner': ['qr-code-scams-quishing', 'why-qr-codes-stop-working'],
   'qr-code-checker': ['qr-code-scams-quishing', 'how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained'],
-  arcade: ['qr-code-error-correction-explained'],
   'qr-code-size-calculator': ['how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained'],
   'wifi-qr-code': ['how-to-print-a-qr-code-that-scans', 'qr-code-scams-quishing'],
   'vcard-qr-code': ['how-to-print-a-qr-code-that-scans', 'static-vs-dynamic-qr-codes'],

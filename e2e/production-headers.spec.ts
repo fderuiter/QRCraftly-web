@@ -127,7 +127,7 @@ test.describe('Production headers and deployment integrity (#1353)', { tag: '@pr
     // A retired route from _redirects, and a trailing slash the host drops (html_handling).
     const retired = await fetchRaw(request, '/game');
     expect(retired.status()).toBe(301);
-    expect(retired.headers()['location']).toBe('/arcade?mode=simulator');
+    expect(retired.headers()['location']).toBe('/qr-code-checker');
     expectGlobalHeaders(retired, '/game redirect');
 
     const trailing = await fetchRaw(request, '/about/');

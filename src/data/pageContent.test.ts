@@ -36,7 +36,7 @@ const guideFaqs = (id: string) =>
   typeGuides[id] ? getGuideFaqs(typeGuides[id]).map((faq) => ({ question: faq.question, answer: guideFaqAnswer(faq) })) : [];
 
 describe('getPageSchema (#1058)', () => {
-  const ownCopyIds = [...Object.keys(TYPE_PAGE_TYPES), 'qr-code-scanner', 'about', 'arcade', 'file-transfer', 'free-forever', 'security'];
+  const ownCopyIds = [...Object.keys(TYPE_PAGE_TYPES), 'qr-code-scanner', 'about', 'file-transfer', 'free-forever', 'security'];
 
   it.each(ownCopyIds)('builds the same schema %s rendered in the browser before', (id) => {
     const path = pathOf(id);

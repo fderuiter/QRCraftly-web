@@ -17,7 +17,7 @@
 */
 
 import { navigate } from 'vike/client/router';
-import { CloudUpload, Gamepad2, ShieldCheck } from 'lucide-react';
+import { CloudUpload, Printer, ShieldCheck } from 'lucide-react';
 import { QRChecker } from '@/components/QRChecker';
 import { PrivacyPromiseGrid } from '@/components/ui/PrivacyPromiseGrid';
 import type { ScanDescription } from '@/components/scanner/describeScan';
@@ -32,7 +32,7 @@ import { stageGeneratorContent } from '@/context/QRContext';
 const PROMISES = [
   { icon: CloudUpload, title: 'Nothing uploaded', text: 'The picture is read on this device and never sent anywhere.' },
   { icon: ShieldCheck, title: 'Links checked first', text: 'See the real address before opening a link. Script links are blocked.' },
-  { icon: Gamepad2, title: 'Test durability too', text: 'The Arcade knocks holes in a code to show how much damage it survives.' },
+  { icon: Printer, title: 'Print blur tested', text: 'See whether the code still reads after the blur a printer adds.' },
 ] as const;
 
 const LINK_CLASSES = 'font-medium text-accent underline-offset-2 hover:underline';
@@ -81,11 +81,6 @@ export default function Page() {
             Related tools
           </h2>
           <ul className="space-y-2">
-            <li>
-              <a href="/arcade" className={LINK_CLASSES}>
-                Stress-test a code in the Arcade
-              </a>
-            </li>
             <li>
               <a href="/qr-code-scanner" className={LINK_CLASSES}>
                 Scan a code with your camera

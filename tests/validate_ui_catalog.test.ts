@@ -217,15 +217,15 @@ describe('UI Catalog Validator and Lineage Sync Checks', () => {
     it('does not attribute a section for an untracked subdirectory to its tracked parent', () => {
       const root = path.join(tempTestDir, 'nested');
       const componentsDir = path.join(root, 'src', 'components');
-      fs.mkdirSync(path.join(componentsDir, 'arcade'), { recursive: true });
+      fs.mkdirSync(path.join(componentsDir, 'labs'), { recursive: true });
       fs.writeFileSync(path.join(componentsDir, 'Feature.tsx'), 'export const Feature = () => null;');
-      fs.writeFileSync(path.join(componentsDir, 'arcade', 'Cockpit.tsx'), 'export const Cockpit = () => null;');
+      fs.writeFileSync(path.join(componentsDir, 'labs', 'Cockpit.tsx'), 'export const Cockpit = () => null;');
       const rel = path.relative(path.join(__dirname, '..'), componentsDir).split(path.sep).join('/');
       const catalog = path.join(root, 'UI_CATALOG.md');
       fs.writeFileSync(catalog, [
         '# Catalog',
-        '## 3a. Arcade Components (`' + rel + '/arcade/`)',
-        '- **Cockpit** (`Cockpit.tsx`): Arcade layout documented in its own untracked section.',
+        '## 3a. Labs Components (`' + rel + '/labs/`)',
+        '- **Cockpit** (`Cockpit.tsx`): Labs layout documented in its own untracked section.',
         '## 4. Shared Feature Components (`' + rel + '/`)',
         '- **Feature** (`Feature.tsx`): A shared feature component used by several routes.',
         '',

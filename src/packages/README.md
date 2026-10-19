@@ -60,21 +60,13 @@ Boundary checks run automatically during `pnpm run lint` and CI. The check is ou
 - **Entry Points**:
   - `index.ts`: `generateQRSvg`, `rasterizeSvgToCanvas`, `validateSvgScannability`, `SvgContext`, `drawWithTemplate`, `SOCIAL_DIMENSIONS`, and the Wallet card (`renderWalletCard`, `planWalletCard`, `paintWalletCard`, `walletRefusalReason`; [ADR 0048](../../docs/adr/0048-wallet-passes-built-in-the-browser.md)).
 
-### `arcade` (`@/packages/arcade`)
-
-- **Purpose**: Headless game logic behind the QR Arcade (`/arcade`): target matrices, the Damage Simulator (blasts, barrages and Reed-Solomon damage analytics), the Arcade Blaster (micro-cell damage grid, projectile and particle physics), and the empirical scan pipeline that checks whether the damaged code still decodes.
-- **Entry Points**:
-  - `index.ts`: `buildTargetMatrix`, `analyzeDamage`, `applyBlast`, `planBarrage`, `MicroGrid`, the physics helpers, mode definitions (`ARCADE_MODES`, `parseArcadeMode`, `arcadeModeHref`) and `EmpiricalScanPipeline`.
-  - `client.ts`: React hooks (`useEmpiricalScan`, `useMediaQuery`, `useReducedMotion`, `useLatestRef`).
-  - `handoff.ts`: In-memory hand-off of a design from the generator to the arcade (`stageArcadeTarget`, `getStagedArcadeTarget`, `clearStagedArcadeTarget`).
-
 ### `optical-scanner` (`@/packages/optical-scanner`)
 
 - **Purpose**: Consolidated off-thread barcode decoding for live camera streams and image files (photos and screenshots) with adaptive backpressure throttling and watchdog fault recovery.
 - **Entry Points**:
   - `index.ts`: Public API, polymorphic `scan(source, options)` for files/images, the headless Camera Scanner Engine (`createCameraScannerEngine`), scanner contracts, and downscaling math.
   - `client.ts`: Thin React adapter hook (`useQrScanner`) over the Camera Session (`state`, `start`, `stop`, `videoRef`: the one owner of the camera stream) and the Camera Scanner Engine, plus file drag-and-drop scanning.
-  - `scheduler.ts`: Secondary entry point exposing `AdaptiveFrameScheduler`, `DoubleBufferPool`, and `terminateScannerWorker` (shared file-scan worker teardown). Worker spawning is private to the package.
+  - `scheduler.ts`: Test-facing entry point exposing `AdaptiveFrameScheduler`, `DoubleBufferPool`, and `terminateScannerWorker` (shared file-scan worker teardown); no app code imports it since the Arcade was removed, so Knip lists it as a non-production entry. Worker spawning is private to the package.
   - `worker.ts`: Dedicated background Web Worker that decodes camera frames (one bounded pass of the `qr-decode` reader each, ADR 0036) and image files (`createImageBitmap` with EXIF orientation, then decoded at 2048 px and 1024 px).
 
 ### `qr-payload` (`@/packages/qr-payload`)

@@ -47,7 +47,6 @@ export const ROUTES = [
   '/security',
   '/file-transfer',
   '/file-transfer/receive',
-  '/arcade',
   '/qr-code-scanner',
   '/qr-code-checker',
   '/qr-code-size-calculator',

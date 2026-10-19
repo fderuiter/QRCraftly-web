@@ -90,8 +90,9 @@ test.describe('XSS regression (#1350)', () => {
     const executed = await watchForExecution(page);
     await open(page, '/text-qr-code');
     await page.locator('#text-content').fill(HTML_PAYLOAD);
-    // Wait past the input debounce so the code is redrawn from the payload.
-    await page.waitForTimeout(800);
+    // A single fill is committed at once, so the preview leaves its empty sample state straight
+    // away. Wait for that before exporting, so the code is drawn from the payload.
+    await expect(page.getByTestId('sample-preview-badge')).toHaveCount(0);
     await expect(page.locator('#text-content')).toHaveValue(HTML_PAYLOAD);
 
     const svg = await downloadSvg(page);
@@ -105,7 +106,9 @@ test.describe('XSS regression (#1350)', () => {
     const executed = await watchForExecution(page);
     await open(page, '/');
     await page.locator('#url-input').fill(`javascript:window.__xss.push('link')`);
-    await page.waitForTimeout(800);
+    // The refused address is shown as the refused-content badge once the form has processed it.
+    // Wait for that before checking, so the negative check below runs on the settled preview.
+    await expect(page.getByTestId('refused-content-badge')).toBeVisible();
     // The preview never becomes a clickable javascript: link.
     await expect(page.locator('a[href^="javascript:" i]')).toHaveCount(0);
     expect(await executed()).toEqual([]);

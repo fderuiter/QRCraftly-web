@@ -257,7 +257,7 @@ describe('generated service worker runtime', () => {
 
   it("never serves a page or the manifest from another build's cache (#1259)", async () => {
     caches = createCacheStorage({
-      'qrcraftly-precache-old': { '/manifest.json': 'old:manifest', '/arcade': 'old:arcade' },
+      'qrcraftly-precache-old': { '/manifest.json': 'old:manifest', '/guides': 'old:guides' },
     });
     let online = true;
     const sw = loadWorker({
@@ -272,7 +272,7 @@ describe('generated service worker runtime', () => {
     expect(await sw.fetchEvent('/manifest.json')).toBe(`fetched:${ORIGIN}/manifest.json`);
     online = false;
     // Offline, an unseen page gets this build's shell, not the old build's copy.
-    expect(await sw.fetchEvent('/arcade', 'navigate')).toBe('network:/');
+    expect(await sw.fetchEvent('/guides', 'navigate')).toBe('network:/');
   });
 
   it('never answers a navigation with a redirected response (#1086)', async () => {
@@ -316,9 +316,9 @@ describe('generated service worker runtime', () => {
     });
     const sw = loadWorker({ caches, fetchImpl });
     await sw.dispatch('install');
-    await sw.fetchEvent('/arcade/index.pageContext.json');
+    await sw.fetchEvent('/guides/index.pageContext.json');
     body = 'second';
-    expect(await sw.fetchEvent('/arcade/index.pageContext.json')).toMatchObject({ body: 'second' });
+    expect(await sw.fetchEvent('/guides/index.pageContext.json')).toMatchObject({ body: 'second' });
     expect(await sw.fetchEvent('/index.pageContext.json')).toMatchObject({ body: 'second' });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
@@ -363,9 +363,9 @@ describe('generated service worker runtime', () => {
     const sw = loadWorker({ caches, fetchImpl });
     await sw.dispatch('install');
 
-    expect(await sw.fetchEvent('/arcade', 'navigate')).toBe(fresh);
+    expect(await sw.fetchEvent('/guides', 'navigate')).toBe(fresh);
     online = false;
-    expect(await sw.fetchEvent('/arcade', 'navigate')).toBe('kept-page');
+    expect(await sw.fetchEvent('/guides', 'navigate')).toBe('kept-page');
     // A page never seen falls back to the shell.
     expect(await sw.fetchEvent('/wifi-qr-code', 'navigate')).toBe('network:/');
   });
@@ -387,9 +387,9 @@ describe('generated service worker runtime', () => {
     });
     const sw = loadWorker({ caches, fetchImpl });
     await sw.dispatch('install');
-    await sw.fetchEvent('/arcade/index.pageContext.json');
+    await sw.fetchEvent('/guides/index.pageContext.json');
     online = false;
-    expect(await sw.fetchEvent('/arcade/index.pageContext.json')).toBe('kept-data');
+    expect(await sw.fetchEvent('/guides/index.pageContext.json')).toBe('kept-data');
   });
 
   it('ignores cross-origin and non-GET requests', async () => {
@@ -402,10 +402,10 @@ describe('generated service worker runtime', () => {
 describe('service worker precache manifest', () => {
   it('precaches pages under the URL the host serves with a 200', () => {
     expect(toPrecacheUrl('index.html')).toBe('/');
-    expect(toPrecacheUrl('arcade/index.html')).toBe('/arcade');
+    expect(toPrecacheUrl('guides/index.html')).toBe('/guides');
     expect(toPrecacheUrl('file-transfer/receive/index.html')).toBe('/file-transfer/receive');
     expect(toPrecacheUrl('404.html')).toBe('/404');
-    expect(toPrecacheUrl('arcade/index.pageContext.json')).toBe('/arcade/index.pageContext.json');
+    expect(toPrecacheUrl('guides/index.pageContext.json')).toBe('/guides/index.pageContext.json');
     expect(toPrecacheUrl('assets/chunks/a.js')).toBe('/assets/chunks/a.js');
   });
 
@@ -501,8 +501,8 @@ describe('service worker precache manifest', () => {
       'assets/static/s.css': '',
       'assets/worker-1.js': '',
       'assets/entries/src_pages_dev-sandbox.js': 'import"../chunks/a.js";',
-      'arcade/index.html': '<script src="/assets/entries/arcade.js"></script>',
-      'assets/entries/arcade.js': '',
+      'guides/index.html': '<script src="/assets/entries/guides.js"></script>',
+      'assets/entries/guides.js': '',
       'index.pageContext.json': '{}',
       'manifest.json': '{}',
     };
@@ -515,7 +515,7 @@ describe('service worker precache manifest', () => {
   it('reads redirect sources so retired routes are not precached as redirects', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sw-redirects-'));
     const file = path.join(dir, '_redirects');
-    fs.writeFileSync(file, '# comment\r\n/game /arcade?mode=simulator 301\r\n/game/ /arcade?mode=simulator 301\n\n');
+    fs.writeFileSync(file, '# comment\r\n/game /qr-code-checker 301\r\n/game/ /qr-code-checker 301\n\n');
     try {
       expect(Array.from(readRedirectSources(file))).toEqual(['/game']);
       expect(readRedirectSources(path.join(dir, 'missing')).size).toBe(0);

@@ -85,17 +85,15 @@ test.describe('Automated Workbox Precaching and Offline Readiness', () => {
 
   test('Unknown routes are answered by the network, not the cached homepage', async ({ browserName, page }) => {
     test.skip(browserName !== 'chromium', 'Service worker response inspection is only reliable in Chromium in Playwright');
+    // Once the worker is active, a reload loads the page under its control.
     await page.evaluate(async () => {
       await navigator.serviceWorker.ready;
-      if (navigator.serviceWorker.controller) return;
-      await new Promise<void>((resolve) => {
-        navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true });
-        setTimeout(() => resolve(), 2000);
-      });
     });
     await page.reload();
     await page.waitForSelector('main[data-hydrated="true"]');
-    expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+    await expect
+      .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
+      .toBe(true);
 
     // Unknown routes are passed through to the server, so its 404 reaches the page
     // instead of the precached homepage.

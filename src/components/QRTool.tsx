@@ -41,7 +41,6 @@ import { QRProvider, useQRStore, useQRStoreSelector } from '@/context/QRContext'
 import { getSamplePayload, hydrateWifiData } from '@/packages/qr-payload';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { sidebarControls } from '@/registry';
-import { StressTestButton } from './arcade/StressTestButton';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from './ToolWorkspaceLayout';
 import { usePageContent } from '@/data/PageContentContext';
 import { MiniPreview } from './MiniPreview';
@@ -587,9 +586,6 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                       </Suspense>
                    )}
                 </div>
-
-                {/* Tertiary: playful side feature, after the export row. */}
-                {!exportsOffReason && <StressTestButton />}
              </Card>
         }
       />

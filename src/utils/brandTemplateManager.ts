@@ -1,5 +1,6 @@
 import type { BrandTemplate, BrandTemplateExportPayload, QRConfig } from '../types';
 import { isStyleField, pickStyle } from './styleFields';
+import { handOffBlob } from './downloadManager';
 
 /** Approved storage key for user-saved brand templates. */
 export const BRAND_TEMPLATES_STORAGE_KEY = 'qrcraftly:brand-templates';
@@ -323,18 +324,9 @@ export function exportTemplateToJson(template: BrandTemplate): void {
 
   const jsonStr = JSON.stringify(payload, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
 
   const slug = template.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'brand-template';
   const fileName = `${slug}.qrcraftly.json`;
 
-  const link = document.createElement('a');
-  // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  handOffBlob(blob, { kind: 'download', fileName });
 }

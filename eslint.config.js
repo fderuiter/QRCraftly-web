@@ -108,7 +108,7 @@ export default tseslint.config(
 
       "react-hooks/exhaustive-deps": "error",
       // React Compiler rules. The app does not use the React Compiler, and these flag patterns that
-      // are correct without it (ref-driven arcade game loops, effects that sync external state:
+      // are correct without it (ref-driven animation loops, effects that sync external state:
       // ~26 hits in 20 files), so they stay off until the compiler is adopted.
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/immutability": "off",

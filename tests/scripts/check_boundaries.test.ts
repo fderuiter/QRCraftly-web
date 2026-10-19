@@ -97,19 +97,19 @@ describe('boundary rules', () => {
   });
 
   it("forbids a package from deep-importing another package's lib/", () => {
-    const from = 'src/packages/arcade/lib/scanPipeline.ts';
+    const from = 'src/packages/bulk-csv/lib/parser.ts';
     const forbids = (to: string) => forbidden('entrypoint-boundary-across-packages', edge(from, to, { aliased: true }));
     expect(forbids('src/packages/scannability/lib/checker.ts')).toBe(true);
     expect(forbids('src/packages/scannability/index.ts')).toBe(false);
-    expect(forbids('src/packages/arcade/lib/matrix.ts')).toBe(false);
+    expect(forbids('src/packages/bulk-csv/lib/rows.ts')).toBe(false);
   });
 
   it('lets package tests import their own fixtures but no internals', () => {
-    const from = 'src/packages/arcade/tests/damage.test.ts';
+    const from = 'src/packages/bulk-csv/tests/parser.test.ts';
     const forbids = (to: string) => forbidden('tests-through-entrypoints', edge(from, to));
-    expect(forbids('src/packages/arcade/tests/fixtures.ts')).toBe(false);
-    expect(forbids('src/packages/arcade/index.ts')).toBe(false);
-    expect(forbids('src/packages/arcade/lib/matrix.ts')).toBe(true);
+    expect(forbids('src/packages/bulk-csv/tests/fixtures.ts')).toBe(false);
+    expect(forbids('src/packages/bulk-csv/index.ts')).toBe(false);
+    expect(forbids('src/packages/bulk-csv/lib/rows.ts')).toBe(true);
     expect(forbids('src/packages/qr-matrix/lib/encoder.ts')).toBe(true);
   });
 

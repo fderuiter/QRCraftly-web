@@ -191,7 +191,6 @@ export const formatPathName = (segment: string): string => {
     'about': 'About',
     'destroy-the-qr': 'Destroy the QR',
     'game': 'QR Damage Simulator Game',
-    'arcade': 'QR Arcade',
     'security': 'Security & Privacy',
     'free-forever': 'Free Forever',
     'acknowledgements': 'Open-Source Acknowledgements',

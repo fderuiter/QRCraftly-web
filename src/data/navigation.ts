@@ -23,7 +23,7 @@ import { QRType } from '@/types';
  */
 export interface PrimaryNavItem {
   /** Stable identifier. */
-  id: 'create' | 'transfer' | 'arcade' | 'about' | 'security';
+  id: 'create' | 'transfer' | 'about' | 'security';
   /** Visible label, identical on every route family. */
   label: string;
   /** Destination path. */
@@ -60,7 +60,6 @@ export const QR_TYPE_ROUTES: Record<QRType, string> = {
 export const PRIMARY_NAV_ITEMS: readonly PrimaryNavItem[] = [
   { id: 'create', label: 'Create QR', href: '/' },
   { id: 'transfer', label: 'File Transfer', href: '/file-transfer', tag: 'Beta' },
-  { id: 'arcade', label: 'Arcade', href: '/arcade' },
   { id: 'about', label: 'About', href: '/about' },
   { id: 'security', label: 'Security', href: '/security' },
 ];
@@ -87,7 +86,6 @@ export const TOOL_LINKS: readonly (readonly [label: string, href: string])[] = [
   ['QR Code Scanner', '/qr-code-scanner'],
   ['Send a File', '/file-transfer'],
   ['Receive a File', '/file-transfer/receive'],
-  ['QR Arcade', '/arcade'],
   ['QR Code Checker', '/qr-code-checker'],
   ['QR Code Size Calculator', '/qr-code-size-calculator'],
 ];

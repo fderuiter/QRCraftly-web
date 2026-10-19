@@ -46,7 +46,7 @@ QRCraftly's output must be objectively the most polished in class. Scannability 
 
 ### P3 — Simplicity wins for the core flow
 
-The path from landing to downloading a customized QR code must require zero account creation, zero configuration, and zero learning. Advanced features (Air-Gapped Transfer and the QR Arcade) are opt-in surfaces that do not interrupt the primary flow.
+The path from landing to downloading a customized QR code must require zero account creation, zero configuration, and zero learning. Advanced features (Air-Gapped Transfer) are opt-in surfaces that do not interrupt the primary flow.
 
 ### P4 — Accessibility and compliance are first-class
 
@@ -139,10 +139,6 @@ User-facing at `/file-transfer` (send) and `/file-transfer/receive` (receive), l
 - Fully responsive — desktop and mobile.
 - Dark mode supported.
 - Core generation works offline once static assets are cached.
-
-### 6.7 QR Arcade `[BETA]`
-
-- At `/arcade` (the old `/game` and `/destroy-the-qr` links redirect here): damage a QR design in the Blaster or the Damage Simulator while Reed-Solomon analytics and a real scanner report whether it still decodes.
 
 ---
 

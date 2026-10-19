@@ -59,10 +59,6 @@ Read the full pledge, and exactly what is and isn't collected, in [docs/PLEDGE.m
 - Several faster modes are previews behind switches under Advanced: a new outer code, several codes per frame, and a webcam back channel that lets the receiver steer the speed. A wallet-compatible BC-UR mode is also available. Speeds come from simulation only until the [device checklist](docs/TRANSFER_DEVICE_CHECKLIST.md) has real results.
 - The design, its status and its evidence rules are in [docs/optical-transfer](docs/optical-transfer/README.md).
 
-### QR Arcade
-
-Damage a QR design and watch whether a real decoder still reads it (`/arcade`). It shows how error correction works.
-
 ### Everywhere
 
 - **Works offline after one visit:** a service worker caches the homepage generator, with its encoder and workers, on the first visit, and other pages as you open them.
@@ -158,7 +154,6 @@ Core features live in deep modules under `src/packages/`. App code imports a pac
 | `optical-modem`    | Experimental colour modem, off unless the build sets `VITE_OPTICAL_MODEM=true`                              |
 | `link-safety`      | Offline checks for disguised links                                                                          |
 | `bulk-csv`         | The Bulk CSV generator's parsing and batching                                                               |
-| `arcade`           | Game logic and damage analytics for the QR Arcade                                                           |
 | `wasm-runtime`     | Loads and instantiates our WebAssembly modules                                                              |
 
 ### Rust crates

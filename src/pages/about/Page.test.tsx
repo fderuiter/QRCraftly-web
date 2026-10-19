@@ -37,7 +37,7 @@ describe('About Page', () => {
     const { container } = render(<Page />);
     const tools = container.querySelector('section#tools') as HTMLElement;
     const hrefs = within(tools).getAllByRole('link').map((link) => link.getAttribute('href'));
-    for (const href of ['/', '/wifi-qr-code', '/bulk-csv-qr-code', '/file-transfer', '/file-transfer/receive', '/arcade']) {
+    for (const href of ['/', '/wifi-qr-code', '/bulk-csv-qr-code', '/file-transfer', '/file-transfer/receive', '/qr-code-checker']) {
       expect(hrefs).toContain(href);
     }
     expect(screen.getByRole('link', { name: /WiFi QR Code/i })).toHaveAttribute('href', '/wifi-qr-code');

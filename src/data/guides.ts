@@ -193,7 +193,7 @@ export const guides: Guide[] = [
           },
           {
             type: 'p',
-            text: 'To see how your code copes, run it through the [QR code checker](/qr-code-checker), which simulates a blurry print, or damage it on purpose in the [QR Arcade](/arcade).',
+            text: 'To see how your code copes, run it through the [QR code checker](/qr-code-checker), which simulates a blurry print.',
           },
         ],
       },

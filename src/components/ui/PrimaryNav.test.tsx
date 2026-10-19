@@ -90,7 +90,7 @@ describe('PrimaryNav', () => {
     openMenu();
     const dialog = menuDialog();
     expect(within(dialog).getByRole('link', { name: 'About' })).toHaveAttribute('aria-current', 'page');
-    expect(within(dialog).getByRole('link', { name: 'Arcade' })).not.toHaveAttribute('aria-current');
+    expect(within(dialog).getByRole('link', { name: 'Security' })).not.toHaveAttribute('aria-current');
   });
 
   it('marks File Transfer as active for both sender and receiver routes', () => {
@@ -135,7 +135,7 @@ describe('PrimaryNav', () => {
   it('closes after a link is chosen', () => {
     render(<PrimaryNav />);
     const button = openMenu();
-    fireEvent.click(within(menuDialog()).getByRole('link', { name: 'Arcade' }));
+    fireEvent.click(within(menuDialog()).getByRole('link', { name: 'Security' }));
     expect(button).toHaveAttribute('aria-expanded', 'false');
   });
 

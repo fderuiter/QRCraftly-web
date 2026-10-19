@@ -20,7 +20,6 @@ export const SAMPLE_ROUTES = [
   '/qr-code-scanner',
   '/file-transfer',
   '/security',
-  '/arcade',
 ];
 
 /**

@@ -72,7 +72,7 @@ export function validateCatalog(uiDir = DEFAULT_UI_DIR, catalogPath = DEFAULT_CA
         return exact;
       }
     }
-    // A heading that names an untracked subdirectory of a tracked directory (e.g. `src/components/arcade/`)
+    // A heading that names an untracked subdirectory of a tracked directory (e.g. `src/components/labs/`)
     // documents that subdirectory, not its tracked parent, so it must not fall through to a looser match.
     const trackedPaths = dirs.map(d => path.relative(root, d).replace(/\\/g, '/').toLowerCase());
     if (backtickedPaths.some(candidate => trackedPaths.some(tracked => tracked && candidate.startsWith(`${tracked}/`)))) {

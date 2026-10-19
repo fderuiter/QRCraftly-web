@@ -48,9 +48,9 @@ export function sinks() {
   // ok: require-isdangerousurl
   window.open('https://example.com', '_blank');
   // ok: require-isdangerousurl
-  window.location.assign('/arcade');
+  window.location.assign('/about');
   // ok: require-isdangerousurl
-  void navigate('/arcade');
+  void navigate('/guides');
   // ok: require-isdangerousurl
   el.href = '/about';
   if (!isDangerousUrl(userUrl)) {

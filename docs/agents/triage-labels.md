@@ -20,7 +20,7 @@ Every open issue carries exactly one type label and one area label. Once triaged
 | `area:generator`     | Making, styling, checking and exporting QR codes           |
 | `area:scanner`       | The camera and image scanner and its decoder               |
 | `area:file-transfer` | Prism animated-QR transfer and the Optical colour modem    |
-| `area:arcade`        | The Arcade games                                           |
+| `area:arcade`        | The retired Arcade (removed in #1486; history only)        |
 | `area:edge`          | Hosting on Cloudflare, headers, CSP and the service worker |
 | `area:docs`          | Documentation                                              |
 | `area:ci`            | Tests, lint, build tooling and release automation          |

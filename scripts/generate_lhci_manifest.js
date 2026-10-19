@@ -60,7 +60,7 @@ export function generateLhciManifest(distDir = DIST_DIR, baseConfigPath = LIGHTH
     // Exclude 404, draft, test, and sandbox pages from the audit list
     if (posixPath.endsWith('404.html')) continue;
     if (posixPath.includes('draft') || posixPath.includes('test') || posixPath.includes('dev-sandbox')) continue;
-    // Skip retired routes that only redirect (e.g. /game -> /arcade); auditing them measures the redirect stub.
+    // Skip retired routes that only redirect (e.g. /game -> /qr-code-checker); auditing them measures the redirect stub.
     if (/<meta[^>]+http-equiv=["']?refresh/i.test(fs.readFileSync(file, 'utf8'))) continue;
 
     let route = `/${posixPath}`;

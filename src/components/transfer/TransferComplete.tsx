@@ -21,6 +21,7 @@ import { Check, File as FileIcon, FileArchive, FileImage, FileText, ShieldCheck 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { formatFileSize } from '@/utils/transferSpeed';
+import { handOffBlob } from '@/utils/downloadManager';
 import { analyseReceivedFile } from '@/utils/fileNames';
 
 /** Image types shown as a thumbnail. SVG is left out so no received markup is ever rendered. */
@@ -107,10 +108,7 @@ export function TransferComplete({ fileName, fileSize, mimeType: announcedType, 
 
   const open = () => {
     if (!data) return;
-    const url = URL.createObjectURL(new Blob([data as BlobPart], { type: mimeType }));
-    // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
-    window.open(url, '_blank', 'noopener');
-    window.setTimeout(() => URL.revokeObjectURL(url), OPEN_URL_LIFETIME_MS);
+    handOffBlob(new Blob([data as BlobPart], { type: mimeType }), { kind: 'open', revokeAfterMs: OPEN_URL_LIFETIME_MS });
   };
 
   return (

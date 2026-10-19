@@ -146,10 +146,10 @@ describe('QRTool Component', () => {
     expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
   });
 
-  it('offers "Stress Test in Arcade" in the live preview card', () => {
+  it('keeps the retired Arcade stress test out of the live preview card', () => {
     render(<ToastProvider><QRTool /></ToastProvider>);
     const preview = screen.getByRole('region', { name: 'QR Code Preview' });
-    expect(within(preview).getByRole('button', { name: 'Stress Test in Arcade' })).toBeInTheDocument();
+    expect(within(preview).queryByRole('button', { name: /arcade/i })).not.toBeInTheDocument();
   });
 
   it('labels the help link by its in-page destination', () => {

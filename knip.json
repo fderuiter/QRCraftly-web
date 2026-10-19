@@ -5,7 +5,8 @@
     "src/packages/*/worker*.ts!",
     "src/utils/imageResizeWorker.ts!",
     "scripts/**/*.{js,cjs,ts}!",
-    "tests/fixtures/echoWorker.ts"
+    "tests/fixtures/echoWorker.ts",
+    "src/packages/optical-scanner/scheduler.ts"
   ],
   "project": [
     "src/**/*.{ts,tsx}!",

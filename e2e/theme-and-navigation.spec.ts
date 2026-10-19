@@ -68,7 +68,7 @@ test.describe('Primary navigation at 320px', () => {
       await menuButton.click();
       await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
       const menu = page.getByRole('dialog', { name: 'Menu' });
-      for (const label of ['Create QR', 'File Transfer', 'Arcade', 'About', 'Security']) {
+      for (const label of ['Create QR', 'File Transfer', 'About', 'Security']) {
         await expect(menu.getByRole('link', { name: new RegExp(`^${label}`) })).toBeVisible();
       }
 

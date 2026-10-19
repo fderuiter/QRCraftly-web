@@ -34,22 +34,17 @@ describe('Search Engine Indexing Prevention & Hybrid Sitemap Generation', () => 
     expect(shouldExcludePath('dist/client/dev-sandbox/index.html')).toBe(true);
     expect(shouldExcludePath('dist/client/index.html')).toBe(false);
     expect(shouldExcludePath('dist/client/about.html')).toBe(false);
-    expect(shouldExcludePath('dist/client/arcade/index.html')).toBe(false);
-    expect(shouldExcludePath('dist/client/arcade.html')).toBe(false);
-    // Retired routes only redirect to /arcade, so they are not indexed.
+    expect(shouldExcludePath('dist/client/qr-code-checker/index.html')).toBe(false);
+    // Retired routes only redirect to /qr-code-checker, so they are not indexed.
+    expect(shouldExcludePath('/arcade')).toBe(true);
     expect(shouldExcludePath('/game')).toBe(true);
     expect(shouldExcludePath('/destroy-the-qr')).toBe(true);
-  });
-
-  it('should verify arcade page config enables static pre-rendering', async () => {
-    const arcadeConfig = (await import('../src/pages/arcade/+config')).default;
-    expect(arcadeConfig.prerender).not.toBe(false);
   });
 
   it('should verify generated static HTML files contain valid canonical tags and DOM content if build output exists', () => {
     const distDir = join(__dirname, '../dist/client');
     if (existsSync(distDir)) {
-      const publicRoutes = ['index.html', 'about/index.html', 'arcade/index.html', 'wifi-qr-code/index.html'];
+      const publicRoutes = ['index.html', 'about/index.html', 'qr-code-checker/index.html', 'wifi-qr-code/index.html'];
       for (const routeFile of publicRoutes) {
         const filePath = join(distDir, routeFile);
         if (existsSync(filePath)) {
@@ -66,7 +61,8 @@ describe('Search Engine Indexing Prevention & Hybrid Sitemap Generation', () => 
 
   it('should discover client-rendered tool routes from central application registries', () => {
     const registryRoutes = getRegistryRoutes();
-    expect(registryRoutes).toContain('/arcade');
+    expect(registryRoutes).toContain('/qr-code-checker');
+    expect(registryRoutes).not.toContain('/arcade');
     expect(registryRoutes).not.toContain('/game');
     expect(registryRoutes).toContain('/about');
     expect(registryRoutes).toContain('/wifi-qr-code');
@@ -91,10 +87,11 @@ describe('Search Engine Indexing Prevention & Hybrid Sitemap Generation', () => 
     expect(sitemapXml).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
     expect(sitemapXml).toContain('</urlset>');
 
-    // 2. Contains static pre-rendered pages AND public client-rendered routes (like /arcade)
+    // 2. Contains static pre-rendered pages AND public client-rendered routes (like /qr-code-checker)
     expect(sitemapXml).toContain('<loc>https://qrcraftly.com</loc>');
     expect(sitemapXml).toContain('<loc>https://qrcraftly.com/about</loc>');
-    expect(sitemapXml).toContain('<loc>https://qrcraftly.com/arcade</loc>');
+    expect(sitemapXml).toContain('<loc>https://qrcraftly.com/qr-code-checker</loc>');
+    expect(sitemapXml).not.toContain('/arcade');
     expect(sitemapXml).not.toContain('/game<');
     expect(sitemapXml).not.toContain('/destroy-the-qr');
     expect(sitemapXml).toContain('<loc>https://qrcraftly.com/wifi-qr-code</loc>');
@@ -116,7 +113,7 @@ describe('Search Engine Indexing Prevention & Hybrid Sitemap Generation', () => 
     }
   });
 
-  it('serves an edge 301 for every retired arcade route in public/_redirects', () => {
+  it('serves an edge 301 for every retired route in public/_redirects', () => {
     const rules = readFileSync(join(__dirname, '../public/_redirects'), 'utf-8')
       .split(/\r?\n/)
       .map((line) => line.trim())

@@ -415,27 +415,6 @@ export const contentRegistry: Record<string, ToolContent> = {
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.AsynchronousWebWorkerDiagnostics,
   },
-  "arcade": {
-    "id": "arcade",
-    "name": "QR Arcade & Durability Lab",
-    "url": getPublicDomain() + "/arcade",
-    "description": "Blast or strike your QR code in the browser and watch a live scanner show how much damage it takes before it stops reading.",
-    "seoTitle": "QR Arcade: See How Much Damage a QR Code Takes | QRCraftly",
-    "image": "/og/arcade.png",
-    "imageAlt": "QR Arcade & Durability Lab: blasting a QR code while a live scanner checks it",
-    "features": [
-      "Arcade Blaster with plasma bolts, a thermal laser and antimatter rockets",
-      "Damage Simulator with precision strikes and artillery barrages",
-      "4x4 micro-cell damage, particles and screen shake (calmed under reduced motion)",
-      "Live error-correction health bar, with an alarm when a corner square is 20% damaged",
-      "Live scanner verdict from the browser's barcode reader, or a built-in reader where it is missing",
-      "Tests your own generator design without sending it anywhere"
-    ],
-    "schemaType": [SchemaType.SoftwareApplication, SchemaType.WebApplication],
-    "schemaCategory": SchemaCategory.UtilitiesApplication,
-    "personas": [TargetPersona.SecurityConsciousEnterprise],
-    "valueProposition": StrategicValueCategory.AsynchronousWebWorkerDiagnostics,
-  },
   "qr-code-scanner": {
     "id": "qr-code-scanner",
     "name": "QR Code Scanner",
@@ -629,29 +608,41 @@ export interface LegacyRouteContent extends AuxiliaryContent {
  * their canonical link at the replacement.
  */
 export const legacyRouteRegistry: Record<string, LegacyRouteContent> = {
-  "destroy-the-qr": {
-    "id": "destroy-the-qr",
-    "name": "Destroy the QR (moved to QR Arcade)",
-    "seoTitle": "Destroy the QR is now QR Arcade Blaster - QRCraftly",
-    "description": "Destroy the QR is now the Arcade Blaster mode of the QR Arcade & Durability Lab.",
-    "image": "/og-image.png?type=arcade",
-    "imageAlt": "QR Arcade & Durability Lab",
+  "arcade": {
+    "id": "arcade",
+    "name": "QR Arcade (retired)",
+    "seoTitle": "The QR Arcade has retired - QRCraftly",
+    "description": "The QR Arcade has retired. Check how well your QR code scans with the QR code checker.",
+    "image": "/og-image.png",
+    "imageAlt": "QRCraftly QR code checker",
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.AsynchronousWebWorkerDiagnostics,
-    "redirectTo": "/arcade?mode=blaster",
-    "canonicalPath": "/arcade"
+    "redirectTo": "/qr-code-checker",
+    "canonicalPath": "/qr-code-checker"
+  },
+  "destroy-the-qr": {
+    "id": "destroy-the-qr",
+    "name": "Destroy the QR (retired)",
+    "seoTitle": "Destroy the QR has retired - QRCraftly",
+    "description": "Destroy the QR has retired. Check how well your QR code scans with the QR code checker.",
+    "image": "/og-image.png",
+    "imageAlt": "QRCraftly QR code checker",
+    "personas": [TargetPersona.SecurityConsciousEnterprise],
+    "valueProposition": StrategicValueCategory.AsynchronousWebWorkerDiagnostics,
+    "redirectTo": "/qr-code-checker",
+    "canonicalPath": "/qr-code-checker"
   },
   "game": {
     "id": "game",
-    "name": "QR Damage Simulator (moved to QR Arcade)",
-    "seoTitle": "The QR Damage Simulator is now part of QR Arcade - QRCraftly",
-    "description": "The QR Damage Simulator game is now the Damage Simulator mode of the QR Arcade & Durability Lab.",
-    "image": "/og-image.png?type=arcade",
-    "imageAlt": "QR Arcade & Durability Lab",
+    "name": "QR Damage Simulator (retired)",
+    "seoTitle": "The QR Damage Simulator has retired - QRCraftly",
+    "description": "The QR Damage Simulator has retired. Check how well your QR code scans with the QR code checker.",
+    "image": "/og-image.png",
+    "imageAlt": "QRCraftly QR code checker",
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.AsynchronousWebWorkerDiagnostics,
-    "redirectTo": "/arcade?mode=simulator",
-    "canonicalPath": "/arcade"
+    "redirectTo": "/qr-code-checker",
+    "canonicalPath": "/qr-code-checker"
   }
 };
 
