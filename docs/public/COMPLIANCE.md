@@ -10,7 +10,7 @@ What QRCraftly does with the data you put into it, what our host can see, and wh
 
 QRCraftly makes QR codes in your browser. What you type, upload or scan is not sent to a server, so it can be used for codes that hold protected health information (PHI) without that information reaching us.
 
-- **Local Processing:** All QR code generation (including vCard 2.1, 3.0, 4.0, and MECard contact payloads) happens locally within the user's browser using HTML5 Canvas and JavaScript.
+- **Local Processing:** All QR code generation (including vCard 2.1, 3.0, 4.0 with photo avatar support, and MECard contact payloads) happens locally within the user's browser using HTML5 Canvas and JavaScript.
 - **Data Transmission:** The sensitive data you enter to generate a QR code (which may include PHI) remains strictly in your device's memory and is not sent to our servers.
 - **Volatile Memory:** QR content you enter is held only in memory and is cleared when the browser tab is closed or refreshed. The only values written to persistent browser storage are the keys listed under Technical Safeguards below.
 - **Undo History and Style Files:** The generator keeps up to 50 appearance steps for Undo and Redo in volatile memory only; QR content is never part of a step, and a reload clears them. A style file (`.qrcraftly.json`) is a download you choose to make: it holds colors, pattern and layout settings only (never the QR value, text or uploaded images), and loading one accepts only a fixed set of known settings.
