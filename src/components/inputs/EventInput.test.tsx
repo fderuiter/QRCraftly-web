@@ -17,8 +17,9 @@
 */
 
 
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
+import { hydrateRoot } from 'react-dom/client';
 import { describe, it, expect, vi } from 'vitest';
 import { EventInput, formatTimezoneLabel, toggleAllDay, webCalendarNotes } from './EventInput';
 import { CalendarProvider, type EventData } from '../../types';
@@ -115,6 +116,38 @@ describe('EventInput', () => {
     expect(htmlString).toContain('Eastern Time (America/New_York)');
     // Fallback timezone in All Timezones optgroup is rendered on server
     expect(htmlString).toContain('Amsterdam (Europe/Amsterdam)');
+  });
+
+  it('hydrates without hydration warnings or errors when mounting client-side over SSR markup', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const ssrHtml = renderToString(<EventInput data={event} onChange={vi.fn()} />);
+    container.innerHTML = ssrHtml;
+
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    await act(async () => {
+      root = hydrateRoot(container, <EventInput data={event} onChange={vi.fn()} />);
+    });
+
+    const hydrationMismatchErrors = consoleErrorSpy.mock.calls.filter(([msg]) =>
+      typeof msg === 'string' && (
+        msg.includes('Hydration failed') ||
+        msg.includes('Did not match') ||
+        msg.includes('Text content does not match') ||
+        msg.includes('Prop `%s` did not match')
+      )
+    );
+
+    expect(hydrationMismatchErrors).toHaveLength(0);
+
+    if (root) {
+      await act(async () => {
+        root?.unmount();
+      });
+    }
+    document.body.removeChild(container);
+    consoleErrorSpy.mockRestore();
   });
 
   it('falls back to static timezone list when Intl.supportedValuesOf is unavailable', () => {
