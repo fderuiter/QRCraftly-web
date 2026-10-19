@@ -18,6 +18,7 @@
 
 
 import { render, screen, fireEvent } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { describe, it, expect, vi } from 'vitest';
 import { EventInput, formatTimezoneLabel, toggleAllDay, webCalendarNotes } from './EventInput';
 import { CalendarProvider, type EventData } from '../../types';
@@ -93,6 +94,27 @@ describe('EventInput', () => {
     const select = screen.getByLabelText('Timezone') as HTMLSelectElement;
     expect(select.value).toBe('Custom/Timezone_Location');
     expect(screen.getByRole('option', { name: 'Timezone Location (Custom/Timezone_Location)' })).toBeInTheDocument();
+  });
+
+  it('renders pinned common timezones in Common optgroup with friendly labels', () => {
+    render(<EventInput data={event} onChange={vi.fn()} />);
+    expect(screen.getByRole('group', { name: 'Common' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'All Timezones' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Eastern Time (America/New_York)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Central Time (America/Chicago)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Pacific Time (America/Los_Angeles)' })).toBeInTheDocument();
+  });
+
+  it('produces server-rendered HTML matching initial client fallback tree to prevent hydration mismatch', () => {
+    const htmlString = renderToString(<EventInput data={event} onChange={vi.fn()} />);
+
+    // Server-rendered markup must contain both optgroups
+    expect(htmlString).toContain('label="Common"');
+    expect(htmlString).toContain('label="All Timezones"');
+    // Common timezones with friendly labels are rendered
+    expect(htmlString).toContain('Eastern Time (America/New_York)');
+    // Fallback timezone in All Timezones optgroup is rendered on server
+    expect(htmlString).toContain('Amsterdam (Europe/Amsterdam)');
   });
 
   it('falls back to static timezone list when Intl.supportedValuesOf is unavailable', () => {

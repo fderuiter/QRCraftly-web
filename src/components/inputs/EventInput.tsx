@@ -13,6 +13,23 @@ const WEB_CALENDAR_OWNERS: Partial<Record<string, string>> = {
   [CalendarProvider.YAHOO]: "Yahoo",
 };
 
+/** Common timezones pinned at the top of the timezone selector for quick access. */
+export const COMMON_TIMEZONES = [
+  { value: "America/New_York", label: "Eastern Time (America/New_York)" },
+  { value: "America/Chicago", label: "Central Time (America/Chicago)" },
+  { value: "America/Denver", label: "Mountain Time (America/Denver)" },
+  { value: "America/Los_Angeles", label: "Pacific Time (America/Los_Angeles)" },
+  { value: "America/Anchorage", label: "Alaska Time (America/Anchorage)" },
+  { value: "Pacific/Honolulu", label: "Hawaii Time (Pacific/Honolulu)" },
+  { value: "Europe/London", label: "London (Europe/London)" },
+  { value: "Europe/Paris", label: "Paris (Europe/Paris)" },
+  { value: "Europe/Berlin", label: "Berlin (Europe/Berlin)" },
+  { value: "Asia/Tokyo", label: "Tokyo (Asia/Tokyo)" },
+  { value: "Asia/Shanghai", label: "Shanghai (Asia/Shanghai)" },
+  { value: "Asia/Kolkata", label: "Kolkata (Asia/Kolkata)" },
+  { value: "Australia/Sydney", label: "Sydney (Australia/Sydney)" },
+];
+
 /** Fallback list of major IANA timezones used when Intl.supportedValuesOf is unavailable. */
 const FALLBACK_TIMEZONES = [
   "America/Anchorage",
@@ -46,8 +63,8 @@ const FALLBACK_TIMEZONES = [
 /**
  * Retrieves the list of supported standard IANA timezone identifiers.
  */
-function getSupportedTimezones(): string[] {
-  if (typeof window !== "undefined" && typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function") {
+export function getSupportedTimezones(): string[] {
+  if (typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function") {
     try {
       return Intl.supportedValuesOf("timeZone");
     } catch {
@@ -109,13 +126,21 @@ interface EventInputProps {
 }
 
 export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
+  const [fullTimezones, setFullTimezones] = React.useState<string[] | null>(null);
+
+  React.useEffect(() => {
+    setFullTimezones(getSupportedTimezones());
+  }, []);
+
+  const baseTimezones = fullTimezones || FALLBACK_TIMEZONES;
+
   const timezoneOptions = React.useMemo(() => {
-    const baseZones = getSupportedTimezones().filter((z) => z !== "UTC" && z !== "");
+    const baseZones = baseTimezones.filter((z) => z !== "UTC" && z !== "");
     if (data.timezone && data.timezone !== "UTC" && !baseZones.includes(data.timezone)) {
       return [...baseZones, data.timezone].sort();
     }
     return baseZones;
-  }, [data.timezone]);
+  }, [baseTimezones, data.timezone]);
 
   return (
     <div className={CONTAINER_SPACING_CLASSES}>
@@ -172,11 +197,20 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
         >
           <option value="">Floating / Local Time</option>
           <option value="UTC">UTC</option>
-          {timezoneOptions.map((tz) => (
-            <option key={tz} value={tz}>
-              {formatTimezoneLabel(tz)}
-            </option>
-          ))}
+          <optgroup label="Common">
+            {COMMON_TIMEZONES.map((ctz) => (
+              <option key={`common-${ctz.value}`} value={ctz.value}>
+                {ctz.label}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="All Timezones">
+            {timezoneOptions.map((tz) => (
+              <option key={`all-${tz}`} value={tz}>
+                {formatTimezoneLabel(tz)}
+              </option>
+            ))}
+          </optgroup>
         </SelectField>
       )}
       <TextField
