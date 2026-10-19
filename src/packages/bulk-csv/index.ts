@@ -24,6 +24,7 @@
  * - Minimal ZIP writer (stored entries, CRC-32, UTF-8 names).
  * - Cross-platform file name helpers for the archive entries.
  * - Column detection and the row the live preview encodes.
+ * - The batch loop that draws each checked row into a ZIP entry, with the drawing supplied by the caller.
  */
 
 export {
@@ -55,3 +56,15 @@ export {
   type PreflightRowDetail,
   type PreflightRowStatus,
 } from './lib/categorize';
+export {
+  runBatch,
+  batchRows,
+  batchZipName,
+  batchPngSize,
+  skippedFromReport,
+  type BatchRow,
+  type BatchFormat,
+  type BatchResult,
+  type RunBatchOptions,
+  type SkippedRow,
+} from './lib/batch';
