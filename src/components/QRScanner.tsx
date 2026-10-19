@@ -76,18 +76,19 @@ export function clearScanHistory(): void {
   sessionHistory = [];
 }
 
+const FORMULA_START = /^[=+\-\t\r@]/;
+
 /**
  * Escapes a single string field for RFC 4180 CSV text.
- * Wraps fields in double quotes if they contain quotes, commas, or line breaks.
- * Internal quotes are doubled.
+ * Neutralises leading formula characters (=, +, -, @, \t, \r) with a single quote to prevent
+ * formula injection in spreadsheets, then wraps fields in double quotes if they contain
+ * quotes, commas, or line breaks. Internal quotes are doubled.
  * @param field - Raw string value to escape.
  * @returns Escaped CSV field.
  */
 export function escapeCsvField(field: string): string {
-  if (field.includes('"') || field.includes(',') || field.includes('\n') || field.includes('\r')) {
-    return `"${field.replaceAll('"', '""')}"`;
-  }
-  return field;
+  const safe = FORMULA_START.test(field) ? `'${field}` : field;
+  return /["\r\n,]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
 /**
@@ -97,12 +98,14 @@ export function escapeCsvField(field: string): string {
  */
 export function formatScanHistoryCsv(history: ScanDescription[]): string {
   const headers = ['type', 'typeLabel', 'text'];
-  const rows = history.map((item) => [
-    escapeCsvField(item.type ?? ''),
-    escapeCsvField(item.typeLabel ?? ''),
-    escapeCsvField(item.text ?? ''),
-  ].join(','));
-  return [headers.join(','), ...rows].join('\n');
+  const rows = history.map((item) =>
+    [
+      escapeCsvField(item.type),
+      escapeCsvField(item.typeLabel),
+      escapeCsvField(item.text),
+    ].join(',')
+  );
+  return [headers.join(','), ...rows].join('\r\n');
 }
 
 function rememberScan(scan: ScanDescription): ScanDescription[] {
@@ -688,7 +691,6 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   );
 
   const handleExportCsv = () => {
-    if (history.length === 0) return;
     const csvText = formatScanHistoryCsv(history);
     const bytes = new TextEncoder().encode(csvText);
     triggerFileDownload(bytes, 'qrcraftly-scan-history.csv', 'text/csv');
@@ -772,7 +774,6 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               variant="secondary"
               size="sm"
               onClick={handleExportCsv}
-              disabled={history.length === 0}
               aria-label="Export scan history as CSV"
             >
               <Download className="size-3.5" aria-hidden="true" />

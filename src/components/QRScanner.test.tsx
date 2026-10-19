@@ -1206,12 +1206,24 @@ describe('QRScanner Component', () => {
       expect(escapeCsvField('hello\rworld')).toBe('"hello\rworld"');
     });
 
-    it('formats scan history descriptions into CSV text', () => {
+    it('neutralises CSV formula injection characters (=, +, -, @, \\t, \\r)', () => {
+      expect(escapeCsvField('=HYPERLINK("https://evil.example","Click")')).toBe('"' + "'=HYPERLINK(" + '""' + 'https://evil.example' + '""' + ',' + '""' + 'Click' + '""' + ')' + '"');
+      expect(escapeCsvField("=cmd|' /C calc'!A0")).toBe("'=cmd|' /C calc'!A0");
+      expect(escapeCsvField('+100')).toBe("'+100");
+      expect(escapeCsvField('-50')).toBe("'-50");
+      expect(escapeCsvField('@SUM(A1:A10)')).toBe("'@SUM(A1:A10)");
+      expect(escapeCsvField('\tTAB_PREFIX')).toBe("'\tTAB_PREFIX");
+      expect(escapeCsvField('\rCARRIAGE_RETURN_PREFIX')).toBe("\"'\rCARRIAGE_RETURN_PREFIX\"");
+    });
+
+    it('formats scan history descriptions into RFC 4180 CSV text with CRLF line endings', () => {
       const scan1 = describeScan('https://example.com');
       const scan2 = describeScan('Hello, "world"');
       const csv = formatScanHistoryCsv([scan1, scan2]);
 
-      const lines = csv.split(/\r?\n/);
+      expect(csv).toContain('\r\n');
+      const lines = csv.split('\r\n');
+      expect(lines.length).toBe(3);
       expect(lines[0]).toBe('type,typeLabel,text');
       expect(lines[1]).toContain('URL,URL,https://example.com');
       expect(lines[2]).toContain('TEXT,Text,"Hello, ""world"""');
