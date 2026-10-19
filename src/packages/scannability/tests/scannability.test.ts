@@ -114,7 +114,7 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       };
       const health = calculateScannabilityHealth(config);
       expect(health.score).toBe(85);
-      expect(health.warnings).toContain('Quiet zone is below recommended 4 modules');
+      expect(health.warnings).toContain('Quiet zone is narrower than the recommended 4 modules');
     });
 
     it('does not warn when quiet zone margin is 4 or higher', () => {
@@ -124,7 +124,7 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       };
       const health = calculateScannabilityHealth(config);
       expect(health.score).toBe(100);
-      expect(health.warnings).not.toContain('Quiet zone is below recommended 4 modules');
+      expect(health.warnings).not.toContain('Quiet zone is narrower than the recommended 4 modules');
     });
   });
 

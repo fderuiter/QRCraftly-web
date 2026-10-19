@@ -60,7 +60,7 @@ export const AdvancedControls: React.FC<AdvancedControlsProps> = ({ config, onCh
           formatValue={(val) => `${val} modules`}
         />
         <p className="mt-2 text-xs text-fg-muted">
-          Quiet zone (margin) around the QR matrix. ISO specification recommends at least 4 modules for reliable scanning.
+          Quiet zone (margin) around the QR matrix. ISO specification recommends at least 4 modules for reliable scanning. Applies to image exports (wallet cards retain a fixed 4-module quiet zone).
         </p>
       </div>
     </div>
