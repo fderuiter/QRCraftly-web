@@ -50,7 +50,7 @@ describe('LogoControls preset categories (#1366)', () => {
   });
 });
 
-describe('LogoControls error correction level auto-elevation & warnings', () => {
+describe('LogoControls error correction level auto-elevation', () => {
   it('auto-elevates errorCorrectionLevel to H when selecting a preset logo', () => {
     const onChange = vi.fn();
     renderControls({ logoUrl: null, errorCorrectionLevel: QRErrorCorrectionLevel.M }, onChange);
@@ -72,51 +72,18 @@ describe('LogoControls error correction level auto-elevation & warnings', () => 
     const fileInput = screen.getByLabelText('Upload logo image');
     const file = new File(['dummy content'], 'logo.png', { type: 'image/png' });
 
-    // Mock FileReader behavior or fire change event
     fireEvent.change(fileInput, { target: { files: [file] } });
 
-    // useImageUpload uses FileReader, which reads async. Let's verify file input exists and handler is wired.
     expect(fileInput).toBeInTheDocument();
   });
 
-  it('renders inline scannability warning when logo is present and errorCorrectionLevel is below H', () => {
+  it('does not render duplicate warning alert in LogoControls panel when logo is present', () => {
     renderControls({
       logoUrl: PRESET_LOGOS[0].dataUrl,
       errorCorrectionLevel: QRErrorCorrectionLevel.M,
     });
 
-    expect(screen.getByText('Scannability Warning:')).toBeInTheDocument();
-    expect(
-      screen.getByText('Logos cover central modules. High error correction is recommended for reliable scanning.')
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Set to High Error Correction' })).toBeInTheDocument();
-  });
-
-  it('hides warning alert when logo is present and errorCorrectionLevel is H', () => {
-    renderControls({
-      logoUrl: PRESET_LOGOS[0].dataUrl,
-      errorCorrectionLevel: QRErrorCorrectionLevel.H,
-    });
-
     expect(screen.queryByText('Scannability Warning:')).not.toBeInTheDocument();
-  });
-
-  it('upgrades errorCorrectionLevel to H when clicking the warning alert button', () => {
-    const onChange = vi.fn();
-    renderControls(
-      {
-        logoUrl: PRESET_LOGOS[0].dataUrl,
-        errorCorrectionLevel: QRErrorCorrectionLevel.M,
-      },
-      onChange
-    );
-
-    const upgradeButton = screen.getByRole('button', { name: 'Set to High Error Correction' });
-    fireEvent.click(upgradeButton);
-
-    expect(onChange).toHaveBeenCalledWith({
-      errorCorrectionLevel: QRErrorCorrectionLevel.H,
-    });
   });
 });
 

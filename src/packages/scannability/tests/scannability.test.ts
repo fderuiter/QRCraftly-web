@@ -107,7 +107,7 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       expect(health.warnings.some((w) => w.includes('Local contrast drop detected'))).toBe(true);
     });
 
-    it('deducts score and emits warning when logo is present with Low (L) or Medium (M) error correction', () => {
+    it('deducts score and emits warning when logo is present with Low (L) error correction', () => {
       const configL: QRConfig = {
         ...getBaseConfig(),
         logoUrl: 'data:image/png;base64,dummy',
@@ -116,18 +116,18 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       const healthL = calculateScannabilityHealth(configL);
       expect(healthL.score).toBe(85);
       expect(healthL.warnings).toContain('Low error correction with logo');
+    });
 
+    it('does not emit error correction warning when logo is present with Medium (M) or High (H) error correction', () => {
       const configM: QRConfig = {
         ...getBaseConfig(),
         logoUrl: 'data:image/png;base64,dummy',
         errorCorrectionLevel: QRErrorCorrectionLevel.M,
       };
       const healthM = calculateScannabilityHealth(configM);
-      expect(healthM.score).toBe(85);
-      expect(healthM.warnings).toContain('Low error correction with logo');
-    });
+      expect(healthM.score).toBe(100);
+      expect(healthM.warnings).not.toContain('Low error correction with logo');
 
-    it('does not emit error correction warning when logo is present with High (H) error correction', () => {
       const configH: QRConfig = {
         ...getBaseConfig(),
         logoUrl: 'data:image/png;base64,dummy',

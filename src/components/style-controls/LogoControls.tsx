@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import { Alert } from '../ui/Alert';
 import { type QRConfig, type LogoPaddingStyle, QRErrorCorrectionLevel } from '../../types';
 import { Upload, X, Square, Circle, Minus } from 'lucide-react';
 import { ColorInput } from '../ui/ColorInput';
@@ -154,21 +153,6 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
               <p className="text-xs text-fg-muted">Embedded in center</p>
             </div>
           </div>
-
-          {config.errorCorrectionLevel !== QRErrorCorrectionLevel.H && (
-            <Alert variant="warning" title="Scannability Warning">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <span>Logos cover central modules. High error correction is recommended for reliable scanning.</span>
-                <Button
-                  size="xs"
-                  variant="secondary"
-                  onClick={() => onChange({ errorCorrectionLevel: QRErrorCorrectionLevel.H })}
-                >
-                  Set to High Error Correction
-                </Button>
-              </div>
-            </Alert>
-          )}
 
           {/* Logo Border Styles */}
           <div>
