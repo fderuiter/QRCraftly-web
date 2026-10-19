@@ -2,7 +2,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
-import { QRScanner, clearScanHistory } from './QRScanner';
+import { QRScanner, clearScanHistory, formatScanHistoryCsv, escapeCsvField } from './QRScanner';
+import { describeScan } from './scanner/describeScan';
+import * as downloadManager from '@/utils/downloadManager';
 import { useQrScanner, type UseQrScannerOptions } from '@/packages/optical-scanner/client';
 import { playChime } from '@/utils/feedback';
 import { fakeQrRead } from '../../tests/utils/fakeQrRead';
@@ -69,6 +71,7 @@ describe('QRScanner Component', () => {
 
   beforeEach(() => {
     clearScanHistory();
+    vi.spyOn(downloadManager, 'triggerFileDownload').mockImplementation(() => {});
     if (globalThis.mockWorkerControl) {
       globalThis.mockWorkerControl.reset();
     }
@@ -1191,6 +1194,54 @@ describe('QRScanner Component', () => {
         expect(mockOnScanSuccess).toHaveBeenCalledWith('https://example.com/image-read');
       });
       expect(playChime).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Scan History CSV Export', () => {
+    it('escapes CSV fields with quotes, commas, and newlines', () => {
+      expect(escapeCsvField('hello')).toBe('hello');
+      expect(escapeCsvField('hello, world')).toBe('"hello, world"');
+      expect(escapeCsvField('hello "world"')).toBe('"hello ""world"""');
+      expect(escapeCsvField('hello\nworld')).toBe('"hello\nworld"');
+      expect(escapeCsvField('hello\rworld')).toBe('"hello\rworld"');
+    });
+
+    it('formats scan history descriptions into CSV text', () => {
+      const scan1 = describeScan('https://example.com');
+      const scan2 = describeScan('Hello, "world"');
+      const csv = formatScanHistoryCsv([scan1, scan2]);
+
+      const lines = csv.split(/\r?\n/);
+      expect(lines[0]).toBe('type,typeLabel,text');
+      expect(lines[1]).toContain('URL,URL,https://example.com');
+      expect(lines[2]).toContain('TEXT,Text,"Hello, ""world"""');
+    });
+
+    it('returns standard headers when history is empty', () => {
+      expect(formatScanHistoryCsv([])).toBe('type,typeLabel,text');
+    });
+
+    it('renders Export CSV button and triggers download on click', async () => {
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      await settle();
+
+      await decode('https://example.com/test-scan');
+
+      const exportBtn = screen.getByRole('button', { name: 'Export scan history as CSV' });
+      expect(exportBtn).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(exportBtn);
+      });
+
+      expect(downloadManager.triggerFileDownload).toHaveBeenCalledTimes(1);
+      const [bytes, filename, mimeType] = vi.mocked(downloadManager.triggerFileDownload).mock.calls[0];
+      expect(filename).toBe('qrcraftly-scan-history.csv');
+      expect(mimeType).toBe('text/csv');
+
+      const decodedText = new TextDecoder('utf-8').decode(bytes);
+      expect(decodedText).toContain('type,typeLabel,text');
+      expect(decodedText).toContain('https://example.com/test-scan');
     });
   });
 });

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Camera, Copy, FileImage, RefreshCw, Upload, Volume2, VolumeX } from 'lucide-react';
+import { Camera, Copy, Download, FileImage, RefreshCw, Upload, Volume2, VolumeX } from 'lucide-react';
 import {
   useQrScanner,
   type CameraProblemStatus,
@@ -7,6 +7,7 @@ import {
   type CameraSessionState,
 } from '@/packages/optical-scanner/client';
 import { playChime, unlockChime } from '@/utils/feedback';
+import { triggerFileDownload } from '@/utils/downloadManager';
 import { Button } from './ui/Button';
 import { ScannerCameraControls } from './ScannerCameraControls';
 import { EmptyState } from './ui/EmptyState';
@@ -73,6 +74,35 @@ let sessionHistory: ScanDescription[] = [];
 /** Forgets this tab's scan history (tests). */
 export function clearScanHistory(): void {
   sessionHistory = [];
+}
+
+/**
+ * Escapes a single string field for RFC 4180 CSV text.
+ * Wraps fields in double quotes if they contain quotes, commas, or line breaks.
+ * Internal quotes are doubled.
+ * @param field - Raw string value to escape.
+ * @returns Escaped CSV field.
+ */
+export function escapeCsvField(field: string): string {
+  if (field.includes('"') || field.includes(',') || field.includes('\n') || field.includes('\r')) {
+    return `"${field.replaceAll('"', '""')}"`;
+  }
+  return field;
+}
+
+/**
+ * Formats active scan history records into RFC 4180 standard CSV text.
+ * @param history - List of ScanDescription items.
+ * @returns CSV string.
+ */
+export function formatScanHistoryCsv(history: ScanDescription[]): string {
+  const headers = ['type', 'typeLabel', 'text'];
+  const rows = history.map((item) => [
+    escapeCsvField(item.type ?? ''),
+    escapeCsvField(item.typeLabel ?? ''),
+    escapeCsvField(item.text ?? ''),
+  ].join(','));
+  return [headers.join(','), ...rows].join('\n');
 }
 
 function rememberScan(scan: ScanDescription): ScanDescription[] {
@@ -657,6 +687,13 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     </section>
   );
 
+  const handleExportCsv = () => {
+    if (history.length === 0) return;
+    const csvText = formatScanHistoryCsv(history);
+    const bytes = new TextEncoder().encode(csvText);
+    triggerFileDownload(bytes, 'qrcraftly-scan-history.csv', 'text/csv');
+  };
+
   return (
     <div className="relative flex flex-col overflow-hidden rounded-xl border border-line bg-surface" {...dropHandlers} data-testid="qr-scanner">
       <p className="sr-only" role="status" aria-live="polite">
@@ -726,9 +763,22 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       )}
       {history.length > 0 && (
         <details className="border-t border-line-subtle px-4 py-3 text-sm">
-          <summary className="flex cursor-pointer items-center gap-2 font-medium text-fg-soft">
-            Recent scans in this tab ({history.length})
+          <summary className="flex cursor-pointer items-center justify-between font-medium text-fg-soft">
+            <span>Recent scans in this tab ({history.length})</span>
           </summary>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-fg-muted">Kept in memory only. Reloading the page clears them.</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportCsv}
+              disabled={history.length === 0}
+              aria-label="Export scan history as CSV"
+            >
+              <Download className="size-3.5" aria-hidden="true" />
+              Export CSV
+            </Button>
+          </div>
           <ul className="mt-2 space-y-1">
             {history.map((item) => (
               <li key={item.text}>
@@ -738,7 +788,6 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-xs text-fg-muted">Kept in memory only. Reloading the page clears them.</p>
         </details>
       )}
       {dragging && (
