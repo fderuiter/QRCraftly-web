@@ -206,7 +206,20 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       const width = (moduleCount + 2 * margin) * cellSize;
       const height = width;
       const data = new Uint8ClampedArray(width * height * 4);
-      data.fill(255); // high contrast white canvas
+      data.fill(255); // white background
+
+      // Draw a black module at matrix cell (0,0) located at pixel offset margin * cellSize
+      const startX = margin * cellSize;
+      const startY = margin * cellSize;
+      for (let y = startY; y < startY + cellSize; y++) {
+        for (let x = startX; x < startX + cellSize; x++) {
+          const idx = (y * width + x) * 4;
+          data[idx] = 0;
+          data[idx + 1] = 0;
+          data[idx + 2] = 0;
+          data[idx + 3] = 255;
+        }
+      }
 
       const audit = auditModuleContrast({ data, width, height }, moduleCount, margin);
       expect(audit.violations).toBe(0);
@@ -223,7 +236,20 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       const width = (moduleCount + 2 * margin) * cellSize;
       const height = width;
       const data = new Uint8ClampedArray(width * height * 4);
-      data.fill(255); // high contrast white canvas
+      data.fill(255); // white background
+
+      // Draw a black module at matrix cell (0,0) located at pixel offset margin * cellSize
+      const startX = margin * cellSize;
+      const startY = margin * cellSize;
+      for (let y = startY; y < startY + cellSize; y++) {
+        for (let x = startX; x < startX + cellSize; x++) {
+          const idx = (y * width + x) * 4;
+          data[idx] = 0;
+          data[idx + 1] = 0;
+          data[idx + 2] = 0;
+          data[idx + 3] = 255;
+        }
+      }
 
       const audit = auditModuleContrast({ data, width, height }, moduleCount, margin);
       expect(audit.violations).toBe(0);
