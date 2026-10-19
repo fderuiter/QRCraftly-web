@@ -84,4 +84,15 @@ describe('pickColumn', () => {
     // For filename column excluding ColB, ColA with plain text should be picked when kind is 'filename'
     expect(pickColumn(['ColA', 'ColB'], FILENAME_COLUMN_WORDS, { exclude: 'ColB', rows: sampleRows, kind: 'filename' })).toBe('ColA');
   });
+
+  it('performs fallback sample inspection with a copied or filtered word list when kind is omitted', () => {
+    const sampleRows = [
+      { ColA: 'Member_101', ColB: 'https://example.com/promo/101' },
+      { ColA: 'Member_102', ColB: 'https://example.com/promo/102' },
+    ];
+    const copiedPayloadWords = [...PAYLOAD_COLUMN_WORDS];
+    const copiedFilenameWords = [...FILENAME_COLUMN_WORDS];
+    expect(pickColumn(['ColA', 'ColB'], copiedPayloadWords, { rows: sampleRows })).toBe('ColB');
+    expect(pickColumn(['ColA', 'ColB'], copiedFilenameWords, { exclude: 'ColB', rows: sampleRows })).toBe('ColA');
+  });
 });

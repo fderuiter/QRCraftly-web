@@ -112,9 +112,9 @@ export function pickColumn(
   const rows = options.rows ?? [];
   const kind =
     options.kind ??
-    (words === PAYLOAD_COLUMN_WORDS
+    (words.some((w) => PAYLOAD_COLUMN_WORDS.includes(w))
       ? 'payload'
-      : words === FILENAME_COLUMN_WORDS
+      : words.some((w) => FILENAME_COLUMN_WORDS.includes(w))
         ? 'filename'
         : undefined);
 
