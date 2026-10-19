@@ -13,6 +13,68 @@ const WEB_CALENDAR_OWNERS: Partial<Record<string, string>> = {
   [CalendarProvider.YAHOO]: "Yahoo",
 };
 
+/** Fallback list of major IANA timezones used when Intl.supportedValuesOf is unavailable. */
+const FALLBACK_TIMEZONES = [
+  "America/Anchorage",
+  "America/Argentina/Buenos_Aires",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Mexico_City",
+  "America/New_York",
+  "America/Phoenix",
+  "America/Sao_Paulo",
+  "Asia/Bangkok",
+  "Asia/Dubai",
+  "Asia/Hong_Kong",
+  "Asia/Kolkata",
+  "Asia/Seoul",
+  "Asia/Shanghai",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+  "Europe/Amsterdam",
+  "Europe/Berlin",
+  "Europe/London",
+  "Europe/Madrid",
+  "Europe/Paris",
+  "Europe/Rome",
+  "Pacific/Auckland",
+  "Pacific/Honolulu",
+];
+
+/**
+ * Retrieves the list of supported standard IANA timezone identifiers.
+ */
+function getSupportedTimezones(): string[] {
+  if (typeof window !== "undefined" && typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function") {
+    try {
+      return Intl.supportedValuesOf("timeZone");
+    } catch {
+      // Fallback if Intl call fails
+    }
+  }
+  return FALLBACK_TIMEZONES;
+}
+
+/**
+ * Formats an IANA timezone identifier into a user-friendly label.
+ * e.g., "Europe/Amsterdam" -> "Amsterdam (Europe/Amsterdam)"
+ * "America/Indiana/Indianapolis" -> "Indiana - Indianapolis (America/Indiana/Indianapolis)"
+ * "UTC" -> "UTC"
+ */
+export function formatTimezoneLabel(tz: string): string {
+  if (!tz) return "Floating / Local Time";
+  if (tz === "UTC") return "UTC";
+
+  const parts = tz.split("/");
+  if (parts.length > 1) {
+    const location = parts.slice(1).join(" - ").replace(/_/g, " ");
+    return `${location} (${tz})`;
+  }
+  return tz;
+}
+
 /**
  * The notice under the calendar choice: a web calendar code is a link, so the provider receives
  * the event details when someone opens it (#1364).
@@ -47,6 +109,14 @@ interface EventInputProps {
 }
 
 export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
+  const timezoneOptions = React.useMemo(() => {
+    const baseZones = getSupportedTimezones().filter((z) => z !== "UTC" && z !== "");
+    if (data.timezone && data.timezone !== "UTC" && !baseZones.includes(data.timezone)) {
+      return [...baseZones, data.timezone].sort();
+    }
+    return baseZones;
+  }, [data.timezone]);
+
   return (
     <div className={CONTAINER_SPACING_CLASSES}>
       <SelectField
@@ -94,26 +164,20 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
         onChange={(e) => onChange({ endDate: e.target.value })}
       />
       {!data.allDay && (
-      <SelectField
-        id="event-timezone"
-        label="Timezone"
-        value={data.timezone || ""}
-        onChange={(e) => onChange({ timezone: e.target.value })}
-      >
-        <option value="">Floating / Local Time</option>
-        <option value="UTC">UTC</option>
-        <option value="America/New_York">Eastern Time (America/New_York)</option>
-        <option value="America/Chicago">Central Time (America/Chicago)</option>
-        <option value="America/Denver">Mountain Time (America/Denver)</option>
-        <option value="America/Los_Angeles">Pacific Time (America/Los_Angeles)</option>
-        <option value="Europe/London">London (Europe/London)</option>
-        <option value="Europe/Paris">Paris (Europe/Paris)</option>
-        <option value="Europe/Berlin">Berlin (Europe/Berlin)</option>
-        <option value="Asia/Tokyo">Tokyo (Asia/Tokyo)</option>
-        <option value="Asia/Shanghai">Shanghai (Asia/Shanghai)</option>
-        <option value="Asia/Kolkata">Kolkata (Asia/Kolkata)</option>
-        <option value="Australia/Sydney">Sydney (Australia/Sydney)</option>
-      </SelectField>
+        <SelectField
+          id="event-timezone"
+          label="Timezone"
+          value={data.timezone || ""}
+          onChange={(e) => onChange({ timezone: e.target.value })}
+        >
+          <option value="">Floating / Local Time</option>
+          <option value="UTC">UTC</option>
+          {timezoneOptions.map((tz) => (
+            <option key={tz} value={tz}>
+              {formatTimezoneLabel(tz)}
+            </option>
+          ))}
+        </SelectField>
       )}
       <TextField
         id="event-location"

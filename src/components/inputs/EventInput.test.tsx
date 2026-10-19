@@ -19,7 +19,7 @@
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { EventInput, toggleAllDay, webCalendarNotes } from './EventInput';
+import { EventInput, formatTimezoneLabel, toggleAllDay, webCalendarNotes } from './EventInput';
 import { CalendarProvider, type EventData } from '../../types';
 
 const event: EventData = {
@@ -62,4 +62,51 @@ describe('EventInput', () => {
     expect(screen.getByText(/sends the event's title, times, location and description to Google/)).toBeInTheDocument();
     expect(screen.getByLabelText('Target Calendar')).toHaveAttribute('aria-describedby', expect.stringContaining('event-provider-hints'));
   });
+
+  it('formats timezone display labels correctly', () => {
+    expect(formatTimezoneLabel('')).toBe('Floating / Local Time');
+    expect(formatTimezoneLabel('UTC')).toBe('UTC');
+    expect(formatTimezoneLabel('Europe/Amsterdam')).toBe('Amsterdam (Europe/Amsterdam)');
+    expect(formatTimezoneLabel('Asia/Dubai')).toBe('Dubai (Asia/Dubai)');
+    expect(formatTimezoneLabel('America/Indiana/Indianapolis')).toBe('Indiana - Indianapolis (America/Indiana/Indianapolis)');
+  });
+
+  it('includes standard IANA timezones in dropdown and updates data.timezone upon selection', () => {
+    const onChange = vi.fn();
+    render(<EventInput data={event} onChange={onChange} />);
+
+    const select = screen.getByLabelText('Timezone') as HTMLSelectElement;
+
+    // Verify unlisted standard IANA timezones (such as Asia/Dubai and Europe/Amsterdam) are present
+    expect(screen.getByRole('option', { name: 'Amsterdam (Europe/Amsterdam)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Dubai (Asia/Dubai)' })).toBeInTheDocument();
+
+    // Select Europe/Amsterdam and check onChange callback
+    fireEvent.change(select, { target: { value: 'Europe/Amsterdam' } });
+    expect(onChange).toHaveBeenCalledWith({ timezone: 'Europe/Amsterdam' });
+  });
+
+  it('renders custom or unlisted timezone value present in data.timezone', () => {
+    const customData: EventData = { ...event, timezone: 'Custom/Timezone_Location' };
+    render(<EventInput data={customData} onChange={vi.fn()} />);
+
+    const select = screen.getByLabelText('Timezone') as HTMLSelectElement;
+    expect(select.value).toBe('Custom/Timezone_Location');
+    expect(screen.getByRole('option', { name: 'Timezone Location (Custom/Timezone_Location)' })).toBeInTheDocument();
+  });
+
+  it('falls back to static timezone list when Intl.supportedValuesOf is unavailable', () => {
+    const originalSupportedValuesOf = Intl.supportedValuesOf;
+    // @ts-expect-error Mocking for test
+    delete Intl.supportedValuesOf;
+
+    try {
+      render(<EventInput data={event} onChange={vi.fn()} />);
+      expect(screen.getByRole('option', { name: 'Amsterdam (Europe/Amsterdam)' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Dubai (Asia/Dubai)' })).toBeInTheDocument();
+    } finally {
+      Intl.supportedValuesOf = originalSupportedValuesOf;
+    }
+  });
 });
+
