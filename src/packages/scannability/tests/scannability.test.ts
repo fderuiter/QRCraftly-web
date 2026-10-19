@@ -106,6 +106,37 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       expect(health.score).toBeLessThan(100);
       expect(health.warnings.some((w) => w.includes('Local contrast drop detected'))).toBe(true);
     });
+
+    it('deducts score and emits warning when logo is present with Low (L) or Medium (M) error correction', () => {
+      const configL: QRConfig = {
+        ...getBaseConfig(),
+        logoUrl: 'data:image/png;base64,dummy',
+        errorCorrectionLevel: QRErrorCorrectionLevel.L,
+      };
+      const healthL = calculateScannabilityHealth(configL);
+      expect(healthL.score).toBe(85);
+      expect(healthL.warnings).toContain('Low error correction with logo');
+
+      const configM: QRConfig = {
+        ...getBaseConfig(),
+        logoUrl: 'data:image/png;base64,dummy',
+        errorCorrectionLevel: QRErrorCorrectionLevel.M,
+      };
+      const healthM = calculateScannabilityHealth(configM);
+      expect(healthM.score).toBe(85);
+      expect(healthM.warnings).toContain('Low error correction with logo');
+    });
+
+    it('does not emit error correction warning when logo is present with High (H) error correction', () => {
+      const configH: QRConfig = {
+        ...getBaseConfig(),
+        logoUrl: 'data:image/png;base64,dummy',
+        errorCorrectionLevel: QRErrorCorrectionLevel.H,
+      };
+      const healthH = calculateScannabilityHealth(configH);
+      expect(healthH.score).toBe(100);
+      expect(healthH.warnings).not.toContain('Low error correction with logo');
+    });
   });
 
   describe('getExportRiskPolicy', () => {

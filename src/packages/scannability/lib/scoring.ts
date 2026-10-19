@@ -84,7 +84,7 @@ export function calculateScannabilityHealth(
       score -= 15;
       warnings.push('Logo size might obscure too much data');
     }
-    if (config.errorCorrectionLevel === 'L') {
+    if (config.errorCorrectionLevel === 'L' || config.errorCorrectionLevel === 'M') {
       score -= 15;
       warnings.push('Low error correction with logo');
     }
