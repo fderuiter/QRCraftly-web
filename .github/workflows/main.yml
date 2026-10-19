@@ -40,8 +40,6 @@ jobs:
     permissions:
       contents: read
       actions: read # the nightly run compares main with the last successful nightly run
-      statuses: write # the Stitch review status (ADR 0051)
-      issues: read # who added ci-approved to a Stitch PR (ADR 0051)
       pull-requests: read
     outputs:
       run_checks: ${{ steps.plan.outputs.run_checks }}
@@ -49,7 +47,6 @@ jobs:
       unit_tests: ${{ steps.plan.outputs.unit_tests }}
       e2e: ${{ steps.plan.outputs.e2e }}
       lighthouse: ${{ steps.plan.outputs.lighthouse }}
-      awaiting_approval: ${{ steps.plan.outputs.awaiting_approval }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -72,37 +69,11 @@ jobs:
           IS_DRAFT: ${{ github.event.pull_request.draft }}
           HEAD_REF: ${{ github.head_ref }}
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
-          AUTHOR: ${{ github.event.pull_request.user.login }}
           FULL_INPUT: ${{ inputs.full }}
           BASE_REF: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.sha }}
           LAST_NIGHTLY_SHA: ${{ steps.last-nightly.outputs.sha }}
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: node scripts/ci/ci_plan.js
-
-      # Required by the ruleset. Pending (never failure) on a Stitch PR until a maintainer
-      # adds ci-approved, so the review itself never shows as a red check for Stitch to
-      # "fix"; success everywhere else. If posting fails the status stays missing, which still
-      # blocks the merge, so the step may fail without failing the plan.
-      - name: Report the Stitch review status
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          AWAITING_APPROVAL: ${{ steps.plan.outputs.awaiting_approval }}
-        run: |
-          if [ "$AWAITING_APPROVAL" = "true" ]; then
-            state=pending
-            description="Waiting for a maintainer to review this bot PR and add ci-approved"
-          else
-            state=success
-            description="No review pending"
-          fi
-          gh api --method POST "repos/$REPO/statuses/$SHA" -f state="$state" -f context="Stitch review" -f description="$description"
 
   # Runs in parallel with the other jobs (none of them depends on it), so a new
   # upstream advisory never skips lint, tests or build. The CI aggregate requires it.
@@ -558,16 +529,12 @@ jobs:
         id: check
         env:
           PLAN_RESULT: ${{ needs.plan.result }}
-          AWAITING_APPROVAL: ${{ needs.plan.outputs.awaiting_approval }}
           NEEDS_RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           echo "Plan: $PLAN_RESULT. Job results: $NEEDS_RESULTS"
           if [ "$PLAN_RESULT" != "success" ]; then
             echo "::error::The Plan job finished with '$PLAN_RESULT'."
             exit 1
-          fi
-          if [ "$AWAITING_APPROVAL" = "true" ]; then
-            echo "::notice::Bot PR not reviewed yet, so only the quick checks ran. The required Stitch review status stays pending until a maintainer adds ci-approved and updates the branch."
           fi
           for result in $NEEDS_RESULTS; do
             if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then

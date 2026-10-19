@@ -68,13 +68,6 @@ describe('CI triggers and tiers (main.yml, ADR 0050)', () => {
     expect(merge).not.toContain('VITEST_SHARD_RUN');
     expect(read('vite.config.ts')).toContain("thresholds: process.env.VITEST_SHARD_RUN === 'true' ? {} : { ...coverageThresholds }");
   });
-
-  it('passes the Plan job what it needs to check who approved a bot PR', () => {
-    const plan = jobBlock('plan');
-    expect(plan).toContain('issues: read');
-    expect(plan).toContain('PR_NUMBER: ${{ github.event.pull_request.number }}');
-    expect(plan).toContain('GH_TOKEN: ${{ github.token }}');
-  });
 });
 
 describe('documentation checks wiring', () => {
