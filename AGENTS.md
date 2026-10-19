@@ -53,7 +53,7 @@ See `docs/agents/docs-maintenance.md`.
 
 ## Quality & Development Standards
 
-- **TypeScript**: Strict typing across all files, tests included. Never use `any` or loose type assertions (`as`). When the same logic is needed twice, extract a helper instead of copying it.
+- **TypeScript**: Strict typing across all files, tests included. Never use `any` or loose type assertions (`as`); ESLint rejects new ones in `src/` (`as const` is fine), and `eslint/legacy-type-assertions.js` lists the older files that still have some. That list may only shrink. When the same logic is needed twice, extract a helper instead of copying it.
 - **Earlier Decisions**: Before changing existing behaviour, run `git log -S` on the lines you touch and check `docs/adr/`. Do not undo something an earlier PR set on purpose (for example, toast offsets that keep the mobile Download bar clear) without saying why in the PR.
 - **Accessibility (a11y)**: Validate WCAG 2.1 SC 1.4.11 contrast compliance for UI states and generated QR codes. Test components with the axe helper in `tests/utils/axe.ts` (`expect(await axe(container)).toHaveNoViolations()`) and screen-reader accessible labels. Validation errors and live regions must not fire while the user is still typing a value that could become valid.
 - **Tests**: Test behaviour, not CSS class names. Count calls when the contract says "only on change", and cover blank, whitespace and boundary input.
@@ -71,5 +71,4 @@ Before declaring any implementation task complete, verify your changes:
 2. **Build, Routing, or Core Generator Changes**: In addition to standard checks, run:
    - `pnpm build` (verifies SSG pre-rendering, the bundle AST audit, and postbuild security scripts; the gzipped bundle size budget is a separate CI step, `pnpm run check-bundle-size`)
    - `pnpm test:e2e` (Playwright end-to-end verification, when modifying navigation, rendering, or input flows)
-3. **Bot PRs** (Google Labs Stitch): open them as drafts, never enable auto-merge, and run the checks above before opening. CI runs on them only after a maintainer adds the `ci-approved` label (ADR 0051).
-4. **CI minutes are metered** (the repository is private, [ADR 0050](./docs/adr/0050-ci-tiers-for-a-private-repository.md)): run the checks above locally before pushing, keep a PR in draft until it is ready (drafts skip unit tests, E2E and Lighthouse), and add the `full-e2e` label when a change may behave differently in Firefox or WebKit, since ready PRs run Chromium E2E only.
+3. **CI minutes are metered** (the repository is private, [ADR 0050](./docs/adr/0050-ci-tiers-for-a-private-repository.md)): run the checks above locally before pushing, keep a PR in draft until it is ready (drafts skip unit tests, E2E and Lighthouse), and add the `full-e2e` label when a change may behave differently in Firefox or WebKit, since ready PRs run Chromium E2E only.

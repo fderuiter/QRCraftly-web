@@ -272,6 +272,8 @@ export interface QRConfig {
   gradientColorStops?: ColorStop[];
   /** Angle in degrees for linear gradient fill (0 to 360). */
   gradientAngle?: number;
+  /** Quiet zone margin around the QR matrix in modules (2 to 10). Defaults to 4. */
+  quietZoneModules?: number;
 }
 
 /**
@@ -389,6 +391,8 @@ export interface VCardData {
   zip: string;
   /** The country of the contact. */
   country: string;
+  /** Profile photo image URL (vCard photo avatar). */
+  photo?: string;
   /** X handle or profile link (vCard only). */
   x?: string;
   /** LinkedIn handle or profile link (vCard only). */
