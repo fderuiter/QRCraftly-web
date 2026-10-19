@@ -42,7 +42,9 @@ Read the full pledge, and exactly what is and isn't collected, in [docs/PLEDGE.m
 - **In the wild:** preview the code on a poster, business card, table tent, phone screen or sticker, all drawn in code. Set a printed width to see module size and estimated scan distance, and run a viewing test (distance, glare, dim light, tilt).
 - **Style tools:** a gallery of every pattern and preset drawn on your own code, "Surprise me", up to 50 steps of undo and redo in memory, and a command palette (`Ctrl/Cmd+K`) with keyboard shortcuts (`?` lists them).
 - **Style files and templates:** save a look as a `.qrcraftly.json` file, or as a brand template in the browser. Both hold colours and layout only, never your content or images.
-- **Export:** PNG, JPEG, WebP or vector SVG, with native "Save As" where the browser supports it and the Web Share API on mobile.
+- **Export:** PNG, JPEG, WebP, or vector SVG, EPS and PDF, with native "Save As" where the browser supports it and the Web Share API on mobile.
+- **Phone wallet:** "Add to phone wallet" makes a plain wallet card image for Google Wallet's photo import or the iPhone Photos app. People with their own Apple or Google issuer keys can build and sign a pass in the tab; the keys stay in memory ([ADR 0048](docs/adr/0048-wallet-passes-built-in-the-browser.md)).
+- **Size calculator** (`/qr-code-size-calculator`): measures the code your content makes and gives the printed width for a scanning distance.
 - **Use-case pages:** presets for jobs such as a menu, a Google review link, WhatsApp, Instagram, a PDF link or a code with a logo, plus printing and safety guides under `/guides`.
 
 ### Scanner and checker
@@ -157,6 +159,7 @@ Core features live in deep modules under `src/packages/`. App code imports a pac
 | `optical-transfer` | Air-Gapped Optical Transfer: Prism frames, fountain and outer codes, sender, receiver, multi-code, feedback |
 | `optical-modem`    | Experimental colour modem, off unless the build sets `VITE_OPTICAL_MODEM=true`                              |
 | `link-safety`      | Offline checks for disguised links                                                                          |
+| `wallet-pass`      | Apple `.pkpass` files and Google Wallet save links, built and signed in the browser with the user's keys    |
 | `bulk-csv`         | The Bulk CSV generator's parsing and batching                                                               |
 | `arcade`           | Game logic and damage analytics for the QR Arcade                                                           |
 | `wasm-runtime`     | Loads and instantiates our WebAssembly modules                                                              |

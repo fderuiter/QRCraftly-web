@@ -94,7 +94,7 @@ Patent notes stay evidence-limited research. Keep the project's exclusions (no R
 
 ```mermaid
 flowchart TD
-  Docs["Reconcile proposed diagrams against source"] --> Integrity["Independent modem integrity admission"]
+  Docs["Reconcile proposed diagrams against source"] --> Integrity["Bind the remaining modem identity fields"]
   Integrity --> Bench["Deadline-aware colour and mono benchmark"]
   Bench --> Devices["Staged physical campaign"]
   Devices --> Choice{"Dominant measured bottleneck"}
@@ -110,7 +110,7 @@ flowchart TD
 
 **Invariant:** this is a dependency map, not a promise to build every branch. Choose the smallest change that addresses the measured bottleneck, and keep both the compatibility goal and the high-end goal.
 
-In issue terms: the modem integrity check (#1163) and an honest colour bench come before the staged phone campaign (#1173). The phone results then choose between the RGB colour layer (#1147) and the modem (#1163 to #1165), and between a manual or fixed profile and duplex.
+In issue terms: the modem's block tag is in place ([ADR 0043](../adr/0043-optical-modem-block-tag.md)), so the remaining modem integrity bindings (part of #1163) and an honest colour bench come before the staged phone campaign (#1173). The phone results then choose between the RGB colour layer (#1147) and the modem (#1163 to #1165), and between a manual or fixed profile and duplex.
 
 ## Evidence record template
 
