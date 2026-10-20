@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import type { QRConfig, LogoPaddingStyle } from '../../types';
+import { type QRConfig, type LogoPaddingStyle, QRErrorCorrectionLevel } from '../../types';
 import { Upload, X, Square, Circle, Minus } from 'lucide-react';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
@@ -52,7 +52,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
   }, [config.logoUrl]);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleUpload(e, (dataUrl) => onChange({ logoUrl: dataUrl }));
+    handleUpload(e, (dataUrl) => onChange({ logoUrl: dataUrl, errorCorrectionLevel: QRErrorCorrectionLevel.H }));
   };
 
   const activePreset = PRESET_LOGOS.find((p) => p.dataUrl === config.logoUrl);
@@ -97,7 +97,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
                 key={preset.id}
                 type="button"
                 onClick={() => {
-                  onChange({ logoUrl: preset.dataUrl });
+                  onChange({ logoUrl: preset.dataUrl, errorCorrectionLevel: QRErrorCorrectionLevel.H });
                   setError(null);
                 }}
                 aria-label={`Select ${preset.label} logo`}

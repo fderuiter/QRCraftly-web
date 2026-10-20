@@ -84,6 +84,8 @@ export function calculateScannabilityHealth(
       score -= 15;
       warnings.push('Logo size might obscure too much data');
     }
+    // Level L provides ~7% error recovery, which is easily exceeded by central logo overlays (typically covering 10-20% of matrix modules).
+    // Higher levels M (~15%), Q (~25%), and H (~30%) retain sufficient capacity to absorb logo damage without failing scan recovery.
     if (config.errorCorrectionLevel === 'L') {
       score -= 15;
       warnings.push('Low error correction with logo');
