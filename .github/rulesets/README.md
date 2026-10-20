@@ -4,7 +4,7 @@ This directory holds the repository rulesets as JSON. GitHub does not read these
 
 ## Rulesets
 
-### `main.json`: Protect main
+### `main.json`: Main branch
 
 Applies to the default branch, `main`, which is the only long-lived branch and deploys to production on every push.
 
@@ -17,11 +17,14 @@ Applies to the default branch, `main`, which is the only long-lived branch and d
 - **No code scanning rules.** The repository is private, and CodeQL and Code Quality need paid GitHub security products there, so a `code_scanning` or `code_quality` rule would block every merge ([ADR 0050](../../docs/adr/0050-ci-tiers-for-a-private-repository.md)). Semgrep, the secret scanner and `pnpm audit` run in `CI` instead.
 - **Branches must be up to date** with `main` before merging (`strict_required_status_checks_policy: true`), so every merge was tested against exactly what it lands on. The project prefers fewer, larger PRs, so re-running CI after a rebase is an acceptable cost.
 - **Deletion and force pushes are blocked.**
+- **Linear history** (`required_linear_history`): no merge commits on `main`. Squash-only merging already gives this; the rule keeps it true if the merge settings ever change.
+- **Signed commits** (`required_signatures`): every commit on `main` must carry a verified signature. GitHub signs the squash commits it makes when a PR merges, so this changes nothing for normal merges and rejects any unsigned commit that reaches `main` some other way.
+- **Stale reviews are dismissed** when new commits are pushed (`dismiss_stale_reviews_on_push`), so an approval always covers the code that merges.
 - **No bypass.** Nothing merges into `main` until every required check is green, including for admins. An admin can still edit or disable the ruleset in an emergency.
 
 These required checks are also what auto-merge waits for, so the ruleset must be imported before **Allow auto-merge** is turned on. Without it, an auto-merge PR would merge as soon as it is opened.
 
-### `main-merge-queue.json`: Protect main, with a merge queue
+### `main-merge-queue.json`: Main branch, with a merge queue
 
 The same ruleset as `main.json`, ready for the day the repository can use GitHub's merge queue ([ADR 0051](../../docs/adr/0051-merge-queue-readiness.md)). GitHub offers merge queues only to repositories owned by an organization (public, or private on GitHub Enterprise Cloud), so it cannot be imported while the repository belongs to a personal account. Until then `main.json` stays live.
 
@@ -32,16 +35,16 @@ It differs from `main.json` in two places:
 
 `CI` and `PR Title` report on queue groups because `main.yml` and `pr-title.yml` also run on `merge_group`. `Workers Builds: qrcraftly` only reports if Cloudflare builds the queue's `gh-readonly-queue/main/*` branches. After importing, watch the first queued PR: if that check never appears on its group, remove it from this file's required checks (the `CI` Build job runs the same `pnpm build`) and import again.
 
-### `tags.json`: Protect release tags
+### `tags.json`: Release tags
 
 Applies to `refs/tags/v*`.
 
 - **Moving and deleting release tags is restricted** to repository admins.
-- **Creating them is not restricted**, because the Release workflow creates `vX.Y.Z` with the GitHub Actions token when a release PR merges.
+- **Creating them is not restricted**, because the Release workflow creates `vX.Y.Z` with the GitHub Actions token when a release PR merges. A `creation` rule would need the GitHub Actions app as a bypass actor, and GitHub rejects that actor ("invalid actors") on a repository owned by a personal account. Publish releases only through the release PR ([RELEASING.md](../../RELEASING.md)), never from the GitHub UI.
 
 ## Replacing the live ruleset
 
-Ruleset names are unique, so to bring the live `main` ruleset in line with `main.json`: open **Settings → Rules → Rulesets**, delete the existing **Protect main** ruleset, then import `main.json`. Import `tags.json` the same way if **Protect release tags** is missing. Check the result without signing in:
+To bring the live `main` ruleset in line with `main.json`, open **Settings → Rules → Rulesets**. Ruleset names are unique: if the live ruleset has a different name, import `main.json` first and then delete the old one, so `main` is never unprotected; if the names match, delete the old one and import `main.json` straight away. Import `tags.json` the same way if **Release tags** is missing. Rulesets that predate these names were called **Protect main**, **Protect main v2** and **Protect release tags**. Check the result without signing in:
 
 ```bash
 curl -s https://api.github.com/repos/fderuiter/QRCraftly-web/rules/branches/main
