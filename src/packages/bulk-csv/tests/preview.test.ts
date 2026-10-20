@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { previewRow, pickColumn, hasPayload, PAYLOAD_COLUMN_WORDS, FILENAME_COLUMN_WORDS } from '../index';
 
 describe('previewRow', () => {
@@ -39,13 +39,14 @@ describe('previewRow', () => {
     expect(previewRow('url\n"unterminated', 'url')).toBeNull();
   });
 
-  it('re-throws non-CsvParseError errors in previewRow', async () => {
-    const csvModule = await import('../lib/csv');
-    const spy = vi.spyOn(csvModule, 'parseCsv').mockImplementationOnce(() => {
-      throw new TypeError('Unexpected runtime exception');
-    });
-    expect(() => previewRow('a,b\n1,2', 'a')).toThrow(TypeError);
-    spy.mockRestore();
+  it('re-throws non-CsvParseError errors in previewRow', () => {
+    const invalidText = {
+      length: 10,
+      charCodeAt: () => {
+        throw new TypeError('Unexpected runtime exception');
+      },
+    } as unknown as string;
+    expect(() => previewRow(invalidText, 'a')).toThrow(TypeError);
   });
 });
 
