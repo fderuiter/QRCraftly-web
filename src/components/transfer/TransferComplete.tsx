@@ -21,7 +21,7 @@ import { Check, File as FileIcon, FileArchive, FileImage, FileText, ShieldCheck 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { formatFileSize } from '@/utils/transferSpeed';
-import { handOffBlob } from '@/utils/downloadManager';
+import { handOffBlob } from '@/utils/blobHandoff';
 import { analyseReceivedFile } from '@/utils/fileNames';
 
 /** Image types shown as a thumbnail. SVG is left out so no received markup is ever rendered. */

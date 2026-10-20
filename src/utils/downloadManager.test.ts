@@ -19,7 +19,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { handOffBlob, triggerFileDownload } from './downloadManager';
+import { handOffBlob } from './blobHandoff';
+import { triggerFileDownload } from './downloadManager';
 
 interface Clicked {
   href: string;

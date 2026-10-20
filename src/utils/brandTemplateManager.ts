@@ -1,6 +1,6 @@
 import type { BrandTemplate, BrandTemplateExportPayload, QRConfig } from '../types';
 import { isStyleField, pickStyle } from './styleFields';
-import { handOffBlob } from './downloadManager';
+import { handOffBlob } from './blobHandoff';
 
 /** Approved storage key for user-saved brand templates. */
 export const BRAND_TEMPLATES_STORAGE_KEY = 'qrcraftly:brand-templates';

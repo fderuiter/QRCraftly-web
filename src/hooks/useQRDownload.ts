@@ -22,7 +22,7 @@ import { generateQRSvg, PayloadRejectedError, renderQRRaster, validateSvgScannab
 import { QrEncodeError } from '@/packages/qr-matrix';
 import { describeViolation } from '@/packages/qr-payload';
 import { previewFailureMessage, tooLongMessage } from '../utils/previewFailure';
-import { handOffBlob } from '../utils/downloadManager';
+import { handOffBlob } from '../utils/blobHandoff';
 import { useCapabilities } from './useCapabilities';
 import type { ExportOptions } from '../utils/exportRiskPolicy';
 import { isDangerousUrl } from '../utils/security';
