@@ -14,7 +14,7 @@ Symbols are chosen to keep the closest two as far apart as possible in OKLab, a 
 
 ## Simulated probe
 
-The same analysis the probe page runs, on simulated captures. The probe frame (120 x 67 cells) is captured with each cell covering the stated number of camera pixels, as if the phone were moved away from the screen. Capacity is the mutual information per cell times the data cells per frame times the new clean frames per second (30 fps camera, 60 Hz display), as an upper bound for an ideal code. "Studio" is a propped phone, "typical" a handheld one and "poor" an old one; their parameters are in `channel.ts`.
+The same analysis the probe page runs, on simulated captures. The probe frame (120 x 67 cells) is captured with each cell covering the stated number of camera pixels, as if the phone were moved away from the screen. Capacity is the mutual information per cell times the data cells per frame times the new clean frames per second (30 fps camera, 60 Hz display), as an upper bound for an ideal code. "Studio" is a propped phone, "typical" a handheld one and "poor" an old one; their parameters are in `src/packages/optical-modem/lib/channel.ts`.
 
 | Channel | Constellation          | Camera px per cell | Clean frames | Symbol errors | Bits per cell | SNR dB | Capacity KB/s |
 | ------- | ---------------------- | ------------------ | ------------ | ------------- | ------------- | ------ | ------------- |

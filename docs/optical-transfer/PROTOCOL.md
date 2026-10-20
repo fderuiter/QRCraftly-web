@@ -35,7 +35,7 @@ Private mode needs its key, which is communicated separately ([ADR 0025](../adr/
 
 ## D05: Turn corruption into erasures before outer decoding
 
-**Status: PROPOSED fix for the modem and a shared admission boundary. The QR path already has one: every Prism Frame carries a CRC-32C ([ADR 0024](../adr/0024-prism-frame-format.md)).**
+**Status: CURRENT for the modem's block tag ([ADR 0043](../adr/0043-optical-modem-block-tag.md)); PROPOSED for the remaining bindings and a shared admission boundary. The QR path already has one: every Prism Frame carries a CRC-32C ([ADR 0024](../adr/0024-prism-frame-format.md)).**
 
 ```mermaid
 flowchart TD
@@ -54,9 +54,9 @@ flowchart TD
 
 **Invariant:** a Reed-Solomon success is not proof that the payload is right. Check it independently before it enters elimination. Rejected data becomes an erasure, never a corrupt equation. The final whole-transfer check is still mandatory.
 
-**The gap today (CURRENT, Measured-code).** [ADR 0028](../adr/0028-optical-modem-frame-format.md) says "a block that decodes is exact", but the reference decoder does not guarantee it. `decode` in [`crates/modem/src/codec.rs`](../../crates/modem/src/codec.rs) tries erasure limits `[parity, parity >> 1, 0]` and accepts a block on Reed-Solomon success alone. On the first attempt it can mark as many bytes as there are check bytes as erasures; with no redundancy left, erasure decoding returns some valid codeword and cannot notice a wrong byte among the bytes it treated as sure. A miscorrected block then enters GF(2) elimination as a droplet, the file fails its final SHA-256, and the receiver cannot tell which droplet poisoned it. The simulator bench counts only blocks whose bytes match what was sent ([`scripts/bench_optical.ts`](../../scripts/bench_optical.ts)), so its goodput is honest, but it does not report how many wrong blocks the decoder accepted. The modem is behind a build flag, so no user is affected; this must be fixed before any modem rollout.
+**The modem's block tag (CURRENT, Measured-code).** The modem decoder used to accept a block on Reed-Solomon success alone, so a miscorrected block could reach GF(2) elimination as a wrong droplet (#1240). [ADR 0043](../adr/0043-optical-modem-block-tag.md) closed that: every block carries a 4-byte CRC-32 over the session id, frame sequence, block index and data, and `decode` in [`crates/modem/src/codec.rs`](../../crates/modem/src/codec.rs) accepts a repair only when the tag matches (`tag_matches`), otherwise it tries the next, smaller erasure set and finally drops the block. `pnpm run bench:optical` and `pnpm run bench:optical-ladder` report the refusals and the wrong accepts, which must be zero. The modem is still behind a build flag.
 
-The proposed check binds the payload to its session identity, outer block, Droplet Symbol index, fragment offset and length where fragments exist, and band identity where bands exist. Choose the canonical byte encoding and the checksum width in a reviewed ADR. Do not quote a universal undetected-error rate for a CRC without stating its error model. An unkeyed checksum catches accidental corruption, not deliberate forgery; encrypted transfers keep their AES-GCM authentication.
+The tag binds the session, frame and block. Fragment offset and length (where fragments exist) and band identity (where bands exist) are not bound yet; binding them, and sharing one admission boundary between the QR and modem paths, needs a reviewed ADR. Do not quote a universal undetected-error rate for a CRC without stating its error model. An unkeyed checksum catches accidental corruption, not deliberate forgery; encrypted transfers keep their AES-GCM authentication.
 
 Bound the decoder's work before trusting any dimension: image size, cells, Reed-Solomon parameters, blocks, retries and allocations. A protected header can still be invalid or miscorrected.
 
