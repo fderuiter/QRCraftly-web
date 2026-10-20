@@ -71,3 +71,30 @@ export function formatShortDuration(seconds: number): string {
   if (minutes < 90) return `${minutes} min`;
   return `${(seconds / 3600).toFixed(1)} h`;
 }
+
+/**
+ * Formats a duration in seconds as a rough, spoken-style estimate.
+ * @param seconds - Duration in seconds.
+ * @returns For example "about 40 seconds" or "about 12 minutes".
+ */
+export function formatApproximateDuration(seconds: number): string {
+  if (seconds < 60) {
+    const whole = Math.max(1, Math.round(seconds));
+    return `about ${whole} second${whole === 1 ? '' : 's'}`;
+  }
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 90) return `about ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  return `about ${(seconds / 3600).toFixed(1)} hours`;
+}
+
+/**
+ * Formats the receiver's time left for the telemetry panel.
+ * @param seconds - Estimated seconds remaining, or null when unknown.
+ * @returns "--" when unknown, otherwise for example "<1 s", "45 s" or "2 min 5 s".
+ */
+export function formatEta(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds)) return '--';
+  if (seconds < 1) return '<1 s';
+  if (seconds < 60) return `${Math.ceil(seconds)} s`;
+  return `${Math.floor(seconds / 60)} min ${Math.ceil(seconds % 60)} s`;
+}

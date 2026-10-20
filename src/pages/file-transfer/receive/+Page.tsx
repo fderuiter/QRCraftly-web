@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useEffectEvent, useMemo, useRef } from 'react';
 import { createPrismSession, TRANSFER_DENSITY_PROFILES } from '@/packages/optical-transfer';
 import { Play, Square, Camera, Activity, Cpu, Trash2, Upload, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -43,19 +43,7 @@ import { LockOnBrackets } from '@/components/transfer/LockOnBrackets';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { playChime, unlockChime, vibrate } from '@/utils/feedback';
 import { analyseReceivedFile } from '@/utils/fileNames';
-import { formatFileSize } from '@/utils/transferSpeed';
-
-/**
- * Formats an ETA in seconds for the telemetry panel.
- * @param seconds Estimated seconds remaining, or null when unknown.
- * @returns A short human-readable duration.
- */
-function formatEta(seconds: number | null): string {
-  if (seconds === null || !Number.isFinite(seconds)) return '--';
-  if (seconds < 1) return '<1 s';
-  if (seconds < 60) return `${Math.ceil(seconds)} s`;
-  return `${Math.floor(seconds / 60)} min ${Math.ceil(seconds % 60)} s`;
-}
+import { formatEta, formatFileSize } from '@/utils/transferSpeed';
 
 /**
  * Explains a failed camera request in plain words, with what to do next.
@@ -190,12 +178,14 @@ function FileTransferReceiveInner() {
 
   // A short buzz when the file arrives, and a chime only if the person turned sound on.
   const [soundOn, setSoundOn] = useState(false);
-  useEffect(() => {
-    if (!isComplete && !bcur) return;
+  // Reads the sound switch as it is when a transfer finishes. Flipping the switch afterwards must not replay it.
+  const announceArrival = useEffectEvent(() => {
     vibrate([30, 50, 30]);
     if (soundOn) playChime();
-    // Fires once per finished transfer; flipping the sound switch afterwards must not replay it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    if (!isComplete && !bcur) return;
+    announceArrival();
   }, [isComplete, bcur]);
 
   /** Clears the finished transfer and, in camera mode, starts scanning for the next one. */

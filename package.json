@@ -13,7 +13,7 @@
   "homepage": "https://qrcraftly.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/fderuiter/QRCraftly.git"
+    "url": "https://github.com/fderuiter/QRCraftly-web.git"
   },
   "keywords": [
     "qr-code",

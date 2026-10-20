@@ -1,9 +1,9 @@
-import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useQRStore } from '@/context/QRContext';
 import { useToast } from '@/components/ui/Toast';
 import { useUndoToast } from '@/hooks/useUndoToast';
 import { usesCommandKey, useGeneratorShortcuts } from './useGeneratorShortcuts';
-import type { GeneratorActions } from './commands';
+import type { buildCommands, Command, GeneratorActions } from './commands';
 
 // The palette, its command list and the style file code load on first use, so they cost
 // nothing on a page that never opens them.
@@ -94,29 +94,32 @@ export function GeneratorCommands({ actions, onDownload }: GeneratorCommandsProp
   }, [applyStyleFile, addToast]);
 
   const close = useCallback(() => setPanel('closed'), []);
-  const [commands, setCommands] = useState<import('./commands').Command[]>([]);
+  const [commands, setCommands] = useState<Command[]>([]);
+  // Reads the latest store, actions and labels at the moment the palette's commands are built.
+  const showPaletteCommands = useEffectEvent((build: typeof buildCommands) => {
+    setCommands(
+      build({
+        store,
+        actions,
+        modLabel,
+        notifyUndo,
+        exportStyleFile: () => void exportStyleFile(),
+        importStyleFile: () => fileInputRef.current?.click(),
+        showShortcuts: () => setPanel('help'),
+      })
+    );
+  });
+  // Rebuilt each time the palette opens so Undo/Redo and the border label are current.
   useEffect(() => {
     if (panel !== 'palette') return;
     let cancelled = false;
-    void import('./commands').then(({ buildCommands }) => {
+    void import('./commands').then(({ buildCommands: build }) => {
       if (cancelled) return;
-      setCommands(
-        buildCommands({
-          store,
-          actions,
-          modLabel,
-          notifyUndo,
-          exportStyleFile: () => void exportStyleFile(),
-          importStyleFile: () => fileInputRef.current?.click(),
-          showShortcuts: () => setPanel('help'),
-        })
-      );
+      showPaletteCommands(build);
     });
     return () => {
       cancelled = true;
     };
-    // Rebuilt each time the palette opens so Undo/Redo and the border label are current.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panel]);
 
   return (

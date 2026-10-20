@@ -22,6 +22,7 @@ import { generateQRSvg, PayloadRejectedError, renderQRRaster, validateSvgScannab
 import { QrEncodeError } from '@/packages/qr-matrix';
 import { describeViolation } from '@/packages/qr-payload';
 import { previewFailureMessage, tooLongMessage } from '../utils/previewFailure';
+import { handOffBlob } from '../utils/blobHandoff';
 import { useCapabilities } from './useCapabilities';
 import type { ExportOptions } from '../utils/exportRiskPolicy';
 import { isDangerousUrl } from '../utils/security';
@@ -436,15 +437,7 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
       if (!built) return { success: false, format: 'svg', error: scanValidationFailed() };
 
       const blob = new Blob([built.svg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = getFilename('svg', options?.filename);
-      // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
-      link.href = url;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      handOffBlob(blob, { kind: 'download', fileName: getFilename('svg', options?.filename) });
       return { success: true, format: 'svg', logoOmitted: built.logoOmitted };
     } catch (err) {
       console.warn('SVG export failed:', err instanceof Error ? err.name : typeof err);
@@ -465,15 +458,7 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
         format === 'eps'
           ? new Blob([await convertSvgToEps(built.svg)], { type: 'application/postscript' })
           : new Blob([await convertSvgToPdf(built.svg)], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = getFilename(format, options?.filename);
-      // nosemgrep: require-isdangerousurl -- a Blob URL made by URL.createObjectURL, never user text
-      link.href = url;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      handOffBlob(blob, { kind: 'download', fileName: getFilename(format, options?.filename) });
       return { success: true, format, logoOmitted: built.logoOmitted };
     } catch (err) {
       console.warn(`${format.toUpperCase()} export failed:`, err instanceof Error ? err.name : typeof err);

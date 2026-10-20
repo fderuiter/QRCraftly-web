@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true # a newer merge supersedes the deploy this run waits for
 
 jobs:
-  verify-staging:
+  verify-production:
     name: Verify Production Deployment
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
