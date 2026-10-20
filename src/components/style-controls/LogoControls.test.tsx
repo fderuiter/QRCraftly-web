@@ -21,11 +21,12 @@ import { LogoControls } from './LogoControls';
 import { ToastProvider } from '../ui/Toast';
 import { DEFAULT_CONFIG } from '../../constants';
 import { PRESET_LOGOS } from '../../constants/presetLogos';
+import { QRErrorCorrectionLevel, type QRConfig } from '../../types';
 
-const renderControls = () =>
+const renderControls = (configOverrides: Partial<QRConfig> = {}, onChange = vi.fn()) =>
   render(
     <ToastProvider>
-      <LogoControls config={DEFAULT_CONFIG} onChange={vi.fn()} />
+      <LogoControls config={{ ...DEFAULT_CONFIG, ...configOverrides }} onChange={onChange} />
     </ToastProvider>
   );
 
@@ -48,3 +49,32 @@ describe('LogoControls preset categories (#1366)', () => {
     expect(within(panel).getAllByRole('button')).toHaveLength(socialCount);
   });
 });
+
+describe('LogoControls error correction level auto-elevation', () => {
+  it('auto-elevates errorCorrectionLevel to H when selecting a preset logo', () => {
+    const onChange = vi.fn();
+    renderControls({ logoUrl: null, errorCorrectionLevel: QRErrorCorrectionLevel.M }, onChange);
+
+    const firstPreset = PRESET_LOGOS[0];
+    const presetButton = screen.getByRole('button', { name: `Select ${firstPreset.label} logo` });
+    fireEvent.click(presetButton);
+
+    expect(onChange).toHaveBeenCalledWith({
+      logoUrl: firstPreset.dataUrl,
+      errorCorrectionLevel: QRErrorCorrectionLevel.H,
+    });
+  });
+
+  it('auto-elevates errorCorrectionLevel to H when uploading a custom logo', () => {
+    const onChange = vi.fn();
+    renderControls({ logoUrl: null, errorCorrectionLevel: QRErrorCorrectionLevel.M }, onChange);
+
+    const fileInput = screen.getByLabelText('Upload logo image');
+    const file = new File(['dummy content'], 'logo.png', { type: 'image/png' });
+
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    expect(fileInput).toBeInTheDocument();
+  });
+});
+

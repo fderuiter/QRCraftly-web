@@ -174,7 +174,7 @@ describe('StyleControls Component', () => {
       if (fileInput) {
           await user.upload(fileInput as HTMLElement, file);
           await waitFor(() => {
-              expect(mockOnChange).toHaveBeenCalledWith({ logoUrl: 'data:image/png;base64,mocklogo' });
+              expect(mockOnChange).toHaveBeenCalledWith({ logoUrl: 'data:image/png;base64,mocklogo', errorCorrectionLevel: 'H' });
           });
       } else {
         throw new Error('File input not found');
@@ -945,6 +945,7 @@ describe('Preset Logo Gallery', () => {
 
     expect(mockOnChange).toHaveBeenCalledWith({
       logoUrl: expect.stringContaining('data:image/svg+xml'),
+      errorCorrectionLevel: 'H',
     });
   });
 
