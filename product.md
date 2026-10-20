@@ -1,6 +1,6 @@
 # QRCraftly — Product Specification
 
-> **Version**: aligned with `v0.11.0`
+> **Version**: aligned with `v0.14.0`
 > **Status**: Living document — update alongside every minor release.
 > **Audience**: Engineering team, stakeholders, and open-source contributors.
 
@@ -42,7 +42,7 @@ User payloads **never** leave the browser. This is a hard architectural invarian
 
 ### P2 — Visual quality is a competitive advantage
 
-QRCraftly's output must be objectively the most polished in class. Scannability and aesthetics are jointly maximized — neither is sacrificed for the other. The [Scannability Worker](docs/public/SCALING.md) enforces optical health automatically; engineers must ensure new pattern styles pass **Print Simulation Verified** before release.
+QRCraftly's output must be objectively the most polished in class. Scannability and aesthetics are jointly maximized — neither is sacrificed for the other. The [Scannability Worker](docs/public/SCALING.md) enforces optical health automatically; engineers must ensure new pattern styles reach **Scans reliably** before release.
 
 ### P3 — Simplicity wins for the core flow
 
@@ -111,11 +111,13 @@ Features are tagged with a maturity tier:
 - **Pattern styles**: Standard Industrial, Modern Soft, Swiss Dot, Fluid Ink, Cyber Circuit, The Hive, Grunge, Starburst.
 - **Color control**: Independent foreground, background, and finder pattern (eye) colors. Accessibility-checked preset themes included. WCAG contrast enforcement with live warnings.
 - **Logo embedding**: Upload JPEG, PNG, WebP, SVG (max 2 MB). Configurable size (max 30% of matrix to preserve scannability), padding, and border style (Square, Circle, None).
-- **Scannability Health indicator**: Real-time badge showing **Print Simulation Verified**, **Screen Scan Verified**, or **Scan Verification Failed** with explanatory guidance.
+- **Mosaic QR**: tile a picture across the whole code (Halftone or Tiles, with adjustable Scan Contrast); each module keeps its dark or light value so the code still scans ([ADR 0019](docs/adr/0019-mosaic-qr-module-level-image-tiling.md)).
+- **Scannability Health indicator**: Real-time verdict of **Scans reliably**, **Scans, but fragile** or **Won't scan reliably**, with explanatory guidance (`VERDICT_LABELS` in `src/components/ScannabilityIndicator.tsx`). The word "Verified" is never used.
 
 ### 6.3 Export & Share `[STABLE]`
 
-- **Formats**: PNG (high-quality), JPEG, WebP, vector SVG (via custom `SvgContext` Canvas 2D emulation).
+- **Formats**: PNG (high-quality), JPEG, WebP, and vector SVG (via custom `SvgContext` Canvas 2D emulation), EPS and PDF.
+- **Phone wallet**: a plain wallet card image for Google Wallet's photo import or iPhone Photos, and Apple `.pkpass` files or Google Wallet save links signed in the tab with the user's own issuer keys, which stay in memory (`src/packages/wallet-pass/`, [ADR 0048](docs/adr/0048-wallet-passes-built-in-the-browser.md)). No wallet card or pass for payment codes.
 - **File System Access API**: Native "Save As" dialog on supported browsers.
 - **Web Share API**: One-tap mobile sharing to any installed app.
 
@@ -143,6 +145,11 @@ User-facing at `/file-transfer` (send) and `/file-transfer/receive` (receive), l
 ### 6.7 QR Arcade `[BETA]`
 
 - At `/arcade` (the old `/game` and `/destroy-the-qr` links redirect here): damage a QR design in the Blaster or the Damage Simulator while Reed-Solomon analytics and a real scanner report whether it still decodes.
+
+### 6.8 Scanner, Checker and Size Calculator `[STABLE]`
+
+- **Scanner** (`/qr-code-scanner`) and **checker** (`/qr-code-checker`): decode a code from the camera or an image file on the device and explain what it does before the user acts on it. Links are checked offline for disguises (`src/packages/link-safety/`), and only `http` and `https` links can be opened. The decoder is our own Rust module, `crates/qr-decode`, run in a worker ([ADR 0036](docs/adr/0036-in-house-qr-decoder-replaces-zxing-wasm.md)).
+- **Size calculator** (`/qr-code-size-calculator`): measures the code the user's content makes and gives the printed width for a scanning distance, in centimetres and inches.
 
 ---
 
@@ -206,14 +213,14 @@ QRCraftly is healthy and growing when all of the following trend in the right di
 
 ### Technical Quality
 
-| Metric                                             | Target                                                                                                            | Enforced in CI today                         |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| Lighthouse Performance                             | >= 90                                                                                                             | >= 90 (`lighthouserc.json`)                  |
-| Lighthouse Accessibility                           | >= 95                                                                                                             | >= 90 (`lighthouserc.json`)                  |
-| Lighthouse SEO                                     | >= 90                                                                                                             | >= 95 (`lighthouserc.json`)                  |
-| Lighthouse Best Practices                          | >= 90                                                                                                             | >= 90 (`lighthouserc.json`)                  |
-| Page first load                                    | <= 260 KB gzipped per page (HTML, CSS and startup scripts); <= 650 KB for the JavaScript and CSS in `dist/client` | Same limits (`scripts/check-bundle-size.js`) |
-| Scannability pass rate (Print Simulation Verified) | >= 95% across all pattern styles in CI visual regression                                                          | No CI check measures this rate               |
+| Metric                                    | Target                                                                                                            | Enforced in CI today                         |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Lighthouse Performance                    | >= 90                                                                                                             | >= 90 (`lighthouserc.json`)                  |
+| Lighthouse Accessibility                  | >= 95                                                                                                             | >= 90 (`lighthouserc.json`)                  |
+| Lighthouse SEO                            | >= 90                                                                                                             | >= 95 (`lighthouserc.json`)                  |
+| Lighthouse Best Practices                 | >= 90                                                                                                             | >= 90 (`lighthouserc.json`)                  |
+| Page first load                           | <= 260 KB gzipped per page (HTML, CSS and startup scripts); <= 650 KB for the JavaScript and CSS in `dist/client` | Same limits (`scripts/check-bundle-size.js`) |
+| Scannability pass rate ("Scans reliably") | >= 95% across all pattern styles in CI visual regression                                                          | No CI check measures this rate               |
 
 ### Reach
 

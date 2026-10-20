@@ -53,4 +53,4 @@ The bug and feature issue templates apply `needs-triage` and their type label (`
 - **`ready-for-human`** issues are assigned to the maintainer (`fderuiter`). They need something only a person can do, such as a decision, an account or a real device.
 - **Specs** link their work as native GitHub sub-issues. Once triaged a spec carries no triage role; each sub-issue carries its own. Record issues, such as a pause checkpoint, carry no triage role either.
 - **Order** between issues is recorded with GitHub's native "blocked by" dependencies (see [issue-tracker.md](./issue-tracker.md#wayfinding-operations)), not only in prose. An agent picks a `ready-for-agent` issue only when it has no open blocker.
-- **Dependabot** applies `dependencies`, `github_actions` and `javascript` to its own pull requests. Issues do not use them.
+- **Dependabot** applies `dependencies` plus its ecosystem label (`github_actions`, `javascript` or `python`) to its own pull requests. Issues do not use them.

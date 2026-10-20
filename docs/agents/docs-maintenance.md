@@ -29,7 +29,7 @@ The audit and the `/security` page both read Markdown with our own parser in `sc
 
 - `pnpm run lint` calls `docs:lint`.
 - The pre-commit hook (`.githooks/pre-commit`) runs `scripts/hooks/staged.js`, which runs the Markdown audit and the ADR validator whenever a `*.md` file is staged.
-- CI runs `pnpm run lint` on every pull request and on pushes that touch `docs/**` or any root `*.md` file, including `CONTEXT.md` and `AGENTS.md`.
+- CI runs `pnpm run lint` on every pull request, including docs-only ones (a PR that changes only Markdown the build does not read runs static validation and unit tests). Pushes to `main` do not re-run CI.
 
 ## Adding an ADR
 
