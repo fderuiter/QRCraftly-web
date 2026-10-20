@@ -78,17 +78,17 @@ _Avoid_: Scannability runner, worker runner, scannability hook internals
 A dedicated background process performing real-time contrast auditing and optical decoding off the main user interface thread.
 _Avoid_: Background scanner, validation thread, scannability thread
 
-**Print Simulation Verified**:
-The optimal scannability grade indicating optical clarity under simulated physical print conditions and localized contrast audits.
-_Avoid_: Physical-Ready, print pass, physical scan ok
+**Scans reliably**:
+The best scannability verdict: the code decodes under the checks with no warnings. "Verified" is never used, because no check can promise every phone and print (`VERDICT_LABELS` in `src/components/ScannabilityIndicator.tsx`).
+_Avoid_: Print Simulation Verified, Physical-Ready, print pass
 
-**Screen Scan Verified**:
-A passing scannability grade indicating reliable digital screen readability with an advisory to verify physical prints prior to mass distribution.
-_Avoid_: Digital-Only Pass, screen pass, digital ok
+**Scans, but fragile**:
+A passing verdict with warnings: the code decodes, but a contrast, size or complexity check says it may fail on some phones or prints.
+_Avoid_: Screen Scan Verified, Digital-Only Pass, screen pass
 
-**Scan Verification Failed**:
-A degraded scannability grade indicating the QR matrix cannot be reliably resolved due to contrast or complexity violations.
-_Avoid_: Low Scannability, bad scan, scan fail
+**Won't scan reliably**:
+A failing verdict: the matrix cannot be reliably resolved because of contrast or complexity problems. The generator warns before exporting such a code.
+_Avoid_: Scan Verification Failed, Low Scannability, bad scan
 
 **Worker Degradation Cache**:
 A client-side state flag indicating that background Web Worker execution lacks OffscreenCanvas 2D rendering capabilities in the current browser environment, routing subsequent scannability evaluations to direct zero-copy ImageData buffer transfers without retry overhead.

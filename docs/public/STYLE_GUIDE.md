@@ -96,7 +96,8 @@ Motion explains a change; it never decorates. Every animation uses the motion to
 | `ease-standard`                         | curve | Most transitions and every exit                        |
 | `ease-emphasized`                       | curve | Entrances that should feel quick to settle             |
 | `animate-fade-in`, `animate-fade-out`   | base  | Dialog backdrop                                        |
-| `animate-pop-in`, `animate-pop-out`     | base  | Dialogs and check badges (scale from 98%)              |
+| `animate-pop-in`                        | base  | Dialogs and check badges (scale from 98%)              |
+| `animate-pop-out`                       | fast  | Dialogs and check badges closing                       |
 | `animate-rise-in`, `animate-rise-out`   | fast  | Menus and tooltips (4px rise)                          |
 | `animate-slide-in`, `animate-slide-out` | base  | Toasts                                                 |
 

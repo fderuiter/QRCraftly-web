@@ -168,6 +168,12 @@ describe('BulkCsvInput Component', () => {
 
     const formatSelect = screen.getByLabelText('Image Format');
     expect(formatSelect).toHaveValue('png');
+
+    // Accessibility test: aria-describedby linkage
+    expect(payloadSelect).toHaveAttribute('aria-describedby', 'bulk-payload-column-desc');
+    expect(filenameSelect).toHaveAttribute('aria-describedby', 'bulk-filename-column-desc');
+    expect(document.getElementById('bulk-payload-column-desc')).toHaveTextContent('Auto-matched column choice');
+    expect(document.getElementById('bulk-filename-column-desc')).toHaveTextContent('Auto-matched column choice');
   });
 
   it('lists unusual addresses without leaving them out (#1159)', () => {
@@ -933,5 +939,68 @@ describe('BulkCsvInput preflight (#1481)', () => {
 
     act(() => store.current?.updateConfig({ frameText: 'Scan me' }));
     expect(categorize.mock.calls.length).toBe(before + 1);
+  });
+});
+
+describe('Interactive CSV Column Mapping UI', () => {
+  it('displays auto-matched badges and inline sample cell previews', () => {
+    const csvContent = 'promo_link,member_id\nhttps://example.com/promo1,MEM001\nhttps://example.com/promo2,MEM002';
+    const onChange = vi.fn();
+    renderWithProvider(
+      <BulkCsvInput
+        data={{ csvContent, payloadColumn: 'promo_link', filenameColumn: 'member_id', exportFormat: 'png' }}
+        onChange={onChange}
+      />
+    );
+
+    expect(screen.getByTestId('payload-auto-matched-badge')).toHaveTextContent('Auto-matched');
+    expect(screen.getByTestId('filename-auto-matched-badge')).toHaveTextContent('Auto-matched');
+
+    expect(screen.getByTestId('bulk-payload-sample-preview')).toHaveTextContent('https://example.com/promo1');
+    expect(screen.getByTestId('bulk-filename-sample-preview')).toHaveTextContent('MEM001');
+  });
+
+  it('updates badge to Mapped when a column is manually chosen', () => {
+    const csvContent = 'promo_link,member_id\nhttps://example.com/promo1,MEM001';
+    const onChange = vi.fn();
+    renderWithProvider(
+      <BulkCsvInput
+        data={{ csvContent, payloadColumn: 'member_id', filenameColumn: 'promo_link', exportFormat: 'png' }}
+        onChange={onChange}
+      />
+    );
+
+    expect(screen.getByTestId('payload-mapped-badge')).toHaveTextContent('Mapped');
+  });
+
+  it('swaps payload and filename columns when Swap Columns button is clicked', () => {
+    const csvContent = 'URL,Name\nhttps://example.com,item1';
+    const onChange = vi.fn();
+    renderWithProvider(
+      <BulkCsvInput
+        data={{ csvContent, payloadColumn: 'URL', filenameColumn: 'Name', exportFormat: 'png' }}
+        onChange={onChange}
+      />
+    );
+
+    const swapBtn = screen.getByRole('button', { name: 'Swap payload and filename columns' });
+    fireEvent.click(swapBtn);
+
+    expect(onChange).toHaveBeenCalledWith({ payloadColumn: 'Name', filenameColumn: 'URL' });
+  });
+
+  it('auto-matches unspecific headers using cell fallback sample inspection', () => {
+    const csvContent = 'FieldA,FieldB\nID_101,https://example.com/target\nID_102,https://example.com/target2';
+    const onChange = vi.fn();
+    renderWithProvider(
+      <BulkCsvInput
+        data={{ csvContent, payloadColumn: '', filenameColumn: '', exportFormat: 'png' }}
+        onChange={onChange}
+      />
+    );
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ payloadColumn: 'FieldB', filenameColumn: 'FieldA' })
+    );
   });
 });

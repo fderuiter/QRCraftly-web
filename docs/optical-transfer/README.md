@@ -45,7 +45,7 @@ These pages link to the existing documents rather than copying them, and do not 
 - [AGENTS.md](../../AGENTS.md) for the repository invariants (client-side only, the storage allowlist, in-house first, no analytics).
 - [CONTEXT.md](../../CONTEXT.md) for the domain vocabulary (Prism Frame, Transfer Manifest, Session ID, Droplet Symbol, Stateless Stream Entry and the rest).
 - The ADRs in [docs/adr](../adr/) for accepted decisions. The ones these pages rely on are listed under [Existing authority](ARCHITECTURE.md#existing-authority).
-- [TRANSFER_BENCHMARK.md](../TRANSFER_BENCHMARK.md), [OPTICAL_BENCHMARK.md](../OPTICAL_BENCHMARK.md), [OPTICAL_LADDER_BENCHMARK.md](../OPTICAL_LADDER_BENCHMARK.md) and [FEEDBACK_BENCHMARK.md](../FEEDBACK_BENCHMARK.md) for simulator results.
+- [TRANSFER_BENCHMARK.md](../TRANSFER_BENCHMARK.md), [OPTICAL_BENCHMARK.md](../OPTICAL_BENCHMARK.md), [OPTICAL_LADDER_BENCHMARK.md](../OPTICAL_LADDER_BENCHMARK.md), [OPTICAL_CEILING.md](../OPTICAL_CEILING.md) and [FEEDBACK_BENCHMARK.md](../FEEDBACK_BENCHMARK.md) for simulator results.
 - [TRANSFER_DEVICE_CHECKLIST.md](../TRANSFER_DEVICE_CHECKLIST.md) for device results.
 - [OPTICAL_RESEARCH.md](../OPTICAL_RESEARCH.md) for the rolling-shutter, GPU and ladder research notes.
 - [ABUSE_PROTECTIONS.md](../ABUSE_PROTECTIONS.md) for receive caps, decompression limits and file-name rules.
