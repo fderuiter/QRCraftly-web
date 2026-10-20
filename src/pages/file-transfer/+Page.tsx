@@ -29,7 +29,7 @@ import { RangeInput } from '@/components/ui/RangeInput';
 import { Alert } from '@/components/ui/Alert';
 import { AccordionItem } from '@/components/ui/Accordion';
 import { PairingGuide } from '@/components/transfer/PairingGuide';
-import { TRANSFER_SPEEDS, formatFileSize, formatShortDuration, matchTransferSpeed } from '@/utils/transferSpeed';
+import { TRANSFER_SPEEDS, formatApproximateDuration, formatFileSize, formatShortDuration, matchTransferSpeed } from '@/utils/transferSpeed';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { BetaNotice } from '@/components/BetaNotice';
 import { QrIllustration } from '@/components/QrIllustration';
@@ -71,21 +71,6 @@ const DENSITY_OPTIONS: ReadonlyArray<{ value: TransferDensity; label: string; hi
   { value: 'balanced', label: 'Balanced', hint: 'Medium QR codes. Works for most phones held steady.' },
   { value: 'fast', label: 'Fast', hint: 'Large QR codes. Needs a sharp camera close to a bright screen.' },
 ];
-
-/**
- * Formats a duration in seconds as a rough, human-readable estimate.
- * @param seconds Duration in seconds.
- * @returns For example "about 40 seconds" or "about 12 minutes".
- */
-function formatDuration(seconds: number): string {
-  if (seconds < 60) {
-    const whole = Math.max(1, Math.round(seconds));
-    return `about ${whole} second${whole === 1 ? '' : 's'}`;
-  }
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 90) return `about ${minutes} minute${minutes === 1 ? '' : 's'}`;
-  return `about ${(seconds / 3600).toFixed(1)} hours`;
-}
 
 /**
  * Opens this device's webcam for the back channel (#1146): the front camera, at a size that reads a
@@ -535,9 +520,9 @@ function FileTransferToolInner() {
                       : fountainInfo?.tiles
                       ? `Each code carries ${fountainInfo.symbolSize}-byte pieces (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). How fast it goes depends on the receiving camera.`
                       : fountainInfo
-                      ? `Each QR carries ${fountainInfo.symbolSize} bytes (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). The receiver needs about ${framesNeeded} frames, ${formatDuration(framesNeeded / fps)} at ${fps} frames/sec.`
+                      ? `Each QR carries ${fountainInfo.symbolSize} bytes (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). The receiver needs about ${framesNeeded} frames, ${formatApproximateDuration(framesNeeded / fps)} at ${fps} frames/sec.`
                       : estimate
-                        ? `Estimated transfer time: up to ${formatDuration(estimate.frames / fps)} at ${fps} frames/sec (${estimate.symbolSize} bytes per QR). Text and other compressible files go faster.`
+                        ? `Estimated transfer time: up to ${formatApproximateDuration(estimate.frames / fps)} at ${fps} frames/sec (${estimate.symbolSize} bytes per QR). Text and other compressible files go faster.`
                         : 'Choose a file to see how long the transfer will take.'}
                   </p>
                 </div>

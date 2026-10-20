@@ -23,6 +23,7 @@ import React from 'react';
 import Page from './+Page';
 import { ToastProvider } from '@/components/ui/Toast';
 import { FountainReassembler, TRANSFER_DENSITY_PROFILES, createPrismSession } from '@/packages/optical-transfer';
+import { playChime, vibrate } from '@/utils/feedback';
 
 /** A Prism stream for a text file, as a sender would show it. */
 async function prismStream(content: string, fileName = 'note.txt', mimeType = 'text/plain') {
@@ -32,6 +33,11 @@ async function prismStream(content: string, fileName = 'note.txt', mimeType = 't
 }
 
 let scanSuccessCallback: ((data: string) => void) | undefined;
+
+vi.mock('@/utils/feedback', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/feedback')>();
+  return { ...actual, vibrate: vi.fn(actual.vibrate), playChime: vi.fn() };
+});
 
 vi.mock('@/packages/optical-scanner/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/packages/optical-scanner/client')>();
@@ -366,6 +372,70 @@ describe('File Transfer Receive Page & Pipeline', () => {
       });
       expect(screen.queryByTestId('inline-complete-panel')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: /deactivate camera scanner/i })).toBeInTheDocument();
+    });
+
+    it('announces a finished transfer once, with the sound switch as it stood at the finish', async () => {
+      installFountainWorker();
+      const stream = await prismStream('Announced once. '.repeat(30), 'announce.txt');
+      render(
+        <ToastProvider>
+          <Page />
+        </ToastProvider>
+      );
+
+      const soundSwitch = screen.getByLabelText('Play a chime when the file arrives');
+      await act(async () => {
+        fireEvent.click(soundSwitch);
+      });
+      expect(vibrate).not.toHaveBeenCalled();
+
+      for (let index = 0; index < stream.k * 6 + 40 && !screen.queryByTestId('inline-complete-panel'); index++) {
+        await act(async () => {
+          scanSuccessCallback!(stream.frameText(index));
+          await new Promise(resolve => setTimeout(resolve, 0));
+        });
+      }
+      await waitFor(() => expect(screen.getByTestId('inline-complete-panel')).toBeInTheDocument());
+
+      expect(vibrate).toHaveBeenCalledTimes(1);
+      expect(vibrate).toHaveBeenCalledWith([30, 50, 30]);
+      expect(playChime).toHaveBeenCalledTimes(1);
+
+      // Re-renders from flipping the switch off and on again must not replay the finished transfer.
+      await act(async () => {
+        fireEvent.click(soundSwitch);
+      });
+      await act(async () => {
+        fireEvent.click(soundSwitch);
+      });
+      expect(vibrate).toHaveBeenCalledTimes(1);
+      expect(playChime).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not chime for a finished transfer when the sound switch is turned on afterwards', async () => {
+      installFountainWorker();
+      const stream = await prismStream('Silent finish. '.repeat(30), 'silent.txt');
+      render(
+        <ToastProvider>
+          <Page />
+        </ToastProvider>
+      );
+
+      for (let index = 0; index < stream.k * 6 + 40 && !screen.queryByTestId('inline-complete-panel'); index++) {
+        await act(async () => {
+          scanSuccessCallback!(stream.frameText(index));
+          await new Promise(resolve => setTimeout(resolve, 0));
+        });
+      }
+      await waitFor(() => expect(screen.getByTestId('inline-complete-panel')).toBeInTheDocument());
+      expect(vibrate).toHaveBeenCalledTimes(1);
+      expect(playChime).not.toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Play a chime when the file arrives'));
+      });
+      expect(vibrate).toHaveBeenCalledTimes(1);
+      expect(playChime).not.toHaveBeenCalled();
     });
 
     it('runs the development Prism simulation end-to-end', async () => {

@@ -3,10 +3,16 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { GeneratorCommands } from './GeneratorCommands';
+import { buildCommands, type GeneratorActions } from './commands';
 import { QRProvider, useQRStore } from '@/context/QRContext';
 import { ToastProvider } from '@/components/ui/Toast';
 import { DEFAULT_CONFIG } from '@/constants';
 import { STYLE_FILE_FORMAT } from '@/utils/styleFile';
+
+vi.mock('./commands', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./commands')>();
+  return { ...actual, buildCommands: vi.fn(actual.buildCommands) };
+});
 
 function setup() {
   const actions = { download: vi.fn(), copyImage: vi.fn(), copySvg: vi.fn(), jumpToPreview: vi.fn() };
@@ -16,15 +22,16 @@ function setup() {
     store = useQRStore();
     return null;
   };
-  render(
+  const tree = (nextActions: GeneratorActions) => (
     <ToastProvider>
       <QRProvider>
         <Grab />
-        <GeneratorCommands actions={actions} onDownload={onDownload} />
+        <GeneratorCommands actions={nextActions} onDownload={onDownload} />
       </QRProvider>
     </ToastProvider>
   );
-  return { actions, onDownload, store: () => store };
+  const { rerender } = render(tree(actions));
+  return { actions, onDownload, store: () => store, rerender: (nextActions: GeneratorActions) => rerender(tree(nextActions)) };
 }
 
 const styleFile = (style: Record<string, unknown>) =>
@@ -40,6 +47,25 @@ describe('GeneratorCommands', () => {
     await userEvent.keyboard('{Enter}');
     expect(actions.download).toHaveBeenCalledWith('svg');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('builds the palette commands once per opening, not on every re-render', async () => {
+    vi.mocked(buildCommands).mockClear();
+    const { rerender, store } = setup();
+    await userEvent.keyboard('{Control>}k{/Control}');
+    await waitFor(() => expect(screen.getAllByRole('option').length).toBeGreaterThanOrEqual(25));
+    expect(buildCommands).toHaveBeenCalledTimes(1);
+
+    // New props and a store change re-render the component while the palette stays open.
+    rerender({ download: vi.fn(), copyImage: vi.fn(), copySvg: vi.fn(), jumpToPreview: vi.fn() });
+    act(() => store().updateConfig({ fgColor: '#222222' }));
+    expect(buildCommands).toHaveBeenCalledTimes(1);
+
+    // Closing and opening the palette again builds the list once more.
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await userEvent.keyboard('{Control>}k{/Control}');
+    await waitFor(() => expect(buildCommands).toHaveBeenCalledTimes(2));
   });
 
   it('shows the cheat sheet with ?', async () => {

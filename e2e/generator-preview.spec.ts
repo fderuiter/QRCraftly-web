@@ -146,8 +146,9 @@ test.describe('Text codes keep line breaks (#1269)', () => {
     await content.press('Enter');
     await content.pressSequentially('Line two');
     await content.press('Tab');
-    // Wait past the input debounce so the stored value has come back to the field.
-    await page.waitForTimeout(800);
+    // Moving focus out of the field applies any pending edit at once (the input panel flushes on
+    // blur), so wait for focus to leave before checking the value came back intact.
+    await expect(content).not.toBeFocused();
     await expect(content).toHaveValue('Line one\nLine two');
   });
 });

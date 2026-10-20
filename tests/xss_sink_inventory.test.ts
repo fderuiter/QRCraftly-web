@@ -31,16 +31,14 @@ const INVENTORY: Record<string, string[]> = {
   ],
   'object URL': [
     'src/components/transfer/TransferComplete.tsx', // received file: safe types only open in a tab
-    'src/hooks/useQRDownload.ts', // downloads
     'src/packages/optical-transfer/lib/receiver/useOpticalReceiver.ts', // a chosen video file
     'src/packages/qr-export/lib/svgExport.ts', // rasterises our own SVG
-    'src/utils/brandTemplateManager.ts', // template export download
     'src/utils/downloadManager.ts', // downloads
     'src/utils/imageResizeHelper.ts', // decodes an uploaded image
   ],
   'new window or navigation': [
+    'src/utils/downloadManager.ts', // handOffBlob: opens a blob: URL of a safe received type
     'src/components/arcade/StressTestButton.tsx', // fixed path /arcade
-    'src/components/transfer/TransferComplete.tsx', // blob: URL of a safe received type
     'src/components/wallet/GooglePassPanel.tsx', // fixed https://pay.google.com/ prefix plus our own JWT, after a confirmation
   ],
   'string as code': [],

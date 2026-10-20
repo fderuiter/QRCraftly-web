@@ -396,6 +396,9 @@ test.describe('Optical file transfer', () => {
       await page.getByRole('button', { name: 'Pause' }).click();
       await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
       const frozen = await picture();
+      // Negative check: nothing may change while paused. The Resume button above is the positive
+      // signal that the pause is applied. The window below is the one deliberate timed wait, kept
+      // bounded so a frame that was already in flight has time to land before the comparison.
       await page.waitForTimeout(600);
       expect(await picture()).toBe(frozen);
 
