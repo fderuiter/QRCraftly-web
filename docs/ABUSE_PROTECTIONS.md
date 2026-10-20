@@ -22,10 +22,10 @@ Everything below runs in the browser. QRCraftly has no server, sends nothing ove
 
 ### Dangerous link schemes are refused
 
-`isDangerousUrl` (`src/utils/url.ts`, re-exported by `src/utils/security.ts`) blocks `javascript:`, `vbscript:`, `jscript:`, `wscript:`, `mocha:`, `file:`, `data:`, `blob:`, `filesystem:`, `mk:`, `about:`, `intent:`, `itms-services:`, `ms-msdt:`, `search-ms:`, `ms-officecmd:`, `jar:` and `view-source:`. Before checking, it:
+`isDangerousUrl` (`src/utils/security.ts`, which delegates to `SafeUrlPipeline.isDangerous` in `src/utils/url.ts`) blocks `javascript:`, `vbscript:`, `jscript:`, `wscript:`, `mocha:`, `file:`, `data:`, `blob:`, `filesystem:`, `mk:`, `about:`, `intent:`, `itms-services:`, `ms-msdt:`, `search-ms:`, `ms-officecmd:`, `jar:` and `view-source:`. Before checking, it:
 
 - decodes up to ten layers of percent-encoding and HTML entities (`&#x6A;`, `&colon;`, `&tab;` and so on, with or without `;`),
-- removes control characters, all whitespace and zero-width characters,
+- removes control and zero-width characters, and leading whitespace,
 - lowercases the result.
 
 So `\tJAVASCRIPT:`, `java&#x09;script:` and `%6Aavascript:` are all caught.
@@ -48,7 +48,7 @@ A blocked payload never renders: the matrix worker and the main-thread fallback 
 
 ### Uploaded images and SVG are sanitised
 
-`sanitizeSvg` (`src/utils/security.ts`) keeps a fixed allowlist of 25 SVG elements (no `script`, `foreignObject`, `a`, `animate` or `set`), removes every `on*` attribute, drops styles that use `@import`, and only allows local references or safe `data:image/*` URIs. It runs on uploaded logos and on every exported SVG. The build's static path tracker (`scripts/static-path-tracker.js`) fails if an SVG reaches the page without passing through it.
+`sanitizeSvg` (`src/utils/security.ts`) keeps a fixed allowlist of 26 SVG elements (no `script`, `foreignObject`, `a`, `animate` or `set`), removes every `on*` attribute, drops styles that use `@import`, and only allows local references or safe `data:image/*` URIs. It runs on uploaded logos and on every exported SVG. The build's static path tracker (`scripts/static-path-tracker.js`) fails if an SVG reaches the page without passing through it.
 
 ### Export safety gate
 
@@ -103,7 +103,7 @@ Camera results need two agreeing reads. Images are decoded off the main thread, 
 - **Strict frame parsing.** Fountain frames must match a strict pattern; CBOR is parsed with a depth limit and no indefinite lengths or trailing bytes; lengths must agree (`src/packages/optical-transfer/lib/prism/frame.ts`, `lib/bcur/uri.ts`, `lib/fountain/cbor.ts`).
 - **Size caps.** A receive is limited to 100 MiB (`MAX_RECEIVE_BYTES`, `lib/limits.ts`). A header that claims more, an implausible droplet length, and a video file over 500 MB are refused before anything is allocated. Decompression is streamed into a buffer sized by the header and cancelled at that limit, so a small stream cannot expand into gigabytes. A stream with more than 65,536 blocks needs 8 identical frames in a row before the receiver builds tables for it.
 - **Integrity.** A file is only offered once its size and SHA-256 match the manifest (`prism/manifest.ts`). Corrupted frames fail their CRC-32C first, and a manifest whose hash does not match its session ID is ignored.
-- **Stream switching.** A different stream must appear for 8 consecutive frames before the receiver switches to it, and a finished stream is ignored afterwards.
+- **Stream switching.** A different stream must appear for 8 consecutive frames before the receiver offers to switch to it, and it switches only if the person accepts. A finished stream is ignored afterwards, and a private transfer opened with its key is never offered a replacement.
 - **Names and types.** The file name is sanitised (`sanitizeFileName`) and shown in full with its real extension. A claimed type that does not match the extension is replaced by `application/octet-stream` with a notice, and a double extension like `invoice.pdf.exe` is called out. Executable and script types (`.exe`, `.msi`, `.bat`, `.ps1`, `.js`, `.jar`, `.apk`, `.html` and the rest of the list in `src/utils/fileNames.ts`) are never saved automatically: the Save button asks "This kind of file can run programs on your device. Only save it if you trust the sender." and then reads "Save anyway".
 - **No preview of active content.** Only PNG, JPEG, GIF, WebP, PDF and plain text can be opened in a tab or shown as a thumbnail, using the effective type. SVG, HTML and everything else is saved, never rendered. Downloads use a Blob URL with the `download` attribute, and the site sends `X-Content-Type-Options: nosniff`.
 - **Old formats.** The `H|`/`F|` carousel and the old `ur:bytes/` droplets are no longer read. Real BC-UR streams from wallets go to their own decoder (`lib/bcur`), which refuses a part claiming more than the receive limit or more than 65,536 fragments.
@@ -120,7 +120,7 @@ Camera results need two agreeing reads. Images are decoded off the main thread, 
 
 ## Known limits
 
-- The receiver checks integrity, not who sent the file: any stream in front of the camera can replace the current one after 8 identical frames.
+- The receiver checks integrity, not who sent the file: any stream in front of the camera can be offered as a replacement after 8 consecutive frames, and it replaces the current one only if the person accepts. A private transfer opened with its key is never offered one.
 - Link analysis is text only. It cannot expand a shortener, check a site's reputation or know a brand that is not on its list, and it never says a link is safe.
 - The Semgrep phone rule matches only simple `tel:${x}` and `sms:${x}` shapes, not a longer template with a query string.
 - Trusted Types (`require-trusted-types-for 'script'`) was evaluated and is **not** enabled. With it on, every `new Worker(url)` (matrix, maze, scanner, scannability, image-resize and file-transfer workers) and the service worker registration throw, because their script URLs are plain strings. Enabling it needs a reviewed policy that wraps same-origin script URLs, plus a Playwright run for each worker. The app has no other known sink, so this is a defence in depth item, tracked as a follow-up.
