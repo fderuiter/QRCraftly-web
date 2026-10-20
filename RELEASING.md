@@ -139,7 +139,7 @@ Tags are protected. As an admin, delete the GitHub Release and the tag (`git pus
 **The Release workflow or `Verify Production Deployment` timed out waiting for production.**
 Check the `Workers Builds: qrcraftly` check on the commit. A failed Cloudflare build leaves production on the previous version. Fix it with a PR; the next successful deploy serves the release.
 
-If the build succeeded, read the end of the wait step's log. `scripts/ci/wait_for_deploy.sh` prints the last response: its HTTP status, the `cf-cache-status`, `age`, `date`, `server`, `cf-ray` and `content-type` headers, and the first 512 bytes of the body (or curl's error when no response came back). An old `version.json` with `cf-cache-status: HIT` points at a cache; a `403` or an HTML body points at a security rule or challenge on the zone (see #1394). `/version.json` is served with `Cache-Control: no-store` (`public/_headers`), so no cache should keep an old copy.
+If the build succeeded, read the end of the wait step's log. `scripts/ci/wait_for_deploy.sh` prints the last response: its HTTP status, the `cf-cache-status`, `age`, `date`, `server`, `cf-ray`, `content-type`, `cache-control` and `location` headers, and the first 512 bytes of the body (or curl's error when no response came back). An old `version.json` with `cf-cache-status: HIT` points at a cache; a `403` or an HTML body points at a security rule or challenge on the zone (see #1394). `/version.json` is served with `Cache-Control: no-store` (`public/_headers`), so no cache should keep an old copy.
 
 ## One-time repository setup
 
