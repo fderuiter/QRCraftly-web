@@ -66,7 +66,7 @@ GitHub's merge queue needs an organization-owned repository, so it is not on yet
 
 ## After the merge
 
-Check that `main`'s `CI` run (including **Verify Production Deployment**) and the `Workers Builds: qrcraftly` check pass on the merge commit before merging the next PR. `curl -s https://qrcraftly.com/version.json` shows which commit production serves. If production broke, roll back in Cloudflare first, then fix forward with a PR (see `RELEASING.md`).
+Check that **Verify Production Deployment** (`deploy-verify.yml`; `CI` does not re-run on `main`) and the `Workers Builds: qrcraftly` check pass on the merge commit before merging the next PR. `curl -s https://qrcraftly.com/version.json` shows which commit production serves. If production broke, roll back in Cloudflare first, then fix forward with a PR (see `RELEASING.md`).
 
 ## Things a PR must never add
 
