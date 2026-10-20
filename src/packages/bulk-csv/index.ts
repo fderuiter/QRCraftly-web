@@ -43,6 +43,7 @@ export { sanitizeFileStem, allocateFileName } from './lib/fileNames';
 export {
   previewRow,
   pickColumn,
+  hasPayload,
   PAYLOAD_COLUMN_WORDS,
   FILENAME_COLUMN_WORDS,
   type BulkCsvPreview,
