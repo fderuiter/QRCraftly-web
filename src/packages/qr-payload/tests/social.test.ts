@@ -73,6 +73,68 @@ describe('Social generator', () => {
     expect(hydrated.handle).toBe('qrcraftly');
   });
 
+  it('hydrates and constructs youtube channel IDs, custom URLs, video links, playlists, and youtu.be links', () => {
+    // Channel handles & double @
+    expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: '@qrcraftly' })).toBe('https://youtube.com/@qrcraftly');
+    expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: '@@qrcraftly' })).toBe('https://youtube.com/@qrcraftly');
+    expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: 'qrcraftly' })).toBe('https://youtube.com/@qrcraftly');
+
+    // Channel ID
+    const channelUrl = 'https://youtube.com/channel/UC1234567890abcdef123456';
+    expect(identifyProtocol(channelUrl)).toBe(QRType.SOCIAL);
+    const hydratedChannel = hydrateSocialData(channelUrl);
+    expect(hydratedChannel).toEqual({ platform: SocialPlatform.YOUTUBE, handle: 'channel/UC1234567890abcdef123456' });
+    expect(constructSocialString(hydratedChannel)).toBe(channelUrl);
+    expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: 'UC1234567890abcdef123456' })).toBe(channelUrl);
+
+    // Custom URL
+    const customUrl = 'https://youtube.com/c/customname';
+    expect(identifyProtocol(customUrl)).toBe(QRType.SOCIAL);
+    const hydratedCustom = hydrateSocialData(customUrl);
+    expect(hydratedCustom).toEqual({ platform: SocialPlatform.YOUTUBE, handle: 'c/customname' });
+    expect(constructSocialString(hydratedCustom)).toBe(customUrl);
+
+    // User legacy URL
+    const userUrl = 'https://youtube.com/user/legacyname';
+    expect(identifyProtocol(userUrl)).toBe(QRType.SOCIAL);
+    const hydratedUser = hydrateSocialData(userUrl);
+    expect(hydratedUser).toEqual({ platform: SocialPlatform.YOUTUBE, handle: 'user/legacyname' });
+    expect(constructSocialString(hydratedUser)).toBe(userUrl);
+
+    // Video watch URL
+    const watchUrl = 'https://youtube.com/watch?v=dQw4w9WgXcQ';
+    expect(identifyProtocol(watchUrl)).toBe(QRType.SOCIAL);
+    const hydratedWatch = hydrateSocialData(watchUrl);
+    expect(hydratedWatch).toEqual({ platform: SocialPlatform.YOUTUBE, handle: 'watch?v=dQw4w9WgXcQ' });
+    expect(constructSocialString(hydratedWatch)).toBe(watchUrl);
+
+    // Shorts URL
+    const shortsUrl = 'https://youtube.com/shorts/dQw4w9WgXcQ';
+    expect(identifyProtocol(shortsUrl)).toBe(QRType.SOCIAL);
+    const hydratedShorts = hydrateSocialData(shortsUrl);
+    expect(hydratedShorts).toEqual({ platform: SocialPlatform.YOUTUBE, handle: 'shorts/dQw4w9WgXcQ' });
+    expect(constructSocialString(hydratedShorts)).toBe(shortsUrl);
+
+    // youtu.be short link
+    const shortLink = 'https://youtu.be/dQw4w9WgXcQ';
+    expect(identifyProtocol(shortLink)).toBe(QRType.SOCIAL);
+    const hydratedShort = hydrateSocialData(shortLink);
+    expect(hydratedShort).toEqual({ platform: SocialPlatform.YOUTUBE, handle: 'youtu.be/dQw4w9WgXcQ' });
+    expect(constructSocialString(hydratedShort)).toBe(shortLink);
+
+    // Playlist URL
+    const playlistUrl = 'https://youtube.com/playlist?list=PL123456';
+    expect(identifyProtocol(playlistUrl)).toBe(QRType.SOCIAL);
+    const hydratedPlaylist = hydrateSocialData(playlistUrl);
+    expect(hydratedPlaylist).toEqual({ platform: SocialPlatform.YOUTUBE, handle: 'playlist?list=PL123456' });
+    expect(constructSocialString(hydratedPlaylist)).toBe(playlistUrl);
+
+    // Full URL input directly in handle field
+    expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: 'https://youtube.com/watch?v=dQw4w9WgXcQ' })).toBe(watchUrl);
+    expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: 'https://youtu.be/dQw4w9WgXcQ' })).toBe(shortLink);
+    expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: 'https://www.youtube.com/@qrcraftly' })).toBe('https://youtube.com/@qrcraftly');
+  });
+
   it('hydrates facebook', () => {
     const hydrated = hydrateSocialData('https://facebook.com/qrcraftly');
     expect(hydrated.platform).toBe(SocialPlatform.FACEBOOK);

@@ -137,4 +137,19 @@ describe('SocialInput', () => {
     expect(mockOnChange).toHaveBeenCalledTimes(1);
     expect(mockOnChange).toHaveBeenCalledWith({ message: 'Inquiry about service:\nLine 1\nLine 2' });
   });
+
+  it('configures YouTube input label, placeholder, maxLength, and passes axe accessibility check', async () => {
+    const youtubeData: SocialData = {
+      platform: SocialPlatform.YOUTUBE,
+      handle: '',
+    };
+    const { container } = render(<SocialInput data={youtubeData} onChange={mockOnChange} />);
+
+    const handleInput = screen.getByLabelText('Username / Channel / Video Link') as HTMLInputElement;
+    expect(handleInput).toBeInTheDocument();
+    expect(handleInput.getAttribute('placeholder')).toBe('@channel, video link, or channel ID');
+    expect(handleInput.getAttribute('maxLength')).toBe('256');
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
 });

@@ -41,6 +41,7 @@ const PROFILE_HOSTS: Record<string, SocialPlatform> = {
   'tiktok.com': SocialPlatform.TIKTOK,
   'linkedin.com': SocialPlatform.LINKEDIN,
   'youtube.com': SocialPlatform.YOUTUBE,
+  'youtu.be': SocialPlatform.YOUTUBE,
   'facebook.com': SocialPlatform.FACEBOOK,
   'wa.me': SocialPlatform.WHATSAPP,
   'github.com': SocialPlatform.GITHUB,
@@ -52,9 +53,11 @@ const RESERVED_SEGMENTS: Partial<Record<SocialPlatform, ReadonlySet<string>>> = 
   [SocialPlatform.TWITTER]: new Set(['i', 'intent', 'home', 'search', 'hashtag', 'share', 'explore', 'settings', 'messages', 'notifications', 'compose', 'login']),
   [SocialPlatform.FACEBOOK]: new Set(['share', 'sharer', 'sharer.php', 'groups', 'events', 'watch', 'photo.php', 'story.php', 'profile.php', 'pages', 'marketplace', 'gaming', 'login']),
   [SocialPlatform.GITHUB]: new Set(['orgs', 'settings', 'marketplace', 'explore', 'topics', 'sponsors', 'features', 'login', 'about', 'pricing', 'enterprise']),
+  [SocialPlatform.YOUTUBE]: new Set(['watch', 'shorts', 'playlist', 'channel', 'c', 'user', 'feed', 'results', 'premium', 'gaming', 'music', 'upload', 'tv', 'about', 'help', 'terms', 'privacy']),
 };
 
 const HANDLE_PATTERN = /^[A-Za-z0-9_.-]+$/;
+const YOUTUBE_HANDLE_PATTERN = /^[a-zA-Z0-9_.\-/@?&=]+$/;
 
 /**
  * Reads a social profile link that the Social form can rebuild without losing anything. Posts,
@@ -76,8 +79,8 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
   const platform = PROFILE_HOSTS[host];
   if (!platform) return null;
 
-  // Non-WhatsApp profile URLs reject query parameters
-  if (platform !== SocialPlatform.WHATSAPP && parsed.params.size > 0) return null;
+  // Non-WhatsApp and non-YouTube profile URLs reject query parameters
+  if (platform !== SocialPlatform.WHATSAPP && platform !== SocialPlatform.YOUTUBE && parsed.params.size > 0) return null;
 
   // One trailing slash is fine; empty segments elsewhere are not.
   const segments = rest.length > 0 && rest[rest.length - 1] === '' ? rest.slice(0, -1) : rest;
@@ -91,8 +94,38 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
       if (segments.length === 2 && segments[0] === 'in') handle = segments[1];
       break;
     case SocialPlatform.TIKTOK:
-    case SocialPlatform.YOUTUBE:
       if (segments.length === 1 && segments[0].startsWith('@')) handle = segments[0].substring(1);
+      break;
+    case SocialPlatform.YOUTUBE:
+      if (host === 'youtu.be') {
+        if (segments.length === 1) {
+          handle = `youtu.be/${segments[0]}`;
+        }
+      } else if (segments.length === 1 && segments[0].startsWith('@')) {
+        handle = segments[0].substring(1);
+      } else if (segments.length === 2 && (segments[0] === 'channel' || segments[0] === 'c' || segments[0] === 'user' || segments[0] === 'shorts')) {
+        handle = `${segments[0]}/${segments[1]}`;
+      } else if (segments.length === 1 && segments[0] === 'watch' && parsed.params.has('v')) {
+        const v = parsed.params.get('v');
+        if (v) {
+          const extra = Array.from(parsed.params.entries())
+            .filter(([k]) => k !== 'v')
+            .map(([k, val]) => `${encodeURIComponent(k)}=${encodeURIComponent(val)}`)
+            .join('&');
+          handle = `watch?v=${encodeURIComponent(v)}${extra ? '&' + extra : ''}`;
+        }
+      } else if (segments.length === 1 && segments[0] === 'playlist' && parsed.params.has('list')) {
+        const list = parsed.params.get('list');
+        if (list) {
+          const extra = Array.from(parsed.params.entries())
+            .filter(([k]) => k !== 'list')
+            .map(([k, val]) => `${encodeURIComponent(k)}=${encodeURIComponent(val)}`)
+            .join('&');
+          handle = `playlist?list=${encodeURIComponent(list)}${extra ? '&' + extra : ''}`;
+        }
+      } else if (segments.length === 1 && !RESERVED_SEGMENTS[SocialPlatform.YOUTUBE]?.has(segments[0].toLowerCase())) {
+        handle = segments[0];
+      }
       break;
     case SocialPlatform.WHATSAPP:
       if (segments.length === 1 && /^\d+$/.test(segments[0])) {
@@ -115,7 +148,12 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
       }
   }
 
-  if (!handle || !HANDLE_PATTERN.test(handle)) return null;
+  if (!handle) return null;
+  if (platform === SocialPlatform.YOUTUBE) {
+    if (!YOUTUBE_HANDLE_PATTERN.test(handle)) return null;
+  } else {
+    if (!HANDLE_PATTERN.test(handle)) return null;
+  }
 
   return message !== undefined ? { platform, handle, message } : { platform, handle };
 };

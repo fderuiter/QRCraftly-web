@@ -32,6 +32,71 @@ const SOCIAL_PLATFORM_URLS: Record<SocialPlatform, (handle: string) => string> =
 };
 
 /**
+ * Normalizes and constructs a canonical YouTube URL from a handle, channel ID, custom URL,
+ * video link, or playlist link.
+ */
+export const parseYouTubeInput = (input: string): string => {
+  if (!input) return '';
+  const trimmed = input.trim().replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+  if (!trimmed) return '';
+
+  // If input is a full URL or starts with domain
+  if (/^(?:https?:\/\/)?(?:www\.|m\.|mobile\.)?(?:youtube\.com|youtu\.be)/i.test(trimmed)) {
+    const fullUrl = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed.replace(/^\/\//, '')}`;
+    const parsed = parseProtocol(fullUrl);
+    const profile = parsed ? parseSocialProfile(parsed) : null;
+    if (profile && profile.platform === SocialPlatform.YOUTUBE) {
+      if (profile.handle.startsWith('youtu.be/')) {
+        return `https://${profile.handle}`;
+      }
+      if (
+        profile.handle.startsWith('watch?') ||
+        profile.handle.startsWith('playlist?') ||
+        profile.handle.startsWith('shorts/') ||
+        profile.handle.startsWith('channel/') ||
+        profile.handle.startsWith('c/') ||
+        profile.handle.startsWith('user/')
+      ) {
+        return `https://youtube.com/${profile.handle}`;
+      }
+      return `https://youtube.com/@${profile.handle.replace(/^@+/, '')}`;
+    }
+  }
+
+  // Handle relative / partial strings input by user in input field
+  const cleanInput = trimmed.replace(/^\/+/, '');
+
+  if (/^youtu\.be\//i.test(cleanInput)) {
+    return `https://${cleanInput}`;
+  }
+  if (/^watch\?/i.test(cleanInput)) {
+    return `https://youtube.com/${cleanInput}`;
+  }
+  if (/^shorts\//i.test(cleanInput)) {
+    return `https://youtube.com/${cleanInput}`;
+  }
+  if (/^playlist\?/i.test(cleanInput)) {
+    return `https://youtube.com/${cleanInput}`;
+  }
+  if (/^channel\//i.test(cleanInput)) {
+    return `https://youtube.com/${cleanInput}`;
+  }
+  if (/^c\//i.test(cleanInput)) {
+    return `https://youtube.com/${cleanInput}`;
+  }
+  if (/^user\//i.test(cleanInput)) {
+    return `https://youtube.com/${cleanInput}`;
+  }
+  if (/^UC[a-zA-Z0-9_-]+$/i.test(cleanInput)) {
+    return `https://youtube.com/channel/${cleanInput}`;
+  }
+
+  const handle = cleanInput.replace(/^@+/, '');
+  if (!handle) return '';
+  return `https://youtube.com/@${handle}`;
+};
+
+/**
  * Constructs a standard HTTPS social media profile URL from the given data.
  *
  * Uses Universal Links (HTTPS) so modern mobile operating systems automatically
@@ -41,7 +106,12 @@ const SOCIAL_PLATFORM_URLS: Record<SocialPlatform, (handle: string) => string> =
  * @returns A full HTTPS profile URL, or an empty string if the handle is empty.
  */
 export const constructSocialString = (data: SocialData): string => {
-  if (!data) return '';
+  if (!data || !data.handle) return '';
+
+  if (data.platform === SocialPlatform.YOUTUBE) {
+    return parseYouTubeInput(data.handle);
+  }
+
   const cleanHandle = sanitizeSocialHandle(data.handle);
   if (!cleanHandle) return '';
 

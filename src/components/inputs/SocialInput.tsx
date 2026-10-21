@@ -9,6 +9,11 @@ interface SocialInputProps {
 }
 
 export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
+  const isYouTube = data.platform === SocialPlatform.YOUTUBE;
+  const handleLabel = isYouTube ? 'Username / Channel / Video Link' : 'Username / Handle';
+  const handlePlaceholder = isYouTube ? '@channel, video link, or channel ID' : '@username';
+  const handleMaxLength = isYouTube ? 256 : 64;
+
   return (
     <FormBlock legend="Social Media Profile">
       <SelectField
@@ -30,10 +35,10 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
       </SelectField>
       <TextField
         id="social-handle"
-        label="Username / Handle"
+        label={handleLabel}
         type="text"
-        placeholder="@username"
-        maxLength={64}
+        placeholder={handlePlaceholder}
+        maxLength={handleMaxLength}
         value={data.handle}
         onChange={(e) => onChange({ handle: e.target.value })}
         showCharCount
