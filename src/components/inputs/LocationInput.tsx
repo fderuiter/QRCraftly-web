@@ -5,6 +5,7 @@ import type { LocationData } from "../../types";
 import { TextField } from "../ui/FormFields";
 import { FormBlock } from "../ui/FormBlock";
 import { announcePolitely } from "../../utils/a11y";
+import { parseLocationUrl } from "../../utils/locationParsers";
 import { coordinateError } from "@/packages/qr-payload";
 
 interface LocationInputProps {
@@ -29,10 +30,15 @@ const isUnfinishedNumber = (value: string): boolean => /^[+-]?\d*\.?$/.test(valu
 const shownCoordinateError = (value: string, axis: "latitude" | "longitude", left: boolean): string | undefined =>
   !left && isUnfinishedNumber(value) ? undefined : (coordinateError(value, axis) ?? undefined);
 
+/**
+ * High-accuracy coordinate form taking latitude and longitude in degrees or a pasted Google Maps URL / location string.
+ */
 export const LocationInput: React.FC<LocationInputProps> = ({
   data,
   onChange,
 }) => {
+  const [mapUrl, setMapUrl] = useState("");
+  const [urlError, setUrlError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const locationButtonRef = useRef<HTMLButtonElement>(null);
@@ -47,8 +53,58 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     };
   }, []);
 
-  const clearGeoError = () => {
+  const clearErrors = () => {
     setGeoError(null);
+    setUrlError(null);
+  };
+
+  const processUrlInput = (input: string) => {
+    clearErrors();
+    const trimmed = input.trim();
+    if (!trimmed) {
+      setUrlError(null);
+      return;
+    }
+    const parsed = parseLocationUrl(trimmed);
+    if (parsed) {
+      setUrlError(null);
+      onChange({ latitude: parsed.latitude, longitude: parsed.longitude });
+      announcePolitely("Location coordinates populated");
+    } else {
+      setUrlError("Could not extract valid coordinates from the provided URL or location string.");
+    }
+  };
+
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setMapUrl(value);
+    clearErrors();
+    if (!value.trim()) {
+      setUrlError(null);
+      return;
+    }
+    const parsed = parseLocationUrl(value);
+    if (parsed) {
+      setUrlError(null);
+      onChange({ latitude: parsed.latitude, longitude: parsed.longitude });
+      announcePolitely("Location coordinates populated");
+    }
+  };
+
+  const handleUrlPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = e.clipboardData.getData("text");
+    if (pastedText) {
+      processUrlInput(pastedText);
+    }
+  };
+
+  const handleUrlBlur = () => {
+    if (mapUrl.trim()) {
+      const parsed = parseLocationUrl(mapUrl);
+      if (!parsed) {
+        setUrlError("Could not extract valid coordinates from the provided URL or location string.");
+      }
+    }
   };
 
   const handleDismissError = () => {
@@ -57,12 +113,12 @@ export const LocationInput: React.FC<LocationInputProps> = ({
   };
 
   const handleLatitudeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    clearGeoError();
+    clearErrors();
     onChange({ latitude: e.target.value });
   };
 
   const handleLongitudeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    clearGeoError();
+    clearErrors();
     onChange({ longitude: e.target.value });
   };
 
@@ -73,7 +129,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     }
 
     setIsLoading(true);
-    setGeoError(null);
+    clearErrors();
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -102,6 +158,17 @@ export const LocationInput: React.FC<LocationInputProps> = ({
 
   return (
     <FormBlock legend="Geo-Location">
+      <TextField
+        id="location-url"
+        label="Google Maps Link or Coordinates"
+        type="text"
+        placeholder="Paste Google Maps link, geo: URI, or coordinates"
+        value={mapUrl}
+        onChange={handleUrlChange}
+        onPaste={handleUrlPaste}
+        onBlur={handleUrlBlur}
+        error={urlError ?? undefined}
+      />
       <TextField
         id="location-latitude"
         label="Latitude"
