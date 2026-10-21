@@ -5,8 +5,17 @@ import type { LocationData } from "../../types";
 import { TextField } from "../ui/FormFields";
 import { FormBlock } from "../ui/FormBlock";
 import { announcePolitely } from "../../utils/a11y";
-import { parseLocationUrl } from "../../utils/locationParsers";
 import { coordinateError } from "@/packages/qr-payload";
+import type { ParsedCoordinates } from "../../utils/locationParsers";
+
+let cachedParseLocationUrl: ((input: string) => ParsedCoordinates | null) | null = null;
+
+const getParseLocationUrl = async () => {
+  if (cachedParseLocationUrl) return cachedParseLocationUrl;
+  const mod = await import("../../utils/locationParsers");
+  cachedParseLocationUrl = mod.parseLocationUrl;
+  return cachedParseLocationUrl;
+};
 
 interface LocationInputProps {
   data: LocationData;
@@ -48,6 +57,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
+    void getParseLocationUrl();
     return () => {
       mountedRef.current = false;
     };
@@ -58,6 +68,18 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     setUrlError(null);
   };
 
+  const runParseUrl = (input: string, callback: (parsed: ParsedCoordinates | null) => void) => {
+    if (cachedParseLocationUrl) {
+      callback(cachedParseLocationUrl(input));
+    } else {
+      void getParseLocationUrl().then((parseFn) => {
+        if (mountedRef.current) {
+          callback(parseFn(input));
+        }
+      });
+    }
+  };
+
   const processUrlInput = (input: string) => {
     clearErrors();
     const trimmed = input.trim();
@@ -65,14 +87,15 @@ export const LocationInput: React.FC<LocationInputProps> = ({
       setUrlError(null);
       return;
     }
-    const parsed = parseLocationUrl(trimmed);
-    if (parsed) {
-      setUrlError(null);
-      onChange({ latitude: parsed.latitude, longitude: parsed.longitude });
-      announcePolitely("Location coordinates populated");
-    } else {
-      setUrlError("Could not extract valid coordinates from the provided URL or location string.");
-    }
+    runParseUrl(trimmed, (parsed) => {
+      if (parsed) {
+        setUrlError(null);
+        onChange({ latitude: parsed.latitude, longitude: parsed.longitude });
+        announcePolitely("Location coordinates populated");
+      } else {
+        setUrlError("Could not extract valid coordinates from the provided URL or location string.");
+      }
+    });
   };
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,12 +106,13 @@ export const LocationInput: React.FC<LocationInputProps> = ({
       setUrlError(null);
       return;
     }
-    const parsed = parseLocationUrl(value);
-    if (parsed) {
-      setUrlError(null);
-      onChange({ latitude: parsed.latitude, longitude: parsed.longitude });
-      announcePolitely("Location coordinates populated");
-    }
+    runParseUrl(value, (parsed) => {
+      if (parsed) {
+        setUrlError(null);
+        onChange({ latitude: parsed.latitude, longitude: parsed.longitude });
+        announcePolitely("Location coordinates populated");
+      }
+    });
   };
 
   const handleUrlPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -100,10 +124,11 @@ export const LocationInput: React.FC<LocationInputProps> = ({
 
   const handleUrlBlur = () => {
     if (mapUrl.trim()) {
-      const parsed = parseLocationUrl(mapUrl);
-      if (!parsed) {
-        setUrlError("Could not extract valid coordinates from the provided URL or location string.");
-      }
+      runParseUrl(mapUrl, (parsed) => {
+        if (!parsed) {
+          setUrlError("Could not extract valid coordinates from the provided URL or location string.");
+        }
+      });
     }
   };
 
