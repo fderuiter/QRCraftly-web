@@ -31,15 +31,17 @@ export {
   parseCsv,
   detectDelimiter,
   decodeCsvBytes,
+  formatErrorLogCsv,
   CsvParseError,
   MAX_BULK_CSV_ROWS,
   MAX_BULK_CSV_CHARS,
   type CsvRow,
   type CsvTable,
   type ParseCsvOptions,
+  type ErrorLogItem,
 } from './lib/csv';
 export { createZip, type ZipEntry, type CreateZipOptions } from './lib/zip';
-export { sanitizeFileStem, allocateFileName } from './lib/fileNames';
+export { sanitizeFileStem, allocateFileName, errorLogFileName } from './lib/fileNames';
 export {
   previewRow,
   pickColumn,

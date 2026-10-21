@@ -18,11 +18,17 @@
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BulkCsvPreflightSummary } from './BulkCsvPreflightSummary';
 import { type PreflightReport } from '@/packages/bulk-csv';
+import * as downloadManager from '@/utils/downloadManager';
+
+vi.spyOn(downloadManager, 'triggerFileDownload').mockImplementation(() => {});
 
 describe('BulkCsvPreflightSummary Component', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
   it('renders all-valid preflight report cleanly', () => {
     const report: PreflightReport = {
       totalRows: 10,
@@ -92,5 +98,42 @@ describe('BulkCsvPreflightSummary Component', () => {
     // Collapse panel
     fireEvent.click(toggleBtn);
     expect(screen.queryByTestId('preflight-details-list')).not.toBeInTheDocument();
+  });
+
+  it('triggers download of error log CSV when Export Error Log button is clicked', () => {
+    const report: PreflightReport = {
+      totalRows: 5,
+      validCount: 3,
+      emptyCount: 1,
+      unsafeCount: 1,
+      cautionCount: 0,
+      details: [],
+      invalidDetails: [
+        { rowNumber: 2, category: 'empty', reason: 'Missing payload value', payload: '' },
+        { rowNumber: 4, category: 'unsafe', reason: 'Dangerous scheme', payload: 'javascript:alert(1)' },
+      ],
+      validRows: [],
+      validRowIndices: [],
+      validPayloads: [],
+    };
+
+    render(<BulkCsvPreflightSummary report={report} fileName="input-data.csv" />);
+
+    const exportBtn = screen.getByTestId('export-error-log-button');
+    expect(exportBtn).toBeInTheDocument();
+    expect(exportBtn).toHaveTextContent('Export Error Log (CSV)');
+
+    fireEvent.click(exportBtn);
+
+    expect(downloadManager.triggerFileDownload).toHaveBeenCalledTimes(1);
+    const [bytes, fileName, mimeType] = vi.mocked(downloadManager.triggerFileDownload).mock.calls[0];
+    expect(ArrayBuffer.isView(bytes)).toBe(true);
+    expect(fileName).toBe('input-data-error-log.csv');
+    expect(mimeType).toBe('text/csv');
+
+    const downloadedText = new TextDecoder().decode(bytes);
+    expect(downloadedText).toContain('Row Number,Category,Reason,Payload');
+    expect(downloadedText).toContain('2,empty,Missing payload value,');
+    expect(downloadedText).toContain('4,unsafe,Dangerous scheme,javascript:alert(1)');
   });
 });

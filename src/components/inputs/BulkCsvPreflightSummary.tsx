@@ -17,7 +17,8 @@
 */
 
 import React, { useState } from 'react';
-import { type PreflightReport, type PreflightRowDetail } from '@/packages/bulk-csv';
+import { type PreflightReport, type PreflightRowDetail, formatErrorLogCsv, errorLogFileName } from '@/packages/bulk-csv';
+import { triggerFileDownload } from '@/utils/downloadManager';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -26,6 +27,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileSpreadsheet,
+  Download,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge, type BadgeTone } from '../ui/Badge';
@@ -77,13 +79,20 @@ const Metric: React.FC<{ label: string; value: number; testId: string; tone: Met
 
 export interface BulkCsvPreflightSummaryProps {
   report: PreflightReport;
+  fileName?: string;
 }
 
-export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = ({ report }) => {
+export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = ({ report, fileName }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const hasIssues = report.invalidDetails.length > 0;
   const isAllValid = !hasIssues && report.totalRows > 0;
+
+  const handleExportErrorLog = () => {
+    const bytes = formatErrorLogCsv(report.invalidDetails);
+    const downloadName = errorLogFileName(fileName);
+    triggerFileDownload(bytes, downloadName, 'text/csv');
+  };
 
   return (
     <div className="rounded-xl border border-line bg-surface-sunken p-4 shadow-raised transition-all" data-testid="preflight-summary-card">
@@ -120,28 +129,42 @@ export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = (
 
       {hasIssues && (
         <div className="mt-3.5 pt-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsExpanded(!isExpanded)}
-            aria-expanded={isExpanded}
-            aria-controls="preflight-details-panel"
-            data-testid="preflight-expand-toggle"
-            className="flex items-center gap-1.5 text-xs text-fg-soft hover:text-fg"
-          >
-            {isExpanded ? (
-              <>
-                <ChevronUp className="size-4" />
-                Hide Row Details
-              </>
-            ) : (
-              <>
-                <ChevronDown className="size-4" />
-                View {report.invalidDetails.length} Problematic {report.invalidDetails.length === 1 ? 'Row' : 'Rows'}
-              </>
-            )}
-          </Button>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              aria-expanded={isExpanded}
+              aria-controls="preflight-details-panel"
+              data-testid="preflight-expand-toggle"
+              className="flex items-center gap-1.5 text-xs text-fg-soft hover:text-fg"
+            >
+              {isExpanded ? (
+                <>
+                  <ChevronUp className="size-4" />
+                  Hide Row Details
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="size-4" />
+                  View {report.invalidDetails.length} Problematic {report.invalidDetails.length === 1 ? 'Row' : 'Rows'}
+                </>
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExportErrorLog}
+              data-testid="export-error-log-button"
+              className="flex items-center gap-1.5 text-xs"
+            >
+              <Download className="size-3.5" aria-hidden="true" />
+              Export Error Log (CSV)
+            </Button>
+          </div>
 
           {isExpanded && (
             <div
