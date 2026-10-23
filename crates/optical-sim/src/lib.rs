@@ -119,25 +119,25 @@ pub fn gaussian_box_widths(sigma: f64) -> [usize; GAUSS_PASSES] {
 }
 
 fn box_pass(src: &[f32], dst: &mut [f32], side: usize, radius: usize, along_rows: bool) {
-    let width = (2 * radius + 1) as f32;
+    let width = (2 * radius + 1) as f64;
     let last = (side - 1) as i32;
     let step = if along_rows { 1 } else { side };
     let radius_i = radius as i32;
 
     for line in 0..side {
         let base = if along_rows { line * side } else { line };
-        let mut sum = 0.0f32;
+        let mut sum = 0.0f64;
         for k in -radius_i..=radius_i {
             let idx = k.clamp(0, last) as usize;
-            sum += src[base + idx * step];
+            sum += src[base + idx * step] as f64;
         }
         for k in 0..side as i32 {
-            dst[base + (k as usize) * step] = sum / width;
+            dst[base + (k as usize) * step] = (sum / width) as f32;
             let enter = k + radius_i + 1;
             let leave = k - radius_i;
             let enter_idx = enter.min(last) as usize;
             let leave_idx = leave.max(0) as usize;
-            sum += src[base + enter_idx * step] - src[base + leave_idx * step];
+            sum += (src[base + enter_idx * step] as f64) - (src[base + leave_idx * step] as f64);
         }
     }
 }
@@ -154,8 +154,8 @@ impl Mulberry32 {
     fn next_f64(&mut self) -> f64 {
         self.state = self.state.wrapping_add(0x6d2b79f5);
         let mut t = (self.state ^ (self.state >> 15)).wrapping_mul(1 | self.state);
-        t = (t ^ (t >> 7)).wrapping_mul(61 | t) ^ t;
-        let val = t ^ (t >> 14);
+        t = t.wrapping_add((t ^ (t >> 7)).wrapping_mul(61 | t)) ^ t;
+        let val = (t ^ (t >> 14)) as u32;
         (val as f64) / 4294967296.0
     }
 }

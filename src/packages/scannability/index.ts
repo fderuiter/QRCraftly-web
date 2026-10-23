@@ -29,6 +29,7 @@ export type { ScanVerdict, ScanFix, ScanAdvice } from './lib/verdict';
 export { auditModuleContrast } from './lib/contrastAudit';
 export {
   simulatePrint,
+  simulatePrintTs,
   loadOpticalSim,
   createOpticalSim,
   PRINT_PX_PER_MODULE,

@@ -94,9 +94,11 @@ const blockedExport = (
  * The hook warms them up once the browser is idle, so a copy or share keeps its user gesture.
  */
 const loadScannabilityCheck = () =>
-  Promise.all([import('@/packages/scannability/checker'), import('@/packages/qr-decode').then(({ loadQrReader }) => loadQrReader())]).then(
-    ([{ performScannabilityCheck }, reader]) => ({ performScannabilityCheck, reader })
-  );
+  Promise.all([
+    import('@/packages/scannability/checker'),
+    import('@/packages/scannability').then(({ loadOpticalSim }) => loadOpticalSim()),
+    import('@/packages/qr-decode').then(({ loadQrReader }) => loadQrReader()),
+  ]).then(([{ performScannabilityCheck }, _, reader]) => ({ performScannabilityCheck, reader }));
 
 /** Loads the export check once the main thread is idle after the page has loaded. */
 function warmScannabilityCheck(): () => void {

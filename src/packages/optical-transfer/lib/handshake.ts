@@ -18,7 +18,7 @@
 
 import { type QRConfig, QRErrorCorrectionLevel, QRStyle, QRType, SocialFormat, TemplateStyle } from '@/types';
 import { drawQRInternal } from '@/packages/qr-matrix';
-import { createScannabilityWorker, isWorkerResponse } from '@/packages/scannability';
+import { createScannabilityWorker, isWorkerResponse, loadOpticalSim } from '@/packages/scannability';
 import { performScannabilityCheck } from '@/packages/scannability/checker';
 import { loadQrReader } from '@/packages/qr-decode';
 
@@ -54,8 +54,10 @@ export interface HandshakeVerifierDeps {
 /** Production capabilities: the real Scannability Worker and checker from `@/packages/scannability`. */
 const defaultHandshakeVerifierDeps: HandshakeVerifierDeps = {
   createWorker: createScannabilityWorker,
-  checkOnMainThread: async ({ imageData, width, height, moduleCount }) =>
-    performScannabilityCheck(await loadQrReader(), imageData, width, height, moduleCount).success,
+  checkOnMainThread: async ({ imageData, width, height, moduleCount }) => {
+    const [reader] = await Promise.all([loadQrReader(), loadOpticalSim()]);
+    return performScannabilityCheck(reader, imageData, width, height, moduleCount).success;
+  },
   createCanvas: () => document.createElement('canvas'),
   watchdogMs: HANDSHAKE_WATCHDOG_MS,
 };

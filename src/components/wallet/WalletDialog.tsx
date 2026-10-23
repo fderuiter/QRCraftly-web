@@ -74,7 +74,11 @@ export const WALLET_SCAN_FAILED = 'The wallet card did not pass the scan check, 
 
 /** Loads our QR reader and the export check on demand, as the other exports do. */
 const loadScanCheck = () =>
-  Promise.all([import('@/packages/scannability/checker'), import('@/packages/qr-decode').then(({ loadQrReader }) => loadQrReader())]).then(
+  Promise.all([
+    import('@/packages/scannability/checker'),
+    import('@/packages/qr-decode').then(({ loadQrReader }) => loadQrReader()),
+    import('@/packages/scannability').then(({ loadOpticalSim }) => loadOpticalSim()),
+  ]).then(
     ([{ performScannabilityCheck }, reader]) => (canvas: HTMLCanvasElement) => {
       const ctx = canvas.getContext('2d');
       if (!ctx) return false;
