@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { rules, type Edge } from '../../scripts/boundaries.config.js';
+import { LEGACY_APP_ROOT_IMPORTERS, rules, type Edge } from '../../scripts/boundaries.config.js';
 import { buildGraph, checkBoundaries, checkGraph, findCycles, formatViolations, toPosix } from '../../scripts/check_boundaries.js';
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), 'boundaries', 'fixtures');
@@ -13,6 +13,8 @@ const RULE_NAMES = [
   'tests-folder-is-private',
   'no-circular',
   'packages-must-not-import-app-layers',
+  'packages-must-not-import-app-root',
+  'core-is-a-leaf',
   'cross-package-imports-use-alias',
   'page-content-stays-on-server',
 ];
@@ -70,6 +72,62 @@ describe('boundary rules', () => {
       expect(forbiddenByAppLayerRules('src/packages/optical-transfer/client.ts', target)).toBe(true);
       expect(forbiddenByAppLayerRules('src/packages/optical-transfer/lib/receiver/useOpticalReceiver.ts', target)).toBe(true);
     }
+  });
+
+  describe('packages-must-not-import-app-root (ADR 0052)', () => {
+    const from = 'src/packages/scannability/lib/newFeature.ts';
+    const forbids = (file: string, to: string) => forbidden('packages-must-not-import-app-root', edge(file, to));
+
+    it.each(['src/types.ts', 'src/utils/security.ts', 'src/constants.ts', 'src/types/extra.ts', 'src/constants/limits.ts'])(
+      'forbids a package file not on the allowlist from importing %s',
+      (to) => {
+        expect(forbids(from, to)).toBe(true);
+      },
+    );
+
+    it('catches a relative escape, because it checks the resolved target', () => {
+      expect(forbidden('packages-must-not-import-app-root', edge(from, 'src/utils/x.ts', { specifier: '../../../utils/x' }))).toBe(true);
+    });
+
+    it('lets an allowlisted file keep its import', () => {
+      const [legacy] = LEGACY_APP_ROOT_IMPORTERS;
+      expect(forbids(legacy, 'src/types.ts')).toBe(false);
+    });
+
+    it('allows core, other packages, and app code importing the app root', () => {
+      expect(forbids(from, 'src/packages/core/types.ts')).toBe(false);
+      expect(forbids(from, 'src/packages/qr-payload/index.ts')).toBe(false);
+      expect(forbids('src/components/QRTool.tsx', 'src/types.ts')).toBe(false);
+    });
+
+    it('keeps the allowlist sorted, POSIX and inside the packages root', () => {
+      const list = [...LEGACY_APP_ROOT_IMPORTERS];
+      expect(list).toEqual([...list].sort());
+      for (const file of list) expect(file).toMatch(/^src\/packages\/[^\\]+$/);
+    });
+
+    it('only shrinks: every allowlisted file still imports app-root code', () => {
+      const { edges } = buildGraph();
+      const appRoot = /^src\/(types|constants|utils)\/|^src\/(types|constants)\.tsx?$/;
+      const stillImporting = new Set(edges.filter((e) => appRoot.test(e.to)).map((e) => e.from));
+      const clean = [...LEGACY_APP_ROOT_IMPORTERS].filter((file) => !stillImporting.has(file));
+      expect(clean, 'these files no longer import app-root code; take them off LEGACY_APP_ROOT_IMPORTERS').toEqual([]);
+    });
+  });
+
+  describe('core-is-a-leaf (ADR 0052)', () => {
+    const forbids = (from: string, to: string) => forbidden('core-is-a-leaf', edge(from, to, { aliased: true }));
+
+    it('forbids core from importing another package or app code', () => {
+      expect(forbids('src/packages/core/types.ts', 'src/packages/qr-matrix/index.ts')).toBe(true);
+      expect(forbids('src/packages/core/security.ts', 'src/utils/security.ts')).toBe(true);
+      expect(forbids('src/packages/core/encoding.ts', 'src/hooks/useCamera.ts')).toBe(true);
+    });
+
+    it('lets core import itself and lets everyone import core', () => {
+      expect(forbids('src/packages/core/security.ts', 'src/packages/core/encoding.ts')).toBe(false);
+      expect(forbids('src/packages/qr-matrix/lib/encoder.ts', 'src/packages/core/types.ts')).toBe(false);
+    });
   });
 
   describe('cross-package-imports-use-alias', () => {
