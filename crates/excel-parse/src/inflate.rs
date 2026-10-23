@@ -19,6 +19,7 @@
 //! In-house DEFLATE (RFC 1951) decompressor in plain Rust.
 
 extern crate alloc;
+use alloc::vec;
 use alloc::vec::Vec;
 
 pub struct BitReader<'a> {
@@ -106,8 +107,7 @@ impl HuffmanTable {
             offset += counts[i];
         }
 
-        let mut symbols = Vec::with_capacity(offset as usize);
-        symbols.resize(offset as usize, 0);
+        let mut symbols = vec![0u16; offset as usize];
 
         for (sym, &len) in lengths.iter().enumerate() {
             if len > 0 {
@@ -143,17 +143,20 @@ impl HuffmanTable {
 }
 
 static LENGTH_BASE: [u16; 29] = [
-    3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258,
+    3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131,
+    163, 195, 227, 258,
 ];
 static LENGTH_EXTRA: [u8; 29] = [
     0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0,
 ];
 
 static DIST_BASE: [u16; 30] = [
-    1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577,
+    1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537,
+    2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577,
 ];
 static DIST_EXTRA: [u8; 30] = [
-    0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13,
+    0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13,
+    13,
 ];
 
 static CODE_ORDER: [usize; 19] = [
@@ -186,10 +189,10 @@ pub fn decompress_deflate(input: &[u8], max_size: usize) -> Option<Vec<u8>> {
             }
             1 => {
                 let mut lit_lens = [0u8; 288];
-                for i in 0..144 { lit_lens[i] = 8; }
-                for i in 144..256 { lit_lens[i] = 9; }
-                for i in 256..280 { lit_lens[i] = 7; }
-                for i in 280..288 { lit_lens[i] = 8; }
+                lit_lens[..144].fill(8);
+                lit_lens[144..256].fill(9);
+                lit_lens[256..280].fill(7);
+                lit_lens[280..288].fill(8);
                 let lit_table = HuffmanTable::from_lengths(&lit_lens)?;
 
                 let dist_lens = [5u8; 32];
@@ -220,21 +223,21 @@ pub fn decompress_deflate(input: &[u8], max_size: usize) -> Option<Vec<u8>> {
                             if combined_lens.len().checked_add(rep)? > total {
                                 return None;
                             }
-                            for _ in 0..rep { combined_lens.push(last); }
+                            combined_lens.resize(combined_lens.len() + rep, last);
                         }
                         17 => {
                             let rep = (reader.read_bits(3)? + 3) as usize;
                             if combined_lens.len().checked_add(rep)? > total {
                                 return None;
                             }
-                            for _ in 0..rep { combined_lens.push(0); }
+                            combined_lens.resize(combined_lens.len() + rep, 0);
                         }
                         18 => {
                             let rep = (reader.read_bits(7)? + 11) as usize;
                             if combined_lens.len().checked_add(rep)? > total {
                                 return None;
                             }
-                            for _ in 0..rep { combined_lens.push(0); }
+                            combined_lens.resize(combined_lens.len() + rep, 0);
                         }
                         _ => return None,
                     }
@@ -334,12 +337,13 @@ mod tests {
     #[test]
     fn rejects_uncompressed_block_exceeding_max_size() {
         // Valid uncompressed block header claiming 15 bytes payload (LEN=15, NLEN=~15=65520)
-        let mut input = Vec::new();
-        input.push(0x01); // BFINAL=1, BTYPE=00
-        input.push(0x0F); // LEN low
-        input.push(0x00); // LEN high (15)
-        input.push(0xF0); // NLEN low
-        input.push(0xFF); // NLEN high (~15 = 0xFFF0)
+        let mut input = vec![
+            0x01, // BFINAL=1, BTYPE=00
+            0x0F, // LEN low
+            0x00, // LEN high (15)
+            0xF0, // NLEN low
+            0xFF, // NLEN high (~15 = 0xFFF0)
+        ];
         input.extend_from_slice(b"123456789012345"); // 15 valid payload bytes
 
         // With max_size=10, decompress_deflate returns None because 15 > 10

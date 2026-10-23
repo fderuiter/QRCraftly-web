@@ -286,7 +286,7 @@ pub fn parse_sheet_xml(xml: &str, shared_strings: &[String]) -> Vec<Vec<String>>
                     if let Some(v_start) = cell_inner.find("<v>") {
                         let val_start = v_start + 3;
                         if let Some(v_end) = cell_inner[val_start..].find("</v>") {
-                            unescape_xml(&cell_inner[val_start..val_start + v_end].trim())
+                            unescape_xml(cell_inner[val_start..val_start + v_end].trim())
                         } else {
                             String::new()
                         }
@@ -407,7 +407,11 @@ pub fn format_matrix_to_csv(matrix: &[Vec<String>]) -> String {
             if c_idx > 0 {
                 csv.push(',');
             }
-            if cell.contains(',') || cell.contains('"') || cell.contains('\n') || cell.contains('\r') {
+            if cell.contains(',')
+                || cell.contains('"')
+                || cell.contains('\n')
+                || cell.contains('\r')
+            {
                 csv.push('"');
                 for ch in cell.chars() {
                     if ch == '"' {
@@ -431,7 +435,10 @@ mod tests {
 
     #[test]
     fn unescapes_xml_entities() {
-        assert_eq!(unescape_xml("Foo &amp; Bar &lt;Baz&gt; &quot;Qux&quot;"), "Foo & Bar <Baz> \"Qux\"");
+        assert_eq!(
+            unescape_xml("Foo &amp; Bar &lt;Baz&gt; &quot;Qux&quot;"),
+            "Foo & Bar <Baz> \"Qux\""
+        );
         assert_eq!(unescape_xml("Hex &#x41; Dec &#66;"), "Hex A Dec B");
     }
 
@@ -462,7 +469,9 @@ mod tests {
             vec!["Line 1\nLine 2".to_string(), "Normal".to_string()],
         ];
         let csv = format_matrix_to_csv(&matrix);
-        assert_eq!(csv, "\"Header,1\",\"Header \"\"2\"\"\"\n\"Line 1\nLine 2\",Normal");
+        assert_eq!(
+            csv,
+            "\"Header,1\",\"Header \"\"2\"\"\"\n\"Line 1\nLine 2\",Normal"
+        );
     }
 }
-

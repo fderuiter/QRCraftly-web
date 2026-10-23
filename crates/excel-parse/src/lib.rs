@@ -32,7 +32,9 @@ pub mod zip;
 
 use alloc::vec::Vec;
 use qrcraftly_core::abi::{STATUS_BUFFER_TOO_SMALL, STATUS_OK};
-use xml::{format_matrix_to_csv, parse_shared_strings, parse_sheet_xml, parse_spreadsheetml_or_html};
+use xml::{
+    format_matrix_to_csv, parse_shared_strings, parse_sheet_xml, parse_spreadsheetml_or_html,
+};
 use zip::parse_zip;
 
 /// Builds a slice from a pointer and length, treating a null or empty input as empty.
@@ -64,7 +66,11 @@ pub fn excel_bytes_to_csv(data: &[u8]) -> Vec<u8> {
         let sheet_xml = zip_files
             .iter()
             .find(|f| f.name.contains("sheet1.xml"))
-            .or_else(|| zip_files.iter().find(|f| f.name.contains("sheet") && f.name.ends_with(".xml")))
+            .or_else(|| {
+                zip_files
+                    .iter()
+                    .find(|f| f.name.contains("sheet") && f.name.ends_with(".xml"))
+            })
             .and_then(|f| core::str::from_utf8(&f.data).ok());
 
         if let Some(xml_content) = sheet_xml {
@@ -80,7 +86,12 @@ pub fn excel_bytes_to_csv(data: &[u8]) -> Vec<u8> {
     // 2. Try XML Spreadsheet 2003 / HTML table format (.xls XML/HTML fallback)
     if let Ok(text) = core::str::from_utf8(data) {
         let trimmed = text.trim();
-        if trimmed.starts_with('<') && (trimmed.contains("<tr") || trimmed.contains("<Row") || trimmed.contains("<table") || trimmed.contains("<Workbook")) {
+        if trimmed.starts_with('<')
+            && (trimmed.contains("<tr")
+                || trimmed.contains("<Row")
+                || trimmed.contains("<table")
+                || trimmed.contains("<Workbook"))
+        {
             let matrix = parse_spreadsheetml_or_html(text);
             let csv_str = format_matrix_to_csv(&matrix);
             return csv_str.into_bytes();
@@ -130,31 +141,48 @@ mod tests {
     fn rejects_plain_text_passthrough() {
         let input = b"Name,URL\nItem 1,https://example.com";
         let csv = excel_bytes_to_csv(input);
-        assert!(csv.is_empty(), "Plain text passed to excel parser should return empty CSV bytes");
+        assert!(
+            csv.is_empty(),
+            "Plain text passed to excel parser should return empty CSV bytes"
+        );
     }
 
     #[test]
     fn parses_empty_workbook_sheet() {
         let xml = "<worksheet><sheetData/></worksheet>";
         let matrix = parse_sheet_xml(xml, &[]);
-        assert!(matrix.is_empty(), "Empty sheet XML should return an empty matrix");
+        assert!(
+            matrix.is_empty(),
+            "Empty sheet XML should return an empty matrix"
+        );
         let csv = format_matrix_to_csv(&matrix);
-        assert!(csv.is_empty(), "Empty matrix should format to empty CSV string");
+        assert!(
+            csv.is_empty(),
+            "Empty matrix should format to empty CSV string"
+        );
     }
 
     #[test]
     fn parses_html_table_xls() {
         let input = b"<table><tr><td>Name</td><td>URL</td></tr><tr><td>Test</td><td>https://test.com</td></tr></table>";
         let csv = excel_bytes_to_csv(input);
-        assert_eq!(String::from_utf8(csv).unwrap(), "Name,URL\nTest,https://test.com");
+        assert_eq!(
+            String::from_utf8(csv).unwrap(),
+            "Name,URL\nTest,https://test.com"
+        );
     }
 
     #[test]
     fn rejects_legacy_biff_binary_xls() {
         // OLE2 Compound File Binary Format magic bytes (\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1)
-        let ole2_bytes = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0x00, 0x01, 0x02];
+        let ole2_bytes = [
+            0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0x00, 0x01, 0x02,
+        ];
         let csv = excel_bytes_to_csv(&ole2_bytes);
-        assert!(csv.is_empty(), "Legacy binary BIFF .xls should return empty CSV bytes");
+        assert!(
+            csv.is_empty(),
+            "Legacy binary BIFF .xls should return empty CSV bytes"
+        );
     }
 
     #[test]
@@ -166,7 +194,10 @@ mod tests {
             0x00, 0x00, 0x72, 0x65, 0x61, 0x64, 0x6d, 0x65, 0x2e, 0x74, 0x78, 0x74,
         ];
         let csv = excel_bytes_to_csv(&zip_bytes);
-        assert!(csv.is_empty(), "Zip file without sheet XML should return empty CSV bytes");
+        assert!(
+            csv.is_empty(),
+            "Zip file without sheet XML should return empty CSV bytes"
+        );
     }
 
     #[test]
@@ -184,21 +215,22 @@ mod tests {
             let offset = zip.len();
             zip.extend_from_slice(b"PK\x03\x04");
             zip.extend_from_slice(&[20, 0]); // version
-            zip.extend_from_slice(&[0, 0]);  // flags
-            zip.extend_from_slice(&[0, 0]);  // method (stored)
+            zip.extend_from_slice(&[0, 0]); // flags
+            zip.extend_from_slice(&[0, 0]); // method (stored)
             zip.extend_from_slice(&[0, 0, 0, 0]); // time/date
             zip.extend_from_slice(&[0, 0, 0, 0]); // crc
             zip.extend_from_slice(&(content.len() as u32).to_le_bytes()); // comp size
             zip.extend_from_slice(&(content.len() as u32).to_le_bytes()); // uncomp size
             zip.extend_from_slice(&(name.len() as u16).to_le_bytes()); // fn len
-            zip.extend_from_slice(&[0, 0]);  // extra len
+            zip.extend_from_slice(&[0, 0]); // extra len
             zip.extend_from_slice(name.as_bytes());
             zip.extend_from_slice(content);
             offset
         }
 
         let sheet1_xml = br#"<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row></sheetData></worksheet>"#;
-        let shared_strings_xml = br#"<sst><si><t>Header</t></si><si><t>https://example.com</t></si></sst>"#;
+        let shared_strings_xml =
+            br#"<sst><si><t>Header</t></si><si><t>https://example.com</t></si></sst>"#;
 
         let mut zip = Vec::new();
         // Excel order: sheet1.xml BEFORE sharedStrings.xml
@@ -243,20 +275,21 @@ mod tests {
         fn append_local_file(zip: &mut Vec<u8>, name: &str, content: &[u8]) {
             zip.extend_from_slice(b"PK\x03\x04");
             zip.extend_from_slice(&[20, 0]); // version
-            zip.extend_from_slice(&[0, 0]);  // flags
-            zip.extend_from_slice(&[0, 0]);  // method (stored)
+            zip.extend_from_slice(&[0, 0]); // flags
+            zip.extend_from_slice(&[0, 0]); // method (stored)
             zip.extend_from_slice(&[0, 0, 0, 0]); // time/date
             zip.extend_from_slice(&[0, 0, 0, 0]); // crc
             zip.extend_from_slice(&(content.len() as u32).to_le_bytes()); // comp size
             zip.extend_from_slice(&(content.len() as u32).to_le_bytes()); // uncomp size
             zip.extend_from_slice(&(name.len() as u16).to_le_bytes()); // fn len
-            zip.extend_from_slice(&[0, 0]);  // extra len
+            zip.extend_from_slice(&[0, 0]); // extra len
             zip.extend_from_slice(name.as_bytes());
             zip.extend_from_slice(content);
         }
 
         let sheet1_xml = br#"<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row></sheetData></worksheet>"#;
-        let shared_strings_xml = br#"<sst><si><t>Header</t></si><si><t>https://example.com</t></si></sst>"#;
+        let shared_strings_xml =
+            br#"<sst><si><t>Header</t></si><si><t>https://example.com</t></si></sst>"#;
 
         let mut zip = Vec::new();
         // Excel order without central directory (testing fallback local header scanner)

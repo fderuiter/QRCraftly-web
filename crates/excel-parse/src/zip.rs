@@ -19,9 +19,9 @@
 //! Plain Rust PKZip archive parser supporting STORED (0) and DEFLATE (8) compression.
 
 extern crate alloc;
+use super::inflate::{decompress_deflate, MAX_UNCOMPRESSED_SIZE};
 use alloc::string::String;
 use alloc::vec::Vec;
-use super::inflate::{decompress_deflate, MAX_UNCOMPRESSED_SIZE};
 
 #[derive(Debug, Clone)]
 pub struct ZipFileEntry {
@@ -103,7 +103,10 @@ pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
                 Some(s) => s,
                 None => break,
             };
-            let data_start = match name_start.checked_add(fn_len).and_then(|s| s.checked_add(extra_len)) {
+            let data_start = match name_start
+                .checked_add(fn_len)
+                .and_then(|s| s.checked_add(extra_len))
+            {
                 Some(s) => s,
                 None => break,
             };
@@ -262,7 +265,10 @@ fn parse_zip_central_dir(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
         let name_bytes = data.get(name_start..name_end)?;
         let name = String::from_utf8_lossy(name_bytes).into_owned();
 
-        let advance = 46usize.checked_add(fn_len)?.checked_add(extra_len)?.checked_add(comment_len)?;
+        let advance = 46usize
+            .checked_add(fn_len)?
+            .checked_add(extra_len)?
+            .checked_add(comment_len)?;
         cd_pos = cd_pos.checked_add(advance)?;
 
         let is_ss = is_shared_strings_entry(&name);
@@ -294,7 +300,10 @@ fn parse_zip_central_dir(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
 
         let loc_fn_len = get_u16_le(data, local_offset.checked_add(26)?)? as usize;
         let loc_extra_len = get_u16_le(data, local_offset.checked_add(28)?)? as usize;
-        let data_start = local_offset.checked_add(30)?.checked_add(loc_fn_len)?.checked_add(loc_extra_len)?;
+        let data_start = local_offset
+            .checked_add(30)?
+            .checked_add(loc_fn_len)?
+            .checked_add(loc_extra_len)?;
 
         let comp_end = data_start.checked_add(comp_size)?;
         let comp_data = data.get(data_start..comp_end)?;
@@ -348,10 +357,10 @@ mod tests {
         // Construct malformed ZIP data that has EOCD header with huge central directory offset
         let mut malformed = Vec::new();
         malformed.extend_from_slice(b"PK\x05\x06"); // EOCD signature
-        malformed.extend_from_slice(&[0u8; 6]);     // disk numbers and cd counts
+        malformed.extend_from_slice(&[0u8; 6]); // disk numbers and cd counts
         malformed.extend_from_slice(&[0xFF, 0xFF, 0x00, 0x00]); // cd_size
         malformed.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0x7F]); // cd_offset out of bounds
-        malformed.extend_from_slice(&[0u8; 2]);     // comment len
+        malformed.extend_from_slice(&[0u8; 2]); // comment len
 
         assert!(parse_zip(&malformed).is_none());
     }
@@ -369,14 +378,14 @@ mod tests {
             let offset = zip.len();
             zip.extend_from_slice(b"PK\x03\x04");
             zip.extend_from_slice(&[20, 0]); // version
-            zip.extend_from_slice(&[0, 0]);  // flags
-            zip.extend_from_slice(&[0, 0]);  // method (stored)
+            zip.extend_from_slice(&[0, 0]); // flags
+            zip.extend_from_slice(&[0, 0]); // method (stored)
             zip.extend_from_slice(&[0, 0, 0, 0]); // time/date
             zip.extend_from_slice(&[0, 0, 0, 0]); // crc
             zip.extend_from_slice(&(content.len() as u32).to_le_bytes()); // comp size
             zip.extend_from_slice(&(content.len() as u32).to_le_bytes()); // uncomp size
             zip.extend_from_slice(&(name.len() as u16).to_le_bytes()); // fn len
-            zip.extend_from_slice(&[0, 0]);  // extra len
+            zip.extend_from_slice(&[0, 0]); // extra len
             zip.extend_from_slice(name.as_bytes());
             zip.extend_from_slice(content);
             offset
@@ -416,7 +425,11 @@ mod tests {
         zip.extend_from_slice(&[0, 0]); // comment len
 
         let parsed = parse_zip(&zip).expect("Should parse zip successfully");
-        assert_eq!(parsed.len(), 1, "Should stop after sheet1.xml and not parse sheet2.xml");
+        assert_eq!(
+            parsed.len(),
+            1,
+            "Should stop after sheet1.xml and not parse sheet2.xml"
+        );
         assert_eq!(parsed[0].name, "xl/worksheets/sheet1.xml");
     }
 }
