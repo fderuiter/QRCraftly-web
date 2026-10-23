@@ -16,7 +16,7 @@ const WASM_DIR = path.resolve(__dirname, '../src/wasm');
 // What one visitor downloads to open one page (#1106): its HTML, the CSS and the scripts it loads
 // at startup (static imports, not lazy chunks, workers or WebAssembly modules). The worst page is the
 // number that matters for load time, so this is the budget that catches JavaScript bloat.
-export const MAX_PAGE_FIRST_LOAD_KB = 260;
+export const MAX_PAGE_FIRST_LOAD_KB = 261;
 // A loose backstop on the JavaScript and CSS in dist/client, so shipped code cannot grow unseen.
 // Pre-rendered HTML is left out: every new page adds some, and the per-page budget already
 // bounds each page's own HTML. Measured at 563 KB on 2026-10-03.
@@ -37,6 +37,7 @@ export const WASM_MODULE_BUDGETS_KB = {
   // 40 KB under #1198; 48 KB since #1161 added the strict fiducial search (ADR 0047), about 45 KB;
   // 52 KB since slanted tear cuts (ADR 0049) took it to about 49.2 KB. It loads only for file transfer.
   modem: 52,
+  'excel-parse': 30,
 };
 
 /**

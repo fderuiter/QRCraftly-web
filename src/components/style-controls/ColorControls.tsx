@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { GradientType, QRConfig } from '../../types';
 import { PRESET_COLORS, MIN_CONTRAST_THRESHOLD, buildPresetColorPatch, DEFAULT_GRADIENT_END_COLOR } from '../../constants';
 import { getContrastRatio } from '../../utils/colorUtils';
+import { announcePolitely } from '../../utils/a11y';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
 import { SegmentedControl } from '../ui/SegmentedControl';
@@ -35,6 +36,28 @@ const BackgroundColorField: React.FC<ColorControlsProps> = ({ config, onChange }
     </div>
   );
 };
+
+const PRESET_OPTIONS = PRESET_COLORS.map((preset) => ({
+  value: preset.label,
+  ariaLabel: `Select ${preset.label} theme`,
+  label: (
+    <>
+      {/* Use SVG presentation attributes instead of inline styles for CSP compliance */}
+      <svg viewBox="0 0 40 40" className="size-7 shrink-0 rounded ring-1 ring-line-strong" aria-hidden="true">
+        <rect width="40" height="40" fill={preset.bg} />
+        <rect x="6" y="6" width="28" height="28" rx="2" fill="none" stroke={preset.fg} strokeWidth="6" />
+        <rect x="11" y="11" width="18" height="18" rx="1" fill={preset.eye} />
+      </svg>
+      <span className="min-w-0 leading-tight">{preset.label}</span>
+    </>
+  ),
+}));
+
+const FILL_MODE_OPTIONS: Array<{ value: GradientType; label: string }> = [
+  { value: 'none', label: 'Solid' },
+  { value: 'linear', label: 'Linear' },
+  { value: 'radial', label: 'Radial' },
+];
 
 export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }) => {
 
@@ -94,24 +117,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
             });
           }
         }}
-        options={PRESET_COLORS.map((preset) => ({
-          value: preset.label,
-          ariaLabel: `Select ${preset.label} theme`,
-          label: (
-            <>
-              {/* Use SVG presentation attributes instead of inline styles for CSP compliance */}
-              <svg viewBox="0 0 40 40" className="size-7 shrink-0 rounded ring-1 ring-line-strong" aria-hidden="true">
-                {/* Background */}
-                <rect width="40" height="40" fill={preset.bg} />
-                {/* Foreground Ring (Simulating Modules) */}
-                <rect x="6" y="6" width="28" height="28" rx="2" fill="none" stroke={preset.fg} strokeWidth="6" />
-                {/* Eye Center */}
-                <rect x="11" y="11" width="18" height="18" rx="1" fill={preset.eye} />
-              </svg>
-              <span className="min-w-0 leading-tight">{preset.label}</span>
-            </>
-          ),
-        }))}
+        options={PRESET_OPTIONS}
       />
 
       <div className="mb-4">
@@ -137,11 +143,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
               });
             }
           }}
-          options={[
-            { value: 'none', label: 'Solid' },
-            { value: 'linear', label: 'Linear' },
-            { value: 'radial', label: 'Radial' },
-          ]}
+          options={FILL_MODE_OPTIONS}
         />
       </div>
 
@@ -229,6 +231,20 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
         messageType="color"
         className="mt-3"
         decimalPrecision={2}
+        onAutoFix={() => {
+          void import('../../utils/contrastAutoFix')
+            .then(({ calculateAutoFixColorPatch }) => {
+              onChange(calculateAutoFixColorPatch(config));
+              announcePolitely('Contrast adjusted to meet WCAG standards');
+              requestAnimationFrame(() => {
+                (document.getElementById('fg-color') || document.getElementById('gradient-start-color') || document.getElementById('bg-color'))?.focus();
+              });
+            })
+            .catch((err) => {
+              console.error('Failed to load contrast auto-fix module:', err);
+              announcePolitely('Failed to auto-fix contrast. Please try again.');
+            });
+        }}
       />
     </div>
   );

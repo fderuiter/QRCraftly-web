@@ -47,13 +47,27 @@ interface EventInputProps {
 }
 
 export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
+  const currentProvider = data.provider || CalendarProvider.ICAL;
+  const supportsRecurrence =
+    currentProvider === CalendarProvider.ICAL || currentProvider === CalendarProvider.GOOGLE;
+
   return (
     <div className={CONTAINER_SPACING_CLASSES}>
       <SelectField
         id="event-provider"
         label="Target Calendar"
-        value={data.provider || CalendarProvider.ICAL}
-        onChange={(e) => onChange({ provider: e.target.value as CalendarProvider })}
+        value={currentProvider}
+        onChange={(e) => {
+          const nextProvider = e.target.value as CalendarProvider;
+          const isSupported =
+            nextProvider === CalendarProvider.ICAL || nextProvider === CalendarProvider.GOOGLE;
+          onChange({
+            provider: nextProvider,
+            ...(!isSupported
+              ? { recurrenceFreq: undefined, recurrenceCount: undefined }
+              : {}),
+          });
+        }}
         aria-describedby={hintsId("event-provider")}
       >
         <option value={CalendarProvider.ICAL}>iCalendar (.ics)</option>
@@ -114,6 +128,48 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
         <option value="Asia/Kolkata">Kolkata (Asia/Kolkata)</option>
         <option value="Australia/Sydney">Sydney (Australia/Sydney)</option>
       </SelectField>
+      )}
+      {supportsRecurrence && (
+        <>
+          <SelectField
+            id="event-recurrence-freq"
+            label="Repeat"
+            value={data.recurrenceFreq || "NONE"}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "DAILY" || val === "WEEKLY" || val === "MONTHLY" || val === "YEARLY") {
+                onChange({ recurrenceFreq: val });
+              } else if (val === "NONE") {
+                onChange({ recurrenceFreq: "NONE", recurrenceCount: undefined });
+              }
+            }}
+          >
+            <option value="NONE">Does not repeat</option>
+            <option value="DAILY">Daily</option>
+            <option value="WEEKLY">Weekly</option>
+            <option value="MONTHLY">Monthly</option>
+            <option value="YEARLY">Yearly</option>
+          </SelectField>
+          {data.recurrenceFreq && data.recurrenceFreq !== "NONE" && (
+            <TextField
+              id="event-recurrence-count"
+              label="Occurrence Count"
+              type="number"
+              min={1}
+              max={999}
+              placeholder="e.g. 5 (leave blank for indefinite)"
+              value={data.recurrenceCount ?? ""}
+              onChange={(e) => {
+                const count = parseInt(e.target.value, 10);
+                if (!e.target.value || isNaN(count) || count <= 0) {
+                  onChange({ recurrenceCount: undefined });
+                } else {
+                  onChange({ recurrenceCount: Math.min(999, count) });
+                }
+              }}
+            />
+          )}
+        </>
       )}
       <TextField
         id="event-location"
