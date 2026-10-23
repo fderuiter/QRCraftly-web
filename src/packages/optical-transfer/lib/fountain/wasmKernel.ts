@@ -32,17 +32,17 @@ function moduleUrl(): URL {
 let cachedModule: WebAssembly.Module | null = null;
 let loadingPromise: Promise<WebAssembly.Module> | null = null;
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null;
+}
+
 function readNodeFileSync(url: URL): Uint8Array | null {
-  const proc: unknown = Reflect.get(globalThis, 'process');
-  if (typeof proc !== 'object' || proc === null) return null;
-  const getBuiltinModule: unknown = Reflect.get(proc, 'getBuiltinModule');
-  if (typeof getBuiltinModule !== 'function') return null;
-  const fs: unknown = Reflect.apply(getBuiltinModule, proc, ['node:fs']);
-  if (typeof fs !== 'object' || fs === null) return null;
-  const readFileSync: unknown = Reflect.get(fs, 'readFileSync');
-  if (typeof readFileSync !== 'function') return null;
+  const proc = globalThis.process;
+  if (!isRecord(proc) || typeof proc.getBuiltinModule !== 'function') return null;
   try {
-    const bytes: unknown = Reflect.apply(readFileSync, fs, [url]);
+    const fs = proc.getBuiltinModule('node:fs');
+    if (!isRecord(fs) || typeof fs.readFileSync !== 'function') return null;
+    const bytes = fs.readFileSync(url);
     if (!ArrayBuffer.isView(bytes)) return null;
     return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   } catch {
