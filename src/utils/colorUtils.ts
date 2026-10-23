@@ -161,20 +161,38 @@ export function rgbToCmyk(
   gParam?: number,
   bParam?: number
 ): CmykColor {
-  const { r, g, b } = typeof rOrColor === 'object' ? rOrColor : { r: rOrColor, g: gParam ?? 0, b: bParam ?? 0 };
-  const cr = Math.min(1, Math.max(0, r));
-  const cg = Math.min(1, Math.max(0, g));
-  const cb = Math.min(1, Math.max(0, b));
+  let r: number;
+  let g: number;
+  let b: number;
 
-  const k = 1 - Math.max(cr, cg, cb);
-  if (k >= 1) return { c: 0, m: 0, y: 0, k: 1 };
+  if (typeof rOrColor === 'object' && rOrColor !== null) {
+    r = rOrColor.r;
+    g = rOrColor.g;
+    b = rOrColor.b;
+  } else {
+    r = rOrColor;
+    g = gParam ?? 0;
+    b = bParam ?? 0;
+  }
 
-  const dk = 1 - k;
+  r = Math.min(1, Math.max(0, r));
+  g = Math.min(1, Math.max(0, g));
+  b = Math.min(1, Math.max(0, b));
+
+  const k = 1 - Math.max(r, g, b);
+  if (k >= 1) {
+    return { c: 0, m: 0, y: 0, k: 1 };
+  }
+
+  const c = (1 - r - k) / (1 - k);
+  const m = (1 - g - k) / (1 - k);
+  const y = (1 - b - k) / (1 - k);
+
   return {
-    c: (1 - cr - k) / dk,
-    m: (1 - cg - k) / dk,
-    y: (1 - cb - k) / dk,
-    k,
+    c: Math.min(1, Math.max(0, c)),
+    m: Math.min(1, Math.max(0, m)),
+    y: Math.min(1, Math.max(0, y)),
+    k: Math.min(1, Math.max(0, k)),
   };
 }
 

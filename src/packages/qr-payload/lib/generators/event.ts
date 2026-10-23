@@ -93,8 +93,26 @@ export const hydrateEventData = (raw: string): EventData => {
           result.endDate = parseEventDateTime(parts[1] || '').replace(/Z$/i, '');
         }
       }
-      if (parsed.params.get('ctz')) {
-        result.timezone = parsed.params.get('ctz')!;
+      const ctz = parsed.params.get('ctz');
+      if (ctz) {
+        result.timezone = ctz;
+      }
+      const recur = parsed.params.get('recur');
+      if (recur) {
+        const freqMatch = recur.match(/FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)/i);
+        if (freqMatch) {
+          const freq = freqMatch[1].toUpperCase();
+          if (freq === 'DAILY' || freq === 'WEEKLY' || freq === 'MONTHLY' || freq === 'YEARLY') {
+            result.recurrenceFreq = freq;
+          }
+        }
+        const countMatch = recur.match(/COUNT=(\d+)/i);
+        if (countMatch) {
+          const count = parseInt(countMatch[1], 10);
+          if (count > 0) {
+            result.recurrenceCount = Math.min(999, count);
+          }
+        }
       }
       result.location = parsed.params.get('location') || '';
       result.description = parsed.params.get('details') || '';
@@ -171,7 +189,7 @@ export const hydrateEventData = (raw: string): EventData => {
         if (countMatch) {
           const count = parseInt(countMatch[1], 10);
           if (count > 0) {
-            result.recurrenceCount = count;
+            result.recurrenceCount = Math.min(999, count);
           }
         }
         break;
@@ -244,8 +262,10 @@ const buildRRule = (freq?: string, count?: number | string): string[] => {
   const f = freq.toUpperCase();
   if (f !== 'DAILY' && f !== 'WEEKLY' && f !== 'MONTHLY' && f !== 'YEARLY') return [];
 
-  const c = Number(count);
-  return [`RRULE:FREQ=${f}${Number.isInteger(c) && c > 0 ? `;COUNT=${c}` : ''}`];
+  const raw = Number(count);
+  if (!Number.isInteger(raw) || raw <= 0) return [`RRULE:FREQ=${f}`];
+  const c = Math.min(999, raw);
+  return [`RRULE:FREQ=${f};COUNT=${c}`];
 };
 
 /**
@@ -261,8 +281,8 @@ const deriveEventUid = (data: EventData): string => {
     data.timezone,
     data.location,
     data.description,
-    data.recurrenceFreq,
-    data.recurrenceCount,
+    ...(data.recurrenceFreq && data.recurrenceFreq !== 'NONE' ? [data.recurrenceFreq] : []),
+    ...(data.recurrenceCount ? [String(data.recurrenceCount)] : []),
     ...(data.allDay ? ['all-day'] : []),
   ]
     .map((part) => part ?? '')
@@ -313,6 +333,8 @@ export const constructEventString = (
     if (startFormatted.value) {
       params.set('dates', `${startFormatted.value}/${effectiveEnd}`);
     }
+    const rrule = buildRRule(data.recurrenceFreq, data.recurrenceCount);
+    if (rrule.length > 0) params.set('recur', rrule[0]);
     if (data.timezone) params.set('ctz', data.timezone);
     if (data.location) params.set('location', data.location);
     if (data.description) params.set('details', data.description);
@@ -418,6 +440,8 @@ const constructAllDayEvent = (data: EventData, provider: string, options: EventC
     params.set('action', 'TEMPLATE');
     if (data.title) params.set('text', data.title);
     if (startDate) params.set('dates', `${compact(startDate)}/${compact(endDate || shiftDate(startDate, 1))}`);
+    const rrule = buildRRule(data.recurrenceFreq, data.recurrenceCount);
+    if (rrule.length > 0) params.set('recur', rrule[0]);
     if (data.location) params.set('location', data.location);
     if (data.description) params.set('details', data.description);
     return `https://calendar.google.com/calendar/render?${params.toString()}`;

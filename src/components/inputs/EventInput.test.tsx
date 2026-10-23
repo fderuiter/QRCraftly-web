@@ -91,4 +91,31 @@ describe('EventInput', () => {
     fireEvent.change(repeatSelect, { target: { value: 'NONE' } });
     expect(onChange).toHaveBeenCalledWith({ recurrenceFreq: 'NONE', recurrenceCount: undefined });
   });
+
+  it('shows recurrence controls for ICAL and GOOGLE, but hides them for OUTLOOK, OFFICE365, YAHOO', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<EventInput data={{ ...event, provider: CalendarProvider.ICAL }} onChange={onChange} />);
+    expect(screen.getByLabelText('Repeat')).toBeInTheDocument();
+
+    rerender(<EventInput data={{ ...event, provider: CalendarProvider.GOOGLE }} onChange={onChange} />);
+    expect(screen.getByLabelText('Repeat')).toBeInTheDocument();
+
+    rerender(<EventInput data={{ ...event, provider: CalendarProvider.OUTLOOK }} onChange={onChange} />);
+    expect(screen.queryByLabelText('Repeat')).not.toBeInTheDocument();
+
+    rerender(<EventInput data={{ ...event, provider: CalendarProvider.OFFICE365 }} onChange={onChange} />);
+    expect(screen.queryByLabelText('Repeat')).not.toBeInTheDocument();
+
+    rerender(<EventInput data={{ ...event, provider: CalendarProvider.YAHOO }} onChange={onChange} />);
+    expect(screen.queryByLabelText('Repeat')).not.toBeInTheDocument();
+  });
+
+  it('caps occurrence count input at 999', () => {
+    const onChange = vi.fn();
+    render(<EventInput data={{ ...event, recurrenceFreq: 'DAILY' }} onChange={onChange} />);
+
+    const countInput = screen.getByLabelText('Occurrence Count');
+    fireEvent.change(countInput, { target: { value: '1500' } });
+    expect(onChange).toHaveBeenCalledWith({ recurrenceCount: 999 });
+  });
 });

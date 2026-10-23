@@ -106,6 +106,59 @@ describe('Event generator', () => {
     const hydratedInvalid = hydrateEventData(rawInvalidCount);
     expect(hydratedInvalid.recurrenceFreq).toBe('YEARLY');
     expect(hydratedInvalid.recurrenceCount).toBeUndefined();
+
+    // 5. Large count capped at 999
+    const dataLargeCount = {
+      title: 'Event',
+      startDate: '2025-01-01T10:00',
+      endDate: '2025-01-01T11:00',
+      recurrenceFreq: 'DAILY' as const,
+      recurrenceCount: 5000,
+      location: '',
+      description: '',
+    };
+    const strLarge = constructEventString(dataLargeCount);
+    expect(strLarge).toContain('RRULE:FREQ=DAILY;COUNT=999');
+    expect(hydrateEventData(strLarge).recurrenceCount).toBe(999);
+  });
+
+  it('supports Google Calendar recurrence links and hydration', () => {
+    const googleData = {
+      provider: CalendarProvider.GOOGLE,
+      title: 'Google Sync',
+      startDate: '2025-01-01T10:00',
+      endDate: '2025-01-01T11:00',
+      recurrenceFreq: 'WEEKLY' as const,
+      recurrenceCount: 12,
+      location: 'Google Meet',
+      description: 'Weekly team call',
+    };
+    const link = constructEventString(googleData);
+    expect(link).toContain('calendar.google.com/calendar/render');
+    expect(link).toContain('recur=RRULE%3AFREQ%3DWEEKLY%3BCOUNT%3D12');
+
+    const hydrated = hydrateEventData(link);
+    expect(hydrated.provider).toBe(CalendarProvider.GOOGLE);
+    expect(hydrated.title).toBe('Google Sync');
+    expect(hydrated.recurrenceFreq).toBe('WEEKLY');
+    expect(hydrated.recurrenceCount).toBe(12);
+  });
+
+  it('maintains stable UID for non-recurring events', () => {
+    const nonRecurring = {
+      title: 'Legacy Event',
+      startDate: '2025-05-01T09:00',
+      endDate: '2025-05-01T10:00',
+      location: 'Office',
+      description: 'Check UID stability',
+    };
+    const str = constructEventString(nonRecurring);
+    const uidLine = str.split(/\r?\n/).find((line) => line.startsWith('UID:'));
+    expect(uidLine).toBeDefined();
+    // Re-constructing same event must yield identical UID
+    const strAgain = constructEventString(nonRecurring);
+    const uidLineAgain = strAgain.split(/\r?\n/).find((line) => line.startsWith('UID:'));
+    expect(uidLineAgain).toBe(uidLine);
   });
 
   it('hydrates with missing fields', () => {
