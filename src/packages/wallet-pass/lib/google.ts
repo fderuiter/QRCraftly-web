@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { wasmRsaSign } from './crypto';
 import { WalletPassError } from './errors';
-import { importRsaSigningKey, rsaSign } from './signer';
 import type { PassColors, PassContent } from './content';
 
 /**
@@ -128,9 +128,8 @@ export interface GoogleSaveLink {
  */
 export async function buildGoogleSaveLink(account: GoogleServiceAccount, input: GoogleWalletInput): Promise<GoogleSaveLink> {
   const claims = googleSaveClaims(account, input);
-  const key = await importRsaSigningKey(account.privateKeyPem);
   const signingInput = `${encodeJson({ alg: 'RS256', typ: 'JWT' })}.${encodeJson(claims)}`;
-  const signature = await rsaSign(key, new TextEncoder().encode(signingInput));
+  const signature = await wasmRsaSign(account.privateKeyPem, new TextEncoder().encode(signingInput));
   const jwt = `${signingInput}.${base64Url(signature)}`;
   return { url: `${GOOGLE_SAVE_URL}${jwt}`, jwt };
 }
