@@ -10,7 +10,9 @@ import {
 } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
 import { Button } from "../ui/Button";
+import { Alert } from "../ui/Alert";
 import { Upload } from "lucide-react";
+import { announcePolitely } from "../../utils/a11y";
 import {
   GRID_TWO_COLUMNS_CLASSES,
   SUB_CONTAINER_SPACING_CLASSES,
@@ -20,6 +22,8 @@ interface VCardInputProps {
   data: VCardData;
   onChange: (updates: Partial<VCardData>) => void;
 }
+
+const MAX_FILE_SIZE_BYTES = 256 * 1024; // 256 KB cap
 
 export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
   const firstNameError = vCardFieldError("firstName", data.firstName);
@@ -37,10 +41,18 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
   // A half-typed profile link is not yet on its network's host, so its error waits for blur (#1435).
   const [blurredSocials, setBlurredSocials] = useState<ReadonlySet<string>>(() => new Set());
   const [isDragging, setIsDragging] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMeCard = data.version === "mecard";
 
   const processFile = async (file: File) => {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      const msg = "File size exceeds 256 KB limit.";
+      setFileError(msg);
+      announcePolitely(msg);
+      return;
+    }
+
     let text = "";
     if (typeof file.text === "function") {
       try {
@@ -58,8 +70,45 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
       });
     }
 
+    const trimmed = text.trim();
+    const hasVCard = /begin:vcard/i.test(trimmed);
+    const hasMECard = /^mecard:/i.test(trimmed);
+
+    if (!hasVCard && !hasMECard) {
+      const msg = "Invalid vCard file. Missing BEGIN:VCARD header.";
+      setFileError(msg);
+      announcePolitely(msg);
+      return;
+    }
+
     const hydrated = hydrateVCardData(text);
-    onChange(hydrated);
+
+    // Filter to pass only non-empty parsed fields
+    const updates: Partial<VCardData> = {};
+    (Object.keys(hydrated) as (keyof VCardData)[]).forEach((key) => {
+      if (key === "version") return;
+      const val = hydrated[key];
+      if (val && typeof val === "string" && val.trim() !== "") {
+        updates[key] = val;
+      }
+    });
+
+    // Keep version unless explicitly set in file (or MECard)
+    if (hasMECard) {
+      updates.version = "mecard";
+    } else if (/VERSION:(2\.1|3\.0|4\.0)/i.test(text)) {
+      updates.version = hydrated.version;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setFileError(null);
+      onChange(updates);
+      announcePolitely("vCard contact details imported");
+    } else {
+      const msg = "No contact details found in vCard file.";
+      setFileError(msg);
+      announcePolitely(msg);
+    }
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -111,16 +160,22 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           onDrop={handleDrop}
           data-dragover={isDragging ? "" : undefined}
           className="group"
-          aria-describedby="vcard-upload-help"
         >
           <span className="flex size-10 items-center justify-center rounded-full bg-surface-hover transition-colors group-hover:bg-accent-soft">
             <Upload className="size-5" aria-hidden="true" />
           </span>
           <span className="text-sm font-medium">Import .vcf or .vcard file</span>
-          <span id="vcard-upload-help" className="text-xs text-fg-muted">
+          <span className="text-xs text-fg-muted">
             Drag & drop or select a vCard file to auto-populate contact fields
           </span>
         </Button>
+        {fileError && (
+          <div className="mt-2">
+            <Alert variant="error" onDismiss={() => setFileError(null)}>
+              {fileError}
+            </Alert>
+          </div>
+        )}
       </div>
 
       <SelectField

@@ -18,10 +18,19 @@
 
 import { useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { VCardInput } from './VCardInput';
 import type { VCardData } from '../../types';
+import { announcePolitely } from '../../utils/a11y';
+
+vi.mock('../../utils/a11y', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../utils/a11y')>();
+  return {
+    ...actual,
+    announcePolitely: vi.fn(),
+  };
+});
 
 const blankCard = (overrides: Partial<VCardData> = {}): VCardData => ({
   version: '3.0',
@@ -154,6 +163,10 @@ EMAIL:jane.doe@example.com
 URL:https://example.com
 END:VCARD`;
 
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders import dropzone button and hidden file input', () => {
     render(<VCardInput data={blankCard()} onChange={vi.fn()} />);
     expect(screen.getByRole('button', { name: /import \.vcf or \.vcard file/i })).toBeInTheDocument();
@@ -184,6 +197,7 @@ END:VCARD`;
           website: 'https://example.com',
         })
       );
+      expect(announcePolitely).toHaveBeenCalledWith('vCard contact details imported');
     });
   });
 
@@ -210,12 +224,53 @@ END:VCARD`;
           email: 'jane.doe@example.com',
         })
       );
+      expect(announcePolitely).toHaveBeenCalledWith('vCard contact details imported');
     });
   });
 
-  it('handles malformed file content without crashing', async () => {
+  it('preserves existing fields and version when importing partial vCard', async () => {
+    const onChange = vi.fn();
+    const existing = blankCard({
+      version: '4.0',
+      photo: 'https://example.com/avatar.jpg',
+      street: '123 Main St',
+    });
+    render(<VCardInput data={existing} onChange={onChange} />);
+
+    const partialVCard = `BEGIN:VCARD
+TEL:+1-555-0199
+END:VCARD`;
+
+    const file = new File([partialVCard], 'partial.vcf', { type: 'text/vcard' });
+    const fileInput = screen.getByLabelText(/upload vcard file/i);
+
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith({ phone: '+1-555-0199' });
+    });
+  });
+
+  it('rejects file larger than 256 KB with error message', async () => {
     const onChange = vi.fn();
     render(<VCardInput data={blankCard()} onChange={onChange} />);
+
+    const largeContent = new Uint8Array(257 * 1024);
+    const largeFile = new File([largeContent], 'large.vcf', { type: 'text/vcard' });
+    const fileInput = screen.getByLabelText(/upload vcard file/i);
+
+    fireEvent.change(fileInput, { target: { files: [largeFile] } });
+
+    await vi.waitFor(() => {
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toHaveTextContent(/file size exceeds 256 kb limit/i);
+      expect(announcePolitely).toHaveBeenCalledWith('File size exceeds 256 KB limit.');
+    });
+  });
+
+  it('handles malformed file content by displaying error alert without wiping form', async () => {
+    const onChange = vi.fn();
+    render(<VCardInput data={blankCard({ firstName: 'Alice' })} onChange={onChange} />);
 
     const badFile = new File(['this is not a vcard file at all'], 'invalid.vcf', { type: 'text/plain' });
     const fileInput = screen.getByLabelText(/upload vcard file/i);
@@ -223,13 +278,25 @@ END:VCARD`;
     fireEvent.change(fileInput, { target: { files: [badFile] } });
 
     await vi.waitFor(() => {
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          firstName: '',
-          lastName: '',
-        })
-      );
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toHaveTextContent(/invalid vcard file/i);
+      expect(announcePolitely).toHaveBeenCalledWith('Invalid vCard file. Missing BEGIN:VCARD header.');
     });
+  });
+
+  it('passes axe accessibility checks on dropzone and error state', async () => {
+    const { container } = render(<VCardInput data={blankCard()} onChange={vi.fn()} />);
+    expect((await axe(container)).violations).toEqual([]);
+
+    const badFile = new File(['invalid content'], 'invalid.vcf', { type: 'text/plain' });
+    const fileInput = screen.getByLabelText(/upload vcard file/i);
+    fireEvent.change(fileInput, { target: { files: [badFile] } });
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+
+    expect((await axe(container)).violations).toEqual([]);
   });
 });
 
