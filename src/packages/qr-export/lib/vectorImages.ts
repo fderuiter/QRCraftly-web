@@ -45,6 +45,8 @@ export type ImageDecoder = (href: string, width: number, height: number) => Prom
 export interface VectorExportOptions {
   /** Image decoder for logos; defaults to the browser's. */
   decodeImage?: ImageDecoder;
+  /** Target color space ('rgb' or 'cmyk'). Defaults to 'rgb'. */
+  colorSpace?: 'rgb' | 'cmyk';
 }
 
 /** Thrown when an export would otherwise leave out a logo it cannot embed. */
@@ -156,3 +158,31 @@ export function alphaToMask(image: RasterImage, alpha: Uint8Array): Uint8Array {
   }
   return mask;
 }
+
+/** Converts 3-channel RGB image bytes to 4-channel CMYK image bytes (0..255). */
+export function rgbToCmykBytes(rgb: Uint8Array): Uint8Array {
+  const pixelCount = Math.floor(rgb.length / 3);
+  const cmyk = new Uint8Array(pixelCount * 4);
+  for (let i = 0; i < pixelCount; i++) {
+    const r = rgb[i * 3] / 255;
+    const g = rgb[i * 3 + 1] / 255;
+    const b = rgb[i * 3 + 2] / 255;
+    const k = 1 - Math.max(r, g, b);
+    if (k >= 1) {
+      cmyk[i * 4] = 0;
+      cmyk[i * 4 + 1] = 0;
+      cmyk[i * 4 + 2] = 0;
+      cmyk[i * 4 + 3] = 255;
+    } else {
+      const c = (1 - r - k) / (1 - k);
+      const m = (1 - g - k) / (1 - k);
+      const y = (1 - b - k) / (1 - k);
+      cmyk[i * 4] = Math.min(255, Math.max(0, Math.round(c * 255)));
+      cmyk[i * 4 + 1] = Math.min(255, Math.max(0, Math.round(m * 255)));
+      cmyk[i * 4 + 2] = Math.min(255, Math.max(0, Math.round(y * 255)));
+      cmyk[i * 4 + 3] = Math.min(255, Math.max(0, Math.round(k * 255)));
+    }
+  }
+  return cmyk;
+}
+
