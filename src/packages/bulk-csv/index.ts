@@ -20,6 +20,13 @@
  * Bulk CSV batch engine: dependency-free building blocks for the Bulk CSV Batch
  * generator. Everything runs in memory in the browser and makes no network requests.
  *
+ * Architectural note (ADR 0033):
+ * CSV parsing and ZIP archive creation are retained in pure TypeScript. Per ADR 0033,
+ * WebAssembly is reserved strictly for heavy compute/math kernels (e.g. GF(256), CRC-32
+ * inner loops, QR matrix layout, and camera decoding) where JS JIT engines hit limits.
+ * Lightweight string tokenization and single-buffer ZIP assembly execute faster in JS linear
+ * memory without WebAssembly FFI memory copying overhead or binary module loading cost.
+ *
  * - RFC 4180 CSV parser with a header row and a bounded row count.
  * - Minimal ZIP writer (stored entries, CRC-32, UTF-8 names).
  * - Cross-platform file name helpers for the archive entries.

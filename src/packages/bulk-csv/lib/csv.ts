@@ -16,6 +16,15 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+/**
+ * Pure TypeScript RFC 4180 CSV Parser
+ *
+ * Enforces strict bounded input limits (`MAX_BULK_CSV_CHARS` and `MAX_BULK_CSV_ROWS`) to
+ * prevent memory spikes and ensure fast single-pass parsing in JavaScript memory.
+ * Per ADR 0033, this utility is retained in TypeScript to avoid unnecessary WebAssembly
+ * FFI memory copying overhead.
+ */
+
 /** Most data rows a bulk batch keeps in memory. Rows past this are counted, not stored. */
 export const MAX_BULK_CSV_ROWS = 500;
 
