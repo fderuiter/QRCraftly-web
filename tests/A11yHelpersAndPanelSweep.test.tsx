@@ -87,7 +87,7 @@ describe('Modular Accessibility Test Helpers & Full Panel Sweep', () => {
     expect(screen.getByText('This Code May Not Scan')).toBeInTheDocument();
 
     // The dialog offers the matching fix first; close it without changing anything
-    expect(screen.getByRole('button', { name: 'Use black on white' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Auto-fix contrast' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Close/ }));
 
     // Confirm that the warning dialog is hidden

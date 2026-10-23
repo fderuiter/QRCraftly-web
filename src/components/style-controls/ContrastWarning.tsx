@@ -115,8 +115,8 @@ export const ContrastBanner: React.FC<ContrastBannerProps> = ({
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span>
               {messageType === 'color'
-                ? `Warning: The contrast ratio is low (${contrastRatio.toFixed(decimalPrecision)}). QR codes should have high contrast (aim for 4.5:1) to be scannable by all devices.`
-                : `The contrast ratio between the layout's text and background is low (${contrastRatio.toFixed(decimalPrecision)}). Ensure contrast is above 4.5:1 for ideal legibility on export.`}
+                ? `Warning: The contrast ratio is low (${contrastRatio.toFixed(decimalPrecision)}). QR codes should have high contrast (aim for 4.5:1) to be scannable.`
+                : `The contrast ratio between the layout's text and background is low (${contrastRatio.toFixed(decimalPrecision)}). Ensure contrast is above 4.5:1 for legibility on export.`}
             </span>
             {onAutoFix && (
               <Button

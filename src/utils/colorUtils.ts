@@ -25,12 +25,9 @@ import type { QRConfig } from '../types';
  * @returns The normalized hex string, or null if invalid.
  */
 export const normalizeHex = (val: string): string | null => {
-  const match = val.match(/^#?([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/);
+  const match = val.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
   if (!match) return null;
-  let hex = match[1];
-  if (hex.length === 3) {
-    hex = hex.split('').map(c => c + c).join('');
-  }
+  const hex = match[1].length === 3 ? match[1].replace(/./g, '$&$&') : match[1];
   return '#' + hex.toLowerCase();
 };
 
@@ -107,17 +104,9 @@ export const getLuminanceFromLinearRgb = (r: number, g: number, b: number): numb
  * @returns The relative luminance value.
  */
 export const getLuminance = (hex: string): number => {
-  let normalizedHex = hex;
-  if (hex.length === 4) {
-    normalizedHex = '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
-  }
-
-  const rgb = parseInt(normalizedHex.slice(1), 16);
-  const r = ((rgb >> 16) & 0xff) / 255;
-  const g = ((rgb >> 8) & 0xff) / 255;
-  const b = (rgb & 0xff) / 255;
-
-  return getLuminanceFromRgb(r, g, b);
+  const norm = hex.length === 4 ? '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3] : hex;
+  const rgb = parseInt(norm.slice(1), 16);
+  return getLuminanceFromRgb(((rgb >> 16) & 0xff) / 255, ((rgb >> 8) & 0xff) / 255, (rgb & 0xff) / 255);
 };
 
 /**
@@ -128,16 +117,12 @@ export const getLuminance = (hex: string): number => {
  */
 export const getContrastRatio = (fg: string, bg: string) => {
   if (!fg || !bg) return 0;
-  if ((fg.length !== 7 && fg.length !== 4) || (bg.length !== 7 && bg.length !== 4)) return 0;
-
-  const hexRegex = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+  const hexRegex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
   if (!hexRegex.test(fg) || !hexRegex.test(bg)) return 0;
 
   const l1 = getLuminance(fg);
   const l2 = getLuminance(bg);
-  const lighter = Math.max(l1, l2);
-  const darker = Math.min(l1, l2);
-  return (lighter + 0.05) / (darker + 0.05);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
 };
 
 /**
@@ -145,32 +130,16 @@ export const getContrastRatio = (fg: string, bg: string) => {
  * @returns Object with h (0..360), s (0..1), and l (0..1).
  */
 export const rgbToHsl = (r: number, g: number, b: number): { h: number; s: number; l: number } => {
-  const rNorm = r / 255;
-  const gNorm = g / 255;
-  const bNorm = b / 255;
-  const max = Math.max(rNorm, gNorm, bNorm);
-  const min = Math.min(rNorm, gNorm, bNorm);
+  const rN = r / 255, gN = g / 255, bN = b / 255;
+  const max = Math.max(rN, gN, bN), min = Math.min(rN, gN, bN);
   const l = (max + min) / 2;
-  let h = 0;
-  let s = 0;
-
+  let h = 0, s = 0;
   if (max !== min) {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case rNorm:
-        h = (gNorm - bNorm) / d + (gNorm < bNorm ? 6 : 0);
-        break;
-      case gNorm:
-        h = (bNorm - rNorm) / d + 2;
-        break;
-      case bNorm:
-        h = (rNorm - gNorm) / d + 4;
-        break;
-    }
+    h = max === rN ? (gN - bN) / d + (gN < bN ? 6 : 0) : max === gN ? (bN - rN) / d + 2 : (rN - gN) / d + 4;
     h /= 6;
   }
-
   return { h: h * 360, s, l };
 };
 
@@ -178,109 +147,44 @@ export const rgbToHsl = (r: number, g: number, b: number): { h: number; s: numbe
  * Converts HSL values (h: 0..360, s: 0..1, l: 0..1) to a CSS hex string (#rrggbb).
  */
 export const hslToHex = (h: number, s: number, l: number): string => {
-  const hNorm = ((h % 360) + 360) % 360;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((hNorm / 60) % 2) - 1));
-  const m = l - c / 2;
-
-  let r = 0;
-  let g = 0;
-  let b = 0;
-
-  if (0 <= hNorm && hNorm < 60) {
-    r = c; g = x; b = 0;
-  } else if (60 <= hNorm && hNorm < 120) {
-    r = x; g = c; b = 0;
-  } else if (120 <= hNorm && hNorm < 180) {
-    r = 0; g = c; b = x;
-  } else if (180 <= hNorm && hNorm < 240) {
-    r = 0; g = x; b = c;
-  } else if (240 <= hNorm && hNorm < 300) {
-    r = x; g = 0; b = c;
-  } else if (300 <= hNorm && hNorm < 360) {
-    r = c; g = 0; b = x;
-  }
-
-  const rByte = Math.round((r + m) * 255);
-  const gByte = Math.round((g + m) * 255);
-  const bByte = Math.round((b + m) * 255);
-
-  const toHex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
-  return `#${toHex(rByte)}${toHex(gByte)}${toHex(bByte)}`;
+  const hN = ((h % 360) + 360) % 360, c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((hN / 60) % 2) - 1)), m = l - c / 2;
+  const i = Math.floor(hN / 60);
+  const [r, g, b] = i === 0 ? [c, x, 0] : i === 1 ? [x, c, 0] : i === 2 ? [0, c, x] : i === 3 ? [0, x, c] : i === 4 ? [x, 0, c] : [c, 0, x];
+  const hex = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, '0');
+  return `#${hex(r)}${hex(g)}${hex(b)}`;
 };
 
 /**
  * Adjusts a foreground hex color's lightness L using binary search to achieve target contrast (>= 4.5 by default)
  * against a background hex color while keeping hue and saturation constant.
  */
-export const adjustColorForContrast = (
-  fgHex: string,
-  bgHex: string,
-  targetContrast = 4.5
-): string => {
+export const adjustColorForContrast = (fgHex: string, bgHex: string, targetContrast = 4.5): string => {
   const normBg = (bgHex === 'transparent' || !bgHex ? '#ffffff' : normalizeHex(bgHex)) || '#ffffff';
   const normFg = (fgHex ? normalizeHex(fgHex) : null) || '#000000';
-
-  if (getContrastRatio(normFg, normBg) >= targetContrast) {
-    return normFg;
-  }
+  if (getContrastRatio(normFg, normBg) >= targetContrast) return normFg;
 
   const rgb = parseInt(normFg.slice(1), 16);
-  const r = (rgb >> 16) & 0xff;
-  const g = (rgb >> 8) & 0xff;
-  const b = rgb & 0xff;
-  const { h, s, l: initialL } = rgbToHsl(r, g, b);
+  const { h, s, l: initL } = rgbToHsl((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
 
-  // Binary search towards darker lightness L in [0, initialL]
-  let bestDark: string | null = null;
-  let bestDarkL = 0;
-  if (getContrastRatio(hslToHex(h, s, 0), normBg) >= targetContrast) {
-    let low = 0;
-    let high = initialL;
+  const search = (low: number, high: number, targetL: number) => {
+    if (getContrastRatio(hslToHex(h, s, targetL), normBg) < targetContrast) return null;
+    let best = { hex: '', l: targetL }, l = low, r = high;
     for (let i = 0; i < 15; i++) {
-      const mid = (low + high) / 2;
-      const hexMid = hslToHex(h, s, mid);
+      const mid = (l + r) / 2, hexMid = hslToHex(h, s, mid);
       if (getContrastRatio(hexMid, normBg) >= targetContrast) {
-        bestDark = hexMid;
-        bestDarkL = mid;
-        low = mid;
+        best = { hex: hexMid, l: mid };
+        if (targetL === 0) l = mid; else r = mid;
       } else {
-        high = mid;
+        if (targetL === 0) r = mid; else l = mid;
       }
     }
-  }
+    return best.hex ? best : null;
+  };
 
-  // Binary search towards lighter lightness L in [initialL, 1]
-  let bestLight: string | null = null;
-  let bestLightL = 1;
-  if (getContrastRatio(hslToHex(h, s, 1), normBg) >= targetContrast) {
-    let low = initialL;
-    let high = 1;
-    for (let i = 0; i < 15; i++) {
-      const mid = (low + high) / 2;
-      const hexMid = hslToHex(h, s, mid);
-      if (getContrastRatio(hexMid, normBg) >= targetContrast) {
-        bestLight = hexMid;
-        bestLightL = mid;
-        high = mid;
-      } else {
-        low = mid;
-      }
-    }
-  }
-
-  if (bestDark !== null && bestLight !== null) {
-    const deltaDark = Math.abs(initialL - bestDarkL);
-    const deltaLight = Math.abs(bestLightL - initialL);
-    return deltaDark <= deltaLight ? bestDark : bestLight;
-  }
-  if (bestDark !== null) return bestDark;
-  if (bestLight !== null) return bestLight;
-
-  // Fallback if maintaining saturation fails to hit contrast ratio: pick black or white based on highest contrast
-  const blackContrast = getContrastRatio('#000000', normBg);
-  const whiteContrast = getContrastRatio('#ffffff', normBg);
-  return blackContrast >= whiteContrast ? '#000000' : '#ffffff';
+  const d = search(0, initL, 0), g = search(initL, 1, 1);
+  if (d && g) return Math.abs(initL - d.l) <= Math.abs(g.l - initL) ? d.hex : g.hex;
+  if (d || g) return (d || g)!.hex;
+  return getContrastRatio('#000000', normBg) >= getContrastRatio('#ffffff', normBg) ? '#000000' : '#ffffff';
 };
 
 /**
@@ -292,40 +196,20 @@ export const calculateAutoFixColorPatch = (config?: Partial<QRConfig> | null): P
   const bg = config.bgColor === 'transparent' || !config.bgColor ? '#ffffff' : config.bgColor;
   const patch: Partial<QRConfig> = {};
 
-  if (
-    config.gradientType &&
-    config.gradientType !== 'none' &&
-    config.gradientColorStops &&
-    config.gradientColorStops.length > 0
-  ) {
-    const newStops = config.gradientColorStops.map((stop) => ({
-      ...stop,
-      color: adjustColorForContrast(stop.color, bg, 4.5),
-    }));
-    patch.gradientColorStops = newStops;
-    patch.fgColor = newStops[0]?.color ?? config.fgColor;
+  if (config.gradientType && config.gradientType !== 'none' && config.gradientColorStops?.length) {
+    const stops = config.gradientColorStops.map((stop) => ({ ...stop, color: adjustColorForContrast(stop.color, bg, 4.5) }));
+    patch.gradientColorStops = stops;
+    patch.fgColor = stops[0]?.color ?? config.fgColor;
   } else {
-    const fg = config.fgColor || '#000000';
-    patch.fgColor = adjustColorForContrast(fg, bg, 4.5);
+    patch.fgColor = adjustColorForContrast(config.fgColor || '#000000', bg, 4.5);
   }
 
-  const effectiveEyeFrame = config.eyeFrameColor || config.eyeColor;
-  if (effectiveEyeFrame) {
-    if (config.eyeFrameColor) {
-      patch.eyeFrameColor = adjustColorForContrast(config.eyeFrameColor, bg, 4.5);
-    } else if (config.eyeColor) {
-      patch.eyeColor = adjustColorForContrast(config.eyeColor, bg, 4.5);
-    }
-  }
+  const fix = (c?: string) => c ? adjustColorForContrast(c, bg, 4.5) : undefined;
+  if (config.eyeFrameColor) patch.eyeFrameColor = fix(config.eyeFrameColor);
+  else if (config.eyeColor) patch.eyeColor = fix(config.eyeColor);
 
-  const effectiveEyeBall = config.eyeBallColor || config.eyeColor;
-  if (effectiveEyeBall) {
-    if (config.eyeBallColor) {
-      patch.eyeBallColor = adjustColorForContrast(config.eyeBallColor, bg, 4.5);
-    } else if (config.eyeColor && !patch.eyeColor) {
-      patch.eyeColor = adjustColorForContrast(config.eyeColor, bg, 4.5);
-    }
-  }
+  if (config.eyeBallColor) patch.eyeBallColor = fix(config.eyeBallColor);
+  else if (config.eyeColor && !patch.eyeColor) patch.eyeColor = fix(config.eyeColor);
 
   return patch;
 };
