@@ -15,18 +15,7 @@ interface VCardInputProps {
 }
 
 export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
-  const firstNameError = vCardFieldError("firstName", data.firstName);
-  const lastNameError = vCardFieldError("lastName", data.lastName);
-  const phoneError = vCardFieldError("phone", data.phone);
-  const emailError = vCardFieldError("email", data.email);
-  const orgError = vCardFieldError("organization", data.organization);
-  const titleError = vCardFieldError("title", data.title);
-  const websiteError = vCardFieldError("website", data.website);
-  const photoError = vCardFieldError("photo", data.photo);
-  const streetError = vCardFieldError("street", data.street);
-  const cityError = vCardFieldError("city", data.city);
-  const zipError = vCardFieldError("zip", data.zip);
-  const countryError = vCardFieldError("country", data.country);
+  const err = (field: keyof VCardData) => vCardFieldError(field, data[field]);
   // A half-typed profile link is not yet on its network's host, so its error waits for blur (#1435).
   const [blurredSocials, setBlurredSocials] = useState<ReadonlySet<string>>(() => new Set());
   const isMeCard = data.version === "mecard";
@@ -57,7 +46,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           placeholder="e.g. Jane"
           value={data.firstName}
           onChange={(e) => onChange({ firstName: e.target.value })}
-          error={firstNameError}
+          error={err("firstName")}
         />
         <TextField
           id="vcard-lastname"
@@ -68,7 +57,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           placeholder="e.g. Doe"
           value={data.lastName}
           onChange={(e) => onChange({ lastName: e.target.value })}
-          error={lastNameError}
+          error={err("lastName")}
         />
       </div>
 
@@ -83,7 +72,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           placeholder="+1 555 000 0000"
           value={data.phone}
           onChange={(e) => onChange({ phone: e.target.value })}
-          error={phoneError}
+          error={err("phone")}
         />
         <TextField
           id="vcard-email"
@@ -95,7 +84,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           placeholder="name@example.com"
           value={data.email}
           onChange={(e) => onChange({ email: e.target.value })}
-          error={emailError}
+          error={err("email")}
         />
       </div>
 
@@ -108,7 +97,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         placeholder="e.g. Acme Corp"
         value={data.organization}
         onChange={(e) => onChange({ organization: e.target.value })}
-        error={orgError}
+        error={err("organization")}
       />
 
       <TextField
@@ -120,7 +109,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         placeholder="e.g. Software Engineer"
         value={data.title}
         onChange={(e) => onChange({ title: e.target.value })}
-        error={titleError}
+        error={err("title")}
       />
 
       <TextField
@@ -133,10 +122,10 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         placeholder="https://example.com"
         value={data.website}
         onChange={(e) => onChange({ website: e.target.value })}
-        error={websiteError}
+        error={err("website")}
         aria-describedby={hintsId("vcard-website")}
       />
-      {!websiteError && <LinkHints fieldId="vcard-website" address={data.website} />}
+      {!err("website") && <LinkHints fieldId="vcard-website" address={data.website} />}
 
       {!isMeCard && (
         <>
@@ -150,11 +139,11 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
             placeholder="https://example.com/avatar.jpg"
             value={data.photo || ""}
             onChange={(e) => onChange({ photo: e.target.value })}
-            error={photoError}
+            error={err("photo")}
             aria-describedby={hintsId("vcard-photo")}
           />
           <p className="mt-1 text-xs text-fg-muted">Some phones don't load linked photos.</p>
-          {!photoError && <LinkHints fieldId="vcard-photo" address={data.photo || ""} />}
+          {!err("photo") && <LinkHints fieldId="vcard-photo" address={data.photo || ""} />}
         </>
       )}
 
@@ -197,7 +186,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
             placeholder="Street"
             value={data.street}
             onChange={(e) => onChange({ street: e.target.value })}
-            error={streetError}
+            error={err("street")}
           />
           <div className={GRID_TWO_COLUMNS_CLASSES}>
             <TextField
@@ -209,7 +198,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               placeholder="City"
               value={data.city}
               onChange={(e) => onChange({ city: e.target.value })}
-              error={cityError}
+              error={err("city")}
             />
             <TextField
               id="vcard-zip"
@@ -220,7 +209,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               placeholder="ZIP"
               value={data.zip}
               onChange={(e) => onChange({ zip: e.target.value })}
-              error={zipError}
+              error={err("zip")}
             />
             <TextField
               id="vcard-country"
@@ -231,7 +220,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               placeholder="Country"
               value={data.country}
               onChange={(e) => onChange({ country: e.target.value })}
-              error={countryError}
+              error={err("country")}
             />
           </div>
         </div>

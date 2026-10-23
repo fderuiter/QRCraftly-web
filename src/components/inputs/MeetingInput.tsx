@@ -8,7 +8,7 @@ import { parseMeetingUrl } from "../../utils/meetingParsers";
 import { FormBlock } from "../ui/FormBlock";
 import { announcePolitely } from "../../utils/a11y";
 
-interface MeetingInputProps {
+export interface MeetingInputProps {
   data: MeetingData;
   onChange: (updates: Partial<MeetingData>) => void;
 }

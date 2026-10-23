@@ -100,19 +100,23 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
         value={data.timezone || ""}
         onChange={(e) => onChange({ timezone: e.target.value })}
       >
-        <option value="">Floating / Local Time</option>
-        <option value="UTC">UTC</option>
-        <option value="America/New_York">Eastern Time (America/New_York)</option>
-        <option value="America/Chicago">Central Time (America/Chicago)</option>
-        <option value="America/Denver">Mountain Time (America/Denver)</option>
-        <option value="America/Los_Angeles">Pacific Time (America/Los_Angeles)</option>
-        <option value="Europe/London">London (Europe/London)</option>
-        <option value="Europe/Paris">Paris (Europe/Paris)</option>
-        <option value="Europe/Berlin">Berlin (Europe/Berlin)</option>
-        <option value="Asia/Tokyo">Tokyo (Asia/Tokyo)</option>
-        <option value="Asia/Shanghai">Shanghai (Asia/Shanghai)</option>
-        <option value="Asia/Kolkata">Kolkata (Asia/Kolkata)</option>
-        <option value="Australia/Sydney">Sydney (Australia/Sydney)</option>
+        {[
+          ["", "Floating / Local Time"],
+          ["UTC", "UTC"],
+          ["America/New_York", "Eastern Time (America/New_York)"],
+          ["America/Chicago", "Central Time (America/Chicago)"],
+          ["America/Denver", "Mountain Time (America/Denver)"],
+          ["America/Los_Angeles", "Pacific Time (America/Los_Angeles)"],
+          ["Europe/London", "London (Europe/London)"],
+          ["Europe/Paris", "Paris (Europe/Paris)"],
+          ["Europe/Berlin", "Berlin (Europe/Berlin)"],
+          ["Asia/Tokyo", "Tokyo (Asia/Tokyo)"],
+          ["Asia/Shanghai", "Shanghai (Asia/Shanghai)"],
+          ["Asia/Kolkata", "Kolkata (Asia/Kolkata)"],
+          ["Australia/Sydney", "Sydney (Australia/Sydney)"],
+        ].map(([val, label]) => (
+          <option key={val} value={val}>{label}</option>
+        ))}
       </SelectField>
       )}
       <TextField

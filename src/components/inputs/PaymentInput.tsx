@@ -10,15 +10,22 @@ interface PaymentInputProps {
   onChange: (updates: Partial<PaymentData>) => void;
 }
 
-const isCryptoNetwork = (network: CryptoNetwork): boolean => {
-  const known: CryptoNetwork[] = [
-    CryptoNetwork.BITCOIN,
-    CryptoNetwork.ETHEREUM,
-    CryptoNetwork.SOLANA,
-    CryptoNetwork.LITECOIN,
-  ];
-  return known.includes(network);
+const CRYPTO_NETWORKS = new Set<string>([
+  CryptoNetwork.BITCOIN,
+  CryptoNetwork.ETHEREUM,
+  CryptoNetwork.SOLANA,
+  CryptoNetwork.LITECOIN,
+]);
+
+const ADDRESS_CONFIGS: Partial<Record<CryptoNetwork, { label: string; placeholder: string }>> = {
+  [CryptoNetwork.EPC_SEPA]: { label: "IBAN", placeholder: "e.g. DE89370400440532013000" },
+  [CryptoNetwork.UPI]: { label: "UPI ID", placeholder: "e.g. jane@okaxis" },
+  [CryptoNetwork.PAYPAL]: { label: "PayPal Handle / Username", placeholder: "e.g. username or paypal.me/username" },
+  [CryptoNetwork.VENMO]: { label: "Venmo Username", placeholder: "e.g. @username" },
+  [CryptoNetwork.CASH_APP]: { label: "Cashtag / Handle", placeholder: "e.g. $username" },
+  [CryptoNetwork.CUSTOM]: { label: "Receiver Address / URI", placeholder: "Raw Payment Address or URI" },
 };
+const DEFAULT_ADDRESS_CONFIG = { label: "Receiver Address", placeholder: "Wallet Address" };
 
 export const PaymentInput: React.FC<PaymentInputProps> = ({
   data,
@@ -38,7 +45,7 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
     : !addressLeft
       ? undefined
     : currentAddress &&
-        isCryptoNetwork(data.network) &&
+        CRYPTO_NETWORKS.has(data.network) &&
         checkCryptoAddress(data.network, currentAddress) === "invalid"
       ? "This address does not pass its built-in check: it has a typo or is not a real address. Money sent to it can be lost. You can still make the code."
       : currentAddress &&
@@ -49,47 +56,7 @@ export const PaymentInput: React.FC<PaymentInputProps> = ({
           ? upiVpaError(currentAddress) ?? undefined
           : undefined;
 
-  const getAddressConfig = () => {
-    switch (data.network) {
-      case CryptoNetwork.EPC_SEPA:
-        return {
-          label: "IBAN",
-          placeholder: "e.g. DE89370400440532013000",
-        };
-      case CryptoNetwork.UPI:
-        return {
-          label: "UPI ID",
-          placeholder: "e.g. jane@okaxis",
-        };
-      case CryptoNetwork.PAYPAL:
-        return {
-          label: "PayPal Handle / Username",
-          placeholder: "e.g. username or paypal.me/username",
-        };
-      case CryptoNetwork.VENMO:
-        return {
-          label: "Venmo Username",
-          placeholder: "e.g. @username",
-        };
-      case CryptoNetwork.CASH_APP:
-        return {
-          label: "Cashtag / Handle",
-          placeholder: "e.g. $username",
-        };
-      case CryptoNetwork.CUSTOM:
-        return {
-          label: "Receiver Address / URI",
-          placeholder: "Raw Payment Address or URI",
-        };
-      default:
-        return {
-          label: "Receiver Address",
-          placeholder: "Wallet Address",
-        };
-    }
-  };
-
-  const mainConfig = getAddressConfig();
+  const mainConfig = ADDRESS_CONFIGS[data.network] ?? DEFAULT_ADDRESS_CONFIG;
 
   return (
     <FormBlock legend="Payment Options">

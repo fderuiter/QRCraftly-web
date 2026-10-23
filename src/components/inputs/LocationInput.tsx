@@ -29,15 +29,12 @@ const GEOLOCATION_ERROR_MESSAGES: Record<number, string> = {
   3: "Location request timed out. Please try again.",
 };
 
-/** A sign, a dot or digits ending in a dot: still being typed, so not wrong yet. */
-const isUnfinishedNumber = (value: string): boolean => /^[+-]?\d*\.?$/.test(value.trim());
-
 /**
  * The coordinate's message for the field: shown at once for a value that cannot become valid,
  * and only after the field is left for one that is still half typed.
  */
 const shownCoordinateError = (value: string, axis: "latitude" | "longitude", left: boolean): string | undefined =>
-  !left && isUnfinishedNumber(value) ? undefined : (coordinateError(value, axis) ?? undefined);
+  !left && /^[+-]?\d*\.?$/.test(value.trim()) ? undefined : (coordinateError(value, axis) ?? undefined);
 
 /**
  * High-accuracy coordinate form taking latitude and longitude in degrees or a pasted Google Maps URL / location string.
@@ -106,18 +103,17 @@ export const LocationInput: React.FC<LocationInputProps> = ({
   };
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setMapUrl(value);
+    setMapUrl(e.target.value);
     clearErrors();
     lastProcessedUrlRef.current = null;
   };
 
   const handleUrlPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    const pastedText = e.clipboardData.getData("text");
-    if (pastedText) {
+    const pasted = e.clipboardData.getData("text");
+    if (pasted) {
       e.preventDefault();
-      setMapUrl(pastedText);
-      processUrlInput(pastedText);
+      setMapUrl(pasted);
+      processUrlInput(pasted);
     }
   };
 
@@ -136,21 +132,6 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     }
   };
 
-  const handleDismissError = () => {
-    setGeoError(null);
-    locationButtonRef.current?.focus();
-  };
-
-  const handleLatitudeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    clearErrors();
-    onChange({ latitude: e.target.value });
-  };
-
-  const handleLongitudeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    clearErrors();
-    onChange({ longitude: e.target.value });
-  };
-
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
       setGeoError("Geolocation is not supported by your browser.");
@@ -165,8 +146,8 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         if (!mountedRef.current) return;
         setIsLoading(false);
         setGeoError(null);
-        // Rounded to six decimals (about 10 cm), so `String()` never writes exponent form.
-        const plain = (degrees: number) => String(Number(degrees.toFixed(6)));
+        // Rounded to six decimals (about 10 cm), so String(+) never writes exponent form.
+        const plain = (deg: number) => String(+deg.toFixed(6));
         onChange({
           latitude: plain(position.coords.latitude),
           longitude: plain(position.coords.longitude),
@@ -208,7 +189,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         placeholder="-90 to 90 (e.g. 40.7128)"
         maxLength={20}
         value={data.latitude}
-        onChange={handleLatitudeChange}
+        onChange={(e) => { clearErrors(); onChange({ latitude: e.target.value }); }}
         onBlur={() => setLatitudeLeft(true)}
         error={shownCoordinateError(data.latitude, "latitude", latitudeLeft)}
       />
@@ -219,10 +200,8 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         inputMode="decimal"
         placeholder="-180 to 180 (e.g. -74.0060)"
         maxLength={21}
-        // Longitude has one extra character vs latitude because it has 3 integer digits
-        // (-180) versus latitude's 2 (-90), requiring one more character for the sign+digits.
         value={data.longitude}
-        onChange={handleLongitudeChange}
+        onChange={(e) => { clearErrors(); onChange({ longitude: e.target.value }); }}
         onBlur={() => setLongitudeLeft(true)}
         error={shownCoordinateError(data.longitude, "longitude", longitudeLeft)}
       />
@@ -240,7 +219,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         {isLoading ? "Fetching location…" : "Use Current Location"}
       </Button>
       {geoError && (
-        <Alert variant="error" onDismiss={handleDismissError}>
+        <Alert variant="error" onDismiss={() => { setGeoError(null); locationButtonRef.current?.focus(); }}>
           {geoError}
         </Alert>
       )}

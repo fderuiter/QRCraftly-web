@@ -32,7 +32,7 @@ import { SmsInput } from "./SmsInput";
 import { PaymentInput } from "./PaymentInput";
 import { EventInput } from "./EventInput";
 import { LocationInput } from "./LocationInput";
-import { MeetingInput } from "./MeetingInput";
+import { LazyMeetingInput } from "./LazyMeetingInput";
 import { SocialInput } from "./SocialInput";
 import { LazyBulkCsvInput } from "./LazyBulkCsvInput";
 
@@ -189,7 +189,7 @@ export const INPUT_REGISTRY: Registry = {
     canHydrateFn: QR_GENERATORS[QRType.LOCATION].matches,
   },
   [QRType.MEETING]: {
-    Component: MeetingInput,
+    Component: LazyMeetingInput,
     initialState: {
       url: "",
     } as MeetingData,
