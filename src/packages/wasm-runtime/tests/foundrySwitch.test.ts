@@ -22,4 +22,8 @@ describe('Foundry canary switch (#1182, ADR 0033)', () => {
   it('builds with the JavaScript implementation unless FOUNDRY_SELFTEST=wasm', () => {
     expect(__FOUNDRY_SELFTEST__).toBe(process.env.FOUNDRY_SELFTEST === 'wasm' ? 'wasm' : 'js');
   });
+
+  it('builds with the JavaScript implementation unless FOUNDRY_FOUNTAIN_BCUR=wasm', () => {
+    expect(__FOUNDRY_FOUNTAIN_BCUR__).toBe(process.env.FOUNDRY_FOUNTAIN_BCUR === 'wasm' ? 'wasm' : 'js');
+  });
 });

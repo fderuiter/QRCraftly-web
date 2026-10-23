@@ -25,7 +25,8 @@
   ],
   "ignoreIssues": {
     "src/packages/*/*.ts": ["types"],
-    "src/packages/scannability/**": ["exports", "types"]
+    "src/packages/scannability/**": ["exports", "types"],
+    "src/packages/optical-transfer/**": ["exports"]
   },
   "ignoreBinaries": ["shellcheck", "semgrep"],
   "ignoreDependencies": ["wrangler", "@ngraveio/bc-ur", "marked"],
