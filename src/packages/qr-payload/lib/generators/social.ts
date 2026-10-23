@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type SocialData, SocialPlatform, QRType, type QRGeneratorContract } from '@/types';
+import { type SocialData, QRType, type QRGeneratorContract } from '@/types';
 import { parseProtocol, parseSocialProfile, identifyProtocol } from '../protocol';
 import { sanitizeSocialHandle } from '@/utils/security';
 
@@ -28,36 +28,7 @@ const PLATFORM_URL_PREFIXES: Record<string, string> = {
   facebook: 'https://facebook.com/',
   whatsapp: 'https://wa.me/',
   github: 'https://github.com/',
-};
-
-const P_RE = /^(watch\?|playlist\?|(shorts|channel|c|user)\/)/;
-const UC_RE = /^UC[\w-]{22}$/;
-
-/**
- * Normalizes and constructs a canonical YouTube URL from a handle, channel ID, custom URL,
- * video link, or playlist link.
- */
-export const parseYouTubeInput = (input: string): string => {
-  let clean = (input || '').trim().replace(/[\x00-\x1F\x7F-\x9F]/g, '').replace(/^\/+/, '');
-  if (!clean) return '';
-
-  if (/(youtube\.com|youtu\.be)/i.test(clean)) {
-    const full = /^https?:\/\//i.test(clean) ? clean : 'https://' + clean;
-    const p = parseSocialProfile(parseProtocol(full)!);
-    return p?.platform === SocialPlatform.YOUTUBE
-      ? 'https://' + (p.handle.startsWith('youtu.be/') ? p.handle : 'youtube.com/' + (P_RE.test(p.handle) ? p.handle : '@' + p.handle))
-      : '';
-  }
-
-  if (UC_RE.test(clean)) clean = 'channel/' + clean;
-  if (P_RE.test(clean)) {
-    if (/^channel\/(?!UC[\w-]{22}(\?.*)?$)/i.test(clean)) return '';
-    return 'https://youtube.com/' + clean;
-  }
-  if (clean.includes('/')) return '';
-
-  const h = clean.replace(/^@+/, '');
-  return h ? 'https://youtube.com/@' + h : '';
+  youtube: 'https://youtube.com/@',
 };
 
 /**
@@ -73,7 +44,10 @@ export const constructSocialString = (data: SocialData): string => {
   if (!data?.handle) return '';
 
   if (data.platform === 'youtube') {
-    return parseYouTubeInput(data.handle);
+    const raw = data.handle.trim();
+    if (/^https?:\/\//i.test(raw)) return raw;
+    const clean = raw.replace(/^@+/, '');
+    return clean ? `https://youtube.com/@${clean}` : '';
   }
 
   const cleanHandle = sanitizeSocialHandle(data.handle);

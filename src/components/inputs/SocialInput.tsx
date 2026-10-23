@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { type SocialData, SocialPlatform } from "../../types";
 import { TextField, SelectField, TextAreaField } from "../ui/FormFields";
 import { FormBlock } from "../ui/FormBlock";
@@ -10,9 +10,29 @@ interface SocialInputProps {
 
 export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
   const isYouTube = data.platform === SocialPlatform.YOUTUBE;
-  const handleLabel = isYouTube ? 'Username / Channel / Video Link' : 'Username / Handle';
-  const handlePlaceholder = isYouTube ? '@channel, video link, or channel ID' : '@username';
+  const [parseYouTubeInput, setParseYouTubeInput] = useState<((input: string) => string) | null>(null);
+
+  useEffect(() => {
+    if (isYouTube && !parseYouTubeInput) {
+      import("@/packages/qr-payload/youtube").then((mod) => {
+        setParseYouTubeInput(() => mod.parseYouTubeInput);
+      });
+    }
+  }, [isYouTube, parseYouTubeInput]);
+
+  const handleLabel = isYouTube ? "Username / Channel / Video Link" : "Username / Handle";
+  const handlePlaceholder = isYouTube ? "@channel, video link, or channel ID" : "@username";
   const handleMaxLength = isYouTube ? 256 : 64;
+
+  const handleHandleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (isYouTube && parseYouTubeInput) {
+      const parsed = parseYouTubeInput(raw);
+      onChange({ handle: parsed || raw });
+    } else {
+      onChange({ handle: raw });
+    }
+  };
 
   return (
     <FormBlock legend="Social Media Profile">
@@ -20,9 +40,10 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
         id="social-platform"
         label="Platform"
         value={data.platform}
-        onChange={(e) =>
-          onChange({ platform: e.target.value as SocialPlatform })
-        }
+        onChange={(e) => {
+          const newPlatform = e.target.value as SocialPlatform;
+          onChange({ platform: newPlatform });
+        }}
       >
         <option value={SocialPlatform.INSTAGRAM}>Instagram</option>
         <option value={SocialPlatform.TWITTER}>Twitter / X</option>
@@ -40,7 +61,7 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
         placeholder={handlePlaceholder}
         maxLength={handleMaxLength}
         value={data.handle}
-        onChange={(e) => onChange({ handle: e.target.value })}
+        onChange={handleHandleChange}
         showCharCount
       />
       {data.platform === SocialPlatform.WHATSAPP && (

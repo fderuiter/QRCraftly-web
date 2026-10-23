@@ -35,30 +35,26 @@ export interface SocialProfile {
 
 /** Hosts whose profile URLs the Social form builds, after `www.`, `m.` or `mobile.` is removed. */
 const PROFILE_HOSTS: Record<string, SocialPlatform> = {
-  'instagram.com': 'instagram',
-  'x.com': 'twitter',
-  'twitter.com': 'twitter',
-  'tiktok.com': 'tiktok',
-  'linkedin.com': 'linkedin',
-  'youtube.com': 'youtube',
-  'youtu.be': 'youtube',
-  'facebook.com': 'facebook',
-  'wa.me': 'whatsapp',
-  'github.com': 'github',
+  'instagram.com': SocialPlatform.INSTAGRAM,
+  'x.com': SocialPlatform.TWITTER,
+  'twitter.com': SocialPlatform.TWITTER,
+  'tiktok.com': SocialPlatform.TIKTOK,
+  'linkedin.com': SocialPlatform.LINKEDIN,
+  'youtube.com': SocialPlatform.YOUTUBE,
+  'facebook.com': SocialPlatform.FACEBOOK,
+  'wa.me': SocialPlatform.WHATSAPP,
+  'github.com': SocialPlatform.GITHUB,
 };
 
-const YT_RESERVED = /^(watch|shorts|playlist|channel|c|user|feed|results|premium|gaming|music|upload|tv|about|help|terms|privacy)$/i;
-
 /** First path segments that are pages of the site, not someone's handle. */
-const RESERVED_PATTERNS: Record<string, RegExp> = {
-  instagram: /^(p|reels?|tv|stories|explore|accounts|direct)$/i,
-  twitter: /^(i|intent|home|search|hashtag|share|explore|settings|messages|notifications|compose|login)$/i,
-  facebook: /^(share|sharer(\.php)?|groups|events|watch|(photo|story|profile)\.php|pages|marketplace|gaming|login)$/i,
-  github: /^(orgs|settings|marketplace|explore|topics|sponsors|features|login|about|pricing|enterprise)$/i,
+const RESERVED_SEGMENTS: Partial<Record<SocialPlatform, ReadonlySet<string>>> = {
+  [SocialPlatform.INSTAGRAM]: new Set(['p', 'reel', 'reels', 'tv', 'stories', 'explore', 'accounts', 'direct']),
+  [SocialPlatform.TWITTER]: new Set(['i', 'intent', 'home', 'search', 'hashtag', 'share', 'explore', 'settings', 'messages', 'notifications', 'compose', 'login']),
+  [SocialPlatform.FACEBOOK]: new Set(['share', 'sharer', 'sharer.php', 'groups', 'events', 'watch', 'photo.php', 'story.php', 'profile.php', 'pages', 'marketplace', 'gaming', 'login']),
+  [SocialPlatform.GITHUB]: new Set(['orgs', 'settings', 'marketplace', 'explore', 'topics', 'sponsors', 'features', 'login', 'about', 'pricing', 'enterprise']),
 };
 
 const HANDLE_PATTERN = /^[A-Za-z0-9_.-]+$/;
-const YOUTUBE_HANDLE_PATTERN = /^[a-zA-Z0-9_.\-/@?&=%]+$/;
 
 /**
  * Reads a social profile link that the Social form can rebuild without losing anything. Posts,
@@ -76,43 +72,29 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
   if (parsed.path.includes('#')) return null;
 
   const [rawHost, ...rest] = parsed.path.split('/');
-  const host = rawHost.toLowerCase().replace(/^(www|m|mobile)\./, '');
+  const host = rawHost.toLowerCase().replace(/^(?:www|m|mobile)\./, '');
   const platform = PROFILE_HOSTS[host];
   if (!platform) return null;
 
-  // Non-WhatsApp and non-YouTube profile URLs reject query parameters
-  if (platform !== 'whatsapp' && platform !== 'youtube' && parsed.params.size) return null;
+  // Non-WhatsApp profile URLs reject query parameters
+  if (platform !== SocialPlatform.WHATSAPP && parsed.params.size > 0) return null;
 
   // One trailing slash is fine; empty segments elsewhere are not.
   const segments = rest.length > 0 && rest[rest.length - 1] === '' ? rest.slice(0, -1) : rest;
-  if (segments.includes('')) return null;
+  if (segments.some((segment) => segment === '')) return null;
 
   let handle: string | undefined;
   let message: string | undefined;
 
   switch (platform) {
-    case 'linkedin':
+    case SocialPlatform.LINKEDIN:
       if (segments.length === 2 && segments[0] === 'in') handle = segments[1];
       break;
-    case 'tiktok':
+    case SocialPlatform.TIKTOK:
+    case SocialPlatform.YOUTUBE:
       if (segments.length === 1 && segments[0].startsWith('@')) handle = segments[0].substring(1);
       break;
-    case 'youtube': {
-      const querySuffix = parsed.params.size ? '?' + new URLSearchParams([...parsed.params]).toString() : '';
-      if (segments.length === 1) {
-        const s0 = segments[0];
-        if (host === 'youtu.be') handle = `youtu.be/${s0}`;
-        else if (s0[0] === '@') handle = s0.replace(/^@+/, '');
-        else if ((s0 === 'watch' && parsed.params.has('v')) || (s0 === 'playlist' && parsed.params.has('list'))) handle = s0;
-        else if (!YT_RESERVED.test(s0)) handle = `c/${s0}`;
-      } else if (segments.length === 2) {
-        const [s0, s1] = segments;
-        if (/^(c|user|shorts)$/.test(s0) || (s0 === 'channel' && /^UC[\w-]{22}$/.test(s1))) handle = `${s0}/${s1}`;
-      }
-      if (handle) handle += querySuffix;
-      break;
-    }
-    case 'whatsapp':
+    case SocialPlatform.WHATSAPP:
       if (segments.length === 1 && /^\d+$/.test(segments[0])) {
         handle = segments[0];
       }
@@ -128,12 +110,12 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
       }
       break;
     default:
-      if (segments.length === 1 && !RESERVED_PATTERNS[platform]?.test(segments[0])) {
+      if (segments.length === 1 && !RESERVED_SEGMENTS[platform]?.has(segments[0].toLowerCase())) {
         handle = segments[0];
       }
   }
 
-  if (!handle || !(platform === 'youtube' ? YOUTUBE_HANDLE_PATTERN : HANDLE_PATTERN).test(handle)) return null;
+  if (!handle || !HANDLE_PATTERN.test(handle)) return null;
 
   return message !== undefined ? { platform, handle, message } : { platform, handle };
 };

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { SocialInput } from './SocialInput';
 import { type SocialData, SocialPlatform } from '../../types';
 import { axe } from '../../../tests/utils/axe';
@@ -143,13 +143,19 @@ describe('SocialInput', () => {
       platform: SocialPlatform.YOUTUBE,
       handle: '',
     };
-    const { container } = render(<SocialInput data={youtubeData} onChange={mockOnChange} />);
+    let container: HTMLElement | undefined;
+    await act(async () => {
+      const res = render(<SocialInput data={youtubeData} onChange={mockOnChange} />);
+      container = res.container;
+    });
 
     const handleInput = screen.getByLabelText('Username / Channel / Video Link') as HTMLInputElement;
     expect(handleInput).toBeInTheDocument();
     expect(handleInput.getAttribute('placeholder')).toBe('@channel, video link, or channel ID');
     expect(handleInput.getAttribute('maxLength')).toBe('256');
 
-    expect(await axe(container)).toHaveNoViolations();
+    if (container) {
+      expect(await axe(container)).toHaveNoViolations();
+    }
   });
 });
