@@ -19,8 +19,7 @@
 /**
  * Offline checksum validation of wallet addresses (#1158, #1159). A typo in an address sends
  * money nowhere, so a code that carries one is worth a warning before it is printed or paid.
- * Pure and synchronous: SHA-256 and Keccak-256 are implemented here because the Web Crypto
- * API is asynchronous and has no Keccak.
+ * Synchronous address validation with WebAssembly and pure JS implementations.
  */
 
 export type AddressCheck =
@@ -31,7 +30,8 @@ export type AddressCheck =
   /** The format has no checksum to check (an all-lower-case Ethereum address, a Solana key). */
   | 'unchecked';
 
-import { sha256 } from '@/utils/sha256';
+import { sha256JS } from '@/utils/sha256';
+import { validateAddressWasm } from '@/utils/cryptoWasm';
 
 const BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const BECH32 = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
@@ -72,11 +72,11 @@ function keccakF(lanes: bigint[]): void {
 }
 
 /**
- * Keccak-256 (the original padding, as Ethereum uses, not NIST SHA3-256).
+ * Pure JavaScript Keccak-256 (the original padding, as Ethereum uses, not NIST SHA3-256).
  * @param message - The bytes to hash.
  * @returns The 32-byte digest.
  */
-export function keccak256(message: Uint8Array): Uint8Array {
+export function keccak256JS(message: Uint8Array): Uint8Array {
   const rate = 136;
   const padded = new Uint8Array(Math.ceil((message.length + 1) / rate) * rate);
   padded.set(message);
@@ -95,7 +95,7 @@ export function keccak256(message: Uint8Array): Uint8Array {
 }
 
 /** Decodes Base58 to bytes, or null when a character is outside the alphabet. */
-function base58Decode(text: string): Uint8Array | null {
+export function base58DecodeJS(text: string): Uint8Array | null {
   let value = 0n;
   for (const char of text) {
     const digit = BASE58.indexOf(char);
@@ -112,11 +112,11 @@ function base58Decode(text: string): Uint8Array | null {
 }
 
 /** Version byte of a valid Base58Check string, or null when the length or checksum is wrong. */
-function base58CheckVersion(text: string): number | null {
-  const bytes = base58Decode(text);
+export function base58CheckVersionJS(text: string): number | null {
+  const bytes = base58DecodeJS(text);
   if (!bytes || bytes.length !== 25) return null;
   const payload = bytes.subarray(0, 21);
-  const checksum = sha256(sha256(payload)).subarray(0, 4);
+  const checksum = sha256JS(sha256JS(payload)).subarray(0, 4);
   return checksum.every((byte, i) => byte === bytes[21 + i]) ? bytes[0] : null;
 }
 
@@ -134,7 +134,7 @@ function bech32Polymod(values: readonly number[]): number {
 }
 
 /** Checks a SegWit address: bech32 for witness version 0, bech32m for later versions. */
-function checkSegwit(address: string, hrp: string): boolean {
+export function checkSegwitJS(address: string, hrp: string): boolean {
   if (address !== address.toLowerCase() && address !== address.toUpperCase()) return false;
   const text = address.toLowerCase();
   const separator = text.lastIndexOf('1');
@@ -148,43 +148,58 @@ function checkSegwit(address: string, hrp: string): boolean {
 }
 
 /** EIP-55: mixed-case addresses carry a Keccak-256 checksum in the capitalisation. */
-function checkEthereum(address: string): AddressCheck {
+export function checkEthereumJS(address: string): AddressCheck {
   const match = /^0x([0-9a-fA-F]{40})$/.exec(address);
   if (!match) return 'invalid';
   const hex = match[1];
   if (hex === hex.toLowerCase() || hex === hex.toUpperCase()) return 'unchecked';
-  const hash = keccak256(new TextEncoder().encode(hex.toLowerCase()));
+  const hash = keccak256JS(new TextEncoder().encode(hex.toLowerCase()));
   const hashHex = [...hash].map((byte) => byte.toString(16).padStart(2, '0')).join('');
   const matches = [...hex].every((char, i) => (parseInt(hashHex[i], 16) >= 8 ? char === char.toUpperCase() : char === char.toLowerCase()));
   return matches ? 'valid' : 'invalid';
 }
 
 /**
- * Checks a wallet address's checksum.
- * @param network - `bitcoin`, `ethereum`, `litecoin` or `solana`; any other network is `unchecked`.
- * @param address - The address as entered or scanned.
- * @returns Whether it is valid, invalid, or has no checksum to check.
+ * Pure JavaScript wallet address checksum validation.
  */
-export function checkCryptoAddress(network: string, address: string): AddressCheck {
+export function checkCryptoAddressJS(network: string, address: string): AddressCheck {
   const value = address.trim();
   switch (network) {
     case 'bitcoin': {
-      const version = base58CheckVersion(value);
+      const version = base58CheckVersionJS(value);
       if (version !== null) return version === 0x00 || version === 0x05 ? 'valid' : 'invalid';
-      return checkSegwit(value, 'bc') ? 'valid' : 'invalid';
+      return checkSegwitJS(value, 'bc') ? 'valid' : 'invalid';
     }
     case 'litecoin': {
-      const version = base58CheckVersion(value);
+      const version = base58CheckVersionJS(value);
       if (version !== null) return version === 0x30 || version === 0x32 || version === 0x05 ? 'valid' : 'invalid';
-      return checkSegwit(value, 'ltc') ? 'valid' : 'invalid';
+      return checkSegwitJS(value, 'ltc') ? 'valid' : 'invalid';
     }
     case 'ethereum':
-      return checkEthereum(value);
+      return checkEthereumJS(value);
     case 'solana': {
-      const bytes = value.length >= 32 && value.length <= 44 ? base58Decode(value) : null;
+      const bytes = value.length >= 32 && value.length <= 44 ? base58DecodeJS(value) : null;
       return bytes?.length === 32 ? 'unchecked' : 'invalid';
     }
     default:
       return 'unchecked';
   }
+}
+
+// -----------------------------------------------------------------------------
+// WASM Integration
+// -----------------------------------------------------------------------------
+
+/**
+ * Checks a wallet address's checksum. Dispatches to WASM or JS based on `__FOUNDRY_CRYPTO__`.
+ * @param network - `bitcoin`, `ethereum`, `litecoin` or `solana`; any other network is `unchecked`.
+ * @param address - The address as entered or scanned.
+ * @returns Whether it is valid, invalid, or has no checksum to check.
+ */
+export function checkCryptoAddress(network: string, address: string): AddressCheck {
+  if (typeof __FOUNDRY_CRYPTO__ !== 'undefined' && __FOUNDRY_CRYPTO__ === 'wasm') {
+    const wasmResult = validateAddressWasm(network, address);
+    if (wasmResult !== null) return wasmResult;
+  }
+  return checkCryptoAddressJS(network, address);
 }

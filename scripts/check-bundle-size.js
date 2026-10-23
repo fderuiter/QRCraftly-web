@@ -28,6 +28,7 @@ export const MAX_GZIPPED_SIZE_KB = 650;
  */
 export const WASM_MODULE_BUDGETS_KB = {
   selftest: 4,
+  crypto: 20,
   'qr-encode': 20,
   'qr-decode': 32,
   'prism-fec': 10,

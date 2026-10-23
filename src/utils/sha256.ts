@@ -21,6 +21,8 @@
  * transfer session IDs) need an answer inside a synchronous parser.
  */
 
+import { sha256Wasm } from '@/utils/cryptoWasm';
+
 const SHA256_K = new Uint32Array([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be,
   0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa,
@@ -33,11 +35,9 @@ const SHA256_K = new Uint32Array([
 const rotr = (value: number, bits: number): number => (value >>> bits) | (value << (32 - bits));
 
 /**
- * SHA-256 of a byte string.
- * @param message - The bytes to hash.
- * @returns The 32-byte digest.
+ * Pure JavaScript SHA-256 implementation.
  */
-export function sha256(message: Uint8Array): Uint8Array {
+export function sha256JS(message: Uint8Array): Uint8Array {
   const state = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
   const padded = new Uint8Array(Math.ceil((message.length + 9) / 64) * 64);
   padded.set(message);
@@ -79,4 +79,17 @@ export function sha256(message: Uint8Array): Uint8Array {
   const outView = new DataView(out.buffer);
   state.forEach((word, i) => outView.setUint32(i * 4, word));
   return out;
+}
+
+/**
+ * SHA-256 of a byte string. Dispatches to WASM or JS based on `__FOUNDRY_CRYPTO__`.
+ * @param message - The bytes to hash.
+ * @returns The 32-byte digest.
+ */
+export function sha256(message: Uint8Array): Uint8Array {
+  if (typeof __FOUNDRY_CRYPTO__ !== 'undefined' && __FOUNDRY_CRYPTO__ === 'wasm') {
+    const wasmDigest = sha256Wasm(message);
+    if (wasmDigest) return wasmDigest;
+  }
+  return sha256JS(message);
 }
