@@ -20,7 +20,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { LogoControls } from './LogoControls';
 import { ToastProvider } from '../ui/Toast';
 import { DEFAULT_CONFIG } from '../../constants';
-import { PRESET_LOGOS } from '../../constants/presetLogos';
+import { PRESET_LOGOS, isLogoOverridden, resetUserLogoOverride } from '../../constants/presetLogos';
 import { QRErrorCorrectionLevel, type QRConfig } from '../../types';
 
 const renderControls = (configOverrides: Partial<QRConfig> = {}, onChange = vi.fn()) =>
@@ -77,4 +77,29 @@ describe('LogoControls error correction level auto-elevation', () => {
     expect(fileInput).toBeInTheDocument();
   });
 });
+
+describe('LogoControls user override tracking', () => {
+  it('marks logo as user overridden when selecting a preset logo or removing a logo', () => {
+    resetUserLogoOverride();
+    expect(isLogoOverridden()).toBe(false);
+
+    const onChange = vi.fn();
+    renderControls({ logoUrl: null }, onChange);
+
+    const firstPreset = PRESET_LOGOS[0];
+    const presetButton = screen.getByRole('button', { name: `Select ${firstPreset.label} logo` });
+    fireEvent.click(presetButton);
+
+    expect(isLogoOverridden()).toBe(true);
+
+    // Test remove button
+    renderControls({ logoUrl: firstPreset.dataUrl }, onChange);
+    const removeButton = screen.getByRole('button', { name: /remove/i });
+    fireEvent.click(removeButton);
+
+    expect(onChange).toHaveBeenCalledWith({ logoUrl: null });
+    expect(isLogoOverridden()).toBe(true);
+  });
+});
+
 

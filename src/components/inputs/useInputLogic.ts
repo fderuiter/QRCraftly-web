@@ -17,11 +17,12 @@
 */
 
 import { useState, useRef, useEffect, type ElementType } from "react";
-import { type QRConfig, QRType, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, type EmailData, CryptoNetwork } from "../../types";
+import { type QRConfig, QRType, QRErrorCorrectionLevel, type WifiData, type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, type EmailData, CryptoNetwork } from "../../types";
 import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
 import { CONTAINMENT_PROFILES, emailListError, cardFieldsFor, vCardFieldError, paymentRefusal } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
+import { TYPE_TO_PRESET_LOGO, isLogoOverridden, resetUserLogoOverride } from "../../constants/presetLogos";
 
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
 const COMMIT_DELAY_MS = 100;
@@ -87,6 +88,7 @@ let retainedInputStates: Partial<InputDataMap> = {};
  */
 export function clearRetainedInputStates(): void {
   retainedInputStates = {};
+  resetUserLogoOverride();
 }
 
 /**
@@ -99,7 +101,7 @@ export function clearRetainedInputStates(): void {
  * @returns An object containing the component to render and its props.
  */
 export function useInputLogic(
-  config: Pick<QRConfig, 'type' | 'value'>,
+  config: Pick<QRConfig, 'type' | 'value'> & { logoUrl?: string | null },
   onChange: (updates: Partial<QRConfig>) => void,
   onRefusedChange?: (refused: boolean) => void,
 ): { InputComponent: ElementType | null; inputProps: { data: InputDataMap[keyof InputDataMap]; onChange: (updates: Partial<InputDataMap[keyof InputDataMap]>) => void } | Record<string, never>; flush: () => void } {
@@ -158,6 +160,18 @@ export function useInputLogic(
     }
     const currentConstructed = entry.constructFn ? entry.constructFn(currentLocalState as never) : '';
 
+    // Automatically assign matching preset logo on type changes if user hasn't overridden logo
+    let logoUpdates: Partial<QRConfig> = {};
+    if (prevType !== null && prevType !== config.type && !isLogoOverridden()) {
+      const defaultLogo = TYPE_TO_PRESET_LOGO[config.type] ?? null;
+      if (config.logoUrl !== defaultLogo) {
+        logoUpdates = {
+          logoUrl: defaultLogo,
+          ...(defaultLogo ? { errorCorrectionLevel: QRErrorCorrectionLevel.H } : {}),
+        };
+      }
+    }
+
     if (currentConstructed !== config.value) {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -168,7 +182,7 @@ export function useInputLogic(
       // If we switched types, or on initial mount where retained state exists for this type:
       // Preserve local retained state and push its constructed value to global state.
       if (retainedInputStates[config.type] !== undefined && (prevType !== config.type || prevType === null)) {
-        onChange({ value: currentConstructed });
+        onChange({ value: currentConstructed, ...logoUpdates });
         return;
       }
 
@@ -176,7 +190,7 @@ export function useInputLogic(
       // and the incoming config.value is empty (usually from tab select),
       // then preserve the local state and push its constructed value to the global state.
       if (prevType !== null && prevType !== config.type && config.value === '' && currentConstructed !== '') {
-        onChange({ value: currentConstructed });
+        onChange({ value: currentConstructed, ...logoUpdates });
         return;
       }
 
@@ -206,8 +220,14 @@ export function useInputLogic(
       } else {
         updateStateForType(config.type, entry.initialState);
       }
+
+      if (Object.keys(logoUpdates).length > 0) {
+        onChange(logoUpdates);
+      }
+    } else if (Object.keys(logoUpdates).length > 0) {
+      onChange(logoUpdates);
     }
-  }, [config.type, config.value, onChange]);
+  }, [config.type, config.value, config.logoUrl, onChange]);
 
   // Clear timeout if type changes to prevent race conditions (simulating unmount of previous input)
   useEffect(() => {

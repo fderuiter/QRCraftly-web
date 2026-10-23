@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { QRType } from '../types';
+
 export interface PresetLogo {
   id: string;
   label: string;
@@ -178,3 +180,59 @@ export const PRESET_LOGOS: PresetLogo[] = [
     `),
   },
 ];
+
+const getPresetDataUrl = (id: string): string | null =>
+  PRESET_LOGOS.find((p) => p.id === id)?.dataUrl ?? null;
+
+/**
+ * Maps each QRType to a default generic preset logo data URL from PRESET_LOGOS.
+ */
+export const TYPE_TO_PRESET_LOGO: Record<QRType, string | null> = {
+  [QRType.URL]: getPresetDataUrl('website'),
+  [QRType.EMAIL]: getPresetDataUrl('email'),
+  [QRType.PHONE]: getPresetDataUrl('phone'),
+  [QRType.LOCATION]: getPresetDataUrl('location'),
+  [QRType.SMS]: getPresetDataUrl('chat'),
+  [QRType.VCARD]: getPresetDataUrl('profile'),
+  [QRType.PAYMENT]: getPresetDataUrl('card'),
+  [QRType.SOCIAL]: getPresetDataUrl('network'),
+  [QRType.MEETING]: getPresetDataUrl('video'),
+  [QRType.WIFI]: getPresetDataUrl('network'),
+  [QRType.EVENT]: null,
+  [QRType.TEXT]: null,
+  [QRType.BULK_CSV]: null,
+};
+
+let isUserLogoOverridden = false;
+let userOverrideLogoUrl: string | null = null;
+
+/**
+ * Marks that the user has explicitly set or removed the logo.
+ */
+export function setUserLogoOverride(logoUrl: string | null): void {
+  isUserLogoOverridden = true;
+  userOverrideLogoUrl = logoUrl;
+}
+
+/**
+ * Returns whether the logo has been explicitly overridden by the user.
+ */
+export function isLogoOverridden(): boolean {
+  return isUserLogoOverridden;
+}
+
+/**
+ * Returns details about the current user logo override.
+ */
+export function getUserLogoOverride(): { isOverridden: boolean; logoUrl: string | null } {
+  return { isOverridden: isUserLogoOverridden, logoUrl: userOverrideLogoUrl };
+}
+
+/**
+ * Resets the user logo override status (used during test teardowns and state clears).
+ */
+export function resetUserLogoOverride(): void {
+  isUserLogoOverridden = false;
+  userOverrideLogoUrl = null;
+}
+

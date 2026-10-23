@@ -1,6 +1,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { useInputLogic, clearRetainedInputStates } from "./useInputLogic";
+import { TYPE_TO_PRESET_LOGO, setUserLogoOverride } from "../../constants/presetLogos";
 import {
   type QRConfig,
   QRType,
@@ -302,7 +303,7 @@ describe("useInputLogic", () => {
     rerender({ cfg: backToUrlConfig });
 
     // It should detect the tab switch, preserve the local "http://google.com/" state, and push it back to the store
-    expect(onChange).toHaveBeenCalledWith({ value: "http://google.com/" });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ value: "http://google.com/" }));
   });
 
   it("should preserve uncommitted form state across generator route remounts via volatile cache", () => {
@@ -595,3 +596,112 @@ describe("useInputLogic flush", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 });
+
+describe("useInputLogic automatic preset logo placement", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    clearRetainedInputStates();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("automatically assigns matching preset logo and sets errorCorrectionLevel to H on QRType switch when no custom logo exists", () => {
+    const onChange = vi.fn();
+    const initialConfig = createMockConfig(QRType.URL, "https://example.com");
+
+    const { rerender } = renderHook(
+      ({ cfg }) => useInputLogic(cfg, onChange),
+      { initialProps: { cfg: initialConfig } }
+    );
+
+    // Switch type to PHONE
+    const phoneConfig = createMockConfig(QRType.PHONE, "");
+    phoneConfig.logoUrl = TYPE_TO_PRESET_LOGO[QRType.URL];
+    rerender({ cfg: phoneConfig });
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        logoUrl: TYPE_TO_PRESET_LOGO[QRType.PHONE],
+        errorCorrectionLevel: QRErrorCorrectionLevel.H,
+      })
+    );
+  });
+
+  it("clears logoUrl when switching to a QRType without a mapped preset logo", () => {
+    const onChange = vi.fn();
+    const initialConfig = createMockConfig(QRType.PHONE, "1234567890");
+    initialConfig.logoUrl = TYPE_TO_PRESET_LOGO[QRType.PHONE];
+
+    const { rerender } = renderHook(
+      ({ cfg }) => useInputLogic(cfg, onChange),
+      { initialProps: { cfg: initialConfig } }
+    );
+
+    // Switch type to TEXT (which has null preset logo)
+    const textConfig = createMockConfig(QRType.TEXT, "");
+    textConfig.logoUrl = TYPE_TO_PRESET_LOGO[QRType.PHONE];
+    rerender({ cfg: textConfig });
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        logoUrl: null,
+      })
+    );
+  });
+
+  it("preserves manual user logo removal across QRType switches", () => {
+    const onChange = vi.fn();
+    const initialConfig = createMockConfig(QRType.URL, "https://example.com");
+
+    const { rerender } = renderHook(
+      ({ cfg }) => useInputLogic(cfg, onChange),
+      { initialProps: { cfg: initialConfig } }
+    );
+
+    // Simulate user explicitly removing logo via LogoControls
+    setUserLogoOverride(null);
+
+    // Switch type to EMAIL
+    onChange.mockClear();
+    const emailConfig = createMockConfig(QRType.EMAIL, "");
+    emailConfig.logoUrl = null;
+    rerender({ cfg: emailConfig });
+
+    // Auto preset logo assignment should be skipped because user explicitly opted out
+    expect(onChange).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        logoUrl: TYPE_TO_PRESET_LOGO[QRType.EMAIL],
+      })
+    );
+  });
+
+  it("preserves manual custom logo upload or preset selection across QRType switches", () => {
+    const onChange = vi.fn();
+    const initialConfig = createMockConfig(QRType.URL, "https://example.com");
+
+    const { rerender } = renderHook(
+      ({ cfg }) => useInputLogic(cfg, onChange),
+      { initialProps: { cfg: initialConfig } }
+    );
+
+    // Simulate user explicitly choosing a custom logo
+    const customLogo = "data:image/png;base64,customlogodata";
+    setUserLogoOverride(customLogo);
+
+    // Switch type to LOCATION
+    onChange.mockClear();
+    const locationConfig = createMockConfig(QRType.LOCATION, "");
+    locationConfig.logoUrl = customLogo;
+    rerender({ cfg: locationConfig });
+
+    // Auto preset logo assignment should NOT overwrite the user's custom logo
+    expect(onChange).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        logoUrl: TYPE_TO_PRESET_LOGO[QRType.LOCATION],
+      })
+    );
+  });
+});
+
