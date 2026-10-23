@@ -20,14 +20,14 @@ import { type SocialData, SocialPlatform, QRType, type QRGeneratorContract } fro
 import { parseProtocol, parseSocialProfile, identifyProtocol, YT_CHANNEL_RE, YT_PREFIX_RE } from '../protocol';
 import { sanitizeSocialHandle } from '@/utils/security';
 
-const SOCIAL_PLATFORM_URLS: Partial<Record<SocialPlatform, (handle: string) => string>> = {
-  [SocialPlatform.INSTAGRAM]: (handle) => `https://instagram.com/${handle}`,
-  [SocialPlatform.TWITTER]: (handle) => `https://x.com/${handle}`,
-  [SocialPlatform.TIKTOK]: (handle) => `https://tiktok.com/@${handle}`,
-  [SocialPlatform.LINKEDIN]: (handle) => `https://linkedin.com/in/${handle}`,
-  [SocialPlatform.FACEBOOK]: (handle) => `https://facebook.com/${handle}`,
-  [SocialPlatform.WHATSAPP]: (handle) => `https://wa.me/${handle}`,
-  [SocialPlatform.GITHUB]: (handle) => `https://github.com/${handle}`,
+const PLATFORM_URL_PREFIXES: Partial<Record<SocialPlatform, string>> = {
+  [SocialPlatform.INSTAGRAM]: 'https://instagram.com/',
+  [SocialPlatform.TWITTER]: 'https://x.com/',
+  [SocialPlatform.TIKTOK]: 'https://tiktok.com/@',
+  [SocialPlatform.LINKEDIN]: 'https://linkedin.com/in/',
+  [SocialPlatform.FACEBOOK]: 'https://facebook.com/',
+  [SocialPlatform.WHATSAPP]: 'https://wa.me/',
+  [SocialPlatform.GITHUB]: 'https://github.com/',
 };
 
 /**
@@ -75,8 +75,8 @@ export const constructSocialString = (data: SocialData): string => {
     return `https://wa.me/${cleanHandle}?text=${encodeURIComponent(data.message.trim())}`;
   }
 
-  const constructUrl = SOCIAL_PLATFORM_URLS[data.platform];
-  return constructUrl ? constructUrl(cleanHandle) : '';
+  const prefix = PLATFORM_URL_PREFIXES[data.platform];
+  return prefix ? prefix + cleanHandle : '';
 };
 
 /**

@@ -100,7 +100,7 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
       if (segments.length === 1 && segments[0].startsWith('@')) handle = segments[0].substring(1);
       break;
     case SocialPlatform.YOUTUBE: {
-      const querySuffix = parsed.params.size ? '?' + new URLSearchParams(Array.from(parsed.params.entries())).toString() : '';
+      const querySuffix = parsed.params.size ? '?' + new URLSearchParams([...parsed.params]).toString() : '';
       if (segments.length === 1) {
         const s0 = segments[0];
         if (host === 'youtu.be') handle = `youtu.be/${s0}`;
