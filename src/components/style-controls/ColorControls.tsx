@@ -31,29 +31,25 @@ const PRESET_OPTIONS = PRESET_COLORS.map((preset) => ({
 
 export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }) => {
   const activeGradientType: GradientType = config.gradientType || 'none';
-  const colorStops = useMemo(
-    () =>
-      config.gradientColorStops && config.gradientColorStops.length > 0
-        ? config.gradientColorStops
-        : [
-            { offset: 0, color: config.fgColor || '#000000' },
-            { offset: 1, color: DEFAULT_GRADIENT_END_COLOR },
-          ],
-    [config.gradientColorStops, config.fgColor]
-  );
+  const colorStops = config.gradientColorStops?.length
+    ? config.gradientColorStops
+    : [
+        { offset: 0, color: config.fgColor || '#000000' },
+        { offset: 1, color: DEFAULT_GRADIENT_END_COLOR },
+      ];
 
   const stop0Color = colorStops[0]?.color ?? config.fgColor;
   const stop1Color = colorStops[colorStops.length - 1]?.color ?? DEFAULT_GRADIENT_END_COLOR;
 
   const contrastRatios = useMemo(() => {
     const bgForContrast = config.bgColor === 'transparent' ? '#ffffff' : config.bgColor;
-    // A gradient is only as scannable as its weakest stop, so every stop is checked (an imported style can have more than two).
-    const moduleColors = activeGradientType !== 'none' ? colorStops.map((s) => s.color) : [config.fgColor];
+    const stops = config.gradientColorStops?.length ? config.gradientColorStops : [{ offset: 0, color: config.fgColor }, { offset: 1, color: DEFAULT_GRADIENT_END_COLOR }];
+    const moduleColors = activeGradientType !== 'none' ? stops.map((s) => s.color) : [config.fgColor];
     const fgContrast = Math.min(...moduleColors.map((color) => getContrastRatio(color, bgForContrast)));
     const eyeFrameContrast = getContrastRatio(config.eyeFrameColor || config.eyeColor, bgForContrast);
     const eyeBallContrast = getContrastRatio(config.eyeBallColor || config.eyeColor, bgForContrast);
     return { fg: fgContrast, eyeFrame: eyeFrameContrast, eyeBall: eyeBallContrast };
-  }, [activeGradientType, colorStops, config.fgColor, config.bgColor, config.eyeColor, config.eyeFrameColor, config.eyeBallColor]);
+  }, [activeGradientType, config.gradientColorStops, config.fgColor, config.bgColor, config.eyeColor, config.eyeFrameColor, config.eyeBallColor]);
 
   const worstContrast = Math.min(contrastRatios.fg, contrastRatios.eyeFrame, contrastRatios.eyeBall);
   const isLowContrast = worstContrast < MIN_CONTRAST_THRESHOLD;
