@@ -93,28 +93,34 @@ export const hydrateEventData = (raw: string): EventData => {
           result.endDate = parseEventDateTime(parts[1] || '').replace(/Z$/i, '');
         }
       }
-      if (parsed.params.get('ctz')) {
-        result.timezone = parsed.params.get('ctz')!;
+      const ctz = parsed.params.get('ctz');
+      if (ctz) {
+        result.timezone = ctz;
+      }
+      const recur = parsed.params.get('recur');
+      if (recur) {
+        const freqMatch = recur.match(/FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)/i);
+        if (freqMatch) {
+          const freq = freqMatch[1].toUpperCase();
+          if (freq === 'DAILY' || freq === 'WEEKLY' || freq === 'MONTHLY' || freq === 'YEARLY') {
+            result.recurrenceFreq = freq;
+          }
+        }
+        const countMatch = recur.match(/COUNT=(\d+)/i);
+        if (countMatch) {
+          const count = parseInt(countMatch[1], 10);
+          if (count > 0) {
+            result.recurrenceCount = Math.min(999, count);
+          }
+        }
       }
       result.location = parsed.params.get('location') || '';
       result.description = parsed.params.get('details') || '';
       return result;
     }
 
-    if (calendar === CalendarProvider.OUTLOOK) {
-      result.provider = CalendarProvider.OUTLOOK;
-      result.title = parsed.params.get('subject') || '';
-      Object.assign(result, hydrateOutlookDates(parsed.params));
-      if (parsed.params.get('ctz')) {
-        result.timezone = parsed.params.get('ctz')!;
-      }
-      result.location = parsed.params.get('location') || '';
-      result.description = parsed.params.get('body') || '';
-      return result;
-    }
-
-    if (calendar === CalendarProvider.OFFICE365) {
-      result.provider = CalendarProvider.OFFICE365;
+    if (calendar === CalendarProvider.OUTLOOK || calendar === CalendarProvider.OFFICE365) {
+      result.provider = calendar;
       result.title = parsed.params.get('subject') || '';
       Object.assign(result, hydrateOutlookDates(parsed.params));
       if (parsed.params.get('ctz')) {
@@ -171,6 +177,23 @@ export const hydrateEventData = (raw: string): EventData => {
       case 'DESCRIPTION':
         result.description = unescapeVCardEvent(value);
         break;
+      case 'RRULE': {
+        const freqMatch = value.match(/FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)/i);
+        if (freqMatch) {
+          const freq = freqMatch[1].toUpperCase();
+          if (freq === 'DAILY' || freq === 'WEEKLY' || freq === 'MONTHLY' || freq === 'YEARLY') {
+            result.recurrenceFreq = freq;
+          }
+        }
+        const countMatch = value.match(/COUNT=(\d+)/i);
+        if (countMatch) {
+          const count = parseInt(countMatch[1], 10);
+          if (count > 0) {
+            result.recurrenceCount = Math.min(999, count);
+          }
+        }
+        break;
+      }
     }
   });
 
@@ -232,12 +255,36 @@ const fnv1a = (input: string, seed: number): string => {
 };
 
 /**
+ * Constructs an RFC 5545 RRULE property string array if frequency is active.
+ */
+const buildRRule = (freq?: string, count?: number | string): string[] => {
+  if (!freq) return [];
+  const f = freq.toUpperCase();
+  if (f !== 'DAILY' && f !== 'WEEKLY' && f !== 'MONTHLY' && f !== 'YEARLY') return [];
+
+  const raw = Number(count);
+  if (!Number.isInteger(raw) || raw <= 0) return [`RRULE:FREQ=${f}`];
+  const c = Math.min(999, raw);
+  return [`RRULE:FREQ=${f};COUNT=${c}`];
+};
+
+/**
  * Builds a stable RFC 5545 UID from the event content, without any network or random source.
  * The same event always gets the same UID, so re-scanning updates the calendar entry
  * instead of duplicating it.
  */
 const deriveEventUid = (data: EventData): string => {
-  const key = [data.title, data.startDate, data.endDate, data.timezone, data.location, data.description, ...(data.allDay ? ['all-day'] : [])]
+  const hasRecurrence = Boolean(data.recurrenceFreq && data.recurrenceFreq !== 'NONE');
+  const key = [
+    data.title,
+    data.startDate,
+    data.endDate,
+    data.timezone,
+    data.location,
+    data.description,
+    ...(data.allDay ? ['all-day'] : []),
+    ...(hasRecurrence ? [data.recurrenceFreq!, ...(data.recurrenceCount ? [String(data.recurrenceCount)] : [])] : []),
+  ]
     .map((part) => part || '')
     .join('\u001f');
   return `${fnv1a(key, 0x811c9dc5)}${fnv1a(key, 0x01000193)}@qrcraftly.com`;
@@ -286,6 +333,8 @@ export const constructEventString = (
     if (startFormatted.value) {
       params.set('dates', `${startFormatted.value}/${effectiveEnd}`);
     }
+    const rrule = buildRRule(data.recurrenceFreq, data.recurrenceCount);
+    if (rrule.length > 0) params.set('recur', rrule[0]);
     if (data.timezone) params.set('ctz', data.timezone);
     if (data.location) params.set('location', data.location);
     if (data.description) params.set('details', data.description);
@@ -365,6 +414,7 @@ const buildCalendar = (
     `DTSTAMP:${resolveStamp(options.now)}`,
     ...optional('SUMMARY', escapeVCardEvent(data.title)),
     ...dates,
+    ...buildRRule(data.recurrenceFreq, data.recurrenceCount),
     ...optional('LOCATION', escapeVCardEvent(data.location)),
     ...optional('DESCRIPTION', escapeVCardEvent(data.description)),
     'END:VEVENT',
@@ -390,6 +440,8 @@ const constructAllDayEvent = (data: EventData, provider: string, options: EventC
     params.set('action', 'TEMPLATE');
     if (data.title) params.set('text', data.title);
     if (startDate) params.set('dates', `${compact(startDate)}/${compact(endDate || shiftDate(startDate, 1))}`);
+    const rrule = buildRRule(data.recurrenceFreq, data.recurrenceCount);
+    if (rrule.length > 0) params.set('recur', rrule[0]);
     if (data.location) params.set('location', data.location);
     if (data.description) params.set('details', data.description);
     return `https://calendar.google.com/calendar/render?${params.toString()}`;

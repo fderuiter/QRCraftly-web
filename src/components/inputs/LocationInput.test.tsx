@@ -63,10 +63,11 @@ describe('LocationInput component', () => {
   // ─── Rendering ────────────────────────────────────────────────────────────
 
   describe('rendering', () => {
-    it('renders latitude and longitude text fields', () => {
+    it('renders latitude and longitude text fields and URL link field', () => {
       renderLocationInput();
       expect(screen.getByLabelText('Latitude')).toBeInTheDocument();
       expect(screen.getByLabelText('Longitude')).toBeInTheDocument();
+      expect(screen.getByLabelText(/Google Maps Link or Coordinates/i)).toBeInTheDocument();
     });
 
     it('renders the "Use Current Location" button', () => {
@@ -504,6 +505,181 @@ describe('LocationInput component', () => {
       deliver({ coords, timestamp: 0, toJSON: () => ({}) });
       expect(onChange).not.toHaveBeenCalled();
       expect(announcePolitely).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── Google Maps link and location string parsing ────────────────────────
+
+  describe('Google Maps link and location string parsing', () => {
+    it('extracts coordinates when pasting a Google Maps place pin URL and does not re-announce on blur', () => {
+      const { onChange } = renderLocationInput();
+      const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
+
+      fireEvent.paste(input, {
+        clipboardData: {
+          getData: () =>
+            'https://www.google.com/maps/place/Statue+of+Liberty/@40.6892494,-74.0466891,17z/data=!3m1!4b1!4m6!3m5!1s0x89c25090129c363d:0x40c6a5770d25022b!8m2!3d40.6892494!4d-74.0445004',
+        },
+      });
+
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).toHaveBeenCalledWith({
+        latitude: '40.689249',
+        longitude: '-74.0445',
+      });
+      expect(announcePolitely).toHaveBeenCalledTimes(1);
+      expect(announcePolitely).toHaveBeenCalledWith('Location coordinates populated');
+
+      // Subsequent blur event
+      fireEvent.blur(input);
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(announcePolitely).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not populate coordinates while typing, populating only on blur or Enter', () => {
+      const { onChange } = renderLocationInput();
+      const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
+
+      fireEvent.change(input, {
+        target: { value: 'https://www.google.com/maps/@40.7128,-74.0060,15z' },
+      });
+
+      expect(onChange).not.toHaveBeenCalled();
+      expect(announcePolitely).not.toHaveBeenCalled();
+
+      fireEvent.blur(input);
+
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).toHaveBeenCalledWith({
+        latitude: '40.7128',
+        longitude: '-74.006',
+      });
+      expect(announcePolitely).toHaveBeenCalledTimes(1);
+      expect(announcePolitely).toHaveBeenCalledWith('Location coordinates populated');
+    });
+
+    it('populates coordinates when Enter key is pressed', () => {
+      const { onChange } = renderLocationInput();
+      const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
+
+      fireEvent.change(input, {
+        target: { value: '40.7128, -74.0060' },
+      });
+
+      expect(onChange).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      expect(onChange).toHaveBeenCalledWith({
+        latitude: '40.7128',
+        longitude: '-74.006',
+      });
+      expect(announcePolitely).toHaveBeenCalledTimes(1);
+    });
+
+    it('extracts coordinates when pasting a DMS string', () => {
+      const { onChange } = renderLocationInput();
+      const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
+
+      fireEvent.paste(input, {
+        clipboardData: {
+          getData: () => '40°42\'46"N 74°00\'21"W',
+        },
+      });
+
+      expect(onChange).toHaveBeenCalledWith({
+        latitude: '40.712778',
+        longitude: '-74.005833',
+      });
+    });
+
+    it('displays error message when pasting an unparseable or short URL', () => {
+      renderLocationInput();
+      const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
+
+      fireEvent.paste(input, {
+        clipboardData: {
+          getData: () => 'https://maps.app.goo.gl/invalid',
+        },
+      });
+
+      expect(
+        screen.getByText('Could not extract valid coordinates from the provided URL or location string.')
+      ).toBeInTheDocument();
+    });
+
+    it('displays error message on blur when entering invalid text or URL with stray %', () => {
+      renderLocationInput();
+      const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
+
+      fireEvent.change(input, { target: { value: 'https://maps.google.com/?q=Cafe 100%' } });
+      fireEvent.blur(input);
+
+      expect(
+        screen.getByText('Could not extract valid coordinates from the provided URL or location string.')
+      ).toBeInTheDocument();
+    });
+
+    it('preserves pasted content and accepts typing immediately after paste without dropping characters', () => {
+      renderLocationInput();
+      const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
+
+      fireEvent.paste(input, {
+        clipboardData: {
+          getData: () => 'https://maps.google.com/123',
+        },
+      });
+
+      expect(input).toHaveValue('https://maps.google.com/123');
+
+      fireEvent.change(input, {
+        target: { value: 'https://maps.google.com/1234' },
+      });
+
+      expect(input).toHaveValue('https://maps.google.com/1234');
+    });
+
+    it('retains error message on repeated blur or Enter on the same invalid text', () => {
+      renderLocationInput();
+      const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
+
+      fireEvent.change(input, { target: { value: 'invalid location text' } });
+      fireEvent.blur(input);
+
+      expect(
+        screen.getByText('Could not extract valid coordinates from the provided URL or location string.')
+      ).toBeInTheDocument();
+
+      fireEvent.blur(input);
+
+      expect(
+        screen.getByText('Could not extract valid coordinates from the provided URL or location string.')
+      ).toBeInTheDocument();
+
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      expect(
+        screen.getByText('Could not extract valid coordinates from the provided URL or location string.')
+      ).toBeInTheDocument();
+    });
+
+    it('replaces existing field text and parses pasted content when user pastes into field', () => {
+      const { onChange } = renderLocationInput();
+      const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
+
+      fireEvent.change(input, { target: { value: 'some existing text' } });
+
+      fireEvent.paste(input, {
+        clipboardData: {
+          getData: () => 'https://www.google.com/maps/@40.7128,-74.0060,15z',
+        },
+      });
+
+      expect(input).toHaveValue('https://www.google.com/maps/@40.7128,-74.0060,15z');
+      expect(onChange).toHaveBeenCalledWith({
+        latitude: '40.7128',
+        longitude: '-74.006',
+      });
     });
   });
 });

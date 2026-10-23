@@ -18,16 +18,18 @@
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BulkCsvPreflightSummary } from './BulkCsvPreflightSummary';
 import { type PreflightReport } from '@/packages/bulk-csv';
-import { triggerFileDownload } from '@/utils/downloadManager';
+import * as downloadManager from '@/utils/downloadManager';
 
-vi.mock('@/utils/downloadManager', () => ({
-  triggerFileDownload: vi.fn(),
-}));
+vi.spyOn(downloadManager, 'triggerFileDownload').mockImplementation(() => {});
 
 describe('BulkCsvPreflightSummary Component', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders all-valid preflight report cleanly', () => {
     const report: PreflightReport = {
       totalRows: 10,
@@ -99,6 +101,43 @@ describe('BulkCsvPreflightSummary Component', () => {
     expect(screen.queryByTestId('preflight-details-list')).not.toBeInTheDocument();
   });
 
+  it('triggers download of error log CSV when Export Error Log button is clicked', () => {
+    const report: PreflightReport = {
+      totalRows: 5,
+      validCount: 3,
+      emptyCount: 1,
+      unsafeCount: 1,
+      cautionCount: 0,
+      details: [],
+      invalidDetails: [
+        { rowNumber: 2, category: 'empty', reason: 'Missing payload value', payload: '' },
+        { rowNumber: 4, category: 'unsafe', reason: 'Dangerous scheme', payload: 'javascript:alert(1)' },
+      ],
+      validRows: [],
+      validRowIndices: [],
+      validPayloads: [],
+    };
+
+    render(<BulkCsvPreflightSummary report={report} fileName="input-data.csv" />);
+
+    const exportBtn = screen.getByTestId('export-error-log-button');
+    expect(exportBtn).toBeInTheDocument();
+    expect(exportBtn).toHaveTextContent('Export Error Log (CSV)');
+
+    fireEvent.click(exportBtn);
+
+    expect(downloadManager.triggerFileDownload).toHaveBeenCalledTimes(1);
+    const [bytes, fileName, mimeType] = vi.mocked(downloadManager.triggerFileDownload).mock.calls[0];
+    expect(ArrayBuffer.isView(bytes)).toBe(true);
+    expect(fileName).toBe('input-data-error-log.csv');
+    expect(mimeType).toBe('text/csv');
+
+    const downloadedText = new TextDecoder().decode(bytes);
+    expect(downloadedText).toContain('Row Number,Category,Reason,Payload');
+    expect(downloadedText).toContain('2,empty,Missing payload value,');
+    expect(downloadedText).toContain('4,unsafe,Dangerous scheme,javascript:alert(1)');
+  });
+
   it('triggers CSV report download with derived file name when export button is clicked', () => {
     const report: PreflightReport = {
       totalRows: 5,
@@ -128,8 +167,8 @@ describe('BulkCsvPreflightSummary Component', () => {
 
     fireEvent.click(exportBtn);
 
-    expect(triggerFileDownload).toHaveBeenCalledTimes(1);
-    const [bytes, fileName, mimeType] = vi.mocked(triggerFileDownload).mock.calls[0];
+    expect(downloadManager.triggerFileDownload).toHaveBeenCalledTimes(1);
+    const [bytes, fileName, mimeType] = vi.mocked(downloadManager.triggerFileDownload).mock.calls[0];
     const text = new TextDecoder().decode(bytes);
 
     expect(fileName).toBe('client_export-preflight-report.csv');
@@ -140,7 +179,6 @@ describe('BulkCsvPreflightSummary Component', () => {
   });
 
   it('falls back to default file name when fileName prop is omitted or missing extension', () => {
-    vi.clearAllMocks();
     const report: PreflightReport = {
       totalRows: 2,
       validCount: 1,
@@ -159,9 +197,8 @@ describe('BulkCsvPreflightSummary Component', () => {
     const exportBtn = screen.getByTestId('export-preflight-report-button');
     fireEvent.click(exportBtn);
 
-    expect(triggerFileDownload).toHaveBeenCalledTimes(1);
-    const [, fileName] = vi.mocked(triggerFileDownload).mock.calls[0];
+    expect(downloadManager.triggerFileDownload).toHaveBeenCalledTimes(1);
+    const [, fileName] = vi.mocked(downloadManager.triggerFileDownload).mock.calls[0];
     expect(fileName).toBe('qrcraftly-preflight-report.csv');
   });
 });
-

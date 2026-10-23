@@ -51,3 +51,13 @@ export function allocateFileName(stem: string, ext: string, used: Set<string>): 
   used.add(nameKey(name));
   return name;
 }
+
+/**
+ * Constructs a file name for the CSV error log: `<original-filename>-error-log.csv`,
+ * or `bulk-error-log.csv` when no file name is provided.
+ */
+export function errorLogFileName(fileName?: string): string {
+  if (!fileName) return 'bulk-error-log.csv';
+  const stem = fileName.replace(/\.[^/.]+$/, '');
+  return `${sanitizeFileStem(stem, 'bulk')}-error-log.csv`;
+}
