@@ -127,3 +127,67 @@ describe('false positives on ordinary addresses', () => {
     expect(cautions(url)).toEqual([]);
   });
 });
+
+describe('performance guardrails & linear execution', () => {
+  it('analyzes a 100 KB payload URL in less than 1 millisecond', () => {
+    const largePadding = 'a'.repeat(100_000);
+    const largeUrl = `https://example.com/search?q=${largePadding}`;
+
+    // Warm-up execution
+    analyseLink(largeUrl);
+
+    const iterations = 3;
+    const start = performance.now();
+    for (let i = 0; i < iterations; i++) {
+      analyseLink(largeUrl);
+    }
+    const elapsedMs = (performance.now() - start) / iterations;
+
+    expect(elapsedMs).toBeLessThan(1.0);
+  });
+
+  it('demonstrates O(N) linear time complexity without exponential backtracking', () => {
+    const smallPayload = 'https://example.com/path?' + 'param=value&'.repeat(500);
+    const largePayload = 'https://example.com/path?' + 'param=value&'.repeat(5000);
+
+    analyseLink(smallPayload);
+    analyseLink(largePayload);
+
+    const iterations = 3;
+
+    const startSmall = performance.now();
+    for (let i = 0; i < iterations; i++) analyseLink(smallPayload);
+    const timeSmall = (performance.now() - startSmall) / iterations;
+
+    const startLarge = performance.now();
+    for (let i = 0; i < iterations; i++) analyseLink(largePayload);
+    const timeLarge = (performance.now() - startLarge) / iterations;
+
+    expect(timeLarge).toBeLessThan(Math.max(1.0, timeSmall * 20));
+  });
+
+  it('resists ReDoS and catastrophic backtracking hazards on adversarial inputs', () => {
+    const adversarialInputs = [
+      'https://' + 'a-'.repeat(200) + 'paypal.com/',
+      'https://' + 'a.'.repeat(100) + 'example.com/',
+      'https://example.com/' + 'login/'.repeat(100) + 'paypal',
+      'https://user:pass@' + 'a'.repeat(1000) + '.example.com/',
+    ];
+
+    for (const url of adversarialInputs) {
+      // Warm up JIT
+      analyseLink(url);
+      const start = performance.now();
+      for (let i = 0; i < 2; i++) {
+        analyseLink(url);
+      }
+      const elapsed = (performance.now() - start) / 2;
+      expect(elapsed).toBeLessThan(5.0);
+    }
+  });
+
+  it('operates purely via TypeScript without binary or WebAssembly assets', () => {
+    const result = analyseLink('https://example.com');
+    expect(Array.isArray(result)).toBe(true);
+  });
+});

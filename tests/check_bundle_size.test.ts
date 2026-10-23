@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'node:crypto';
-import { OPTICAL_PROBE_MARKER, WASM_MODULE_BUDGETS_KB, checkWasmModuleBudgets, getFiles, isOwnWasmModule, measurePageLoads, verifyBundleSize } from '../scripts/check-bundle-size.js';
+import { OPTICAL_PROBE_MARKER, WASM_MODULE_BUDGETS_KB, MAX_LINK_SAFETY_GZIPPED_SIZE_KB, checkWasmModuleBudgets, getFiles, isOwnWasmModule, measurePageLoads, verifyBundleSize, verifyLinkSafetyBundleSize } from '../scripts/check-bundle-size.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -149,5 +149,11 @@ describe('Bundle Size Verification Script Tests', () => {
     expect(loads[0].files).toBe(4);
     expect(loads[1].files).toBe(2);
     expect(loads[0].gzipSize).toBeGreaterThan(loads[1].gzipSize);
+  });
+
+  it('keeps @/packages/link-safety strictly under the 6 KB gzipped budget', async () => {
+    const result = await verifyLinkSafetyBundleSize(MAX_LINK_SAFETY_GZIPPED_SIZE_KB);
+    expect(result.exceeds).toBe(false);
+    expect(result.gzipSize).toBeLessThan(MAX_LINK_SAFETY_GZIPPED_SIZE_KB * 1024);
   });
 });
