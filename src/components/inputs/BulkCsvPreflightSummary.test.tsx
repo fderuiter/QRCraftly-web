@@ -18,9 +18,14 @@
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { BulkCsvPreflightSummary } from './BulkCsvPreflightSummary';
 import { type PreflightReport } from '@/packages/bulk-csv';
+import { triggerFileDownload } from '@/utils/downloadManager';
+
+vi.mock('@/utils/downloadManager', () => ({
+  triggerFileDownload: vi.fn(),
+}));
 
 describe('BulkCsvPreflightSummary Component', () => {
   it('renders all-valid preflight report cleanly', () => {
@@ -93,4 +98,70 @@ describe('BulkCsvPreflightSummary Component', () => {
     fireEvent.click(toggleBtn);
     expect(screen.queryByTestId('preflight-details-list')).not.toBeInTheDocument();
   });
+
+  it('triggers CSV report download with derived file name when export button is clicked', () => {
+    const report: PreflightReport = {
+      totalRows: 5,
+      validCount: 3,
+      emptyCount: 1,
+      unsafeCount: 1,
+      cautionCount: 0,
+      details: [
+        { rowNumber: 1, category: 'valid', payload: 'https://example.com/1' },
+        { rowNumber: 2, category: 'empty', reason: 'Missing payload value', payload: '' },
+        { rowNumber: 3, category: 'unsafe', reason: 'Unsafe scheme', payload: 'javascript:alert(1)' },
+      ],
+      invalidDetails: [
+        { rowNumber: 2, category: 'empty', reason: 'Missing payload value', payload: '' },
+        { rowNumber: 3, category: 'unsafe', reason: 'Unsafe scheme', payload: 'javascript:alert(1)' },
+      ],
+      validRows: [],
+      validRowIndices: [],
+      validPayloads: [],
+    };
+
+    render(<BulkCsvPreflightSummary report={report} fileName="client_export.csv" />);
+
+    const exportBtn = screen.getByTestId('export-preflight-report-button');
+    expect(exportBtn).toBeInTheDocument();
+    expect(exportBtn).toHaveTextContent('Export Report CSV');
+
+    fireEvent.click(exportBtn);
+
+    expect(triggerFileDownload).toHaveBeenCalledTimes(1);
+    const [bytes, fileName, mimeType] = vi.mocked(triggerFileDownload).mock.calls[0];
+    const text = new TextDecoder().decode(bytes);
+
+    expect(fileName).toBe('client_export-preflight-report.csv');
+    expect(mimeType).toBe('text/csv');
+    expect(text).toContain('Row,Status,Reason,Payload');
+    expect(text).toContain('2,empty,Missing payload value,');
+    expect(text).toContain('3,unsafe,Unsafe scheme,javascript:alert(1)');
+  });
+
+  it('falls back to default file name when fileName prop is omitted or missing extension', () => {
+    vi.clearAllMocks();
+    const report: PreflightReport = {
+      totalRows: 2,
+      validCount: 1,
+      emptyCount: 1,
+      unsafeCount: 0,
+      cautionCount: 0,
+      details: [{ rowNumber: 2, category: 'empty', reason: 'Missing payload', payload: '' }],
+      invalidDetails: [{ rowNumber: 2, category: 'empty', reason: 'Missing payload', payload: '' }],
+      validRows: [],
+      validRowIndices: [],
+      validPayloads: [],
+    };
+
+    render(<BulkCsvPreflightSummary report={report} />);
+
+    const exportBtn = screen.getByTestId('export-preflight-report-button');
+    fireEvent.click(exportBtn);
+
+    expect(triggerFileDownload).toHaveBeenCalledTimes(1);
+    const [, fileName] = vi.mocked(triggerFileDownload).mock.calls[0];
+    expect(fileName).toBe('qrcraftly-preflight-report.csv');
+  });
 });
+
