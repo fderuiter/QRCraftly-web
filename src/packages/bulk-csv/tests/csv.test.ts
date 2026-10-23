@@ -254,13 +254,25 @@ describe('formatErrorLogCsv', () => {
     expect(text).toContain('1,skipped,Invalid or skipped row,\r\n');
   });
 
-  it('neutralises formula injection in payloads starting with =', () => {
+  it('neutralises formula injection in fields starting with =, +, -, @, or leading tab', () => {
     const items = [
       {
         rowNumber: 2,
         category: 'unsafe',
         reason: '=SUM(1,2)',
         payload: '=HYPERLINK("http://example.com")',
+      },
+      {
+        rowNumber: 3,
+        category: 'unsafe',
+        reason: '+12345678',
+        payload: '-100',
+      },
+      {
+        rowNumber: 4,
+        category: 'caution',
+        reason: '@admin',
+        payload: '\ttab_prefix',
       },
     ];
     const bytes = formatErrorLogCsv(items);
@@ -269,6 +281,10 @@ describe('formatErrorLogCsv', () => {
     const parsed = parseCsv(text);
     expect(parsed.rows[0]['Reason']).toBe("'=SUM(1,2)");
     expect(parsed.rows[0]['Payload']).toBe("'=HYPERLINK(\"http://example.com\")");
+    expect(parsed.rows[1]['Reason']).toBe("'+12345678");
+    expect(parsed.rows[1]['Payload']).toBe("'-100");
+    expect(parsed.rows[2]['Reason']).toBe("'@admin");
+    expect(parsed.rows[2]['Payload']).toBe("'\ttab_prefix");
   });
 });
 

@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { escapeCsvCell } from './categorize';
+import { escapeCsvCell } from './csvEscape';
 
 /** Most data rows a bulk batch keeps in memory. Rows past this are counted, not stored. */
 export const MAX_BULK_CSV_ROWS = 500;

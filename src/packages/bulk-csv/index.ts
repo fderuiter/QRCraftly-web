@@ -52,9 +52,9 @@ export {
 } from './lib/preview';
 export { encodeBulkCell, type BulkContentType } from './lib/payload';
 export { SAMPLE_CSV_TEMPLATE } from './lib/template';
+export { escapeCsvCell } from './lib/csvEscape';
 export {
   categorizeCsvRows,
-  escapeCsvCell,
   formatPreflightReportCsv,
   preflightReportFileName,
   type CategorizeOptions,
