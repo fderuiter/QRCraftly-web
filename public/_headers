@@ -16,4 +16,3 @@
 # Preview and workers.dev copies of the site are never indexed; qrcraftly.com is the canonical host.
 https://:subdomain.fpderuiter.workers.dev/*
   X-Robots-Tag: noindex
-

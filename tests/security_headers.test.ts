@@ -81,15 +81,9 @@ describe('public/_headers security headers', () => {
     expect(fs.readFileSync(HEADERS_PATH, 'utf8')).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
   });
 
-  it('ensures all route matchers in public/_headers begin with a leading slash relative path (#1028)', () => {
+  it('keeps workers.dev preview and production URLs out of search results; only qrcraftly.com is indexed (#1028)', () => {
     const content = fs.readFileSync(HEADERS_PATH, 'utf8');
-    const lines = content.split(/\r?\n/);
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#') || line.startsWith(' ') || line.startsWith('\t')) continue;
-      expect(trimmed.startsWith('/')).toBe(true);
-    }
-    expect(content).not.toContain('https://');
+    expect(content).toMatch(/^https:\/\/:subdomain\.fpderuiter\.workers\.dev\/\*\r?\n\s+X-Robots-Tag: noindex$/m);
     expect(readGlobalHeaders().has('x-robots-tag')).toBe(false);
   });
 });
