@@ -17,7 +17,15 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { categorizeCsvRows, type CsvRow } from '../index';
+import {
+  categorizeCsvRows,
+  escapeCsvCell,
+  formatPreflightReportCsv,
+  preflightReportFileName,
+  type CsvRow,
+  type PreflightRowDetail,
+  type PreflightReport,
+} from '../index';
 
 describe('categorizeCsvRows Engine', () => {
   it('returns empty report when rows array or payload column is empty', () => {
@@ -104,3 +112,88 @@ describe('categorizeCsvRows Engine', () => {
     expect(report.invalidDetails.map((d) => d.rowNumber)).toEqual([4]);
   });
 });
+
+describe('escapeCsvCell', () => {
+  it('escapes quotes, commas, and line breaks according to RFC 4180', () => {
+    expect(escapeCsvCell('hello, world')).toBe('"hello, world"');
+    expect(escapeCsvCell('hello "world"')).toBe('"hello ""world"""');
+    expect(escapeCsvCell('line1\nline2')).toBe('"line1\nline2"');
+    expect(escapeCsvCell('line1\r\nline2')).toBe('"line1\r\nline2"');
+    expect(escapeCsvCell('plain text')).toBe('plain text');
+  });
+
+  it('prevents spreadsheet formula injection by prefixing formula start characters', () => {
+    expect(escapeCsvCell('=SUM(A1:A10)')).toBe("'=SUM(A1:A10)");
+    expect(escapeCsvCell('+12345678')).toBe("'+12345678");
+    expect(escapeCsvCell('-100')).toBe("'-100");
+    expect(escapeCsvCell('@admin')).toBe("'@admin");
+    expect(escapeCsvCell('\ttab')).toBe("'\ttab");
+  });
+
+  it('handles quotes and formula injection together', () => {
+    expect(escapeCsvCell('=CMD("calc")')).toBe('"\'=CMD(""calc"")"');
+    expect(escapeCsvCell('=1+1,2')).toBe('"\'=1+1,2"');
+  });
+});
+
+describe('formatPreflightReportCsv', () => {
+  it('formats PreflightRowDetail[] into RFC 4180 CSV string with headers', () => {
+    const details: PreflightRowDetail[] = [
+      { rowNumber: 2, category: 'empty', reason: "Missing value in payload column 'URL'", payload: '' },
+      { rowNumber: 5, category: 'unsafe', reason: 'Unsafe URL scheme or dangerous payload detected', payload: 'javascript:alert(1)' },
+      { rowNumber: 8, category: 'caution', reason: 'Lookalike domain detected', payload: 'https://paypa1.com/login' },
+    ];
+
+    const csv = formatPreflightReportCsv(details);
+    const lines = csv.split('\r\n');
+
+    expect(lines[0]).toBe('Row,Status,Reason,Payload');
+    expect(lines[1]).toBe("2,empty,Missing value in payload column 'URL',");
+    expect(lines[2]).toBe('5,unsafe,Unsafe URL scheme or dangerous payload detected,javascript:alert(1)');
+    expect(lines[3]).toBe('8,caution,Lookalike domain detected,https://paypa1.com/login');
+  });
+
+  it('accepts PreflightReport object directly', () => {
+    const report: PreflightReport = {
+      totalRows: 3,
+      validCount: 1,
+      emptyCount: 1,
+      unsafeCount: 1,
+      cautionCount: 0,
+      details: [
+        { rowNumber: 1, category: 'valid', payload: 'https://example.com' },
+        { rowNumber: 2, category: 'empty', reason: 'Missing payload', payload: '' },
+        { rowNumber: 3, category: 'unsafe', reason: 'Unsafe payload', payload: 'javascript:void(0)' },
+      ],
+      invalidDetails: [
+        { rowNumber: 2, category: 'empty', reason: 'Missing payload', payload: '' },
+        { rowNumber: 3, category: 'unsafe', reason: 'Unsafe payload', payload: 'javascript:void(0)' },
+      ],
+      validRows: [],
+      validRowIndices: [],
+      validPayloads: [],
+    };
+
+    const csv = formatPreflightReportCsv(report);
+    expect(csv).toContain('Row,Status,Reason,Payload');
+    expect(csv).toContain('1,valid,,https://example.com');
+    expect(csv).toContain('2,empty,Missing payload,');
+    expect(csv).toContain('3,unsafe,Unsafe payload,javascript:void(0)');
+  });
+});
+
+describe('preflightReportFileName', () => {
+  it('derives sanitized preflight report file name from source file name', () => {
+    expect(preflightReportFileName('my-batch.csv')).toBe('my-batch-preflight-report.csv');
+    expect(preflightReportFileName('qr_data_2026.xlsx.csv')).toBe('qr_data_2026.xlsx-preflight-report.csv');
+  });
+
+  it('falls back to default report file name when file name is missing or invalid', () => {
+    expect(preflightReportFileName()).toBe('qrcraftly-preflight-report.csv');
+    expect(preflightReportFileName('')).toBe('qrcraftly-preflight-report.csv');
+    expect(preflightReportFileName('   ')).toBe('qrcraftly-preflight-report.csv');
+    expect(preflightReportFileName('noextension')).toBe('qrcraftly-preflight-report.csv');
+    expect(preflightReportFileName('///.csv')).toBe('qrcraftly-preflight-report.csv');
+  });
+});
+

@@ -79,6 +79,9 @@ interface ExportOptionsProps {
   id: string;
   format: DownloadFormat;
   onFormatChange: (format: DownloadFormat) => void;
+  /** Color space for EPS and PDF vector downloads. */
+  colorSpace?: 'rgb' | 'cmyk';
+  onColorSpaceChange?: (colorSpace: 'rgb' | 'cmyk') => void;
   /** Raster width in pixels. */
   size: number;
   onSizeChange: (size: number) => void;
@@ -94,11 +97,25 @@ interface ExportOptionsProps {
 
 /**
  * The Download options panel of the generator: format, raster size with a print helper,
- * the file name, Copy as SVG and Add to phone wallet. The Download button exports with these choices.
+ * color space toggle for vector EPS and PDF formats, the file name, Copy as SVG and Add to phone wallet.
+ * The Download button exports with these choices.
  * @param props - Current choices and their change handlers.
  * @returns The options panel.
  */
-export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, filename, onFilenameChange, onCopySvg, copySvgBusy, onWallet }: ExportOptionsProps) {
+export function ExportOptions({
+  id,
+  format,
+  onFormatChange,
+  colorSpace = 'rgb',
+  onColorSpaceChange,
+  size,
+  onSizeChange,
+  filename,
+  onFilenameChange,
+  onCopySvg,
+  copySvgBusy,
+  onWallet,
+}: ExportOptionsProps) {
   const matchedPreset = (Object.keys(SIZE_PRESETS) as (keyof typeof SIZE_PRESETS)[]).find((key) => SIZE_PRESETS[key] === size);
   // Custom stays chosen while the width is typed, even through 512 or 2048, so the field keeps focus.
   const [customChosen, setCustomChosen] = useState(matchedPreset === undefined);
@@ -162,6 +179,26 @@ export function ExportOptions({ id, format, onFormatChange, size, onSizeChange, 
           </>
         )}
       </div>
+
+      {(format === 'eps' || format === 'pdf') && (
+        <div>
+          <p id={`${id}-colorspace`} className="mb-1.5 text-sm font-medium text-fg-soft">Color Space</p>
+          <SegmentedControl<'rgb' | 'cmyk'>
+            labelledBy={`${id}-colorspace`}
+            value={colorSpace}
+            onChange={onColorSpaceChange ?? (() => {})}
+            options={[
+              { value: 'rgb', label: 'RGB' },
+              { value: 'cmyk', label: 'CMYK' },
+            ]}
+          />
+          <p className="mt-1.5 text-xs text-fg-muted">
+            {colorSpace === 'cmyk'
+              ? 'CMYK four-color process for commercial printing and prepress.'
+              : 'Standard RGB color space for digital display.'}
+          </p>
+        </div>
+      )}
 
       <TextField label="File name" value={filename} onChange={(event) => onFilenameChange(event.target.value)} spellCheck={false} />
 
