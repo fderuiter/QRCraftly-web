@@ -16,6 +16,25 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { instantiateWasmSync, type WasmInstance } from '@/packages/wasm-runtime';
+import { getFountainBcurModuleSync, loadFountainBcurModule, solveGF2Wasm } from './wasmKernel';
+
+const syncModule = getFountainBcurModuleSync();
+let gf2WasmInstance: WasmInstance | null = syncModule ? instantiateWasmSync(syncModule) : null;
+let gf2WasmPromise: Promise<WasmInstance> | null = null;
+
+function ensureGf2WasmInstance(): Promise<WasmInstance> {
+  if (gf2WasmInstance) return Promise.resolve(gf2WasmInstance);
+  return (gf2WasmPromise ??= loadFountainBcurModule().then((m) => {
+    gf2WasmInstance = instantiateWasmSync(m);
+    return gf2WasmInstance;
+  }));
+}
+
+if (typeof __FOUNDRY_FOUNTAIN_BCUR__ !== 'undefined' && __FOUNDRY_FOUNTAIN_BCUR__ === 'wasm') {
+  void ensureGf2WasmInstance();
+}
+
 /**
  * A linear equation over GF(2): the XOR of the listed source blocks equals `data`.
  */
@@ -49,6 +68,15 @@ export interface GF2Solution {
  * @returns Determined blocks, residual independent equations and the system rank.
  */
 export function solveGF2(equations: GF2Equation[], unknowns: number[], blockSize: number): GF2Solution {
+  if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm') {
+    if (!gf2WasmInstance) {
+      const syncModule = getFountainBcurModuleSync();
+      if (syncModule) gf2WasmInstance = instantiateWasmSync(syncModule);
+    }
+    if (gf2WasmInstance) {
+      return solveGF2Wasm(gf2WasmInstance, equations, unknowns, blockSize);
+    }
+  }
   const width = unknowns.length;
   const words = Math.ceil(width / 32);
   const position = new Map<number, number>();

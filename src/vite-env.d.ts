@@ -35,6 +35,7 @@ declare const __APP_VERSION__: string;
  * `foundryDefines` in scripts/utils/rustWorkspace.js). Each Rust module that replaces code gets one.
  */
 declare const __FOUNDRY_SELFTEST__: 'wasm' | 'js';
+declare const __FOUNDRY_FOUNTAIN_BCUR__: 'wasm' | 'js';
 
 /** Third-party packages that ship to the browser, generated at build time (see `scripts/vite/thirdPartyLicenses.ts`). */
 declare module 'virtual:shipped-packages' {

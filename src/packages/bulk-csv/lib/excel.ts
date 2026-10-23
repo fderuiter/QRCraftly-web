@@ -16,52 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { checkStatus, compileWasmUrl, instantiateWasm, type WasmInstance } from '@/packages/wasm-runtime';
-
-const EXCEL_PARSE_WASM_URL = new URL('../../../wasm/excel-parse.wasm', import.meta.url);
-
-function moduleUrl(): URL {
-  const here = import.meta.url;
-  return here.startsWith('file:') ? new URL('../../../wasm/excel-parse.wasm', here) : EXCEL_PARSE_WASM_URL;
-}
-
-let loadedInstance: Promise<WasmInstance> | null = null;
-
-export async function getExcelParser(): Promise<WasmInstance> {
-  if (!loadedInstance) {
-    loadedInstance = compileWasmUrl(moduleUrl()).then((mod) => instantiateWasm(mod));
-  }
-  return loadedInstance;
-}
-
 /**
- * Parses Excel files (.xlsx) using our Rust WebAssembly kernel
- * and returns normalized CSV text.
+ * Parses Excel files (.xlsx) to normalized CSV text. The WebAssembly loader lives in its own
+ * chunk so the Excel kernel never counts toward a page's first load; it loads on the first file.
  */
 export async function parseExcelToCsv(fileBytes: Uint8Array): Promise<string> {
-  const instance = await getExcelParser();
-
-  return instance.withBytes(fileBytes, (inPtr, inLen) => {
-    const lenPtr = instance.alloc(4);
-    try {
-      let status = instance.fn('excel_parse_to_csv')(inPtr, inLen, 0, 0, lenPtr);
-      const neededLen = new Uint32Array(instance.memory.buffer, lenPtr, 1)[0] ?? 0;
-
-      if (neededLen === 0) {
-        return '';
-      }
-
-      const outPtr = instance.alloc(neededLen);
-      try {
-        status = instance.fn('excel_parse_to_csv')(inPtr, inLen, outPtr, neededLen, lenPtr);
-        checkStatus(status, 'excel_parse_to_csv');
-        const csvBytes = instance.read(outPtr, neededLen);
-        return new TextDecoder('utf-8').decode(csvBytes);
-      } finally {
-        instance.free(outPtr, neededLen);
-      }
-    } finally {
-      instance.free(lenPtr, 4);
-    }
-  });
+  const { parseExcelToCsv: parse } = await import('./excelWasm');
+  return parse(fileBytes);
 }

@@ -33,6 +33,7 @@ export const WASM_MODULE_BUDGETS_KB = {
   'qr-encode': 20,
   'qr-decode': 32,
   'prism-fec': 10,
+  'fountain-bcur': 40,
   // 40 KB under #1198; 48 KB since #1161 added the strict fiducial search (ADR 0047), about 45 KB;
   // 52 KB since slanted tear cuts (ADR 0049) took it to about 49.2 KB. It loads only for file transfer.
   modem: 52,
