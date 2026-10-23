@@ -15,8 +15,8 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { ContrastBadge, ContrastBanner } from './ContrastWarning';
 
 /** Counts the live regions inside an element, the element itself included. */
@@ -46,5 +46,52 @@ describe('ContrastWarning', () => {
     rerender(<ContrastBadge isVisible contrastRatio={1.4} announce={false} />);
     expect(screen.getByText('Low Contrast (1.4)')).toBeVisible();
     expect(countLiveRegions(container)).toBe(0);
+  });
+
+  it('keeps the outer live span mounted when toggling isVisible', () => {
+    const { container, rerender } = render(<ContrastBadge isVisible={false} contrastRatio={1.4} />);
+    const liveSpan = container.querySelector('[aria-live="polite"]');
+    expect(liveSpan).toBeInTheDocument();
+    expect(liveSpan).toHaveTextContent('');
+
+    rerender(<ContrastBadge isVisible={true} contrastRatio={1.4} />);
+    expect(container.querySelector('[aria-live="polite"]')).toBe(liveSpan);
+    expect(liveSpan).toHaveTextContent('Low Contrast (1.4)');
+
+    rerender(<ContrastBadge isVisible={false} contrastRatio={1.4} />);
+    expect(container.querySelector('[aria-live="polite"]')).toBe(liveSpan);
+    expect(liveSpan).toHaveTextContent('');
+  });
+
+  it('renders inline auto-fix action button when onAutoFix callback is provided and triggers callback', () => {
+    const onAutoFix = vi.fn();
+    render(
+      <ContrastBanner
+        isVisible
+        contrastRatio={1.36}
+        messageType="color"
+        onAutoFix={onAutoFix}
+      />
+    );
+
+    const fixBtn = screen.getByRole('button', { name: 'Fix contrast' });
+    expect(fixBtn).toBeInTheDocument();
+
+    fireEvent.click(fixBtn);
+    expect(onAutoFix).toHaveBeenCalledTimes(1);
+  });
+
+  it('customizes the auto-fix button label when autoFixLabel is supplied', () => {
+    render(
+      <ContrastBanner
+        isVisible
+        contrastRatio={2.1}
+        messageType="color"
+        onAutoFix={vi.fn()}
+        autoFixLabel="Auto-correct colors"
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Auto-correct colors' })).toBeInTheDocument();
   });
 });
