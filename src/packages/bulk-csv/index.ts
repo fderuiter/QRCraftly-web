@@ -59,6 +59,9 @@ export { encodeBulkCell, type BulkContentType } from './lib/payload';
 export { SAMPLE_CSV_TEMPLATE } from './lib/template';
 export {
   categorizeCsvRows,
+  escapeCsvCell,
+  formatPreflightReportCsv,
+  preflightReportFileName,
   type CategorizeOptions,
   type PreflightReport,
   type PreflightRowDetail,

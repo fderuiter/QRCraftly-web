@@ -175,6 +175,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   }, [done]);
   const [format, setFormat] = useState<DownloadFormat>(lastDownload.format);
   const [size, setSize] = useState(lastDownload.size);
+  const [colorSpace, setColorSpace] = useState<'rgb' | 'cmyk'>('rgb');
   const [customFilename, setCustomFilename] = useState<string | null>(null);
   const filename = customFilename ?? suggestFilename(config);
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -284,7 +285,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
 
   const exportWith = (target: ExportFormat, buttonRef: React.RefObject<HTMLButtonElement | null>, message: string) => {
     const run = async (options?: AssetOptions) => {
-      const result = await exportAsset(target, { ...options, size: clampSize(size), filename });
+      const result = await exportAsset(target, { ...options, size: clampSize(size), filename, colorSpace });
       if (result.error?.name === SCAN_VALIDATION_ERROR && !options?.allowUnsafe) {
         // The finished image failed the scan check: offer the same choice as the pre-flight gate
         // instead of a raw error (#1255).
@@ -527,6 +528,8 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                         onFormatChange={setFormat}
                         size={size}
                         onSizeChange={setSize}
+                        colorSpace={colorSpace}
+                        onColorSpaceChange={setColorSpace}
                         filename={filename}
                         onFilenameChange={setCustomFilename}
                         onCopySvg={onCopySvg}
