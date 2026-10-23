@@ -271,7 +271,7 @@ describe('ColorControls', () => {
     );
   });
 
-  it('triggers onAutoFix in ContrastBanner, computing HSL contrast patch and updating config', () => {
+  it('triggers onAutoFix in ContrastBanner, computing HSL contrast patch, updating config, and shifting focus', async () => {
     const handleChange = vi.fn();
     const lowContrastConfig = {
       ...DEFAULT_CONFIG,
@@ -291,5 +291,10 @@ describe('ColorControls', () => {
     expect(patch.fgColor).toBeDefined();
     // Verify that new fgColor has contrast >= 4.5:1 against #ffffff
     expect(patch.fgColor).not.toBe('#93c5fd');
+
+    // Wait for rAF focus restoration
+    await new Promise((r) => requestAnimationFrame(r));
+    const fgInput = document.getElementById('fg-color');
+    expect(document.activeElement).toBe(fgInput);
   });
 });

@@ -40,7 +40,7 @@ const VERDICT_ICONS = {
 
 export const FIX_LABELS: Record<ScanFix, string> = {
   'raise-error-correction': 'Use high error correction',
-  'increase-contrast': 'Auto-fix contrast',
+  'increase-contrast': 'Use black on white',
   'standard-pattern': 'Use the standard pattern',
   'smaller-logo': 'Shrink the logo',
 };

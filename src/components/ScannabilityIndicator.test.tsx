@@ -220,7 +220,7 @@ describe('ScannabilityIndicator Component', () => {
       />
     );
     fireEvent.click(screen.getByTestId('scannability-pill'));
-    fireEvent.click(screen.getByRole('button', { name: 'Auto-fix contrast' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use black on white' }));
     expect(onFix).toHaveBeenCalledWith('increase-contrast');
 
     fireEvent.click(screen.getByTestId('scannability-pill'));

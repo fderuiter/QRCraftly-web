@@ -185,18 +185,27 @@ describe('adjustColorForContrast', () => {
     expect(Math.abs(origHsl.h - fixedHsl.h)).toBeLessThan(5);
   });
 
-  it('adjusts dark blue on black background to meet contrast >= 4.5:1 while preserving hue', () => {
+  it('falls back to white for dark blue on black background where dark side cannot reach 4.5:1', () => {
     const darkBlue = '#1e3a8a'; // Low contrast against black #000000
     expect(getContrastRatio(darkBlue, '#000000')).toBeLessThan(4.5);
 
     const fixed = adjustColorForContrast(darkBlue, '#000000');
+    expect(fixed).toBe('#ffffff');
     expect(getContrastRatio(fixed, '#000000')).toBeGreaterThanOrEqual(4.5);
+  });
 
-    const origRgb = parseInt(darkBlue.slice(1), 16);
-    const fixedRgb = parseInt(fixed.slice(1), 16);
-    const origHsl = rgbToHsl((origRgb >> 16) & 0xff, (origRgb >> 8) & 0xff, origRgb & 0xff);
-    const fixedHsl = rgbToHsl((fixedRgb >> 16) & 0xff, (fixedRgb >> 8) & 0xff, fixedRgb & 0xff);
-    expect(Math.abs(origHsl.h - fixedHsl.h)).toBeLessThan(5);
+  it('does not invert code when dark side cannot reach 4.5:1, falling back to white or black', () => {
+    // #333333 on #595959 cannot reach 4.5:1 on the dark side (black on #595959 is 3.0:1)
+    // It must not invert to #d0d0d0 (lighter gray); it must fall back to #ffffff
+    const fix1 = adjustColorForContrast('#333333', '#595959');
+    expect(fix1).toBe('#ffffff');
+    expect(getContrastRatio(fix1, '#595959')).toBeGreaterThanOrEqual(4.5);
+
+    // #2a2a2a on #1a1a1a cannot reach 4.5:1 on the dark side
+    // It must not invert to #828282; it must fall back to #ffffff
+    const fix2 = adjustColorForContrast('#2a2a2a', '#1a1a1a');
+    expect(fix2).toBe('#ffffff');
+    expect(getContrastRatio(fix2, '#1a1a1a')).toBeGreaterThanOrEqual(4.5);
   });
 
   it('evaluates transparent background against solid white', () => {
