@@ -338,6 +338,8 @@ export function loadOpticalSim(): Promise<OpticalSim> {
   return loading;
 }
 
+let hasWarnedFallback = false;
+
 /**
  * Simulates a phone camera looking at a print of the code.
  * Delegates frame calculation to the Rust WebAssembly kernel in `optical-sim.wasm`, falling back
@@ -357,7 +359,11 @@ export function simulatePrint(
   }
   try {
     return ensureSyncInstance().simulatePrint(frame, placement, scratch);
-  } catch {
+  } catch (error) {
+    if (!hasWarnedFallback) {
+      console.warn('Optical simulation WASM module fallback to TypeScript:', error);
+      hasWarnedFallback = true;
+    }
     return simulatePrintTs(frame, placement, scratch);
   }
 }

@@ -16,10 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { qrEncoder } from '../../../../tests/fixtures/qrEncoder';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
-import { simulatePrint, simulatePrintTs, type PixelFrame } from '../index';
+import { loadOpticalSim, simulatePrintTs, type OpticalSim, type PixelFrame } from '../index';
 
 function renderFrame(version: number, size: number, ink = 0): PixelFrame {
   const { modules } = qrEncoder.create('QR', { errorCorrectionLevel: 'M', version });
@@ -40,12 +40,20 @@ function renderFrame(version: number, size: number, ink = 0): PixelFrame {
 }
 
 describe('optical simulation differential tests (Rust WASM vs TS Oracle)', () => {
+  let sim: OpticalSim;
+
+  beforeAll(async () => {
+    sim = await loadOpticalSim();
+    expect(sim).toBeDefined();
+    expect(typeof sim.simulatePrint).toBe('function');
+  });
+
   it.each([1, 2, 5, 10, 20])('produces byte-identical simulation output for version %i', (version) => {
     const frame = renderFrame(version, 512);
     const [code] = qrReader.read(frame.data, frame.width, frame.height);
     expect(code).toBeDefined();
 
-    const wasmOutput = simulatePrint(frame, code);
+    const wasmOutput = sim.simulatePrint(frame, code);
     const tsOutput = simulatePrintTs(frame, code);
 
     expect(wasmOutput.width).toBe(tsOutput.width);
@@ -61,7 +69,7 @@ describe('optical simulation differential tests (Rust WASM vs TS Oracle)', () =>
     const [code] = qrReader.read(frame.data, frame.width, frame.height);
     expect(code).toBeDefined();
 
-    const wasmOutput = simulatePrint(frame, code);
+    const wasmOutput = sim.simulatePrint(frame, code);
     const tsOutput = simulatePrintTs(frame, code);
 
     expect(Array.from(wasmOutput.data)).toEqual(Array.from(tsOutput.data));
