@@ -13,9 +13,6 @@ const WEB_CALENDAR_OWNERS: Partial<Record<string, string>> = {
   [CalendarProvider.YAHOO]: "Yahoo",
 };
 
-/** Valid RFC 5545 recurrence frequencies. */
-const VALID_FREQS = new Set(["NONE", "DAILY", "WEEKLY", "MONTHLY", "YEARLY"]);
-
 /**
  * The notice under the calendar choice: a web calendar code is a link, so the provider receives
  * the event details when someone opens it (#1364).
@@ -140,13 +137,10 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
             value={data.recurrenceFreq || "NONE"}
             onChange={(e) => {
               const val = e.target.value;
-              if (VALID_FREQS.has(val)) {
-                onChange({
-                  recurrenceFreq: val as EventData['recurrenceFreq'],
-                  ...(val === "NONE" ? { recurrenceCount: undefined } : {}),
-                });
-              } else {
-                onChange({ recurrenceFreq: undefined, recurrenceCount: undefined });
+              if (val === "DAILY" || val === "WEEKLY" || val === "MONTHLY" || val === "YEARLY") {
+                onChange({ recurrenceFreq: val });
+              } else if (val === "NONE") {
+                onChange({ recurrenceFreq: "NONE", recurrenceCount: undefined });
               }
             }}
           >
