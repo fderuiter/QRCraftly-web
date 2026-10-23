@@ -6,6 +6,16 @@ import { TextField } from "../ui/FormFields";
 import { FormBlock } from "../ui/FormBlock";
 import { announcePolitely } from "../../utils/a11y";
 import { coordinateError } from "@/packages/qr-payload";
+import type { ParsedCoordinates } from "../../utils/locationParsers";
+
+let cachedParseLocationUrl: ((input: string) => ParsedCoordinates | null) | null = null;
+
+const getParseLocationUrl = async () => {
+  if (cachedParseLocationUrl) return cachedParseLocationUrl;
+  const mod = await import("../../utils/locationParsers");
+  cachedParseLocationUrl = mod.parseLocationUrl;
+  return cachedParseLocationUrl;
+};
 
 interface LocationInputProps {
   data: LocationData;
@@ -29,10 +39,15 @@ const isUnfinishedNumber = (value: string): boolean => /^[+-]?\d*\.?$/.test(valu
 const shownCoordinateError = (value: string, axis: "latitude" | "longitude", left: boolean): string | undefined =>
   !left && isUnfinishedNumber(value) ? undefined : (coordinateError(value, axis) ?? undefined);
 
+/**
+ * High-accuracy coordinate form taking latitude and longitude in degrees or a pasted Google Maps URL / location string.
+ */
 export const LocationInput: React.FC<LocationInputProps> = ({
   data,
   onChange,
 }) => {
+  const [mapUrl, setMapUrl] = useState("");
+  const [urlError, setUrlError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const locationButtonRef = useRef<HTMLButtonElement>(null);
@@ -42,13 +57,83 @@ export const LocationInput: React.FC<LocationInputProps> = ({
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
+    void getParseLocationUrl();
     return () => {
       mountedRef.current = false;
     };
   }, []);
 
-  const clearGeoError = () => {
+  const lastProcessedUrlRef = useRef<string | null>(null);
+
+  const clearErrors = () => {
     setGeoError(null);
+    setUrlError(null);
+  };
+
+  const runParseUrl = (input: string, callback: (parsed: ParsedCoordinates | null) => void) => {
+    if (cachedParseLocationUrl) {
+      callback(cachedParseLocationUrl(input));
+    } else {
+      void getParseLocationUrl().then((parseFn) => {
+        if (mountedRef.current) {
+          callback(parseFn(input));
+        }
+      });
+    }
+  };
+
+  const processUrlInput = (input: string) => {
+    const trimmed = input.trim();
+    if (!trimmed) {
+      clearErrors();
+      lastProcessedUrlRef.current = null;
+      return;
+    }
+    if (trimmed === lastProcessedUrlRef.current) {
+      return;
+    }
+    clearErrors();
+    runParseUrl(trimmed, (parsed) => {
+      lastProcessedUrlRef.current = trimmed;
+      if (parsed) {
+        setUrlError(null);
+        onChange({ latitude: parsed.latitude, longitude: parsed.longitude });
+        announcePolitely("Location coordinates populated");
+      } else {
+        setUrlError("Could not extract valid coordinates from the provided URL or location string.");
+      }
+    });
+  };
+
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setMapUrl(value);
+    clearErrors();
+    lastProcessedUrlRef.current = null;
+  };
+
+  const handleUrlPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = e.clipboardData.getData("text");
+    if (pastedText) {
+      e.preventDefault();
+      setMapUrl(pastedText);
+      processUrlInput(pastedText);
+    }
+  };
+
+  const handleUrlBlur = () => {
+    if (mapUrl.trim()) {
+      processUrlInput(mapUrl);
+    }
+  };
+
+  const handleUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (mapUrl.trim()) {
+        processUrlInput(mapUrl);
+      }
+    }
   };
 
   const handleDismissError = () => {
@@ -57,12 +142,12 @@ export const LocationInput: React.FC<LocationInputProps> = ({
   };
 
   const handleLatitudeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    clearGeoError();
+    clearErrors();
     onChange({ latitude: e.target.value });
   };
 
   const handleLongitudeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    clearGeoError();
+    clearErrors();
     onChange({ longitude: e.target.value });
   };
 
@@ -73,7 +158,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     }
 
     setIsLoading(true);
-    setGeoError(null);
+    clearErrors();
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -102,6 +187,19 @@ export const LocationInput: React.FC<LocationInputProps> = ({
 
   return (
     <FormBlock legend="Geo-Location">
+      <TextField
+        id="location-url"
+        label="Google Maps Link or Coordinates"
+        type="text"
+        placeholder="Paste Google Maps link, geo: URI, or coordinates"
+        maxLength={2048}
+        value={mapUrl}
+        onChange={handleUrlChange}
+        onPaste={handleUrlPaste}
+        onBlur={handleUrlBlur}
+        onKeyDown={handleUrlKeyDown}
+        error={urlError ?? undefined}
+      />
       <TextField
         id="location-latitude"
         label="Latitude"

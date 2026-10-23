@@ -38,6 +38,8 @@ import {
   batchZipName,
   batchPngSize,
   skippedFromReport,
+  formatErrorLogCsv,
+  errorLogFileName,
   type BulkContentType,
   type SkippedRow,
 } from '@/packages/bulk-csv';
@@ -270,6 +272,13 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     triggerFileDownload(bytes, 'qrcraftly-sample-template.csv', 'text/csv');
   };
 
+  const handleExportErrorLog = () => {
+    if (skippedRows.length === 0) return;
+    const bytes = formatErrorLogCsv(skippedRows);
+    const downloadName = errorLogFileName(data.fileName);
+    triggerFileDownload(bytes, downloadName, 'text/csv');
+  };
+
   const startBatchGeneration = async () => {
     if (!payloadCol) {
       addToast({
@@ -484,6 +493,19 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
                   </li>
                 ))}
               </ul>
+              <div className="mt-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportErrorLog}
+                  data-testid="export-error-log-button"
+                  className="flex items-center gap-1.5 text-xs"
+                >
+                  <Download className="size-3.5" aria-hidden="true" />
+                  Export Error Log (CSV)
+                </Button>
+              </div>
             </Alert>
           )}
 
