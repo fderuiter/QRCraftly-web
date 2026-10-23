@@ -61,6 +61,8 @@ export const parseYouTubeInput = (input: string): string => {
       }
       return `https://youtube.com/@${profile.handle.replace(/^@+/, '')}`;
     }
+    // If input is a full YouTube URL that could not be parsed, return empty string to avoid double-prefixing
+    return '';
   }
 
   // Handle relative / partial strings input by user in input field
@@ -79,7 +81,10 @@ export const parseYouTubeInput = (input: string): string => {
     return `https://youtube.com/${cleanInput}`;
   }
   if (/^channel\//i.test(cleanInput)) {
-    return `https://youtube.com/${cleanInput}`;
+    if (/^channel\/UC[A-Za-z0-9_-]{22}(?:\?.*)?$/.test(cleanInput)) {
+      return `https://youtube.com/${cleanInput}`;
+    }
+    return '';
   }
   if (/^c\//i.test(cleanInput)) {
     return `https://youtube.com/${cleanInput}`;
@@ -87,8 +92,12 @@ export const parseYouTubeInput = (input: string): string => {
   if (/^user\//i.test(cleanInput)) {
     return `https://youtube.com/${cleanInput}`;
   }
-  if (/^UC[a-zA-Z0-9_-]+$/i.test(cleanInput)) {
+  if (/^UC[A-Za-z0-9_-]{22}$/.test(cleanInput)) {
     return `https://youtube.com/channel/${cleanInput}`;
+  }
+
+  if (cleanInput.includes('/')) {
+    return '';
   }
 
   const handle = cleanInput.replace(/^@+/, '');

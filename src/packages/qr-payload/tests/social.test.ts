@@ -135,6 +135,75 @@ describe('Social generator', () => {
     expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: 'https://www.youtube.com/@qrcraftly' })).toBe('https://youtube.com/@qrcraftly');
   });
 
+  it('returns empty string for unrecognised YouTube URLs to avoid double-prefixing', () => {
+    const invalidYouTubeInputs = [
+      'https://youtube.com/@name/videos',
+      'https://youtube.com/live/dQw4w9WgXcQ',
+      'https://youtube.com/embed/dQw4w9WgXcQ',
+      'https://youtube.com/channel/UC1234567890abcdef123456/featured',
+      'https://youtube.com/watch',
+      'https://youtube.com/playlist',
+      'https://youtube.com/feed/subscriptions',
+      'https://youtube.com/results?search_query=test',
+      '@name/videos',
+      'live/dQw4w9WgXcQ',
+      'embed/dQw4w9WgXcQ',
+      'channel/UC1234567890abcdef123456/featured',
+    ];
+
+    for (const input of invalidYouTubeInputs) {
+      expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: input })).toBe('');
+      if (input.startsWith('https://')) {
+        expect(identifyProtocol(input)).toBe(QRType.URL);
+      }
+    }
+  });
+
+  it('handles YouTube channel IDs strictly (22 characters, case-sensitive) and distinguishes handles', () => {
+    // 22-char channel ID
+    expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: 'UC1234567890abcdef123456' })).toBe(
+      'https://youtube.com/channel/UC1234567890abcdef123456'
+    );
+
+    // Handles that start with UC but are not 22-char channel IDs
+    expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: 'UCLA' })).toBe(
+      'https://youtube.com/@UCLA'
+    );
+    expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: 'uc_berkeley' })).toBe(
+      'https://youtube.com/@uc_berkeley'
+    );
+    expect(constructSocialString({ platform: SocialPlatform.YOUTUBE, handle: 'UC12345' })).toBe(
+      'https://youtube.com/@UC12345'
+    );
+  });
+
+  it('preserves query parameters across all YouTube URL formats during hydration and construction', () => {
+    const testCases = [
+      'https://youtu.be/dQw4w9WgXcQ?t=42',
+      'https://youtube.com/@mkbhd?si=xyz123',
+      'https://youtube.com/shorts/dQw4w9WgXcQ?si=abc',
+      'https://youtube.com/channel/UC1234567890abcdef123456?si=abc',
+      'https://youtube.com/watch?v=dQw4w9WgXcQ&t=42',
+      'https://youtube.com/playlist?list=PL123456&si=xyz',
+      'https://youtube.com/c/customname?si=abc',
+    ];
+
+    for (const raw of testCases) {
+      expect(identifyProtocol(raw)).toBe(QRType.SOCIAL);
+      const hydrated = hydrateSocialData(raw);
+      expect(hydrated.platform).toBe(SocialPlatform.YOUTUBE);
+      expect(constructSocialString(hydrated)).toBe(raw);
+    }
+  });
+
+  it('maps legacy custom channel URLs without @ to /c/ namespace', () => {
+    const raw = 'https://youtube.com/customname';
+    expect(identifyProtocol(raw)).toBe(QRType.SOCIAL);
+    const hydrated = hydrateSocialData(raw);
+    expect(hydrated).toEqual({ platform: SocialPlatform.YOUTUBE, handle: 'c/customname' });
+    expect(constructSocialString(hydrated)).toBe('https://youtube.com/c/customname');
+  });
+
   it('hydrates facebook', () => {
     const hydrated = hydrateSocialData('https://facebook.com/qrcraftly');
     expect(hydrated.platform).toBe(SocialPlatform.FACEBOOK);
