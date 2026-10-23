@@ -41,10 +41,3 @@ version = "0.0.0"
 dependencies = [
  "qrcraftly-core",
 ]
-
-[[package]]
-name = "wallet-pass-crypto"
-version = "0.0.0"
-dependencies = [
- "qrcraftly-core",
-]

@@ -196,6 +196,9 @@ export function integer(value: number | Uint8Array): Uint8Array {
   return der(TAG.INTEGER, bytes[0] & 0x80 ? concatBytes([Uint8Array.of(0), bytes]) : bytes);
 }
 
+/** An OCTET STRING. */
+export const octetString = (bytes: Uint8Array): Uint8Array => der(TAG.OCTET_STRING, bytes);
+
 /** A BIT STRING with no unused bits. */
 export const bitString = (bytes: Uint8Array): Uint8Array => der(TAG.BIT_STRING, Uint8Array.of(0), bytes);
 

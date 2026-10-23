@@ -17,7 +17,7 @@
 */
 
 import { issuedBy, NAME_OIDS, readCertificate, type CertificateInfo } from './certificate';
-import { wasmCmsSign, wasmRsaSign } from './crypto';
+import { signDetached } from './cms';
 import { WalletPassError } from './errors';
 import { certificatesFromFile, privateKeyToPkcs8 } from './pem';
 
@@ -48,19 +48,23 @@ export interface PassSigner {
   sign(manifest: Uint8Array, signingTime?: Date): Promise<Uint8Array>;
 }
 
-/** Validates and parses an RSA private key PEM using WebAssembly kernel. */
+/** Imports an RSA private key for signing. The key is not extractable. */
 export async function importRsaSigningKey(pem: string): Promise<CryptoKey> {
   try {
-    const pkcs8 = privateKeyToPkcs8(pem);
-    return await crypto.subtle.importKey('pkcs8', pkcs8 as BufferSource, RSA_SHA256, false, ['sign']);
+    return await crypto.subtle.importKey('pkcs8', privateKeyToPkcs8(pem) as BufferSource, RSA_SHA256, false, ['sign']);
   } catch (err) {
     if (err instanceof WalletPassError) throw err;
     throw new WalletPassError('This private key could not be loaded. Use an RSA private key in PEM form.');
   }
 }
 
-/** Checks that the private key belongs to the certificate by signing and verifying a probe using WASM. */
-async function assertKeyMatchesPem(pem: string, certificate: CertificateInfo): Promise<void> {
+/** Signs `data` with the key, RSASSA-PKCS1-v1_5 over SHA-256. */
+export async function rsaSign(key: CryptoKey, data: Uint8Array): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.sign(RSA_SHA256, key, data as BufferSource));
+}
+
+/** Checks that the private key belongs to the certificate by signing and verifying a probe. */
+async function assertKeyMatches(key: CryptoKey, certificate: CertificateInfo): Promise<void> {
   let publicKey: CryptoKey;
   try {
     publicKey = await crypto.subtle.importKey('spki', certificate.publicKeyInfo as BufferSource, RSA_SHA256, false, ['verify']);
@@ -68,7 +72,7 @@ async function assertKeyMatchesPem(pem: string, certificate: CertificateInfo): P
     throw new WalletPassError('This certificate does not have an RSA key. Apple Pass Type ID certificates use RSA.');
   }
   const probe = crypto.getRandomValues(new Uint8Array(32));
-  const signature = await wasmRsaSign(pem, probe);
+  const signature = await rsaSign(key, probe);
   if (!(await crypto.subtle.verify(RSA_SHA256, publicKey, signature as BufferSource, probe as BufferSource))) {
     throw new WalletPassError('This private key does not belong to the certificate. Choose the key that was made with this certificate.');
   }
@@ -100,16 +104,13 @@ export async function createPassSigner(keys: ApplePassKeys, now: Date = new Date
   if (now > intermediate.notAfter) {
     throw new WalletPassError(`The WWDR intermediate certificate expired on ${intermediate.notAfter.toISOString().slice(0, 10)}. Download the current one from apple.com/certificateauthority.`);
   }
-  // Validate key format and check match against certificate using WASM
-  await importRsaSigningKey(keys.privateKeyPem);
-  await assertKeyMatchesPem(keys.privateKeyPem, signer);
-
+  const key = await importRsaSigningKey(keys.privateKeyPem);
+  await assertKeyMatches(key, signer);
   return {
     passTypeIdentifier: signer.subjectAttributes[NAME_OIDS.userId],
     teamIdentifier,
     organizationName: signer.subjectAttributes[NAME_OIDS.organization] ?? '',
     expires: signer.notAfter,
-    sign: (manifest, signingTime = new Date()) =>
-      wasmCmsSign(manifest, signer.der, [intermediate.der], keys.privateKeyPem, signingTime),
+    sign: (manifest, signingTime = new Date()) => signDetached({ content: manifest, signer, chain: [intermediate], sign: (data) => rsaSign(key, data), signingTime }),
   };
 }
