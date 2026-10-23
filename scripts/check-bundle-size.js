@@ -21,6 +21,8 @@ export const MAX_PAGE_FIRST_LOAD_KB = 260;
 // Pre-rendered HTML is left out: every new page adds some, and the per-page budget already
 // bounds each page's own HTML. Measured at 563 KB on 2026-10-03.
 export const MAX_GZIPPED_SIZE_KB = 650;
+/** Gzipped budget in KB for the pure TypeScript link safety engine (@/packages/link-safety). */
+export const MAX_LINK_SAFETY_GZIPPED_SIZE_KB = 6;
 
 /**
  * Gzipped budget in KB for each of our own Rust modules in `src/wasm/` (#1182, ADR 0033). Each
@@ -205,7 +207,42 @@ export function verifyBundleSize(distDir, limitKb) {
   };
 }
 
-export function runCheck() {
+/**
+ * Measures the standalone gzipped bundle size of `@/packages/link-safety`.
+ * Confirms the package operates purely via TypeScript and remains under 6 KB gzipped.
+ * @param {number} [limitKb]
+ * @returns {Promise<{ rawSize: number, gzipSize: number, limitBytes: number, exceeds: boolean }>}
+ */
+export async function verifyLinkSafetyBundleSize(limitKb = MAX_LINK_SAFETY_GZIPPED_SIZE_KB) {
+  const { build } = await import('vite');
+  const entry = path.resolve(__dirname, '../src/packages/link-safety/index.ts');
+  const srcDir = path.resolve(__dirname, '../src');
+
+  const res = await build({
+    configFile: false,
+    resolve: { alias: { '@': srcDir } },
+    build: {
+      target: 'esnext',
+      lib: { entry, formats: ['es'], fileName: 'index' },
+      write: false,
+      minify: 'esbuild',
+    },
+  });
+
+  const output = Array.isArray(res) ? res[0].output : res.output;
+  const code = output[0].code;
+  const gzipSize = zlib.gzipSync(code).length;
+  const limitBytes = limitKb * 1024;
+
+  return {
+    rawSize: code.length,
+    gzipSize,
+    limitBytes,
+    exceeds: gzipSize > limitBytes,
+  };
+}
+
+export async function runCheck() {
   try {
     const result = verifyBundleSize(DIST_DIR, MAX_GZIPPED_SIZE_KB);
     
@@ -277,6 +314,17 @@ export function runCheck() {
     if (over) {
       console.error(
         `\n❌ ERROR: The Rust module ${over.name} (${(over.gzipSize / 1024).toFixed(2)} KB gzipped) exceeds its ${(over.limitBytes / 1024).toFixed(2)} KB budget!`
+      );
+      process.exit(1);
+    }
+
+    const linkSafety = await verifyLinkSafetyBundleSize();
+    console.log(
+      `Package @/packages/link-safety: ${(linkSafety.gzipSize / 1024).toFixed(2)} KB gzipped (budget ${MAX_LINK_SAFETY_GZIPPED_SIZE_KB}.00 KB)`
+    );
+    if (linkSafety.exceeds) {
+      console.error(
+        `\n❌ ERROR: The link-safety package (${(linkSafety.gzipSize / 1024).toFixed(2)} KB gzipped) exceeds its ${MAX_LINK_SAFETY_GZIPPED_SIZE_KB}.00 KB budget!`
       );
       process.exit(1);
     }
