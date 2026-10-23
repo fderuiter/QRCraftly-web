@@ -178,18 +178,6 @@ export default tseslint.config(
     }
   },
   {
-    files: ["src/worker.js"],
-    languageOptions: {
-      globals: {
-        fetch: "readonly",
-        URL: "readonly",
-        Headers: "readonly",
-        Response: "readonly",
-        Request: "readonly"
-      }
-    }
-  },
-  {
     files: ["**/*.cjs"],
     languageOptions: {
       sourceType: "commonjs",

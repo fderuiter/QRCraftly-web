@@ -32,8 +32,7 @@ export const FORBIDDEN_IMPORTS = [
 // 3. Whitelisted files in src/ that are authorized to perform network requests (fetch)
 export const AUTHORIZED_NETWORK_FILES = new Set([
   'src/packages/qr-export/lib/svgExport.ts',
-  'src/packages/wasm-runtime/index.ts', // Same-origin GET of QRCraftly's own Rust WebAssembly modules (ADR 0033)
-  'src/worker.js' // Cloudflare Worker edge middleware
+  'src/packages/wasm-runtime/index.ts' // Same-origin GET of QRCraftly's own Rust WebAssembly modules (ADR 0033)
 ]);
 
 /**

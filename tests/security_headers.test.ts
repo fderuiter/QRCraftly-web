@@ -3,8 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import worker from '../src/worker.js';
-
 const HEADERS_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public/_headers');
 
 /**
@@ -93,26 +91,6 @@ describe('public/_headers security headers', () => {
     }
     expect(content).not.toContain('https://');
     expect(readGlobalHeaders().has('x-robots-tag')).toBe(false);
-  });
-
-  it('edge Worker middleware injects X-Robots-Tag: noindex for non-canonical hosts', async () => {
-    const mockAssetFetch = async (req: Request) => new Response('OK', { status: 200, headers: { 'Content-Type': 'text/html' } });
-    const env = { ASSETS: { fetch: mockAssetFetch } };
-
-    // Canonical request: qrcraftly.com
-    const canonicalReq = new Request('https://qrcraftly.com/about');
-    const canonicalRes = await worker.fetch(canonicalReq, env);
-    expect(canonicalRes.headers.get('X-Robots-Tag')).toBeNull();
-
-    // Non-canonical request: workers.dev host
-    const workerDevReq = new Request('https://qrcraftly.fpderuiter.workers.dev/about');
-    const workerDevRes = await worker.fetch(workerDevReq, env);
-    expect(workerDevRes.headers.get('X-Robots-Tag')).toBe('noindex');
-
-    // Non-canonical request: PR preview host
-    const previewReq = new Request('https://feat-test-qrcraftly.fpderuiter.workers.dev/');
-    const previewRes = await worker.fetch(previewReq, env);
-    expect(previewRes.headers.get('X-Robots-Tag')).toBe('noindex');
   });
 });
 
