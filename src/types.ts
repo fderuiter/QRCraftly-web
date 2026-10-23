@@ -449,6 +449,10 @@ export interface EventData {
   timezone?: string;
   /** An all-day event: the dates are `YYYY-MM-DD` and the end date is the last day, inclusive. */
   allDay?: boolean;
+  /** Recurrence frequency for repeating events. */
+  recurrenceFreq?: 'NONE' | 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+  /** Optional count of occurrences for event recurrence. */
+  recurrenceCount?: number;
   /** The event location. */
   location: string;
   /** The event description. */

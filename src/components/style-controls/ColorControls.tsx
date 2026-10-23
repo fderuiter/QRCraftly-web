@@ -219,7 +219,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
         className="mt-3"
         decimalPrecision={2}
         onAutoFix={() => {
-          import('../../utils/contrastAutoFix')
+          void import('../../utils/contrastAutoFix')
             .then(({ calculateAutoFixColorPatch }) => {
               onChange(calculateAutoFixColorPatch(config));
               announcePolitely('Contrast adjusted to meet WCAG standards');
