@@ -42,6 +42,7 @@ const PRESET_OPTIONS = PRESET_COLORS.map((preset) => ({
   ariaLabel: `Select ${preset.label} theme`,
   label: (
     <>
+      {/* Use SVG presentation attributes instead of inline styles for CSP compliance */}
       <svg viewBox="0 0 40 40" className="size-7 shrink-0 rounded ring-1 ring-line-strong" aria-hidden="true">
         <rect width="40" height="40" fill={preset.bg} />
         <rect x="6" y="6" width="28" height="28" rx="2" fill="none" stroke={preset.fg} strokeWidth="6" />
@@ -231,13 +232,18 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
         className="mt-3"
         decimalPrecision={2}
         onAutoFix={() => {
-          void import('../../utils/contrastAutoFix').then(({ calculateAutoFixColorPatch }) => {
-            onChange(calculateAutoFixColorPatch(config));
-            announcePolitely('Contrast adjusted to meet WCAG standards');
-            requestAnimationFrame(() => {
-              (document.getElementById('fg-color') || document.getElementById('gradient-start-color') || document.getElementById('bg-color'))?.focus();
+          void import('../../utils/contrastAutoFix')
+            .then(({ calculateAutoFixColorPatch }) => {
+              onChange(calculateAutoFixColorPatch(config));
+              announcePolitely('Contrast adjusted to meet WCAG standards');
+              requestAnimationFrame(() => {
+                (document.getElementById('fg-color') || document.getElementById('gradient-start-color') || document.getElementById('bg-color'))?.focus();
+              });
+            })
+            .catch((err) => {
+              console.error('Failed to load contrast auto-fix module:', err);
+              announcePolitely('Failed to auto-fix contrast. Please try again.');
             });
-          });
         }}
       />
     </div>

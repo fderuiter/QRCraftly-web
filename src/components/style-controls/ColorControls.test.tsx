@@ -299,4 +299,30 @@ describe('ColorControls', () => {
     const fgInput = document.getElementById('fg-color');
     expect(document.activeElement).toBe(fgInput);
   });
+
+  it('handles contrastAutoFix module load failure gracefully in onAutoFix', async () => {
+    const handleChange = vi.fn();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const lowContrastConfig = {
+      ...DEFAULT_CONFIG,
+      fgColor: '#93c5fd',
+      bgColor: '#ffffff',
+    };
+
+    vi.doMock('../../utils/contrastAutoFix', () => {
+      throw new Error('Chunk load failed');
+    });
+
+    render(<ColorControls config={lowContrastConfig} onChange={handleChange} />);
+
+    const fixBtn = screen.getByRole('button', { name: 'Fix contrast' });
+    fireEvent.click(fixBtn);
+
+    await vi.waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to load contrast auto-fix module:', expect.any(Error));
+    });
+
+    consoleSpy.mockRestore();
+    vi.doUnmock('../../utils/contrastAutoFix');
+  });
 });

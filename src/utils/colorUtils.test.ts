@@ -17,16 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import {
-  getContrastRatio,
-  normalizeHex,
-  hexToRgba,
-  srgbToLinear,
-  linearToSrgb,
-  getLuminanceFromLinearRgb,
-  getLuminanceFromRgb,
-  rgbToCmyk,
-} from './colorUtils';
+import { getContrastRatio, normalizeHex, hexToRgba, srgbToLinear, linearToSrgb, getLuminanceFromLinearRgb, getLuminanceFromRgb, rgbToCmyk } from './colorUtils';
 
 describe('colorUtils', () => {
   describe('getContrastRatio', () => {
@@ -141,8 +132,6 @@ describe('linear-light helpers', () => {
   });
 });
 
-
-
 describe('rgbToCmyk', () => {
   it('converts black (0,0,0) to CMYK (0,0,0,1)', () => {
     const cmyk = rgbToCmyk(0, 0, 0);
@@ -171,3 +160,4 @@ describe('rgbToCmyk', () => {
     expect(cmyk).toEqual({ c: 0, m: 0, y: 0, k: 0.5 });
   });
 });
+
