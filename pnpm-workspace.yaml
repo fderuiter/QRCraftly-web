@@ -49,3 +49,4 @@ overrides:
   esbuild: 0.28.1
   # GHSA-wq5f-xc86-pv6w (librsvg in sharp < 0.35.5); Miniflare pins 0.35.4.
   sharp: "^0.35.5"
+

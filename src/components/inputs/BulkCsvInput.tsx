@@ -258,8 +258,33 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       return;
     }
 
+    if (/\.xls$/i.test(file.name) || file.type === 'application/vnd.ms-excel') {
+      addToast({
+        type: 'error',
+        message: 'Legacy .xls files are not supported. Please save your spreadsheet as .xlsx or .csv.',
+        duration: 5000,
+      });
+      return;
+    }
+
     try {
-      const content = decodeCsvBytes(new Uint8Array(await file.arrayBuffer()));
+      const isExcel =
+        /\.xlsx$/i.test(file.name) ||
+        file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+      let content: string;
+      if (isExcel) {
+        const arrayBuffer = await file.arrayBuffer();
+        const { parseExcelToCsv } = await import('@/packages/bulk-csv');
+        content = await parseExcelToCsv(new Uint8Array(arrayBuffer));
+        if (!content || content.trim() === '') {
+          addToast({ type: 'error', message: `Could not read ${file.name}. Choose the file again.`, duration: 5000 });
+          return;
+        }
+      } else {
+        content = decodeCsvBytes(new Uint8Array(await file.arrayBuffer()));
+      }
+
       onChange({ csvContent: content, fileName: file.name });
       addToast({ type: 'success', message: `Loaded ${file.name}.`, duration: 3000 });
     } catch {
@@ -438,8 +463,8 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       <input
         ref={fileInputRef}
         type="file"
-        aria-label={data.csvContent ? 'Change CSV or TXT file' : 'Upload CSV or TXT file'}
-        accept=".csv, .txt, text/csv, text/plain"
+        aria-label={data.csvContent ? 'Change CSV, TXT, or Excel file' : 'Upload CSV, TXT, or Excel file'}
+        accept=".csv, .txt, .xlsx, text/csv, text/plain, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         className="sr-only"
         tabIndex={-1}
         onChange={handleFileUpload}

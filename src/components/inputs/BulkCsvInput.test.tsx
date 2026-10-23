@@ -123,7 +123,7 @@ describe('BulkCsvInput Component', () => {
   it('renders upload prompt and sample template button when no CSV content is loaded', () => {
     renderWithProvider(<BulkCsvInput data={initialData} onChange={vi.fn()} />);
 
-    expect(screen.getByText('Upload CSV or TXT File')).toBeInTheDocument();
+    expect(screen.getByText('Upload CSV, TXT, or Excel File')).toBeInTheDocument();
     expect(screen.getByText('Choose File')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download Sample Template' })).toBeInTheDocument();
   });
@@ -528,7 +528,7 @@ describe('BulkCsvInput Component', () => {
     renderWithProvider(<BulkCsvInput data={initialData} onChange={onChange} />);
 
     const file = new File(['URL,Name\nhttps://example.com,One'], 'batch.csv', { type: 'text/csv' });
-    fireEvent.change(screen.getByLabelText('Upload CSV or TXT file'), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });
 
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith({
@@ -540,7 +540,7 @@ describe('BulkCsvInput Component', () => {
 
   it('loads the batch generator lazily through the registry wrapper', async () => {
     renderWithProvider(<LazyBulkCsvInput data={initialData} onChange={vi.fn()} />);
-    expect(await screen.findByText('Upload CSV or TXT File')).toBeInTheDocument();
+    expect(await screen.findByText('Upload CSV, TXT, or Excel File')).toBeInTheDocument();
   });
 
   it('renders resolution selector when PNG format is active and updates BulkCsvData on selection', () => {
@@ -736,7 +736,7 @@ describe('BulkCsvInput Component', () => {
     const onChange = vi.fn();
     renderWithProvider(<BulkCsvInput data={initialData} onChange={onChange} />);
     const file = new File([bytes], 'export.txt', { type: 'text/plain' });
-    fireEvent.change(screen.getByLabelText('Upload CSV or TXT file'), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });
     await waitFor(() => expect(onChange).toHaveBeenCalledWith({ csvContent: text, fileName: 'export.txt' }));
   });
 
@@ -1038,5 +1038,141 @@ describe('Interactive CSV Column Mapping UI', () => {
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ payloadColumn: 'FieldB', filenameColumn: 'FieldA' })
     );
+  });
+});
+
+describe('Excel Spreadsheet Parsing (.xlsx)', () => {
+  const initialData: BulkCsvData = {
+    csvContent: '',
+    payloadColumn: '',
+    filenameColumn: '',
+    exportFormat: 'png',
+  };
+
+  it('shows an error toast when a legacy .xls file is uploaded', async () => {
+    const htmlTable = '<table><tr><td>Website</td><td>Label</td></tr><tr><td>https://example.com/xls1</td><td>XLS1</td></tr></table>';
+    const excelBuffer = new TextEncoder().encode(htmlTable);
+
+    const onChange = vi.fn();
+    renderWithToasts(<BulkCsvInput data={initialData} onChange={onChange} />);
+
+    const file = new File([excelBuffer], 'legacy.xls', { type: 'application/vnd.ms-excel' });
+    fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Legacy .xls files are not supported. Please save your spreadsheet as .xlsx or .csv.'
+      );
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('reads an uploaded .xlsx spreadsheet using Rust WebAssembly parser', async () => {
+    const sheetXml =
+      '<worksheet><sheetData>' +
+      '<row><c t="inlineStr"><is><t>URL</t></is></c><c t="inlineStr"><is><t>Name</t></is></c></row>' +
+      '<row><c t="inlineStr"><is><t>https://example.com/excel1</t></is></c><c t="inlineStr"><is><t>Excel1</t></is></c></row>' +
+      '<row><c t="inlineStr"><is><t>https://example.com/excel2</t></is></c><c t="inlineStr"><is><t>Excel2</t></is></c></row>' +
+      '</sheetData></worksheet>';
+    const nameBytes = new TextEncoder().encode('xl/worksheets/sheet1.xml');
+    const contentBytes = new TextEncoder().encode(sheetXml);
+
+    const localHeader = new Uint8Array(30 + nameBytes.length + contentBytes.length);
+    const view = new DataView(localHeader.buffer);
+    view.setUint32(0, 0x04034b50, true);
+    view.setUint16(4, 20, true);
+    view.setUint16(6, 0, true);
+    view.setUint16(8, 0, true);
+    view.setUint32(10, 0, true);
+    view.setUint32(14, 0, true);
+    view.setUint32(18, contentBytes.length, true);
+    view.setUint32(22, contentBytes.length, true);
+    view.setUint16(26, nameBytes.length, true);
+    view.setUint16(28, 0, true);
+    localHeader.set(nameBytes, 30);
+    localHeader.set(contentBytes, 30 + nameBytes.length);
+
+    const cdEntry = new Uint8Array(46 + nameBytes.length);
+    const cdView = new DataView(cdEntry.buffer);
+    cdView.setUint32(0, 0x02014b50, true);
+    cdView.setUint16(4, 20, true);
+    cdView.setUint16(6, 20, true);
+    cdView.setUint16(8, 0, true);
+    cdView.setUint16(10, 0, true);
+    cdView.setUint32(12, 0, true);
+    cdView.setUint32(16, 0, true);
+    cdView.setUint32(20, contentBytes.length, true);
+    cdView.setUint32(24, contentBytes.length, true);
+    cdView.setUint16(28, nameBytes.length, true);
+    cdView.setUint16(30, 0, true);
+    cdView.setUint16(32, 0, true);
+    cdView.setUint16(34, 0, true);
+    cdView.setUint16(36, 0, true);
+    cdView.setUint32(38, 0, true);
+    cdView.setUint32(42, 0, true);
+    cdEntry.set(nameBytes, 46);
+
+    const eocd = new Uint8Array(22);
+    const eocdView = new DataView(eocd.buffer);
+    eocdView.setUint32(0, 0x06054b50, true);
+    eocdView.setUint16(4, 0, true);
+    eocdView.setUint16(6, 0, true);
+    eocdView.setUint16(8, 1, true);
+    eocdView.setUint16(10, 1, true);
+    eocdView.setUint32(12, cdEntry.length, true);
+    eocdView.setUint32(16, localHeader.length, true);
+    eocdView.setUint16(20, 0, true);
+
+    const excelBuffer = new Uint8Array(localHeader.length + cdEntry.length + eocd.length);
+    excelBuffer.set(localHeader, 0);
+    excelBuffer.set(cdEntry, localHeader.length);
+    excelBuffer.set(eocd, localHeader.length + cdEntry.length);
+
+    const onChange = vi.fn();
+    renderWithProvider(<BulkCsvInput data={initialData} onChange={onChange} />);
+
+    const file = new File([excelBuffer], 'data.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith({
+        csvContent: 'URL,Name\nhttps://example.com/excel1,Excel1\nhttps://example.com/excel2,Excel2',
+        fileName: 'data.xlsx',
+      });
+    });
+  });
+
+  it('shows an error toast when a corrupt .xlsx binary file is uploaded', async () => {
+    const onChange = vi.fn();
+    renderWithToasts(<BulkCsvInput data={initialData} onChange={onChange} />);
+
+    const corruptBinary = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00]);
+    const file = new File([corruptBinary], 'corrupt.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Could not read corrupt.xlsx. Choose the file again.');
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('shows an error toast when a blank spreadsheet file is uploaded', async () => {
+    const onChange = vi.fn();
+    renderWithToasts(<BulkCsvInput data={initialData} onChange={onChange} />);
+
+    const emptyBuffer = new TextEncoder().encode('   ');
+    const file = new File([emptyBuffer], 'blank.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Could not read blank.xlsx. Choose the file again.');
+    });
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
