@@ -344,6 +344,9 @@ export function validateHeaders(csp, headersContent) {
       }
       routeHeaders[currentRoute].push({ name, value, size: headerSize });
     } else {
+      if (!trimmed.startsWith('/') && !trimmed.startsWith('https://')) {
+        throw new Error(`Invalid route matcher "${trimmed}" in _headers: route matchers must start with "/" or "https://".`);
+      }
       if (currentRoute) {
         if (currentRouteHeadersSize > 8192) {
           throw new Error(`Route "${currentRoute}" total headers size (${currentRouteHeadersSize} bytes) exceeds Cloudflare limit of 8,192 bytes!`);
