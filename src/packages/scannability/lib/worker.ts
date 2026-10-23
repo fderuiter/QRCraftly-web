@@ -18,6 +18,7 @@
 
 import { assertWorkerRequest, assertWorkerResponse } from './sharedContract';
 import { loadQrReader } from '@/packages/qr-decode';
+import { loadOpticalSim } from './opticalSimulation';
 import { scannabilitySteps, type OpticalScratchBuffers, type PixelFrame } from './checker';
 import { releaseImageHandle } from './imageHandle';
 
@@ -144,7 +145,8 @@ self.onmessage = async (e: MessageEvent<unknown>) => {
       throw new Error('Neither imageData nor imageBitmap provided');
     }
 
-    const steps = scannabilitySteps(await loadQrReader(), frame, moduleCount, scratch, quietZoneModules);
+    const [reader] = await Promise.all([loadQrReader(), loadOpticalSim()]);
+    const steps = scannabilitySteps(reader, frame, moduleCount, scratch, quietZoneModules);
     let step = configId !== undefined && isStale() ? null : steps.next();
     while (step && !step.done) {
       // Yield between stages so a newer request can supersede this one
