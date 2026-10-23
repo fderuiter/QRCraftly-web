@@ -41,6 +41,19 @@ fn get_u32_le(data: &[u8], offset: usize) -> Option<u32> {
     Some(u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]))
 }
 
+fn is_shared_strings_entry(name: &str) -> bool {
+    name.to_ascii_lowercase().ends_with("sharedstrings.xml")
+}
+
+fn is_sheet1_entry(name: &str) -> bool {
+    name.to_ascii_lowercase().contains("sheet1.xml")
+}
+
+fn is_sheet_entry(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    lower.contains("sheet") && lower.ends_with(".xml")
+}
+
 pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
     if data.len() < 22 {
         return None;
@@ -57,6 +70,10 @@ pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
     let mut entries = Vec::new();
     let mut remaining_budget = MAX_UNCOMPRESSED_SIZE;
     let mut offset: usize = 0;
+
+    let mut has_shared_strings = false;
+    let mut has_sheet1 = false;
+    let mut has_any_sheet = false;
 
     while offset.saturating_add(30) <= data.len() {
         let sig_end = match offset.checked_add(4) {
@@ -105,12 +122,30 @@ pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
                 Some(e) => e,
                 None => break,
             };
+
+            let is_ss = is_shared_strings_entry(&name);
+            let is_s1 = is_sheet1_entry(&name);
+            let is_s = is_sheet_entry(&name);
+
+            let should_decompress = if is_ss {
+                !has_shared_strings
+            } else if is_s1 {
+                !has_sheet1
+            } else if is_s {
+                !has_any_sheet && !has_sheet1
+            } else {
+                false
+            };
+
+            if !should_decompress {
+                offset = comp_end;
+                continue;
+            }
+
             let comp_data = match data.get(data_start..comp_end) {
                 Some(d) => d,
                 None => break,
             };
-
-            let is_sheet_xml = name.contains("sheet1.xml") || (name.contains("sheet") && name.ends_with(".xml"));
 
             let file_bytes = match method {
                 0 => {
@@ -122,10 +157,7 @@ pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
                 8 => match decompress_deflate(comp_data, remaining_budget) {
                     Some(b) => b,
                     None => {
-                        offset = match offset.checked_add(1) {
-                            Some(o) => o,
-                            None => break,
-                        };
+                        offset = comp_end;
                         continue;
                     }
                 },
@@ -139,7 +171,18 @@ pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
                 data: file_bytes,
             });
 
-            if is_sheet_xml {
+            if is_ss {
+                has_shared_strings = true;
+            }
+            if is_s1 {
+                has_sheet1 = true;
+                has_any_sheet = true;
+            }
+            if is_s {
+                has_any_sheet = true;
+            }
+
+            if has_sheet1 && has_shared_strings {
                 break;
             }
 
@@ -194,6 +237,10 @@ fn parse_zip_central_dir(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
     let mut cd_pos = cd_offset;
     let mut remaining_budget = MAX_UNCOMPRESSED_SIZE;
 
+    let mut has_shared_strings = false;
+    let mut has_sheet1 = false;
+    let mut has_any_sheet = false;
+
     for _ in 0..cd_count {
         let cd_sig_end = match cd_pos.checked_add(4) {
             Some(e) => e,
@@ -218,6 +265,24 @@ fn parse_zip_central_dir(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
         let advance = 46usize.checked_add(fn_len)?.checked_add(extra_len)?.checked_add(comment_len)?;
         cd_pos = cd_pos.checked_add(advance)?;
 
+        let is_ss = is_shared_strings_entry(&name);
+        let is_s1 = is_sheet1_entry(&name);
+        let is_s = is_sheet_entry(&name);
+
+        let should_decompress = if is_ss {
+            !has_shared_strings
+        } else if is_s1 {
+            !has_sheet1
+        } else if is_s {
+            !has_any_sheet && !has_sheet1
+        } else {
+            false
+        };
+
+        if !should_decompress {
+            continue;
+        }
+
         // Read from local header
         let loc_sig_end = match local_offset.checked_add(4) {
             Some(e) => e,
@@ -233,8 +298,6 @@ fn parse_zip_central_dir(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
 
         let comp_end = data_start.checked_add(comp_size)?;
         let comp_data = data.get(data_start..comp_end)?;
-
-        let is_sheet_xml = name.contains("sheet1.xml") || (name.contains("sheet") && name.ends_with(".xml"));
 
         let file_bytes = match method {
             0 => {
@@ -257,7 +320,18 @@ fn parse_zip_central_dir(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
             data: file_bytes,
         });
 
-        if is_sheet_xml {
+        if is_ss {
+            has_shared_strings = true;
+        }
+        if is_s1 {
+            has_sheet1 = true;
+            has_any_sheet = true;
+        }
+        if is_s {
+            has_any_sheet = true;
+        }
+
+        if has_sheet1 && has_shared_strings {
             break;
         }
     }

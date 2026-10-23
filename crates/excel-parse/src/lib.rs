@@ -177,4 +177,94 @@ mod tests {
         assert_eq!(col_letters_to_index("Z"), 25);
         assert_eq!(col_letters_to_index("AA"), 26);
     }
+
+    #[test]
+    fn parses_excel_order_sheet_before_shared_strings() {
+        fn append_local_file(zip: &mut Vec<u8>, name: &str, content: &[u8]) -> usize {
+            let offset = zip.len();
+            zip.extend_from_slice(b"PK\x03\x04");
+            zip.extend_from_slice(&[20, 0]); // version
+            zip.extend_from_slice(&[0, 0]);  // flags
+            zip.extend_from_slice(&[0, 0]);  // method (stored)
+            zip.extend_from_slice(&[0, 0, 0, 0]); // time/date
+            zip.extend_from_slice(&[0, 0, 0, 0]); // crc
+            zip.extend_from_slice(&(content.len() as u32).to_le_bytes()); // comp size
+            zip.extend_from_slice(&(content.len() as u32).to_le_bytes()); // uncomp size
+            zip.extend_from_slice(&(name.len() as u16).to_le_bytes()); // fn len
+            zip.extend_from_slice(&[0, 0]);  // extra len
+            zip.extend_from_slice(name.as_bytes());
+            zip.extend_from_slice(content);
+            offset
+        }
+
+        let sheet1_xml = br#"<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row></sheetData></worksheet>"#;
+        let shared_strings_xml = br#"<sst><si><t>Header</t></si><si><t>https://example.com</t></si></sst>"#;
+
+        let mut zip = Vec::new();
+        // Excel order: sheet1.xml BEFORE sharedStrings.xml
+        let off1 = append_local_file(&mut zip, "xl/worksheets/sheet1.xml", sheet1_xml);
+        let off2 = append_local_file(&mut zip, "xl/sharedStrings.xml", shared_strings_xml);
+
+        let cd_start = zip.len();
+        let cd_entries = [
+            ("xl/worksheets/sheet1.xml", sheet1_xml.len(), off1),
+            ("xl/sharedStrings.xml", shared_strings_xml.len(), off2),
+        ];
+
+        for (name, len, loc_off) in &cd_entries {
+            zip.extend_from_slice(b"PK\x01\x02");
+            zip.extend_from_slice(&[20, 0, 20, 0]);
+            zip.extend_from_slice(&[0, 0, 0, 0]);
+            zip.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0, 0]);
+            zip.extend_from_slice(&(*len as u32).to_le_bytes());
+            zip.extend_from_slice(&(*len as u32).to_le_bytes());
+            zip.extend_from_slice(&(name.len() as u16).to_le_bytes());
+            zip.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+            zip.extend_from_slice(&(*loc_off as u32).to_le_bytes());
+            zip.extend_from_slice(name.as_bytes());
+        }
+
+        let cd_size = zip.len() - cd_start;
+        zip.extend_from_slice(b"PK\x05\x06");
+        zip.extend_from_slice(&[0, 0, 0, 0]);
+        zip.extend_from_slice(&(cd_entries.len() as u16).to_le_bytes());
+        zip.extend_from_slice(&(cd_entries.len() as u16).to_le_bytes());
+        zip.extend_from_slice(&(cd_size as u32).to_le_bytes());
+        zip.extend_from_slice(&(cd_start as u32).to_le_bytes());
+        zip.extend_from_slice(&[0, 0]);
+
+        let csv_bytes = excel_bytes_to_csv(&zip);
+        let csv_text = String::from_utf8(csv_bytes).expect("CSV should be valid UTF-8");
+        assert_eq!(csv_text, "Header,https://example.com", "Shared strings must be preserved even when sheet1.xml precedes sharedStrings.xml in archive");
+    }
+
+    #[test]
+    fn parses_excel_order_local_header_fallback_sheet_before_shared_strings() {
+        fn append_local_file(zip: &mut Vec<u8>, name: &str, content: &[u8]) {
+            zip.extend_from_slice(b"PK\x03\x04");
+            zip.extend_from_slice(&[20, 0]); // version
+            zip.extend_from_slice(&[0, 0]);  // flags
+            zip.extend_from_slice(&[0, 0]);  // method (stored)
+            zip.extend_from_slice(&[0, 0, 0, 0]); // time/date
+            zip.extend_from_slice(&[0, 0, 0, 0]); // crc
+            zip.extend_from_slice(&(content.len() as u32).to_le_bytes()); // comp size
+            zip.extend_from_slice(&(content.len() as u32).to_le_bytes()); // uncomp size
+            zip.extend_from_slice(&(name.len() as u16).to_le_bytes()); // fn len
+            zip.extend_from_slice(&[0, 0]);  // extra len
+            zip.extend_from_slice(name.as_bytes());
+            zip.extend_from_slice(content);
+        }
+
+        let sheet1_xml = br#"<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row></sheetData></worksheet>"#;
+        let shared_strings_xml = br#"<sst><si><t>Header</t></si><si><t>https://example.com</t></si></sst>"#;
+
+        let mut zip = Vec::new();
+        // Excel order without central directory (testing fallback local header scanner)
+        append_local_file(&mut zip, "xl/worksheets/sheet1.xml", sheet1_xml);
+        append_local_file(&mut zip, "xl/sharedStrings.xml", shared_strings_xml);
+
+        let csv_bytes = excel_bytes_to_csv(&zip);
+        let csv_text = String::from_utf8(csv_bytes).expect("CSV should be valid UTF-8");
+        assert_eq!(csv_text, "Header,https://example.com", "Local header scanner must preserve shared strings when sheet1.xml precedes sharedStrings.xml");
+    }
 }
