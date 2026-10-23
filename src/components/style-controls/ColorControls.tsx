@@ -1,49 +1,21 @@
-/*
-    QRCraftly
-    Copyright (C) 2025 fderuiter
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as published
-    by the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-*/
-
 import React, { useMemo } from 'react';
-import type { QRConfig, GradientType } from '../../types';
+import type { GradientType, QRConfig } from '../../types';
+import { PRESET_COLORS, MIN_CONTRAST_THRESHOLD, buildPresetColorPatch, DEFAULT_GRADIENT_END_COLOR } from '../../constants';
+import { getContrastRatio, calculateAutoFixColorPatch } from '../../utils/colorUtils';
+import { announcePolitely } from '../../utils/a11y';
 import { ColorInput } from '../ui/ColorInput';
-import { ToggleSwitch } from '../ui/ToggleSwitch';
 import { RangeInput } from '../ui/RangeInput';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { ToggleSwitch } from '../ui/ToggleSwitch';
 import { ContrastBadge, ContrastBanner } from './ContrastWarning';
-import {
-  getContrastRatio,
-  calculateAutoFixColorPatch,
-} from '../../utils/colorUtils';
-import {
-  PRESET_COLORS,
-  MIN_CONTRAST_THRESHOLD,
-  DEFAULT_GRADIENT_END_COLOR,
-  buildPresetColorPatch,
-} from '../../constants';
-import { announcePolitely } from '../../utils/a11y';
 
-export interface ColorControlsProps {
+interface ColorControlsProps {
   config: QRConfig;
-  onChange: (patch: Partial<QRConfig>) => void;
+  onChange: (updates: Partial<QRConfig>) => void;
 }
 
-const BackgroundColorField: React.FC<{
-  config: QRConfig;
-  onChange: (patch: Partial<QRConfig>) => void;
-}> = ({ config, onChange }) => {
+/** The background colour, with a switch for a transparent background. */
+const BackgroundColorField: React.FC<ColorControlsProps> = ({ config, onChange }) => {
   const isTransparent = config.bgColor === 'transparent';
   return (
     <div className="space-y-2">
@@ -66,6 +38,7 @@ const BackgroundColorField: React.FC<{
 };
 
 export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }) => {
+
   const activeGradientType: GradientType = config.gradientType || 'none';
   const colorStops = (config.gradientColorStops && config.gradientColorStops.length > 0)
     ? config.gradientColorStops

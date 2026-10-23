@@ -48,6 +48,21 @@ describe('ContrastWarning', () => {
     expect(countLiveRegions(container)).toBe(0);
   });
 
+  it('keeps the outer live span mounted when toggling isVisible', () => {
+    const { container, rerender } = render(<ContrastBadge isVisible={false} contrastRatio={1.4} />);
+    const liveSpan = container.querySelector('[aria-live="polite"]');
+    expect(liveSpan).toBeInTheDocument();
+    expect(liveSpan).toHaveTextContent('');
+
+    rerender(<ContrastBadge isVisible={true} contrastRatio={1.4} />);
+    expect(container.querySelector('[aria-live="polite"]')).toBe(liveSpan);
+    expect(liveSpan).toHaveTextContent('Low Contrast (1.4)');
+
+    rerender(<ContrastBadge isVisible={false} contrastRatio={1.4} />);
+    expect(container.querySelector('[aria-live="polite"]')).toBe(liveSpan);
+    expect(liveSpan).toHaveTextContent('');
+  });
+
   it('renders inline auto-fix action button when onAutoFix callback is provided and triggers callback', () => {
     const onAutoFix = vi.fn();
     render(

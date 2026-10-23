@@ -42,20 +42,23 @@ export const ContrastBadge: React.FC<ContrastBadgeProps> = ({
   decimalPrecision = 1,
   announce = true,
   'data-testid': dataTestId,
-}) =>
-  isVisible ? (
-    <span
-      aria-live={announce ? 'polite' : undefined}
-      aria-atomic={announce ? true : undefined}
-      className="inline-block text-xs font-medium text-warning"
-      data-testid={dataTestId}
-    >
-      <span className="flex items-center gap-1">
+}) => (
+  <span
+    aria-live={announce ? 'polite' : undefined}
+    aria-atomic={announce ? true : undefined}
+    className="inline-block"
+  >
+    {isVisible && (
+      <span
+        className="flex items-center gap-1 text-xs font-medium text-warning"
+        data-testid={dataTestId}
+      >
         <AlertTriangle className="size-3" aria-hidden="true" />
         Low Contrast ({contrastRatio.toFixed(decimalPrecision)})
       </span>
-    </span>
-  ) : null;
+    )}
+  </span>
+);
 
 /**
  * Props for the ContrastBanner component.
