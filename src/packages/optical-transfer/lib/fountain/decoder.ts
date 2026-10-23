@@ -20,6 +20,22 @@ import type { DropletMetadata } from './contracts';
 import { buildRobustSolitonCdf, getNeighborsForSeq } from './soliton';
 import { crc32 } from './crc32';
 import { solveGF2 } from './gf2';
+import { getFountainBcurModuleSync, loadFountainBcurModule, WasmFountainDecoder } from './wasmKernel';
+
+let cachedFountainWasmModule: WebAssembly.Module | null = getFountainBcurModuleSync();
+let fountainWasmModulePromise: Promise<WebAssembly.Module> | null = null;
+
+function ensureFountainWasmModule(): Promise<WebAssembly.Module> {
+  if (cachedFountainWasmModule) return Promise.resolve(cachedFountainWasmModule);
+  return (fountainWasmModulePromise ??= loadFountainBcurModule().then((m) => {
+    cachedFountainWasmModule = m;
+    return m;
+  }));
+}
+
+if (typeof __FOUNDRY_FOUNTAIN_BCUR__ !== 'undefined' && __FOUNDRY_FOUNTAIN_BCUR__ === 'wasm') {
+  void ensureFountainWasmModule();
+}
 
 interface PendingEquation {
   neighbors: Set<number>;
@@ -47,6 +63,7 @@ const MAX_ELIMINATION_UNKNOWNS = 4096;
  * enables stateless stream entry.
  */
 export class FountainDecoder {
+  private wasmDecoder: WasmFountainDecoder | null = null;
   public k: number | null = null;
   public messageLength: number | null = null;
   public checksum: number | null = null;
@@ -66,6 +83,9 @@ export class FountainDecoder {
    * @returns Percentage of solved source blocks.
    */
   public get progress(): number {
+    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm' && this.wasmDecoder) {
+      return this.wasmDecoder.progress;
+    }
     if (!this.k) return 0;
     return Math.round((this.solvedCount / this.k) * 100);
   }
@@ -75,6 +95,9 @@ export class FountainDecoder {
    * @returns Whether decoding is complete.
    */
   public get isComplete(): boolean {
+    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm' && this.wasmDecoder) {
+      return this.wasmDecoder.isComplete;
+    }
     return this.k !== null && this.solvedCount >= this.k;
   }
 
@@ -83,6 +106,9 @@ export class FountainDecoder {
    * @returns Solved block count.
    */
   public get resolvedBlockCount(): number {
+    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm' && this.wasmDecoder) {
+      return this.wasmDecoder.progress;
+    }
     return this.solvedCount;
   }
 
@@ -101,6 +127,9 @@ export class FountainDecoder {
    * @returns Rank lower bound.
    */
   public get rank(): number {
+    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm' && this.wasmDecoder) {
+      return this.wasmDecoder.rank;
+    }
     let independent = 0;
     for (const eq of this.pending) if (eq.independent) independent++;
     return Math.min(this.k ?? 0, this.solvedCount + independent);
@@ -111,6 +140,9 @@ export class FountainDecoder {
    * @returns Elimination pass count.
    */
   public get eliminationPasses(): number {
+    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm' && this.wasmDecoder) {
+      return this.wasmDecoder.eliminationPasses;
+    }
     return this.eliminationRuns;
   }
 
@@ -146,6 +178,20 @@ export class FountainDecoder {
    * @returns True if the droplet advanced decoding.
    */
   public ingest(meta: DropletMetadata, data: Uint8Array): boolean {
+    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm') {
+      if (this.k === null) this.init(meta, data.length);
+      cachedFountainWasmModule ??= getFountainBcurModuleSync();
+      if (!this.wasmDecoder && cachedFountainWasmModule && this.k !== null && this.messageLength !== null && this.checksum !== null && this.blockSize !== null) {
+        this.wasmDecoder = new WasmFountainDecoder(cachedFountainWasmModule, this.k, this.messageLength, this.checksum, this.blockSize);
+      }
+      if (this.wasmDecoder) {
+        if (!this.receivedSeqNumbers.has(meta.seq)) {
+          this.receivedSeqNumbers.add(meta.seq);
+          this.droplets += 1;
+        }
+        return this.wasmDecoder.ingest(meta, data);
+      }
+    }
     if (this.isComplete) return false;
     if (!this.matchesSession(meta, data.length)) return false;
     if (this.receivedSeqNumbers.has(meta.seq)) return false;
@@ -165,6 +211,9 @@ export class FountainDecoder {
    * @returns True if at least one new block was resolved.
    */
   public ingestEquation(indices: number[], data: Uint8Array): boolean {
+    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm' && this.wasmDecoder) {
+      return this.wasmDecoder.ingestEquation(indices, data);
+    }
     if (this.k === null || this.blockSize === null || this.isComplete) return false;
     const blockSize = this.blockSize;
     const payload = new Uint8Array(blockSize);
@@ -261,6 +310,15 @@ export class FountainDecoder {
    * @throws Error when the reassembled message fails the CRC-32 check.
    */
   public finalize(): Uint8Array | null {
+    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm' && this.wasmDecoder) {
+      const res = this.wasmDecoder.finalize();
+      if (!res && this.isComplete) {
+        throw new Error(
+          `Fountain integrity error: checksum mismatch (expected ${(this.checksum ?? 0).toString(16)})`
+        );
+      }
+      return res;
+    }
     if (!this.isComplete || this.k === null || this.blockSize === null || this.messageLength === null) {
       return null;
     }
@@ -284,6 +342,10 @@ export class FountainDecoder {
    * Resets the decoder to accept a new stream session.
    */
   public reset(): void {
+    if (this.wasmDecoder) {
+      this.wasmDecoder.reset();
+      this.wasmDecoder = null;
+    }
     this.k = null;
     this.messageLength = null;
     this.checksum = null;

@@ -17,7 +17,16 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { parseCsv, CsvParseError, MAX_BULK_CSV_ROWS, MAX_BULK_CSV_CHARS, detectDelimiter, decodeCsvBytes } from '../index';
+import {
+  parseCsv,
+  CsvParseError,
+  MAX_BULK_CSV_ROWS,
+  MAX_BULK_CSV_CHARS,
+  detectDelimiter,
+  decodeCsvBytes,
+  formatErrorLogCsv,
+  errorLogFileName,
+} from '../index';
 
 describe('parseCsv', () => {
   it('maps data rows to the header row', () => {
@@ -193,5 +202,101 @@ describe('decodeCsvBytes (#1287)', () => {
   it('reads anything else as UTF-8', () => {
     expect(decodeCsvBytes(new TextEncoder().encode('naam,stad\nZoë,Zürich'))).toBe('naam,stad\nZoë,Zürich');
     expect(decodeCsvBytes(new Uint8Array([0xef, 0xbb, 0xbf, 0x61]))).toBe('a');
+  });
+});
+
+describe('formatErrorLogCsv', () => {
+  it('formats error log items into RFC 4180 CSV bytes with expected headers', () => {
+    const items = [
+      { rowNumber: 2, category: 'empty', reason: 'Missing payload value', payload: '' },
+      { rowNumber: 5, category: 'unsafe', reason: 'Dangerous scheme', payload: 'javascript:alert(1)' },
+    ];
+    const bytes = formatErrorLogCsv(items);
+    const text = new TextDecoder().decode(bytes);
+
+    expect(text).toContain('Row Number,Category,Reason,Payload\r\n');
+    expect(text).toContain('2,empty,Missing payload value,\r\n');
+    expect(text).toContain('5,unsafe,Dangerous scheme,javascript:alert(1)\r\n');
+
+    const parsed = parseCsv(text);
+    expect(parsed.headers).toEqual(['Row Number', 'Category', 'Reason', 'Payload']);
+    expect(parsed.rows).toHaveLength(2);
+    expect(parsed.rows[0]['Row Number']).toBe('2');
+    expect(parsed.rows[0]['Category']).toBe('empty');
+    expect(parsed.rows[0]['Reason']).toBe('Missing payload value');
+  });
+
+  it('escapes quotes, commas, and newlines in reasons and payloads per RFC 4180', () => {
+    const items = [
+      {
+        rowNumber: 3,
+        category: 'unsafe',
+        reason: 'Error on line 1,\nline 2 with "quotes"',
+        payload: 'http://example.com/a,b',
+      },
+    ];
+    const bytes = formatErrorLogCsv(items);
+    const text = new TextDecoder().decode(bytes);
+
+    expect(text).toContain('"Error on line 1,\nline 2 with ""quotes"""');
+    expect(text).toContain('"http://example.com/a,b"');
+
+    const parsed = parseCsv(text);
+    expect(parsed.rows[0]['Reason']).toBe('Error on line 1,\nline 2 with "quotes"');
+    expect(parsed.rows[0]['Payload']).toBe('http://example.com/a,b');
+  });
+
+  it('falls back to default reason and category when omitted', () => {
+    const items = [{ rowNumber: 1, reason: '   ' }];
+    const bytes = formatErrorLogCsv(items);
+    const text = new TextDecoder().decode(bytes);
+
+    expect(text).toContain('1,skipped,Invalid or skipped row,\r\n');
+  });
+
+  it('neutralises formula injection in fields starting with =, +, -, @, or leading tab', () => {
+    const items = [
+      {
+        rowNumber: 2,
+        category: 'unsafe',
+        reason: '=SUM(1,2)',
+        payload: '=HYPERLINK("http://example.com")',
+      },
+      {
+        rowNumber: 3,
+        category: 'unsafe',
+        reason: '+12345678',
+        payload: '-100',
+      },
+      {
+        rowNumber: 4,
+        category: 'caution',
+        reason: '@admin',
+        payload: '\ttab_prefix',
+      },
+    ];
+    const bytes = formatErrorLogCsv(items);
+    const text = new TextDecoder().decode(bytes);
+
+    const parsed = parseCsv(text);
+    expect(parsed.rows[0]['Reason']).toBe("'=SUM(1,2)");
+    expect(parsed.rows[0]['Payload']).toBe("'=HYPERLINK(\"http://example.com\")");
+    expect(parsed.rows[1]['Reason']).toBe("'+12345678");
+    expect(parsed.rows[1]['Payload']).toBe("'-100");
+    expect(parsed.rows[2]['Reason']).toBe("'@admin");
+    expect(parsed.rows[2]['Payload']).toBe("'\ttab_prefix");
+  });
+});
+
+describe('errorLogFileName', () => {
+  it('formats download file name as <original-filename>-error-log.csv', () => {
+    expect(errorLogFileName('batch-urls.csv')).toBe('batch-urls-error-log.csv');
+    expect(errorLogFileName('customers-2026.txt')).toBe('customers-2026-error-log.csv');
+    expect(errorLogFileName('data.with.many.dots.csv')).toBe('data.with.many.dots-error-log.csv');
+  });
+
+  it('falls back to bulk-error-log.csv when no file name is provided', () => {
+    expect(errorLogFileName()).toBe('bulk-error-log.csv');
+    expect(errorLogFileName('')).toBe('bulk-error-log.csv');
   });
 });

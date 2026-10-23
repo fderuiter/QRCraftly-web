@@ -19,9 +19,25 @@
 import { crc32 } from '../fountain/crc32';
 import { cborDecode } from '../fountain/cbor';
 import { decodeBytewordsMinimal } from '../fountain/bytewords';
+import { getFountainBcurModuleSync, loadFountainBcurModule, WasmBcUrDecoder } from '../fountain/wasmKernel';
 import { MAX_RECEIVE_MESSAGE_BYTES } from '../limits';
 import { FragmentChooser } from './schedule';
 import { decodeUrPart, parseUr, type BcUrPart } from './uri';
+
+let cachedWasmModule: WebAssembly.Module | null = getFountainBcurModuleSync();
+let wasmModulePromise: Promise<WebAssembly.Module> | null = null;
+
+function ensureWasmModule(): Promise<WebAssembly.Module> {
+  if (cachedWasmModule) return Promise.resolve(cachedWasmModule);
+  return (wasmModulePromise ??= loadFountainBcurModule().then((m) => {
+    cachedWasmModule = m;
+    return m;
+  }));
+}
+
+if (typeof __FOUNDRY_FOUNTAIN_BCUR__ !== 'undefined' && __FOUNDRY_FOUNTAIN_BCUR__ === 'wasm') {
+  void ensureWasmModule();
+}
 
 /** Source block count above which a claimed stream is refused (bounds alias-table and mixing work). */
 export const MAX_BCUR_FRAGMENTS = 1 << 16;
@@ -105,6 +121,7 @@ function classify(type: string, cbor: Uint8Array): BcUrContent {
  * any order, with duplicates and lost parts tolerated.
  */
 export class BcUrDecoder {
+  private wasmDecoder: WasmBcUrDecoder | null = null;
   private type = '';
   private seqLen = 0;
   private messageLen = 0;
@@ -117,12 +134,28 @@ export class BcUrDecoder {
   private pendingCount = 0;
   private done: BcUrResult | null = null;
 
+  constructor() {
+    cachedWasmModule ??= getFountainBcurModuleSync();
+    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm' && cachedWasmModule) {
+      this.wasmDecoder = new WasmBcUrDecoder(cachedWasmModule);
+    }
+  }
+
   /**
    * Feeds one scanned string.
    * @param text Decoded QR text (any case).
    * @returns The updated progress, the finished result or a rejection.
    */
   public ingest(text: string): BcUrIngest {
+    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm') {
+      cachedWasmModule ??= getFountainBcurModuleSync();
+      if (!this.wasmDecoder && cachedWasmModule) {
+        this.wasmDecoder = new WasmBcUrDecoder(cachedWasmModule);
+      }
+      if (this.wasmDecoder) {
+        return this.wasmDecoder.ingest(text);
+      }
+    }
     if (this.done) return { status: 'complete', result: this.done };
     const parsed = parseUr(text);
     if (!parsed) return { status: 'rejected' };
@@ -154,12 +187,18 @@ export class BcUrDecoder {
 
   /** Fraction of fragments recovered so far, 0 to 1. */
   public get progress(): number {
+    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm' && this.wasmDecoder) {
+      return this.wasmDecoder.progress;
+    }
     if (this.done) return 1;
     return this.seqLen === 0 ? 0 : this.simple.size / this.seqLen;
   }
 
   /** Forgets the current stream so another can start. */
   public reset(): void {
+    if (this.wasmDecoder) {
+      this.wasmDecoder.reset();
+    }
     this.type = '';
     this.seqLen = 0;
     this.messageLen = 0;
