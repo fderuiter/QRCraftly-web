@@ -70,26 +70,6 @@ pub fn lookup_minimal_pair(code: u16) -> Option<u8> {
     None
 }
 
-pub fn encode_bytewords_minimal(bytes: &[u8]) -> Vec<u8> {
-    let checksum = crc32::checksum(bytes);
-    let mut out_bytes = Vec::with_capacity(bytes.len() + 4);
-    out_bytes.extend_from_slice(bytes);
-    out_bytes.push(((checksum >> 24) & 0xff) as u8);
-    out_bytes.push(((checksum >> 16) & 0xff) as u8);
-    out_bytes.push(((checksum >> 8) & 0xff) as u8);
-    out_bytes.push((checksum & 0xff) as u8);
-
-    let mut result = Vec::with_capacity(out_bytes.len() * 2);
-    for &b in &out_bytes {
-        let code = MINIMAL_PAIR_CODES[b as usize];
-        let first = (code >> 8) as u8;
-        let last = (code & 0xff) as u8;
-        result.push(first);
-        result.push(last);
-    }
-    result
-}
-
 pub fn decode_bytewords_minimal(text: &[u8]) -> Option<Vec<u8>> {
     if !text.len().is_multiple_of(2) || text.len() < 10 {
         return None;
@@ -125,10 +105,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_bytewords_roundtrip() {
-        let data = b"hello world";
-        let encoded = encode_bytewords_minimal(data);
-        let decoded = decode_bytewords_minimal(&encoded).expect("should decode");
-        assert_eq!(decoded, data);
+    fn test_bytewords_decode_invalid() {
+        assert!(decode_bytewords_minimal(b"short").is_none());
+        assert!(decode_bytewords_minimal(b"invalidbytewordspair").is_none());
     }
 }

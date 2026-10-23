@@ -43,7 +43,6 @@ pub mod xoshiro;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use bcur_decoder::{BcUrDecoder, BcUrIngestStatus};
-use bytewords::{decode_bytewords_minimal, encode_bytewords_minimal};
 use cbor::{cbor_decode, cbor_encode, CborValue};
 use fountain_decoder::FountainDecoder;
 use gf2::{solve_gf2, GF2Equation};
@@ -446,61 +445,6 @@ pub unsafe extern "C" fn fountain_decoder_free(wrapper: *mut FountainDecoderWrap
     if !wrapper.is_null() {
         drop(unsafe { Box::from_raw(wrapper) });
     }
-}
-
-/// Encodes bytes into minimal pair Bytewords.
-///
-/// # Safety
-/// `in_ptr`, `out_ptr`, and `out_written` must be valid non-null pointers.
-#[no_mangle]
-pub unsafe extern "C" fn bytewords_encode_minimal_c(
-    in_ptr: *const u8,
-    in_len: usize,
-    out_ptr: *mut u8,
-    out_cap: usize,
-    out_written: *mut usize,
-) -> i32 {
-    if in_ptr.is_null() || out_ptr.is_null() || out_written.is_null() {
-        return STATUS_BAD_INPUT;
-    }
-    let input = unsafe { core::slice::from_raw_parts(in_ptr, in_len) };
-    let encoded = encode_bytewords_minimal(input);
-    if out_cap < encoded.len() {
-        return STATUS_BUFFER_TOO_SMALL;
-    }
-    let out = unsafe { core::slice::from_raw_parts_mut(out_ptr, encoded.len()) };
-    out.copy_from_slice(&encoded);
-    unsafe { *out_written = encoded.len() };
-    STATUS_OK
-}
-
-/// Decodes minimal pair Bytewords into bytes.
-///
-/// # Safety
-/// `in_ptr`, `out_ptr`, and `out_written` must be valid non-null pointers.
-#[no_mangle]
-pub unsafe extern "C" fn bytewords_decode_minimal_c(
-    in_ptr: *const u8,
-    in_len: usize,
-    out_ptr: *mut u8,
-    out_cap: usize,
-    out_written: *mut usize,
-) -> i32 {
-    if in_ptr.is_null() || out_ptr.is_null() || out_written.is_null() {
-        return STATUS_BAD_INPUT;
-    }
-    let input = unsafe { core::slice::from_raw_parts(in_ptr, in_len) };
-    let decoded = match decode_bytewords_minimal(input) {
-        Some(d) => d,
-        None => return STATUS_BAD_INPUT,
-    };
-    if out_cap < decoded.len() {
-        return STATUS_BUFFER_TOO_SMALL;
-    }
-    let out = unsafe { core::slice::from_raw_parts_mut(out_ptr, decoded.len()) };
-    out.copy_from_slice(&decoded);
-    unsafe { *out_written = decoded.len() };
-    STATUS_OK
 }
 
 /// Encodes bytes as a CBOR byte string value.
