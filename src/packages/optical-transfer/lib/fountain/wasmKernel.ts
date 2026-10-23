@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { compileWasmUrl, instantiateWasmSync, WasmInstance } from '@/packages/wasm-runtime';
 import type { GF2Equation, GF2Solution } from './gf2';
 import type { DropletMetadata } from './contracts';
@@ -34,16 +32,36 @@ function moduleUrl(): URL {
 let cachedModule: WebAssembly.Module | null = null;
 let loadingPromise: Promise<WebAssembly.Module> | null = null;
 
+function readNodeFileSync(url: URL): Uint8Array | null {
+  const proc: unknown = Reflect.get(globalThis, 'process');
+  if (typeof proc !== 'object' || proc === null) return null;
+  const getBuiltinModule: unknown = Reflect.get(proc, 'getBuiltinModule');
+  if (typeof getBuiltinModule !== 'function') return null;
+  const fs: unknown = Reflect.apply(getBuiltinModule, proc, ['node:fs']);
+  if (typeof fs !== 'object' || fs === null) return null;
+  const readFileSync: unknown = Reflect.get(fs, 'readFileSync');
+  if (typeof readFileSync !== 'function') return null;
+  try {
+    const bytes: unknown = Reflect.apply(readFileSync, fs, [url]);
+    if (!ArrayBuffer.isView(bytes)) return null;
+    return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  } catch {
+    return null;
+  }
+}
+
 /** Synchronously returns the compiled WebAssembly module under Node/Vitest if available. */
 export function getFountainBcurModuleSync(): WebAssembly.Module | null {
   if (cachedModule) return cachedModule;
   if (import.meta.url.startsWith('file:')) {
-    try {
-      const bytes = fs.readFileSync(fileURLToPath(moduleUrl()));
-      cachedModule = new WebAssembly.Module(bytes);
-      return cachedModule;
-    } catch {
-      // Fall back to async compileWasmUrl
+    const bytes = readNodeFileSync(moduleUrl());
+    if (bytes) {
+      try {
+        cachedModule = new WebAssembly.Module(bytes);
+        return cachedModule;
+      } catch {
+        // Fall back to async compileWasmUrl
+      }
     }
   }
   return null;
