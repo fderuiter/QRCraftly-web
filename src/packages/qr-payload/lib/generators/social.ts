@@ -43,11 +43,8 @@ const PLATFORM_URL_PREFIXES: Record<string, string> = {
 export const constructSocialString = (data: SocialData): string => {
   if (!data?.handle) return '';
 
-  if (data.platform === 'youtube') {
-    const raw = data.handle.trim();
-    if (/^https?:\/\//i.test(raw)) return raw;
-    const clean = raw.replace(/^@+/, '');
-    return clean ? `https://youtube.com/@${clean}` : '';
+  if (data.platform === 'youtube' && /^https?:\/\//i.test(data.handle.trim())) {
+    return data.handle.trim();
   }
 
   const cleanHandle = sanitizeSocialHandle(data.handle);

@@ -26,12 +26,7 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
 
   const handleHandleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    if (isYouTube && parseYouTubeInput) {
-      const parsed = parseYouTubeInput(raw);
-      onChange({ handle: parsed || raw });
-    } else {
-      onChange({ handle: raw });
-    }
+    onChange({ handle: isYouTube && parseYouTubeInput ? parseYouTubeInput(raw) || raw : raw });
   };
 
   return (
@@ -40,10 +35,7 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
         id="social-platform"
         label="Platform"
         value={data.platform}
-        onChange={(e) => {
-          const newPlatform = e.target.value as SocialPlatform;
-          onChange({ platform: newPlatform });
-        }}
+        onChange={(e) => onChange({ platform: e.target.value as SocialPlatform })}
       >
         <option value={SocialPlatform.INSTAGRAM}>Instagram</option>
         <option value={SocialPlatform.TWITTER}>Twitter / X</option>

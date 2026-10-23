@@ -155,6 +155,7 @@ describe('Social links (#1282, #1363)', () => {
     ['https://x.com/jack/status/20'],
     ['https://twitter.com/intent/tweet?text=hi'],
     ['https://vm.tiktok.com/ZMabc/'],
+    ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
     ['https://github.com/fderuiter/QRCraftly-web/issues/1'],
     ['https://www.facebook.com/sharer.php'],
     ['https://linkedin.com/company/acme'],
@@ -169,7 +170,6 @@ describe('Social links (#1282, #1363)', () => {
     ['https://m.facebook.com/zuck', SocialPlatform.FACEBOOK, 'zuck'],
     ['https://mobile.twitter.com/jack', SocialPlatform.TWITTER, 'jack'],
     ['https://www.youtube.com/@mkbhd', SocialPlatform.YOUTUBE, 'mkbhd'],
-    ['https://www.youtube.com/watch?v=dQw4w9WgXcQ', SocialPlatform.YOUTUBE, 'watch?v=dQw4w9WgXcQ'],
     ['https://www.linkedin.com/in/jane-doe', SocialPlatform.LINKEDIN, 'jane-doe'],
     ['https://github.com/fderuiter', SocialPlatform.GITHUB, 'fderuiter'],
   ])('%s is a profile', (raw, platform, handle) => {
