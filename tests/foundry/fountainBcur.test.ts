@@ -20,7 +20,6 @@ import { describe, expect, it } from 'vitest';
 import { solveGF2, type GF2Equation } from '@/packages/optical-transfer/lib/fountain/gf2';
 import { FountainDecoder } from '@/packages/optical-transfer/lib/fountain/decoder';
 import { FountainEncoder } from '@/packages/optical-transfer/lib/fountain/encoder';
-import { decodeBytewordsMinimal, encodeBytewordsMinimal } from '@/packages/optical-transfer/lib/fountain/bytewords';
 import { BcUrDecoder } from '@/packages/optical-transfer/lib/bcur/decoder';
 import { BcUrEncoder } from '@/packages/optical-transfer/lib/bcur/encoder';
 import {
@@ -31,8 +30,6 @@ import {
 import {
   solveGF2Wasm,
   WasmFountainDecoder,
-  encodeBytewordsMinimalWasm,
-  decodeBytewordsMinimalWasm,
   WasmBcUrDecoder,
   loadFountainBcurModule,
 } from '@/packages/optical-transfer/lib/fountain/wasmKernel';
@@ -96,28 +93,6 @@ describe('fountain-bcur WebAssembly kernel', () => {
       console.dir(report.mismatches, { depth: null });
     }
     expect(report.mismatchCount).toBe(0);
-  });
-
-  it('passes Bytewords minimal encode/decode differential test', async () => {
-    const instance = await loadCommittedModule('fountain-bcur');
-    const byteInputs = Array.from(seededBytes(12345, 20, 64));
-
-    const encodeReport = runDifferential({
-      name: 'Bytewords Encode Minimal',
-      inputs: byteInputs,
-      candidate: (buf) => encodeBytewordsMinimalWasm(instance, buf),
-      reference: (buf) => encodeBytewordsMinimal(buf),
-    });
-    expect(encodeReport.mismatchCount).toBe(0);
-
-    const stringInputs = byteInputs.map((buf) => encodeBytewordsMinimal(buf));
-    const decodeReport = runDifferential({
-      name: 'Bytewords Decode Minimal',
-      inputs: stringInputs,
-      candidate: (str) => decodeBytewordsMinimalWasm(instance, str),
-      reference: (str) => decodeBytewordsMinimal(str),
-    });
-    expect(decodeReport.mismatchCount).toBe(0);
   });
 
   it('passes FountainDecoder differential test', async () => {

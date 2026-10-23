@@ -232,48 +232,6 @@ export class WasmFountainDecoder {
   }
 }
 
-/** WebAssembly Bytewords minimal encoder & decoder. */
-export function encodeBytewordsMinimalWasm(instance: WasmInstance, bytes: Uint8Array): string {
-  const encodeFn = instance.fn('bytewords_encode_minimal_c');
-  const cap = (bytes.length + 4) * 2;
-  const outBuf = instance.alloc(cap);
-  const writtenPtr = instance.alloc(4);
-  try {
-    instance.withBytes(bytes, (inPtr, inLen) => {
-      const status = encodeFn(inPtr, inLen, outBuf, cap, writtenPtr);
-      if (status !== 0) throw new Error(`bytewords_encode_minimal_c failed: status ${status}`);
-    });
-    const writtenView = new DataView(instance.memory.buffer, writtenPtr, 4);
-    const written = writtenView.getUint32(0, true);
-    const rawStr = instance.read(outBuf, written);
-    return new TextDecoder('ascii').decode(rawStr);
-  } finally {
-    instance.free(outBuf, cap);
-    instance.free(writtenPtr, 4);
-  }
-}
-
-export function decodeBytewordsMinimalWasm(instance: WasmInstance, text: string): Uint8Array | null {
-  const textBytes = new TextEncoder().encode(text);
-  const decodeFn = instance.fn('bytewords_decode_minimal_c');
-  const cap = textBytes.length;
-  const outBuf = instance.alloc(cap);
-  const writtenPtr = instance.alloc(4);
-  try {
-    let status = 0;
-    instance.withBytes(textBytes, (inPtr, inLen) => {
-      status = decodeFn(inPtr, inLen, outBuf, cap, writtenPtr);
-    });
-    if (status !== 0) return null;
-    const writtenView = new DataView(instance.memory.buffer, writtenPtr, 4);
-    const written = writtenView.getUint32(0, true);
-    return instance.read(outBuf, written);
-  } finally {
-    instance.free(outBuf, cap);
-    instance.free(writtenPtr, 4);
-  }
-}
-
 /** WebAssembly-backed BC-UR Decoder. */
 export class WasmBcUrDecoder {
   private readonly instance: WasmInstance;
