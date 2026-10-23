@@ -17,6 +17,7 @@
 */
 
 import { clampCornerRadius } from '@/packages/qr-matrix/canvas';
+import { parseCanvasFont } from './canvasFont';
 
 /**
  * A 2D affine transformation matrix in column-major form:
@@ -465,24 +466,7 @@ export class SvgContext {
 
   /** Measures text width for layout calculations. */
   measureText(text: string): TextMetrics {
-    let actualWidth: number | null = null;
-    try {
-      const measuringCtx = getMeasuringContext();
-      if (measuringCtx && typeof measuringCtx.measureText === 'function') {
-        measuringCtx.font = this.font;
-        const metrics = measuringCtx.measureText(text);
-        if (metrics && typeof metrics.width === 'number') {
-          actualWidth = metrics.width;
-        }
-      }
-    } catch (_e) {
-      // Fallback
-    }
-    const match = this.font.match(/(\d+)px/);
-    const fontSize = match ? parseInt(match[1], 10) : 16;
-    const estimatedWidth = text.length * fontSize * 0.55;
-    const width = (actualWidth !== null && actualWidth > 0) ? actualWidth : estimatedWidth;
-    return { width } as TextMetrics;
+    return { width: this._textWidth(text) } as TextMetrics;
   }
 
   /** Renders text as an SVG <text> element. */
@@ -493,37 +477,33 @@ export class SvgContext {
     const baseline = this._svgDominantBaseline(this.textBaseline);
 
     let textLengthAttr = '';
-    if (maxWidth !== undefined && maxWidth > 0) {
-      let actualWidth: number | null = null;
-      try {
-        const measuringCtx = getMeasuringContext();
-        if (measuringCtx && typeof measuringCtx.measureText === 'function') {
-          measuringCtx.font = this.font;
-          const metrics = measuringCtx.measureText(text);
-          if (metrics && typeof metrics.width === 'number') {
-            actualWidth = metrics.width;
-          }
-        }
-      } catch (_e) {
-        // Fallback on error
-      }
-
-      // Safe font-size extraction and scaling fallback
-      const match = this.font.match(/(\d+)px/);
-      const fontSize = match ? parseInt(match[1], 10) : 16;
-      const estimatedWidth = text.length * fontSize * 0.55;
-
-      const measuredWidth = (actualWidth !== null && actualWidth > 0) ? actualWidth : estimatedWidth;
-
-      if (measuredWidth > maxWidth) {
-        textLengthAttr = ` textLength="${this._n(maxWidth)}" lengthAdjust="spacingAndGlyphs"`;
-      }
+    if (maxWidth !== undefined && maxWidth > 0 && this._textWidth(text) > maxWidth) {
+      textLengthAttr = ` textLength="${this._n(maxWidth)}" lengthAdjust="spacingAndGlyphs"`;
     }
 
-    const parsedFont = this._parseFont(this.font);
+    // SVG has no `font` presentation attribute, so the canvas shorthand is split into its parts (#1467).
+    const font = parseCanvasFont(this.font);
+    const styleAttr = font.fontStyle === 'normal' ? '' : ` font-style="${font.fontStyle}"`;
     this._elements.push(
-      `<text x="${this._n(tx)}" y="${this._n(ty)}" fill="${fill}" font-family="${this._escapeAttr(parsedFont.fontFamily)}" font-size="${this._n(parsedFont.fontSize)}" font-weight="${parsedFont.fontWeight}" text-anchor="${anchor}" dominant-baseline="${baseline}"${textLengthAttr}>${this._escapeText(text)}</text>`
+      `<text x="${this._n(tx)}" y="${this._n(ty)}" fill="${fill}" font-family="${this._escapeAttr(font.fontFamily)}" font-size="${this._n(font.fontSize)}" font-weight="${font.fontWeight}"${styleAttr} text-anchor="${anchor}" dominant-baseline="${baseline}"${textLengthAttr}>${this._escapeText(text)}</text>`
     );
+  }
+
+  /** Text width from a real canvas when one is available, else estimated from the font size. */
+  private _textWidth(text: string): number {
+    try {
+      const measuringCtx = getMeasuringContext();
+      if (measuringCtx && typeof measuringCtx.measureText === 'function') {
+        measuringCtx.font = this.font;
+        const metrics = measuringCtx.measureText(text);
+        if (metrics && typeof metrics.width === 'number' && metrics.width > 0) {
+          return metrics.width;
+        }
+      }
+    } catch (_e) {
+      // Fall back to the estimate below
+    }
+    return text.length * parseCanvasFont(this.font).fontSize * 0.55;
   }
 
   private _getTransformAttr(): string {
@@ -684,17 +664,5 @@ export class SvgContext {
 
   private _escapeText(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  private _parseFont(fontStr: string): { fontFamily: string; fontSize: number; fontWeight: string } {
-    const trimmed = fontStr ? fontStr.trim() : '';
-    const match = /^(?:(bold|[1-9]00|normal)\s+)?(\d+(?:\.\d+)?)(?:px|pt|em|rem)?\s+(.+)$/i.exec(trimmed);
-    if (match) {
-      const weight = match[1] ? match[1].toLowerCase() : 'normal';
-      const size = parseFloat(match[2]) || 16;
-      const family = match[3].trim();
-      return { fontFamily: family, fontSize: size, fontWeight: weight };
-    }
-    return { fontFamily: trimmed || 'sans-serif', fontSize: 16, fontWeight: 'normal' };
   }
 }

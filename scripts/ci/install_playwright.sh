@@ -11,7 +11,9 @@ ATTEMPTS="${PLAYWRIGHT_INSTALL_ATTEMPTS:-3}"
 ATTEMPT_SECONDS="${PLAYWRIGHT_INSTALL_ATTEMPT_SECONDS:-240}"
 
 # Give up on a dead mirror connection quickly so the attempt limit is spent on retries.
-echo 'Acquire::Retries "3"; Acquire::http::Timeout "30"; Acquire::https::Timeout "30";' |
+# `timeout` kills pnpm but not the apt-get it started under sudo, so that apt-get keeps the dpkg lock
+# after an attempt times out; wait for it instead of failing the next attempts at once.
+echo 'Acquire::Retries "3"; Acquire::http::Timeout "30"; Acquire::https::Timeout "30"; DPkg::Lock::Timeout "200";' |
   sudo tee /etc/apt/apt.conf.d/80-playwright-ci >/dev/null
 
 retry() {
