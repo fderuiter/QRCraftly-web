@@ -130,6 +130,39 @@ describe('ExportOptions (#1052)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('The largest width is 8192 pixels.');
   });
 
+  it('renders color space toggle for EPS and PDF and fires onColorSpaceChange', () => {
+    const onColorSpaceChange = vi.fn();
+    const props = {
+      id: 'opts',
+      format: 'eps' as const,
+      colorSpace: 'rgb' as const,
+      onColorSpaceChange,
+      size: 1000,
+      filename: 'file',
+      copySvgBusy: false,
+      onFormatChange: vi.fn(),
+      onSizeChange: vi.fn(),
+      onFilenameChange: vi.fn(),
+      onCopySvg: vi.fn(),
+      onWallet: vi.fn(),
+    };
+    const { rerender } = render(<ExportOptions {...props} />);
+
+    expect(screen.getByText('Color Space')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'RGB' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'CMYK' })).toHaveAttribute('aria-checked', 'false');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'CMYK' }));
+    expect(onColorSpaceChange).toHaveBeenCalledWith('cmyk');
+
+    rerender(<ExportOptions {...props} format="pdf" colorSpace="cmyk" />);
+    expect(screen.getByRole('radio', { name: 'CMYK' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(/CMYK four-color process/)).toBeInTheDocument();
+
+    rerender(<ExportOptions {...props} format="png" />);
+    expect(screen.queryByText('Color Space')).not.toBeInTheDocument();
+  });
+
   it('does not show inline error when custom width is within valid range', () => {
     renderOptions('png', 1000);
     const input = screen.getByLabelText('Width in pixels');
