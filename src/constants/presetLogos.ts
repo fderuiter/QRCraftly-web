@@ -204,14 +204,12 @@ export const TYPE_TO_PRESET_LOGO: Record<QRType, string | null> = {
 };
 
 let isUserLogoOverridden = false;
-let userOverrideLogoUrl: string | null = null;
 
 /**
  * Marks that the user has explicitly set or removed the logo.
  */
-export function setUserLogoOverride(logoUrl: string | null): void {
+export function setUserLogoOverride(_logoUrl?: string | null): void {
   isUserLogoOverridden = true;
-  userOverrideLogoUrl = logoUrl;
 }
 
 /**
@@ -222,17 +220,9 @@ export function isLogoOverridden(): boolean {
 }
 
 /**
- * Returns details about the current user logo override.
- */
-export function getUserLogoOverride(): { isOverridden: boolean; logoUrl: string | null } {
-  return { isOverridden: isUserLogoOverridden, logoUrl: userOverrideLogoUrl };
-}
-
-/**
  * Resets the user logo override status (used during test teardowns and state clears).
  */
 export function resetUserLogoOverride(): void {
   isUserLogoOverridden = false;
-  userOverrideLogoUrl = null;
 }
 
