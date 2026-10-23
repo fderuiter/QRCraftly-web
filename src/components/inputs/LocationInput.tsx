@@ -63,7 +63,6 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     };
   }, []);
 
-  const pastedRef = useRef(false);
   const lastProcessedUrlRef = useRef<string | null>(null);
 
   const clearErrors = () => {
@@ -107,10 +106,6 @@ export const LocationInput: React.FC<LocationInputProps> = ({
   };
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (pastedRef.current) {
-      pastedRef.current = false;
-      return;
-    }
     const value = e.target.value;
     setMapUrl(value);
     clearErrors();
@@ -121,7 +116,6 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     const pastedText = e.clipboardData.getData("text");
     if (pastedText) {
       e.preventDefault();
-      pastedRef.current = true;
       setMapUrl(pastedText);
       processUrlInput(pastedText);
     }

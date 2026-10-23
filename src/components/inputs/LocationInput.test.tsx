@@ -511,7 +511,7 @@ describe('LocationInput component', () => {
   // ─── Google Maps link and location string parsing ────────────────────────
 
   describe('Google Maps link and location string parsing', () => {
-    it('extracts coordinates when pasting a Google Maps place pin URL and does not re-announce on change or blur', () => {
+    it('extracts coordinates when pasting a Google Maps place pin URL and does not re-announce on blur', () => {
       const { onChange } = renderLocationInput();
       const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
 
@@ -529,16 +529,6 @@ describe('LocationInput component', () => {
       });
       expect(announcePolitely).toHaveBeenCalledTimes(1);
       expect(announcePolitely).toHaveBeenCalledWith('Location coordinates populated');
-
-      // Subsequent change event from paste browser dispatch
-      fireEvent.change(input, {
-        target: {
-          value:
-            'https://www.google.com/maps/place/Statue+of+Liberty/@40.6892494,-74.0466891,17z/data=!3m1!4b1!4m6!3m5!1s0x89c25090129c363d:0x40c6a5770d25022b!8m2!3d40.6892494!4d-74.0445004',
-        },
-      });
-      expect(onChange).toHaveBeenCalledTimes(1);
-      expect(announcePolitely).toHaveBeenCalledTimes(1);
 
       // Subsequent blur event
       fireEvent.blur(input);
@@ -630,27 +620,23 @@ describe('LocationInput component', () => {
       ).toBeInTheDocument();
     });
 
-    it('retains error message when pasting an invalid URL followed by a change event', () => {
+    it('preserves pasted content and accepts typing immediately after paste without dropping characters', () => {
       renderLocationInput();
       const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
 
       fireEvent.paste(input, {
         clipboardData: {
-          getData: () => 'https://maps.app.goo.gl/invalid',
+          getData: () => 'https://maps.google.com/123',
         },
       });
 
-      expect(
-        screen.getByText('Could not extract valid coordinates from the provided URL or location string.')
-      ).toBeInTheDocument();
+      expect(input).toHaveValue('https://maps.google.com/123');
 
       fireEvent.change(input, {
-        target: { value: 'https://maps.app.goo.gl/invalid' },
+        target: { value: 'https://maps.google.com/1234' },
       });
 
-      expect(
-        screen.getByText('Could not extract valid coordinates from the provided URL or location string.')
-      ).toBeInTheDocument();
+      expect(input).toHaveValue('https://maps.google.com/1234');
     });
 
     it('retains error message on repeated blur or Enter on the same invalid text', () => {
