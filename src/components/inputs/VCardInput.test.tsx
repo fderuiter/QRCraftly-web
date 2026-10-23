@@ -264,7 +264,7 @@ END:VCARD`;
     await vi.waitFor(() => {
       expect(onChange).not.toHaveBeenCalled();
       expect(screen.getByRole('alert')).toHaveTextContent(/file size exceeds 256 kb limit/i);
-      expect(announcePolitely).toHaveBeenCalledWith('File size exceeds 256 KB limit.');
+      expect(announcePolitely).not.toHaveBeenCalled();
     });
   });
 
@@ -280,7 +280,7 @@ END:VCARD`;
     await vi.waitFor(() => {
       expect(onChange).not.toHaveBeenCalled();
       expect(screen.getByRole('alert')).toHaveTextContent(/invalid vcard file/i);
-      expect(announcePolitely).toHaveBeenCalledWith('Invalid vCard file. Missing BEGIN:VCARD header.');
+      expect(announcePolitely).not.toHaveBeenCalled();
     });
   });
 

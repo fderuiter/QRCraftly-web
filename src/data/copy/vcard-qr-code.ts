@@ -16,7 +16,7 @@ export const copy: ToolCopy = {
     {
       question: 'Does a vCard QR code work on iPhone and Android?',
       answer:
-        'Yes. The default is vCard 3.0, which the built-in camera apps on iPhone and Android can read and save. You can also pick vCard 4.0, vCard 2.1 or the more compact MECARD format.',
+        'Yes. Default vCard 3.0 is supported by iPhone and Android camera apps. You can also choose vCard 4.0, 2.1 or compact MECARD format.',
     },
     {
       question: 'Why is my vCard QR code so dense?',

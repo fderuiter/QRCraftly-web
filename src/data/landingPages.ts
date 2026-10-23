@@ -87,13 +87,13 @@ export const LANDING_GALLERIES: Readonly<Record<string, readonly LandingGalleryI
   'mosaic-qr-code': [
     {
       src: '/examples/mosaic-halftone.png',
-      alt: 'A QR code tiled from a sunset over a striped sea in halftone mode, with fine detail inside each module',
-      caption: 'Halftone: each module holds a 3 by 3 patch of the picture, so more detail shows.',
+      alt: 'A QR code tiled from a sunset image in halftone mode, with detail inside each module',
+      caption: 'Halftone: each module holds a 3x3 patch, showing more detail.',
     },
     {
       src: '/examples/mosaic-tiles.png',
-      alt: 'A QR code tiled from a sunset over a striped sea in tiles mode, one color per module',
-      caption: 'Tiles: one color per module, which is bolder and scans from further away.',
+      alt: 'A QR code tiled from a sunset image in tiles mode, one color per module',
+      caption: 'Tiles: one color per module, bold and scans from further away.',
     },
   ],
 };

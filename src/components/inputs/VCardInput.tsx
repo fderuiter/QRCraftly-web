@@ -47,9 +47,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
 
   const processFile = async (file: File) => {
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      const msg = "File size exceeds 256 KB limit.";
-      setFileError(msg);
-      announcePolitely(msg);
+      setFileError("File size exceeds 256 KB limit.");
       return;
     }
 
@@ -75,9 +73,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
     const hasMECard = /^mecard:/i.test(trimmed);
 
     if (!hasVCard && !hasMECard) {
-      const msg = "Invalid vCard file. Missing BEGIN:VCARD header.";
-      setFileError(msg);
-      announcePolitely(msg);
+      setFileError("Invalid vCard file. Missing BEGIN:VCARD header.");
       return;
     }
 
@@ -105,9 +101,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
       onChange(updates);
       announcePolitely("vCard contact details imported");
     } else {
-      const msg = "No contact details found in vCard file.";
-      setFileError(msg);
-      announcePolitely(msg);
+      setFileError("No contact details found in vCard file.");
     }
   };
 
@@ -166,7 +160,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           </span>
           <span className="text-sm font-medium">Import .vcf or .vcard file</span>
           <span className="text-xs text-fg-muted">
-            Drag & drop or select a vCard file to auto-populate contact fields
+            Drag & drop or select a vCard file to populate fields
           </span>
         </Button>
         {fileError && (
