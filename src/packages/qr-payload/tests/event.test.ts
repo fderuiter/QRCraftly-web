@@ -146,15 +146,16 @@ describe('Event generator', () => {
 
   it('maintains stable UID for non-recurring events', () => {
     const nonRecurring = {
-      title: 'Legacy Event',
-      startDate: '2025-05-01T09:00',
-      endDate: '2025-05-01T10:00',
-      location: 'Office',
-      description: 'Check UID stability',
+      title: 'Lunch Meeting',
+      startDate: '2025-07-04T12:00:00',
+      endDate: '2025-07-04T13:00:00',
+      location: 'Cafe',
+      description: 'Catch up',
     };
     const str = constructEventString(nonRecurring);
     const uidLine = str.split(/\r?\n/).find((line) => line.startsWith('UID:'));
-    expect(uidLine).toBeDefined();
+    expect(uidLine).toBe('UID:9f2a7f4bed35a9f5@qrcraftly.com');
+
     // Re-constructing same event must yield identical UID
     const strAgain = constructEventString(nonRecurring);
     const uidLineAgain = strAgain.split(/\r?\n/).find((line) => line.startsWith('UID:'));

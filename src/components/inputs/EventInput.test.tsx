@@ -118,4 +118,13 @@ describe('EventInput', () => {
     fireEvent.change(countInput, { target: { value: '1500' } });
     expect(onChange).toHaveBeenCalledWith({ recurrenceCount: 999 });
   });
+
+  it('validates frequency against allowed list and clears when switching to invalid value', () => {
+    const onChange = vi.fn();
+    render(<EventInput data={{ ...event, recurrenceFreq: 'DAILY', recurrenceCount: 5 }} onChange={onChange} />);
+
+    const repeatSelect = screen.getByLabelText('Repeat');
+    fireEvent.change(repeatSelect, { target: { value: 'HOURLY' } });
+    expect(onChange).toHaveBeenCalledWith({ recurrenceFreq: undefined, recurrenceCount: undefined });
+  });
 });

@@ -274,6 +274,7 @@ const buildRRule = (freq?: string, count?: number | string): string[] => {
  * instead of duplicating it.
  */
 const deriveEventUid = (data: EventData): string => {
+  const hasRecurrence = Boolean(data.recurrenceFreq && data.recurrenceFreq !== 'NONE');
   const key = [
     data.title,
     data.startDate,
@@ -281,11 +282,10 @@ const deriveEventUid = (data: EventData): string => {
     data.timezone,
     data.location,
     data.description,
-    ...(data.recurrenceFreq && data.recurrenceFreq !== 'NONE' ? [data.recurrenceFreq] : []),
-    ...(data.recurrenceCount ? [String(data.recurrenceCount)] : []),
     ...(data.allDay ? ['all-day'] : []),
+    ...(hasRecurrence ? [data.recurrenceFreq!, ...(data.recurrenceCount ? [String(data.recurrenceCount)] : [])] : []),
   ]
-    .map((part) => part ?? '')
+    .map((part) => part || '')
     .join('\u001f');
   return `${fnv1a(key, 0x811c9dc5)}${fnv1a(key, 0x01000193)}@qrcraftly.com`;
 };
