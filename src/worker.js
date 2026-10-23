@@ -6,7 +6,7 @@ export default {
    *
    * @param {Request} request
    * @param {{ ASSETS?: { fetch: (req: Request) => Promise<Response> } }} env
-   * @param {object} [ctx]
+   * @param {object} [_ctx]
    * @returns {Promise<Response>}
    */
   async fetch(request, env, _ctx) {

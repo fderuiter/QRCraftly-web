@@ -178,7 +178,7 @@ export default tseslint.config(
     }
   },
   {
-    files: ["public/_worker.js"],
+    files: ["src/worker.js"],
     languageOptions: {
       globals: {
         fetch: "readonly",

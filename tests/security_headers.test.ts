@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import worker from '../public/_worker.js';
+import worker from '../src/worker.js';
 
 const HEADERS_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public/_headers');
 
