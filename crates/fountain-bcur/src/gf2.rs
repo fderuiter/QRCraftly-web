@@ -40,7 +40,7 @@ pub fn solve_gf2(equations: &[GF2Equation], unknowns: &[usize], block_size: usiz
         };
     }
 
-    let words = (width + 31) / 32;
+    let words = width.div_ceil(32);
     let mut position = BTreeMap::new();
     for (i, &col) in unknowns.iter().enumerate() {
         position.insert(col, i);
@@ -80,8 +80,8 @@ pub fn solve_gf2(equations: &[GF2Equation], unknowns: &[usize], block_size: usiz
         let mask = 1u32 << (c % 32);
         let mut pivot = None;
 
-        for r in rank..num_rows {
-            if (rows[r][word] & mask) != 0 {
+        for (r, row) in rows.iter().enumerate().take(num_rows).skip(rank) {
+            if (row[word] & mask) != 0 {
                 pivot = Some(r);
                 break;
             }

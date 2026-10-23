@@ -20,7 +20,7 @@ use crate::sha256;
 use alloc::vec::Vec;
 
 fn rotl(x: u64, k: u32) -> u64 {
-    (x << k) | (x >> (64 - k))
+    x.rotate_left(k)
 }
 
 fn floor(x: f64) -> f64 {
@@ -89,8 +89,8 @@ impl FragmentChooser {
             weights.push(w);
             sum += w;
         }
-        for i in 0..count {
-            weights[i] = (weights[i] * (count as f64)) / sum;
+        for w in weights.iter_mut().take(count) {
+            *w = (*w * (count as f64)) / sum;
         }
 
         let mut small = Vec::new();

@@ -149,7 +149,9 @@ impl BcUrDecoder {
             return BcUrIngestStatus::Rejected;
         }
 
-        if self.chooser.is_none() && (part.seq_len > MAX_BCUR_FRAGMENTS || part.message_len > MAX_RECEIVE_MESSAGE_BYTES) {
+        if self.chooser.is_none()
+            && (part.seq_len > MAX_BCUR_FRAGMENTS || part.message_len > MAX_RECEIVE_MESSAGE_BYTES)
+        {
             return BcUrIngestStatus::Rejected;
         }
 
@@ -189,7 +191,7 @@ impl BcUrDecoder {
                 && part.checksum == self.checksum
                 && part.data.len() == self.fragment_length
         } else {
-            let expected_len = (part.message_len + part.data.len() - 1) / part.data.len();
+            let expected_len = part.message_len.div_ceil(part.data.len());
             part.seq_len == expected_len
         }
     }
@@ -222,16 +224,23 @@ impl BcUrDecoder {
             } else if self.pending.len() < MAX_PENDING_PARTS && !self.is_duplicate(&reduced) {
                 let mut matches = Vec::new();
                 for other in &self.pending {
-                    if reduced.indexes.is_subset(&other.indexes) && reduced.indexes.len() < other.indexes.len() {
+                    if reduced.indexes.is_subset(&other.indexes)
+                        && reduced.indexes.len() < other.indexes.len()
+                    {
                         matches.push(other.indexes.clone());
                     }
                 }
                 for other_indexes in matches {
-                    if let Some(pos) = self.pending.iter().position(|e| e.indexes == other_indexes) {
+                    if let Some(pos) = self.pending.iter().position(|e| e.indexes == other_indexes)
+                    {
                         let other = self.pending.remove(pos);
                         let mut new_data = other.data;
                         xor_into(&mut new_data, &reduced.data);
-                        let new_indexes: BTreeSet<usize> = other.indexes.difference(&reduced.indexes).copied().collect();
+                        let new_indexes: BTreeSet<usize> = other
+                            .indexes
+                            .difference(&reduced.indexes)
+                            .copied()
+                            .collect();
                         queue.push(PendingEq {
                             indexes: new_indexes,
                             data: new_data,
@@ -263,7 +272,9 @@ impl BcUrDecoder {
         while changed && part.indexes.len() > 1 {
             changed = false;
             for other in &self.pending {
-                if other.indexes.is_subset(&part.indexes) && other.indexes.len() < part.indexes.len() {
+                if other.indexes.is_subset(&part.indexes)
+                    && other.indexes.len() < part.indexes.len()
+                {
                     xor_into(&mut part.data, &other.data);
                     for idx in &other.indexes {
                         part.indexes.remove(idx);
@@ -385,7 +396,10 @@ pub fn parse_ur(text: &str) -> Option<ParsedUr> {
 }
 
 fn is_type_valid(type_str: &str) -> bool {
-    !type_str.is_empty() && type_str.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    !type_str.is_empty()
+        && type_str
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 fn is_body_valid(body_str: &str) -> bool {

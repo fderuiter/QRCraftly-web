@@ -91,7 +91,7 @@ pub fn encode_bytewords_minimal(bytes: &[u8]) -> Vec<u8> {
 }
 
 pub fn decode_bytewords_minimal(text: &[u8]) -> Option<Vec<u8>> {
-    if text.len() % 2 != 0 || text.len() < 10 {
+    if !text.len().is_multiple_of(2) || text.len() < 10 {
         return None;
     }
 
@@ -102,10 +102,8 @@ pub fn decode_bytewords_minimal(text: &[u8]) -> Option<Vec<u8>> {
         let c1 = text[i * 2].to_ascii_lowercase();
         let c2 = text[i * 2 + 1].to_ascii_lowercase();
         let code = ((c1 as u16) << 8) | (c2 as u16);
-        match lookup_minimal_pair(code) {
-            Some(b) => decoded.push(b),
-            None => return None,
-        }
+        let b = lookup_minimal_pair(code)?;
+        decoded.push(b);
     }
 
     let payload_len = decoded.len() - 4;

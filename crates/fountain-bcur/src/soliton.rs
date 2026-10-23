@@ -43,11 +43,11 @@ pub fn ln(x: f64) -> f64 {
     }
     let mut k = 0i32;
     let mut m = x;
-    while m > 1.4142135623730951 {
+    while m > core::f64::consts::SQRT_2 {
         m /= 2.0;
         k += 1;
     }
-    while m < 0.7071067811865476 {
+    while m < core::f64::consts::FRAC_1_SQRT_2 {
         m *= 2.0;
         k -= 1;
     }
@@ -63,7 +63,7 @@ pub fn ln(x: f64) -> f64 {
         i += 2.0;
     }
     let ln_m = 2.0 * p;
-    ln_m + (k as f64) * 0.6931471805599453
+    ln_m + (k as f64) * core::f64::consts::LN_2
 }
 
 pub fn sqrt(x: f64) -> f64 {
@@ -98,8 +98,8 @@ pub fn build_robust_soliton_cdf(k: usize, c: f64, delta: f64) -> Vec<f64> {
 
     let mut rho = alloc::vec![0.0f64; k + 1];
     rho[1] = 1.0 / (k as f64);
-    for d in 2..=k {
-        rho[d] = 1.0 / ((d * (d - 1)) as f64);
+    for (d, val) in rho.iter_mut().enumerate().take(k + 1).skip(2) {
+        *val = 1.0 / ((d * (d - 1)) as f64);
     }
 
     let mut tau = alloc::vec![0.0f64; k + 1];
@@ -107,9 +107,9 @@ pub fn build_robust_soliton_cdf(k: usize, c: f64, delta: f64) -> Vec<f64> {
     let pivot = floor(k as f64 / capital_r) as usize;
     let pivot = pivot.clamp(1, k);
 
-    for d in 1..pivot {
+    for (d, val) in tau.iter_mut().enumerate().take(pivot).skip(1) {
         if d <= k {
-            tau[d] = capital_r / ((d * k) as f64);
+            *val = capital_r / ((d * k) as f64);
         }
     }
     if pivot <= k {

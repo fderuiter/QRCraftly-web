@@ -47,9 +47,7 @@ use bytewords::{decode_bytewords_minimal, encode_bytewords_minimal};
 use cbor::{cbor_decode, cbor_encode, CborValue};
 use fountain_decoder::FountainDecoder;
 use gf2::{solve_gf2, GF2Equation};
-use qrcraftly_core::abi::{
-    STATUS_BAD_INPUT, STATUS_BUFFER_TOO_SMALL, STATUS_OK,
-};
+use qrcraftly_core::abi::{STATUS_BAD_INPUT, STATUS_BUFFER_TOO_SMALL, STATUS_OK};
 
 pub struct GF2Solver {
     block_size: usize,
@@ -70,6 +68,11 @@ pub extern "C" fn fountain_gf2_solver_new(block_size: usize) -> *mut GF2Solver {
     }))
 }
 
+/// Adds an equation to the GF(2) solver.
+///
+/// # Safety
+/// Pointers `solver`, `indices_ptr` (if `indices_len` > 0), and `data_ptr` (if `data_len` > 0)
+/// must be valid, aligned, and non-dangling if non-null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_gf2_solver_add_eq(
     solver: *mut GF2Solver,
@@ -91,6 +94,10 @@ pub unsafe extern "C" fn fountain_gf2_solver_add_eq(
     });
 }
 
+/// Solves the linear system using Gauss-Jordan elimination over GF(2).
+///
+/// # Safety
+/// `solver` and `unknowns_ptr` must be valid pointers if non-null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_gf2_solver_solve(
     solver: *mut GF2Solver,
@@ -116,6 +123,10 @@ pub unsafe extern "C" fn fountain_gf2_solver_solve(
     sol.rank as u32
 }
 
+/// Returns the number of solved keys.
+///
+/// # Safety
+/// `solver` must be a valid pointer from `fountain_gf2_solver_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_gf2_solver_solved_count(solver: *const GF2Solver) -> usize {
     if solver.is_null() {
@@ -125,6 +136,10 @@ pub unsafe extern "C" fn fountain_gf2_solver_solved_count(solver: *const GF2Solv
     }
 }
 
+/// Returns the key at the given solved index.
+///
+/// # Safety
+/// `solver` must be a valid pointer from `fountain_gf2_solver_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_gf2_solver_get_solved_key(
     solver: *const GF2Solver,
@@ -138,6 +153,10 @@ pub unsafe extern "C" fn fountain_gf2_solver_get_solved_key(
     }
 }
 
+/// Returns a pointer to the solved payload data at the given index.
+///
+/// # Safety
+/// `solver` must be a valid pointer from `fountain_gf2_solver_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_gf2_solver_get_solved_data(
     solver: *const GF2Solver,
@@ -154,6 +173,10 @@ pub unsafe extern "C" fn fountain_gf2_solver_get_solved_data(
     }
 }
 
+/// Returns the number of residual equations.
+///
+/// # Safety
+/// `solver` must be a valid pointer from `fountain_gf2_solver_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_gf2_solver_residual_count(solver: *const GF2Solver) -> usize {
     if solver.is_null() {
@@ -163,6 +186,10 @@ pub unsafe extern "C" fn fountain_gf2_solver_residual_count(solver: *const GF2So
     }
 }
 
+/// Returns a pointer to residual column indices at the given index.
+///
+/// # Safety
+/// `solver` must be a valid pointer from `fountain_gf2_solver_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_gf2_solver_get_residual_cols_ptr(
     solver: *const GF2Solver,
@@ -179,6 +206,10 @@ pub unsafe extern "C" fn fountain_gf2_solver_get_residual_cols_ptr(
     }
 }
 
+/// Returns the length of residual column indices at the given index.
+///
+/// # Safety
+/// `solver` must be a valid pointer from `fountain_gf2_solver_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_gf2_solver_get_residual_cols_len(
     solver: *const GF2Solver,
@@ -195,6 +226,10 @@ pub unsafe extern "C" fn fountain_gf2_solver_get_residual_cols_len(
     }
 }
 
+/// Returns a pointer to the residual data payload at the given index.
+///
+/// # Safety
+/// `solver` must be a valid pointer from `fountain_gf2_solver_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_gf2_solver_get_residual_data(
     solver: *const GF2Solver,
@@ -211,6 +246,10 @@ pub unsafe extern "C" fn fountain_gf2_solver_get_residual_data(
     }
 }
 
+/// Frees the GF(2) solver.
+///
+/// # Safety
+/// `solver` must be a valid pointer created by `fountain_gf2_solver_new` and not previously freed.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_gf2_solver_free(solver: *mut GF2Solver) {
     if !solver.is_null() {
@@ -241,6 +280,10 @@ pub extern "C" fn fountain_decoder_new(
     }))
 }
 
+/// Ingests a single droplet into the fountain decoder.
+///
+/// # Safety
+/// `wrapper` and `data_ptr` must be valid non-null pointers.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_decoder_ingest_droplet(
     wrapper: *mut FountainDecoderWrapper,
@@ -260,6 +303,10 @@ pub unsafe extern "C" fn fountain_decoder_ingest_droplet(
     }
 }
 
+/// Ingests an equation into the fountain decoder.
+///
+/// # Safety
+/// `wrapper`, `indices_ptr`, and `data_ptr` must be valid non-null pointers.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_decoder_ingest_equation(
     wrapper: *mut FountainDecoderWrapper,
@@ -283,10 +330,12 @@ pub unsafe extern "C" fn fountain_decoder_ingest_equation(
     }
 }
 
+/// Returns current decoding progress as the count of solved blocks.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `fountain_decoder_new` or null.
 #[no_mangle]
-pub unsafe extern "C" fn fountain_decoder_progress(
-    wrapper: *const FountainDecoderWrapper,
-) -> u32 {
+pub unsafe extern "C" fn fountain_decoder_progress(wrapper: *const FountainDecoderWrapper) -> u32 {
     if wrapper.is_null() {
         0
     } else {
@@ -294,6 +343,10 @@ pub unsafe extern "C" fn fountain_decoder_progress(
     }
 }
 
+/// Returns current decoder rank.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `fountain_decoder_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_decoder_rank(wrapper: *const FountainDecoderWrapper) -> u32 {
     if wrapper.is_null() {
@@ -303,6 +356,10 @@ pub unsafe extern "C" fn fountain_decoder_rank(wrapper: *const FountainDecoderWr
     }
 }
 
+/// Checks if decoding is complete.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `fountain_decoder_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_decoder_is_complete(
     wrapper: *const FountainDecoderWrapper,
@@ -316,6 +373,10 @@ pub unsafe extern "C" fn fountain_decoder_is_complete(
     }
 }
 
+/// Finalizes decoding and returns a pointer to the reconstructed message buffer.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `fountain_decoder_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_decoder_finalize(
     wrapper: *mut FountainDecoderWrapper,
@@ -333,6 +394,10 @@ pub unsafe extern "C" fn fountain_decoder_finalize(
     }
 }
 
+/// Returns the byte length of the finalized message buffer.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `fountain_decoder_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_decoder_finalize_len(
     wrapper: *const FountainDecoderWrapper,
@@ -344,6 +409,10 @@ pub unsafe extern "C" fn fountain_decoder_finalize_len(
     }
 }
 
+/// Resets the fountain decoder state.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `fountain_decoder_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_decoder_reset(wrapper: *mut FountainDecoderWrapper) {
     if !wrapper.is_null() {
@@ -353,6 +422,10 @@ pub unsafe extern "C" fn fountain_decoder_reset(wrapper: *mut FountainDecoderWra
     }
 }
 
+/// Frees the fountain decoder wrapper.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `fountain_decoder_new` and not previously freed.
 #[no_mangle]
 pub unsafe extern "C" fn fountain_decoder_free(wrapper: *mut FountainDecoderWrapper) {
     if !wrapper.is_null() {
@@ -360,6 +433,10 @@ pub unsafe extern "C" fn fountain_decoder_free(wrapper: *mut FountainDecoderWrap
     }
 }
 
+/// Encodes bytes into minimal pair Bytewords.
+///
+/// # Safety
+/// `in_ptr`, `out_ptr`, and `out_written` must be valid non-null pointers.
 #[no_mangle]
 pub unsafe extern "C" fn bytewords_encode_minimal_c(
     in_ptr: *const u8,
@@ -382,6 +459,10 @@ pub unsafe extern "C" fn bytewords_encode_minimal_c(
     STATUS_OK
 }
 
+/// Decodes minimal pair Bytewords into bytes.
+///
+/// # Safety
+/// `in_ptr`, `out_ptr`, and `out_written` must be valid non-null pointers.
 #[no_mangle]
 pub unsafe extern "C" fn bytewords_decode_minimal_c(
     in_ptr: *const u8,
@@ -407,6 +488,10 @@ pub unsafe extern "C" fn bytewords_decode_minimal_c(
     STATUS_OK
 }
 
+/// Encodes bytes as a CBOR byte string value.
+///
+/// # Safety
+/// `in_ptr`, `out_ptr`, and `out_written` must be valid non-null pointers.
 #[no_mangle]
 pub unsafe extern "C" fn cbor_encode_bytes_c(
     in_ptr: *const u8,
@@ -429,6 +514,10 @@ pub unsafe extern "C" fn cbor_encode_bytes_c(
     STATUS_OK
 }
 
+/// Decodes CBOR byte string bytes into raw bytes.
+///
+/// # Safety
+/// `in_ptr`, `out_ptr`, and `out_written` must be valid non-null pointers.
 #[no_mangle]
 pub unsafe extern "C" fn cbor_decode_bytes_c(
     in_ptr: *const u8,
@@ -473,6 +562,10 @@ pub extern "C" fn bcur_decoder_new() -> *mut BcUrDecoderWrapper {
     }))
 }
 
+/// Ingests a BC-UR string frame into the BC-UR decoder.
+///
+/// # Safety
+/// `wrapper` and `str_ptr` must be valid non-null pointers.
 #[no_mangle]
 pub unsafe extern "C" fn bcur_decoder_ingest_str(
     wrapper: *mut BcUrDecoderWrapper,
@@ -501,6 +594,10 @@ pub unsafe extern "C" fn bcur_decoder_ingest_str(
     }
 }
 
+/// Returns BC-UR stream decoder progress as a ratio from 0.0 to 1.0.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `bcur_decoder_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn bcur_decoder_progress(wrapper: *const BcUrDecoderWrapper) -> f64 {
     if wrapper.is_null() {
@@ -510,10 +607,12 @@ pub unsafe extern "C" fn bcur_decoder_progress(wrapper: *const BcUrDecoderWrappe
     }
 }
 
+/// Returns the number of received BC-UR frame parts.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `bcur_decoder_new` or null.
 #[no_mangle]
-pub unsafe extern "C" fn bcur_decoder_received_count(
-    wrapper: *const BcUrDecoderWrapper,
-) -> u32 {
+pub unsafe extern "C" fn bcur_decoder_received_count(wrapper: *const BcUrDecoderWrapper) -> u32 {
     if wrapper.is_null() {
         0
     } else {
@@ -521,6 +620,10 @@ pub unsafe extern "C" fn bcur_decoder_received_count(
     }
 }
 
+/// Returns expected total sequence length for multipart BC-UR transfers.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `bcur_decoder_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn bcur_decoder_seq_len(wrapper: *const BcUrDecoderWrapper) -> u32 {
     if wrapper.is_null() {
@@ -530,10 +633,12 @@ pub unsafe extern "C" fn bcur_decoder_seq_len(wrapper: *const BcUrDecoderWrapper
     }
 }
 
+/// Returns a pointer to the decoded BC-UR result payload buffer.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `bcur_decoder_new` or null.
 #[no_mangle]
-pub unsafe extern "C" fn bcur_decoder_result_ptr(
-    wrapper: *const BcUrDecoderWrapper,
-) -> *const u8 {
+pub unsafe extern "C" fn bcur_decoder_result_ptr(wrapper: *const BcUrDecoderWrapper) -> *const u8 {
     if wrapper.is_null() {
         core::ptr::null()
     } else {
@@ -541,10 +646,12 @@ pub unsafe extern "C" fn bcur_decoder_result_ptr(
     }
 }
 
+/// Returns byte length of the decoded BC-UR result payload.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `bcur_decoder_new` or null.
 #[no_mangle]
-pub unsafe extern "C" fn bcur_decoder_result_len(
-    wrapper: *const BcUrDecoderWrapper,
-) -> usize {
+pub unsafe extern "C" fn bcur_decoder_result_len(wrapper: *const BcUrDecoderWrapper) -> usize {
     if wrapper.is_null() {
         0
     } else {
@@ -552,10 +659,12 @@ pub unsafe extern "C" fn bcur_decoder_result_len(
     }
 }
 
+/// Returns the content kind discriminator of the decoded BC-UR payload.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `bcur_decoder_new` or null.
 #[no_mangle]
-pub unsafe extern "C" fn bcur_decoder_result_kind(
-    wrapper: *const BcUrDecoderWrapper,
-) -> u32 {
+pub unsafe extern "C" fn bcur_decoder_result_kind(wrapper: *const BcUrDecoderWrapper) -> u32 {
     if wrapper.is_null() {
         2 // Cbor
     } else {
@@ -567,10 +676,12 @@ pub unsafe extern "C" fn bcur_decoder_result_kind(
     }
 }
 
+/// Returns a pointer to the UR type string buffer.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `bcur_decoder_new` or null.
 #[no_mangle]
-pub unsafe extern "C" fn bcur_decoder_ur_type_ptr(
-    wrapper: *const BcUrDecoderWrapper,
-) -> *const u8 {
+pub unsafe extern "C" fn bcur_decoder_ur_type_ptr(wrapper: *const BcUrDecoderWrapper) -> *const u8 {
     if wrapper.is_null() {
         core::ptr::null()
     } else {
@@ -578,10 +689,12 @@ pub unsafe extern "C" fn bcur_decoder_ur_type_ptr(
     }
 }
 
+/// Returns the byte length of the UR type string.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `bcur_decoder_new` or null.
 #[no_mangle]
-pub unsafe extern "C" fn bcur_decoder_ur_type_len(
-    wrapper: *const BcUrDecoderWrapper,
-) -> usize {
+pub unsafe extern "C" fn bcur_decoder_ur_type_len(wrapper: *const BcUrDecoderWrapper) -> usize {
     if wrapper.is_null() {
         0
     } else {
@@ -589,6 +702,10 @@ pub unsafe extern "C" fn bcur_decoder_ur_type_len(
     }
 }
 
+/// Resets the BC-UR decoder state.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `bcur_decoder_new` or null.
 #[no_mangle]
 pub unsafe extern "C" fn bcur_decoder_reset(wrapper: *mut BcUrDecoderWrapper) {
     if !wrapper.is_null() {
@@ -599,6 +716,10 @@ pub unsafe extern "C" fn bcur_decoder_reset(wrapper: *mut BcUrDecoderWrapper) {
     }
 }
 
+/// Frees the BC-UR decoder wrapper.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `bcur_decoder_new` and not previously freed.
 #[no_mangle]
 pub unsafe extern "C" fn bcur_decoder_free(wrapper: *mut BcUrDecoderWrapper) {
     if !wrapper.is_null() {
@@ -615,8 +736,8 @@ mod tests {
         let k = 4;
         let block_size = 8;
         let mut source = alloc::vec![0u8; k * block_size];
-        for i in 0..source.len() {
-            source[i] = (i + 1) as u8;
+        for (i, byte) in source.iter_mut().enumerate() {
+            *byte = (i + 1) as u8;
         }
 
         let checksum = qrcraftly_core::crc32::checksum(&source);

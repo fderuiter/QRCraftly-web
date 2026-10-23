@@ -70,11 +70,7 @@ impl FountainDecoder {
     }
 
     pub fn progress(&self) -> u32 {
-        if self.k == 0 {
-            0
-        } else {
-            ((self.solved_count * 100) / self.k) as u32
-        }
+        (self.solved_count * 100).checked_div(self.k).unwrap_or(0) as u32
     }
 
     pub fn rank(&self) -> usize {
@@ -159,8 +155,8 @@ impl FountainDecoder {
                     still_pending.push(eq);
                     continue;
                 }
-                for b in 0..self.block_size {
-                    eq.data[b] ^= block_data[b];
+                for (b, val) in eq.data.iter_mut().enumerate().take(self.block_size) {
+                    *val ^= block_data[b];
                 }
                 eq.neighbors.remove(&index);
                 if eq.neighbors.len() == 1 {
@@ -181,7 +177,7 @@ impl FountainDecoder {
             return;
         }
 
-        let threshold = 1.max((unknown_count + 15) / 16);
+        let threshold = 1.max(unknown_count.div_ceil(16));
         if self.equations_since_elimination < threshold {
             return;
         }
