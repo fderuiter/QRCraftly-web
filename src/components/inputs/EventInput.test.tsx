@@ -62,4 +62,33 @@ describe('EventInput', () => {
     expect(screen.getByText(/sends the event's title, times, location and description to Google/)).toBeInTheDocument();
     expect(screen.getByLabelText('Target Calendar')).toHaveAttribute('aria-describedby', expect.stringContaining('event-provider-hints'));
   });
+
+  it('renders recurrence frequency and conditional occurrence count controls', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<EventInput data={event} onChange={onChange} />);
+
+    // Frequency field should exist and default to "Does not repeat" (NONE)
+    const repeatSelect = screen.getByLabelText('Repeat');
+    expect(repeatSelect).toHaveValue('NONE');
+    expect(screen.queryByLabelText('Occurrence Count')).not.toBeInTheDocument();
+
+    // Select WEEKLY frequency
+    fireEvent.change(repeatSelect, { target: { value: 'WEEKLY' } });
+    expect(onChange).toHaveBeenCalledWith({ recurrenceFreq: 'WEEKLY' });
+
+    // Rerender with recurrenceFreq = WEEKLY
+    rerender(<EventInput data={{ ...event, recurrenceFreq: 'WEEKLY' }} onChange={onChange} />);
+
+    // Conditional occurrence count field should now appear
+    const countInput = screen.getByLabelText('Occurrence Count');
+    expect(countInput).toBeInTheDocument();
+
+    // Type occurrence count
+    fireEvent.change(countInput, { target: { value: '5' } });
+    expect(onChange).toHaveBeenCalledWith({ recurrenceCount: 5 });
+
+    // Switch frequency back to NONE -> clears count
+    fireEvent.change(repeatSelect, { target: { value: 'NONE' } });
+    expect(onChange).toHaveBeenCalledWith({ recurrenceFreq: 'NONE', recurrenceCount: undefined });
+  });
 });

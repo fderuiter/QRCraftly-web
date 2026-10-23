@@ -171,6 +171,23 @@ export const hydrateEventData = (raw: string): EventData => {
       case 'DESCRIPTION':
         result.description = unescapeVCardEvent(value);
         break;
+      case 'RRULE': {
+        const freqMatch = value.match(/FREQ=([A-Za-z]+)/i);
+        if (freqMatch) {
+          const freq = freqMatch[1].toUpperCase();
+          if (freq === 'DAILY' || freq === 'WEEKLY' || freq === 'MONTHLY' || freq === 'YEARLY') {
+            result.recurrenceFreq = freq;
+          }
+        }
+        const countMatch = value.match(/COUNT=(\d+)/i);
+        if (countMatch) {
+          const count = parseInt(countMatch[1], 10);
+          if (!isNaN(count) && count > 0) {
+            result.recurrenceCount = count;
+          }
+        }
+        break;
+      }
     }
   });
 
@@ -231,14 +248,47 @@ const fnv1a = (input: string, seed: number): string => {
   return hash.toString(16).padStart(8, '0');
 };
 
+const VALID_RRULE_FREQS = new Set(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY']);
+
+/**
+ * Constructs an RFC 5545 RRULE property string array if frequency is active.
+ */
+const buildRRule = (freq?: string, count?: number | string): string[] => {
+  if (!freq) return [];
+  const normalizedFreq = freq.toUpperCase();
+  if (!VALID_RRULE_FREQS.has(normalizedFreq)) return [];
+
+  let rule = `RRULE:FREQ=${normalizedFreq}`;
+  const countNum =
+    typeof count === 'number'
+      ? count
+      : typeof count === 'string' && count.trim() !== ''
+        ? Number(count)
+        : NaN;
+  if (Number.isInteger(countNum) && countNum > 0) {
+    rule += `;COUNT=${countNum}`;
+  }
+  return [rule];
+};
+
 /**
  * Builds a stable RFC 5545 UID from the event content, without any network or random source.
  * The same event always gets the same UID, so re-scanning updates the calendar entry
  * instead of duplicating it.
  */
 const deriveEventUid = (data: EventData): string => {
-  const key = [data.title, data.startDate, data.endDate, data.timezone, data.location, data.description, ...(data.allDay ? ['all-day'] : [])]
-    .map((part) => part || '')
+  const key = [
+    data.title,
+    data.startDate,
+    data.endDate,
+    data.timezone,
+    data.location,
+    data.description,
+    data.recurrenceFreq,
+    data.recurrenceCount,
+    ...(data.allDay ? ['all-day'] : []),
+  ]
+    .map((part) => part ?? '')
     .join('\u001f');
   return `${fnv1a(key, 0x811c9dc5)}${fnv1a(key, 0x01000193)}@qrcraftly.com`;
 };
@@ -365,6 +415,7 @@ const buildCalendar = (
     `DTSTAMP:${resolveStamp(options.now)}`,
     ...optional('SUMMARY', escapeVCardEvent(data.title)),
     ...dates,
+    ...buildRRule(data.recurrenceFreq, data.recurrenceCount),
     ...optional('LOCATION', escapeVCardEvent(data.location)),
     ...optional('DESCRIPTION', escapeVCardEvent(data.description)),
     'END:VEVENT',

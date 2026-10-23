@@ -115,6 +115,49 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
         <option value="Australia/Sydney">Sydney (Australia/Sydney)</option>
       </SelectField>
       )}
+      <SelectField
+        id="event-recurrence-freq"
+        label="Repeat"
+        value={data.recurrenceFreq || "NONE"}
+        onChange={(e) => {
+          const val = e.target.value;
+          if (
+            val === "NONE" ||
+            val === "DAILY" ||
+            val === "WEEKLY" ||
+            val === "MONTHLY" ||
+            val === "YEARLY"
+          ) {
+            onChange({
+              recurrenceFreq: val,
+              ...(val === "NONE" ? { recurrenceCount: undefined } : {}),
+            });
+          }
+        }}
+      >
+        <option value="NONE">Does not repeat</option>
+        <option value="DAILY">Daily</option>
+        <option value="WEEKLY">Weekly</option>
+        <option value="MONTHLY">Monthly</option>
+        <option value="YEARLY">Yearly</option>
+      </SelectField>
+      {data.recurrenceFreq && data.recurrenceFreq !== "NONE" && (
+        <TextField
+          id="event-recurrence-count"
+          label="Occurrence Count"
+          type="number"
+          min={1}
+          placeholder="e.g. 5 (leave blank for indefinite)"
+          value={data.recurrenceCount ?? ""}
+          onChange={(e) => {
+            const val = e.target.value;
+            const count = parseInt(val, 10);
+            onChange({
+              recurrenceCount: val === "" || isNaN(count) || count <= 0 ? undefined : count,
+            });
+          }}
+        />
+      )}
       <TextField
         id="event-location"
         label="Location"
