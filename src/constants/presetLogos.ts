@@ -203,26 +203,3 @@ export const TYPE_TO_PRESET_LOGO: Record<QRType, string | null> = {
   [QRType.BULK_CSV]: null,
 };
 
-let isUserLogoOverridden = false;
-
-/**
- * Marks that the user has explicitly set or removed the logo.
- */
-export function setUserLogoOverride(): void {
-  isUserLogoOverridden = true;
-}
-
-/**
- * Returns whether the logo has been explicitly overridden by the user.
- */
-export function isLogoOverridden(): boolean {
-  return isUserLogoOverridden;
-}
-
-/**
- * Resets the user logo override status (used during test teardowns and state clears).
- */
-export function resetUserLogoOverride(): void {
-  isUserLogoOverridden = false;
-}
-

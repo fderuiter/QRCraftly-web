@@ -1,7 +1,8 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { useInputLogic, clearRetainedInputStates } from "./useInputLogic";
-import { TYPE_TO_PRESET_LOGO, setUserLogoOverride } from "../../constants/presetLogos";
+import { TYPE_TO_PRESET_LOGO } from "../../constants/presetLogos";
+import { QRProvider, useQRStore } from "../../context/QRContext";
 import {
   type QRConfig,
   QRType,
@@ -607,13 +608,36 @@ describe("useInputLogic automatic preset logo placement", () => {
     vi.useRealTimers();
   });
 
-  it("automatically assigns matching preset logo and sets errorCorrectionLevel to H on QRType switch when no custom logo exists", () => {
+  it("does not auto-place preset logo when no store is present", () => {
     const onChange = vi.fn();
     const initialConfig = createMockConfig(QRType.URL, "https://example.com");
 
     const { rerender } = renderHook(
       ({ cfg }) => useInputLogic(cfg, onChange),
       { initialProps: { cfg: initialConfig } }
+    );
+
+    // Switch type to PHONE without a store
+    const phoneConfig = createMockConfig(QRType.PHONE, "");
+    phoneConfig.logoUrl = TYPE_TO_PRESET_LOGO[QRType.URL];
+    rerender({ cfg: phoneConfig });
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("automatically assigns matching preset logo and sets errorCorrectionLevel to H on QRType switch when store exists and logo is not overridden", () => {
+    const initialConfig = createMockConfig(QRType.URL, "https://example.com");
+
+    const { result, rerender } = renderHook(
+      ({ cfg }) => {
+        const store = useQRStore();
+        useInputLogic(cfg, vi.fn());
+        return store;
+      },
+      {
+        wrapper: ({ children }: { children: React.ReactNode }) => <QRProvider>{children}</QRProvider>,
+        initialProps: { cfg: initialConfig },
+      }
     );
 
     // Switch type to PHONE
@@ -621,22 +645,23 @@ describe("useInputLogic automatic preset logo placement", () => {
     phoneConfig.logoUrl = TYPE_TO_PRESET_LOGO[QRType.URL];
     rerender({ cfg: phoneConfig });
 
-    expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        logoUrl: TYPE_TO_PRESET_LOGO[QRType.PHONE],
-        errorCorrectionLevel: QRErrorCorrectionLevel.H,
-      })
-    );
+    expect(result.current.getState().config.logoUrl).toBe(TYPE_TO_PRESET_LOGO[QRType.PHONE]);
+    expect(result.current.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.H);
   });
 
   it("clears logoUrl when switching to a QRType without a mapped preset logo", () => {
-    const onChange = vi.fn();
     const initialConfig = createMockConfig(QRType.PHONE, "1234567890");
-    initialConfig.logoUrl = TYPE_TO_PRESET_LOGO[QRType.PHONE];
 
-    const { rerender } = renderHook(
-      ({ cfg }) => useInputLogic(cfg, onChange),
-      { initialProps: { cfg: initialConfig } }
+    const { result, rerender } = renderHook(
+      ({ cfg }) => {
+        const store = useQRStore();
+        useInputLogic(cfg, vi.fn());
+        return store;
+      },
+      {
+        wrapper: ({ children }: { children: React.ReactNode }) => <QRProvider>{children}</QRProvider>,
+        initialProps: { cfg: initialConfig },
+      }
     );
 
     // Switch type to TEXT (which has null preset logo)
@@ -644,64 +669,37 @@ describe("useInputLogic automatic preset logo placement", () => {
     textConfig.logoUrl = TYPE_TO_PRESET_LOGO[QRType.PHONE];
     rerender({ cfg: textConfig });
 
-    expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        logoUrl: null,
-      })
-    );
+    expect(result.current.getState().config.logoUrl).toBeNull();
   });
 
   it("preserves manual user logo removal across QRType switches", () => {
-    const onChange = vi.fn();
     const initialConfig = createMockConfig(QRType.URL, "https://example.com");
 
-    const { rerender } = renderHook(
-      ({ cfg }) => useInputLogic(cfg, onChange),
-      { initialProps: { cfg: initialConfig } }
+    const { result, rerender } = renderHook(
+      ({ cfg }) => {
+        const store = useQRStore();
+        useInputLogic(cfg, vi.fn());
+        return store;
+      },
+      {
+        wrapper: ({ children }: { children: React.ReactNode }) => <QRProvider>{children}</QRProvider>,
+        initialProps: { cfg: initialConfig },
+      }
     );
 
-    // Simulate user explicitly removing logo via LogoControls
-    setUserLogoOverride();
+    // Explicitly remove logo in store
+    act(() => {
+      result.current.updateConfig({ logoUrl: null });
+    });
+    expect(result.current.getState().isLogoOverridden).toBe(true);
 
     // Switch type to EMAIL
-    onChange.mockClear();
     const emailConfig = createMockConfig(QRType.EMAIL, "");
     emailConfig.logoUrl = null;
     rerender({ cfg: emailConfig });
 
     // Auto preset logo assignment should be skipped because user explicitly opted out
-    expect(onChange).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        logoUrl: TYPE_TO_PRESET_LOGO[QRType.EMAIL],
-      })
-    );
-  });
-
-  it("preserves manual custom logo upload or preset selection across QRType switches", () => {
-    const onChange = vi.fn();
-    const initialConfig = createMockConfig(QRType.URL, "https://example.com");
-
-    const { rerender } = renderHook(
-      ({ cfg }) => useInputLogic(cfg, onChange),
-      { initialProps: { cfg: initialConfig } }
-    );
-
-    // Simulate user explicitly choosing a custom logo
-    const customLogo = "data:image/png;base64,customlogodata";
-    setUserLogoOverride();
-
-    // Switch type to LOCATION
-    onChange.mockClear();
-    const locationConfig = createMockConfig(QRType.LOCATION, "");
-    locationConfig.logoUrl = customLogo;
-    rerender({ cfg: locationConfig });
-
-    // Auto preset logo assignment should NOT overwrite the user's custom logo
-    expect(onChange).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        logoUrl: TYPE_TO_PRESET_LOGO[QRType.LOCATION],
-      })
-    );
+    expect(result.current.getState().config.logoUrl).toBeNull();
   });
 
   it("does not interrupt pending form input typing debounce when logoUrl changes", () => {

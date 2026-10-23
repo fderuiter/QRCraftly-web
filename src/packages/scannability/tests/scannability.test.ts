@@ -290,5 +290,28 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       expect(res.localContrastViolations).toBe(0);
     });
   });
+
+  describe('scannability audit on long payload with logo at level H', () => {
+    it('passes scannability audit when composed with a logo at error correction level H on a long URL', () => {
+      const longUrl = 'https://example.com/very/long/path/with/multiple/query/parameters?utm_source=newsletter&utm_medium=email&utm_campaign=october_promo_2026&user_id=1234567890abcdef&session_token=xyz987654321';
+      const sampleLogo = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCI+PHJlY3Qgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZWQiLz48L3N2Zz4=';
+      const config: QRConfig = {
+        ...getBaseConfig(),
+        type: QRType.URL,
+        value: longUrl,
+        logoUrl: sampleLogo,
+        errorCorrectionLevel: QRErrorCorrectionLevel.H,
+      };
+
+      const health = calculateScannabilityHealth(config);
+      expect(health.score).toBeGreaterThanOrEqual(80);
+      expect(health.criticalWarnings).toHaveLength(0);
+
+      const frame = renderCorpusFrame({ text: longUrl, errorCorrection: 'H' });
+      const assessment = evaluateScannability(qrReader, frame, config);
+      expect(assessment.status).not.toBe('fail');
+      expect(assessment.exportRisk).not.toBe('unsafe');
+    });
+  });
 });
 

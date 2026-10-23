@@ -46,8 +46,9 @@ export type QRState = {
    */
   contentRefused: boolean;
   /**
-   * Whether the logo has been explicitly changed or removed by the user in this generator session.
-   * When false, switching QR types automatically assigns a matching preset logo.
+   * Whether the logo has been explicitly changed or removed by the user in this generator session,
+   * or initialized with a custom logoUrl in initial/retained/preset config. When false, switching
+   * QR types automatically assigns a matching preset logo.
    */
   isLogoOverridden: boolean;
   /** Whether an appearance change can be undone. */
@@ -188,6 +189,7 @@ interface HistoryStep {
   appearance: Partial<QRConfig>;
   isLogoOverridden: boolean;
   userECC: QRErrorCorrectionLevel;
+  isAutoPlacement?: boolean;
 }
 
 function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = false, presetConfig?: Partial<QRConfig>): QRStore {
@@ -254,7 +256,7 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
       const prevLogoUrl = state.config.logoUrl;
       const nextLogoUrl = mergedConfig.logoUrl ?? null;
 
-      if (nextLogoUrl) {
+      if (!prevLogoUrl && nextLogoUrl && updates.errorCorrectionLevel === undefined) {
         mergedConfig.errorCorrectionLevel = QRErrorCorrectionLevel.H;
       } else if (prevLogoUrl && !nextLogoUrl && updates.errorCorrectionLevel === undefined) {
         mergedConfig.errorCorrectionLevel = userErrorCorrectionLevel;
@@ -272,7 +274,15 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
         const now = Date.now();
         const coalesce = lastPush !== null && lastPush.keys === keys && now - lastPush.at < COALESCE_MS && past.length > 0;
         if (!coalesce) {
-          past = [...past.slice(-(MAX_HISTORY_STEPS - 1)), { appearance: before, isLogoOverridden: state.isLogoOverridden, userECC: userErrorCorrectionLevel }];
+          past = [
+            ...past.slice(-(MAX_HISTORY_STEPS - 1)),
+            {
+              appearance: before,
+              isLogoOverridden: state.isLogoOverridden,
+              userECC: userErrorCorrectionLevel,
+              isAutoPlacement: Boolean(options?.isAutoPlacement),
+            },
+          ];
         }
         lastPush = { keys, at: now };
         future = [];
@@ -297,7 +307,8 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
       userErrorCorrectionLevel = step.userECC;
       const sanitized = sanitizeConfig({ ...state.config, ...step.appearance });
       if (retainAppearance) retainedAppearance = pickAppearance(sanitized);
-      setState({ ...state, config: sanitized, isLogoOverridden: step.isLogoOverridden, canUndo: past.length > 0, canRedo: true });
+      const nextLogoOverridden = step.isAutoPlacement ? true : step.isLogoOverridden;
+      setState({ ...state, config: sanitized, isLogoOverridden: nextLogoOverridden, canUndo: past.length > 0, canRedo: true });
       return true;
     },
     redo: () => {

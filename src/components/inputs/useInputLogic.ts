@@ -22,7 +22,7 @@ import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
 import { CONTAINMENT_PROFILES, emailListError, cardFieldsFor, vCardFieldError, paymentRefusal } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
-import { TYPE_TO_PRESET_LOGO, PRESET_LOGOS, isLogoOverridden as isLogoOverriddenModule, resetUserLogoOverride } from "../../constants/presetLogos";
+import { TYPE_TO_PRESET_LOGO, PRESET_LOGOS } from "../../constants/presetLogos";
 import { useOptionalQRStore } from "@/context/QRContext";
 import { useUndoToast } from "@/hooks/useUndoToast";
 import { announcePolitely } from "../../utils/a11y";
@@ -91,7 +91,6 @@ let retainedInputStates: Partial<InputDataMap> = {};
  */
 export function clearRetainedInputStates(): void {
   retainedInputStates = {};
-  resetUserLogoOverride();
 }
 
 /**
@@ -159,25 +158,18 @@ export function useInputLogic(
 
     if (prevType === null || prevType === config.type) return;
 
-    const storeState = store?.getState();
-    const isOverridden = storeState ? storeState.isLogoOverridden : isLogoOverriddenModule();
-    if (isOverridden) return;
+    if (!store) return;
+    const storeState = store.getState();
+    if (storeState.isLogoOverridden) return;
 
     const defaultLogo = TYPE_TO_PRESET_LOGO[config.type] ?? null;
     const currentLogoUrl = config.logoUrl ?? null;
 
     if (currentLogoUrl !== defaultLogo) {
-      if (store) {
-        store.updateConfig(
-          { logoUrl: defaultLogo, ...(defaultLogo ? { errorCorrectionLevel: QRErrorCorrectionLevel.H } : {}) },
-          { isAutoPlacement: true }
-        );
-      } else {
-        onChange({
-          logoUrl: defaultLogo,
-          ...(defaultLogo ? { errorCorrectionLevel: QRErrorCorrectionLevel.H } : {}),
-        });
-      }
+      store.updateConfig(
+        { logoUrl: defaultLogo, ...(defaultLogo ? { errorCorrectionLevel: QRErrorCorrectionLevel.H } : {}) },
+        { isAutoPlacement: true }
+      );
 
       if (defaultLogo) {
         const preset = PRESET_LOGOS.find((p) => p.dataUrl === defaultLogo);

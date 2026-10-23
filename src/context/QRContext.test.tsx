@@ -690,5 +690,34 @@ describe('QRStore appearance history', () => {
       expect(store.getState().isLogoOverridden).toBe(true);
       expect(store.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.H);
     });
+
+    it('allows changing errorCorrectionLevel to L, M, or Q while logo is present without snapping back to H on subsequent updates', () => {
+      const store = setup();
+      store.updateConfig({ logoUrl: 'data:image/svg+xml;base64,logo1' });
+      expect(store.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.H);
+
+      // User changes ECC to M while logo is present
+      store.updateConfig({ errorCorrectionLevel: QRErrorCorrectionLevel.M });
+      expect(store.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.M);
+
+      // User updates another setting while logo is present
+      store.updateConfig({ value: 'https://updated.example.com' });
+      expect(store.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.M);
+    });
+
+    it('sets isLogoOverridden to true when undoing an auto-placement step', () => {
+      const store = setup();
+      expect(store.getState().isLogoOverridden).toBe(false);
+
+      // Auto-placement assigns a logo
+      store.updateConfig({ logoUrl: 'data:image/svg+xml;base64,auto' }, { isAutoPlacement: true });
+      expect(store.getState().isLogoOverridden).toBe(false);
+      expect(store.getState().config.logoUrl).toBe('data:image/svg+xml;base64,auto');
+
+      // User undos auto-placement (e.g. clicking Undo on toast)
+      store.undo();
+      expect(store.getState().config.logoUrl).toBeNull();
+      expect(store.getState().isLogoOverridden).toBe(true);
+    });
   });
 });

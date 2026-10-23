@@ -18,7 +18,6 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { QRErrorCorrectionLevel, QRType } from '@/types';
-import { TYPE_TO_PRESET_LOGO } from '../../../constants/presetLogos';
 import { qrEncoder } from '../../../../tests/fixtures/qrEncoder';
 import { buildMatrix, loadQrEncoder, resolveEncodedValue, type QrEncoder } from '../index';
 
@@ -70,23 +69,5 @@ describe('buildMatrix', () => {
         expect(bare.get(r, c)).toBe(full.get(r, c));
       }
     }
-  });
-
-  it('encodes a long payload with an auto-placed logo at error correction level H and produces a valid matrix', async () => {
-    const encoder = await loadQrEncoder();
-    const longUrl = 'https://example.com/very/long/path/with/multiple/query/parameters?utm_source=newsletter&utm_medium=email&utm_campaign=october_promo_2026&user_id=1234567890abcdef&session_token=xyz987654321';
-
-    const matrix = buildMatrix(
-      {
-        type: QRType.URL,
-        value: longUrl,
-        errorCorrectionLevel: QRErrorCorrectionLevel.H,
-      },
-      encoder
-    );
-
-    expect(matrix).toBeDefined();
-    expect(matrix.size).toBeGreaterThan(21);
-    expect(typeof matrix.get(0, 0)).toBe('boolean');
   });
 });
