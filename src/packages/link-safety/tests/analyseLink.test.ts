@@ -127,4 +127,3 @@ describe('false positives on ordinary addresses', () => {
     expect(cautions(url)).toEqual([]);
   });
 });
-
