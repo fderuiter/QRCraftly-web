@@ -48,16 +48,19 @@ const PROFILE_HOSTS: Record<string, SocialPlatform> = {
 };
 
 /** First path segments that are pages of the site, not someone's handle. */
-const RESERVED_SEGMENTS: Partial<Record<SocialPlatform, ReadonlySet<string>>> = {
-  [SocialPlatform.INSTAGRAM]: new Set(['p', 'reel', 'reels', 'tv', 'stories', 'explore', 'accounts', 'direct']),
-  [SocialPlatform.TWITTER]: new Set(['i', 'intent', 'home', 'search', 'hashtag', 'share', 'explore', 'settings', 'messages', 'notifications', 'compose', 'login']),
-  [SocialPlatform.FACEBOOK]: new Set(['share', 'sharer', 'sharer.php', 'groups', 'events', 'watch', 'photo.php', 'story.php', 'profile.php', 'pages', 'marketplace', 'gaming', 'login']),
-  [SocialPlatform.GITHUB]: new Set(['orgs', 'settings', 'marketplace', 'explore', 'topics', 'sponsors', 'features', 'login', 'about', 'pricing', 'enterprise']),
-  [SocialPlatform.YOUTUBE]: new Set(['watch', 'shorts', 'playlist', 'channel', 'c', 'user', 'feed', 'results', 'premium', 'gaming', 'music', 'upload', 'tv', 'about', 'help', 'terms', 'privacy']),
+const RESERVED_PATTERNS: Partial<Record<SocialPlatform, RegExp>> = {
+  [SocialPlatform.INSTAGRAM]: /^(p|reel|reels|tv|stories|explore|accounts|direct)$/i,
+  [SocialPlatform.TWITTER]: /^(i|intent|home|search|hashtag|share|explore|settings|messages|notifications|compose|login)$/i,
+  [SocialPlatform.FACEBOOK]: /^(share|sharer|sharer\.php|groups|events|watch|photo\.php|story\.php|profile\.php|pages|marketplace|gaming|login)$/i,
+  [SocialPlatform.GITHUB]: /^(orgs|settings|marketplace|explore|topics|sponsors|features|login|about|pricing|enterprise)$/i,
+  [SocialPlatform.YOUTUBE]: /^(watch|shorts|playlist|channel|c|user|feed|results|premium|gaming|music|upload|tv|about|help|terms|privacy)$/i,
 };
 
-const HANDLE_PATTERN = /^[A-Za-z0-9_.-]+$/;
-const YOUTUBE_HANDLE_PATTERN = /^[a-zA-Z0-9_.\-/@?&=%]+$/;
+const HANDLE_PATTERN = /^[\w.-]+$/;
+const YOUTUBE_HANDLE_PATTERN = /^[\w.\-/@?&=%]+$/;
+
+const buildQueryParams = (p: Map<string, string>): string =>
+  Array.from(p, ([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
 
 /**
  * Reads a social profile link that the Social form can rebuild without losing anything. Posts,
@@ -82,9 +85,9 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
   // Non-WhatsApp and non-YouTube profile URLs reject query parameters
   if (platform !== SocialPlatform.WHATSAPP && platform !== SocialPlatform.YOUTUBE && parsed.params.size > 0) return null;
 
-  // One trailing slash is fine; empty segments elsewhere are not.
-  const segments = rest.length > 0 && rest[rest.length - 1] === '' ? rest.slice(0, -1) : rest;
-  if (segments.some((segment) => segment === '')) return null;
+  if (rest[rest.length - 1] === '') rest.pop();
+  if (rest.includes('')) return null;
+  const segments = rest;
 
   let handle: string | undefined;
   let message: string | undefined;
@@ -97,49 +100,19 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
       if (segments.length === 1 && segments[0].startsWith('@')) handle = segments[0].substring(1);
       break;
     case SocialPlatform.YOUTUBE: {
-      const queryString =
-        parsed.params.size > 0
-          ? Array.from(parsed.params.entries())
-              .map(([k, val]) => `${encodeURIComponent(k)}=${encodeURIComponent(val)}`)
-              .join('&')
-          : '';
-      const querySuffix = queryString ? `?${queryString}` : '';
-
-      if (host === 'youtu.be') {
-        if (segments.length === 1) {
-          handle = `youtu.be/${segments[0]}${querySuffix}`;
-        }
-      } else if (segments.length === 1 && segments[0].startsWith('@')) {
-        handle = `${segments[0].substring(1)}${querySuffix}`;
-      } else if (
-        segments.length === 2 &&
-        (segments[0] === 'channel' || segments[0] === 'c' || segments[0] === 'user' || segments[0] === 'shorts')
-      ) {
-        if (segments[0] === 'channel' && !/^UC[A-Za-z0-9_-]{22}$/.test(segments[1])) {
-          return null;
-        }
-        handle = `${segments[0]}/${segments[1]}${querySuffix}`;
-      } else if (segments.length === 1 && segments[0] === 'watch' && parsed.params.has('v')) {
-        const v = parsed.params.get('v');
-        if (v) {
-          const extra = Array.from(parsed.params.entries())
-            .filter(([k]) => k !== 'v')
-            .map(([k, val]) => `${encodeURIComponent(k)}=${encodeURIComponent(val)}`)
-            .join('&');
-          handle = `watch?v=${encodeURIComponent(v)}${extra ? '&' + extra : ''}`;
-        }
-      } else if (segments.length === 1 && segments[0] === 'playlist' && parsed.params.has('list')) {
-        const list = parsed.params.get('list');
-        if (list) {
-          const extra = Array.from(parsed.params.entries())
-            .filter(([k]) => k !== 'list')
-            .map(([k, val]) => `${encodeURIComponent(k)}=${encodeURIComponent(val)}`)
-            .join('&');
-          handle = `playlist?list=${encodeURIComponent(list)}${extra ? '&' + extra : ''}`;
-        }
-      } else if (segments.length === 1 && !RESERVED_SEGMENTS[SocialPlatform.YOUTUBE]?.has(segments[0].toLowerCase())) {
-        handle = `c/${segments[0]}${querySuffix}`;
+      const q = buildQueryParams(parsed.params);
+      const querySuffix = q ? `?${q}` : '';
+      if (segments.length === 1) {
+        const s0 = segments[0];
+        if (host === 'youtu.be') handle = `youtu.be/${s0}`;
+        else if (s0.startsWith('@')) handle = s0.replace(/^@+/, '');
+        else if ((s0 === 'watch' && parsed.params.has('v')) || (s0 === 'playlist' && parsed.params.has('list'))) handle = s0;
+        else if (!RESERVED_PATTERNS[SocialPlatform.YOUTUBE]?.test(s0)) handle = `c/${s0}`;
+      } else if (segments.length === 2) {
+        const [s0, s1] = segments;
+        if (/^(c|user|shorts)$/.test(s0) || (s0 === 'channel' && /^UC[\w-]{22}$/.test(s1))) handle = `${s0}/${s1}`;
       }
+      if (handle) handle += querySuffix;
       break;
     }
     case SocialPlatform.WHATSAPP:
@@ -158,17 +131,12 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
       }
       break;
     default:
-      if (segments.length === 1 && !RESERVED_SEGMENTS[platform]?.has(segments[0].toLowerCase())) {
+      if (segments.length === 1 && !RESERVED_PATTERNS[platform]?.test(segments[0])) {
         handle = segments[0];
       }
   }
 
-  if (!handle) return null;
-  if (platform === SocialPlatform.YOUTUBE) {
-    if (!YOUTUBE_HANDLE_PATTERN.test(handle)) return null;
-  } else {
-    if (!HANDLE_PATTERN.test(handle)) return null;
-  }
+  if (!handle || !(platform === SocialPlatform.YOUTUBE ? YOUTUBE_HANDLE_PATTERN : HANDLE_PATTERN).test(handle)) return null;
 
   return message !== undefined ? { platform, handle, message } : { platform, handle };
 };
