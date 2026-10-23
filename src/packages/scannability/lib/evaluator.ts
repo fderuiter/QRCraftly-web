@@ -217,7 +217,7 @@ let defaultRunCheck: Promise<RunCheck> | null = null;
  * not kept, so a later check retries.
  */
 function loadDefaultRunCheck(): Promise<RunCheck> {
-  defaultRunCheck ??= Promise.all([import('./checker'), import('@/packages/qr-decode'), import('./opticalSimulation')])
+  defaultRunCheck ??= Promise.all([import('./checker'), import('@/packages/qr-decode'), import('./opticalSimKernel')])
     .then(([{ performScannabilityCheck }, { loadQrReader }, { loadOpticalSim }]) =>
       Promise.all([loadQrReader(), loadOpticalSim()]).then(([reader]) => ({ performScannabilityCheck, reader }))
     )

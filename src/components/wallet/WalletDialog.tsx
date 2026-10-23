@@ -77,7 +77,7 @@ const loadScanCheck = () =>
   Promise.all([
     import('@/packages/scannability/checker'),
     import('@/packages/qr-decode').then(({ loadQrReader }) => loadQrReader()),
-    import('@/packages/scannability').then(({ loadOpticalSim }) => loadOpticalSim()),
+    import('@/packages/scannability/kernel').then(({ loadOpticalSim }) => loadOpticalSim()),
   ]).then(
     ([{ performScannabilityCheck }, reader]) => (canvas: HTMLCanvasElement) => {
       const ctx = canvas.getContext('2d');

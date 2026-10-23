@@ -18,7 +18,7 @@
 
 import { assertWorkerRequest, assertWorkerResponse } from './sharedContract';
 import { loadQrReader } from '@/packages/qr-decode';
-import { loadOpticalSim } from './opticalSimulation';
+import { loadOpticalSim } from './opticalSimKernel';
 import { scannabilitySteps, type OpticalScratchBuffers, type PixelFrame } from './checker';
 import { releaseImageHandle } from './imageHandle';
 

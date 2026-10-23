@@ -19,7 +19,8 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { qrEncoder } from '../../../../tests/fixtures/qrEncoder';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
-import { loadOpticalSim, simulatePrintTs, type OpticalSim, type PixelFrame } from '../index';
+import { loadOpticalSim, simulatePrintTs, type OpticalSim } from '../kernel';
+import type { PixelFrame } from '../checker';
 
 function renderFrame(version: number, size: number, ink = 0): PixelFrame {
   const { modules } = qrEncoder.create('QR', { errorCorrectionLevel: 'M', version });

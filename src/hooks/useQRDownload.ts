@@ -96,7 +96,7 @@ const blockedExport = (
 const loadScannabilityCheck = () =>
   Promise.all([
     import('@/packages/scannability/checker'),
-    import('@/packages/scannability').then(({ loadOpticalSim }) => loadOpticalSim()),
+    import('@/packages/scannability/kernel').then(({ loadOpticalSim }) => loadOpticalSim()),
     import('@/packages/qr-decode').then(({ loadQrReader }) => loadQrReader()),
   ]).then(([{ performScannabilityCheck }, _, reader]) => ({ performScannabilityCheck, reader }));
 
