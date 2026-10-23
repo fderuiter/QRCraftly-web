@@ -137,3 +137,62 @@ export const getContrastRatio = (fg: string, bg: string) => {
   const darker = Math.min(l1, l2);
   return (lighter + 0.05) / (darker + 0.05);
 };
+
+export interface CmykColor {
+  c: number;
+  m: number;
+  y: number;
+  k: number;
+}
+
+/**
+ * Converts sRGB color channels (0..1) to CMYK (0..1).
+ * Supports calling with individual r, g, b arguments or an { r, g, b } object.
+ *
+ * @param r - Red channel (0..1) or { r, g, b } object.
+ * @param g - Green channel (0..1) if first arg is number.
+ * @param b - Blue channel (0..1) if first arg is number.
+ * @returns CMYK components scaled 0..1.
+ */
+export function rgbToCmyk(r: number, g: number, b: number): CmykColor;
+export function rgbToCmyk(color: { r: number; g: number; b: number }): CmykColor;
+export function rgbToCmyk(
+  rOrColor: number | { r: number; g: number; b: number },
+  gParam?: number,
+  bParam?: number
+): CmykColor {
+  let r: number;
+  let g: number;
+  let b: number;
+
+  if (typeof rOrColor === 'object' && rOrColor !== null) {
+    r = rOrColor.r;
+    g = rOrColor.g;
+    b = rOrColor.b;
+  } else {
+    r = rOrColor;
+    g = gParam ?? 0;
+    b = bParam ?? 0;
+  }
+
+  r = Math.min(1, Math.max(0, r));
+  g = Math.min(1, Math.max(0, g));
+  b = Math.min(1, Math.max(0, b));
+
+  const k = 1 - Math.max(r, g, b);
+  if (k >= 1) {
+    return { c: 0, m: 0, y: 0, k: 1 };
+  }
+
+  const c = (1 - r - k) / (1 - k);
+  const m = (1 - g - k) / (1 - k);
+  const y = (1 - b - k) / (1 - k);
+
+  return {
+    c: Math.min(1, Math.max(0, c)),
+    m: Math.min(1, Math.max(0, m)),
+    y: Math.min(1, Math.max(0, y)),
+    k: Math.min(1, Math.max(0, k)),
+  };
+}
+
