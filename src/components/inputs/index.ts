@@ -1,5 +1,6 @@
 export * from './EmailInput';
 export * from './EventInput';
+export * from './LazyEventInput';
 export * from '../ui/FormFields';
 export * from './InputRegistry';
 export * from './LocationInput';

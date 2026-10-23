@@ -270,4 +270,59 @@ describe('ColorControls', () => {
       })
     );
   });
+
+  it('triggers onAutoFix in ContrastBanner, computing HSL contrast patch, updating config, and shifting focus', async () => {
+    const handleChange = vi.fn();
+    const lowContrastConfig = {
+      ...DEFAULT_CONFIG,
+      fgColor: '#93c5fd', // Light blue on white
+      bgColor: '#ffffff',
+    };
+
+    render(<ColorControls config={lowContrastConfig} onChange={handleChange} />);
+
+    const fixBtn = screen.getByRole('button', { name: 'Fix contrast' });
+    expect(fixBtn).toBeInTheDocument();
+
+    fireEvent.click(fixBtn);
+
+    await vi.waitFor(() => {
+      expect(handleChange).toHaveBeenCalledTimes(1);
+    });
+    const patch = handleChange.mock.calls[0][0];
+    expect(patch.fgColor).toBeDefined();
+    // Verify that new fgColor has contrast >= 4.5:1 against #ffffff
+    expect(patch.fgColor).not.toBe('#93c5fd');
+
+    // Wait for rAF focus restoration
+    await new Promise((r) => requestAnimationFrame(r));
+    const fgInput = document.getElementById('fg-color');
+    expect(document.activeElement).toBe(fgInput);
+  });
+
+  it('handles contrastAutoFix module load failure gracefully in onAutoFix', async () => {
+    const handleChange = vi.fn();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const lowContrastConfig = {
+      ...DEFAULT_CONFIG,
+      fgColor: '#93c5fd',
+      bgColor: '#ffffff',
+    };
+
+    vi.doMock('../../utils/contrastAutoFix', () => {
+      throw new Error('Chunk load failed');
+    });
+
+    render(<ColorControls config={lowContrastConfig} onChange={handleChange} />);
+
+    const fixBtn = screen.getByRole('button', { name: 'Fix contrast' });
+    fireEvent.click(fixBtn);
+
+    await vi.waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to load contrast auto-fix module:', expect.any(Error));
+    });
+
+    consoleSpy.mockRestore();
+    vi.doUnmock('../../utils/contrastAutoFix');
+  });
 });
