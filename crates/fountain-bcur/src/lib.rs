@@ -43,10 +43,8 @@ pub mod xoshiro;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use bcur_decoder::{BcUrDecoder, BcUrIngestStatus};
-use cbor::{cbor_decode, cbor_encode, CborValue};
 use fountain_decoder::FountainDecoder;
 use gf2::{solve_gf2, GF2Equation};
-use qrcraftly_core::abi::{STATUS_BAD_INPUT, STATUS_BUFFER_TOO_SMALL, STATUS_OK};
 
 pub struct GF2Solver {
     block_size: usize,
@@ -445,65 +443,6 @@ pub unsafe extern "C" fn fountain_decoder_free(wrapper: *mut FountainDecoderWrap
     if !wrapper.is_null() {
         drop(unsafe { Box::from_raw(wrapper) });
     }
-}
-
-/// Encodes bytes as a CBOR byte string value.
-///
-/// # Safety
-/// `in_ptr`, `out_ptr`, and `out_written` must be valid non-null pointers.
-#[no_mangle]
-pub unsafe extern "C" fn cbor_encode_bytes_c(
-    in_ptr: *const u8,
-    in_len: usize,
-    out_ptr: *mut u8,
-    out_cap: usize,
-    out_written: *mut usize,
-) -> i32 {
-    if in_ptr.is_null() || out_ptr.is_null() || out_written.is_null() {
-        return STATUS_BAD_INPUT;
-    }
-    let input = unsafe { core::slice::from_raw_parts(in_ptr, in_len) };
-    let encoded = cbor_encode(&CborValue::Bytes(input.to_vec()));
-    if out_cap < encoded.len() {
-        return STATUS_BUFFER_TOO_SMALL;
-    }
-    let out = unsafe { core::slice::from_raw_parts_mut(out_ptr, encoded.len()) };
-    out.copy_from_slice(&encoded);
-    unsafe { *out_written = encoded.len() };
-    STATUS_OK
-}
-
-/// Decodes CBOR byte string bytes into raw bytes.
-///
-/// # Safety
-/// `in_ptr`, `out_ptr`, and `out_written` must be valid non-null pointers.
-#[no_mangle]
-pub unsafe extern "C" fn cbor_decode_bytes_c(
-    in_ptr: *const u8,
-    in_len: usize,
-    out_ptr: *mut u8,
-    out_cap: usize,
-    out_written: *mut usize,
-) -> i32 {
-    if in_ptr.is_null() || out_ptr.is_null() || out_written.is_null() {
-        return STATUS_BAD_INPUT;
-    }
-    let input = unsafe { core::slice::from_raw_parts(in_ptr, in_len) };
-    let decoded_val = match cbor_decode(input) {
-        Some(v) => v,
-        None => return STATUS_BAD_INPUT,
-    };
-    let bytes = match decoded_val {
-        CborValue::Bytes(b) => b,
-        _ => return STATUS_BAD_INPUT,
-    };
-    if out_cap < bytes.len() {
-        return STATUS_BUFFER_TOO_SMALL;
-    }
-    let out = unsafe { core::slice::from_raw_parts_mut(out_ptr, bytes.len()) };
-    out.copy_from_slice(&bytes);
-    unsafe { *out_written = bytes.len() };
-    STATUS_OK
 }
 
 pub struct BcUrDecoderWrapper {
