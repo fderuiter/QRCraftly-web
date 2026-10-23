@@ -17,8 +17,14 @@
 */
 
 import React, { useState } from 'react';
-import { type PreflightReport, type PreflightRowDetail, formatErrorLogCsv, errorLogFileName } from '@/packages/bulk-csv';
-import { triggerFileDownload } from '@/utils/downloadManager';
+import {
+  type PreflightReport,
+  type PreflightRowDetail,
+  formatErrorLogCsv,
+  errorLogFileName,
+  formatPreflightReportCsv,
+  preflightReportFileName,
+} from '@/packages/bulk-csv';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -26,11 +32,12 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
-  FileSpreadsheet,
   Download,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge, type BadgeTone } from '../ui/Badge';
+import { triggerFileDownload } from '@/utils/downloadManager';
 
 /** Badge text per row category. A skipped row is not always a safety problem (it may be too long, say). */
 const CATEGORY_LABELS: Readonly<Record<PreflightRowDetail['category'], string>> = {
@@ -94,6 +101,15 @@ export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = (
     triggerFileDownload(bytes, downloadName, 'text/csv');
   };
 
+  const handleExportCsv = () => {
+    const csvContent = formatPreflightReportCsv(
+      report.invalidDetails.length > 0 ? report.invalidDetails : report.details
+    );
+    const downloadName = preflightReportFileName(fileName);
+    const bytes = new TextEncoder().encode(csvContent);
+    triggerFileDownload(bytes, downloadName, 'text/csv');
+  };
+
   return (
     <div className="rounded-xl border border-line bg-surface-sunken p-4 shadow-raised transition-all" data-testid="preflight-summary-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
@@ -153,17 +169,31 @@ export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = (
               )}
             </Button>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleExportErrorLog}
-              data-testid="export-error-log-button"
-              className="flex items-center gap-1.5 text-xs"
-            >
-              <Download className="size-3.5" aria-hidden="true" />
-              Export Error Log (CSV)
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleExportErrorLog}
+                data-testid="export-error-log-button"
+                className="flex items-center gap-1.5 text-xs"
+              >
+                <Download className="size-3.5" aria-hidden="true" />
+                Export Error Log (CSV)
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleExportCsv}
+                data-testid="export-preflight-report-button"
+                className="flex items-center gap-1.5 text-xs"
+              >
+                <Download className="size-3.5" aria-hidden="true" />
+                Export Report CSV
+              </Button>
+            </div>
           </div>
 
           {isExpanded && (
