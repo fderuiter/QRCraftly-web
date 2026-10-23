@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { escapeCsvCell } from './categorize';
+
 /** Most data rows a bulk batch keeps in memory. Rows past this are counted, not stored. */
 export const MAX_BULK_CSV_ROWS = 500;
 
@@ -262,15 +264,6 @@ export interface ErrorLogItem {
   reason?: string;
   /** The payload cell content, if available. */
   payload?: string;
-}
-
-/** Escapes a cell value for CSV output in accordance with RFC 4180. */
-function escapeCsvCell(value: string | number): string {
-  const str = String(value);
-  if (/[",\r\n]/.test(str)) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
 }
 
 /**

@@ -253,6 +253,23 @@ describe('formatErrorLogCsv', () => {
 
     expect(text).toContain('1,skipped,Invalid or skipped row,\r\n');
   });
+
+  it('neutralises formula injection in payloads starting with =', () => {
+    const items = [
+      {
+        rowNumber: 2,
+        category: 'unsafe',
+        reason: '=SUM(1,2)',
+        payload: '=HYPERLINK("http://example.com")',
+      },
+    ];
+    const bytes = formatErrorLogCsv(items);
+    const text = new TextDecoder().decode(bytes);
+
+    const parsed = parseCsv(text);
+    expect(parsed.rows[0]['Reason']).toBe("'=SUM(1,2)");
+    expect(parsed.rows[0]['Payload']).toBe("'=HYPERLINK(\"http://example.com\")");
+  });
 });
 
 describe('errorLogFileName', () => {
