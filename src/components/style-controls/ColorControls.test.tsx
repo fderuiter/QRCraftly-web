@@ -286,7 +286,9 @@ describe('ColorControls', () => {
 
     fireEvent.click(fixBtn);
 
-    expect(handleChange).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(handleChange).toHaveBeenCalledTimes(1);
+    });
     const patch = handleChange.mock.calls[0][0];
     expect(patch.fgColor).toBeDefined();
     // Verify that new fgColor has contrast >= 4.5:1 against #ffffff

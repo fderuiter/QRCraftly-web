@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { GradientType, QRConfig } from '../../types';
 import { PRESET_COLORS, MIN_CONTRAST_THRESHOLD, buildPresetColorPatch, DEFAULT_GRADIENT_END_COLOR } from '../../constants';
-import { getContrastRatio, calculateAutoFixColorPatch } from '../../utils/colorUtils';
+import { getContrastRatio } from '../../utils/colorUtils';
 import { announcePolitely } from '../../utils/a11y';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
@@ -231,10 +231,12 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
         className="mt-3"
         decimalPrecision={2}
         onAutoFix={() => {
-          onChange(calculateAutoFixColorPatch(config));
-          announcePolitely('Contrast adjusted to meet WCAG standards');
-          requestAnimationFrame(() => {
-            (document.getElementById('fg-color') || document.getElementById('gradient-start-color') || document.getElementById('bg-color'))?.focus();
+          void import('../../utils/contrastAutoFix').then(({ calculateAutoFixColorPatch }) => {
+            onChange(calculateAutoFixColorPatch(config));
+            announcePolitely('Contrast adjusted to meet WCAG standards');
+            requestAnimationFrame(() => {
+              (document.getElementById('fg-color') || document.getElementById('gradient-start-color') || document.getElementById('bg-color'))?.focus();
+            });
           });
         }}
       />

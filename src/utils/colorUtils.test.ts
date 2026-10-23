@@ -25,14 +25,8 @@ import {
   linearToSrgb,
   getLuminanceFromLinearRgb,
   getLuminanceFromRgb,
-  rgbToHsl,
-  hslToHex,
-  adjustColorForContrast,
-  calculateAutoFixColorPatch,
   rgbToCmyk,
 } from './colorUtils';
-import { DEFAULT_CONFIG } from '../constants';
-import type { QRConfig } from '../types';
 
 describe('colorUtils', () => {
   describe('getContrastRatio', () => {
@@ -147,110 +141,7 @@ describe('linear-light helpers', () => {
   });
 });
 
-describe('HSL conversion helpers', () => {
-  it('converts RGB to HSL and back to Hex accurately', () => {
-    // Pure red
-    const hslRed = rgbToHsl(255, 0, 0);
-    expect(hslRed.h).toBe(0);
-    expect(hslRed.s).toBe(1);
-    expect(hslRed.l).toBe(0.5);
-    expect(hslToHex(hslRed.h, hslRed.s, hslRed.l)).toBe('#ff0000');
 
-    // Blue #3b82f6
-    const hslBlue = rgbToHsl(59, 130, 246);
-    expect(Math.round(hslBlue.h)).toBe(217);
-    expect(hslToHex(hslBlue.h, hslBlue.s, hslBlue.l)).toBe('#3b82f6');
-  });
-});
-
-describe('adjustColorForContrast', () => {
-  it('returns normalized foreground color if contrast is already >= 4.5:1', () => {
-    const fixed = adjustColorForContrast('#000000', '#ffffff');
-    expect(fixed).toBe('#000000');
-    expect(getContrastRatio(fixed, '#ffffff')).toBeGreaterThanOrEqual(4.5);
-  });
-
-  it('adjusts light blue on white background to meet contrast >= 4.5:1 while preserving hue', () => {
-    const lightBlue = '#93c5fd'; // Contrast against white is ~1.7:1
-    expect(getContrastRatio(lightBlue, '#ffffff')).toBeLessThan(4.5);
-
-    const fixed = adjustColorForContrast(lightBlue, '#ffffff');
-    expect(getContrastRatio(fixed, '#ffffff')).toBeGreaterThanOrEqual(4.5);
-
-    // Verify hue is preserved (~212 degrees for blue)
-    const origRgb = parseInt(lightBlue.slice(1), 16);
-    const fixedRgb = parseInt(fixed.slice(1), 16);
-    const origHsl = rgbToHsl((origRgb >> 16) & 0xff, (origRgb >> 8) & 0xff, origRgb & 0xff);
-    const fixedHsl = rgbToHsl((fixedRgb >> 16) & 0xff, (fixedRgb >> 8) & 0xff, fixedRgb & 0xff);
-    expect(Math.abs(origHsl.h - fixedHsl.h)).toBeLessThan(5);
-  });
-
-  it('falls back to white for dark blue on black background where dark side cannot reach 4.5:1', () => {
-    const darkBlue = '#1e3a8a'; // Low contrast against black #000000
-    expect(getContrastRatio(darkBlue, '#000000')).toBeLessThan(4.5);
-
-    const fixed = adjustColorForContrast(darkBlue, '#000000');
-    expect(fixed).toBe('#ffffff');
-    expect(getContrastRatio(fixed, '#000000')).toBeGreaterThanOrEqual(4.5);
-  });
-
-  it('does not invert code when dark side cannot reach 4.5:1, falling back to white or black', () => {
-    // #333333 on #595959 cannot reach 4.5:1 on the dark side (black on #595959 is 3.0:1)
-    // It must not invert to #d0d0d0 (lighter gray); it must fall back to #ffffff
-    const fix1 = adjustColorForContrast('#333333', '#595959');
-    expect(fix1).toBe('#ffffff');
-    expect(getContrastRatio(fix1, '#595959')).toBeGreaterThanOrEqual(4.5);
-
-    // #2a2a2a on #1a1a1a cannot reach 4.5:1 on the dark side
-    // It must not invert to #828282; it must fall back to #ffffff
-    const fix2 = adjustColorForContrast('#2a2a2a', '#1a1a1a');
-    expect(fix2).toBe('#ffffff');
-    expect(getContrastRatio(fix2, '#1a1a1a')).toBeGreaterThanOrEqual(4.5);
-  });
-
-  it('evaluates transparent background against solid white', () => {
-    const lightYellow = '#fef08a';
-    const fixed = adjustColorForContrast(lightYellow, 'transparent');
-    expect(getContrastRatio(fixed, '#ffffff')).toBeGreaterThanOrEqual(4.5);
-  });
-});
-
-describe('calculateAutoFixColorPatch', () => {
-  it('calculates contrast fix patch for solid foreground color', () => {
-    const config: QRConfig = {
-      ...DEFAULT_CONFIG,
-      fgColor: '#93c5fd', // Light blue on white
-      bgColor: '#ffffff',
-    };
-
-    const patch = calculateAutoFixColorPatch(config);
-    expect(patch.fgColor).toBeDefined();
-    expect(getContrastRatio(patch.fgColor!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
-  });
-
-  it('calculates contrast fix patch for gradient stops, eye frame, and eye ball colors', () => {
-    const config: QRConfig = {
-      ...DEFAULT_CONFIG,
-      bgColor: '#ffffff',
-      gradientType: 'linear',
-      gradientColorStops: [
-        { offset: 0, color: '#93c5fd' }, // Low contrast light blue
-        { offset: 1, color: '#fef08a' }, // Low contrast light yellow
-      ],
-      eyeFrameColor: '#a7f3d0', // Low contrast light green
-      eyeBallColor: '#fbcfe8',  // Low contrast light pink
-    };
-
-    const patch = calculateAutoFixColorPatch(config);
-    expect(patch.gradientColorStops).toHaveLength(2);
-    expect(getContrastRatio(patch.gradientColorStops![0].color, '#ffffff')).toBeGreaterThanOrEqual(4.5);
-    expect(getContrastRatio(patch.gradientColorStops![1].color, '#ffffff')).toBeGreaterThanOrEqual(4.5);
-    expect(patch.eyeFrameColor).toBeDefined();
-    expect(getContrastRatio(patch.eyeFrameColor!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
-    expect(patch.eyeBallColor).toBeDefined();
-    expect(getContrastRatio(patch.eyeBallColor!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
-  });
-});
 
 describe('rgbToCmyk', () => {
   it('converts black (0,0,0) to CMYK (0,0,0,1)', () => {
