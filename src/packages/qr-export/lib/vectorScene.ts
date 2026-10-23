@@ -22,8 +22,11 @@
  * writer only has to say how to draw a path, a text line or an image.
  */
 
-import { normalizeHex } from '@/utils/colorUtils';
+import { normalizeHex, rgbToCmyk, type CmykColor } from '@/utils/colorUtils';
 import { parseSvgPath, type PathCommandVisitor } from './pathParser';
+
+export type { CmykColor };
+export { rgbToCmyk };
 
 export interface RgbColor {
   r: number;
@@ -133,6 +136,10 @@ export function formatNum(n: number): string {
 
 /** `r g b` as three numbers. */
 export const formatRgb = (c: RgbColor): string => `${formatNum(c.r)} ${formatNum(c.g)} ${formatNum(c.b)}`;
+
+/** `c m y k` as four numbers. */
+export const formatCmyk = (c: CmykColor): string =>
+  `${formatNum(c.c)} ${formatNum(c.m)} ${formatNum(c.y)} ${formatNum(c.k)}`;
 
 export const formatMatrix = (m: Matrix): string => m.map(formatNum).join(' ');
 
@@ -359,27 +366,32 @@ export function literalString(codes: readonly number[]): string {
 
 // --- shading -----------------------------------------------------------------------------
 
-const exponential = (c0: RgbColor, c1: RgbColor): string =>
-  `<< /FunctionType 2 /Domain [0 1] /C0 [${formatRgb(c0)}] /C1 [${formatRgb(c1)}] /N 1 >>`;
+const exponential = (c0: RgbColor, c1: RgbColor, colorSpace: 'rgb' | 'cmyk' = 'rgb'): string => {
+  if (colorSpace === 'cmyk') {
+    return `<< /FunctionType 2 /Domain [0 1] /C0 [${formatCmyk(rgbToCmyk(c0))}] /C1 [${formatCmyk(rgbToCmyk(c1))}] /N 1 >>`;
+  }
+  return `<< /FunctionType 2 /Domain [0 1] /C0 [${formatRgb(c0)}] /C1 [${formatRgb(c1)}] /N 1 >>`;
+};
 
 /**
  * Builds the shading dictionary for a gradient. PostScript (LanguageLevel 3) and PDF use
  * the same syntax: an axial or radial shading over a stitching function with one segment per
  * pair of stops.
  */
-export function shadingDictionary(gradient: SceneGradient): string {
+export function shadingDictionary(gradient: SceneGradient, colorSpace: 'rgb' | 'cmyk' = 'rgb'): string {
   const { stops } = gradient;
   let fn: string;
   if (stops.length <= 2) {
-    fn = exponential(stops[0].color, stops[stops.length - 1].color);
+    fn = exponential(stops[0].color, stops[stops.length - 1].color, colorSpace);
   } else {
-    const segments = stops.slice(1).map((stop, i) => exponential(stops[i].color, stop.color));
+    const segments = stops.slice(1).map((stop, i) => exponential(stops[i].color, stop.color, colorSpace));
     const bounds = stops.slice(1, -1).map((stop) => formatNum(stop.offset));
     const encode = segments.map(() => '0 1').join(' ');
     fn = `<< /FunctionType 3 /Domain [0 1] /Functions [${segments.join(' ')}] /Bounds [${bounds.join(' ')}] /Encode [${encode}] >>`;
   }
   const type = gradient.type === 'linear' ? 2 : 3;
-  return `<< /ShadingType ${type} /ColorSpace /DeviceRGB /Coords [${gradient.coords.map(formatNum).join(' ')}] /Function ${fn} /Extend [true true] >>`;
+  const cs = colorSpace === 'cmyk' ? '/DeviceCMYK' : '/DeviceRGB';
+  return `<< /ShadingType ${type} /ColorSpace ${cs} /Coords [${gradient.coords.map(formatNum).join(' ')}] /Function ${fn} /Extend [true true] >>`;
 }
 
 // --- paths -------------------------------------------------------------------------------

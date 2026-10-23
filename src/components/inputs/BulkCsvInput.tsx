@@ -689,7 +689,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
           <BulkCsvRowPreview rows={rows} rowNumbers={rowNumbers} payloadColumn={payloadCol} filenameColumn={filenameCol} />
 
-          {preflightReport && <BulkCsvPreflightSummary report={preflightReport} />}
+          {preflightReport && <BulkCsvPreflightSummary report={preflightReport} fileName={data.fileName} />}
 
           <p className="text-xs text-fg-muted" data-testid="bulk-preview-row">
             {preview

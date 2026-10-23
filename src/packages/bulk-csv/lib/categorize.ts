@@ -18,6 +18,7 @@
 
 import { DEFAULT_CONFIG } from '@/constants';
 import type { CsvRow } from './csv';
+import { sanitizeFileStem } from './fileNames';
 import { hasPayload } from './preview';
 import { bulkValidationType, encodeBulkCell, type BulkContentType } from './payload';
 import { analyseLink, type LinkFinding } from '@/packages/link-safety';
@@ -242,4 +243,63 @@ export function categorizeCsvRows(
     validRowIndices,
     validPayloads,
   };
+}
+
+const FORMULA_START = /^[=+\-@\t\r]/;
+
+/**
+ * Escapes a single string field for RFC 4180 CSV text.
+ * Neutralises leading formula characters (=, +, -, @, \t, \r) with a single quote to prevent
+ * formula injection in spreadsheets, then wraps fields in double quotes if they contain
+ * quotes, commas, or line breaks. Internal quotes are doubled.
+ * @param field - Raw value to escape.
+ * @returns Escaped CSV field.
+ */
+export function escapeCsvCell(field: string | number | undefined | null): string {
+  const str = String(field ?? '');
+  const safe = FORMULA_START.test(str) ? `'${str}` : str;
+  return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
+}
+
+/**
+ * Serializes preflight row details or report findings into an RFC 4180 formatted CSV string.
+ *
+ * @param reportOrDetails Array of PreflightRowDetail or a PreflightReport object.
+ * @returns RFC 4180 formatted CSV string with headers Row, Status, Reason, and Payload.
+ */
+export function formatPreflightReportCsv(reportOrDetails: PreflightReport | PreflightRowDetail[]): string {
+  const details = Array.isArray(reportOrDetails)
+    ? reportOrDetails
+    : (reportOrDetails.details ?? []);
+
+  const headers = ['Row', 'Status', 'Reason', 'Payload'];
+  const rows = details.map((item) =>
+    [
+      escapeCsvCell(item.rowNumber),
+      escapeCsvCell(item.category),
+      escapeCsvCell(item.reason ?? ''),
+      escapeCsvCell(item.payload ?? ''),
+    ].join(',')
+  );
+
+  return [headers.join(','), ...rows].join('\r\n');
+}
+
+/**
+ * Derives a sanitized preflight CSV report file name based on the source CSV file name.
+ * Falls back to `qrcraftly-preflight-report.csv` if file name is missing, has no extension,
+ * or contains only invalid characters.
+ *
+ * @param fileName Source file name.
+ * @returns Sanitized CSV report file name.
+ */
+export function preflightReportFileName(fileName?: string): string {
+  if (!fileName || !fileName.trim()) return 'qrcraftly-preflight-report.csv';
+  const trimmed = fileName.trim();
+  const hasExt = /\.[^/.]+$/.test(trimmed);
+  if (!hasExt) return 'qrcraftly-preflight-report.csv';
+  const rawStem = trimmed.replace(/\.[^/.]+$/, '');
+  const stem = sanitizeFileStem(rawStem, '');
+  if (!stem || /^_+$/.test(stem)) return 'qrcraftly-preflight-report.csv';
+  return `${stem}-preflight-report.csv`;
 }
