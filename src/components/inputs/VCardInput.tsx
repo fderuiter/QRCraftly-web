@@ -1,9 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useRef, type ChangeEvent, type DragEvent } from "react";
 import type { VCardData } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
-import { vCardFieldError, VCARD_SOCIAL_FIELDS, VCARD_SOCIAL_NETWORKS } from "@/packages/qr-payload";
+import {
+  hydrateVCardData,
+  vCardFieldError,
+  VCARD_SOCIAL_FIELDS,
+  VCARD_SOCIAL_NETWORKS,
+} from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
+import { Button } from "../ui/Button";
+import { Upload } from "lucide-react";
 import {
   GRID_TWO_COLUMNS_CLASSES,
   SUB_CONTAINER_SPACING_CLASSES,
@@ -29,10 +36,93 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
   const countryError = vCardFieldError("country", data.country);
   // A half-typed profile link is not yet on its network's host, so its error waits for blur (#1435).
   const [blurredSocials, setBlurredSocials] = useState<ReadonlySet<string>>(() => new Set());
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isMeCard = data.version === "mecard";
+
+  const processFile = async (file: File) => {
+    let text = "";
+    if (typeof file.text === "function") {
+      try {
+        text = await file.text();
+      } catch {
+        text = "";
+      }
+    }
+    if (!text) {
+      text = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string) || "");
+        reader.onerror = () => resolve("");
+        reader.readAsText(file);
+      });
+    }
+
+    const hydrated = hydrateVCardData(text);
+    onChange(hydrated);
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      void processFile(file);
+    }
+    e.target.value = "";
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLButtonElement>) => {
+    if (!e.dataTransfer?.types?.includes?.("Files")) return;
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLButtonElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (e: DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      void processFile(file);
+    }
+  };
 
   return (
     <FormBlock legend="Contact Details (vCard)">
+      <div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".vcf,.vcard"
+          className="hidden"
+          onChange={handleFileChange}
+          aria-label="Upload vCard file"
+        />
+        <Button
+          type="button"
+          variant="dropzone"
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          data-dragover={isDragging ? "" : undefined}
+          className="group"
+          aria-describedby="vcard-upload-help"
+        >
+          <span className="flex size-10 items-center justify-center rounded-full bg-surface-hover transition-colors group-hover:bg-accent-soft">
+            <Upload className="size-5" aria-hidden="true" />
+          </span>
+          <span className="text-sm font-medium">Import .vcf or .vcard file</span>
+          <span id="vcard-upload-help" className="text-xs text-fg-muted">
+            Drag & drop or select a vCard file to auto-populate contact fields
+          </span>
+        </Button>
+      </div>
+
       <SelectField
         id="vcard-version"
         label="Contact Format"
