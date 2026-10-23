@@ -3,7 +3,6 @@ import type { VCardData } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
 import {
-  hydrateVCardData,
   vCardFieldError,
   VCARD_SOCIAL_FIELDS,
   VCARD_SOCIAL_NETWORKS,
@@ -16,7 +15,7 @@ import {
   SUB_CONTAINER_SPACING_CLASSES,
 } from "../ui/styles";
 
-interface VCardInputProps {
+export interface VCardInputProps {
   data: VCardData;
   onChange: (updates: Partial<VCardData>) => void;
 }
@@ -50,6 +49,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
       return;
     }
 
+    const { hydrateVCardData } = await import("@/packages/qr-payload");
     const hydrated = hydrateVCardData(text);
     const updates: Partial<VCardData> = {};
     for (const key in hydrated) {

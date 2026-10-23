@@ -2,6 +2,8 @@ export * from './EmailInput';
 export * from './EventInput';
 export * from '../ui/FormFields';
 export * from './InputRegistry';
+export * from './LazyBulkCsvInput';
+export * from './LazyVCardInput';
 export * from './LocationInput';
 export * from './MeetingInput';
 export * from './PaymentInput';
