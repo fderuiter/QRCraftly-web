@@ -17,39 +17,47 @@
 */
 
 import { type SocialData, SocialPlatform, QRType, type QRGeneratorContract } from '@/types';
-import { parseProtocol, parseSocialProfile, identifyProtocol, YT_CHANNEL_RE, YT_PREFIX_RE } from '../protocol';
+import { parseProtocol, parseSocialProfile, identifyProtocol } from '../protocol';
 import { sanitizeSocialHandle } from '@/utils/security';
 
-const PLATFORM_URL_PREFIXES: Partial<Record<SocialPlatform, string>> = {
-  [SocialPlatform.INSTAGRAM]: 'https://instagram.com/',
-  [SocialPlatform.TWITTER]: 'https://x.com/',
-  [SocialPlatform.TIKTOK]: 'https://tiktok.com/@',
-  [SocialPlatform.LINKEDIN]: 'https://linkedin.com/in/',
-  [SocialPlatform.FACEBOOK]: 'https://facebook.com/',
-  [SocialPlatform.WHATSAPP]: 'https://wa.me/',
-  [SocialPlatform.GITHUB]: 'https://github.com/',
+const PLATFORM_URL_PREFIXES: Record<string, string> = {
+  instagram: 'https://instagram.com/',
+  twitter: 'https://x.com/',
+  tiktok: 'https://tiktok.com/@',
+  linkedin: 'https://linkedin.com/in/',
+  facebook: 'https://facebook.com/',
+  whatsapp: 'https://wa.me/',
+  github: 'https://github.com/',
 };
+
+const P_RE = /^(watch\?|playlist\?|(shorts|channel|c|user)\/)/;
+const UC_RE = /^UC[\w-]{22}$/;
 
 /**
  * Normalizes and constructs a canonical YouTube URL from a handle, channel ID, custom URL,
  * video link, or playlist link.
  */
 export const parseYouTubeInput = (input: string): string => {
-  if (!input) return '';
-  const clean = input.trim().replace(/[\x00-\x1F\x7F-\x9F]/g, '').replace(/^\/+/, '');
+  let clean = (input || '').trim().replace(/[\x00-\x1F\x7F-\x9F]/g, '').replace(/^\/+/, '');
   if (!clean) return '';
 
-  const target = /^https?:\/\//i.test(clean)
-    ? clean
-    : /^(?:www\.|m\.|mobile\.)?(youtube\.com|youtu\.be)/i.test(clean)
-      ? `https://${clean}`
-      : `https://youtube.com/${YT_CHANNEL_RE.test(clean) ? 'channel/' + clean : YT_PREFIX_RE.test(clean) ? clean : '@' + clean.replace(/^@+/, '')}`;
+  if (/(youtube\.com|youtu\.be)/i.test(clean)) {
+    const full = /^https?:\/\//i.test(clean) ? clean : 'https://' + clean;
+    const p = parseSocialProfile(parseProtocol(full)!);
+    return p?.platform === SocialPlatform.YOUTUBE
+      ? 'https://' + (p.handle.startsWith('youtu.be/') ? p.handle : 'youtube.com/' + (P_RE.test(p.handle) ? p.handle : '@' + p.handle))
+      : '';
+  }
 
-  const profile = parseSocialProfile(parseProtocol(target)!);
-  if (!profile || profile.platform !== SocialPlatform.YOUTUBE) return '';
+  if (UC_RE.test(clean)) clean = 'channel/' + clean;
+  if (P_RE.test(clean)) {
+    if (/^channel\/(?!UC[\w-]{22}(\?.*)?$)/i.test(clean)) return '';
+    return 'https://youtube.com/' + clean;
+  }
+  if (clean.includes('/')) return '';
 
-  const h = profile.handle;
-  return h.startsWith('youtu.be/') ? `https://${h}` : `https://youtube.com/${YT_PREFIX_RE.test(h) ? h : '@' + h}`;
+  const h = clean.replace(/^@+/, '');
+  return h ? 'https://youtube.com/@' + h : '';
 };
 
 /**
@@ -62,16 +70,16 @@ export const parseYouTubeInput = (input: string): string => {
  * @returns A full HTTPS profile URL, or an empty string if the handle is empty.
  */
 export const constructSocialString = (data: SocialData): string => {
-  if (!data || !data.handle) return '';
+  if (!data?.handle) return '';
 
-  if (data.platform === SocialPlatform.YOUTUBE) {
+  if (data.platform === 'youtube') {
     return parseYouTubeInput(data.handle);
   }
 
   const cleanHandle = sanitizeSocialHandle(data.handle);
   if (!cleanHandle) return '';
 
-  if (data.platform === SocialPlatform.WHATSAPP && data.message && data.message.trim()) {
+  if (data.platform === 'whatsapp' && data.message?.trim()) {
     return `https://wa.me/${cleanHandle}?text=${encodeURIComponent(data.message.trim())}`;
   }
 
@@ -87,7 +95,7 @@ export const hydrateSocialData = (raw: string): SocialData => {
   const profile = parsed ? parseSocialProfile(parsed) : null;
   return profile
     ? { platform: profile.platform, handle: profile.handle, ...(profile.message ? { message: profile.message } : {}) }
-    : { platform: SocialPlatform.INSTAGRAM, handle: '' };
+    : { platform: 'instagram', handle: '' };
 };
 
 export const SocialContract: QRGeneratorContract<SocialData> = {
