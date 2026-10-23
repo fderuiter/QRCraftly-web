@@ -17,21 +17,18 @@
 */
 
 import { type SocialData, SocialPlatform, QRType, type QRGeneratorContract } from '@/types';
-import { parseProtocol, parseSocialProfile, identifyProtocol } from '../protocol';
+import { parseProtocol, parseSocialProfile, identifyProtocol, YT_CHANNEL_RE, YT_PREFIX_RE } from '../protocol';
 import { sanitizeSocialHandle } from '@/utils/security';
 
-const SOCIAL_PLATFORM_URLS: Record<SocialPlatform, (handle: string) => string> = {
+const SOCIAL_PLATFORM_URLS: Partial<Record<SocialPlatform, (handle: string) => string>> = {
   [SocialPlatform.INSTAGRAM]: (handle) => `https://instagram.com/${handle}`,
   [SocialPlatform.TWITTER]: (handle) => `https://x.com/${handle}`,
   [SocialPlatform.TIKTOK]: (handle) => `https://tiktok.com/@${handle}`,
   [SocialPlatform.LINKEDIN]: (handle) => `https://linkedin.com/in/${handle}`,
-  [SocialPlatform.YOUTUBE]: (handle) => `https://youtube.com/@${handle}`,
   [SocialPlatform.FACEBOOK]: (handle) => `https://facebook.com/${handle}`,
   [SocialPlatform.WHATSAPP]: (handle) => `https://wa.me/${handle}`,
   [SocialPlatform.GITHUB]: (handle) => `https://github.com/${handle}`,
 };
-
-const YT_PREFIX_PATTERN = /^(watch\?|playlist\?|shorts\/|channel\/|c\/|user\/)/;
 
 /**
  * Normalizes and constructs a canonical YouTube URL from a handle, channel ID, custom URL,
@@ -39,21 +36,20 @@ const YT_PREFIX_PATTERN = /^(watch\?|playlist\?|shorts\/|channel\/|c\/|user\/)/;
  */
 export const parseYouTubeInput = (input: string): string => {
   if (!input) return '';
-  const trimmed = input.trim().replace(/[\x00-\x1F\x7F-\x9F]/g, '');
-  if (!trimmed) return '';
+  const clean = input.trim().replace(/[\x00-\x1F\x7F-\x9F]/g, '').replace(/^\/+/, '');
+  if (!clean) return '';
 
-  const clean = trimmed.replace(/^\/+/, '');
-  let target = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${clean}`;
-  if (!/^(https?:\/\/)?(www\.|m\.|mobile\.)?(youtube\.com|youtu\.be)/i.test(trimmed)) {
-    target = `https://youtube.com/${/^UC[\w-]{22}$/.test(clean) ? 'channel/' + clean : YT_PREFIX_PATTERN.test(clean) ? clean : '@' + clean.replace(/^@+/, '')}`;
-  }
+  const target = /^https?:\/\//i.test(clean)
+    ? clean
+    : /^(?:www\.|m\.|mobile\.)?(youtube\.com|youtu\.be)/i.test(clean)
+      ? `https://${clean}`
+      : `https://youtube.com/${YT_CHANNEL_RE.test(clean) ? 'channel/' + clean : YT_PREFIX_RE.test(clean) ? clean : '@' + clean.replace(/^@+/, '')}`;
 
-  const parsed = parseProtocol(target);
-  const profile = parsed ? parseSocialProfile(parsed) : null;
+  const profile = parseSocialProfile(parseProtocol(target)!);
   if (!profile || profile.platform !== SocialPlatform.YOUTUBE) return '';
 
   const h = profile.handle;
-  return h.startsWith('youtu.be/') ? `https://${h}` : YT_PREFIX_PATTERN.test(h) ? `https://youtube.com/${h}` : `https://youtube.com/@${h}`;
+  return h.startsWith('youtu.be/') ? `https://${h}` : `https://youtube.com/${YT_PREFIX_RE.test(h) ? h : '@' + h}`;
 };
 
 /**
@@ -87,22 +83,11 @@ export const constructSocialString = (data: SocialData): string => {
  * Hydrates SocialData from a raw string.
  */
 export const hydrateSocialData = (raw: string): SocialData => {
-  const result: SocialData = {
-    platform: SocialPlatform.INSTAGRAM,
-    handle: '',
-  };
-
   const parsed = parseProtocol(raw);
   const profile = parsed ? parseSocialProfile(parsed) : null;
-  if (profile) {
-    result.platform = profile.platform;
-    result.handle = profile.handle;
-    if (profile.message) {
-      result.message = profile.message;
-    }
-  }
-
-  return result;
+  return profile
+    ? { platform: profile.platform, handle: profile.handle, ...(profile.message ? { message: profile.message } : {}) }
+    : { platform: SocialPlatform.INSTAGRAM, handle: '' };
 };
 
 export const SocialContract: QRGeneratorContract<SocialData> = {

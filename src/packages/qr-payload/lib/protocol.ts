@@ -53,14 +53,14 @@ const RESERVED_PATTERNS: Partial<Record<SocialPlatform, RegExp>> = {
   [SocialPlatform.TWITTER]: /^(i|intent|home|search|hashtag|share|explore|settings|messages|notifications|compose|login)$/i,
   [SocialPlatform.FACEBOOK]: /^(share|sharer|sharer\.php|groups|events|watch|photo\.php|story\.php|profile\.php|pages|marketplace|gaming|login)$/i,
   [SocialPlatform.GITHUB]: /^(orgs|settings|marketplace|explore|topics|sponsors|features|login|about|pricing|enterprise)$/i,
-  [SocialPlatform.YOUTUBE]: /^(watch|shorts|playlist|channel|c|user|feed|results|premium|gaming|music|upload|tv|about|help|terms|privacy)$/i,
 };
+
+export const YT_CHANNEL_RE = /^UC[\w-]{22}$/;
+export const YT_PREFIX_RE = /^(watch\?|playlist\?|shorts\/|channel\/|c\/|user\/)/;
+const YT_RESERVED = /^(watch|shorts|playlist|channel|c|user|feed|results|premium|gaming|music|upload|tv|about|help|terms|privacy)$/i;
 
 const HANDLE_PATTERN = /^[\w.-]+$/;
 const YOUTUBE_HANDLE_PATTERN = /^[\w.\-/@?&=%]+$/;
-
-const buildQueryParams = (p: Map<string, string>): string =>
-  Array.from(p, ([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
 
 /**
  * Reads a social profile link that the Social form can rebuild without losing anything. Posts,
@@ -74,7 +74,7 @@ const buildQueryParams = (p: Map<string, string>): string =>
  */
 export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null => {
   // The Social form writes https links, so an http one stays a Website code to keep its scheme.
-  if (parsed.scheme !== 'https') return null;
+  if (!parsed || parsed.scheme !== 'https') return null;
   if (parsed.path.includes('#')) return null;
 
   const [rawHost, ...rest] = parsed.path.split('/');
@@ -100,17 +100,16 @@ export const parseSocialProfile = (parsed: ParsedProtocol): SocialProfile | null
       if (segments.length === 1 && segments[0].startsWith('@')) handle = segments[0].substring(1);
       break;
     case SocialPlatform.YOUTUBE: {
-      const q = buildQueryParams(parsed.params);
-      const querySuffix = q ? `?${q}` : '';
+      const querySuffix = parsed.params.size ? '?' + new URLSearchParams(Array.from(parsed.params.entries())).toString() : '';
       if (segments.length === 1) {
         const s0 = segments[0];
         if (host === 'youtu.be') handle = `youtu.be/${s0}`;
         else if (s0.startsWith('@')) handle = s0.replace(/^@+/, '');
         else if ((s0 === 'watch' && parsed.params.has('v')) || (s0 === 'playlist' && parsed.params.has('list'))) handle = s0;
-        else if (!RESERVED_PATTERNS[SocialPlatform.YOUTUBE]?.test(s0)) handle = `c/${s0}`;
+        else if (!YT_RESERVED.test(s0)) handle = `c/${s0}`;
       } else if (segments.length === 2) {
         const [s0, s1] = segments;
-        if (/^(c|user|shorts)$/.test(s0) || (s0 === 'channel' && /^UC[\w-]{22}$/.test(s1))) handle = `${s0}/${s1}`;
+        if (/^(c|user|shorts)$/.test(s0) || (s0 === 'channel' && YT_CHANNEL_RE.test(s1))) handle = `${s0}/${s1}`;
       }
       if (handle) handle += querySuffix;
       break;
