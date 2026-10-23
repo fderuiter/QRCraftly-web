@@ -16,19 +16,19 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type SocialData, QRType, type QRGeneratorContract } from '@/types';
+import { type SocialData, SocialPlatform, QRType, type QRGeneratorContract } from '@/types';
 import { parseProtocol, parseSocialProfile, identifyProtocol } from '../protocol';
 import { sanitizeSocialHandle } from '@/utils/security';
 
-const PLATFORM_URL_PREFIXES: Record<string, string> = {
-  instagram: 'https://instagram.com/',
-  twitter: 'https://x.com/',
-  tiktok: 'https://tiktok.com/@',
-  linkedin: 'https://linkedin.com/in/',
-  facebook: 'https://facebook.com/',
-  whatsapp: 'https://wa.me/',
-  github: 'https://github.com/',
-  youtube: 'https://youtube.com/@',
+const SOCIAL_PLATFORM_URLS: Record<SocialPlatform, (handle: string) => string> = {
+  [SocialPlatform.INSTAGRAM]: (handle) => `https://instagram.com/${handle}`,
+  [SocialPlatform.TWITTER]: (handle) => `https://x.com/${handle}`,
+  [SocialPlatform.TIKTOK]: (handle) => `https://tiktok.com/@${handle}`,
+  [SocialPlatform.LINKEDIN]: (handle) => `https://linkedin.com/in/${handle}`,
+  [SocialPlatform.YOUTUBE]: (handle) => `https://youtube.com/@${handle}`,
+  [SocialPlatform.FACEBOOK]: (handle) => `https://facebook.com/${handle}`,
+  [SocialPlatform.WHATSAPP]: (handle) => `https://wa.me/${handle}`,
+  [SocialPlatform.GITHUB]: (handle) => `https://github.com/${handle}`,
 };
 
 /**
@@ -41,32 +41,41 @@ const PLATFORM_URL_PREFIXES: Record<string, string> = {
  * @returns A full HTTPS profile URL, or an empty string if the handle is empty.
  */
 export const constructSocialString = (data: SocialData): string => {
-  if (!data?.handle) return '';
-
-  if (data.platform === 'youtube' && /^https?:\/\//i.test(data.handle.trim())) {
+  if (!data) return '';
+  if (data.platform === SocialPlatform.YOUTUBE && /^https?:\/\//i.test(data.handle.trim())) {
     return data.handle.trim();
   }
-
   const cleanHandle = sanitizeSocialHandle(data.handle);
   if (!cleanHandle) return '';
 
-  if (data.platform === 'whatsapp' && data.message?.trim()) {
+  if (data.platform === SocialPlatform.WHATSAPP && data.message && data.message.trim()) {
     return `https://wa.me/${cleanHandle}?text=${encodeURIComponent(data.message.trim())}`;
   }
 
-  const prefix = PLATFORM_URL_PREFIXES[data.platform];
-  return prefix ? prefix + cleanHandle : '';
+  const constructUrl = SOCIAL_PLATFORM_URLS[data.platform];
+  return constructUrl ? constructUrl(cleanHandle) : '';
 };
 
 /**
  * Hydrates SocialData from a raw string.
  */
 export const hydrateSocialData = (raw: string): SocialData => {
+  const result: SocialData = {
+    platform: SocialPlatform.INSTAGRAM,
+    handle: '',
+  };
+
   const parsed = parseProtocol(raw);
   const profile = parsed ? parseSocialProfile(parsed) : null;
-  return profile
-    ? { platform: profile.platform, handle: profile.handle, ...(profile.message ? { message: profile.message } : {}) }
-    : { platform: 'instagram', handle: '' };
+  if (profile) {
+    result.platform = profile.platform;
+    result.handle = profile.handle;
+    if (profile.message) {
+      result.message = profile.message;
+    }
+  }
+
+  return result;
 };
 
 export const SocialContract: QRGeneratorContract<SocialData> = {

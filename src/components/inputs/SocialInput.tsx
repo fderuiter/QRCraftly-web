@@ -1,33 +1,27 @@
-import React, { useEffect, useState } from "react";
-import { type SocialData, SocialPlatform } from "../../types";
-import { TextField, SelectField, TextAreaField } from "../ui/FormFields";
-import { FormBlock } from "../ui/FormBlock";
+import React, { useEffect, useState } from 'react';
+import { type SocialData, SocialPlatform } from '../../types';
+import { TextField, SelectField, TextAreaField } from '../ui/FormFields';
+import { FormBlock } from '../ui/FormBlock';
 
 interface SocialInputProps {
   data: SocialData;
   onChange: (updates: Partial<SocialData>) => void;
 }
 
+let yt: typeof import('@/packages/qr-payload/youtube') | null = null;
+
 export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
-  const isYouTube = data.platform === SocialPlatform.YOUTUBE;
-  const [parseYouTubeInput, setParseYouTubeInput] = useState<((input: string) => string) | null>(null);
+  const isYt = data.platform === SocialPlatform.YOUTUBE;
+  const [, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (isYouTube && !parseYouTubeInput) {
-      import("@/packages/qr-payload/youtube").then((mod) => {
-        setParseYouTubeInput(() => mod.parseYouTubeInput);
+    if (isYt && !yt) {
+      import('@/packages/qr-payload/youtube').then((m) => {
+        yt = m;
+        setLoaded(true);
       });
     }
-  }, [isYouTube, parseYouTubeInput]);
-
-  const handleLabel = isYouTube ? "Username / Channel / Video Link" : "Username / Handle";
-  const handlePlaceholder = isYouTube ? "@channel, video link, or channel ID" : "@username";
-  const handleMaxLength = isYouTube ? 256 : 64;
-
-  const handleHandleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    onChange({ handle: isYouTube && parseYouTubeInput ? parseYouTubeInput(raw) || raw : raw });
-  };
+  }, [isYt]);
 
   return (
     <FormBlock legend="Social Media Profile">
@@ -48,12 +42,15 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
       </SelectField>
       <TextField
         id="social-handle"
-        label={handleLabel}
+        label={isYt ? yt?.YT_LABEL || 'Username / Channel / Video Link' : 'Username / Handle'}
         type="text"
-        placeholder={handlePlaceholder}
-        maxLength={handleMaxLength}
+        placeholder={isYt ? yt?.YT_PLACEHOLDER || '@channel, video link, or channel ID' : '@username'}
+        maxLength={isYt ? 256 : 64}
         value={data.handle}
-        onChange={handleHandleChange}
+        onChange={(e) => {
+          const v = e.target.value;
+          onChange({ handle: isYt && yt ? yt.parseYouTubeInput(v) || v : v });
+        }}
         showCharCount
       />
       {data.platform === SocialPlatform.WHATSAPP && (
@@ -64,7 +61,7 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
           placeholder="Enter pre-filled message..."
           rows={3}
           maxLength={256}
-          value={data.message || ""}
+          value={data.message || ''}
           onChange={(e) => onChange({ message: e.target.value })}
           showCharCount
         />

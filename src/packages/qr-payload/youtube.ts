@@ -16,13 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { SocialPlatform } from '@/types';
 import { parseProtocol, type ParsedProtocol, type SocialProfile } from './lib/protocol';
+import { SocialPlatform } from '@/types';
 
-const YT_RESERVED = /^(watch|shorts|playlist|channel|c|user|feed|results|premium|gaming|music|upload|tv|about|help|terms|privacy)$/i;
+const YT_RESERVED = /^(watch|shorts|playlist|channel|c|user|feed|results|premium|gaming|music|upload|tv|about|help|terms|privacy|live|embed)$/i;
 const YOUTUBE_HANDLE_PATTERN = /^[a-zA-Z0-9_.\-/@?&=%]+$/;
 const P_RE = /^(watch\?|playlist\?|(shorts|channel|c|user)\/)/;
 const UC_RE = /^UC[\w-]{22}$/;
+
+export const YT_LABEL = 'Username / Channel / Video Link';
+export const YT_PLACEHOLDER = '@channel, video link, or channel ID';
 
 /**
  * Reads a YouTube profile URL from a parsed protocol.
@@ -43,13 +46,20 @@ export const parseYouTubeProfile = (parsed: ParsedProtocol): SocialProfile | nul
 
   if (segments.length === 1) {
     const s0 = segments[0];
-    if (host === 'youtu.be') handle = `youtu.be/${s0}`;
-    else if (s0[0] === '@') handle = s0.replace(/^@+/, '');
-    else if ((s0 === 'watch' && parsed.params.has('v')) || (s0 === 'playlist' && parsed.params.has('list'))) handle = s0;
-    else if (!YT_RESERVED.test(s0)) handle = `c/${s0}`;
+    if (host === 'youtu.be') {
+      handle = `youtu.be/${s0}`;
+    } else if (s0[0] === '@') {
+      handle = s0.replace(/^@+/, '');
+    } else if ((s0 === 'watch' && parsed.params.has('v')) || (s0 === 'playlist' && parsed.params.has('list'))) {
+      handle = s0;
+    } else if (!YT_RESERVED.test(s0)) {
+      handle = `c/${s0}`;
+    }
   } else if (segments.length === 2) {
     const [s0, s1] = segments;
-    if (/^(c|user|shorts)$/.test(s0) || (s0 === 'channel' && /^UC[\w-]{22}$/.test(s1))) handle = `${s0}/${s1}`;
+    if (/^(c|user|shorts)$/.test(s0) || (s0 === 'channel' && UC_RE.test(s1))) {
+      handle = `${s0}/${s1}`;
+    }
   }
 
   if (handle) handle += querySuffix;
@@ -70,9 +80,8 @@ export const parseYouTubeInput = (input: string): string => {
     const full = /^https?:\/\//i.test(clean) ? clean : 'https://' + clean;
     const parsed = parseProtocol(full);
     const p = parsed ? parseYouTubeProfile(parsed) : null;
-    return p?.platform === SocialPlatform.YOUTUBE
-      ? 'https://' + (p.handle.startsWith('youtu.be/') ? p.handle : 'youtube.com/' + (P_RE.test(p.handle) ? p.handle : '@' + p.handle))
-      : '';
+    if (!p || p.platform !== SocialPlatform.YOUTUBE) return '';
+    return 'https://' + (p.handle.startsWith('youtu.be/') ? p.handle : 'youtube.com/' + (P_RE.test(p.handle) ? p.handle : '@' + p.handle));
   }
 
   if (UC_RE.test(clean)) clean = 'channel/' + clean;
