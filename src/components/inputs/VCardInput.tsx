@@ -128,7 +128,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           </span>
           <span className="text-sm font-medium">Import .vcf or .vcard file</span>
           <span className="text-xs text-fg-muted">
-            Drag & drop or select a vCard file
+            Drag & drop or select a vCard file to auto-populate contact fields
           </span>
         </Button>
         {fileError && (
