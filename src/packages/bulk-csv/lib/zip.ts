@@ -78,11 +78,6 @@ function assertSafeName(name: string): void {
  * per entry, a central directory and an end-of-central-directory record. Names are
  * flagged as UTF-8 (general purpose bit 11). ZIP64 is not supported: the archive
  * must stay under 4 GiB and 65,535 entries.
- *
- * Single-allocation implementation: pre-calculates total archive size and allocates a single
- * contiguous Uint8Array buffer up front. Per ADR 0033, this utility is retained in pure
- * TypeScript to avoid FFI memory copying overhead between JS and WebAssembly.
- *
  * @throws {Error} on duplicate or unsafe names, or when the ZIP64 limits are exceeded.
  */
 export function createZip(entries: readonly ZipEntry[], options: CreateZipOptions = {}): Uint8Array {
