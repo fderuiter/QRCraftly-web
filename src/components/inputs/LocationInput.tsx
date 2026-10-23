@@ -63,6 +63,9 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     };
   }, []);
 
+  const pastedRef = useRef(false);
+  const lastProcessedUrlRef = useRef<string | null>(null);
+
   const clearErrors = () => {
     setGeoError(null);
     setUrlError(null);
@@ -85,9 +88,14 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     const trimmed = input.trim();
     if (!trimmed) {
       setUrlError(null);
+      lastProcessedUrlRef.current = null;
+      return;
+    }
+    if (trimmed === lastProcessedUrlRef.current) {
       return;
     }
     runParseUrl(trimmed, (parsed) => {
+      lastProcessedUrlRef.current = trimmed;
       if (parsed) {
         setUrlError(null);
         onChange({ latitude: parsed.latitude, longitude: parsed.longitude });
@@ -102,33 +110,34 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     const value = e.target.value;
     setMapUrl(value);
     clearErrors();
-    if (!value.trim()) {
-      setUrlError(null);
+    if (pastedRef.current) {
+      pastedRef.current = false;
       return;
     }
-    runParseUrl(value, (parsed) => {
-      if (parsed) {
-        setUrlError(null);
-        onChange({ latitude: parsed.latitude, longitude: parsed.longitude });
-        announcePolitely("Location coordinates populated");
-      }
-    });
+    lastProcessedUrlRef.current = null;
   };
 
   const handleUrlPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     const pastedText = e.clipboardData.getData("text");
     if (pastedText) {
+      pastedRef.current = true;
+      setMapUrl(pastedText);
       processUrlInput(pastedText);
     }
   };
 
   const handleUrlBlur = () => {
     if (mapUrl.trim()) {
-      runParseUrl(mapUrl, (parsed) => {
-        if (!parsed) {
-          setUrlError("Could not extract valid coordinates from the provided URL or location string.");
-        }
-      });
+      processUrlInput(mapUrl);
+    }
+  };
+
+  const handleUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (mapUrl.trim()) {
+        processUrlInput(mapUrl);
+      }
     }
   };
 
@@ -188,10 +197,12 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         label="Google Maps Link or Coordinates"
         type="text"
         placeholder="Paste Google Maps link, geo: URI, or coordinates"
+        maxLength={2048}
         value={mapUrl}
         onChange={handleUrlChange}
         onPaste={handleUrlPaste}
         onBlur={handleUrlBlur}
+        onKeyDown={handleUrlKeyDown}
         error={urlError ?? undefined}
       />
       <TextField

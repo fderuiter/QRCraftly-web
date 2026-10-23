@@ -511,7 +511,7 @@ describe('LocationInput component', () => {
   // ─── Google Maps link and location string parsing ────────────────────────
 
   describe('Google Maps link and location string parsing', () => {
-    it('extracts coordinates when pasting a Google Maps place pin URL', () => {
+    it('extracts coordinates when pasting a Google Maps place pin URL and does not re-announce on change or blur', () => {
       const { onChange } = renderLocationInput();
       const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
 
@@ -522,14 +522,31 @@ describe('LocationInput component', () => {
         },
       });
 
+      expect(onChange).toHaveBeenCalledTimes(1);
       expect(onChange).toHaveBeenCalledWith({
         latitude: '40.689249',
         longitude: '-74.0445',
       });
+      expect(announcePolitely).toHaveBeenCalledTimes(1);
       expect(announcePolitely).toHaveBeenCalledWith('Location coordinates populated');
+
+      // Subsequent change event from paste browser dispatch
+      fireEvent.change(input, {
+        target: {
+          value:
+            'https://www.google.com/maps/place/Statue+of+Liberty/@40.6892494,-74.0466891,17z/data=!3m1!4b1!4m6!3m5!1s0x89c25090129c363d:0x40c6a5770d25022b!8m2!3d40.6892494!4d-74.0445004',
+        },
+      });
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(announcePolitely).toHaveBeenCalledTimes(1);
+
+      // Subsequent blur event
+      fireEvent.blur(input);
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(announcePolitely).toHaveBeenCalledTimes(1);
     });
 
-    it('extracts coordinates when typing a Google Maps viewport URL', () => {
+    it('does not populate coordinates while typing, populating only on blur or Enter', () => {
       const { onChange } = renderLocationInput();
       const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
 
@@ -537,11 +554,37 @@ describe('LocationInput component', () => {
         target: { value: 'https://www.google.com/maps/@40.7128,-74.0060,15z' },
       });
 
+      expect(onChange).not.toHaveBeenCalled();
+      expect(announcePolitely).not.toHaveBeenCalled();
+
+      fireEvent.blur(input);
+
+      expect(onChange).toHaveBeenCalledTimes(1);
       expect(onChange).toHaveBeenCalledWith({
         latitude: '40.7128',
         longitude: '-74.006',
       });
+      expect(announcePolitely).toHaveBeenCalledTimes(1);
       expect(announcePolitely).toHaveBeenCalledWith('Location coordinates populated');
+    });
+
+    it('populates coordinates when Enter key is pressed', () => {
+      const { onChange } = renderLocationInput();
+      const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
+
+      fireEvent.change(input, {
+        target: { value: '40.7128, -74.0060' },
+      });
+
+      expect(onChange).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      expect(onChange).toHaveBeenCalledWith({
+        latitude: '40.7128',
+        longitude: '-74.006',
+      });
+      expect(announcePolitely).toHaveBeenCalledTimes(1);
     });
 
     it('extracts coordinates when pasting a DMS string', () => {
@@ -575,11 +618,11 @@ describe('LocationInput component', () => {
       ).toBeInTheDocument();
     });
 
-    it('displays error message on blur when entering invalid text', () => {
+    it('displays error message on blur when entering invalid text or URL with stray %', () => {
       renderLocationInput();
       const input = screen.getByLabelText(/Google Maps Link or Coordinates/i);
 
-      fireEvent.change(input, { target: { value: 'Not a valid location' } });
+      fireEvent.change(input, { target: { value: 'https://maps.google.com/?q=Cafe 100%' } });
       fireEvent.blur(input);
 
       expect(

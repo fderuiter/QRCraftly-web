@@ -199,5 +199,10 @@ describe("locationParsers utility", () => {
       expect(parseLocationUrl("Hello World")).toBeNull();
       expect(parseLocationUrl("https://example.com/about")).toBeNull();
     });
+
+    it("handles URL with a stray % without throwing URIError", () => {
+      expect(() => parseLocationUrl("https://maps.google.com/?q=Cafe 100%")).not.toThrow();
+      expect(parseLocationUrl("https://maps.google.com/?q=Cafe 100%")).toBeNull();
+    });
   });
 });

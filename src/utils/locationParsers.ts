@@ -109,16 +109,20 @@ export function parseLocationUrl(input: string): ParsedCoordinates | null {
   }
 
   if (trimmed.includes("?") || trimmed.includes("=")) {
-    let s = trimmed;
-    if (s.includes("?")) s = s.substring(s.indexOf("?") + 1);
-    const params = new URLSearchParams(s);
-    const keys = /^(q|ll|c|center|loc|location|point|sll|cbll|near|destination|origin)$/i;
-    for (const [k, v] of params.entries()) {
-      if (!keys.test(k) || !v) continue;
-      let val = decodeURIComponent(v).trim();
-      if (/^loc:/i.test(val)) val = val.slice(4).trim();
-      const res = parseRawCoordinates(val) || parseDms(val);
-      if (res) return res;
+    try {
+      let s = trimmed;
+      if (s.includes("?")) s = s.substring(s.indexOf("?") + 1);
+      const params = new URLSearchParams(s);
+      const keys = /^(q|ll|c|center|loc|location|point|sll|cbll|near|destination|origin)$/i;
+      for (const [k, v] of params.entries()) {
+        if (!keys.test(k) || !v) continue;
+        let val = v.trim();
+        if (/^loc:/i.test(val)) val = val.slice(4).trim();
+        const res = parseRawCoordinates(val) || parseDms(val);
+        if (res) return res;
+      }
+    } catch {
+      // Ignore query parsing errors (e.g. malformed URIs) and continue to fallback parsers
     }
   }
 
