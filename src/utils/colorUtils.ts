@@ -16,18 +16,19 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-
 /**
  * Normalizes a hex color string, validating and formatting it consistently.
  * Converts shorthand (#123) to full (#112233), ensures # prefix, and lowercases.
  * @param val - The input hex string.
  * @returns The normalized hex string, or null if invalid.
  */
-export const normalizeHex = (val?: string | null): string | null => {
-  if (!val) return null;
+export const normalizeHex = (val: string): string | null => {
   const match = val.match(/^#?([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/);
   if (!match) return null;
-  const hex = match[1].length === 3 ? match[1].split('').map((c) => c + c).join('') : match[1];
+  let hex = match[1];
+  if (hex.length === 3) {
+    hex = hex.split('').map(c => c + c).join('');
+  }
   return '#' + hex.toLowerCase();
 };
 
@@ -104,9 +105,17 @@ export const getLuminanceFromLinearRgb = (r: number, g: number, b: number): numb
  * @returns The relative luminance value.
  */
 export const getLuminance = (hex: string): number => {
-  const norm = hex.length === 4 ? '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3] : hex;
-  const rgb = parseInt(norm.slice(1), 16);
-  return getLuminanceFromRgb(((rgb >> 16) & 255) / 255, ((rgb >> 8) & 255) / 255, (rgb & 255) / 255);
+  let normalizedHex = hex;
+  if (hex.length === 4) {
+    normalizedHex = '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+  }
+
+  const rgb = parseInt(normalizedHex.slice(1), 16);
+  const r = ((rgb >> 16) & 0xff) / 255;
+  const g = ((rgb >> 8) & 0xff) / 255;
+  const b = (rgb & 0xff) / 255;
+
+  return getLuminanceFromRgb(r, g, b);
 };
 
 /**
@@ -116,12 +125,18 @@ export const getLuminance = (hex: string): number => {
  * @returns The contrast ratio (1 to 21).
  */
 export const getContrastRatio = (fg: string, bg: string) => {
-  if (!fg || !bg || !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(fg) || !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(bg)) return 0;
-  const l1 = getLuminance(fg), l2 = getLuminance(bg);
-  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  if (!fg || !bg) return 0;
+  if ((fg.length !== 7 && fg.length !== 4) || (bg.length !== 7 && bg.length !== 4)) return 0;
+
+  const hexRegex = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+  if (!hexRegex.test(fg) || !hexRegex.test(bg)) return 0;
+
+  const l1 = getLuminance(fg);
+  const l2 = getLuminance(bg);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
 };
-
-
 
 export interface CmykColor {
   c: number;
@@ -146,19 +161,38 @@ export function rgbToCmyk(
   gParam?: number,
   bParam?: number
 ): CmykColor {
-  const isObj = typeof rOrColor === 'object' && rOrColor !== null;
-  const r = Math.min(1, Math.max(0, isObj ? rOrColor.r : (typeof rOrColor === 'number' ? rOrColor : 0)));
-  const g = Math.min(1, Math.max(0, isObj ? rOrColor.g : (gParam ?? 0)));
-  const b = Math.min(1, Math.max(0, isObj ? rOrColor.b : (bParam ?? 0)));
+  let r: number;
+  let g: number;
+  let b: number;
+
+  if (typeof rOrColor === 'object' && rOrColor !== null) {
+    r = rOrColor.r;
+    g = rOrColor.g;
+    b = rOrColor.b;
+  } else {
+    r = rOrColor;
+    g = gParam ?? 0;
+    b = bParam ?? 0;
+  }
+
+  r = Math.min(1, Math.max(0, r));
+  g = Math.min(1, Math.max(0, g));
+  b = Math.min(1, Math.max(0, b));
 
   const k = 1 - Math.max(r, g, b);
-  if (k >= 1) return { c: 0, m: 0, y: 0, k: 1 };
+  if (k >= 1) {
+    return { c: 0, m: 0, y: 0, k: 1 };
+  }
 
-  const d = 1 - k;
+  const c = (1 - r - k) / (1 - k);
+  const m = (1 - g - k) / (1 - k);
+  const y = (1 - b - k) / (1 - k);
+
   return {
-    c: Math.min(1, Math.max(0, (d - r) / d)),
-    m: Math.min(1, Math.max(0, (d - g) / d)),
-    y: Math.min(1, Math.max(0, (d - b) / d)),
+    c: Math.min(1, Math.max(0, c)),
+    m: Math.min(1, Math.max(0, m)),
+    y: Math.min(1, Math.max(0, y)),
     k: Math.min(1, Math.max(0, k)),
   };
 }
+

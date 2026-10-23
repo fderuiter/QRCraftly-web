@@ -42,8 +42,8 @@ export const hslToHex = (h: number, s: number, l: number): string => {
  * falls back to black (#000000) or white (#ffffff).
  */
 export const adjustColorForContrast = (fgHex: string, bgHex: string, targetContrast = 4.5): string => {
-  const normBg = normalizeHex(bgHex) || '#ffffff';
-  const normFg = normalizeHex(fgHex) || '#000000';
+  const normBg = (bgHex && normalizeHex(bgHex)) || '#ffffff';
+  const normFg = (fgHex && normalizeHex(fgHex)) || '#000000';
   if (getContrastRatio(normFg, normBg) >= targetContrast) return normFg;
 
   const rgb = parseInt(normFg.slice(1), 16);
@@ -82,7 +82,7 @@ export const adjustColorForContrast = (fgHex: string, bgHex: string, targetContr
  */
 export const calculateAutoFixColorPatch = (config?: Partial<QRConfig> | null): Partial<QRConfig> => {
   if (!config) return {};
-  const bg = normalizeHex(config.bgColor) || '#ffffff';
+  const bg = (config.bgColor && normalizeHex(config.bgColor)) || '#ffffff';
   const patch: Partial<QRConfig> = {};
 
   if (config.gradientType && config.gradientType !== 'none' && config.gradientColorStops?.length) {
