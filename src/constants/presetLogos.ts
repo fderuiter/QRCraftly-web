@@ -208,7 +208,7 @@ let isUserLogoOverridden = false;
 /**
  * Marks that the user has explicitly set or removed the logo.
  */
-export function setUserLogoOverride(_logoUrl?: string | null): void {
+export function setUserLogoOverride(): void {
   isUserLogoOverridden = true;
 }
 

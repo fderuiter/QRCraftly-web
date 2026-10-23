@@ -8,7 +8,7 @@ import { RangeInput } from '../ui/RangeInput';
 import { useImageUpload } from '../../hooks/useImageUpload';
 import { SYSTEM_LIMITS } from '../../constants';
 import { MIN_LOGO_BACKING_PADDING } from '@/packages/qr-matrix';
-import { PRESET_LOGOS, PRESET_LOGO_CATEGORIES, type PresetCategory, setUserLogoOverride } from '../../constants/presetLogos';
+import { PRESET_LOGOS, PRESET_LOGO_CATEGORIES, type PresetCategory } from '../../constants/presetLogos';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { combineIds } from '../../utils/a11y';
 import { useUndoToast } from '../../hooks/useUndoToast';
@@ -53,7 +53,6 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleUpload(e, (dataUrl) => {
-      setUserLogoOverride(dataUrl);
       onChange({ logoUrl: dataUrl, errorCorrectionLevel: QRErrorCorrectionLevel.H });
     });
   };
@@ -68,7 +67,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
       <div className="mb-3 flex items-center justify-between">
         <h4 className="text-sm font-semibold text-fg-soft">Logo</h4>
         {config.logoUrl && (
-          <Button variant="error" size="xs" onClick={() => { setUserLogoOverride(null); onChange({ logoUrl: null }); setError(null); notifyUndo('Logo removed'); }}>
+          <Button variant="error" size="xs" onClick={() => { onChange({ logoUrl: null }); setError(null); notifyUndo('Logo removed'); }}>
             <X className="size-3.5" aria-hidden="true" /> Remove
           </Button>
         )}
@@ -100,7 +99,6 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
                 key={preset.id}
                 type="button"
                 onClick={() => {
-                  setUserLogoOverride(preset.dataUrl);
                   onChange({ logoUrl: preset.dataUrl, errorCorrectionLevel: QRErrorCorrectionLevel.H });
                   setError(null);
                 }}

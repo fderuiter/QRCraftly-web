@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react';
-import type { QRConfig } from '@/types';
+import { type QRConfig, QRErrorCorrectionLevel } from '@/types';
 import { DEFAULT_CONFIG } from '@/constants';
 import { sanitizeConfig } from '@/packages/qr-payload';
 
@@ -45,6 +45,11 @@ export type QRState = {
    * accepted content, so the preview and exports must not use it until the field is fixed (#1279).
    */
   contentRefused: boolean;
+  /**
+   * Whether the logo has been explicitly changed or removed by the user in this generator session.
+   * When false, switching QR types automatically assigns a matching preset logo.
+   */
+  isLogoOverridden: boolean;
   /** Whether an appearance change can be undone. */
   canUndo: boolean;
   /** Whether an undone appearance change can be redone. */
@@ -58,6 +63,11 @@ export interface UpdateConfigOptions {
    * step, for example a hover preview.
    */
   history?: 'push' | 'skip';
+  /**
+   * Whether this config update is an automated preset logo assignment. Automated assignments
+   * do not set {@link QRState.isLogoOverridden}.
+   */
+  isAutoPlacement?: boolean;
 }
 
 /**
@@ -174,25 +184,41 @@ function sameAppearance(a: Partial<QRConfig>, b: Partial<QRConfig>): boolean {
   return keys.every(key => Object.is(a[key], b[key]));
 }
 
+interface HistoryStep {
+  appearance: Partial<QRConfig>;
+  isLogoOverridden: boolean;
+  userECC: QRErrorCorrectionLevel;
+}
+
 function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = false, presetConfig?: Partial<QRConfig>): QRStore {
+  let userErrorCorrectionLevel: QRErrorCorrectionLevel =
+    initialConfig?.errorCorrectionLevel ??
+    presetConfig?.errorCorrectionLevel ??
+    DEFAULT_CONFIG.errorCorrectionLevel;
+
+  const isLogoOverridden = Boolean(initialConfig?.logoUrl || presetConfig?.logoUrl);
+
+  const initialMergedConfig = {
+    ...DEFAULT_CONFIG,
+    ...initialConfig,
+    ...(retainAppearance ? retainedAppearance : null),
+    ...presetConfig,
+    ...(retainAppearance ? stagedContentFor(initialConfig?.type ?? DEFAULT_CONFIG.type) : null),
+  };
+
   let state: QRState = {
-    config: {
-      ...DEFAULT_CONFIG,
-      ...initialConfig,
-      ...(retainAppearance ? retainedAppearance : null),
-      ...presetConfig,
-      ...(retainAppearance ? stagedContentFor(initialConfig?.type ?? DEFAULT_CONFIG.type) : null),
-    },
+    config: initialMergedConfig,
     moduleCount: 0,
     isScannabilityFallbackActive: false,
     contentRefused: false,
+    isLogoOverridden,
     canUndo: false,
     canRedo: false,
   };
 
   // Undo history holds appearance snapshots in memory only (never persisted).
-  let past: Partial<QRConfig>[] = [];
-  let future: Partial<QRConfig>[] = [];
+  let past: HistoryStep[] = [];
+  let future: HistoryStep[] = [];
   let lastPush: { keys: string; at: number } | null = null;
   let previewBase: Partial<QRConfig> | null = null;
 
@@ -215,8 +241,28 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
       };
     },
     updateConfig: (updates, options) => {
-      const sanitized = sanitizeConfig({ ...state.config, ...updates });
-      if (shallowEqualConfig(sanitized, state.config)) return;
+      let nextLogoOverridden = state.isLogoOverridden;
+      if (updates.logoUrl !== undefined && !options?.isAutoPlacement) {
+        nextLogoOverridden = true;
+      }
+
+      if (updates.errorCorrectionLevel !== undefined && !options?.isAutoPlacement) {
+        userErrorCorrectionLevel = updates.errorCorrectionLevel;
+      }
+
+      const mergedConfig = { ...state.config, ...updates };
+      const prevLogoUrl = state.config.logoUrl;
+      const nextLogoUrl = mergedConfig.logoUrl ?? null;
+
+      if (nextLogoUrl) {
+        mergedConfig.errorCorrectionLevel = QRErrorCorrectionLevel.H;
+      } else if (prevLogoUrl && !nextLogoUrl && updates.errorCorrectionLevel === undefined) {
+        mergedConfig.errorCorrectionLevel = userErrorCorrectionLevel;
+      }
+
+      const sanitized = sanitizeConfig(mergedConfig);
+      if (shallowEqualConfig(sanitized, state.config) && nextLogoOverridden === state.isLogoOverridden) return;
+
       const before = pickAppearance(state.config);
       const after = pickAppearance(sanitized);
       const appearanceChanged = !sameAppearance(before, after);
@@ -226,7 +272,7 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
         const now = Date.now();
         const coalesce = lastPush !== null && lastPush.keys === keys && now - lastPush.at < COALESCE_MS && past.length > 0;
         if (!coalesce) {
-          past = [...past.slice(-(MAX_HISTORY_STEPS - 1)), before];
+          past = [...past.slice(-(MAX_HISTORY_STEPS - 1)), { appearance: before, isLogoOverridden: state.isLogoOverridden, userECC: userErrorCorrectionLevel }];
         }
         lastPush = { keys, at: now };
         future = [];
@@ -237,30 +283,33 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
         ...state,
         config: sanitized,
         isScannabilityFallbackActive: resetsFallback ? false : state.isScannabilityFallbackActive,
+        isLogoOverridden: nextLogoOverridden,
         canUndo: past.length > 0,
         canRedo: future.length > 0,
       });
     },
     undo: () => {
-      const target = past[past.length - 1];
-      if (!target) return false;
+      const step = past[past.length - 1];
+      if (!step) return false;
       past = past.slice(0, -1);
-      future = [...future, pickAppearance(state.config)];
+      future = [...future, { appearance: pickAppearance(state.config), isLogoOverridden: state.isLogoOverridden, userECC: userErrorCorrectionLevel }];
       lastPush = null;
-      const sanitized = sanitizeConfig({ ...state.config, ...target });
+      userErrorCorrectionLevel = step.userECC;
+      const sanitized = sanitizeConfig({ ...state.config, ...step.appearance });
       if (retainAppearance) retainedAppearance = pickAppearance(sanitized);
-      setState({ ...state, config: sanitized, canUndo: past.length > 0, canRedo: true });
+      setState({ ...state, config: sanitized, isLogoOverridden: step.isLogoOverridden, canUndo: past.length > 0, canRedo: true });
       return true;
     },
     redo: () => {
-      const target = future[future.length - 1];
-      if (!target) return false;
+      const step = future[future.length - 1];
+      if (!step) return false;
       future = future.slice(0, -1);
-      past = [...past, pickAppearance(state.config)];
+      past = [...past, { appearance: pickAppearance(state.config), isLogoOverridden: state.isLogoOverridden, userECC: userErrorCorrectionLevel }];
       lastPush = null;
-      const sanitized = sanitizeConfig({ ...state.config, ...target });
+      userErrorCorrectionLevel = step.userECC;
+      const sanitized = sanitizeConfig({ ...state.config, ...step.appearance });
       if (retainAppearance) retainedAppearance = pickAppearance(sanitized);
-      setState({ ...state, config: sanitized, canUndo: true, canRedo: future.length > 0 });
+      setState({ ...state, config: sanitized, isLogoOverridden: step.isLogoOverridden, canUndo: true, canRedo: future.length > 0 });
       return true;
     },
     preview: (updates) => {

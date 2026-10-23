@@ -661,7 +661,7 @@ describe("useInputLogic automatic preset logo placement", () => {
     );
 
     // Simulate user explicitly removing logo via LogoControls
-    setUserLogoOverride(null);
+    setUserLogoOverride();
 
     // Switch type to EMAIL
     onChange.mockClear();
@@ -688,7 +688,7 @@ describe("useInputLogic automatic preset logo placement", () => {
 
     // Simulate user explicitly choosing a custom logo
     const customLogo = "data:image/png;base64,customlogodata";
-    setUserLogoOverride(customLogo);
+    setUserLogoOverride();
 
     // Switch type to LOCATION
     onChange.mockClear();
@@ -702,6 +702,36 @@ describe("useInputLogic automatic preset logo placement", () => {
         logoUrl: TYPE_TO_PRESET_LOGO[QRType.LOCATION],
       })
     );
+  });
+
+  it("does not interrupt pending form input typing debounce when logoUrl changes", () => {
+    const config = createMockConfig(QRType.TEXT, "Start");
+    const onChange = vi.fn();
+
+    const { result, rerender } = renderHook(
+      ({ cfg }) => useInputLogic(cfg, onChange),
+      { initialProps: { cfg: config } }
+    );
+
+    // User types in text input (first edit fires, second edit is debounced)
+    act(() => {
+      result.current.inputProps.onChange({ text: "Typed A" });
+    });
+    act(() => {
+      result.current.inputProps.onChange({ text: "Typed B" });
+    });
+
+    // logoUrl changes externally (e.g., logo color or size preview)
+    const logoUpdatedConfig = { ...config, logoUrl: "data:image/svg+xml;base64,sample" };
+    rerender({ cfg: logoUpdatedConfig });
+
+    // Advance debounce timer
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    // The debounced edit should still complete successfully
+    expect(onChange).toHaveBeenLastCalledWith({ value: "Typed B" });
   });
 });
 

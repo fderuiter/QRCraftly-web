@@ -633,4 +633,62 @@ describe('QRStore appearance history', () => {
     });
     expect(next.result.current.getState().config.fgColor).toBe(DEFAULT_CONFIG.fgColor);
   });
+
+  describe('isLogoOverridden and errorCorrectionLevel behavior', () => {
+    it('initializes isLogoOverridden as false when no logoUrl is in initialConfig', () => {
+      const store = setup();
+      expect(store.getState().isLogoOverridden).toBe(false);
+    });
+
+    it('marks isLogoOverridden as true when logoUrl is explicitly set or cleared', () => {
+      const store = setup();
+      expect(store.getState().isLogoOverridden).toBe(false);
+
+      // Explicitly remove logo (e.g., command palette "Remove logo")
+      store.updateConfig({ logoUrl: null });
+      expect(store.getState().isLogoOverridden).toBe(true);
+
+      // Explicitly set logo
+      store.updateConfig({ logoUrl: 'data:image/svg+xml;base64,sample' });
+      expect(store.getState().isLogoOverridden).toBe(true);
+    });
+
+    it('does NOT mark isLogoOverridden as true when isAutoPlacement option is true', () => {
+      const store = setup();
+      store.updateConfig({ logoUrl: 'data:image/svg+xml;base64,auto' }, { isAutoPlacement: true });
+      expect(store.getState().isLogoOverridden).toBe(false);
+    });
+
+    it('forces errorCorrectionLevel to H when logo is placed and restores user ECC level when logo is removed', () => {
+      const store = setup();
+      // User sets ECC to L
+      store.updateConfig({ errorCorrectionLevel: QRErrorCorrectionLevel.L });
+      expect(store.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.L);
+
+      // Logo is placed (auto or manual)
+      store.updateConfig({ logoUrl: 'data:image/svg+xml;base64,logo' });
+      expect(store.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.H);
+
+      // Logo is removed
+      store.updateConfig({ logoUrl: null });
+      // Restores to user's remembered ECC (L)
+      expect(store.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.L);
+    });
+
+    it('restores isLogoOverridden and user ECC on undo and redo', () => {
+      const store = setup();
+      store.updateConfig({ errorCorrectionLevel: QRErrorCorrectionLevel.M });
+      store.updateConfig({ logoUrl: 'data:image/svg+xml;base64,logo1' });
+      expect(store.getState().isLogoOverridden).toBe(true);
+      expect(store.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.H);
+
+      store.undo(); // Undo logo placement
+      expect(store.getState().isLogoOverridden).toBe(false);
+      expect(store.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.M);
+
+      store.redo(); // Redo logo placement
+      expect(store.getState().isLogoOverridden).toBe(true);
+      expect(store.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.H);
+    });
+  });
 });

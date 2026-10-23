@@ -22,7 +22,10 @@ import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
 import { CONTAINMENT_PROFILES, emailListError, cardFieldsFor, vCardFieldError, paymentRefusal } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
-import { TYPE_TO_PRESET_LOGO, isLogoOverridden, resetUserLogoOverride } from "../../constants/presetLogos";
+import { TYPE_TO_PRESET_LOGO, PRESET_LOGOS, isLogoOverridden as isLogoOverriddenModule, resetUserLogoOverride } from "../../constants/presetLogos";
+import { useOptionalQRStore } from "@/context/QRContext";
+import { useUndoToast } from "@/hooks/useUndoToast";
+import { announcePolitely } from "../../utils/a11y";
 
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
 const COMMIT_DELAY_MS = 100;
@@ -142,8 +145,50 @@ export function useInputLogic(
   // The debounced write waiting in timeoutRef, so flush() can apply it immediately.
   const pendingCommitRef = useRef<(() => void) | null>(null);
   const prevTypeRef = useRef<QRType | null>(null);
+  const prevLogoTypeRef = useRef<QRType | null>(null);
   // When the last edit was written, so an edit after a quiet spell is written at once.
   const lastEditAtRef = useRef(Number.NEGATIVE_INFINITY);
+
+  const store = useOptionalQRStore();
+  const notifyUndo = useUndoToast();
+
+  // Automatically assign matching preset logo on QR type changes in its own effect
+  useEffect(() => {
+    const prevType = prevLogoTypeRef.current;
+    prevLogoTypeRef.current = config.type;
+
+    if (prevType === null || prevType === config.type) return;
+
+    const storeState = store?.getState();
+    const isOverridden = storeState ? storeState.isLogoOverridden : isLogoOverriddenModule();
+    if (isOverridden) return;
+
+    const defaultLogo = TYPE_TO_PRESET_LOGO[config.type] ?? null;
+    const currentLogoUrl = config.logoUrl ?? null;
+
+    if (currentLogoUrl !== defaultLogo) {
+      if (store) {
+        store.updateConfig(
+          { logoUrl: defaultLogo, ...(defaultLogo ? { errorCorrectionLevel: QRErrorCorrectionLevel.H } : {}) },
+          { isAutoPlacement: true }
+        );
+      } else {
+        onChange({
+          logoUrl: defaultLogo,
+          ...(defaultLogo ? { errorCorrectionLevel: QRErrorCorrectionLevel.H } : {}),
+        });
+      }
+
+      if (defaultLogo) {
+        const preset = PRESET_LOGOS.find((p) => p.dataUrl === defaultLogo);
+        if (preset) {
+          const message = `${preset.label} logo added`;
+          notifyUndo(message);
+          announcePolitely(message);
+        }
+      }
+    }
+  }, [config.type, config.logoUrl, store, onChange, notifyUndo]);
 
   // Synchronize input states reactively when config changes externally (e.g., undo/redo or preset loaded)
   useEffect(() => {
@@ -160,18 +205,6 @@ export function useInputLogic(
     }
     const currentConstructed = entry.constructFn ? entry.constructFn(currentLocalState as never) : '';
 
-    // Automatically assign matching preset logo on type changes if user hasn't overridden logo
-    let logoUpdates: Partial<QRConfig> = {};
-    if (prevType !== null && prevType !== config.type && !isLogoOverridden()) {
-      const defaultLogo = TYPE_TO_PRESET_LOGO[config.type] ?? null;
-      if (config.logoUrl !== defaultLogo) {
-        logoUpdates = {
-          logoUrl: defaultLogo,
-          ...(defaultLogo ? { errorCorrectionLevel: QRErrorCorrectionLevel.H } : {}),
-        };
-      }
-    }
-
     if (currentConstructed !== config.value) {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -182,7 +215,7 @@ export function useInputLogic(
       // If we switched types, or on initial mount where retained state exists for this type:
       // Preserve local retained state and push its constructed value to global state.
       if (retainedInputStates[config.type] !== undefined && (prevType !== config.type || prevType === null)) {
-        onChange({ value: currentConstructed, ...logoUpdates });
+        onChange({ value: currentConstructed });
         return;
       }
 
@@ -190,7 +223,7 @@ export function useInputLogic(
       // and the incoming config.value is empty (usually from tab select),
       // then preserve the local state and push its constructed value to the global state.
       if (prevType !== null && prevType !== config.type && config.value === '' && currentConstructed !== '') {
-        onChange({ value: currentConstructed, ...logoUpdates });
+        onChange({ value: currentConstructed });
         return;
       }
 
@@ -220,14 +253,8 @@ export function useInputLogic(
       } else {
         updateStateForType(config.type, entry.initialState);
       }
-
-      if (Object.keys(logoUpdates).length > 0) {
-        onChange(logoUpdates);
-      }
-    } else if (Object.keys(logoUpdates).length > 0) {
-      onChange(logoUpdates);
     }
-  }, [config.type, config.value, config.logoUrl, onChange]);
+  }, [config.type, config.value, onChange]);
 
   // Clear timeout if type changes to prevent race conditions (simulating unmount of previous input)
   useEffect(() => {

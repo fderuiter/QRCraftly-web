@@ -15,18 +15,41 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { useEffect } from 'react';
+import { fireEvent, render, screen, within, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { LogoControls } from './LogoControls';
 import { ToastProvider } from '../ui/Toast';
 import { DEFAULT_CONFIG } from '../../constants';
-import { PRESET_LOGOS, isLogoOverridden, resetUserLogoOverride } from '../../constants/presetLogos';
+import { PRESET_LOGOS } from '../../constants/presetLogos';
 import { QRErrorCorrectionLevel, type QRConfig } from '../../types';
+import { QRProvider, useQRStore, useQRStoreSelector } from '../../context/QRContext';
+
+let storeHandle: ReturnType<typeof useQRStore>;
+
+function Harness({ configOverrides = {}, onChange }: { configOverrides?: Partial<QRConfig>; onChange?: (u: Partial<QRConfig>) => void }) {
+  const store = useQRStore();
+  useEffect(() => {
+    storeHandle = store;
+  }, [store]);
+  const config = useQRStoreSelector((s) => s.config);
+  return (
+    <LogoControls
+      config={config}
+      onChange={(updates) => {
+        storeHandle.updateConfig(updates);
+        onChange?.(updates);
+      }}
+    />
+  );
+}
 
 const renderControls = (configOverrides: Partial<QRConfig> = {}, onChange = vi.fn()) =>
   render(
     <ToastProvider>
-      <LogoControls config={{ ...DEFAULT_CONFIG, ...configOverrides }} onChange={onChange} />
+      <QRProvider initialConfig={{ ...DEFAULT_CONFIG, ...configOverrides }}>
+        <Harness configOverrides={configOverrides} onChange={onChange} />
+      </QRProvider>
     </ToastProvider>
   );
 
@@ -80,25 +103,25 @@ describe('LogoControls error correction level auto-elevation', () => {
 
 describe('LogoControls user override tracking', () => {
   it('marks logo as user overridden when selecting a preset logo or removing a logo', () => {
-    resetUserLogoOverride();
-    expect(isLogoOverridden()).toBe(false);
-
     const onChange = vi.fn();
     renderControls({ logoUrl: null }, onChange);
+    expect(storeHandle.getState().isLogoOverridden).toBe(false);
 
     const firstPreset = PRESET_LOGOS[0];
     const presetButton = screen.getByRole('button', { name: `Select ${firstPreset.label} logo` });
     fireEvent.click(presetButton);
 
-    expect(isLogoOverridden()).toBe(true);
+    expect(storeHandle.getState().isLogoOverridden).toBe(true);
 
     // Test remove button
-    renderControls({ logoUrl: firstPreset.dataUrl }, onChange);
+    act(() => {
+      storeHandle.updateConfig({ logoUrl: firstPreset.dataUrl });
+    });
     const removeButton = screen.getByRole('button', { name: /remove/i });
     fireEvent.click(removeButton);
 
     expect(onChange).toHaveBeenCalledWith({ logoUrl: null });
-    expect(isLogoOverridden()).toBe(true);
+    expect(storeHandle.getState().isLogoOverridden).toBe(true);
   });
 });
 
