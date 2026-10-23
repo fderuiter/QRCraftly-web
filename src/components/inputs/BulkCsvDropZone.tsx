@@ -37,9 +37,9 @@ export function BulkCsvDropZone({ children }: BulkCsvDropZoneProps) {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-line-strong bg-surface-sunken p-8 text-center">
       <FileSpreadsheet className="size-12 text-accent" aria-hidden="true" />
-      <h3 className="mt-3 text-base font-semibold text-fg">Upload CSV or TXT File</h3>
+      <h3 className="mt-3 text-base font-semibold text-fg">Upload CSV, TXT, or Excel File</h3>
       <p className="mt-1 text-xs text-fg-muted">
-        Upload a .csv or .txt file with a header row. Up to {MAX_BULK_CSV_ROWS} rows are processed, entirely
+        Upload a .csv, .txt, or .xlsx file with a header row. Up to {MAX_BULK_CSV_ROWS} rows are processed, entirely
         in your browser.
       </p>
       {children}

@@ -30,7 +30,7 @@ import { VCardInput } from "./VCardInput";
 import { PhoneInput } from "./PhoneInput";
 import { SmsInput } from "./SmsInput";
 import { PaymentInput } from "./PaymentInput";
-import { EventInput } from "./EventInput";
+import { LazyEventInput } from "./LazyEventInput";
 import { LocationInput } from "./LocationInput";
 import { MeetingInput } from "./MeetingInput";
 import { SocialInput } from "./SocialInput";
@@ -100,7 +100,7 @@ export const INPUT_REGISTRY: Registry = {
     canHydrateFn: QR_GENERATORS[QRType.WIFI].matches,
   },
   [QRType.EVENT]: {
-    Component: EventInput,
+    Component: LazyEventInput,
     initialState: {
       title: "",
       startDate: "",

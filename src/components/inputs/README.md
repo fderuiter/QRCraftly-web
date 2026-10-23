@@ -39,7 +39,7 @@ export const WifiInput: React.FC<WifiInputProps> = ({ data, onChange }) => {
 - `UrlInput.tsx`: For `QRType.URL`. Handles URL validation and sanitization.
 - `TextInput.tsx`: For `QRType.TEXT`. Includes character counting.
 - `WifiInput.tsx`: For `QRType.WIFI`. Handles SSID, password, encryption type (WPA/WPA2, WPA3 Personal SAE, WEP, WPA2-Enterprise, Open), hidden network flags, and (for WPA2-Enterprise) the EAP method (`E:`), phase 2 authentication (`PH2:`) and identity (`I:`) fields.
-- `EventInput.tsx`: For `QRType.EVENT`. Builds iCalendar-compatible event payloads (with optional IANA / UTC timezone selection, or all-day dates) and web calendar direct links (Google, Outlook, Office 365, Yahoo). Zoned times are written in UTC with `X-WR-TIMEZONE`, because a `TZID` needs a `VTIMEZONE` block. A notice under the calendar choice says a web calendar link sends the details to that provider.
+- `EventInput.tsx`: For `QRType.EVENT`. Builds iCalendar-compatible event payloads (with optional IANA / UTC timezone selection, all-day dates, or RFC 5545 RRULE recurrence frequency and count) and web calendar direct links (Google, Outlook, Office 365, Yahoo). Zoned times are written in UTC with `X-WR-TIMEZONE`, because a `TZID` needs a `VTIMEZONE` block. A notice under the calendar choice says a web calendar link sends the details to that provider.
 - `EmailInput.tsx`: For `QRType.EMAIL`. Fields for email address, CC, BCC, subject, and body.
 - `VCardInput.tsx`: For `QRType.VCARD`. Complex form for contact details supporting vCard 2.1, 3.0, 4.0 (RFC 6350), and MECard formats, with profile photo URL support and social profile fields (X, LinkedIn, Instagram, Facebook, GitHub) in vCard formats only.
 - `PhoneInput.tsx`: For `QRType.PHONE`. Simple phone number input.

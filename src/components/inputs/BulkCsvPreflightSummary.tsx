@@ -20,6 +20,8 @@ import React, { useState } from 'react';
 import {
   type PreflightReport,
   type PreflightRowDetail,
+  formatErrorLogCsv,
+  errorLogFileName,
   formatPreflightReportCsv,
   preflightReportFileName,
 } from '@/packages/bulk-csv';
@@ -93,6 +95,12 @@ export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = (
   const hasIssues = report.invalidDetails.length > 0;
   const isAllValid = !hasIssues && report.totalRows > 0;
 
+  const handleExportErrorLog = () => {
+    const bytes = formatErrorLogCsv(report.invalidDetails);
+    const downloadName = errorLogFileName(fileName);
+    triggerFileDownload(bytes, downloadName, 'text/csv');
+  };
+
   const handleExportCsv = () => {
     const csvContent = formatPreflightReportCsv(
       report.invalidDetails.length > 0 ? report.invalidDetails : report.details
@@ -161,17 +169,31 @@ export const BulkCsvPreflightSummary: React.FC<BulkCsvPreflightSummaryProps> = (
               )}
             </Button>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleExportCsv}
-              data-testid="export-preflight-report-button"
-              className="flex items-center gap-1.5 text-xs"
-            >
-              <Download className="size-3.5" aria-hidden="true" />
-              Export Report CSV
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleExportErrorLog}
+                data-testid="export-error-log-button"
+                className="flex items-center gap-1.5 text-xs"
+              >
+                <Download className="size-3.5" aria-hidden="true" />
+                Export Error Log (CSV)
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleExportCsv}
+                data-testid="export-preflight-report-button"
+                className="flex items-center gap-1.5 text-xs"
+              >
+                <Download className="size-3.5" aria-hidden="true" />
+                Export Report CSV
+              </Button>
+            </div>
           </div>
 
           {isExpanded && (
