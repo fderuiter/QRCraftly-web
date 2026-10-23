@@ -18,6 +18,7 @@
 
 import { DEFAULT_CONFIG } from '@/constants';
 import type { CsvRow } from './csv';
+import { escapeCsvCell } from './csvEscape';
 import { sanitizeFileStem } from './fileNames';
 import { hasPayload } from './preview';
 import { bulkValidationType, encodeBulkCell, type BulkContentType } from './payload';
@@ -243,22 +244,6 @@ export function categorizeCsvRows(
     validRowIndices,
     validPayloads,
   };
-}
-
-const FORMULA_START = /^[=+\-@\t\r]/;
-
-/**
- * Escapes a single string field for RFC 4180 CSV text.
- * Neutralises leading formula characters (=, +, -, @, \t, \r) with a single quote to prevent
- * formula injection in spreadsheets, then wraps fields in double quotes if they contain
- * quotes, commas, or line breaks. Internal quotes are doubled.
- * @param field - Raw value to escape.
- * @returns Escaped CSV field.
- */
-export function escapeCsvCell(field: string | number | undefined | null): string {
-  const str = String(field ?? '');
-  const safe = FORMULA_START.test(str) ? `'${str}` : str;
-  return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
 /**

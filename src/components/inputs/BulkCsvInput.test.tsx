@@ -418,6 +418,42 @@ describe('BulkCsvInput Component', () => {
     expect(list.textContent).not.toContain('Row 1:');
   });
 
+  it('triggers download of error log CSV when Export Error Log (CSV) button is clicked for skipped rows', async () => {
+    const csvContent = [
+      'URL,Name',
+      'https://example.com/ok,Good',
+      'javascript:alert(1),Bad',
+    ].join('\n');
+    const data: BulkCsvData = {
+      ...initialData,
+      csvContent,
+      payloadColumn: 'URL',
+      filenameColumn: 'Name',
+      exportFormat: 'svg',
+      fileName: 'my-list.csv',
+    };
+
+    renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Generate Batch/ }));
+
+    await waitFor(() => expect(downloadManager.triggerFileDownload).toHaveBeenCalled());
+    vi.mocked(downloadManager.triggerFileDownload).mockClear();
+
+    const exportBtn = screen.getAllByTestId('export-error-log-button')[0];
+    expect(exportBtn).toBeInTheDocument();
+    fireEvent.click(exportBtn);
+
+    expect(downloadManager.triggerFileDownload).toHaveBeenCalledTimes(1);
+    const [bytes, fileName, mimeType] = vi.mocked(downloadManager.triggerFileDownload).mock.calls[0];
+    expect(ArrayBuffer.isView(bytes)).toBe(true);
+    expect(fileName).toBe('my-list-error-log.csv');
+    expect(mimeType).toBe('text/csv');
+
+    const downloadedText = new TextDecoder().decode(bytes);
+    expect(downloadedText).toContain('Row Number,Category,Reason,Payload');
+    expect(downloadedText).toContain('2,skipped,Unsafe URL scheme or malicious protocol detected.,');
+  });
+
   it('makes no ZIP and disables button when every row is blocked', async () => {
     const data: BulkCsvData = {
       ...initialData,
