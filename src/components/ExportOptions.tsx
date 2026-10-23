@@ -36,12 +36,12 @@ export const FORMAT_LABELS: Record<DownloadFormat, string> = {
 };
 
 const FORMAT_HINTS: Record<DownloadFormat, string> = {
-  png: 'Sharp image that works everywhere.',
-  svg: 'Vector: scales to any size, best for print and design tools.',
-  eps: 'Vector EPS for print shops and older design tools. Logos are embedded as images.',
-  pdf: 'Vector PDF for printing and sharing. Logos are embedded as images.',
-  jpeg: 'Smallest image, with no transparency.',
-  webp: 'Small and sharp, for websites.',
+  png: 'Sharp image.',
+  svg: 'Scales to any size for print and design tools.',
+  eps: 'For print shops. Logos embedded as images.',
+  pdf: 'For printing. Logos embedded as images.',
+  jpeg: 'Smallest image, no transparency.',
+  webp: 'Small and sharp.',
 };
 
 

@@ -120,19 +120,11 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
         label="Repeat"
         value={data.recurrenceFreq || "NONE"}
         onChange={(e) => {
-          const val = e.target.value;
-          if (
-            val === "NONE" ||
-            val === "DAILY" ||
-            val === "WEEKLY" ||
-            val === "MONTHLY" ||
-            val === "YEARLY"
-          ) {
-            onChange({
-              recurrenceFreq: val,
-              ...(val === "NONE" ? { recurrenceCount: undefined } : {}),
-            });
-          }
+          const val = e.target.value as EventData['recurrenceFreq'];
+          onChange({
+            recurrenceFreq: val,
+            ...(val === "NONE" ? { recurrenceCount: undefined } : {}),
+          });
         }}
       >
         <option value="NONE">Does not repeat</option>
@@ -150,10 +142,9 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
           placeholder="e.g. 5 (leave blank for indefinite)"
           value={data.recurrenceCount ?? ""}
           onChange={(e) => {
-            const val = e.target.value;
-            const count = parseInt(val, 10);
+            const count = parseInt(e.target.value, 10);
             onChange({
-              recurrenceCount: val === "" || isNaN(count) || count <= 0 ? undefined : count,
+              recurrenceCount: !e.target.value || isNaN(count) || count <= 0 ? undefined : count,
             });
           }}
         />

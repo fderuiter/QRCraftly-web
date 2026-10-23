@@ -101,20 +101,8 @@ export const hydrateEventData = (raw: string): EventData => {
       return result;
     }
 
-    if (calendar === CalendarProvider.OUTLOOK) {
-      result.provider = CalendarProvider.OUTLOOK;
-      result.title = parsed.params.get('subject') || '';
-      Object.assign(result, hydrateOutlookDates(parsed.params));
-      if (parsed.params.get('ctz')) {
-        result.timezone = parsed.params.get('ctz')!;
-      }
-      result.location = parsed.params.get('location') || '';
-      result.description = parsed.params.get('body') || '';
-      return result;
-    }
-
-    if (calendar === CalendarProvider.OFFICE365) {
-      result.provider = CalendarProvider.OFFICE365;
+    if (calendar === CalendarProvider.OUTLOOK || calendar === CalendarProvider.OFFICE365) {
+      result.provider = calendar;
       result.title = parsed.params.get('subject') || '';
       Object.assign(result, hydrateOutlookDates(parsed.params));
       if (parsed.params.get('ctz')) {
@@ -172,7 +160,7 @@ export const hydrateEventData = (raw: string): EventData => {
         result.description = unescapeVCardEvent(value);
         break;
       case 'RRULE': {
-        const freqMatch = value.match(/FREQ=([A-Za-z]+)/i);
+        const freqMatch = value.match(/FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)/i);
         if (freqMatch) {
           const freq = freqMatch[1].toUpperCase();
           if (freq === 'DAILY' || freq === 'WEEKLY' || freq === 'MONTHLY' || freq === 'YEARLY') {
@@ -182,7 +170,7 @@ export const hydrateEventData = (raw: string): EventData => {
         const countMatch = value.match(/COUNT=(\d+)/i);
         if (countMatch) {
           const count = parseInt(countMatch[1], 10);
-          if (!isNaN(count) && count > 0) {
+          if (count > 0) {
             result.recurrenceCount = count;
           }
         }
@@ -248,27 +236,16 @@ const fnv1a = (input: string, seed: number): string => {
   return hash.toString(16).padStart(8, '0');
 };
 
-const VALID_RRULE_FREQS = new Set(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY']);
-
 /**
  * Constructs an RFC 5545 RRULE property string array if frequency is active.
  */
 const buildRRule = (freq?: string, count?: number | string): string[] => {
   if (!freq) return [];
-  const normalizedFreq = freq.toUpperCase();
-  if (!VALID_RRULE_FREQS.has(normalizedFreq)) return [];
+  const f = freq.toUpperCase();
+  if (f !== 'DAILY' && f !== 'WEEKLY' && f !== 'MONTHLY' && f !== 'YEARLY') return [];
 
-  let rule = `RRULE:FREQ=${normalizedFreq}`;
-  const countNum =
-    typeof count === 'number'
-      ? count
-      : typeof count === 'string' && count.trim() !== ''
-        ? Number(count)
-        : NaN;
-  if (Number.isInteger(countNum) && countNum > 0) {
-    rule += `;COUNT=${countNum}`;
-  }
-  return [rule];
+  const c = Number(count);
+  return [`RRULE:FREQ=${f}${Number.isInteger(c) && c > 0 ? `;COUNT=${c}` : ''}`];
 };
 
 /**
