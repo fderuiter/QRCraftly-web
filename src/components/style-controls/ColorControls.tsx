@@ -147,83 +147,70 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
         />
       </div>
 
-      {activeGradientType === 'none' ? (
-        <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4">
+        {activeGradientType === 'none' ? (
           <ColorInput
             id="fg-color"
             label="Foreground"
             value={config.fgColor}
             onChange={(val) => onChange({ fgColor: val })}
           />
-          <BackgroundColorField config={config} onChange={onChange} />
-          <ColorInput
-            id="eye-frame-color"
-            label="Eye Frame"
-            value={config.eyeFrameColor || config.eyeColor}
-            onChange={(val) => onChange({ eyeFrameColor: val })}
-          />
-          <ColorInput
-            id="eye-ball-color"
-            label="Eye Ball"
-            value={config.eyeBallColor || config.eyeColor}
-            onChange={(val) => onChange({ eyeBallColor: val })}
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4">
-          <ColorInput
-            id="gradient-start-color"
-            label="Start Color"
-            value={stop0Color}
-            onChange={(val) => {
-              const newStops = [
-                { offset: 0, color: val },
-                { offset: 1, color: stop1Color },
-              ];
-              onChange({ fgColor: val, gradientColorStops: newStops });
-            }}
-          />
-          <ColorInput
-            id="gradient-end-color"
-            label="End Color"
-            value={stop1Color}
-            onChange={(val) => {
-              const newStops = [
-                { offset: 0, color: stop0Color },
-                { offset: 1, color: val },
-              ];
-              onChange({ gradientColorStops: newStops });
-            }}
-          />
-          {activeGradientType === 'linear' && (
-            <div className="col-span-2">
-              <RangeInput
-                id="gradient-angle"
-                label="Gradient Angle"
-                value={config.gradientAngle ?? 0}
-                min={0}
-                max={360}
-                step={15}
-                formatValue={(val) => `${val}°`}
-                onChange={(val) => onChange({ gradientAngle: val })}
-              />
-            </div>
-          )}
-          <BackgroundColorField config={config} onChange={onChange} />
-          <ColorInput
-            id="eye-frame-color"
-            label="Eye Frame"
-            value={config.eyeFrameColor || config.eyeColor}
-            onChange={(val) => onChange({ eyeFrameColor: val })}
-          />
-          <ColorInput
-            id="eye-ball-color"
-            label="Eye Ball"
-            value={config.eyeBallColor || config.eyeColor}
-            onChange={(val) => onChange({ eyeBallColor: val })}
-          />
-        </div>
-      )}
+        ) : (
+          <>
+            <ColorInput
+              id="gradient-start-color"
+              label="Start Color"
+              value={stop0Color}
+              onChange={(val) => {
+                const newStops = [
+                  { offset: 0, color: val },
+                  { offset: 1, color: stop1Color },
+                ];
+                onChange({ fgColor: val, gradientColorStops: newStops });
+              }}
+            />
+            <ColorInput
+              id="gradient-end-color"
+              label="End Color"
+              value={stop1Color}
+              onChange={(val) => {
+                const newStops = [
+                  { offset: 0, color: stop0Color },
+                  { offset: 1, color: val },
+                ];
+                onChange({ gradientColorStops: newStops });
+              }}
+            />
+            {activeGradientType === 'linear' && (
+              <div className="col-span-2">
+                <RangeInput
+                  id="gradient-angle"
+                  label="Gradient Angle"
+                  value={config.gradientAngle ?? 0}
+                  min={0}
+                  max={360}
+                  step={15}
+                  formatValue={(val) => `${val}°`}
+                  onChange={(val) => onChange({ gradientAngle: val })}
+                />
+              </div>
+            )}
+          </>
+        )}
+        <BackgroundColorField config={config} onChange={onChange} />
+        <ColorInput
+          id="eye-frame-color"
+          label="Eye Frame"
+          value={config.eyeFrameColor || config.eyeColor}
+          onChange={(val) => onChange({ eyeFrameColor: val })}
+        />
+        <ColorInput
+          id="eye-ball-color"
+          label="Eye Ball"
+          value={config.eyeBallColor || config.eyeColor}
+          onChange={(val) => onChange({ eyeBallColor: val })}
+        />
+      </div>
 
       <ContrastBanner
         isVisible={isLowContrast}
@@ -232,7 +219,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
         className="mt-3"
         decimalPrecision={2}
         onAutoFix={() => {
-          void import('../../utils/contrastAutoFix')
+          import('../../utils/contrastAutoFix')
             .then(({ calculateAutoFixColorPatch }) => {
               onChange(calculateAutoFixColorPatch(config));
               announcePolitely('Contrast adjusted to meet WCAG standards');
