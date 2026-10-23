@@ -26,7 +26,7 @@ import { UrlInput } from "./UrlInput";
 import { TextInput } from "./TextInput";
 import { WifiInput } from "./WifiInput";
 import { EmailInput } from "./EmailInput";
-import { LazyVCardInput } from "./LazyVCardInput";
+import { VCardInput } from "./VCardInput";
 import { PhoneInput } from "./PhoneInput";
 import { SmsInput } from "./SmsInput";
 import { PaymentInput } from "./PaymentInput";
@@ -128,7 +128,7 @@ export const INPUT_REGISTRY: Registry = {
     canHydrateFn: QR_GENERATORS[QRType.EMAIL].matches,
   },
   [QRType.VCARD]: {
-    Component: LazyVCardInput,
+    Component: VCardInput,
     initialState: {
       version: "3.0",
       firstName: "",
