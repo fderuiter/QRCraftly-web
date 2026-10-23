@@ -152,7 +152,7 @@ impl BcUrDecoder {
         if self.chooser.is_none()
             && (part.seq_len > MAX_BCUR_FRAGMENTS || part.message_len > MAX_RECEIVE_MESSAGE_BYTES)
         {
-            return BcUrIngestStatus::Rejected;
+            return BcUrIngestStatus::Failed(String::from("too-large"));
         }
 
         if !self.accepts(&part) {

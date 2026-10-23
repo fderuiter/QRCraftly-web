@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { compileWasmUrl, instantiateWasmSync, WasmInstance } from '@/packages/wasm-runtime';
 import type { GF2Equation, GF2Solution } from './gf2';
 import type { DropletMetadata } from './contracts';
@@ -29,9 +31,32 @@ function moduleUrl(): URL {
   return here.startsWith('file:') ? new URL('../../../../wasm/fountain-bcur.wasm', here) : FOUNTAIN_BCUR_WASM_URL;
 }
 
+let cachedModule: WebAssembly.Module | null = null;
+let loadingPromise: Promise<WebAssembly.Module> | null = null;
+
+/** Synchronously returns the compiled WebAssembly module under Node/Vitest if available. */
+export function getFountainBcurModuleSync(): WebAssembly.Module | null {
+  if (cachedModule) return cachedModule;
+  if (import.meta.url.startsWith('file:')) {
+    try {
+      const bytes = fs.readFileSync(fileURLToPath(moduleUrl()));
+      cachedModule = new WebAssembly.Module(bytes);
+      return cachedModule;
+    } catch {
+      // Fall back to async compileWasmUrl
+    }
+  }
+  return null;
+}
+
 /** Compiles the fountain-bcur WebAssembly module once. */
 export function loadFountainBcurModule(): Promise<WebAssembly.Module> {
-  return compileWasmUrl(moduleUrl());
+  const sync = getFountainBcurModuleSync();
+  if (sync) return Promise.resolve(sync);
+  return (loadingPromise ??= compileWasmUrl(moduleUrl()).then((m) => {
+    cachedModule = m;
+    return m;
+  }));
 }
 
 /** Solves a GF(2) equation system using the compiled WebAssembly kernel. */
@@ -108,6 +133,7 @@ export class WasmFountainDecoder {
   private readonly progressFn: (handle: number) => number;
   private readonly rankFn: (handle: number) => number;
   private readonly isCompleteFn: (handle: number) => number;
+  private readonly eliminationPassesFn: (handle: number) => number;
   private readonly finalizeFn: (handle: number) => number;
   private readonly finalizeLenFn: (handle: number) => number;
   private readonly resetFn: (handle: number) => void;
@@ -133,6 +159,7 @@ export class WasmFountainDecoder {
     this.progressFn = this.instance.fn('fountain_decoder_progress');
     this.rankFn = this.instance.fn('fountain_decoder_rank');
     this.isCompleteFn = this.instance.fn('fountain_decoder_is_complete');
+    this.eliminationPassesFn = this.instance.fn('fountain_decoder_elimination_passes');
     this.finalizeFn = this.instance.fn('fountain_decoder_finalize');
     this.finalizeLenFn = this.instance.fn('fountain_decoder_finalize_len');
     this.resetFn = this.instance.fn('fountain_decoder_reset');
@@ -149,6 +176,10 @@ export class WasmFountainDecoder {
 
   public get isComplete(): boolean {
     return this.isCompleteFn(this.handle) === 1;
+  }
+
+  public get eliminationPasses(): number {
+    return this.eliminationPassesFn(this.handle) >>> 0;
   }
 
   public ingest(meta: DropletMetadata, data: Uint8Array): boolean {
@@ -310,7 +341,13 @@ export class WasmBcUrDecoder {
       const result: BcUrResult = { type, cbor, content };
       return { status: 'complete', result };
     }
-    return { status: 'failed', reason: 'checksum mismatch' };
+    const resPtr = this.resPtrFn(this.handle) >>> 0;
+    const resLen = this.resLenFn(this.handle) >>> 0;
+    const reason = resLen > 0 ? new TextDecoder().decode(this.instance.read(resPtr, resLen)) : 'checksum mismatch';
+    if (reason === 'too-large') {
+      return { status: 'rejected', reason: 'too-large' };
+    }
+    return { status: 'failed', reason };
   }
 
   public reset(): void {

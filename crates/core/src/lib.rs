@@ -17,7 +17,7 @@
 */
 
 //! Shared maths for every QRCraftly WebAssembly module (#1182): GF(256),
-//! Reed-Solomon encoding and decoding, CRC-32, the QR tables and the module allocator.
+//! Reed-Solomon encoding and decoding, CRC-32, SHA-256, the QR tables and the module allocator.
 //!
 //! `no_std` plus nothing else: integer arithmetic only, so every browser and
 //! every device computes the same bytes. Feature crates depend on this one and
@@ -26,11 +26,14 @@
 #![no_std]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
+extern crate alloc;
+
 pub mod abi;
 pub mod crc32;
 pub mod gf256;
 pub mod qr;
 pub mod reed_solomon;
+pub mod sha256;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;

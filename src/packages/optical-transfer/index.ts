@@ -38,14 +38,6 @@ export { type HandshakeInfo, type TransferStats } from './lib/contracts';
 export { FountainEncoder } from './lib/fountain/encoder';
 export { FountainDecoder } from './lib/fountain/decoder';
 export {
-  loadFountainBcurModule,
-  solveGF2Wasm,
-  WasmFountainDecoder,
-  encodeBytewordsMinimalWasm,
-  decodeBytewordsMinimalWasm,
-  WasmBcUrDecoder,
-} from './lib/fountain/wasmKernel';
-export {
   FecEncoder,
   FecDecoder,
   loadFecModule,

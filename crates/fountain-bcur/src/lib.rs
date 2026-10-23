@@ -18,7 +18,7 @@
 
 //! Unified Fountain and BC-UR WebAssembly Kernel.
 //!
-//! Provides zero-allocation, deterministic execution for:
+//! Provides `#![no_std]`, deterministic WebAssembly execution for:
 //! - Fountain code belief-propagation peeling & GF(2) Gauss-Jordan matrix elimination
 //! - Bytewords minimal pair encoding and decoding with CRC-32 checks
 //! - Minimal CBOR subset encoding and decoding
@@ -356,6 +356,21 @@ pub unsafe extern "C" fn fountain_decoder_rank(wrapper: *const FountainDecoderWr
     }
 }
 
+/// Returns number of Gaussian elimination passes run.
+///
+/// # Safety
+/// `wrapper` must be a valid pointer from `fountain_decoder_new` or null.
+#[no_mangle]
+pub unsafe extern "C" fn fountain_decoder_elimination_passes(
+    wrapper: *const FountainDecoderWrapper,
+) -> u32 {
+    if wrapper.is_null() {
+        0
+    } else {
+        unsafe { &*wrapper }.decoder.elimination_runs as u32
+    }
+}
+
 /// Checks if decoding is complete.
 ///
 /// # Safety
@@ -584,13 +599,19 @@ pub unsafe extern "C" fn bcur_decoder_ingest_str(
 
     match wrapper.decoder.ingest_str(text) {
         BcUrIngestStatus::Rejected => 0,
-        BcUrIngestStatus::Progress { .. } => 1,
+        BcUrIngestStatus::Progress { .. } => {
+            wrapper.ur_type_buf = wrapper.decoder.ur_type.as_bytes().to_vec();
+            1
+        }
         BcUrIngestStatus::Complete(res) => {
             wrapper.result_buf = res.cbor;
             wrapper.ur_type_buf = res.ur_type.as_bytes().to_vec();
             2
         }
-        BcUrIngestStatus::Failed(_) => 3,
+        BcUrIngestStatus::Failed(reason) => {
+            wrapper.result_buf = reason.as_bytes().to_vec();
+            3
+        }
     }
 }
 
