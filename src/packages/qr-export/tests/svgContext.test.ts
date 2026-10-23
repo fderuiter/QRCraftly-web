@@ -192,6 +192,69 @@ describe('SvgContext', () => {
       expect(svg).toContain('dominant-baseline="middle"');
     });
 
+    it('splits the canvas font shorthand into SVG font attributes (#1467)', () => {
+      const ctx = new SvgContext(200, 200);
+      ctx.font = 'bold 52px sans-serif';
+      ctx.fillText('Headline', 10, 10);
+      const svg = ctx.serialize();
+      expect(svg).toContain('font-size="52"');
+      expect(svg).toContain('font-weight="bold"');
+      expect(svg).toContain('font-family="sans-serif"');
+      expect(svg).not.toContain(' font="');
+      expect(svg).not.toContain('font-style');
+    });
+
+    it('writes font-style for an italic font and escapes a quoted family', () => {
+      const ctx = new SvgContext(200, 200);
+      ctx.font = 'italic 600 24px "Open Sans", sans-serif';
+      ctx.fillText('Sub', 10, 10);
+      const svg = ctx.serialize();
+      expect(svg).toContain('font-style="italic"');
+      expect(svg).toContain('font-weight="600"');
+      expect(svg).toContain('font-size="24"');
+      expect(svg).toContain('font-family="&quot;Open Sans&quot;, sans-serif"');
+    });
+
+    it('keeps the canvas default font when none is set', () => {
+      const ctx = new SvgContext(200, 200);
+      ctx.fillText('Plain', 10, 10);
+      const svg = ctx.serialize();
+      expect(svg).toContain('font-size="10"');
+      expect(svg).toContain('font-weight="normal"');
+    });
+
+    const textAttrs = (font: string): Record<string, string> => {
+      const ctx = new SvgContext(200, 200);
+      ctx.font = font;
+      ctx.fillText('T', 0, 0);
+      const tag = /<text ([^>]*)>/.exec(ctx.serialize())?.[1] ?? '';
+      return Object.fromEntries(Array.from(tag.matchAll(/([\w-]+)="([^"]*)"/g), (m) => [m[1], m[2]]));
+    };
+
+    it('reads style, variant and line-height in any keyword order', () => {
+      expect(textAttrs('small-caps italic bold 12.5px/1.2 serif')).toMatchObject({
+        'font-family': 'serif', 'font-size': '12.5', 'font-weight': 'bold', 'font-style': 'italic',
+      });
+    });
+
+    it('converts pt and em sizes to pixels', () => {
+      expect(textAttrs('12pt serif')['font-size']).toBe('16');
+      expect(textAttrs('2em serif')['font-size']).toBe('32');
+    });
+
+    it.each(['', '   ', 'sans-serif', 'bold', '16px', 'huge 16px serif'])('falls back to 16px sans-serif for %j', (font) => {
+      const attrs = textAttrs(font);
+      expect(attrs).toMatchObject({ 'font-family': 'sans-serif', 'font-size': '16', 'font-weight': 'normal' });
+      expect(attrs).not.toHaveProperty('font-style');
+    });
+
+    it('estimates width from a fractional font size', () => {
+      const ctx = new SvgContext(200, 200);
+      ctx.font = 'bold 52.5px sans-serif';
+      // 4 chars * 52.5 * 0.55 = 115.5; the old /(\d+)px/ read "5px" and estimated 11.
+      expect(ctx.measureText('Wide').width).toBeCloseTo(115.5);
+    });
+
     it('escapes special characters in text', () => {
       const ctx = new SvgContext(200, 200);
       ctx.fillText('<scan&me>', 10, 10);

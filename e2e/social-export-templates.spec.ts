@@ -428,6 +428,43 @@ test.describe('SVG download', () => {
     expect(content).toContain('<svg');
     expect(content).toContain('<path'); // Verify core vector components are present
   });
+
+  test('SVG template headline renders at its font size, matching the PNG (#1467)', async ({ page }) => {
+    await page.getByRole('radio', { name: /Select Minimalist template/i }).click();
+    await page.getByLabel('Template headline').fill('Scan for the menu');
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      (async () => {
+        await page.getByRole('button', { name: 'Download options' }).click();
+        await page.getByRole('group', { name: 'Download options' }).getByRole('radio', { name: 'SVG' }).click();
+        await page.getByRole('button', { name: 'Download SVG' }).click();
+      })(),
+    ]);
+    const content = fs.readFileSync(await download.path(), 'utf8');
+
+    // The PNG draws the headline at round(width * 0.055)px; the SVG must ask for the same size,
+    // and the browser must actually lay the glyphs out at that size (a `font=` attribute is ignored).
+    const { fontSize, glyphHeight, viewBoxWidth } = await page.evaluate((svgText) => {
+      const host = document.createElement('div');
+      host.innerHTML = svgText;
+      document.body.appendChild(host);
+      const svg = host.querySelector('svg');
+      const text = Array.from(host.querySelectorAll('text')).find((t) => t.textContent === 'Scan for the menu');
+      if (!svg || !text) throw new Error('headline <text> not found');
+      const result = {
+        fontSize: parseFloat(text.getAttribute('font-size') || '0'),
+        glyphHeight: text.getBBox().height,
+        viewBoxWidth: svg.viewBox.baseVal.width,
+      };
+      host.remove();
+      return result;
+    }, content);
+
+    expect(fontSize).toBe(Math.round(viewBoxWidth * 0.055));
+    expect(glyphHeight).toBeGreaterThan(fontSize * 0.8);
+    expect(content).toMatch(/<text[^>]*font-weight="bold"[^>]*>Scan for the menu</);
+  });
 });
 
 // ---------------------------------------------------------------------------
