@@ -55,10 +55,15 @@ impl From<DerError> for String {
         match err {
             DerError::UnexpectedEof => "Unexpected end of DER data.".into(),
             DerError::HighTagNumberNotSupported => "High tag numbers are not supported.".into(),
-            DerError::IndefiniteOrOversizedLength => "Indefinite or oversized lengths are not DER.".into(),
+            DerError::IndefiniteOrOversizedLength => {
+                "Indefinite or oversized lengths are not DER.".into()
+            }
             DerError::InvalidOid => "Invalid object identifier.".into(),
             DerError::ElementMissing(idx) => format!("Element {} is missing.", idx),
-            DerError::TagMismatch { expected, actual } => format!("Element tag mismatch: expected 0x{:x}, got 0x{:x}", expected, actual),
+            DerError::TagMismatch { expected, actual } => format!(
+                "Element tag mismatch: expected 0x{:x}, got 0x{:x}",
+                expected, actual
+            ),
             DerError::InvalidTime(s) => format!("Unsupported time: {}", s),
             DerError::ExtraBytes => "There are extra bytes after the element.".into(),
         }
@@ -129,12 +134,22 @@ pub fn read_der_all(data: &[u8]) -> Result<DerNode, DerError> {
     Ok(node)
 }
 
-pub fn child_at(node: &DerNode, index: usize, expected_tag: Option<u8>) -> Result<DerNode, DerError> {
+pub fn child_at(
+    node: &DerNode,
+    index: usize,
+    expected_tag: Option<u8>,
+) -> Result<DerNode, DerError> {
     let children = read_children(node)?;
-    let child = children.get(index).cloned().ok_or(DerError::ElementMissing(index))?;
+    let child = children
+        .get(index)
+        .cloned()
+        .ok_or(DerError::ElementMissing(index))?;
     if let Some(t) = expected_tag {
         if child.tag != t {
-            return Err(DerError::TagMismatch { expected: t, actual: child.tag });
+            return Err(DerError::TagMismatch {
+                expected: t,
+                actual: child.tag,
+            });
         }
     }
     Ok(child)
@@ -325,12 +340,18 @@ pub fn algorithm(dotted_oid: &str) -> Result<Vec<u8>, DerError> {
 
 pub fn time_utc(year: u16, month: u8, day: u8, hour: u8, min: u8, sec: u8) -> Vec<u8> {
     let yr_str = format!("{:02}", year % 100);
-    let str_val = format!("{}{:02}{:02}{:02}{:02}{:02}Z", yr_str, month, day, hour, min, sec);
+    let str_val = format!(
+        "{}{:02}{:02}{:02}{:02}{:02}Z",
+        yr_str, month, day, hour, min, sec
+    );
     der(tag::UTC_TIME, &[str_val.as_bytes()])
 }
 
 pub fn time_generalized(year: u16, month: u8, day: u8, hour: u8, min: u8, sec: u8) -> Vec<u8> {
-    let str_val = format!("{:04}{:02}{:02}{:02}{:02}{:02}Z", year, month, day, hour, min, sec);
+    let str_val = format!(
+        "{:04}{:02}{:02}{:02}{:02}{:02}Z",
+        year, month, day, hour, min, sec
+    );
     der(tag::GENERALIZED_TIME, &[str_val.as_bytes()])
 }
 

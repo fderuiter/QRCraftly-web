@@ -54,14 +54,18 @@ pub fn parse_rsa_key_der(der_bytes: &[u8]) -> Result<RsaPrivateKey, String> {
 
     let pkcs1_top = read_der_all(pkcs1_bytes).map_err(|_| "Invalid PKCS#1 key.".to_string())?;
     let fields = read_children(&pkcs1_top).map_err(|_| "Invalid PKCS#1 fields.".to_string())?;
-    if fields.len() < 4 || fields[1].tag != tag::INTEGER || fields[2].tag != tag::INTEGER || fields[3].tag != tag::INTEGER {
+    if fields.len() < 4
+        || fields[1].tag != tag::INTEGER
+        || fields[2].tag != tag::INTEGER
+        || fields[3].tag != tag::INTEGER
+    {
         return Err("Invalid RSA private key structure.".to_string());
     }
 
     let n = BigUint::from_bytes_be(&fields[1].value);
     let e = BigUint::from_bytes_be(&fields[2].value);
     let d = BigUint::from_bytes_be(&fields[3].value);
-    let k = (n.bit_len() + 7) / 8;
+    let k = n.bit_len().div_ceil(8);
 
     if k < 64 {
         return Err("RSA key length too short.".to_string());

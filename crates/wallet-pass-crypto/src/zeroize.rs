@@ -39,13 +39,23 @@ pub struct ZeroizingVec {
     vec: alloc::vec::Vec<u8>,
 }
 
+impl Default for ZeroizingVec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ZeroizingVec {
     pub fn new() -> Self {
-        Self { vec: alloc::vec::Vec::new() }
+        Self {
+            vec: alloc::vec::Vec::new(),
+        }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
-        Self { vec: alloc::vec::Vec::with_capacity(capacity) }
+        Self {
+            vec: alloc::vec::Vec::with_capacity(capacity),
+        }
     }
 
     pub fn from_vec(vec: alloc::vec::Vec<u8>) -> Self {

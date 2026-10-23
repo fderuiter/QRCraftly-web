@@ -66,9 +66,21 @@ pub fn base64_decode(text: &str) -> Result<ZeroizingVec, String> {
             break;
         }
         let b0 = decode_char(clean[i])?;
-        let b1 = if i + 1 < clean.len() && clean[i + 1] != b'=' { decode_char(clean[i + 1])? } else { 0 };
-        let b2 = if i + 2 < clean.len() && clean[i + 2] != b'=' { decode_char(clean[i + 2])? } else { 0 };
-        let b3 = if i + 3 < clean.len() && clean[i + 3] != b'=' { decode_char(clean[i + 3])? } else { 0 };
+        let b1 = if i + 1 < clean.len() && clean[i + 1] != b'=' {
+            decode_char(clean[i + 1])?
+        } else {
+            0
+        };
+        let b2 = if i + 2 < clean.len() && clean[i + 2] != b'=' {
+            decode_char(clean[i + 2])?
+        } else {
+            0
+        };
+        let b3 = if i + 3 < clean.len() && clean[i + 3] != b'=' {
+            decode_char(clean[i + 3])?
+        } else {
+            0
+        };
 
         let triple = ((b0 as u32) << 18) | ((b1 as u32) << 12) | ((b2 as u32) << 6) | (b3 as u32);
 
@@ -133,7 +145,8 @@ pub fn private_key_to_pkcs8(text: &str) -> Result<ZeroizingVec, String> {
     }
 
     if let Some(pkcs1) = blocks.iter().find(|b| b.label == "RSA PRIVATE KEY") {
-        let node = read_der_all(pkcs1.bytes.as_slice()).map_err(|_| "The RSA private key is damaged.".to_string())?;
+        let node = read_der_all(pkcs1.bytes.as_slice())
+            .map_err(|_| "The RSA private key is damaged.".to_string())?;
         if node.tag != tag::SEQUENCE {
             return Err("The RSA private key is damaged.".to_string());
         }
@@ -146,7 +159,10 @@ pub fn private_key_to_pkcs8(text: &str) -> Result<ZeroizingVec, String> {
         return Ok(ZeroizingVec::from_vec(pkcs8_bytes));
     }
 
-    Err("No private key was found. Choose a PEM file that contains \"BEGIN PRIVATE KEY\".".to_string())
+    Err(
+        "No private key was found. Choose a PEM file that contains \"BEGIN PRIVATE KEY\"."
+            .to_string(),
+    )
 }
 
 pub fn certificates_from_pem(text: &str) -> Result<Vec<ZeroizingVec>, String> {

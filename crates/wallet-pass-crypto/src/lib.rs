@@ -59,10 +59,10 @@ unsafe fn write_output(
     if !out_actual_len.is_null() {
         unsafe { *out_actual_len = src.len() as u32 };
     }
-    if out_len < src.len() || (src.len() > 0 && out_ptr.is_null()) {
+    if out_len < src.len() || (!src.is_empty() && out_ptr.is_null()) {
         return STATUS_BUFFER_TOO_SMALL;
     }
-    if !out_ptr.is_null() && src.len() > 0 {
+    if !out_ptr.is_null() && !src.is_empty() {
         unsafe {
             core::ptr::copy_nonoverlapping(src.as_ptr(), out_ptr, src.len());
         }
@@ -71,6 +71,10 @@ unsafe fn write_output(
 }
 
 /// Zeroes linear memory buffer at `ptr` for `len` bytes.
+///
+/// # Safety
+///
+/// The caller must ensure that `ptr` points to a valid buffer of at least `len` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn wallet_pass_zeroize(ptr: *mut u8, len: usize) {
     if !ptr.is_null() && len > 0 {
@@ -80,6 +84,12 @@ pub unsafe extern "C" fn wallet_pass_zeroize(ptr: *mut u8, len: usize) {
 }
 
 /// Parses PEM text and returns PKCS#8 DER bytes.
+///
+/// # Safety
+///
+/// `pem_ptr` must point to valid UTF-8 PEM text of `pem_len` bytes.
+/// `out_ptr` must point to a writable output buffer of size `out_len`.
+/// `out_actual_len` must point to a writable `u32` location.
 #[no_mangle]
 pub unsafe extern "C" fn wallet_pass_pem_to_pkcs8(
     pem_ptr: *const u8,
@@ -101,6 +111,13 @@ pub unsafe extern "C" fn wallet_pass_pem_to_pkcs8(
 }
 
 /// Calculates RSASSA-PKCS1-v1_5 SHA-256 signature over `data`.
+///
+/// # Safety
+///
+/// `key_pem_ptr` must point to valid UTF-8 PEM key text of `key_pem_len` bytes.
+/// `data_ptr` must point to valid input data of `data_len` bytes.
+/// `out_ptr` must point to a writable output buffer of size `out_len`.
+/// `out_actual_len` must point to a writable `u32` location.
 #[no_mangle]
 pub unsafe extern "C" fn wallet_pass_rsa_sign(
     key_pem_ptr: *const u8,
@@ -120,12 +137,19 @@ pub unsafe extern "C" fn wallet_pass_rsa_sign(
     };
 
     match rsa::rsa_sign_sha256_pem(key_pem_str, data) {
-        Ok(signature) => unsafe { write_output(signature.as_slice(), out_ptr, out_len, out_actual_len) },
+        Ok(signature) => unsafe {
+            write_output(signature.as_slice(), out_ptr, out_len, out_actual_len)
+        },
         Err(_) => STATUS_BAD_INPUT,
     }
 }
 
 /// Creates a detached CMS SignedData ContentInfo DER for Apple .pkpass files.
+///
+/// # Safety
+///
+/// All pointer arguments must point to valid readable or writable memory regions
+/// corresponding to their given lengths.
 #[no_mangle]
 pub unsafe extern "C" fn wallet_pass_cms_sign(
     content_ptr: *const u8,
@@ -173,13 +197,27 @@ pub unsafe extern "C" fn wallet_pass_cms_sign(
         offset += cert_len;
     }
 
-    match cms::sign_detached_cms(content, signer_der, &chain_ders, key_pem_str, time_sec as i64) {
-        Ok(cms_der) => unsafe { write_output(cms_der.as_slice(), out_ptr, out_len, out_actual_len) },
+    match cms::sign_detached_cms(
+        content,
+        signer_der,
+        &chain_ders,
+        key_pem_str,
+        time_sec as i64,
+    ) {
+        Ok(cms_der) => unsafe {
+            write_output(cms_der.as_slice(), out_ptr, out_len, out_actual_len)
+        },
         Err(_) => STATUS_BAD_INPUT,
     }
 }
 
 /// Parses PEM certificates from a file buffer. Returns concatenated length-prefixed DER certificates.
+///
+/// # Safety
+///
+/// `file_ptr` must point to valid input data of `file_len` bytes.
+/// `out_ptr` must point to a writable output buffer of size `out_len`.
+/// `out_actual_len` must point to a writable `u32` location.
 #[no_mangle]
 pub unsafe extern "C" fn wallet_pass_certificates_from_file(
     file_ptr: *const u8,

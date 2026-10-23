@@ -28,6 +28,36 @@ pub struct BigUint {
     pub limbs: Vec<u32>,
 }
 
+impl PartialEq for BigUint {
+    fn eq(&self, other: &Self) -> bool {
+        core::cmp::Ord::cmp(self, other) == Ordering::Equal
+    }
+}
+
+impl Eq for BigUint {}
+
+impl PartialOrd for BigUint {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(core::cmp::Ord::cmp(self, other))
+    }
+}
+
+impl Ord for BigUint {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let l1 = self.limbs.len();
+        let l2 = other.limbs.len();
+        if l1 != l2 {
+            return l1.cmp(&l2);
+        }
+        for (a, b) in self.limbs.iter().rev().zip(other.limbs.iter().rev()) {
+            if a != b {
+                return a.cmp(b);
+            }
+        }
+        Ordering::Equal
+    }
+}
+
 impl BigUint {
     pub fn zero() -> Self {
         Self { limbs: Vec::new() }
@@ -37,7 +67,9 @@ impl BigUint {
         if val == 0 {
             Self::zero()
         } else {
-            Self { limbs: alloc::vec![val] }
+            Self {
+                limbs: alloc::vec![val],
+            }
         }
     }
 
@@ -51,7 +83,7 @@ impl BigUint {
             return Self::zero();
         }
 
-        let num_limbs = (clean.len() + 3) / 4;
+        let num_limbs = clean.len().div_ceil(4);
         let mut limbs = Vec::with_capacity(num_limbs);
 
         for chunk in clean.rchunks(4) {
@@ -125,20 +157,6 @@ impl BigUint {
         }
     }
 
-    pub fn cmp(&self, other: &Self) -> Ordering {
-        let l1 = self.limbs.len();
-        let l2 = other.limbs.len();
-        if l1 != l2 {
-            return l1.cmp(&l2);
-        }
-        for (a, b) in self.limbs.iter().rev().zip(other.limbs.iter().rev()) {
-            if a != b {
-                return a.cmp(b);
-            }
-        }
-        Ordering::Equal
-    }
-
     pub fn add(&self, other: &Self) -> Self {
         let len = core::cmp::max(self.limbs.len(), other.limbs.len());
         let mut limbs = Vec::with_capacity(len + 1);
@@ -160,7 +178,10 @@ impl BigUint {
     }
 
     pub fn sub(&self, other: &Self) -> Self {
-        assert!(self.cmp(other) != Ordering::Less, "underflow in BigUint::sub");
+        assert!(
+            self.cmp(other) != Ordering::Less,
+            "underflow in BigUint::sub"
+        );
         let mut limbs = Vec::with_capacity(self.limbs.len());
         let mut borrow = 0i64;
 
@@ -335,7 +356,9 @@ impl BigUint {
         q.trim();
 
         // Remainder is in u_limbs[0..n], shifted right by `shift`
-        let mut r_untrimmed = Self { limbs: u_limbs[..n].to_vec() };
+        let mut r_untrimmed = Self {
+            limbs: u_limbs[..n].to_vec(),
+        };
         r_untrimmed.trim();
         let r = r_untrimmed.shr_bits(shift);
 
@@ -403,7 +426,10 @@ impl BigUint {
 
     /// Computes `(self ^ exp) % modulus` using left-to-right binary exponentiation.
     pub fn mod_pow(&self, exp: &Self, modulus: &Self) -> Self {
-        assert!(!modulus.is_zero(), "modular exponentiation with zero modulus");
+        assert!(
+            !modulus.is_zero(),
+            "modular exponentiation with zero modulus"
+        );
         if exp.is_zero() {
             return Self::from_u32(1).div_rem(modulus).1;
         }
@@ -450,7 +476,14 @@ mod tests {
         let a = BigUint::from_u32(123456789);
         let b = BigUint::from_u32(987654321);
         let c = a.add(&b);
-        assert_eq!(c.to_bytes_be(), (123456789u64 + 987654321u64).to_be_bytes()[0..8].iter().copied().skip_while(|&x| x == 0).collect::<Vec<_>>());
+        assert_eq!(
+            c.to_bytes_be(),
+            (123456789u64 + 987654321u64).to_be_bytes()[0..8]
+                .iter()
+                .copied()
+                .skip_while(|&x| x == 0)
+                .collect::<Vec<_>>()
+        );
 
         let d = c.sub(&a);
         assert_eq!(d.cmp(&b), Ordering::Equal);

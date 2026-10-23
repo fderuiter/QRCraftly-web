@@ -36,11 +36,18 @@ pub struct Sha256 {
     total_len: u64,
 }
 
+impl Default for Sha256 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Sha256 {
     pub fn new() -> Self {
         Self {
             state: [
-                0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+                0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
+                0x5be0cd19,
             ],
             buffer: [0u8; 64],
             buf_len: 0,
@@ -53,7 +60,8 @@ impl Sha256 {
         let mut offset = 0;
         while offset < data.len() {
             let to_copy = core::cmp::min(data.len() - offset, 64 - self.buf_len);
-            self.buffer[self.buf_len..self.buf_len + to_copy].copy_from_slice(&data[offset..offset + to_copy]);
+            self.buffer[self.buf_len..self.buf_len + to_copy]
+                .copy_from_slice(&data[offset..offset + to_copy]);
             self.buf_len += to_copy;
             offset += to_copy;
             if self.buf_len == 64 {
@@ -100,18 +108,16 @@ impl Sha256 {
 
     fn process_block(&mut self) {
         let mut w = [0u32; 64];
-        for i in 0..16 {
-            w[i] = u32::from_be_bytes([
-                self.buffer[i * 4],
-                self.buffer[i * 4 + 1],
-                self.buffer[i * 4 + 2],
-                self.buffer[i * 4 + 3],
-            ]);
+        for (i, chunk) in self.buffer.chunks_exact(4).take(16).enumerate() {
+            w[i] = u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
         }
         for i in 16..64 {
             let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
             let s1 = w[i - 2].rotate_right(17) ^ w[i - 2].rotate_right(19) ^ (w[i - 2] >> 10);
-            w[i] = w[i - 16].wrapping_add(s0).wrapping_add(w[i - 7]).wrapping_add(s1);
+            w[i] = w[i - 16]
+                .wrapping_add(s0)
+                .wrapping_add(w[i - 7])
+                .wrapping_add(s1);
         }
 
         let mut a = self.state[0];
@@ -126,7 +132,11 @@ impl Sha256 {
         for i in 0..64 {
             let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
             let ch = (e & f) ^ ((!e) & g);
-            let temp1 = h.wrapping_add(s1).wrapping_add(ch).wrapping_add(K[i]).wrapping_add(w[i]);
+            let temp1 = h
+                .wrapping_add(s1)
+                .wrapping_add(ch)
+                .wrapping_add(K[i])
+                .wrapping_add(w[i]);
             let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
             let maj = (a & b) ^ (a & c) ^ (b & c);
             let temp2 = s0.wrapping_add(maj);

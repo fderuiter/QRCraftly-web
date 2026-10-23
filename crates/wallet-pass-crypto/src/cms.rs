@@ -22,7 +22,7 @@ use crate::der::{
     algorithm, child_at, context_tag, integer_from_bytes, integer_from_u32, octet_string, oid,
     read_children, read_der_all, sequence, set_of, tag, time_generalized, time_utc,
 };
-use crate::rsa::{rsa_sign_sha256_pem};
+use crate::rsa::rsa_sign_sha256_pem;
 use crate::sha256::Sha256;
 use crate::zeroize::ZeroizingVec;
 use alloc::string::{String, ToString};
@@ -46,10 +46,15 @@ pub struct ParsedCertificateInfo {
 
 pub fn parse_cert_info(der: &[u8]) -> Result<ParsedCertificateInfo, String> {
     let certificate = read_der_all(der).map_err(|_| "Invalid certificate DER.".to_string())?;
-    let tbs = child_at(&certificate, 0, Some(tag::SEQUENCE)).map_err(|_| "Invalid TBS Certificate.".to_string())?;
+    let tbs = child_at(&certificate, 0, Some(tag::SEQUENCE))
+        .map_err(|_| "Invalid TBS Certificate.".to_string())?;
     let fields = read_children(&tbs).map_err(|_| "Invalid TBS fields.".to_string())?;
 
-    let at = if fields.first().map(|f| f.tag) == Some(0xa0) { 1 } else { 0 };
+    let at = if fields.first().map(|f| f.tag) == Some(0xa0) {
+        1
+    } else {
+        0
+    };
     let serial = fields.get(at).ok_or("Missing serial number.")?;
     let issuer = fields.get(at + 2).ok_or("Missing issuer.")?;
 
@@ -78,8 +83,12 @@ pub fn format_time_der(time_sec: i64) -> Vec<u8> {
     let mut year = 1970u16;
     let mut day_count = days;
 
+    fn is_leap_year(year: u16) -> bool {
+        (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
+    }
+
     loop {
-        let is_leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+        let is_leap = is_leap_year(year);
         let days_in_year = if is_leap { 366 } else { 365 };
         if day_count < days_in_year {
             break;
@@ -88,7 +97,7 @@ pub fn format_time_der(time_sec: i64) -> Vec<u8> {
         year += 1;
     }
 
-    let is_leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+    let is_leap = is_leap_year(year);
     let days_in_months = [
         31,
         if is_leap { 29 } else { 28 },
@@ -114,7 +123,7 @@ pub fn format_time_der(time_sec: i64) -> Vec<u8> {
     }
     let day = (day_count + 1) as u8;
 
-    if year >= 1950 && year < 2050 {
+    if (1950..2050).contains(&year) {
         time_utc(year, month, day, hour, min, sec)
     } else {
         time_generalized(year, month, day, hour, min, sec)
@@ -133,9 +142,15 @@ pub fn sign_detached_cms(
     let content_hash = Sha256::digest(content);
     let time_der = format_time_der(time_sec);
 
-    let attr_content_type = sequence(&[&oid(cms_oids::CONTENT_TYPE)?, &set_of(&[&oid(cms_oids::DATA)?])]);
+    let attr_content_type = sequence(&[
+        &oid(cms_oids::CONTENT_TYPE)?,
+        &set_of(&[&oid(cms_oids::DATA)?]),
+    ]);
     let attr_signing_time = sequence(&[&oid(cms_oids::SIGNING_TIME)?, &set_of(&[&time_der])]);
-    let attr_msg_digest = sequence(&[&oid(cms_oids::MESSAGE_DIGEST)?, &set_of(&[&octet_string(&content_hash)])]);
+    let attr_msg_digest = sequence(&[
+        &oid(cms_oids::MESSAGE_DIGEST)?,
+        &set_of(&[&octet_string(&content_hash)]),
+    ]);
 
     let signed_attributes = set_of(&[&attr_content_type, &attr_signing_time, &attr_msg_digest]);
 
@@ -144,7 +159,10 @@ pub fn sign_detached_cms(
     let mut implicit_attributes = signed_attributes;
     implicit_attributes[0] = 0xa0;
 
-    let signer_identifier = sequence(&[&signer_info.issuer, &integer_from_bytes(&signer_info.serial_number)]);
+    let signer_identifier = sequence(&[
+        &signer_info.issuer,
+        &integer_from_bytes(&signer_info.serial_number),
+    ]);
     let sha256_alg = algorithm(cms_oids::SHA256)?;
     let rsa_alg = algorithm(cms_oids::RSA_ENCRYPTION)?;
 
@@ -171,7 +189,10 @@ pub fn sign_detached_cms(
         &set_of(&[&signer_info_der]),
     ]);
 
-    let content_info = sequence(&[&oid(cms_oids::SIGNED_DATA)?, &context_tag(0, &[&signed_data])]);
+    let content_info = sequence(&[
+        &oid(cms_oids::SIGNED_DATA)?,
+        &context_tag(0, &[&signed_data]),
+    ]);
 
     Ok(ZeroizingVec::from_vec(content_info))
 }
