@@ -20,6 +20,10 @@
 //!
 //! Provides SHA-256, Keccak-256, Base58Check, Bech32/Bech32m and wallet address
 //! checksum verification over linear memory for the WASM runtime.
+//!
+//! Note: These hashes and checksums are used solely for offline wallet address
+//! validation, not for security purposes (ADR 0040 forbids custom cryptography
+//! for security purposes).
 
 #![cfg_attr(target_arch = "wasm32", no_std)]
 #![forbid(unsafe_op_in_unsafe_fn)]
@@ -33,7 +37,7 @@ pub mod address;
 pub mod base58;
 pub mod bech32;
 pub mod keccak256;
-pub mod sha256;
+pub use qrcraftly_core::sha256;
 
 use address::{ADDRESS_INVALID, ADDRESS_UNCHECKED};
 use qrcraftly_core::abi::{STATUS_BAD_INPUT, STATUS_BUFFER_TOO_SMALL, STATUS_OK};

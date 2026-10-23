@@ -16,15 +16,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { instantiateWasmSync, type WasmInstance } from '@/packages/wasm-runtime';
+import { compileWasmUrl, instantiateWasmSync, WasmModuleError, type WasmInstance } from '@/packages/wasm-runtime';
+import type { AddressCheck } from '@/packages/qr-payload';
 
-export type AddressCheck =
-  /** The checksum matched. */
-  | 'valid'
-  /** The address is malformed or its checksum does not match. */
-  | 'invalid'
-  /** The format has no checksum to check (an all-lower-case Ethereum address, a Solana key). */
-  | 'unchecked';
+export type { AddressCheck };
+
+const CRYPTO_WASM_URL = new URL('../wasm/crypto.wasm', import.meta.url);
+
+function moduleUrl(): URL {
+  const here = import.meta.url;
+  return here.startsWith('file:') ? new URL('../wasm/crypto.wasm', here) : CRYPTO_WASM_URL;
+}
 
 function nodeReadWasmFile(url: URL): Uint8Array | null {
   const proc: unknown = Reflect.get(globalThis, 'process');
@@ -40,7 +42,35 @@ function nodeReadWasmFile(url: URL): Uint8Array | null {
   return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
+let loading: Promise<WasmInstance> | null = null;
 let wasmInstanceCache: WasmInstance | null = null;
+
+/**
+ * Asynchronously loads and instantiates the crypto WebAssembly module.
+ * Uses `compileWasmUrl` from `wasm-runtime` to fetch and compile across browser and Node.
+ */
+export function loadCryptoWasm(): Promise<WasmInstance> {
+  if (wasmInstanceCache) return Promise.resolve(wasmInstanceCache);
+  if (!loading) {
+    loading = compileWasmUrl(moduleUrl())
+      .then((module) => {
+        wasmInstanceCache = instantiateWasmSync(module);
+        return wasmInstanceCache;
+      })
+      .catch((error: unknown) => {
+        loading = null;
+        throw error instanceof WasmModuleError
+          ? error
+          : new WasmModuleError('compile', 'The crypto WebAssembly module did not load.', { cause: error });
+      });
+  }
+  return loading;
+}
+
+// Auto-trigger load when the canary switch is active.
+if (typeof __FOUNDRY_CRYPTO__ !== 'undefined' && __FOUNDRY_CRYPTO__ === 'wasm') {
+  void loadCryptoWasm().catch(() => undefined);
+}
 
 export function getCryptoWasmInstance(): WasmInstance | null {
   if (wasmInstanceCache) return wasmInstanceCache;
@@ -54,11 +84,13 @@ export function getCryptoWasmInstance(): WasmInstance | null {
         wasmInstanceCache = instantiateWasmSync(module);
         return wasmInstanceCache;
       }
+    } else {
+      void loadCryptoWasm().catch(() => undefined);
     }
   } catch {
-    // Fall back to pure JS if sync WASM load fails
+    // Fall back to pure JS if WASM load fails
   }
-  return null;
+  return wasmInstanceCache;
 }
 
 export function validateAddressWasm(network: string, address: string): AddressCheck | null {

@@ -23,6 +23,7 @@ import {
 } from '@/packages/qr-payload/lib/cryptoAddress';
 import {
   keccak256Wasm,
+  loadCryptoWasm,
   sha256Wasm,
   validateAddressWasm,
 } from '@/utils/cryptoWasm';
@@ -73,7 +74,14 @@ describe('Foundry crypto differential harness (#1182)', () => {
     expect(module).toBeDefined();
   });
 
-  it('matches WASM SHA-256 against pure JavaScript reference', () => {
+  it('loads crypto WASM module via loadCryptoWasm', async () => {
+    const instance = await loadCryptoWasm();
+    expect(instance).toBeDefined();
+    expect(typeof instance.fn('crypto_sha256')).toBe('function');
+  });
+
+  it('matches WASM SHA-256 against pure JavaScript reference', async () => {
+    await loadCryptoWasm();
     const report = runDifferential({
       name: 'sha256',
       inputs: seededBytes(42, 100, 1024),
@@ -83,7 +91,8 @@ describe('Foundry crypto differential harness (#1182)', () => {
     expect(report).toMatchObject({ checked: 100, mismatchCount: 0 });
   });
 
-  it('matches WASM Keccak-256 against pure JavaScript reference', () => {
+  it('matches WASM Keccak-256 against pure JavaScript reference', async () => {
+    await loadCryptoWasm();
     const report = runDifferential({
       name: 'keccak256',
       inputs: seededBytes(123, 100, 1024),
@@ -93,7 +102,8 @@ describe('Foundry crypto differential harness (#1182)', () => {
     expect(report).toMatchObject({ checked: 100, mismatchCount: 0 });
   });
 
-  it('matches WASM address validation against pure JavaScript reference', () => {
+  it('matches WASM address validation against pure JavaScript reference', async () => {
+    await loadCryptoWasm();
     const report = runDifferential({
       name: 'validate_address',
       inputs: ADDRESS_TEST_CASES,

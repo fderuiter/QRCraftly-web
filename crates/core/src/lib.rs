@@ -26,11 +26,14 @@
 #![no_std]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
+extern crate alloc;
+
 pub mod abi;
 pub mod crc32;
 pub mod gf256;
 pub mod qr;
 pub mod reed_solomon;
+pub mod sha256;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
