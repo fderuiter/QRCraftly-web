@@ -115,6 +115,8 @@ export interface AssetOptions extends ExportOptions {
   size?: number;
   /** File name without extension; defaults to `<type>-qr-code-qrcraftly-<date>`. */
   filename?: string;
+  /** Color space for vector EPS and PDF downloads ('rgb' | 'cmyk'). */
+  colorSpace?: 'rgb' | 'cmyk';
 }
 
 /** Every export the hook performs. `svg-copy` copies the SVG markup as text. */
@@ -454,10 +456,11 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
       if (!built) return { success: false, format, error: scanValidationFailed() };
 
       const { convertSvgToEps, convertSvgToPdf } = await import('@/packages/qr-export');
+      const vectorOpts = { colorSpace: options?.colorSpace };
       const blob =
         format === 'eps'
-          ? new Blob([await convertSvgToEps(built.svg)], { type: 'application/postscript' })
-          : new Blob([await convertSvgToPdf(built.svg)], { type: 'application/pdf' });
+          ? new Blob([await convertSvgToEps(built.svg, vectorOpts)], { type: 'application/postscript' })
+          : new Blob([await convertSvgToPdf(built.svg, vectorOpts)], { type: 'application/pdf' });
       handOffBlob(blob, { kind: 'download', fileName: getFilename(format, options?.filename) });
       return { success: true, format, logoOmitted: built.logoOmitted };
     } catch (err) {
