@@ -29,12 +29,14 @@ pub struct ZipFileEntry {
     pub data: Vec<u8>,
 }
 
-fn u16_le(bytes: &[u8]) -> u16 {
-    u16::from_le_bytes([bytes[0], bytes[1]])
+fn get_u16_le(data: &[u8], offset: usize) -> Option<u16> {
+    let slice = data.get(offset..offset + 2)?;
+    Some(u16::from_le_bytes([slice[0], slice[1]]))
 }
 
-fn u32_le(bytes: &[u8]) -> u32 {
-    u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+fn get_u32_le(data: &[u8], offset: usize) -> Option<u32> {
+    let slice = data.get(offset..offset + 4)?;
+    Some(u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]))
 }
 
 pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
@@ -52,31 +54,59 @@ pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
     }
 
     // 2. Fallback: sequential local headers scan
-    let mut offset = 0;
-    while offset + 30 <= data.len() {
-        if &data[offset..offset + 4] == b"PK\x03\x04" {
-            let method = u16_le(&data[offset + 8..offset + 10]);
-            let comp_size = u32_le(&data[offset + 18..offset + 22]) as usize;
-            let fn_len = u16_le(&data[offset + 26..offset + 28]) as usize;
-            let extra_len = u16_le(&data[offset + 28..offset + 30]) as usize;
+    let mut offset: usize = 0;
+    while offset.saturating_add(30) <= data.len() {
+        if data.get(offset..offset + 4) == Some(b"PK\x03\x04") {
+            let method = match get_u16_le(data, offset + 8) {
+                Some(m) => m,
+                None => break,
+            };
+            let comp_size = match get_u32_le(data, offset + 18) {
+                Some(s) => s as usize,
+                None => break,
+            };
+            let fn_len = match get_u16_le(data, offset + 26) {
+                Some(l) => l as usize,
+                None => break,
+            };
+            let extra_len = match get_u16_le(data, offset + 28) {
+                Some(l) => l as usize,
+                None => break,
+            };
 
-            let name_start = offset + 30;
-            if name_start + fn_len + extra_len > data.len() {
-                break;
-            }
+            let name_start = match offset.checked_add(30) {
+                Some(s) => s,
+                None => break,
+            };
+            let data_start = match name_start.checked_add(fn_len).and_then(|s| s.checked_add(extra_len)) {
+                Some(s) => s,
+                None => break,
+            };
 
-            let name_bytes = &data[name_start..name_start + fn_len];
+            let name_bytes = match data.get(name_start..name_start.saturating_add(fn_len)) {
+                Some(b) => b,
+                None => break,
+            };
             let name = String::from_utf8_lossy(name_bytes).into_owned();
 
-            let data_start = name_start + fn_len + extra_len;
-            if data_start + comp_size > data.len() {
-                break;
-            }
+            let comp_end = match data_start.checked_add(comp_size) {
+                Some(e) => e,
+                None => break,
+            };
+            let comp_data = match data.get(data_start..comp_end) {
+                Some(d) => d,
+                None => break,
+            };
 
-            let comp_data = &data[data_start..data_start + comp_size];
             let file_bytes = match method {
                 0 => comp_data.to_vec(),
-                8 => decompress_deflate(comp_data)?,
+                8 => match decompress_deflate(comp_data) {
+                    Some(b) => b,
+                    None => {
+                        offset += 1;
+                        continue;
+                    }
+                },
                 _ => Vec::new(),
             };
 
@@ -85,7 +115,7 @@ pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
                 data: file_bytes,
             });
 
-            offset = data_start + comp_size;
+            offset = comp_end;
         } else {
             offset += 1;
         }
@@ -99,61 +129,64 @@ pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
 }
 
 fn parse_zip_central_dir(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
+    if data.len() < 22 {
+        return None;
+    }
+
     // Find End of Central Directory record (PK\x05\x06)
     let max_search = data.len().min(65557);
-    let search_start = data.len() - max_search;
+    let search_start = data.len().checked_sub(max_search)?;
+    let search_end = data.len().checked_sub(22)?;
     let mut eocd_pos = None;
 
-    for i in (search_start..=data.len() - 22).rev() {
-        if &data[i..i + 4] == b"PK\x05\x06" {
+    for i in (search_start..=search_end).rev() {
+        if data.get(i..i + 4) == Some(b"PK\x05\x06") {
             eocd_pos = Some(i);
             break;
         }
     }
 
     let eocd = eocd_pos?;
-    let cd_count = u16_le(&data[eocd + 10..eocd + 12]) as usize;
-    let cd_size = u32_le(&data[eocd + 12..eocd + 16]) as usize;
-    let cd_offset = u32_le(&data[eocd + 16..eocd + 20]) as usize;
+    let cd_count = get_u16_le(data, eocd.checked_add(10)?)? as usize;
+    let cd_size = get_u32_le(data, eocd.checked_add(12)?)? as usize;
+    let cd_offset = get_u32_le(data, eocd.checked_add(16)?)? as usize;
 
-    if cd_offset + cd_size > data.len() {
+    if cd_offset.checked_add(cd_size)? > data.len() {
         return None;
     }
 
-    let mut entries = Vec::with_capacity(cd_count);
+    let mut entries = Vec::with_capacity(cd_count.min(1024));
     let mut cd_pos = cd_offset;
 
     for _ in 0..cd_count {
-        if cd_pos + 46 > data.len() || &data[cd_pos..cd_pos + 4] != b"PK\x01\x02" {
+        if data.get(cd_pos..cd_pos + 4) != Some(b"PK\x01\x02") {
             break;
         }
 
-        let method = u16_le(&data[cd_pos + 10..cd_pos + 12]);
-        let comp_size = u32_le(&data[cd_pos + 20..cd_pos + 24]) as usize;
-        let fn_len = u16_le(&data[cd_pos + 28..cd_pos + 30]) as usize;
-        let extra_len = u16_le(&data[cd_pos + 30..cd_pos + 32]) as usize;
-        let comment_len = u16_le(&data[cd_pos + 32..cd_pos + 34]) as usize;
-        let local_offset = u32_le(&data[cd_pos + 42..cd_pos + 46]) as usize;
+        let method = get_u16_le(data, cd_pos.checked_add(10)?)?;
+        let comp_size = get_u32_le(data, cd_pos.checked_add(20)?)? as usize;
+        let fn_len = get_u16_le(data, cd_pos.checked_add(28)?)? as usize;
+        let extra_len = get_u16_le(data, cd_pos.checked_add(30)?)? as usize;
+        let comment_len = get_u16_le(data, cd_pos.checked_add(32)?)? as usize;
+        let local_offset = get_u32_le(data, cd_pos.checked_add(42)?)? as usize;
 
-        let name_bytes = &data[cd_pos + 46..cd_pos + 46 + fn_len];
+        let name_start = cd_pos.checked_add(46)?;
+        let name_bytes = data.get(name_start..name_start.checked_add(fn_len)?)?;
         let name = String::from_utf8_lossy(name_bytes).into_owned();
 
-        cd_pos += 46 + fn_len + extra_len + comment_len;
+        let advance = 46usize.checked_add(fn_len)?.checked_add(extra_len)?.checked_add(comment_len)?;
+        cd_pos = cd_pos.checked_add(advance)?;
 
         // Read from local header
-        if local_offset + 30 > data.len() || &data[local_offset..local_offset + 4] != b"PK\x03\x04" {
+        if data.get(local_offset..local_offset + 4) != Some(b"PK\x03\x04") {
             continue;
         }
 
-        let loc_fn_len = u16_le(&data[local_offset + 26..local_offset + 28]) as usize;
-        let loc_extra_len = u16_le(&data[local_offset + 28..local_offset + 30]) as usize;
-        let data_start = local_offset + 30 + loc_fn_len + loc_extra_len;
+        let loc_fn_len = get_u16_le(data, local_offset.checked_add(26)?)? as usize;
+        let loc_extra_len = get_u16_le(data, local_offset.checked_add(28)?)? as usize;
+        let data_start = local_offset.checked_add(30)?.checked_add(loc_fn_len)?.checked_add(loc_extra_len)?;
 
-        if data_start + comp_size > data.len() {
-            continue;
-        }
-
-        let comp_data = &data[data_start..data_start + comp_size];
+        let comp_data = data.get(data_start..data_start.checked_add(comp_size)?)?;
         let file_bytes = match method {
             0 => comp_data.to_vec(),
             8 => match decompress_deflate(comp_data) {
@@ -170,4 +203,28 @@ fn parse_zip_central_dir(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
     }
 
     Some(entries)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn malformed_central_dir_does_not_panic() {
+        // Construct malformed ZIP data that has EOCD header with huge central directory offset
+        let mut malformed = Vec::new();
+        malformed.extend_from_slice(b"PK\x05\x06"); // EOCD signature
+        malformed.extend_from_slice(&[0u8; 6]);     // disk numbers and cd counts
+        malformed.extend_from_slice(&[0xFF, 0xFF, 0x00, 0x00]); // cd_size
+        malformed.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0x7F]); // cd_offset out of bounds
+        malformed.extend_from_slice(&[0u8; 2]);     // comment len
+
+        assert!(parse_zip(&malformed).is_none());
+    }
+
+    #[test]
+    fn truncated_zip_returns_none() {
+        let truncated = b"PK\x03\x04\x0a\x00";
+        assert!(parse_zip(truncated).is_none());
+    }
 }

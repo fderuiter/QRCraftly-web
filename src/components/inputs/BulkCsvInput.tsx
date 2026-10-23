@@ -256,11 +256,19 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       return;
     }
 
+    if (/\.xls$/i.test(file.name) || file.type === 'application/vnd.ms-excel') {
+      addToast({
+        type: 'error',
+        message: 'Legacy .xls files are not supported. Please save your spreadsheet as .xlsx or .csv.',
+        duration: 5000,
+      });
+      return;
+    }
+
     try {
       const isExcel =
-        /\.(xlsx|xls)$/i.test(file.name) ||
-        file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        file.type === 'application/vnd.ms-excel';
+        /\.xlsx$/i.test(file.name) ||
+        file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
       let content: string;
       if (isExcel) {
@@ -447,7 +455,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
         ref={fileInputRef}
         type="file"
         aria-label={data.csvContent ? 'Change CSV, TXT, or Excel file' : 'Upload CSV, TXT, or Excel file'}
-        accept=".csv, .txt, .xlsx, .xls, text/csv, text/plain, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+        accept=".csv, .txt, .xlsx, text/csv, text/plain, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         className="sr-only"
         tabIndex={-1}
         onChange={handleFileUpload}

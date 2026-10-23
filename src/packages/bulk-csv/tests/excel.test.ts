@@ -32,6 +32,22 @@ describe('Excel WebAssembly Parser', () => {
     expect(result).toBe('Website,Label\nhttps://example.com,Sample');
   });
 
+  it('returns empty string for legacy binary .xls OLE2 header bytes', async () => {
+    const ole2Bytes = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+    const result = await parseExcelToCsv(ole2Bytes);
+    expect(result).toBe('');
+  });
+
+  it('returns empty string for corrupt zip file without sheet XML', async () => {
+    const corruptZip = new Uint8Array([
+      0x50, 0x4b, 0x03, 0x04, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00,
+      0x00, 0x00, 0x72, 0x65, 0x61, 0x64, 0x6d, 0x65, 0x2e, 0x74, 0x78, 0x74,
+    ]);
+    const result = await parseExcelToCsv(corruptZip);
+    expect(result).toBe('');
+  });
+
   it('returns empty string for empty input', async () => {
     const result = await parseExcelToCsv(new Uint8Array(0));
     expect(result).toBe('');

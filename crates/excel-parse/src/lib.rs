@@ -72,9 +72,12 @@ pub fn excel_bytes_to_csv(data: &[u8]) -> Vec<u8> {
             let csv_str = format_matrix_to_csv(&matrix);
             return csv_str.into_bytes();
         }
+
+        // Zip archive without sheet XML (e.g. corrupt XLSX or unrelated ZIP)
+        return Vec::new();
     }
 
-    // 2. Try XML Spreadsheet 2003 / HTML table format (.xls)
+    // 2. Try XML Spreadsheet 2003 / HTML table format (.xls XML/HTML fallback)
     if let Ok(text) = core::str::from_utf8(data) {
         let trimmed = text.trim();
         if trimmed.starts_with('<') && (trimmed.contains("<tr") || trimmed.contains("<Row") || trimmed.contains("<table") || trimmed.contains("<Workbook")) {
@@ -83,12 +86,14 @@ pub fn excel_bytes_to_csv(data: &[u8]) -> Vec<u8> {
             return csv_str.into_bytes();
         }
 
-        // 3. Fallback: return input text as CSV
-        return data.to_vec();
+        // Plain text / CSV fallback if UTF-8 text contains no null bytes or binary control characters
+        if !data.contains(&0) {
+            return data.to_vec();
+        }
     }
 
-    // Fallback binary
-    data.to_vec()
+    // Unrecognized binary input (e.g. legacy BIFF8 .xls or corrupt binary)
+    Vec::new()
 }
 
 /// Parses an Excel spreadsheet (XLSX, XLS) or CSV file and writes normalized CSV text to `out_ptr`.
@@ -138,6 +143,26 @@ mod tests {
         let input = b"<table><tr><td>Name</td><td>URL</td></tr><tr><td>Test</td><td>https://test.com</td></tr></table>";
         let csv = excel_bytes_to_csv(input);
         assert_eq!(String::from_utf8(csv).unwrap(), "Name,URL\nTest,https://test.com");
+    }
+
+    #[test]
+    fn rejects_legacy_biff_binary_xls() {
+        // OLE2 Compound File Binary Format magic bytes (\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1)
+        let ole2_bytes = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0x00, 0x01, 0x02];
+        let csv = excel_bytes_to_csv(&ole2_bytes);
+        assert!(csv.is_empty(), "Legacy binary BIFF .xls should return empty CSV bytes");
+    }
+
+    #[test]
+    fn rejects_corrupt_zip_without_sheet_xml() {
+        // Minimal PKZip with a single file named 'readme.txt' instead of sheet XML
+        let zip_bytes = [
+            0x50, 0x4b, 0x03, 0x04, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00,
+            0x00, 0x00, 0x72, 0x65, 0x61, 0x64, 0x6d, 0x65, 0x2e, 0x74, 0x78, 0x74,
+        ];
+        let csv = excel_bytes_to_csv(&zip_bytes);
+        assert!(csv.is_empty(), "Zip file without sheet XML should return empty CSV bytes");
     }
 
     #[test]

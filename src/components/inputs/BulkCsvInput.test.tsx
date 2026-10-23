@@ -1005,7 +1005,7 @@ describe('Interactive CSV Column Mapping UI', () => {
   });
 });
 
-describe('Excel Spreadsheet Parsing (.xlsx and .xls)', () => {
+describe('Excel Spreadsheet Parsing (.xlsx)', () => {
   const initialData: BulkCsvData = {
     csvContent: '',
     payloadColumn: '',
@@ -1013,22 +1013,22 @@ describe('Excel Spreadsheet Parsing (.xlsx and .xls)', () => {
     exportFormat: 'png',
   };
 
-  it('reads an uploaded .xls HTML table Excel file', async () => {
+  it('shows an error toast when a legacy .xls file is uploaded', async () => {
     const htmlTable = '<table><tr><td>Website</td><td>Label</td></tr><tr><td>https://example.com/xls1</td><td>XLS1</td></tr></table>';
     const excelBuffer = new TextEncoder().encode(htmlTable);
 
     const onChange = vi.fn();
-    renderWithProvider(<BulkCsvInput data={initialData} onChange={onChange} />);
+    renderWithToasts(<BulkCsvInput data={initialData} onChange={onChange} />);
 
     const file = new File([excelBuffer], 'legacy.xls', { type: 'application/vnd.ms-excel' });
     fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });
 
     await waitFor(() => {
-      expect(onChange).toHaveBeenCalledWith({
-        csvContent: 'Website,Label\nhttps://example.com/xls1,XLS1',
-        fileName: 'legacy.xls',
-      });
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Legacy .xls files are not supported. Please save your spreadsheet as .xlsx or .csv.'
+      );
     });
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('reads an uploaded .xlsx spreadsheet using Rust WebAssembly parser', async () => {
@@ -1049,6 +1049,22 @@ describe('Excel Spreadsheet Parsing (.xlsx and .xls)', () => {
         fileName: 'data.xlsx',
       });
     });
+  });
+
+  it('shows an error toast when a corrupt .xlsx binary file is uploaded', async () => {
+    const onChange = vi.fn();
+    renderWithToasts(<BulkCsvInput data={initialData} onChange={onChange} />);
+
+    const corruptBinary = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00]);
+    const file = new File([corruptBinary], 'corrupt.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Could not read corrupt.xlsx. Choose the file again.');
+    });
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('shows an error toast when a blank spreadsheet file is uploaded', async () => {
