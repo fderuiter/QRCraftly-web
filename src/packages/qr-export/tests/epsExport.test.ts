@@ -128,6 +128,27 @@ describe('EPS Vector Export', () => {
         MissingImageError
       );
     });
+
+    it('emits CMYK color commands when colorSpace option is cmyk', async () => {
+      const sampleSvg = `<svg width="500" height="500"><path d="M 10 10 L 100 10 L 100 100 Z" fill="#ff0000"/><text x="50" y="200" fill="#00ff00" font="bold 20px sans-serif">TEST</text></svg>`;
+      const eps = await convertSvgToEps(sampleSvg, { colorSpace: 'cmyk' });
+
+      // Red (#ff0000) converts to CMYK C:0, M:1, Y:1, K:0 -> "0 1 1 0 setcmykcolor"
+      expect(eps).toContain('0 1 1 0 setcmykcolor');
+      // Green (#00ff00) converts to CMYK C:1, M:0, Y:1, K:0 -> "1 0 1 0 setcmykcolor"
+      expect(eps).toContain('1 0 1 0 setcmykcolor');
+      expect(eps).not.toContain('setrgbcolor');
+    });
+
+    it('emits /DeviceCMYK and 4-component decode array for raster images when colorSpace is cmyk', async () => {
+      const decode = async (_href: string, width: number, height: number) => {
+        const data = new Uint8ClampedArray(width * height * 4).fill(255);
+        return { width, height, data };
+      };
+      const eps = await convertSvgToEps(logoSvg, { decodeImage: decode, colorSpace: 'cmyk' });
+      expect(eps).toContain('/DeviceCMYK setcolorspace');
+      expect(eps).toContain('/Decode [0 1 0 1 0 1 0 1]');
+    });
   });
 });
 
