@@ -135,6 +135,15 @@ describe('CSP Hash Injector Unit Tests', () => {
       const content = `/*\n` + Array(6).fill(`  X-Custom-Header: ${largeHeader}\n`).join("");
       expect(() => validateHeaders(csp, content)).toThrowError(/exceeds Cloudflare's limit of 8,192 bytes/);
     });
+
+    it('rejects route matchers that do not start with / or https:// while allowing valid domain-prefixed rules', () => {
+      const csp = "default-src 'self';";
+      const validDomainContent = `https://:subdomain.fpderuiter.workers.dev/*\n  X-Robots-Tag: noindex\n`;
+      expect(() => validateHeaders(csp, validDomainContent)).not.toThrow();
+
+      const invalidPathContent = `assets/*\n  Cache-Control: no-cache\n`;
+      expect(() => validateHeaders(csp, invalidPathContent)).toThrowError(/Invalid route matcher "assets\/\*" in _headers: route matchers must start with "\/" or "https:\/\/"/);
+    });
   });
 
   describe('BASE_CSP_PATTERN', () => {
