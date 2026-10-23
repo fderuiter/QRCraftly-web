@@ -10,8 +10,6 @@ import {
 } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
 import { Button } from "../ui/Button";
-import { Alert } from "../ui/Alert";
-import { Upload } from "lucide-react";
 import { announcePolitely } from "../../utils/a11y";
 import {
   GRID_TWO_COLUMNS_CLASSES,
@@ -23,21 +21,13 @@ interface VCardInputProps {
   onChange: (updates: Partial<VCardData>) => void;
 }
 
-const MAX_FILE_SIZE_BYTES = 256 * 1024; // 256 KB cap
+const MAX_FILE_SIZE = 256 * 1024;
 
 export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
-  const firstNameError = vCardFieldError("firstName", data.firstName);
-  const lastNameError = vCardFieldError("lastName", data.lastName);
-  const phoneError = vCardFieldError("phone", data.phone);
-  const emailError = vCardFieldError("email", data.email);
-  const orgError = vCardFieldError("organization", data.organization);
-  const titleError = vCardFieldError("title", data.title);
-  const websiteError = vCardFieldError("website", data.website);
-  const photoError = vCardFieldError("photo", data.photo);
-  const streetError = vCardFieldError("street", data.street);
-  const cityError = vCardFieldError("city", data.city);
-  const zipError = vCardFieldError("zip", data.zip);
-  const countryError = vCardFieldError("country", data.country);
+  const err = (field: keyof VCardData) => vCardFieldError(field, data[field]);
+  const set = (field: keyof VCardData) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    onChange({ [field]: e.target.value });
+
   // A half-typed profile link is not yet on its network's host, so its error waits for blur (#1435).
   const [blurredSocials, setBlurredSocials] = useState<ReadonlySet<string>>(() => new Set());
   const [isDragging, setIsDragging] = useState(false);
@@ -46,54 +36,35 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
   const isMeCard = data.version === "mecard";
 
   const processFile = async (file: File) => {
-    if (file.size > MAX_FILE_SIZE_BYTES) {
+    if (file.size > MAX_FILE_SIZE) {
       setFileError("File size exceeds 256 KB limit.");
       return;
     }
 
-    let text = "";
-    if (typeof file.text === "function") {
-      try {
-        text = await file.text();
-      } catch {
-        text = "";
-      }
-    }
-    if (!text) {
-      text = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string) || "");
-        reader.onerror = () => resolve("");
-        reader.readAsText(file);
-      });
-    }
+    const text = (await file.text().catch(() => "")).trim();
+    const isVCard = /begin:vcard/i.test(text);
+    const isMECard = /^mecard:/i.test(text);
 
-    const trimmed = text.trim();
-    const hasVCard = /begin:vcard/i.test(trimmed);
-    const hasMECard = /^mecard:/i.test(trimmed);
-
-    if (!hasVCard && !hasMECard) {
+    if (!isVCard && !isMECard) {
       setFileError("Invalid vCard file. Missing BEGIN:VCARD header.");
       return;
     }
 
     const hydrated = hydrateVCardData(text);
-
-    // Filter to pass only non-empty parsed fields
     const updates: Partial<VCardData> = {};
-    (Object.keys(hydrated) as (keyof VCardData)[]).forEach((key) => {
-      if (key === "version") return;
-      const val = hydrated[key];
-      if (val && typeof val === "string" && val.trim() !== "") {
-        updates[key] = val;
+    for (const key in hydrated) {
+      if (key !== "version") {
+        const val = hydrated[key as keyof VCardData];
+        if (typeof val === "string" && val.trim()) {
+          (updates as Record<string, string>)[key] = val;
+        }
       }
-    });
+    }
 
-    // Keep version unless explicitly set in file (or MECard)
-    if (hasMECard) {
+    if (isMECard) {
       updates.version = "mecard";
     } else if (/VERSION:(2\.1|3\.0|4\.0)/i.test(text)) {
-      updates.version = hydrated.version;
+      updates.version = hydrated.version as VCardData["version"];
     }
 
     if (Object.keys(updates).length > 0) {
@@ -107,31 +78,26 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      void processFile(file);
-    }
+    if (file) void processFile(file);
     e.target.value = "";
   };
 
   const handleDragOver = (e: DragEvent<HTMLButtonElement>) => {
-    if (!e.dataTransfer?.types?.includes?.("Files")) return;
-    e.preventDefault();
-    setIsDragging(true);
+    if (e.dataTransfer?.types?.includes("Files")) {
+      e.preventDefault();
+      setIsDragging(true);
+    }
   };
 
   const handleDragLeave = (e: DragEvent<HTMLButtonElement>) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-      setIsDragging(false);
-    }
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setIsDragging(false);
   };
 
   const handleDrop = (e: DragEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) {
-      void processFile(file);
-    }
+    if (file) void processFile(file);
   };
 
   return (
@@ -156,18 +122,32 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           className="group"
         >
           <span className="flex size-10 items-center justify-center rounded-full bg-surface-hover transition-colors group-hover:bg-accent-soft">
-            <Upload className="size-5" aria-hidden="true" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-5" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+            </svg>
           </span>
           <span className="text-sm font-medium">Import .vcf or .vcard file</span>
           <span className="text-xs text-fg-muted">
-            Drag & drop or select a vCard file to populate fields
+            Drag & drop or select a vCard file
           </span>
         </Button>
         {fileError && (
-          <div className="mt-2">
-            <Alert variant="error" onDismiss={() => setFileError(null)}>
-              {fileError}
-            </Alert>
+          <div
+            role="alert"
+            aria-live="polite"
+            className="mt-2 flex items-start justify-between gap-3 rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger"
+          >
+            <span>{fileError}</span>
+            <button
+              type="button"
+              onClick={() => setFileError(null)}
+              className="inline-flex size-5 shrink-0 items-center justify-center rounded text-danger hover:opacity-80 focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none"
+              aria-label="Dismiss alert"
+            >
+              <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         )}
       </div>
@@ -176,9 +156,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         id="vcard-version"
         label="Contact Format"
         value={data.version || "3.0"}
-        onChange={(e) =>
-          onChange({ version: e.target.value as VCardData["version"] })
-        }
+        onChange={set("version") as (e: ChangeEvent<HTMLSelectElement>) => void}
       >
         <option value="3.0">vCard 3.0 (Standard)</option>
         <option value="4.0">vCard 4.0 (Modern RFC 6350)</option>
@@ -195,8 +173,8 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           maxLength={100}
           placeholder="e.g. Jane"
           value={data.firstName}
-          onChange={(e) => onChange({ firstName: e.target.value })}
-          error={firstNameError}
+          onChange={set("firstName")}
+          error={err("firstName")}
         />
         <TextField
           id="vcard-lastname"
@@ -206,8 +184,8 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           maxLength={100}
           placeholder="e.g. Doe"
           value={data.lastName}
-          onChange={(e) => onChange({ lastName: e.target.value })}
-          error={lastNameError}
+          onChange={set("lastName")}
+          error={err("lastName")}
         />
       </div>
 
@@ -221,8 +199,8 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           maxLength={20}
           placeholder="+1 555 000 0000"
           value={data.phone}
-          onChange={(e) => onChange({ phone: e.target.value })}
-          error={phoneError}
+          onChange={set("phone")}
+          error={err("phone")}
         />
         <TextField
           id="vcard-email"
@@ -233,8 +211,8 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           maxLength={254}
           placeholder="name@example.com"
           value={data.email}
-          onChange={(e) => onChange({ email: e.target.value })}
-          error={emailError}
+          onChange={set("email")}
+          error={err("email")}
         />
       </div>
 
@@ -246,8 +224,8 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         maxLength={100}
         placeholder="e.g. Acme Corp"
         value={data.organization}
-        onChange={(e) => onChange({ organization: e.target.value })}
-        error={orgError}
+        onChange={set("organization")}
+        error={err("organization")}
       />
 
       <TextField
@@ -258,8 +236,8 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         maxLength={100}
         placeholder="e.g. Software Engineer"
         value={data.title}
-        onChange={(e) => onChange({ title: e.target.value })}
-        error={titleError}
+        onChange={set("title")}
+        error={err("title")}
       />
 
       <TextField
@@ -271,11 +249,11 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         maxLength={2048}
         placeholder="https://example.com"
         value={data.website}
-        onChange={(e) => onChange({ website: e.target.value })}
-        error={websiteError}
+        onChange={set("website")}
+        error={err("website")}
         aria-describedby={hintsId("vcard-website")}
       />
-      {!websiteError && <LinkHints fieldId="vcard-website" address={data.website} />}
+      {!err("website") && <LinkHints fieldId="vcard-website" address={data.website} />}
 
       {!isMeCard && (
         <>
@@ -288,12 +266,12 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
             maxLength={2048}
             placeholder="https://example.com/avatar.jpg"
             value={data.photo || ""}
-            onChange={(e) => onChange({ photo: e.target.value })}
-            error={photoError}
+            onChange={set("photo")}
+            error={err("photo")}
             aria-describedby={hintsId("vcard-photo")}
           />
           <p className="mt-1 text-xs text-fg-muted">Some phones don't load linked photos.</p>
-          {!photoError && <LinkHints fieldId="vcard-photo" address={data.photo || ""} />}
+          {!err("photo") && <LinkHints fieldId="vcard-photo" address={data.photo || ""} />}
         </>
       )}
 
@@ -315,9 +293,9 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
                   maxLength={2048}
                   placeholder={`@user or ${network.hosts[0]}/…`}
                   value={data[field] || ""}
-                  onChange={(e) => onChange({ [field]: e.target.value })}
+                  onChange={set(field)}
                   onBlur={() => setBlurredSocials((prev) => new Set(prev).add(field))}
-                  error={blurredSocials.has(field) ? vCardFieldError(field, data[field]) : undefined}
+                  error={blurredSocials.has(field) ? err(field) : undefined}
                 />
               );
             })}
@@ -335,8 +313,8 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
             maxLength={100}
             placeholder="Street"
             value={data.street}
-            onChange={(e) => onChange({ street: e.target.value })}
-            error={streetError}
+            onChange={set("street")}
+            error={err("street")}
           />
           <div className={GRID_TWO_COLUMNS_CLASSES}>
             <TextField
@@ -347,8 +325,8 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               maxLength={100}
               placeholder="City"
               value={data.city}
-              onChange={(e) => onChange({ city: e.target.value })}
-              error={cityError}
+              onChange={set("city")}
+              error={err("city")}
             />
             <TextField
               id="vcard-zip"
@@ -358,8 +336,8 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               maxLength={20}
               placeholder="ZIP"
               value={data.zip}
-              onChange={(e) => onChange({ zip: e.target.value })}
-              error={zipError}
+              onChange={set("zip")}
+              error={err("zip")}
             />
             <TextField
               id="vcard-country"
@@ -369,8 +347,8 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               maxLength={100}
               placeholder="Country"
               value={data.country}
-              onChange={(e) => onChange({ country: e.target.value })}
-              error={countryError}
+              onChange={set("country")}
+              error={err("country")}
             />
           </div>
         </div>
