@@ -49,6 +49,7 @@ export {
   type BulkCsvPreview,
 } from './lib/preview';
 export { encodeBulkCell, type BulkContentType } from './lib/payload';
+export { parseExcelToCsv } from './lib/excel';
 export { SAMPLE_CSV_TEMPLATE } from './lib/template';
 export {
   categorizeCsvRows,

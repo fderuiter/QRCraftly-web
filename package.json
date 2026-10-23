@@ -74,8 +74,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "vike": "^0.4.247",
-    "vike-react": "^0.6.13",
-    "xlsx": "0.18.5"
+    "vike-react": "^0.6.13"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

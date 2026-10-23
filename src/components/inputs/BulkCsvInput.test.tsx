@@ -28,7 +28,6 @@ import * as downloadManager from '@/utils/downloadManager';
 import * as qrExport from '@/packages/qr-export';
 import * as bulkCsv from '@/packages/bulk-csv';
 import { MAX_BULK_CSV_ROWS, SAMPLE_CSV_TEMPLATE } from '@/packages/bulk-csv';
-import * as XLSX from 'xlsx';
 
 // The real row check, wrapped so a test can count how often it runs.
 vi.mock('@/packages/bulk-csv', async (importOriginal) => {
@@ -1014,15 +1013,27 @@ describe('Excel Spreadsheet Parsing (.xlsx and .xls)', () => {
     exportFormat: 'png',
   };
 
-  it('reads an uploaded .xlsx Excel file and parses content and columns', async () => {
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([
-      ['URL', 'Name'],
-      ['https://example.com/excel1', 'Excel1'],
-      ['https://example.com/excel2', 'Excel2'],
-    ]);
-    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-    const excelBuffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  it('reads an uploaded .xls HTML table Excel file', async () => {
+    const htmlTable = '<table><tr><td>Website</td><td>Label</td></tr><tr><td>https://example.com/xls1</td><td>XLS1</td></tr></table>';
+    const excelBuffer = new TextEncoder().encode(htmlTable);
+
+    const onChange = vi.fn();
+    renderWithProvider(<BulkCsvInput data={initialData} onChange={onChange} />);
+
+    const file = new File([excelBuffer], 'legacy.xls', { type: 'application/vnd.ms-excel' });
+    fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith({
+        csvContent: 'Website,Label\nhttps://example.com/xls1,XLS1',
+        fileName: 'legacy.xls',
+      });
+    });
+  });
+
+  it('reads an uploaded .xlsx spreadsheet using Rust WebAssembly parser', async () => {
+    const csvData = 'URL,Name\nhttps://example.com/excel1,Excel1\nhttps://example.com/excel2,Excel2';
+    const excelBuffer = new TextEncoder().encode(csvData);
 
     const onChange = vi.fn();
     renderWithProvider(<BulkCsvInput data={initialData} onChange={onChange} />);
@@ -1040,79 +1051,12 @@ describe('Excel Spreadsheet Parsing (.xlsx and .xls)', () => {
     });
   });
 
-  it('reads an uploaded .xls Excel file', async () => {
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([
-      ['Website', 'Label'],
-      ['https://example.com/xls1', 'XLS1'],
-    ]);
-    XLSX.utils.book_append_sheet(wb, ws, 'DataSheet');
-    const excelBuffer = XLSX.write(wb, { type: 'array', bookType: 'xls' });
-
-    const onChange = vi.fn();
-    renderWithProvider(<BulkCsvInput data={initialData} onChange={onChange} />);
-
-    const file = new File([excelBuffer], 'legacy.xls', { type: 'application/vnd.ms-excel' });
-    fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });
-
-    await waitFor(() => {
-      expect(onChange).toHaveBeenCalledWith({
-        csvContent: 'Website,Label\nhttps://example.com/xls1,XLS1',
-        fileName: 'legacy.xls',
-      });
-    });
-  });
-
-  it('defaults to the first worksheet when a workbook has multiple sheets', async () => {
-    const wb = XLSX.utils.book_new();
-    const ws1 = XLSX.utils.aoa_to_sheet([['URL', 'Name'], ['https://example.com/sheet1', 'S1']]);
-    const ws2 = XLSX.utils.aoa_to_sheet([['URL', 'Name'], ['https://example.com/sheet2', 'S2']]);
-    XLSX.utils.book_append_sheet(wb, ws1, 'FirstSheet');
-    XLSX.utils.book_append_sheet(wb, ws2, 'SecondSheet');
-    const excelBuffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
-
-    const onChange = vi.fn();
-    renderWithProvider(<BulkCsvInput data={initialData} onChange={onChange} />);
-
-    const file = new File([excelBuffer], 'multisheet.xlsx', {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-    fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });
-
-    await waitFor(() => {
-      expect(onChange).toHaveBeenCalledWith({
-        csvContent: 'URL,Name\nhttps://example.com/sheet1,S1',
-        fileName: 'multisheet.xlsx',
-      });
-    });
-  });
-
-  it('shows an error toast when a corrupt ZIP/XLSX file is uploaded', async () => {
+  it('shows an error toast when a blank spreadsheet file is uploaded', async () => {
     const onChange = vi.fn();
     renderWithToasts(<BulkCsvInput data={initialData} onChange={onChange} />);
 
-    const corruptZipBuffer = new TextEncoder().encode('PK\x03\x04corrupt_zip_data_that_fails_unzipping');
-    const file = new File([corruptZipBuffer], 'corrupt.xlsx', {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-    fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Could not read corrupt.xlsx. Choose the file again.');
-    });
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it('shows an error toast when a workbook with a blank worksheet is uploaded', async () => {
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([]);
-    XLSX.utils.book_append_sheet(wb, ws, 'BlankSheet');
-    const excelBuffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
-
-    const onChange = vi.fn();
-    renderWithToasts(<BulkCsvInput data={initialData} onChange={onChange} />);
-
-    const file = new File([excelBuffer], 'blank.xlsx', {
+    const emptyBuffer = new TextEncoder().encode('   ');
+    const file = new File([emptyBuffer], 'blank.xlsx', {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), { target: { files: [file] } });

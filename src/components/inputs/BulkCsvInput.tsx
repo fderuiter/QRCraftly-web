@@ -265,19 +265,8 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       let content: string;
       if (isExcel) {
         const arrayBuffer = await file.arrayBuffer();
-        const XLSX = await import('xlsx');
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
-          addToast({ type: 'error', message: `Could not read ${file.name}. Choose the file again.`, duration: 5000 });
-          return;
-        }
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        if (!worksheet || !worksheet['!ref']) {
-          addToast({ type: 'error', message: `Could not read ${file.name}. Choose the file again.`, duration: 5000 });
-          return;
-        }
-        content = XLSX.utils.sheet_to_csv(worksheet);
+        const { parseExcelToCsv } = await import('@/packages/bulk-csv');
+        content = await parseExcelToCsv(new Uint8Array(arrayBuffer));
         if (!content || content.trim() === '') {
           addToast({ type: 'error', message: `Could not read ${file.name}. Choose the file again.`, duration: 5000 });
           return;
