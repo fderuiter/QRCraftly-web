@@ -160,9 +160,8 @@ mod tests {
     fn test_crypto_validate_address_export() {
         let net = b"bitcoin";
         let addr = b"1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2";
-        let status = unsafe {
-            crypto_validate_address(net.as_ptr(), net.len(), addr.as_ptr(), addr.len())
-        };
+        let status =
+            unsafe { crypto_validate_address(net.as_ptr(), net.len(), addr.as_ptr(), addr.len()) };
         assert_eq!(status, 0);
     }
 }

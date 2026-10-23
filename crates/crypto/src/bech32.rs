@@ -28,9 +28,9 @@ fn bech32_polymod(values: &[u8]) -> u32 {
     for &v in values {
         let top = check >> 25;
         check = ((check & 0x01ff_ffff) << 5) ^ (v as u32);
-        for i in 0..5 {
+        for (i, &gen) in generators.iter().enumerate() {
             if ((top >> i) & 1) != 0 {
-                check ^= generators[i];
+                check ^= gen;
             }
         }
     }
@@ -112,14 +112,29 @@ mod tests {
 
     #[test]
     fn test_check_segwit_valid() {
-        assert!(check_segwit("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "bc"));
-        assert!(check_segwit("BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4", "bc"));
-        assert!(check_segwit("bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", "bc"));
+        assert!(check_segwit(
+            "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+            "bc"
+        ));
+        assert!(check_segwit(
+            "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4",
+            "bc"
+        ));
+        assert!(check_segwit(
+            "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0",
+            "bc"
+        ));
     }
 
     #[test]
     fn test_check_segwit_invalid() {
-        assert!(!check_segwit("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5", "bc"));
-        assert!(!check_segwit("Bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "bc"));
+        assert!(!check_segwit(
+            "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5",
+            "bc"
+        ));
+        assert!(!check_segwit(
+            "Bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+            "bc"
+        ));
     }
 }

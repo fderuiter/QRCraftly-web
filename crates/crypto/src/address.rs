@@ -129,15 +129,33 @@ mod tests {
 
     #[test]
     fn test_bitcoin_addresses() {
-        assert_eq!(validate_address("bitcoin", "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2"), ADDRESS_VALID);
-        assert_eq!(validate_address("bitcoin", "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN3"), ADDRESS_INVALID);
-        assert_eq!(validate_address("bitcoin", "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"), ADDRESS_VALID);
+        assert_eq!(
+            validate_address("bitcoin", "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2"),
+            ADDRESS_VALID
+        );
+        assert_eq!(
+            validate_address("bitcoin", "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN3"),
+            ADDRESS_INVALID
+        );
+        assert_eq!(
+            validate_address("bitcoin", "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"),
+            ADDRESS_VALID
+        );
     }
 
     #[test]
     fn test_ethereum_addresses() {
-        assert_eq!(validate_address("ethereum", "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"), ADDRESS_VALID);
-        assert_eq!(validate_address("ethereum", "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"), ADDRESS_UNCHECKED);
-        assert_eq!(validate_address("ethereum", "0x5AAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"), ADDRESS_INVALID);
+        assert_eq!(
+            validate_address("ethereum", "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"),
+            ADDRESS_VALID
+        );
+        assert_eq!(
+            validate_address("ethereum", "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"),
+            ADDRESS_UNCHECKED
+        );
+        assert_eq!(
+            validate_address("ethereum", "0x5AAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"),
+            ADDRESS_INVALID
+        );
     }
 }

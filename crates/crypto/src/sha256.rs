@@ -43,7 +43,7 @@ pub fn sha256(message: &[u8]) -> [u8; 32] {
     ];
 
     let bit_len = (message.len() as u64).wrapping_mul(8);
-    let mut padded = Vec::with_capacity(((message.len() + 9 + 63) / 64) * 64);
+    let mut padded = Vec::with_capacity((message.len() + 9).div_ceil(64) * 64);
     padded.extend_from_slice(message);
     padded.push(0x80);
     while (padded.len() + 8) % 64 != 0 {
@@ -64,7 +64,10 @@ pub fn sha256(message: &[u8]) -> [u8; 32] {
         for i in 16..64 {
             let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
             let s1 = w[i - 2].rotate_right(17) ^ w[i - 2].rotate_right(19) ^ (w[i - 2] >> 10);
-            w[i] = w[i - 16].wrapping_add(s0).wrapping_add(w[i - 7]).wrapping_add(s1);
+            w[i] = w[i - 16]
+                .wrapping_add(s0)
+                .wrapping_add(w[i - 7])
+                .wrapping_add(s1);
         }
 
         let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut h] = state;
