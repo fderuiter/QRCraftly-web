@@ -32,27 +32,27 @@ export const landingPageContent: Record<string, LandingCopy> = {
       name: 'How to Make an Image QR Code',
       description: 'Put a picture into a QR code in four steps, all in your browser.',
       steps: [
-        { name: 'Enter your link', text: 'Type or paste the address the code should open. Any QR content works, because the picture only recolours the modules.' },
-        { name: 'Add your image', text: 'In the Logo section below the code, open Mosaic and choose a picture. It is read on this device and never sent anywhere.' },
-        { name: 'Pick halftone or tiles, then the contrast', text: 'Halftone shows more of the picture. Tiles is bolder. Raise the contrast if the scan badge says the code is fragile.' },
-        { name: 'Check the scan badge and download', text: 'Wait for “Scans reliably”, download the code, and test it with a phone before you print it.' },
+        { name: 'Enter your link', text: 'Type or paste the link to open. Any content works because the picture only recolours modules.' },
+        { name: 'Add your image', text: 'In the Logo section, open Mosaic and choose a picture. It is read locally and never uploaded.' },
+        { name: 'Pick halftone or tiles, then the contrast', text: 'Halftone shows more detail. Tiles is bolder. Raise contrast if the scan badge suggests it.' },
+        { name: 'Check the scan badge and download', text: 'Wait for “Scans reliably”, download the code, and test it with a phone before printing.' },
       ],
     },
     faqs: [
       {
         question: 'Is this an AI QR code?',
         answer:
-          'No. There is no AI model and no image generation. Your picture is shrunk to one color per module, and each module is pulled toward dark or light to match it. The result is your own picture, made in your browser.',
+          'No. There is no AI model or image generation. Your picture is scaled to one color per module, matched to light or dark. The result is made entirely in your browser.',
       },
       {
         question: 'Will an image QR code still scan?',
         answer:
-          'Usually yes, and the generator checks it for you. The code underneath is a standard QR code and no module is flipped to draw the picture, so scanners read it like any other. Busy or very dark pictures are the risky ones: raise the contrast, switch to Tiles, or pick a simpler image if the scan badge warns you.',
+          'Usually yes, and the generator checks it for you. The code underneath is a standard QR code and no module is flipped, so scanners read it normally. For dark or busy pictures, raise contrast or switch to Tiles if warned.',
       },
       {
         question: 'What error correction level does it use?',
         answer:
-          'Adding a mosaic image sets error correction to H, the highest level, which leaves the most room for print damage and for a small logo. You can change it under Advanced, but lowering it makes the code less forgiving.',
+          'Mosaic images set error correction to H, leaving maximum room for print damage. You can adjust this under Advanced, but lower levels reduce readability.',
       },
     ],
     guide: {

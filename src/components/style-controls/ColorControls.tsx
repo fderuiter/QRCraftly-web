@@ -37,6 +37,27 @@ const BackgroundColorField: React.FC<ColorControlsProps> = ({ config, onChange }
   );
 };
 
+const PRESET_OPTIONS = PRESET_COLORS.map((preset) => ({
+  value: preset.label,
+  ariaLabel: `Select ${preset.label} theme`,
+  label: (
+    <>
+      <svg viewBox="0 0 40 40" className="size-7 shrink-0 rounded ring-1 ring-line-strong" aria-hidden="true">
+        <rect width="40" height="40" fill={preset.bg} />
+        <rect x="6" y="6" width="28" height="28" rx="2" fill="none" stroke={preset.fg} strokeWidth="6" />
+        <rect x="11" y="11" width="18" height="18" rx="1" fill={preset.eye} />
+      </svg>
+      <span className="min-w-0 leading-tight">{preset.label}</span>
+    </>
+  ),
+}));
+
+const FILL_MODE_OPTIONS: Array<{ value: GradientType; label: string }> = [
+  { value: 'none', label: 'Solid' },
+  { value: 'linear', label: 'Linear' },
+  { value: 'radial', label: 'Radial' },
+];
+
 export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }) => {
 
   const activeGradientType: GradientType = config.gradientType || 'none';
@@ -95,24 +116,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
             });
           }
         }}
-        options={PRESET_COLORS.map((preset) => ({
-          value: preset.label,
-          ariaLabel: `Select ${preset.label} theme`,
-          label: (
-            <>
-              {/* Use SVG presentation attributes instead of inline styles for CSP compliance */}
-              <svg viewBox="0 0 40 40" className="size-7 shrink-0 rounded ring-1 ring-line-strong" aria-hidden="true">
-                {/* Background */}
-                <rect width="40" height="40" fill={preset.bg} />
-                {/* Foreground Ring (Simulating Modules) */}
-                <rect x="6" y="6" width="28" height="28" rx="2" fill="none" stroke={preset.fg} strokeWidth="6" />
-                {/* Eye Center */}
-                <rect x="11" y="11" width="18" height="18" rx="1" fill={preset.eye} />
-              </svg>
-              <span className="min-w-0 leading-tight">{preset.label}</span>
-            </>
-          ),
-        }))}
+        options={PRESET_OPTIONS}
       />
 
       <div className="mb-4">
@@ -138,11 +142,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
               });
             }
           }}
-          options={[
-            { value: 'none', label: 'Solid' },
-            { value: 'linear', label: 'Linear' },
-            { value: 'radial', label: 'Radial' },
-          ]}
+          options={FILL_MODE_OPTIONS}
         />
       </div>
 
@@ -234,11 +234,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
           onChange(calculateAutoFixColorPatch(config));
           announcePolitely('Contrast adjusted to meet WCAG standards');
           requestAnimationFrame(() => {
-            const target =
-              document.getElementById('fg-color') ||
-              document.getElementById('gradient-start-color') ||
-              document.getElementById('bg-color');
-            target?.focus();
+            (document.getElementById('fg-color') || document.getElementById('gradient-start-color') || document.getElementById('bg-color'))?.focus();
           });
         }}
       />

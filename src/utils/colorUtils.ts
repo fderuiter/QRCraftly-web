@@ -28,10 +28,7 @@ export const normalizeHex = (val?: string | null): string | null => {
   if (!val) return null;
   const match = val.match(/^#?([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/);
   if (!match) return null;
-  let hex = match[1];
-  if (hex.length === 3) {
-    hex = hex.split('').map((c) => c + c).join('');
-  }
+  const hex = match[1].length === 3 ? match[1].split('').map((c) => c + c).join('') : match[1];
   return '#' + hex.toLowerCase();
 };
 
@@ -108,17 +105,9 @@ export const getLuminanceFromLinearRgb = (r: number, g: number, b: number): numb
  * @returns The relative luminance value.
  */
 export const getLuminance = (hex: string): number => {
-  let normalizedHex = hex;
-  if (hex.length === 4) {
-    normalizedHex = '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
-  }
-
-  const rgb = parseInt(normalizedHex.slice(1), 16);
-  const r = ((rgb >> 16) & 0xff) / 255;
-  const g = ((rgb >> 8) & 0xff) / 255;
-  const b = (rgb & 0xff) / 255;
-
-  return getLuminanceFromRgb(r, g, b);
+  const norm = hex.length === 4 ? '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3] : hex;
+  const rgb = parseInt(norm.slice(1), 16);
+  return getLuminanceFromRgb(((rgb >> 16) & 255) / 255, ((rgb >> 8) & 255) / 255, (rgb & 255) / 255);
 };
 
 /**
@@ -128,31 +117,19 @@ export const getLuminance = (hex: string): number => {
  * @returns The contrast ratio (1 to 21).
  */
 export const getContrastRatio = (fg: string, bg: string) => {
-  if (!fg || !bg) return 0;
-  if ((fg.length !== 7 && fg.length !== 4) || (bg.length !== 7 && bg.length !== 4)) return 0;
-
-  const hexRegex = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
-  if (!hexRegex.test(fg) || !hexRegex.test(bg)) return 0;
-
-  const l1 = getLuminance(fg);
-  const l2 = getLuminance(bg);
-  const lighter = Math.max(l1, l2);
-  const darker = Math.min(l1, l2);
-  return (lighter + 0.05) / (darker + 0.05);
+  if (!fg || !bg || !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(fg) || !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(bg)) return 0;
+  const l1 = getLuminance(fg), l2 = getLuminance(bg);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
 };
 
 /**
  * Converts sRGB channels (0..255) to HSL color space.
  */
 export const rgbToHsl = (r: number, g: number, b: number): { h: number; s: number; l: number } => {
-  const rN = r / 255;
-  const gN = g / 255;
-  const bN = b / 255;
-  const max = Math.max(rN, gN, bN);
-  const min = Math.min(rN, gN, bN);
+  const rN = r / 255, gN = g / 255, bN = b / 255;
+  const max = Math.max(rN, gN, bN), min = Math.min(rN, gN, bN);
   const l = (max + min) / 2;
-  let h = 0;
-  let s = 0;
+  let h = 0, s = 0;
   if (max !== min) {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
@@ -168,10 +145,7 @@ export const rgbToHsl = (r: number, g: number, b: number): { h: number; s: numbe
 export const hslToHex = (h: number, s: number, l: number): string => {
   const normH = ((h % 360) + 360) % 360;
   const a = s * Math.min(l, 1 - l);
-  const f = (n: number) => {
-    const k = (n + normH / 30) % 12;
-    return (Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))) | 256).toString(16).slice(1);
-  };
+  const f = (n: number) => (Math.round(255 * (l - a * Math.max(-1, Math.min((n + normH / 30) % 12 - 3, 9 - ((n + normH / 30) % 12), 1)))) | 256).toString(16).slice(1);
   return `#${f(0)}${f(8)}${f(4)}`;
 };
 
@@ -190,16 +164,14 @@ export const adjustColorForContrast = (fgHex: string, bgHex: string, targetContr
   const { h, s, l: initL } = rgbToHsl((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
   const bgLuminance = getLuminance(normBg);
 
-  // Keep the foreground darker than the background
   let bestL: number | null = null;
   if (getContrastRatio(hslToHex(h, s, 0), normBg) >= targetContrast && getLuminance(hslToHex(h, s, 0)) < bgLuminance) {
-    let l = 0;
-    let r = initL;
+    let l = 0, r = initL;
     bestL = 0;
     for (let i = 0; i < 10; i++) {
       const mid = (l + r) / 2;
-      const candidateHex = hslToHex(h, s, mid);
-      if (getContrastRatio(candidateHex, normBg) >= targetContrast && getLuminance(candidateHex) < bgLuminance) {
+      const hex = hslToHex(h, s, mid);
+      if (getContrastRatio(hex, normBg) >= targetContrast && getLuminance(hex) < bgLuminance) {
         bestL = mid;
         l = mid;
       } else {
@@ -208,12 +180,7 @@ export const adjustColorForContrast = (fgHex: string, bgHex: string, targetContr
     }
   }
 
-  if (bestL !== null) {
-    return hslToHex(h, s, bestL);
-  }
-
-  // When no lightness on the dark side works, fall back to black or white
-  return getContrastRatio('#000000', normBg) >= targetContrast ? '#000000' : '#ffffff';
+  return bestL !== null ? hslToHex(h, s, bestL) : (getContrastRatio('#000000', normBg) >= targetContrast ? '#000000' : '#ffffff');
 };
 
 /**
@@ -263,37 +230,19 @@ export function rgbToCmyk(
   gParam?: number,
   bParam?: number
 ): CmykColor {
-  let r: number;
-  let g: number;
-  let b: number;
-
-  if (typeof rOrColor === 'object' && rOrColor !== null) {
-    r = rOrColor.r;
-    g = rOrColor.g;
-    b = rOrColor.b;
-  } else {
-    r = rOrColor;
-    g = gParam ?? 0;
-    b = bParam ?? 0;
-  }
-
-  r = Math.min(1, Math.max(0, r));
-  g = Math.min(1, Math.max(0, g));
-  b = Math.min(1, Math.max(0, b));
+  const isObj = typeof rOrColor === 'object' && rOrColor !== null;
+  const r = Math.min(1, Math.max(0, isObj ? rOrColor.r : (typeof rOrColor === 'number' ? rOrColor : 0)));
+  const g = Math.min(1, Math.max(0, isObj ? rOrColor.g : (gParam ?? 0)));
+  const b = Math.min(1, Math.max(0, isObj ? rOrColor.b : (bParam ?? 0)));
 
   const k = 1 - Math.max(r, g, b);
-  if (k >= 1) {
-    return { c: 0, m: 0, y: 0, k: 1 };
-  }
+  if (k >= 1) return { c: 0, m: 0, y: 0, k: 1 };
 
-  const c = (1 - r - k) / (1 - k);
-  const m = (1 - g - k) / (1 - k);
-  const y = (1 - b - k) / (1 - k);
-
+  const d = 1 - k;
   return {
-    c: Math.min(1, Math.max(0, c)),
-    m: Math.min(1, Math.max(0, m)),
-    y: Math.min(1, Math.max(0, y)),
+    c: Math.min(1, Math.max(0, (d - r) / d)),
+    m: Math.min(1, Math.max(0, (d - g) / d)),
+    y: Math.min(1, Math.max(0, (d - b) / d)),
     k: Math.min(1, Math.max(0, k)),
   };
 }

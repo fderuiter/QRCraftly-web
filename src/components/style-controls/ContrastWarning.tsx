@@ -113,7 +113,7 @@ export const ContrastBanner: React.FC<ContrastBannerProps> = ({
       <Alert variant="warning" className={className} role="note">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            {messageType === 'color' ? 'Warning: ' : ''}The contrast ratio is low ({contrastRatio.toFixed(decimalPrecision)}). {messageType === 'color' ? 'Aim for 4.5:1 for scannability.' : 'Ensure contrast is above 4.5:1 for export legibility.'}
+            {messageType === 'color' && 'Warning: '}The contrast ratio is low ({contrastRatio.toFixed(decimalPrecision)}). {messageType === 'color' ? 'Aim for 4.5:1 for scannability.' : 'Ensure contrast is above 4.5:1 for export legibility.'}
           </span>
           {onAutoFix && (
             <Button variant="primary" size="sm" onClick={onAutoFix} className="shrink-0">
