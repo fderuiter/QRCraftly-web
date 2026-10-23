@@ -34,6 +34,130 @@ describe('Event generator', () => {
     expect(hydrated).toEqual(data);
   });
 
+  it('constructs and hydrates recurring events with RRULE', () => {
+    const dataWithFreqCount = {
+      title: 'Weekly Sync',
+      startDate: '2025-01-01T10:00',
+      endDate: '2025-01-01T11:00',
+      recurrenceFreq: 'WEEKLY' as const,
+      recurrenceCount: 10,
+      location: 'Zoom',
+      description: 'Team sync',
+    };
+    const str1 = constructEventString(dataWithFreqCount);
+    expect(str1).toContain('RRULE:FREQ=WEEKLY;COUNT=10');
+    expect(hydrateEventData(str1)).toEqual(dataWithFreqCount);
+
+    const dataWithFreqOnly = {
+      title: 'Daily Standup',
+      startDate: '2025-01-01T09:00',
+      endDate: '2025-01-01T09:15',
+      recurrenceFreq: 'DAILY' as const,
+      location: '',
+      description: '',
+    };
+    const str2 = constructEventString(dataWithFreqOnly);
+    expect(str2).toContain('RRULE:FREQ=DAILY');
+    expect(str2).not.toContain('COUNT=');
+    expect(hydrateEventData(str2)).toEqual(dataWithFreqOnly);
+  });
+
+  it('handles recurrence edge cases gracefully', () => {
+    // 1. Frequency set to NONE or empty -> No RRULE generated
+    const dataNone = {
+      title: 'One-off',
+      startDate: '2025-01-01T10:00',
+      endDate: '2025-01-01T11:00',
+      recurrenceFreq: 'NONE' as const,
+      recurrenceCount: 5,
+      location: '',
+      description: '',
+    };
+    const strNone = constructEventString(dataNone);
+    expect(strNone).not.toContain('RRULE');
+
+    // 2. Unrecognized frequency -> No RRULE generated
+    const dataInvalidFreq = {
+      title: 'Event',
+      startDate: '2025-01-01T10:00',
+      endDate: '2025-01-01T11:00',
+      recurrenceFreq: 'HOURLY' as unknown as 'DAILY',
+      location: '',
+      description: '',
+    };
+    expect(constructEventString(dataInvalidFreq)).not.toContain('RRULE');
+
+    // 3. Non-positive, zero or non-numeric count -> Omit COUNT parameter
+    const dataZeroCount = {
+      title: 'Event',
+      startDate: '2025-01-01T10:00',
+      endDate: '2025-01-01T11:00',
+      recurrenceFreq: 'MONTHLY' as const,
+      recurrenceCount: 0,
+      location: '',
+      description: '',
+    };
+    const strZero = constructEventString(dataZeroCount);
+    expect(strZero).toContain('RRULE:FREQ=MONTHLY');
+    expect(strZero).not.toContain('COUNT');
+
+    // 4. Hydrating RRULE with unrecognized FREQ or invalid COUNT
+    const rawInvalidCount = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:Test\nRRULE:FREQ=YEARLY;COUNT=invalid\nEND:VEVENT\nEND:VCALENDAR`;
+    const hydratedInvalid = hydrateEventData(rawInvalidCount);
+    expect(hydratedInvalid.recurrenceFreq).toBe('YEARLY');
+    expect(hydratedInvalid.recurrenceCount).toBeUndefined();
+
+    // 5. Large count capped at 999
+    const dataLargeCount = {
+      title: 'Event',
+      startDate: '2025-01-01T10:00',
+      endDate: '2025-01-01T11:00',
+      recurrenceFreq: 'DAILY' as const,
+      recurrenceCount: 5000,
+      location: '',
+      description: '',
+    };
+    const strLarge = constructEventString(dataLargeCount);
+    expect(strLarge).toContain('RRULE:FREQ=DAILY;COUNT=999');
+    expect(hydrateEventData(strLarge).recurrenceCount).toBe(999);
+  });
+
+  it('supports Google Calendar recurrence links and hydration', () => {
+    const googleData = {
+      provider: CalendarProvider.GOOGLE,
+      title: 'Google Sync',
+      startDate: '2025-01-01T10:00',
+      endDate: '2025-01-01T11:00',
+      recurrenceFreq: 'WEEKLY' as const,
+      recurrenceCount: 12,
+      location: 'Google Meet',
+      description: 'Weekly team call',
+    };
+    const link = constructEventString(googleData);
+    expect(link).toContain('calendar.google.com/calendar/render');
+    expect(link).toContain('recur=RRULE%3AFREQ%3DWEEKLY%3BCOUNT%3D12');
+
+    const hydrated = hydrateEventData(link);
+    expect(hydrated.provider).toBe(CalendarProvider.GOOGLE);
+    expect(hydrated.title).toBe('Google Sync');
+    expect(hydrated.recurrenceFreq).toBe('WEEKLY');
+    expect(hydrated.recurrenceCount).toBe(12);
+  });
+
+  it('maintains stable UID for non-recurring events', () => {
+    const nonRecurring = {
+      title: 'Lunch Meeting',
+      startDate: '2025-07-04T12:00:00',
+      endDate: '2025-07-04T13:00:00',
+      location: 'Cafe',
+      description: 'Catch up',
+    };
+    const now = new Date('2025-01-01T00:00:00Z');
+    const str = constructEventString(nonRecurring, { now });
+    const uidLine = str.split(/\r?\n/).find((line) => line.startsWith('UID:'));
+    expect(uidLine).toBe('UID:9f2a7f4bed35a9f5@qrcraftly.com');
+  });
+
   it('hydrates with missing fields', () => {
     const raw = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:Meeting\nEND:VEVENT\nEND:VCALENDAR`;
     const hydrated = hydrateEventData(raw);

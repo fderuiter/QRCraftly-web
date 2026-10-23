@@ -62,4 +62,69 @@ describe('EventInput', () => {
     expect(screen.getByText(/sends the event's title, times, location and description to Google/)).toBeInTheDocument();
     expect(screen.getByLabelText('Target Calendar')).toHaveAttribute('aria-describedby', expect.stringContaining('event-provider-hints'));
   });
+
+  it('renders recurrence frequency and conditional occurrence count controls', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<EventInput data={event} onChange={onChange} />);
+
+    // Frequency field should exist and default to "Does not repeat" (NONE)
+    const repeatSelect = screen.getByLabelText('Repeat');
+    expect(repeatSelect).toHaveValue('NONE');
+    expect(screen.queryByLabelText('Occurrence Count')).not.toBeInTheDocument();
+
+    // Select WEEKLY frequency
+    fireEvent.change(repeatSelect, { target: { value: 'WEEKLY' } });
+    expect(onChange).toHaveBeenCalledWith({ recurrenceFreq: 'WEEKLY' });
+
+    // Rerender with recurrenceFreq = WEEKLY
+    rerender(<EventInput data={{ ...event, recurrenceFreq: 'WEEKLY' }} onChange={onChange} />);
+
+    // Conditional occurrence count field should now appear
+    const countInput = screen.getByLabelText('Occurrence Count');
+    expect(countInput).toBeInTheDocument();
+
+    // Type occurrence count
+    fireEvent.change(countInput, { target: { value: '5' } });
+    expect(onChange).toHaveBeenCalledWith({ recurrenceCount: 5 });
+
+    // Switch frequency back to NONE -> clears count
+    fireEvent.change(repeatSelect, { target: { value: 'NONE' } });
+    expect(onChange).toHaveBeenCalledWith({ recurrenceFreq: 'NONE', recurrenceCount: undefined });
+  });
+
+  it('shows recurrence controls for ICAL and GOOGLE, but hides them for OUTLOOK, OFFICE365, YAHOO', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<EventInput data={{ ...event, provider: CalendarProvider.ICAL }} onChange={onChange} />);
+    expect(screen.getByLabelText('Repeat')).toBeInTheDocument();
+
+    rerender(<EventInput data={{ ...event, provider: CalendarProvider.GOOGLE }} onChange={onChange} />);
+    expect(screen.getByLabelText('Repeat')).toBeInTheDocument();
+
+    rerender(<EventInput data={{ ...event, provider: CalendarProvider.OUTLOOK }} onChange={onChange} />);
+    expect(screen.queryByLabelText('Repeat')).not.toBeInTheDocument();
+
+    rerender(<EventInput data={{ ...event, provider: CalendarProvider.OFFICE365 }} onChange={onChange} />);
+    expect(screen.queryByLabelText('Repeat')).not.toBeInTheDocument();
+
+    rerender(<EventInput data={{ ...event, provider: CalendarProvider.YAHOO }} onChange={onChange} />);
+    expect(screen.queryByLabelText('Repeat')).not.toBeInTheDocument();
+  });
+
+  it('caps occurrence count input at 999', () => {
+    const onChange = vi.fn();
+    render(<EventInput data={{ ...event, recurrenceFreq: 'DAILY' }} onChange={onChange} />);
+
+    const countInput = screen.getByLabelText('Occurrence Count');
+    fireEvent.change(countInput, { target: { value: '1500' } });
+    expect(onChange).toHaveBeenCalledWith({ recurrenceCount: 999 });
+  });
+
+  it('ignores invalid frequency values when selected', () => {
+    const onChange = vi.fn();
+    render(<EventInput data={{ ...event, recurrenceFreq: 'DAILY', recurrenceCount: 5 }} onChange={onChange} />);
+
+    const repeatSelect = screen.getByLabelText('Repeat');
+    fireEvent.change(repeatSelect, { target: { value: 'HOURLY' } });
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
