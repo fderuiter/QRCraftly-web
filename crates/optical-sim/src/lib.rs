@@ -28,9 +28,7 @@ qrcraftly_core::module_exports!();
 pub mod math;
 
 use alloc::vec;
-use qrcraftly_core::abi::{
-    STATUS_BAD_INPUT, STATUS_BUFFER_TOO_SMALL, STATUS_OK,
-};
+use qrcraftly_core::abi::{STATUS_BAD_INPUT, STATUS_BUFFER_TOO_SMALL, STATUS_OK};
 
 pub const PRINT_PX_PER_MODULE: usize = 6;
 pub const PRINT_QUIET_ZONE_MODULES: usize = 4;
@@ -71,14 +69,30 @@ fn sample_luma(plane: &[f32], width: usize, height: usize, x: f64, y: f64) -> f6
 
     if y0 >= 0 && y0 < (height as i32) {
         let row = (y0 as usize) * width;
-        let v0 = if in_x0 { plane[row + (x0 as usize)] as f64 } else { 255.0 };
-        let v1 = if in_x1 { plane[row + ((x0 + 1) as usize)] as f64 } else { 255.0 };
+        let v0 = if in_x0 {
+            plane[row + (x0 as usize)] as f64
+        } else {
+            255.0
+        };
+        let v1 = if in_x1 {
+            plane[row + ((x0 + 1) as usize)] as f64
+        } else {
+            255.0
+        };
         top = (v0 * (1.0 - ax) + v1 * ax) * (1.0 - ay);
     }
     if (y0 + 1) >= 0 && (y0 + 1) < (height as i32) {
         let row = ((y0 + 1) as usize) * width;
-        let v0 = if in_x0 { plane[row + (x0 as usize)] as f64 } else { 255.0 };
-        let v1 = if in_x1 { plane[row + ((x0 + 1) as usize)] as f64 } else { 255.0 };
+        let v0 = if in_x0 {
+            plane[row + (x0 as usize)] as f64
+        } else {
+            255.0
+        };
+        let v1 = if in_x1 {
+            plane[row + ((x0 + 1) as usize)] as f64
+        } else {
+            255.0
+        };
         bottom = (v0 * (1.0 - ax) + v1 * ax) * ay;
     }
     top + bottom
@@ -98,8 +112,8 @@ pub fn gaussian_box_widths(sigma: f64) -> [usize; GAUSS_PASSES] {
     let den = -4.0 * lower_f - 4.0;
     let lower_count = math::round(num / den) as usize;
     let mut widths = [0; GAUSS_PASSES];
-    for i in 0..GAUSS_PASSES {
-        widths[i] = if i < lower_count { lower } else { upper };
+    for (i, slot) in widths.iter_mut().enumerate() {
+        *slot = if i < lower_count { lower } else { upper };
     }
     widths
 }
@@ -158,23 +172,35 @@ pub extern "C" fn optical_sim_output_capacity(version: u32) -> usize {
     side * side
 }
 
+/// Simulates print output for optical scanner analysis.
+///
+/// # Safety
+///
+/// The caller must guarantee that:
+/// - `frame_ptr` points to at least `frame_width * frame_height * 4` valid, initialized bytes (RGBA).
+/// - `out_ptr` points to a mutable buffer of at least `out_len` bytes, which must be at least `optical_sim_output_capacity(version)`.
+/// - `frame_ptr` and `out_ptr` do not overlap.
 #[no_mangle]
 pub unsafe extern "C" fn simulate_print(
     frame_ptr: *const u8,
     frame_width: u32,
     frame_height: u32,
     version: u32,
-    tl_x: f32, tl_y: f32,
-    tr_x: f32, tr_y: f32,
-    br_x: f32, br_y: f32,
-    bl_x: f32, bl_y: f32,
+    tl_x: f32,
+    tl_y: f32,
+    tr_x: f32,
+    tr_y: f32,
+    br_x: f32,
+    br_y: f32,
+    bl_x: f32,
+    bl_y: f32,
     out_ptr: *mut u8,
     out_len: usize,
 ) -> i32 {
     if frame_ptr.is_null() || out_ptr.is_null() || frame_width == 0 || frame_height == 0 {
         return STATUS_BAD_INPUT;
     }
-    if version < 1 || version > 40 {
+    if !(1..=40).contains(&version) {
         return STATUS_BAD_INPUT;
     }
     let required_cap = optical_sim_output_capacity(version);
@@ -227,12 +253,19 @@ pub unsafe extern "C" fn simulate_print(
                 for sx in 0..taps {
                     let s = (((ox * taps + sx) as f64 + 0.5) / scale - quiet_zone) / modules_f;
                     let st = s * t;
-                    let x = tl.0 + s * (tr.0 - tl.0) + t * (bl.0 - tl.0) + st * (br.0 - tr.0 - bl.0 + tl.0);
-                    let y = tl.1 + s * (tr.1 - tl.1) + t * (bl.1 - tl.1) + st * (br.1 - tr.1 - bl.1 + tl.1);
+                    let x = tl.0
+                        + s * (tr.0 - tl.0)
+                        + t * (bl.0 - tl.0)
+                        + st * (br.0 - tr.0 - bl.0 + tl.0);
+                    let y = tl.1
+                        + s * (tr.1 - tl.1)
+                        + t * (bl.1 - tl.1)
+                        + st * (br.1 - tr.1 - bl.1 + tl.1);
                     sum += sample_luma(&source, frame_width as usize, frame_height as usize, x, y);
                 }
             }
-            luma[oy * side + ox] = (PRINT_INK_LEVEL + range * (sum / ((taps * taps) as f64))) as f32;
+            luma[oy * side + ox] =
+                (PRINT_INK_LEVEL + range * (sum / ((taps * taps) as f64))) as f32;
         }
     }
 
