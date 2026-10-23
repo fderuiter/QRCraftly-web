@@ -21,7 +21,7 @@
 extern crate alloc;
 use alloc::string::String;
 use alloc::vec::Vec;
-use super::inflate::decompress_deflate;
+use super::inflate::{decompress_deflate, MAX_UNCOMPRESSED_SIZE};
 
 #[derive(Debug, Clone)]
 pub struct ZipFileEntry {
@@ -30,12 +30,14 @@ pub struct ZipFileEntry {
 }
 
 fn get_u16_le(data: &[u8], offset: usize) -> Option<u16> {
-    let slice = data.get(offset..offset + 2)?;
+    let end = offset.checked_add(2)?;
+    let slice = data.get(offset..end)?;
     Some(u16::from_le_bytes([slice[0], slice[1]]))
 }
 
 fn get_u32_le(data: &[u8], offset: usize) -> Option<u32> {
-    let slice = data.get(offset..offset + 4)?;
+    let end = offset.checked_add(4)?;
+    let slice = data.get(offset..end)?;
     Some(u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]))
 }
 
@@ -43,8 +45,6 @@ pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
     if data.len() < 22 {
         return None;
     }
-
-    let mut entries = Vec::new();
 
     // 1. Try Central Directory parsing first
     if let Some(cd_entries) = parse_zip_central_dir(data) {
@@ -54,22 +54,30 @@ pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
     }
 
     // 2. Fallback: sequential local headers scan
+    let mut entries = Vec::new();
+    let mut remaining_budget = MAX_UNCOMPRESSED_SIZE;
     let mut offset: usize = 0;
+
     while offset.saturating_add(30) <= data.len() {
-        if data.get(offset..offset + 4) == Some(b"PK\x03\x04") {
-            let method = match get_u16_le(data, offset + 8) {
+        let sig_end = match offset.checked_add(4) {
+            Some(e) => e,
+            None => break,
+        };
+
+        if data.get(offset..sig_end) == Some(b"PK\x03\x04") {
+            let method = match offset.checked_add(8).and_then(|o| get_u16_le(data, o)) {
                 Some(m) => m,
                 None => break,
             };
-            let comp_size = match get_u32_le(data, offset + 18) {
+            let comp_size = match offset.checked_add(18).and_then(|o| get_u32_le(data, o)) {
                 Some(s) => s as usize,
                 None => break,
             };
-            let fn_len = match get_u16_le(data, offset + 26) {
+            let fn_len = match offset.checked_add(26).and_then(|o| get_u16_le(data, o)) {
                 Some(l) => l as usize,
                 None => break,
             };
-            let extra_len = match get_u16_le(data, offset + 28) {
+            let extra_len = match offset.checked_add(28).and_then(|o| get_u16_le(data, o)) {
                 Some(l) => l as usize,
                 None => break,
             };
@@ -83,7 +91,11 @@ pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
                 None => break,
             };
 
-            let name_bytes = match data.get(name_start..name_start.saturating_add(fn_len)) {
+            let name_end = match name_start.checked_add(fn_len) {
+                Some(e) => e,
+                None => break,
+            };
+            let name_bytes = match data.get(name_start..name_end) {
                 Some(b) => b,
                 None => break,
             };
@@ -98,26 +110,45 @@ pub fn parse_zip(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
                 None => break,
             };
 
+            let is_sheet_xml = name.contains("sheet1.xml") || (name.contains("sheet") && name.ends_with(".xml"));
+
             let file_bytes = match method {
-                0 => comp_data.to_vec(),
-                8 => match decompress_deflate(comp_data) {
+                0 => {
+                    if comp_data.len() > remaining_budget {
+                        break;
+                    }
+                    comp_data.to_vec()
+                }
+                8 => match decompress_deflate(comp_data, remaining_budget) {
                     Some(b) => b,
                     None => {
-                        offset += 1;
+                        offset = match offset.checked_add(1) {
+                            Some(o) => o,
+                            None => break,
+                        };
                         continue;
                     }
                 },
                 _ => Vec::new(),
             };
 
+            remaining_budget = remaining_budget.saturating_sub(file_bytes.len());
+
             entries.push(ZipFileEntry {
                 name,
                 data: file_bytes,
             });
 
+            if is_sheet_xml {
+                break;
+            }
+
             offset = comp_end;
         } else {
-            offset += 1;
+            offset = match offset.checked_add(1) {
+                Some(o) => o,
+                None => break,
+            };
         }
     }
 
@@ -140,7 +171,11 @@ fn parse_zip_central_dir(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
     let mut eocd_pos = None;
 
     for i in (search_start..=search_end).rev() {
-        if data.get(i..i + 4) == Some(b"PK\x05\x06") {
+        let sig_end = match i.checked_add(4) {
+            Some(e) => e,
+            None => continue,
+        };
+        if data.get(i..sig_end) == Some(b"PK\x05\x06") {
             eocd_pos = Some(i);
             break;
         }
@@ -157,9 +192,14 @@ fn parse_zip_central_dir(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
 
     let mut entries = Vec::with_capacity(cd_count.min(1024));
     let mut cd_pos = cd_offset;
+    let mut remaining_budget = MAX_UNCOMPRESSED_SIZE;
 
     for _ in 0..cd_count {
-        if data.get(cd_pos..cd_pos + 4) != Some(b"PK\x01\x02") {
+        let cd_sig_end = match cd_pos.checked_add(4) {
+            Some(e) => e,
+            None => break,
+        };
+        if data.get(cd_pos..cd_sig_end) != Some(b"PK\x01\x02") {
             break;
         }
 
@@ -171,14 +211,19 @@ fn parse_zip_central_dir(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
         let local_offset = get_u32_le(data, cd_pos.checked_add(42)?)? as usize;
 
         let name_start = cd_pos.checked_add(46)?;
-        let name_bytes = data.get(name_start..name_start.checked_add(fn_len)?)?;
+        let name_end = name_start.checked_add(fn_len)?;
+        let name_bytes = data.get(name_start..name_end)?;
         let name = String::from_utf8_lossy(name_bytes).into_owned();
 
         let advance = 46usize.checked_add(fn_len)?.checked_add(extra_len)?.checked_add(comment_len)?;
         cd_pos = cd_pos.checked_add(advance)?;
 
         // Read from local header
-        if data.get(local_offset..local_offset + 4) != Some(b"PK\x03\x04") {
+        let loc_sig_end = match local_offset.checked_add(4) {
+            Some(e) => e,
+            None => continue,
+        };
+        if data.get(local_offset..loc_sig_end) != Some(b"PK\x03\x04") {
             continue;
         }
 
@@ -186,20 +231,35 @@ fn parse_zip_central_dir(data: &[u8]) -> Option<Vec<ZipFileEntry>> {
         let loc_extra_len = get_u16_le(data, local_offset.checked_add(28)?)? as usize;
         let data_start = local_offset.checked_add(30)?.checked_add(loc_fn_len)?.checked_add(loc_extra_len)?;
 
-        let comp_data = data.get(data_start..data_start.checked_add(comp_size)?)?;
+        let comp_end = data_start.checked_add(comp_size)?;
+        let comp_data = data.get(data_start..comp_end)?;
+
+        let is_sheet_xml = name.contains("sheet1.xml") || (name.contains("sheet") && name.ends_with(".xml"));
+
         let file_bytes = match method {
-            0 => comp_data.to_vec(),
-            8 => match decompress_deflate(comp_data) {
+            0 => {
+                if comp_data.len() > remaining_budget {
+                    break;
+                }
+                comp_data.to_vec()
+            }
+            8 => match decompress_deflate(comp_data, remaining_budget) {
                 Some(b) => b,
                 None => continue,
             },
             _ => Vec::new(),
         };
 
+        remaining_budget = remaining_budget.saturating_sub(file_bytes.len());
+
         entries.push(ZipFileEntry {
             name,
             data: file_bytes,
         });
+
+        if is_sheet_xml {
+            break;
+        }
     }
 
     Some(entries)
@@ -226,5 +286,63 @@ mod tests {
     fn truncated_zip_returns_none() {
         let truncated = b"PK\x03\x04\x0a\x00";
         assert!(parse_zip(truncated).is_none());
+    }
+
+    #[test]
+    fn stops_after_finding_sheet_xml_in_multisheet_zip() {
+        // Construct a zip file containing sheet1.xml followed by sheet2.xml
+        fn append_local_file(zip: &mut Vec<u8>, name: &str, content: &[u8]) -> usize {
+            let offset = zip.len();
+            zip.extend_from_slice(b"PK\x03\x04");
+            zip.extend_from_slice(&[20, 0]); // version
+            zip.extend_from_slice(&[0, 0]);  // flags
+            zip.extend_from_slice(&[0, 0]);  // method (stored)
+            zip.extend_from_slice(&[0, 0, 0, 0]); // time/date
+            zip.extend_from_slice(&[0, 0, 0, 0]); // crc
+            zip.extend_from_slice(&(content.len() as u32).to_le_bytes()); // comp size
+            zip.extend_from_slice(&(content.len() as u32).to_le_bytes()); // uncomp size
+            zip.extend_from_slice(&(name.len() as u16).to_le_bytes()); // fn len
+            zip.extend_from_slice(&[0, 0]);  // extra len
+            zip.extend_from_slice(name.as_bytes());
+            zip.extend_from_slice(content);
+            offset
+        }
+
+        let mut zip = Vec::new();
+        let off1 = append_local_file(&mut zip, "xl/worksheets/sheet1.xml", b"<sheet1/>");
+        let _off2 = append_local_file(&mut zip, "xl/worksheets/sheet2.xml", b"<sheet2/>");
+
+        // Add central directory
+        let cd_start = zip.len();
+        let cd_entries = [
+            ("xl/worksheets/sheet1.xml", b"<sheet1/>".len(), off1),
+            ("xl/worksheets/sheet2.xml", b"<sheet2/>".len(), _off2),
+        ];
+
+        for (name, len, loc_off) in &cd_entries {
+            zip.extend_from_slice(b"PK\x01\x02");
+            zip.extend_from_slice(&[20, 0, 20, 0]); // versions
+            zip.extend_from_slice(&[0, 0, 0, 0]); // flags & method
+            zip.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0, 0]); // time/date & crc
+            zip.extend_from_slice(&(*len as u32).to_le_bytes()); // comp
+            zip.extend_from_slice(&(*len as u32).to_le_bytes()); // uncomp
+            zip.extend_from_slice(&(name.len() as u16).to_le_bytes()); // fn
+            zip.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]); // extra, comment, disk, attrs
+            zip.extend_from_slice(&(*loc_off as u32).to_le_bytes()); // local offset
+            zip.extend_from_slice(name.as_bytes());
+        }
+
+        let cd_size = zip.len() - cd_start;
+        zip.extend_from_slice(b"PK\x05\x06");
+        zip.extend_from_slice(&[0, 0, 0, 0]); // disk numbers
+        zip.extend_from_slice(&(cd_entries.len() as u16).to_le_bytes()); // entries on disk
+        zip.extend_from_slice(&(cd_entries.len() as u16).to_le_bytes()); // total entries
+        zip.extend_from_slice(&(cd_size as u32).to_le_bytes()); // cd size
+        zip.extend_from_slice(&(cd_start as u32).to_le_bytes()); // cd offset
+        zip.extend_from_slice(&[0, 0]); // comment len
+
+        let parsed = parse_zip(&zip).expect("Should parse zip successfully");
+        assert_eq!(parsed.len(), 1, "Should stop after sheet1.xml and not parse sheet2.xml");
+        assert_eq!(parsed[0].name, "xl/worksheets/sheet1.xml");
     }
 }

@@ -162,7 +162,7 @@ static CODE_ORDER: [usize; 19] = [
 
 pub const MAX_UNCOMPRESSED_SIZE: usize = 64 * 1024 * 1024;
 
-pub fn decompress_deflate(input: &[u8]) -> Option<Vec<u8>> {
+pub fn decompress_deflate(input: &[u8], max_size: usize) -> Option<Vec<u8>> {
     let mut reader = BitReader::new(input);
     let mut out = Vec::new();
 
@@ -178,7 +178,7 @@ pub fn decompress_deflate(input: &[u8]) -> Option<Vec<u8>> {
                 if (len ^ 0xFFFF) != nlen {
                     return None;
                 }
-                if out.len().checked_add(len)? > MAX_UNCOMPRESSED_SIZE {
+                if out.len().checked_add(len)? > max_size {
                     return None;
                 }
                 let bytes = reader.read_bytes(len)?;
@@ -195,7 +195,7 @@ pub fn decompress_deflate(input: &[u8]) -> Option<Vec<u8>> {
                 let dist_lens = [5u8; 32];
                 let dist_table = HuffmanTable::from_lengths(&dist_lens)?;
 
-                decode_block(&mut reader, &lit_table, &dist_table, &mut out)?;
+                decode_block(&mut reader, &lit_table, &dist_table, &mut out, max_size)?;
             }
             2 => {
                 let hlit = (reader.read_bits(5)? + 257) as usize;
@@ -243,7 +243,7 @@ pub fn decompress_deflate(input: &[u8]) -> Option<Vec<u8>> {
                 let lit_table = HuffmanTable::from_lengths(&combined_lens[..hlit])?;
                 let dist_table = HuffmanTable::from_lengths(&combined_lens[hlit..])?;
 
-                decode_block(&mut reader, &lit_table, &dist_table, &mut out)?;
+                decode_block(&mut reader, &lit_table, &dist_table, &mut out, max_size)?;
             }
             _ => return None,
         }
@@ -261,14 +261,15 @@ fn decode_block(
     lit_table: &HuffmanTable,
     dist_table: &HuffmanTable,
     out: &mut Vec<u8>,
+    max_size: usize,
 ) -> Option<()> {
     loop {
-        if out.len() > MAX_UNCOMPRESSED_SIZE {
+        if out.len() > max_size {
             return None;
         }
         let sym = lit_table.decode(reader)?;
         if sym < 256 {
-            if out.len() >= MAX_UNCOMPRESSED_SIZE {
+            if out.len() >= max_size {
                 return None;
             }
             out.push(sym as u8);
@@ -305,7 +306,7 @@ fn decode_block(
                 return None;
             }
 
-            if out.len().checked_add(match_len)? > MAX_UNCOMPRESSED_SIZE {
+            if out.len().checked_add(match_len)? > max_size {
                 return None;
             }
 
@@ -326,15 +327,24 @@ mod tests {
     #[test]
     fn uncompressed_block_round_trip() {
         let input = [1, 5, 0, 250, 255, b'H', b'e', b'l', b'l', b'o'];
-        let decompressed = decompress_deflate(&input).unwrap();
+        let decompressed = decompress_deflate(&input, MAX_UNCOMPRESSED_SIZE).unwrap();
         assert_eq!(decompressed, b"Hello");
     }
 
     #[test]
     fn rejects_uncompressed_block_exceeding_max_size() {
-        // Block header claiming 0xFFFF bytes with matching NLEN
-        let input = [1, 0xFF, 0xFF, 0x00, 0x00];
-        // BitReader will fail to read 65535 payload bytes from this short input, returning None safely
-        assert!(decompress_deflate(&input).is_none());
+        // Valid uncompressed block header claiming 15 bytes payload (LEN=15, NLEN=~15=65520)
+        let mut input = Vec::new();
+        input.push(0x01); // BFINAL=1, BTYPE=00
+        input.push(0x0F); // LEN low
+        input.push(0x00); // LEN high (15)
+        input.push(0xF0); // NLEN low
+        input.push(0xFF); // NLEN high (~15 = 0xFFF0)
+        input.extend_from_slice(b"123456789012345"); // 15 valid payload bytes
+
+        // With max_size=10, decompress_deflate returns None because 15 > 10
+        assert!(decompress_deflate(&input, 10).is_none());
+        // With max_size=20, decompress_deflate succeeds and returns 15 bytes
+        assert_eq!(decompress_deflate(&input, 20).unwrap(), b"123456789012345");
     }
 }

@@ -35,7 +35,7 @@ export async function getExcelParser(): Promise<WasmInstance> {
 }
 
 /**
- * Parses Excel binary bytes (.xlsx, .xls) using our Rust WebAssembly kernel
+ * Parses Excel files (.xlsx) using our Rust WebAssembly kernel
  * and returns normalized CSV text.
  */
 export async function parseExcelToCsv(fileBytes: Uint8Array): Promise<string> {

@@ -1032,8 +1032,65 @@ describe('Excel Spreadsheet Parsing (.xlsx)', () => {
   });
 
   it('reads an uploaded .xlsx spreadsheet using Rust WebAssembly parser', async () => {
-    const csvData = 'URL,Name\nhttps://example.com/excel1,Excel1\nhttps://example.com/excel2,Excel2';
-    const excelBuffer = new TextEncoder().encode(csvData);
+    const sheetXml =
+      '<worksheet><sheetData>' +
+      '<row><c t="inlineStr"><is><t>URL</t></is></c><c t="inlineStr"><is><t>Name</t></is></c></row>' +
+      '<row><c t="inlineStr"><is><t>https://example.com/excel1</t></is></c><c t="inlineStr"><is><t>Excel1</t></is></c></row>' +
+      '<row><c t="inlineStr"><is><t>https://example.com/excel2</t></is></c><c t="inlineStr"><is><t>Excel2</t></is></c></row>' +
+      '</sheetData></worksheet>';
+    const nameBytes = new TextEncoder().encode('xl/worksheets/sheet1.xml');
+    const contentBytes = new TextEncoder().encode(sheetXml);
+
+    const localHeader = new Uint8Array(30 + nameBytes.length + contentBytes.length);
+    const view = new DataView(localHeader.buffer);
+    view.setUint32(0, 0x04034b50, true);
+    view.setUint16(4, 20, true);
+    view.setUint16(6, 0, true);
+    view.setUint16(8, 0, true);
+    view.setUint32(10, 0, true);
+    view.setUint32(14, 0, true);
+    view.setUint32(18, contentBytes.length, true);
+    view.setUint32(22, contentBytes.length, true);
+    view.setUint16(26, nameBytes.length, true);
+    view.setUint16(28, 0, true);
+    localHeader.set(nameBytes, 30);
+    localHeader.set(contentBytes, 30 + nameBytes.length);
+
+    const cdEntry = new Uint8Array(46 + nameBytes.length);
+    const cdView = new DataView(cdEntry.buffer);
+    cdView.setUint32(0, 0x02014b50, true);
+    cdView.setUint16(4, 20, true);
+    cdView.setUint16(6, 20, true);
+    cdView.setUint16(8, 0, true);
+    cdView.setUint16(10, 0, true);
+    cdView.setUint32(12, 0, true);
+    cdView.setUint32(16, 0, true);
+    cdView.setUint32(20, contentBytes.length, true);
+    cdView.setUint32(24, contentBytes.length, true);
+    cdView.setUint16(28, nameBytes.length, true);
+    cdView.setUint16(30, 0, true);
+    cdView.setUint16(32, 0, true);
+    cdView.setUint16(34, 0, true);
+    cdView.setUint16(36, 0, true);
+    cdView.setUint32(38, 0, true);
+    cdView.setUint32(42, 0, true);
+    cdEntry.set(nameBytes, 46);
+
+    const eocd = new Uint8Array(22);
+    const eocdView = new DataView(eocd.buffer);
+    eocdView.setUint32(0, 0x06054b50, true);
+    eocdView.setUint16(4, 0, true);
+    eocdView.setUint16(6, 0, true);
+    eocdView.setUint16(8, 1, true);
+    eocdView.setUint16(10, 1, true);
+    eocdView.setUint32(12, cdEntry.length, true);
+    eocdView.setUint32(16, localHeader.length, true);
+    eocdView.setUint16(20, 0, true);
+
+    const excelBuffer = new Uint8Array(localHeader.length + cdEntry.length + eocd.length);
+    excelBuffer.set(localHeader, 0);
+    excelBuffer.set(cdEntry, localHeader.length);
+    excelBuffer.set(eocd, localHeader.length + cdEntry.length);
 
     const onChange = vi.fn();
     renderWithProvider(<BulkCsvInput data={initialData} onChange={onChange} />);

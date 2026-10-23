@@ -19,11 +19,131 @@
 import { describe, it, expect } from 'vitest';
 import { parseExcelToCsv } from '../index';
 
+function createStoredZip(files: { name: string; content: string }[]): Uint8Array {
+  const parts: Uint8Array[] = [];
+  const cdHeaders: Uint8Array[] = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const nameBytes = new TextEncoder().encode(file.name);
+    const contentBytes = new TextEncoder().encode(file.content);
+
+    const localHeader = new Uint8Array(30 + nameBytes.length + contentBytes.length);
+    const view = new DataView(localHeader.buffer);
+    view.setUint32(0, 0x04034b50, true);
+    view.setUint16(4, 20, true);
+    view.setUint16(6, 0, true);
+    view.setUint16(8, 0, true);
+    view.setUint32(10, 0, true);
+    view.setUint32(14, 0, true);
+    view.setUint32(18, contentBytes.length, true);
+    view.setUint32(22, contentBytes.length, true);
+    view.setUint16(26, nameBytes.length, true);
+    view.setUint16(28, 0, true);
+    localHeader.set(nameBytes, 30);
+    localHeader.set(contentBytes, 30 + nameBytes.length);
+
+    parts.push(localHeader);
+
+    const cdEntry = new Uint8Array(46 + nameBytes.length);
+    const cdView = new DataView(cdEntry.buffer);
+    cdView.setUint32(0, 0x02014b50, true);
+    cdView.setUint16(4, 20, true);
+    cdView.setUint16(6, 20, true);
+    cdView.setUint16(8, 0, true);
+    cdView.setUint16(10, 0, true);
+    cdView.setUint32(12, 0, true);
+    cdView.setUint32(16, 0, true);
+    cdView.setUint32(20, contentBytes.length, true);
+    cdView.setUint32(24, contentBytes.length, true);
+    cdView.setUint16(28, nameBytes.length, true);
+    cdView.setUint16(30, 0, true);
+    cdView.setUint16(32, 0, true);
+    cdView.setUint16(34, 0, true);
+    cdView.setUint16(36, 0, true);
+    cdView.setUint32(38, 0, true);
+    cdView.setUint32(42, offset, true);
+    cdEntry.set(nameBytes, 46);
+
+    cdHeaders.push(cdEntry);
+    offset += localHeader.length;
+  }
+
+  const cdStart = offset;
+  let cdSize = 0;
+  for (const cd of cdHeaders) {
+    parts.push(cd);
+    cdSize += cd.length;
+  }
+
+  const eocd = new Uint8Array(22);
+  const eocdView = new DataView(eocd.buffer);
+  eocdView.setUint32(0, 0x06054b50, true);
+  eocdView.setUint16(4, 0, true);
+  eocdView.setUint16(6, 0, true);
+  eocdView.setUint16(8, files.length, true);
+  eocdView.setUint16(10, files.length, true);
+  eocdView.setUint32(12, cdSize, true);
+  eocdView.setUint32(16, cdStart, true);
+  eocdView.setUint16(20, 0, true);
+
+  parts.push(eocd);
+
+  const totalLen = parts.reduce((acc, p) => acc + p.length, 0);
+  const result = new Uint8Array(totalLen);
+  let pos = 0;
+  for (const part of parts) {
+    result.set(part, pos);
+    pos += part.length;
+  }
+  return result;
+}
+
 describe('Excel WebAssembly Parser', () => {
-  it('parses plain text/CSV passthrough', async () => {
+  it('returns empty string for plain text/CSV input passed to excel parser', async () => {
     const text = 'URL,Name\nhttps://example.com,Test';
     const result = await parseExcelToCsv(new TextEncoder().encode(text));
-    expect(result).toBe('URL,Name\nhttps://example.com,Test');
+    expect(result).toBe('');
+  });
+
+  it('parses valid .xlsx workbook zip', async () => {
+    const zip = createStoredZip([
+      {
+        name: 'xl/worksheets/sheet1.xml',
+        content:
+          '<worksheet><sheetData><row><c t="inlineStr"><is><t>URL</t></is></c><c t="inlineStr"><is><t>Name</t></is></c></row><row><c t="inlineStr"><is><t>https://example.com/excel1</t></is></c><c t="inlineStr"><is><t>Excel1</t></is></c></row></sheetData></worksheet>',
+      },
+    ]);
+    const result = await parseExcelToCsv(zip);
+    expect(result).toBe('URL,Name\nhttps://example.com/excel1,Excel1');
+  });
+
+  it('parses multi-sheet workbooks by extracting the first sheet', async () => {
+    const zip = createStoredZip([
+      {
+        name: 'xl/worksheets/sheet1.xml',
+        content:
+          '<worksheet><sheetData><row><c t="inlineStr"><is><t>Sheet1_Col</t></is></c></row></sheetData></worksheet>',
+      },
+      {
+        name: 'xl/worksheets/sheet2.xml',
+        content:
+          '<worksheet><sheetData><row><c t="inlineStr"><is><t>Sheet2_Col</t></is></c></row></sheetData></worksheet>',
+      },
+    ]);
+    const result = await parseExcelToCsv(zip);
+    expect(result).toBe('Sheet1_Col');
+  });
+
+  it('handles empty workbooks / empty sheet XML', async () => {
+    const zip = createStoredZip([
+      {
+        name: 'xl/worksheets/sheet1.xml',
+        content: '<worksheet><sheetData/></worksheet>',
+      },
+    ]);
+    const result = await parseExcelToCsv(zip);
+    expect(result).toBe('');
   });
 
   it('parses HTML table .xls format', async () => {

@@ -17,7 +17,7 @@
 */
 
 //! In-house Excel spreadsheet parsing WebAssembly kernel (ADR 0033).
-//! Converts XLSX, XLS (SpreadsheetML / HTML) and CSV input into normalized CSV text.
+//! Converts XLSX (and SpreadsheetML/HTML) input into normalized CSV text.
 
 #![cfg_attr(target_arch = "wasm32", no_std)]
 
@@ -85,18 +85,13 @@ pub fn excel_bytes_to_csv(data: &[u8]) -> Vec<u8> {
             let csv_str = format_matrix_to_csv(&matrix);
             return csv_str.into_bytes();
         }
-
-        // Plain text / CSV fallback if UTF-8 text contains no null bytes or binary control characters
-        if !data.contains(&0) {
-            return data.to_vec();
-        }
     }
 
-    // Unrecognized binary input (e.g. legacy BIFF8 .xls or corrupt binary)
+    // Unrecognized binary or plain text input (e.g. legacy BIFF8 .xls, plain CSV, or corrupt binary)
     Vec::new()
 }
 
-/// Parses an Excel spreadsheet (XLSX, XLS) or CSV file and writes normalized CSV text to `out_ptr`.
+/// Parses an Excel spreadsheet (XLSX, SpreadsheetML) and writes normalized CSV text to `out_ptr`.
 ///
 /// # Safety
 /// `in_ptr..in_ptr + in_len` must be readable linear memory and `out_ptr..out_ptr + out_max_len` writable.
@@ -132,10 +127,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_plain_text_passthrough() {
+    fn rejects_plain_text_passthrough() {
         let input = b"Name,URL\nItem 1,https://example.com";
         let csv = excel_bytes_to_csv(input);
-        assert_eq!(csv, input);
+        assert!(csv.is_empty(), "Plain text passed to excel parser should return empty CSV bytes");
+    }
+
+    #[test]
+    fn parses_empty_workbook_sheet() {
+        let xml = "<worksheet><sheetData/></worksheet>";
+        let matrix = parse_sheet_xml(xml, &[]);
+        assert!(matrix.is_empty(), "Empty sheet XML should return an empty matrix");
+        let csv = format_matrix_to_csv(&matrix);
+        assert!(csv.is_empty(), "Empty matrix should format to empty CSV string");
     }
 
     #[test]
