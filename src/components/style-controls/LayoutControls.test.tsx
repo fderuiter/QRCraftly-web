@@ -44,7 +44,7 @@ describe('LayoutControls - Contrast Warnings', () => {
     // Warning indicators should not be present
     expect(screen.queryByTestId('layout-bg-warning')).not.toBeInTheDocument();
     expect(screen.queryByTestId('layout-text-warning')).not.toBeInTheDocument();
-    expect(screen.queryByText(/The contrast ratio between the layout's text and background is low/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/contrast ratio is low/i)).not.toBeInTheDocument();
   });
 
   it('shows inline badges and alert card due to fallback color inheritance leading to low contrast', () => {
@@ -64,7 +64,7 @@ describe('LayoutControls - Contrast Warnings', () => {
     // Warnings should be displayed
     expect(screen.getByTestId('layout-bg-warning')).toBeInTheDocument();
     expect(screen.getByTestId('layout-text-warning')).toBeInTheDocument();
-    expect(screen.getByText(/The contrast ratio between the layout's text and background is low/i)).toBeInTheDocument();
+    expect(screen.getByText(/contrast ratio is low/i)).toBeInTheDocument();
   });
 
   it('shows inline badges and alert card when explicit custom override values lead to low contrast', () => {
@@ -84,7 +84,7 @@ describe('LayoutControls - Contrast Warnings', () => {
     // Warnings should be displayed
     expect(screen.getByTestId('layout-bg-warning')).toBeInTheDocument();
     expect(screen.getByTestId('layout-text-warning')).toBeInTheDocument();
-    expect(screen.getByText(/The contrast ratio between the layout's text and background is low/i)).toBeInTheDocument();
+    expect(screen.getByText(/contrast ratio is low/i)).toBeInTheDocument();
   });
 
   it('instantly hides warning elements when contrast becomes high', () => {
@@ -102,7 +102,7 @@ describe('LayoutControls - Contrast Warnings', () => {
     // Confirm warning elements exist
     expect(screen.getByTestId('layout-bg-warning')).toBeInTheDocument();
     expect(screen.getByTestId('layout-text-warning')).toBeInTheDocument();
-    expect(screen.getByText(/The contrast ratio between the layout's text and background is low/i)).toBeInTheDocument();
+    expect(screen.getByText(/contrast ratio is low/i)).toBeInTheDocument();
 
     // Rerender with high contrast override colors
     const highContrastConfig: QRConfig = {
@@ -116,7 +116,7 @@ describe('LayoutControls - Contrast Warnings', () => {
     // Confirm warnings are hidden instantly
     expect(screen.queryByTestId('layout-bg-warning')).not.toBeInTheDocument();
     expect(screen.queryByTestId('layout-text-warning')).not.toBeInTheDocument();
-    expect(screen.queryByText(/The contrast ratio between the layout's text and background is low/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/contrast ratio is low/i)).not.toBeInTheDocument();
   });
 
   it('does not display warning when template style is NONE even with low-contrast active values', () => {
@@ -132,7 +132,7 @@ describe('LayoutControls - Contrast Warnings', () => {
 
     expect(screen.queryByTestId('layout-bg-warning')).not.toBeInTheDocument();
     expect(screen.queryByTestId('layout-text-warning')).not.toBeInTheDocument();
-    expect(screen.queryByText(/The contrast ratio between the layout's text and background is low/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/contrast ratio is low/i)).not.toBeInTheDocument();
   });
 
   it('does not block layout actions or input elements when low contrast warnings are active', async () => {

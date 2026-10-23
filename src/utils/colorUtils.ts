@@ -24,8 +24,8 @@ import type { QRConfig } from '../types';
  * @param val - The input hex string.
  * @returns The normalized hex string, or null if invalid.
  */
-export const normalizeHex = (val: string): string | null => {
-  const m = val.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+export const normalizeHex = (val?: string | null): string | null => {
+  const m = val?.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
   return m ? '#' + (m[1].length === 3 ? m[1].replace(/./g, '$&$&') : m[1]).toLowerCase() : null;
 };
 
