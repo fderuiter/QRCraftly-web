@@ -49,3 +49,12 @@ overrides:
   esbuild: 0.28.1
   # GHSA-wq5f-xc86-pv6w (librsvg in sharp < 0.35.5); Miniflare pins 0.35.4.
   sharp: "^0.35.5"
+
+# Ignore SheetJS (xlsx) 0.18.5 advisories (Prototype Pollution and ReDoS) because SheetJS
+# upstream npm package releases stopped at 0.18.5 on npmjs.org. SheetJS spreadsheet parsing is
+# executed strictly in client-side volatile browser memory on user-provided local files without server execution.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-4r6h-8v6p-xvw6 # Prototype Pollution in sheetJS (<0.19.3)
+    - GHSA-5pgg-2g8v-p4x9 # SheetJS Regular Expression Denial of Service (<0.20.2)
+
