@@ -19,8 +19,8 @@ const WASM_DIR = path.resolve(__dirname, '../src/wasm');
 export const MAX_PAGE_FIRST_LOAD_KB = 260;
 // A loose backstop on the JavaScript and CSS in dist/client, so shipped code cannot grow unseen.
 // Pre-rendered HTML is left out: every new page adds some, and the per-page budget already
-// bounds each page's own HTML. Measured at 563 KB on 2026-10-03.
-export const MAX_GZIPPED_SIZE_KB = 650;
+// bounds each page's own HTML. Measured at 563 KB on 2026-10-03; ~685 KB with SheetJS (xlsx) dynamic chunk.
+export const MAX_GZIPPED_SIZE_KB = 750;
 
 /**
  * Gzipped budget in KB for each of our own Rust modules in `src/wasm/` (#1182, ADR 0033). Each

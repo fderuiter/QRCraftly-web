@@ -76,6 +76,15 @@ export const REVIEWED_HOSTS = {
   'help.qr.io': 'Source cited in the no-subscription guide',
   'www.qrcode-tiger.com': 'Source cited in the no-subscription guide',
   'me-qr.com': 'Source cited in the no-subscription guide',
+  'sheetjs.com': 'SheetJS library documentation and namespace references in xlsx dependency',
+  'schemas.openxmlformats.org': 'OpenXML spreadsheet XML namespaces in xlsx dependency',
+  'purl.oclc.org': 'OpenXML relationship XML namespaces in xlsx dependency',
+  'schemas.microsoft.com': 'Microsoft Excel XML namespaces in xlsx dependency',
+  'sheetjs.openxmlformats.org': 'SheetJS OpenXML namespaces in xlsx dependency',
+  'purl.org': 'OpenXML schema URIs in xlsx dependency',
+  'macvmlschemauri': 'Microsoft Mac VML schema URIs in xlsx dependency',
+  'docs.oasis-open.org': 'OASIS OpenDocument XML namespaces in xlsx dependency',
+  'openoffice.org': 'OpenOffice XML namespaces in xlsx dependency',
 };
 
 const EXTERNAL_URL = /^\s*(?:[a-z][a-z0-9+.-]*:)?\/\//i;

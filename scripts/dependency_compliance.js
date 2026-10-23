@@ -16,7 +16,8 @@ export const ALLOWED_DEPENDENCIES = new Set([
   'react',
   'react-dom',
   'vike',
-  'vike-react'
+  'vike-react',
+  'xlsx'
 ]);
 
 // 2. Forbidden imports / patterns to detect bypasses

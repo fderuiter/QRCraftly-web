@@ -9,5 +9,6 @@
   "tailwindcss",
   "vike",
   "vike-react",
-  "vite"
+  "vite",
+  "xlsx"
 ]
