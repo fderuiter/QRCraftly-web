@@ -1,4 +1,4 @@
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { useInputLogic, clearRetainedInputStates } from "./useInputLogic";
 import { TYPE_TO_PRESET_LOGO } from "../../constants/presetLogos";
@@ -625,7 +625,7 @@ describe("useInputLogic automatic preset logo placement", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("automatically assigns matching preset logo and sets errorCorrectionLevel to H on QRType switch when store exists and logo is not overridden", () => {
+  it("automatically assigns matching preset logo and sets errorCorrectionLevel to H on QRType switch when store exists and logo is not overridden", async () => {
     const initialConfig = createMockConfig(QRType.URL, "https://example.com");
 
     const { result, rerender } = renderHook(
@@ -643,13 +643,17 @@ describe("useInputLogic automatic preset logo placement", () => {
     // Switch type to PHONE
     const phoneConfig = createMockConfig(QRType.PHONE, "");
     phoneConfig.logoUrl = TYPE_TO_PRESET_LOGO[QRType.URL];
-    rerender({ cfg: phoneConfig });
+    
+    await act(async () => {
+      rerender({ cfg: phoneConfig });
+      await Promise.resolve();
+    });
 
     expect(result.current.getState().config.logoUrl).toBe(TYPE_TO_PRESET_LOGO[QRType.PHONE]);
     expect(result.current.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.H);
   });
 
-  it("clears logoUrl when switching to a QRType without a mapped preset logo", () => {
+  it("clears logoUrl when switching to a QRType without a mapped preset logo", async () => {
     const initialConfig = createMockConfig(QRType.PHONE, "1234567890");
 
     const { result, rerender } = renderHook(
@@ -667,7 +671,11 @@ describe("useInputLogic automatic preset logo placement", () => {
     // Switch type to TEXT (which has null preset logo)
     const textConfig = createMockConfig(QRType.TEXT, "");
     textConfig.logoUrl = TYPE_TO_PRESET_LOGO[QRType.PHONE];
-    rerender({ cfg: textConfig });
+
+    await act(async () => {
+      rerender({ cfg: textConfig });
+      await Promise.resolve();
+    });
 
     expect(result.current.getState().config.logoUrl).toBeNull();
   });

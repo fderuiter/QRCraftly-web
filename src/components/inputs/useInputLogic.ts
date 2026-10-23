@@ -22,7 +22,6 @@ import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "../../utils/security";
 import { CONTAINMENT_PROFILES, emailListError, cardFieldsFor, vCardFieldError, paymentRefusal } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
-import { TYPE_TO_PRESET_LOGO, PRESET_LOGOS } from "../../constants/presetLogos";
 import { useOptionalQRStore } from "@/context/QRContext";
 import { useUndoToast } from "@/hooks/useUndoToast";
 import { announcePolitely } from "../../utils/a11y";
@@ -162,24 +161,38 @@ export function useInputLogic(
     const storeState = store.getState();
     if (storeState.isLogoOverridden) return;
 
-    const defaultLogo = TYPE_TO_PRESET_LOGO[config.type] ?? null;
-    const currentLogoUrl = config.logoUrl ?? null;
+    let canceled = false;
+    const targetType = config.type;
 
-    if (currentLogoUrl !== defaultLogo) {
-      store.updateConfig(
-        { logoUrl: defaultLogo, ...(defaultLogo ? { errorCorrectionLevel: QRErrorCorrectionLevel.H } : {}) },
-        { isAutoPlacement: true }
-      );
+    import("../../constants/presetLogos").then(({ TYPE_TO_PRESET_LOGO, PRESET_LOGOS }) => {
+      if (canceled) return;
+      if (!store) return;
+      if (prevLogoTypeRef.current !== targetType) return;
+      if (store.getState().isLogoOverridden) return;
 
-      if (defaultLogo) {
-        const preset = PRESET_LOGOS.find((p) => p.dataUrl === defaultLogo);
-        if (preset) {
-          const message = `${preset.label} logo added`;
-          notifyUndo(message);
-          announcePolitely(message);
+      const defaultLogo = TYPE_TO_PRESET_LOGO[targetType] ?? null;
+      const currentLogoUrl = config.logoUrl ?? null;
+
+      if (currentLogoUrl !== defaultLogo) {
+        store.updateConfig(
+          { logoUrl: defaultLogo, ...(defaultLogo ? { errorCorrectionLevel: QRErrorCorrectionLevel.H } : {}) },
+          { isAutoPlacement: true }
+        );
+
+        if (defaultLogo) {
+          const preset = PRESET_LOGOS.find((p) => p.dataUrl === defaultLogo);
+          if (preset) {
+            const message = `${preset.label} logo added`;
+            notifyUndo(message);
+            announcePolitely(message);
+          }
         }
       }
-    }
+    });
+
+    return () => {
+      canceled = true;
+    };
   }, [config.type, config.logoUrl, store, onChange, notifyUndo]);
 
   // Synchronize input states reactively when config changes externally (e.g., undo/redo or preset loaded)

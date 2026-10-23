@@ -23,7 +23,6 @@ import type { LandingPrimaryAction } from '../data/landingPages';
 import {
   PatternControls,
   ColorControls,
-  LogoControls,
   MosaicControls,
   AdvancedControls,
   BrandTemplateGallery
@@ -42,6 +41,7 @@ const StyleGallery = lazy(() => import('./style-controls/StyleGallery'));
 const LayoutControls = lazy(() => import('./style-controls/LayoutControls').then((module) => ({ default: module.LayoutControls })));
 const BorderControls = lazy(() => import('./style-controls/BorderControls').then((module) => ({ default: module.BorderControls })));
 const FrameControls = lazy(() => import('./style-controls/FrameControls').then((module) => ({ default: module.FrameControls })));
+const LogoControls = lazy(() => import('./style-controls/LogoControls').then((module) => ({ default: module.LogoControls })));
 
 /**
  * Appearance sections the person has expanded or collapsed during this visit. Held in memory
@@ -99,6 +99,8 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
   const [galleryOpened, setGalleryOpened] = useState(false);
   const layoutOpenAtStart = sectionOpenState.get('Layout & Border') ?? presetOpen.includes('Layout & Border');
   const [layoutOpened, setLayoutOpened] = useState(layoutOpenAtStart);
+  const logoOpenAtStart = sectionOpenState.get('Logo') ?? presetOpen.includes('Logo');
+  const [logoOpened, setLogoOpened] = useState(logoOpenAtStart);
   // Each press of the call to action counts up, so the section reopens even after the person closed it.
   const [openRequest, setOpenRequest] = useState<{ section: string; count: number } | null>(null);
   const requestFor = (title: string) => (openRequest?.section === title ? openRequest.count : undefined);
@@ -183,9 +185,22 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
         )}
       </AccordionItem>
 
-      <AccordionItem title="Logo" headingLevel={3} defaultOpen={sectionOpenState.get('Logo') ?? presetOpen.includes('Logo')} onOpenChange={rememberSection('Logo')} openRequest={requestFor('Logo')}>
+      <AccordionItem
+        title="Logo"
+        headingLevel={3}
+        defaultOpen={logoOpenAtStart}
+        onOpenChange={(open) => {
+          rememberSection('Logo')(open);
+          if (open) setLogoOpened(true);
+        }}
+        openRequest={requestFor('Logo')}
+      >
         <div className="pt-1">
-          <LogoControls config={config} onChange={onChange} />
+          {logoOpened ? (
+            <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+              <LogoControls config={config} onChange={onChange} />
+            </Suspense>
+          ) : null}
           <div className="border-t border-line pt-5">
             <MosaicControls config={config} onChange={onChange} />
           </div>

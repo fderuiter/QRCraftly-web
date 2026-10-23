@@ -17,7 +17,8 @@
 */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import StyleControls from './StyleControls';
-import { DEFAULT_CONFIG, PRESET_LOGOS } from '../constants';
+import { DEFAULT_CONFIG } from '../constants';
+import { PRESET_LOGOS } from '../constants/presetLogos';
 import { QRStyle, type LogoPaddingStyle, QRErrorCorrectionLevel, type QRConfig, SocialFormat, TemplateStyle } from '../types';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { expandAppearanceSections } from '../../tests/utils/expandAppearanceSections';

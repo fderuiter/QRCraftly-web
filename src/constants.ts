@@ -132,5 +132,3 @@ export const SYSTEM_LIMITS = {
  * The minimum WCAG AA color contrast threshold for readability and accessibility.
  */
 export const MIN_CONTRAST_THRESHOLD = 4.5;
-
-export * from './constants/presetLogos';
