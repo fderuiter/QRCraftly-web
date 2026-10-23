@@ -187,6 +187,23 @@ describe('PDF Vector Export', () => {
       const file = bytesOf(await convertSvgToPdf(svg));
       expect(file).toMatch(/f\n0 0 1 RG\n2 w\n0 0 m\n10 0 l\n10 10 l\nh\nS/);
     });
+
+    it('emits CMYK operators k and K when colorSpace is cmyk', async () => {
+      const svg = `<svg width="100" height="100"><path d="M 0 0 L 10 0 L 10 10 Z" fill="#ff0000" stroke="#0000ff" stroke-width="2"/><text x="10" y="10" fill="#00ff00">CMYK</text></svg>`;
+      const file = bytesOf(await convertSvgToPdf(svg, { colorSpace: 'cmyk' }));
+      // Red (#ff0000) fill -> C:0 M:1 Y:1 K:0 -> "0 1 1 0 k"
+      expect(file).toContain('0 1 1 0 k');
+      // Blue (#0000ff) stroke -> C:1 M:1 Y:0 K:0 -> "1 1 0 0 K"
+      expect(file).toContain('1 1 0 0 K');
+      // Green (#00ff00) text -> C:1 M:0 Y:1 K:0 -> "1 0 1 0 k"
+      expect(file).toContain('1 0 1 0 k');
+    });
+
+    it('embeds image XObjects as /DeviceCMYK when colorSpace is cmyk', async () => {
+      const svg = `<svg width="100" height="100"><image href="data:image/png;base64,AA==" x="0" y="0" width="10" height="10"/></svg>`;
+      const file = bytesOf(await convertSvgToPdf(svg, { decodeImage: opaqueDecoder, colorSpace: 'cmyk' }));
+      expect(file).toContain('/ColorSpace /DeviceCMYK');
+    });
   });
 });
 

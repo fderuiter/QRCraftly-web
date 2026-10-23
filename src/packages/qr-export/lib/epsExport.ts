@@ -20,12 +20,14 @@ import type { QRConfig } from '@/types';
 import { generateQRSvg } from './svgExport';
 import { type ModuleRenderOptions } from '@/packages/qr-matrix';
 import {
+  formatCmyk,
   formatMatrix,
   formatNum,
   formatRgb,
   literalString,
   pathOperators,
   readSvgScene,
+  rgbToCmyk,
   shadingDictionary,
   type SceneElement,
   type SceneImage,
@@ -33,7 +35,7 @@ import {
   type SceneText,
   winAnsiExtraPuts,
 } from './vectorScene';
-import { alphaToMask, decodeSceneImages, deflate, MissingImageError, type RasterImage, type VectorExportOptions } from './vectorImages';
+import { alphaToMask, decodeSceneImages, deflate, MissingImageError, rgbToCmykBytes, type RasterImage, type VectorExportOptions } from './vectorImages';
 
 const PS_PATH = { move: 'moveto', line: 'lineto', curve: 'curveto', close: 'closepath' };
 
@@ -78,44 +80,56 @@ function clipAndTransform(el: SceneElement, out: string[]): void {
   if (el.matrix) out.push(`[${formatMatrix(el.matrix)}] concat`);
 }
 
-function drawPath(el: ScenePath, out: string[]): void {
+function drawPath(el: ScenePath, out: string[], colorSpace: 'rgb' | 'cmyk' = 'rgb'): void {
   const path = pathOperators(el.d, PS_PATH);
   if (el.fill && 'color' in el.fill) {
-    out.push('newpath', path, `${formatRgb(el.fill.color)} setrgbcolor`, el.evenOdd ? 'eofill' : 'fill');
+    const colorCmd = colorSpace === 'cmyk'
+      ? `${formatCmyk(rgbToCmyk(el.fill.color))} setcmykcolor`
+      : `${formatRgb(el.fill.color)} setrgbcolor`;
+    out.push('newpath', path, colorCmd, el.evenOdd ? 'eofill' : 'fill');
   } else if (el.fill) {
     out.push('gsave', 'newpath', path, el.evenOdd ? 'eoclip' : 'clip', 'newpath');
     if (el.fill.gradient.transform) out.push(`[${formatMatrix(el.fill.gradient.transform)}] concat`);
-    out.push(`${shadingDictionary(el.fill.gradient)} shfill`, 'grestore');
+    out.push(`${shadingDictionary(el.fill.gradient, colorSpace)} shfill`, 'grestore');
   }
   if (el.stroke) {
-    out.push('newpath', path, `${formatRgb(el.stroke.color)} setrgbcolor`, `${formatNum(el.stroke.width)} setlinewidth`);
+    const strokeCmd = colorSpace === 'cmyk'
+      ? `${formatCmyk(rgbToCmyk(el.stroke.color))} setcmykcolor`
+      : `${formatRgb(el.stroke.color)} setrgbcolor`;
+    out.push('newpath', path, strokeCmd, `${formatNum(el.stroke.width)} setlinewidth`);
     if (el.stroke.dash.length > 0) out.push(`[${el.stroke.dash.map(formatNum).join(' ')}] 0 setdash`);
     out.push('stroke');
   }
 }
 
-function drawText(el: SceneText, out: string[]): void {
+function drawText(el: SceneText, out: string[], colorSpace: 'rgb' | 'cmyk' = 'rgb'): void {
   const text = literalString(el.codes);
   // Back to y-up for the glyphs; the baseline sits on y.
   out.push(`${formatNum(el.x)} ${formatNum(el.y)} translate 1 -1 scale`);
   out.push(`/QR${el.bold ? 'Helvetica-Bold' : 'Helvetica'} findfont ${formatNum(el.fontSize)} scalefont setfont`);
-  out.push(`${formatRgb(el.color)} setrgbcolor`);
+  const colorCmd = colorSpace === 'cmyk'
+    ? `${formatCmyk(rgbToCmyk(el.color))} setcmykcolor`
+    : `${formatRgb(el.color)} setrgbcolor`;
+  out.push(colorCmd);
   if (el.textLength) out.push(`${formatNum(el.textLength)} ${text} stringwidth pop div 1 scale`);
   const shift = el.anchor === 'middle' ? ' 2 div neg' : el.anchor === 'end' ? ' neg' : null;
   out.push(shift ? `${text} stringwidth pop${shift} 0 moveto ${text} show` : `0 0 moveto ${text} show`);
 }
 
-async function drawImage(el: SceneImage, image: RasterImage, id: number, out: string[]): Promise<void> {
+async function drawImage(el: SceneImage, image: RasterImage, id: number, out: string[], colorSpace: 'rgb' | 'cmyk' = 'rgb'): Promise<void> {
   const name = `qrImg${id}`;
-  const data = await dataSource(name, image.rgb, out);
+  const bytes = colorSpace === 'cmyk' ? rgbToCmykBytes(image.rgb) : image.rgb;
+  const data = await dataSource(name, bytes, out);
   const mask = image.alpha ? await dataSource(`${name}M`, alphaToMask(image, image.alpha), out) : null;
   out.push('gsave');
   clipAndTransform(el, out);
   // Unit square to the image box; the first row lands at the top (smaller y).
   out.push(`${formatNum(el.x)} ${formatNum(el.y)} translate ${formatNum(el.width)} ${formatNum(el.height)} scale`);
-  out.push('/DeviceRGB setcolorspace', `/${name}I 0 def`);
+  const cs = colorSpace === 'cmyk' ? '/DeviceCMYK setcolorspace' : '/DeviceRGB setcolorspace';
+  const decode = colorSpace === 'cmyk' ? '[0 1 0 1 0 1 0 1]' : '[0 1 0 1 0 1]';
+  out.push(cs, `/${name}I 0 def`);
   const size = `/Width ${image.width} /Height ${image.height} /ImageMatrix [${image.width} 0 0 ${image.height} 0 0]`;
-  const dataDict = `<< /ImageType 1 ${size} /BitsPerComponent 8 /Decode [0 1 0 1 0 1] /DataSource ${data} >>`;
+  const dataDict = `<< /ImageType 1 ${size} /BitsPerComponent 8 /Decode ${decode} /DataSource ${data} >>`;
   if (mask) {
     // Masked image: mask samples of 1 are painted, 0 left clear.
     out.push(`/${name}MI 0 def`);
@@ -139,6 +153,7 @@ async function drawImage(el: SceneImage, image: RasterImage, id: number, out: st
 export async function convertSvgToEps(svgString: string, options: VectorExportOptions = {}): Promise<string> {
   const scene = readSvgScene(svgString);
   const images = await decodeSceneImages(scene, options.decodeImage);
+  const colorSpace = options.colorSpace ?? 'rgb';
 
   const body: string[] = [];
   let imageCount = 0;
@@ -148,14 +163,14 @@ export async function convertSvgToEps(svgString: string, options: VectorExportOp
       const image = images.get(el.href);
       if (!image) throw new MissingImageError();
       needsLevel3 = true;
-      await drawImage(el, image, ++imageCount, body);
+      await drawImage(el, image, ++imageCount, body, colorSpace);
       continue;
     }
     if (el.kind === 'path' && el.fill && 'gradient' in el.fill) needsLevel3 = true;
     body.push('gsave');
     clipAndTransform(el, body);
-    if (el.kind === 'path') drawPath(el, body);
-    else drawText(el, body);
+    if (el.kind === 'path') drawPath(el, body, colorSpace);
+    else drawText(el, body, colorSpace);
     body.push('grestore');
   }
 

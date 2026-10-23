@@ -86,16 +86,6 @@ export function announcePolitely(message: string) {
     liveRegion.className = 'sr-only';
     liveRegion.setAttribute('aria-live', 'polite');
     liveRegion.setAttribute('role', 'status');
-    // Ensure it is visually hidden
-    liveRegion.style.position = 'absolute';
-    liveRegion.style.width = '1px';
-    liveRegion.style.height = '1px';
-    liveRegion.style.padding = '0';
-    liveRegion.style.margin = '-1px';
-    liveRegion.style.overflow = 'hidden';
-    liveRegion.style.clip = 'rect(0, 0, 0, 0)';
-    liveRegion.style.whiteSpace = 'nowrap';
-    liveRegion.style.borderWidth = '0';
     document.body.appendChild(liveRegion);
   }
 

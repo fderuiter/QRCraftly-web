@@ -14,58 +14,49 @@ interface ColorControlsProps {
   onChange: (updates: Partial<QRConfig>) => void;
 }
 
-/** The background colour, with a switch for a transparent background. */
-const BackgroundColorField: React.FC<ColorControlsProps> = ({ config, onChange }) => {
-  const isTransparent = config.bgColor === 'transparent';
-  return (
-    <div className="space-y-2">
-      <ColorInput
-        id="bg-color"
-        label="Background"
-        value={isTransparent ? '#ffffff' : config.bgColor}
-        onChange={(val) => onChange({ bgColor: val })}
-        disabled={isTransparent}
-      />
-      <ToggleSwitch
-        id="transparent-bg"
-        label="Transparent Background"
-        checked={isTransparent}
-        onChange={(checked) => onChange({ bgColor: checked ? 'transparent' : '#ffffff' })}
-        labelClassName="text-xs font-medium text-fg-muted"
-      />
-    </div>
-  );
-};
+const PRESET_OPTIONS = PRESET_COLORS.map((preset) => ({
+  value: preset.label,
+  ariaLabel: `Select ${preset.label} theme`,
+  label: (
+    <>
+      <svg viewBox="0 0 40 40" className="size-7 shrink-0 rounded ring-1 ring-line-strong" aria-hidden="true">
+        <rect width="40" height="40" fill={preset.bg} />
+        <rect x="6" y="6" width="28" height="28" rx="2" fill="none" stroke={preset.fg} strokeWidth="6" />
+        <rect x="11" y="11" width="18" height="18" rx="1" fill={preset.eye} />
+      </svg>
+      <span className="min-w-0 leading-tight">{preset.label}</span>
+    </>
+  ),
+}));
 
 export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }) => {
-
   const activeGradientType: GradientType = config.gradientType || 'none';
-  const colorStops = (config.gradientColorStops && config.gradientColorStops.length > 0)
-    ? config.gradientColorStops
-    : [
-        { offset: 0, color: config.fgColor || '#000000' },
-        { offset: 1, color: DEFAULT_GRADIENT_END_COLOR },
-      ];
+  const colorStops = useMemo(
+    () =>
+      config.gradientColorStops && config.gradientColorStops.length > 0
+        ? config.gradientColorStops
+        : [
+            { offset: 0, color: config.fgColor || '#000000' },
+            { offset: 1, color: DEFAULT_GRADIENT_END_COLOR },
+          ],
+    [config.gradientColorStops, config.fgColor]
+  );
 
   const stop0Color = colorStops[0]?.color ?? config.fgColor;
   const stop1Color = colorStops[colorStops.length - 1]?.color ?? DEFAULT_GRADIENT_END_COLOR;
-  const stopColors = colorStops.map((stop) => stop.color).join(',');
 
   const contrastRatios = useMemo(() => {
     const bgForContrast = config.bgColor === 'transparent' ? '#ffffff' : config.bgColor;
     // A gradient is only as scannable as its weakest stop, so every stop is checked (an imported style can have more than two).
-    const moduleColors = activeGradientType !== 'none' ? stopColors.split(',') : [config.fgColor];
+    const moduleColors = activeGradientType !== 'none' ? colorStops.map((s) => s.color) : [config.fgColor];
     const fgContrast = Math.min(...moduleColors.map((color) => getContrastRatio(color, bgForContrast)));
     const eyeFrameContrast = getContrastRatio(config.eyeFrameColor || config.eyeColor, bgForContrast);
     const eyeBallContrast = getContrastRatio(config.eyeBallColor || config.eyeColor, bgForContrast);
     return { fg: fgContrast, eyeFrame: eyeFrameContrast, eyeBall: eyeBallContrast };
-  }, [activeGradientType, stopColors, config.fgColor, config.bgColor, config.eyeColor, config.eyeFrameColor, config.eyeBallColor]);
+  }, [activeGradientType, colorStops, config.fgColor, config.bgColor, config.eyeColor, config.eyeFrameColor, config.eyeBallColor]);
 
-  const isLowContrast =
-    contrastRatios.fg < MIN_CONTRAST_THRESHOLD ||
-    contrastRatios.eyeFrame < MIN_CONTRAST_THRESHOLD ||
-    contrastRatios.eyeBall < MIN_CONTRAST_THRESHOLD;
   const worstContrast = Math.min(contrastRatios.fg, contrastRatios.eyeFrame, contrastRatios.eyeBall);
+  const isLowContrast = worstContrast < MIN_CONTRAST_THRESHOLD;
   const selectedPreset = PRESET_COLORS.find(
     (preset) =>
       config.fgColor === preset.fg &&
@@ -73,6 +64,8 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
       (config.eyeFrameColor || config.eyeColor) === preset.eye &&
       (config.eyeBallColor || config.eyeColor) === preset.eye
   );
+
+  const isTransparent = config.bgColor === 'transparent';
 
   return (
     <div>
@@ -95,24 +88,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
             });
           }
         }}
-        options={PRESET_COLORS.map((preset) => ({
-          value: preset.label,
-          ariaLabel: `Select ${preset.label} theme`,
-          label: (
-            <>
-              {/* Use SVG presentation attributes instead of inline styles for CSP compliance */}
-              <svg viewBox="0 0 40 40" className="size-7 shrink-0 rounded ring-1 ring-line-strong" aria-hidden="true">
-                {/* Background */}
-                <rect width="40" height="40" fill={preset.bg} />
-                {/* Foreground Ring (Simulating Modules) */}
-                <rect x="6" y="6" width="28" height="28" rx="2" fill="none" stroke={preset.fg} strokeWidth="6" />
-                {/* Eye Center */}
-                <rect x="11" y="11" width="18" height="18" rx="1" fill={preset.eye} />
-              </svg>
-              <span className="min-w-0 leading-tight">{preset.label}</span>
-            </>
-          ),
-        }))}
+        options={PRESET_OPTIONS}
       />
 
       <div className="mb-4">
@@ -146,30 +122,8 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
         />
       </div>
 
-      {activeGradientType === 'none' ? (
-        <div className="grid grid-cols-2 gap-4">
-          <ColorInput
-            id="fg-color"
-            label="Foreground"
-            value={config.fgColor}
-            onChange={(val) => onChange({ fgColor: val })}
-          />
-          <BackgroundColorField config={config} onChange={onChange} />
-          <ColorInput
-            id="eye-frame-color"
-            label="Eye Frame"
-            value={config.eyeFrameColor || config.eyeColor}
-            onChange={(val) => onChange({ eyeFrameColor: val })}
-          />
-          <ColorInput
-            id="eye-ball-color"
-            label="Eye Ball"
-            value={config.eyeBallColor || config.eyeColor}
-            onChange={(val) => onChange({ eyeBallColor: val })}
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4">
+      {activeGradientType !== 'none' && (
+        <div className="mb-4 grid grid-cols-2 gap-4">
           <ColorInput
             id="gradient-start-color"
             label="Start Color"
@@ -208,21 +162,47 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
               />
             </div>
           )}
-          <BackgroundColorField config={config} onChange={onChange} />
-          <ColorInput
-            id="eye-frame-color"
-            label="Eye Frame"
-            value={config.eyeFrameColor || config.eyeColor}
-            onChange={(val) => onChange({ eyeFrameColor: val })}
-          />
-          <ColorInput
-            id="eye-ball-color"
-            label="Eye Ball"
-            value={config.eyeBallColor || config.eyeColor}
-            onChange={(val) => onChange({ eyeBallColor: val })}
-          />
         </div>
       )}
+
+      <div className="grid grid-cols-2 gap-4">
+        {activeGradientType === 'none' && (
+          <ColorInput
+            id="fg-color"
+            label="Foreground"
+            value={config.fgColor}
+            onChange={(val) => onChange({ fgColor: val })}
+          />
+        )}
+        <div className="space-y-2">
+          <ColorInput
+            id="bg-color"
+            label="Background"
+            value={isTransparent ? '#ffffff' : config.bgColor}
+            onChange={(val) => onChange({ bgColor: val })}
+            disabled={isTransparent}
+          />
+          <ToggleSwitch
+            id="transparent-bg"
+            label="Transparent Background"
+            checked={isTransparent}
+            onChange={(checked) => onChange({ bgColor: checked ? 'transparent' : '#ffffff' })}
+            labelClassName="text-xs font-medium text-fg-muted"
+          />
+        </div>
+        <ColorInput
+          id="eye-frame-color"
+          label="Eye Frame"
+          value={config.eyeFrameColor || config.eyeColor}
+          onChange={(val) => onChange({ eyeFrameColor: val })}
+        />
+        <ColorInput
+          id="eye-ball-color"
+          label="Eye Ball"
+          value={config.eyeBallColor || config.eyeColor}
+          onChange={(val) => onChange({ eyeBallColor: val })}
+        />
+      </div>
 
       <ContrastBanner
         isVisible={isLowContrast}
@@ -231,8 +211,7 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
         className="mt-3"
         decimalPrecision={2}
         onAutoFix={() => {
-          const patch = calculateAutoFixColorPatch(config);
-          onChange(patch);
+          onChange(calculateAutoFixColorPatch(config));
           announcePolitely('Contrast adjusted to meet WCAG standards');
         }}
       />

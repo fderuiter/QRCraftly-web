@@ -29,6 +29,7 @@ import {
   hslToHex,
   adjustColorForContrast,
   calculateAutoFixColorPatch,
+  rgbToCmyk,
 } from './colorUtils';
 import { DEFAULT_CONFIG } from '../constants';
 import type { QRConfig } from '../types';
@@ -239,5 +240,34 @@ describe('calculateAutoFixColorPatch', () => {
     expect(getContrastRatio(patch.eyeFrameColor!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
     expect(patch.eyeBallColor).toBeDefined();
     expect(getContrastRatio(patch.eyeBallColor!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('rgbToCmyk', () => {
+  it('converts black (0,0,0) to CMYK (0,0,0,1)', () => {
+    const cmyk = rgbToCmyk(0, 0, 0);
+    expect(cmyk).toEqual({ c: 0, m: 0, y: 0, k: 1 });
+  });
+
+  it('converts white (1,1,1) to CMYK (0,0,0,0)', () => {
+    const cmyk = rgbToCmyk(1, 1, 1);
+    expect(cmyk).toEqual({ c: 0, m: 0, y: 0, k: 0 });
+  });
+
+  it('converts red, green, blue primary colors', () => {
+    expect(rgbToCmyk(1, 0, 0)).toEqual({ c: 0, m: 1, y: 1, k: 0 });
+    expect(rgbToCmyk(0, 1, 0)).toEqual({ c: 1, m: 0, y: 1, k: 0 });
+    expect(rgbToCmyk(0, 0, 1)).toEqual({ c: 1, m: 1, y: 0, k: 0 });
+  });
+
+  it('converts secondary colors cyan, magenta, yellow', () => {
+    expect(rgbToCmyk(0, 1, 1)).toEqual({ c: 1, m: 0, y: 0, k: 0 });
+    expect(rgbToCmyk(1, 0, 1)).toEqual({ c: 0, m: 1, y: 0, k: 0 });
+    expect(rgbToCmyk(1, 1, 0)).toEqual({ c: 0, m: 0, y: 1, k: 0 });
+  });
+
+  it('supports object argument { r, g, b }', () => {
+    const cmyk = rgbToCmyk({ r: 0.5, g: 0.5, b: 0.5 });
+    expect(cmyk).toEqual({ c: 0, m: 0, y: 0, k: 0.5 });
   });
 });

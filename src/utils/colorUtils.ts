@@ -25,10 +25,8 @@ import type { QRConfig } from '../types';
  * @returns The normalized hex string, or null if invalid.
  */
 export const normalizeHex = (val: string): string | null => {
-  const match = val.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (!match) return null;
-  const hex = match[1].length === 3 ? match[1].replace(/./g, '$&$&') : match[1];
-  return '#' + hex.toLowerCase();
+  const m = val.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  return m ? '#' + (m[1].length === 3 ? m[1].replace(/./g, '$&$&') : m[1]).toLowerCase() : null;
 };
 
 /**
@@ -39,10 +37,10 @@ export const normalizeHex = (val: string): string | null => {
  * @returns The `rgba(r,g,b,a)` string.
  */
 export const hexToRgba = (hex: string, alpha: number): string => {
-  const normalized = normalizeHex(hex);
-  if (!normalized) return `rgba(0,0,0,${alpha})`;
-  const value = parseInt(normalized.slice(1), 16);
-  return `rgba(${(value >> 16) & 0xff},${(value >> 8) & 0xff},${value & 0xff},${alpha})`;
+  const n = normalizeHex(hex);
+  if (!n) return `rgba(0,0,0,${alpha})`;
+  const v = parseInt(n.slice(1), 16);
+  return `rgba(${(v >> 16) & 255},${(v >> 8) & 255},${v & 255},${alpha})`;
 };
 
 /**
@@ -53,81 +51,49 @@ export const hexToRgba = (hex: string, alpha: number): string => {
  * @param b - Blue channel normalized (0..1).
  * @returns Relative luminance value (0..1).
  */
-export const getLuminanceFromRgb = (r: number, g: number, b: number): number => {
-  return getLuminanceFromLinearRgb(srgbToLinear(r), srgbToLinear(g), srgbToLinear(b));
-};
+export const getLuminanceFromRgb = (r: number, g: number, b: number): number =>
+  getLuminanceFromLinearRgb(srgbToLinear(r), srgbToLinear(g), srgbToLinear(b));
 
 /**
  * Converts one gamma-encoded sRGB channel (0..1) to linear light (0..1).
- *
- * @param c - Gamma-encoded channel value (0..1).
- * @returns Linear-light channel value (0..1).
  */
 export const srgbToLinear = (c: number): number =>
   c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 
 /**
  * Converts one linear-light channel (0..1) back to gamma-encoded sRGB (0..1).
- * Inverse of {@link srgbToLinear}.
- *
- * @param c - Linear-light channel value (0..1).
- * @returns Gamma-encoded channel value (0..1).
  */
 export const linearToSrgb = (c: number): number =>
   c <= 0.03928 / 12.92 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
 
 /**
  * Calculates WCAG relative luminance from linear-light channels (0..1).
- * Relative luminance is linear in these channels, so scaling all three by `k` scales it by `k`.
- *
- * @param r - Red channel in linear light (0..1).
- * @param g - Green channel in linear light (0..1).
- * @param b - Blue channel in linear light (0..1).
- * @returns Relative luminance value (0..1).
  */
 export const getLuminanceFromLinearRgb = (r: number, g: number, b: number): number =>
   0.2126 * r + 0.7152 * g + 0.0722 * b;
 
 /**
  * Utility to calculate relative luminance of a color based on the WCAG 2.0 formula.
- * Used for contrast ratio calculation.
- *
- * The magic numbers in this formula are defined by the sRGB color space specification:
- * - 0.03928: The threshold where the sRGB gamma correction curve changes from linear to exponential.
- * - 12.92: The linear scaling factor for low luminance values.
- * - 2.4: The gamma exponent for sRGB conversion.
- * - 0.2126, 0.7152, 0.0722: The relative weights (luminance contributions) of Red, Green, and Blue,
- *   based on human eye sensitivity (green appears much brighter than blue).
- *
- * @see https://www.w3.org/TR/WCAG20/#relativeluminancedef
- * @param hex - The hex color code (e.g. #RRGGBB or #RGB).
- * @returns The relative luminance value.
  */
 export const getLuminance = (hex: string): number => {
-  const norm = hex.length === 4 ? '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3] : hex;
-  const rgb = parseInt(norm.slice(1), 16);
-  return getLuminanceFromRgb(((rgb >> 16) & 0xff) / 255, ((rgb >> 8) & 0xff) / 255, (rgb & 0xff) / 255);
+  const v = parseInt(hex.slice(1), 16);
+  return hex.length === 4
+    ? getLuminanceFromRgb(((v >> 8) & 15) / 15, ((v >> 4) & 15) / 15, (v & 15) / 15)
+    : getLuminanceFromRgb(((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255);
 };
 
 /**
  * Calculates the contrast ratio between two colors.
- * @param fg - Foreground color hex.
- * @param bg - Background color hex.
- * @returns The contrast ratio (1 to 21).
  */
 export const getContrastRatio = (fg: string, bg: string) => {
-  if (!fg || !bg) return 0;
   const hexRegex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
-  if (!hexRegex.test(fg) || !hexRegex.test(bg)) return 0;
-
-  const l1 = getLuminance(fg);
-  const l2 = getLuminance(bg);
+  if (!fg || !bg || !hexRegex.test(fg) || !hexRegex.test(bg)) return 0;
+  const l1 = getLuminance(fg), l2 = getLuminance(bg);
   return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
 };
 
 /**
  * Converts sRGB channels (0..255) to HSL color space.
- * @returns Object with h (0..360), s (0..1), and l (0..1).
  */
 export const rgbToHsl = (r: number, g: number, b: number): { h: number; s: number; l: number } => {
   const rN = r / 255, gN = g / 255, bN = b / 255;
@@ -147,11 +113,12 @@ export const rgbToHsl = (r: number, g: number, b: number): { h: number; s: numbe
  * Converts HSL values (h: 0..360, s: 0..1, l: 0..1) to a CSS hex string (#rrggbb).
  */
 export const hslToHex = (h: number, s: number, l: number): string => {
-  const hN = ((h % 360) + 360) % 360, c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((hN / 60) % 2) - 1)), m = l - c / 2;
-  const i = Math.floor(hN / 60);
-  const [r, g, b] = i === 0 ? [c, x, 0] : i === 1 ? [x, c, 0] : i === 2 ? [0, c, x] : i === 3 ? [0, x, c] : i === 4 ? [x, 0, c] : [c, 0, x];
-  const hex = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, '0');
-  return `#${hex(r)}${hex(g)}${hex(b)}`;
+  const normH = ((h % 360) + 360) % 360, a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + normH / 30) % 12;
+    return (Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))) | 256).toString(16).slice(1);
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
 };
 
 /**
@@ -168,23 +135,19 @@ export const adjustColorForContrast = (fgHex: string, bgHex: string, targetContr
 
   const search = (low: number, high: number, targetL: number) => {
     if (getContrastRatio(hslToHex(h, s, targetL), normBg) < targetContrast) return null;
-    let best = { hex: '', l: targetL }, l = low, r = high;
-    for (let i = 0; i < 15; i++) {
-      const mid = (l + r) / 2, hexMid = hslToHex(h, s, mid);
-      if (getContrastRatio(hexMid, normBg) >= targetContrast) {
-        best = { hex: hexMid, l: mid };
-        if (targetL === 0) l = mid; else r = mid;
-      } else {
-        if (targetL === 0) r = mid; else l = mid;
-      }
+    let bestL = targetL, l = low, r = high;
+    for (let i = 0; i < 10; i++) {
+      const mid = (l + r) / 2;
+      const ok = getContrastRatio(hslToHex(h, s, mid), normBg) >= targetContrast;
+      if (ok) bestL = mid;
+      if (ok === !targetL) l = mid; else r = mid;
     }
-    return best.hex ? best : null;
+    return bestL;
   };
 
-  const d = search(0, initL, 0), g = search(initL, 1, 1);
-  if (d && g) return Math.abs(initL - d.l) <= Math.abs(g.l - initL) ? d.hex : g.hex;
-  if (d || g) return (d || g)!.hex;
-  return getContrastRatio('#000000', normBg) >= getContrastRatio('#ffffff', normBg) ? '#000000' : '#ffffff';
+  const dL = search(0, initL, 0), gL = search(initL, 1, 1);
+  const bestL = dL !== null && gL !== null ? (2 * initL <= dL + gL ? dL : gL) : (dL ?? gL);
+  return bestL !== null ? hslToHex(h, s, bestL) : getLuminance(normBg) > 0.18 ? '#000000' : '#ffffff';
 };
 
 /**
@@ -197,20 +160,50 @@ export const calculateAutoFixColorPatch = (config?: Partial<QRConfig> | null): P
   const patch: Partial<QRConfig> = {};
 
   if (config.gradientType && config.gradientType !== 'none' && config.gradientColorStops?.length) {
-    const stops = config.gradientColorStops.map((stop) => ({ ...stop, color: adjustColorForContrast(stop.color, bg, 4.5) }));
+    const stops = config.gradientColorStops.map((stop) => ({ ...stop, color: adjustColorForContrast(stop.color, bg) }));
     patch.gradientColorStops = stops;
     patch.fgColor = stops[0]?.color ?? config.fgColor;
   } else {
-    patch.fgColor = adjustColorForContrast(config.fgColor || '#000000', bg, 4.5);
+    patch.fgColor = adjustColorForContrast(config.fgColor ?? '#000000', bg);
   }
 
-  const fix = (c?: string) => c ? adjustColorForContrast(c, bg, 4.5) : undefined;
-  if (config.eyeFrameColor) patch.eyeFrameColor = fix(config.eyeFrameColor);
-  else if (config.eyeColor) patch.eyeColor = fix(config.eyeColor);
-
-  if (config.eyeBallColor) patch.eyeBallColor = fix(config.eyeBallColor);
-  else if (config.eyeColor && !patch.eyeColor) patch.eyeColor = fix(config.eyeColor);
+  if (config.eyeFrameColor) patch.eyeFrameColor = adjustColorForContrast(config.eyeFrameColor, bg);
+  if (config.eyeBallColor) patch.eyeBallColor = adjustColorForContrast(config.eyeBallColor, bg);
+  if (config.eyeColor && (!config.eyeFrameColor || !config.eyeBallColor)) patch.eyeColor = adjustColorForContrast(config.eyeColor, bg);
 
   return patch;
 };
+
+export interface CmykColor {
+  c: number;
+  m: number;
+  y: number;
+  k: number;
+}
+
+/**
+ * Converts sRGB color channels (0..1) to CMYK (0..1).
+ * Supports calling with individual r, g, b arguments or an { r, g, b } object.
+ *
+ * @param r - Red channel (0..1) or { r, g, b } object.
+ * @param g - Green channel (0..1) if first arg is number.
+ * @param b - Blue channel (0..1) if first arg is number.
+ * @returns CMYK components scaled 0..1.
+ */
+export function rgbToCmyk(r: number, g: number, b: number): CmykColor;
+export function rgbToCmyk(color: { r: number; g: number; b: number }): CmykColor;
+export function rgbToCmyk(
+  rOrColor: number | { r: number; g: number; b: number },
+  gParam?: number,
+  bParam?: number
+): CmykColor {
+  const o = typeof rOrColor === 'object' && rOrColor !== null;
+  const r = Math.min(1, Math.max(0, o ? rOrColor.r : (typeof rOrColor === 'number' ? rOrColor : 0)));
+  const g = Math.min(1, Math.max(0, o ? rOrColor.g : (gParam ?? 0)));
+  const b = Math.min(1, Math.max(0, o ? rOrColor.b : (bParam ?? 0)));
+  const k = 1 - Math.max(r, g, b);
+  if (k >= 1) return { c: 0, m: 0, y: 0, k: 1 };
+  const d = 1 - k;
+  return { c: (d - r) / d, m: (d - g) / d, y: (d - b) / d, k };
+}
 
