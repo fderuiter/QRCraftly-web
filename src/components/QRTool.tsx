@@ -34,6 +34,7 @@ import { useQRDownload, BLOCKED_EXPORT_MESSAGE, SCAN_VALIDATION_ERROR, type Expo
 import { previewFailureMessage, type PreviewFailure } from '@/utils/previewFailure';
 import { getExportRiskPolicy } from '@/utils/exportRiskPolicy';
 import { isDangerousUrl } from '@/utils/security';
+import { calculateAutoFixColorPatch } from '@/utils/colorUtils';
 import { useToast } from './ui/Toast';
 import { useScannability } from '@/hooks/useScannability';
 import { FIX_LABELS, ScannabilityIndicator } from '@/components/ScannabilityIndicator';
@@ -216,6 +217,9 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
       store.updateConfig({ style: QRStyle.STANDARD });
     } else if (fix === 'smaller-logo') {
       store.updateConfig({ logoSize: SYSTEM_LIMITS.MAX_LOGO_SIZE });
+    } else if (fix === 'increase-contrast') {
+      const patch = calculateAutoFixColorPatch(config);
+      store.updateConfig(patch);
     } else {
       store.updateConfig({
         fgColor: '#000000',
@@ -225,7 +229,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
         eyeBallColor: '#000000',
       });
     }
-  }, [store]);
+  }, [store, config]);
 
   const notifyUndo = useUndoToast();
   const handleResetDefault = useCallback(() => {

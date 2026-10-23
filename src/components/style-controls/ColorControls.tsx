@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import type { GradientType, QRConfig } from '../../types';
 import { PRESET_COLORS, MIN_CONTRAST_THRESHOLD, buildPresetColorPatch, DEFAULT_GRADIENT_END_COLOR } from '../../constants';
-import { getContrastRatio } from '../../utils/colorUtils';
+import { getContrastRatio, calculateAutoFixColorPatch } from '../../utils/colorUtils';
+import { announcePolitely } from '../../utils/a11y';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
 import { SegmentedControl } from '../ui/SegmentedControl';
@@ -229,6 +230,11 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
         messageType="color"
         className="mt-3"
         decimalPrecision={2}
+        onAutoFix={() => {
+          const patch = calculateAutoFixColorPatch(config);
+          onChange(patch);
+          announcePolitely('Contrast adjusted to meet WCAG standards');
+        }}
       />
     </div>
   );

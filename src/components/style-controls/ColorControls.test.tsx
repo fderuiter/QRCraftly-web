@@ -270,4 +270,26 @@ describe('ColorControls', () => {
       })
     );
   });
+
+  it('triggers onAutoFix in ContrastBanner, computing HSL contrast patch and updating config', () => {
+    const handleChange = vi.fn();
+    const lowContrastConfig = {
+      ...DEFAULT_CONFIG,
+      fgColor: '#93c5fd', // Light blue on white
+      bgColor: '#ffffff',
+    };
+
+    render(<ColorControls config={lowContrastConfig} onChange={handleChange} />);
+
+    const fixBtn = screen.getByRole('button', { name: 'Fix contrast' });
+    expect(fixBtn).toBeInTheDocument();
+
+    fireEvent.click(fixBtn);
+
+    expect(handleChange).toHaveBeenCalledTimes(1);
+    const patch = handleChange.mock.calls[0][0];
+    expect(patch.fgColor).toBeDefined();
+    // Verify that new fgColor has contrast >= 4.5:1 against #ffffff
+    expect(patch.fgColor).not.toBe('#93c5fd');
+  });
 });

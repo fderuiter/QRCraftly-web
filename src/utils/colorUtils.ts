@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import type { QRConfig } from '../types';
+
 /**
  * Normalizes a hex color string, validating and formatting it consistently.
  * Converts shorthand (#123) to full (#112233), ensures # prefix, and lowercases.
@@ -137,3 +139,194 @@ export const getContrastRatio = (fg: string, bg: string) => {
   const darker = Math.min(l1, l2);
   return (lighter + 0.05) / (darker + 0.05);
 };
+
+/**
+ * Converts sRGB channels (0..255) to HSL color space.
+ * @returns Object with h (0..360), s (0..1), and l (0..1).
+ */
+export const rgbToHsl = (r: number, g: number, b: number): { h: number; s: number; l: number } => {
+  const rNorm = r / 255;
+  const gNorm = g / 255;
+  const bNorm = b / 255;
+  const max = Math.max(rNorm, gNorm, bNorm);
+  const min = Math.min(rNorm, gNorm, bNorm);
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case rNorm:
+        h = (gNorm - bNorm) / d + (gNorm < bNorm ? 6 : 0);
+        break;
+      case gNorm:
+        h = (bNorm - rNorm) / d + 2;
+        break;
+      case bNorm:
+        h = (rNorm - gNorm) / d + 4;
+        break;
+    }
+    h /= 6;
+  }
+
+  return { h: h * 360, s, l };
+};
+
+/**
+ * Converts HSL values (h: 0..360, s: 0..1, l: 0..1) to a CSS hex string (#rrggbb).
+ */
+export const hslToHex = (h: number, s: number, l: number): string => {
+  const hNorm = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((hNorm / 60) % 2) - 1));
+  const m = l - c / 2;
+
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (0 <= hNorm && hNorm < 60) {
+    r = c; g = x; b = 0;
+  } else if (60 <= hNorm && hNorm < 120) {
+    r = x; g = c; b = 0;
+  } else if (120 <= hNorm && hNorm < 180) {
+    r = 0; g = c; b = x;
+  } else if (180 <= hNorm && hNorm < 240) {
+    r = 0; g = x; b = c;
+  } else if (240 <= hNorm && hNorm < 300) {
+    r = x; g = 0; b = c;
+  } else if (300 <= hNorm && hNorm < 360) {
+    r = c; g = 0; b = x;
+  }
+
+  const rByte = Math.round((r + m) * 255);
+  const gByte = Math.round((g + m) * 255);
+  const bByte = Math.round((b + m) * 255);
+
+  const toHex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
+  return `#${toHex(rByte)}${toHex(gByte)}${toHex(bByte)}`;
+};
+
+/**
+ * Adjusts a foreground hex color's lightness L using binary search to achieve target contrast (>= 4.5 by default)
+ * against a background hex color while keeping hue and saturation constant.
+ */
+export const adjustColorForContrast = (
+  fgHex: string,
+  bgHex: string,
+  targetContrast = 4.5
+): string => {
+  const normBg = (bgHex === 'transparent' || !bgHex ? '#ffffff' : normalizeHex(bgHex)) || '#ffffff';
+  const normFg = (fgHex ? normalizeHex(fgHex) : null) || '#000000';
+
+  if (getContrastRatio(normFg, normBg) >= targetContrast) {
+    return normFg;
+  }
+
+  const rgb = parseInt(normFg.slice(1), 16);
+  const r = (rgb >> 16) & 0xff;
+  const g = (rgb >> 8) & 0xff;
+  const b = rgb & 0xff;
+  const { h, s, l: initialL } = rgbToHsl(r, g, b);
+
+  // Binary search towards darker lightness L in [0, initialL]
+  let bestDark: string | null = null;
+  let bestDarkL = 0;
+  if (getContrastRatio(hslToHex(h, s, 0), normBg) >= targetContrast) {
+    let low = 0;
+    let high = initialL;
+    for (let i = 0; i < 15; i++) {
+      const mid = (low + high) / 2;
+      const hexMid = hslToHex(h, s, mid);
+      if (getContrastRatio(hexMid, normBg) >= targetContrast) {
+        bestDark = hexMid;
+        bestDarkL = mid;
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+  }
+
+  // Binary search towards lighter lightness L in [initialL, 1]
+  let bestLight: string | null = null;
+  let bestLightL = 1;
+  if (getContrastRatio(hslToHex(h, s, 1), normBg) >= targetContrast) {
+    let low = initialL;
+    let high = 1;
+    for (let i = 0; i < 15; i++) {
+      const mid = (low + high) / 2;
+      const hexMid = hslToHex(h, s, mid);
+      if (getContrastRatio(hexMid, normBg) >= targetContrast) {
+        bestLight = hexMid;
+        bestLightL = mid;
+        high = mid;
+      } else {
+        low = mid;
+      }
+    }
+  }
+
+  if (bestDark !== null && bestLight !== null) {
+    const deltaDark = Math.abs(initialL - bestDarkL);
+    const deltaLight = Math.abs(bestLightL - initialL);
+    return deltaDark <= deltaLight ? bestDark : bestLight;
+  }
+  if (bestDark !== null) return bestDark;
+  if (bestLight !== null) return bestLight;
+
+  // Fallback if maintaining saturation fails to hit contrast ratio: pick black or white based on highest contrast
+  const blackContrast = getContrastRatio('#000000', normBg);
+  const whiteContrast = getContrastRatio('#ffffff', normBg);
+  return blackContrast >= whiteContrast ? '#000000' : '#ffffff';
+};
+
+/**
+ * Computes a minimal partial QRConfig patch that adjusts foreground colors, gradient stops,
+ * eye frame colors, and eye ball colors to satisfy WCAG contrast targets (>= 4.5:1).
+ */
+export const calculateAutoFixColorPatch = (config?: Partial<QRConfig> | null): Partial<QRConfig> => {
+  if (!config) return {};
+  const bg = config.bgColor === 'transparent' || !config.bgColor ? '#ffffff' : config.bgColor;
+  const patch: Partial<QRConfig> = {};
+
+  if (
+    config.gradientType &&
+    config.gradientType !== 'none' &&
+    config.gradientColorStops &&
+    config.gradientColorStops.length > 0
+  ) {
+    const newStops = config.gradientColorStops.map((stop) => ({
+      ...stop,
+      color: adjustColorForContrast(stop.color, bg, 4.5),
+    }));
+    patch.gradientColorStops = newStops;
+    patch.fgColor = newStops[0]?.color ?? config.fgColor;
+  } else {
+    const fg = config.fgColor || '#000000';
+    patch.fgColor = adjustColorForContrast(fg, bg, 4.5);
+  }
+
+  const effectiveEyeFrame = config.eyeFrameColor || config.eyeColor;
+  if (effectiveEyeFrame) {
+    if (config.eyeFrameColor) {
+      patch.eyeFrameColor = adjustColorForContrast(config.eyeFrameColor, bg, 4.5);
+    } else if (config.eyeColor) {
+      patch.eyeColor = adjustColorForContrast(config.eyeColor, bg, 4.5);
+    }
+  }
+
+  const effectiveEyeBall = config.eyeBallColor || config.eyeColor;
+  if (effectiveEyeBall) {
+    if (config.eyeBallColor) {
+      patch.eyeBallColor = adjustColorForContrast(config.eyeBallColor, bg, 4.5);
+    } else if (config.eyeColor && !patch.eyeColor) {
+      patch.eyeColor = adjustColorForContrast(config.eyeColor, bg, 4.5);
+    }
+  }
+
+  return patch;
+};
+

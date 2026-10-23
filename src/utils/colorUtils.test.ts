@@ -17,7 +17,21 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { getContrastRatio, normalizeHex, hexToRgba, srgbToLinear, linearToSrgb, getLuminanceFromLinearRgb, getLuminanceFromRgb } from './colorUtils';
+import {
+  getContrastRatio,
+  normalizeHex,
+  hexToRgba,
+  srgbToLinear,
+  linearToSrgb,
+  getLuminanceFromLinearRgb,
+  getLuminanceFromRgb,
+  rgbToHsl,
+  hslToHex,
+  adjustColorForContrast,
+  calculateAutoFixColorPatch,
+} from './colorUtils';
+import { DEFAULT_CONFIG } from '../constants';
+import type { QRConfig } from '../types';
 
 describe('colorUtils', () => {
   describe('getContrastRatio', () => {
@@ -129,5 +143,101 @@ describe('linear-light helpers', () => {
     const [r, g, b] = [0.2, 0.6, 0.9];
     expect(getLuminanceFromLinearRgb(srgbToLinear(r), srgbToLinear(g), srgbToLinear(b))).toBeCloseTo(getLuminanceFromRgb(r, g, b), 12);
     expect(getLuminanceFromLinearRgb(1, 1, 1)).toBeCloseTo(1, 12);
+  });
+});
+
+describe('HSL conversion helpers', () => {
+  it('converts RGB to HSL and back to Hex accurately', () => {
+    // Pure red
+    const hslRed = rgbToHsl(255, 0, 0);
+    expect(hslRed.h).toBe(0);
+    expect(hslRed.s).toBe(1);
+    expect(hslRed.l).toBe(0.5);
+    expect(hslToHex(hslRed.h, hslRed.s, hslRed.l)).toBe('#ff0000');
+
+    // Blue #3b82f6
+    const hslBlue = rgbToHsl(59, 130, 246);
+    expect(Math.round(hslBlue.h)).toBe(217);
+    expect(hslToHex(hslBlue.h, hslBlue.s, hslBlue.l)).toBe('#3b82f6');
+  });
+});
+
+describe('adjustColorForContrast', () => {
+  it('returns normalized foreground color if contrast is already >= 4.5:1', () => {
+    const fixed = adjustColorForContrast('#000000', '#ffffff');
+    expect(fixed).toBe('#000000');
+    expect(getContrastRatio(fixed, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('adjusts light blue on white background to meet contrast >= 4.5:1 while preserving hue', () => {
+    const lightBlue = '#93c5fd'; // Contrast against white is ~1.7:1
+    expect(getContrastRatio(lightBlue, '#ffffff')).toBeLessThan(4.5);
+
+    const fixed = adjustColorForContrast(lightBlue, '#ffffff');
+    expect(getContrastRatio(fixed, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+
+    // Verify hue is preserved (~212 degrees for blue)
+    const origRgb = parseInt(lightBlue.slice(1), 16);
+    const fixedRgb = parseInt(fixed.slice(1), 16);
+    const origHsl = rgbToHsl((origRgb >> 16) & 0xff, (origRgb >> 8) & 0xff, origRgb & 0xff);
+    const fixedHsl = rgbToHsl((fixedRgb >> 16) & 0xff, (fixedRgb >> 8) & 0xff, fixedRgb & 0xff);
+    expect(Math.abs(origHsl.h - fixedHsl.h)).toBeLessThan(5);
+  });
+
+  it('adjusts dark blue on black background to meet contrast >= 4.5:1 while preserving hue', () => {
+    const darkBlue = '#1e3a8a'; // Low contrast against black #000000
+    expect(getContrastRatio(darkBlue, '#000000')).toBeLessThan(4.5);
+
+    const fixed = adjustColorForContrast(darkBlue, '#000000');
+    expect(getContrastRatio(fixed, '#000000')).toBeGreaterThanOrEqual(4.5);
+
+    const origRgb = parseInt(darkBlue.slice(1), 16);
+    const fixedRgb = parseInt(fixed.slice(1), 16);
+    const origHsl = rgbToHsl((origRgb >> 16) & 0xff, (origRgb >> 8) & 0xff, origRgb & 0xff);
+    const fixedHsl = rgbToHsl((fixedRgb >> 16) & 0xff, (fixedRgb >> 8) & 0xff, fixedRgb & 0xff);
+    expect(Math.abs(origHsl.h - fixedHsl.h)).toBeLessThan(5);
+  });
+
+  it('evaluates transparent background against solid white', () => {
+    const lightYellow = '#fef08a';
+    const fixed = adjustColorForContrast(lightYellow, 'transparent');
+    expect(getContrastRatio(fixed, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('calculateAutoFixColorPatch', () => {
+  it('calculates contrast fix patch for solid foreground color', () => {
+    const config: QRConfig = {
+      ...DEFAULT_CONFIG,
+      fgColor: '#93c5fd', // Light blue on white
+      bgColor: '#ffffff',
+    };
+
+    const patch = calculateAutoFixColorPatch(config);
+    expect(patch.fgColor).toBeDefined();
+    expect(getContrastRatio(patch.fgColor!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('calculates contrast fix patch for gradient stops, eye frame, and eye ball colors', () => {
+    const config: QRConfig = {
+      ...DEFAULT_CONFIG,
+      bgColor: '#ffffff',
+      gradientType: 'linear',
+      gradientColorStops: [
+        { offset: 0, color: '#93c5fd' }, // Low contrast light blue
+        { offset: 1, color: '#fef08a' }, // Low contrast light yellow
+      ],
+      eyeFrameColor: '#a7f3d0', // Low contrast light green
+      eyeBallColor: '#fbcfe8',  // Low contrast light pink
+    };
+
+    const patch = calculateAutoFixColorPatch(config);
+    expect(patch.gradientColorStops).toHaveLength(2);
+    expect(getContrastRatio(patch.gradientColorStops![0].color, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+    expect(getContrastRatio(patch.gradientColorStops![1].color, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+    expect(patch.eyeFrameColor).toBeDefined();
+    expect(getContrastRatio(patch.eyeFrameColor!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+    expect(patch.eyeBallColor).toBeDefined();
+    expect(getContrastRatio(patch.eyeBallColor!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
   });
 });

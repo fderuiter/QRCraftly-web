@@ -27,6 +27,7 @@ import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { pageCopy } from '../../tests/utils/pageCopy';
 import { axe } from '../../tests/utils/axe';
 import { withPageContent } from '../../tests/utils/pageContent';
+import { getContrastRatio } from '@/utils/colorUtils';
 
 const qrRead = vi.hoisted(() => vi.fn());
 vi.mock('@/packages/qr-decode', () => ({ loadQrReader: () => Promise.resolve({ read: qrRead }) }));
@@ -897,16 +898,16 @@ describe('QRTool Component', () => {
 
       // Wait for the failing verdict, then open its details panel
       fireEvent.click(await screen.findByRole('button', { name: /Won't scan reliably/ }, { timeout: SCANNABILITY_FAIL_TIMEOUT_MS }));
-      const autoFixBtn = screen.getByRole('button', { name: 'Use black on white' });
+      const autoFixBtn = screen.getByRole('button', { name: 'Auto-fix contrast' });
 
       fireEvent.click(autoFixBtn);
 
-      // Verify that colors are updated to high-contrast defaults (#000000 / #ffffff)
+      // Verify that foreground color is updated to meet contrast >= 4.5:1 against background
       await waitFor(() => {
-        const fgInput = screen.getByLabelText('Foreground');
-        const bgInput = screen.getByLabelText('Background');
-        expect(fgInput).toHaveValue('#000000');
-        expect(bgInput).toHaveValue('#ffffff');
+        const fgInput = screen.getByLabelText('Foreground') as HTMLInputElement;
+        const bgInput = screen.getByLabelText('Background') as HTMLInputElement;
+        expect(fgInput.value).not.toBe('#cccccc');
+        expect(getContrastRatio(fgInput.value, bgInput.value)).toBeGreaterThanOrEqual(4.5);
       });
     });
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Alert } from '../ui/Alert';
+import { Button } from '../ui/Button';
 
 /**
  * Props for the ContrastBadge component.
@@ -82,6 +83,14 @@ export interface ContrastBannerProps {
    * Additional CSS classes to apply to the alert wrapper.
    */
   className?: string;
+  /**
+   * Optional callback triggered when the inline auto-fix action button is clicked.
+   */
+  onAutoFix?: () => void;
+  /**
+   * Label text for the inline auto-fix button. Defaults to "Fix contrast".
+   */
+  autoFixLabel?: string;
 }
 
 /**
@@ -94,6 +103,8 @@ export const ContrastBanner: React.FC<ContrastBannerProps> = ({
   messageType,
   decimalPrecision = 2,
   className = '',
+  onAutoFix,
+  autoFixLabel = 'Fix contrast',
 }) => {
   // The wrapper is the only live region and stays mounted, so the warning is announced once when it
   // appears. The inner card is a static note: a second live role inside it would be read twice.
@@ -101,9 +112,23 @@ export const ContrastBanner: React.FC<ContrastBannerProps> = ({
     <div role="status" aria-live="polite" aria-atomic="true">
       {isVisible && (
         <Alert variant="warning" className={className} role="note">
-          {messageType === 'color'
-            ? `Warning: The contrast ratio is low (${contrastRatio.toFixed(decimalPrecision)}). QR codes should have high contrast (aim for 4.5:1) to be scannable by all devices.`
-            : `The contrast ratio between the layout's text and background is low (${contrastRatio.toFixed(decimalPrecision)}). Ensure contrast is above 4.5:1 for ideal legibility on export.`}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              {messageType === 'color'
+                ? `Warning: The contrast ratio is low (${contrastRatio.toFixed(decimalPrecision)}). QR codes should have high contrast (aim for 4.5:1) to be scannable by all devices.`
+                : `The contrast ratio between the layout's text and background is low (${contrastRatio.toFixed(decimalPrecision)}). Ensure contrast is above 4.5:1 for ideal legibility on export.`}
+            </span>
+            {onAutoFix && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={onAutoFix}
+                className="shrink-0"
+              >
+                {autoFixLabel}
+              </Button>
+            )}
+          </div>
         </Alert>
       )}
     </div>
