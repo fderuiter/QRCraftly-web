@@ -49,4 +49,6 @@ overrides:
   esbuild: 0.28.1
   # GHSA-wq5f-xc86-pv6w (librsvg in sharp < 0.35.5); Miniflare pins 0.35.4.
   sharp: "^0.35.5"
+  # GHSA-xjj6-f33q-929c (undici Denial of Service < 7.30.1); Miniflare pins 7.29.1.
+  undici@7: ">=7.30.1"
 
