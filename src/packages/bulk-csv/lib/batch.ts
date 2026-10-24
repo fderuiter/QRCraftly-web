@@ -18,7 +18,7 @@
 
 import type { PreflightReport } from './categorize';
 import { allocateFileName, sanitizeFileStem } from './fileNames';
-import type { ZipEntry } from './zip';
+import type { ZipEntry } from '@/packages/core/zip';
 
 /** A row left out of the batch: its payload failed the checks, or it could not be drawn. */
 export interface SkippedRow {

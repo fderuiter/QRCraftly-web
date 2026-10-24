@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { previewRow } from '@/packages/bulk-csv';
+import { previewRow } from '../bulkCsv/preview';
 import type { BulkCsvData, QRGeneratorContract } from '../types';
 import { QRType } from '@/packages/core/types';
 

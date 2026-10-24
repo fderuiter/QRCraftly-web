@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { crc32 } from './crc32';
+import { crc32 } from '@/packages/core/checksum';
 
 /**
  * Bytewords (BCR-2020-012): the canonical 256 four-letter words. The

@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { escapeCsvCell } from './csvEscape';
 
 /** Most data rows a bulk batch keeps in memory. Rows past this are counted, not stored. */
 export const MAX_BULK_CSV_ROWS = 500;
@@ -252,40 +251,4 @@ export function parseCsv(text: string, options: ParseCsvOptions = {}): CsvTable 
   });
 
   return { headers: headers ?? [], rows, totalRows, truncated: totalRows > rows.length, rowNumbers, delimiter };
-}
-
-/** An item representing an error or skipped row in bulk CSV processing. */
-export interface ErrorLogItem {
-  /** 1-based data row number as shown in the spreadsheet. */
-  rowNumber: number;
-  /** Category of the error or issue (e.g. 'empty', 'unsafe', 'caution', or 'skipped'). */
-  category?: string;
-  /** Human-readable reason why the row was skipped or failed. */
-  reason?: string;
-  /** The payload cell content, if available. */
-  payload?: string;
-}
-
-/**
- * Formats a list of skipped or invalid bulk CSV row items into UTF-8 CSV bytes according to RFC 4180.
- * Includes headers: Row Number, Category, Reason, Payload.
- *
- * @param items List of error or skipped row details.
- * @returns UTF-8 encoded CSV binary data.
- */
-export function formatErrorLogCsv(items: readonly ErrorLogItem[]): Uint8Array {
-  const headers = ['Row Number', 'Category', 'Reason', 'Payload'];
-  const lines: string[] = [headers.map(escapeCsvCell).join(',')];
-
-  for (const item of items) {
-    const rowNum = escapeCsvCell(item.rowNumber);
-    const category = escapeCsvCell(item.category ?? 'skipped');
-    const reasonText = item.reason && item.reason.trim() ? item.reason.trim() : 'Invalid or skipped row';
-    const reason = escapeCsvCell(reasonText);
-    const payload = escapeCsvCell(item.payload ?? '');
-    lines.push(`${rowNum},${category},${reason},${payload}`);
-  }
-
-  const csvText = lines.join('\r\n') + '\r\n';
-  return new TextEncoder().encode(csvText);
 }

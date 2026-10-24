@@ -1,6 +1,6 @@
 /*
     QRCraftly
-    Copyright (C) 2025 fderuiter
+    Copyright (C) 2026 fderuiter
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -16,9 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-/*
- * CRC-32 on its own entry point, for callers (the Bulk CSV zip writer) that need only the checksum.
- * The root entry also carries the handshake and its scannability check, which generator pages
- * should not download (#1041).
+/**
+ * CRC-32 (ZIP, PNG, bc-ur) and CRC-32C checksums shared by the ZIP writer and the optical
+ * transfer codecs (ADR 0052, #1599).
  */
-export { crc32 } from './lib/fountain/crc32';
+export { crc32, crc32c, crc32Hex } from './lib/crc32';

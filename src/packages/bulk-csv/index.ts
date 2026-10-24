@@ -17,13 +17,12 @@
 */
 
 /**
- * Bulk CSV batch engine: dependency-free building blocks for the Bulk CSV Batch
- * generator. Everything runs in memory in the browser and makes no network requests.
+ * Bulk CSV batch engine: the building blocks of the Bulk CSV Batch generator. Everything
+ * runs in memory in the browser and makes no network requests. It builds on core (the ZIP
+ * writer), qr-payload (the CSV parser, cell encoding and preview row, re-exported here),
+ * link-safety and wasm-runtime (the Excel reader).
  *
- * - RFC 4180 CSV parser with a header row and a bounded row count.
- * - Minimal ZIP writer (stored entries, CRC-32, UTF-8 names).
- * - Cross-platform file name helpers for the archive entries.
- * - Column detection and the row the live preview encodes.
+ * - Cross-platform file name helpers for the archive entries, and the error log.
  * - The batch loop that draws each checked row into a ZIP entry, with the drawing supplied by the caller.
  */
 
@@ -31,26 +30,24 @@ export {
   parseCsv,
   detectDelimiter,
   decodeCsvBytes,
-  formatErrorLogCsv,
   CsvParseError,
   MAX_BULK_CSV_ROWS,
   MAX_BULK_CSV_CHARS,
   type CsvRow,
   type CsvTable,
   type ParseCsvOptions,
-  type ErrorLogItem,
-} from './lib/csv';
-export { createZip, type ZipEntry, type CreateZipOptions } from './lib/zip';
-export { sanitizeFileStem, allocateFileName, errorLogFileName } from './lib/fileNames';
-export {
   previewRow,
   pickColumn,
   hasPayload,
   PAYLOAD_COLUMN_WORDS,
   FILENAME_COLUMN_WORDS,
   type BulkCsvPreview,
-} from './lib/preview';
-export { encodeBulkCell, type BulkContentType } from './lib/payload';
+  encodeBulkCell,
+  type BulkContentType,
+} from '@/packages/qr-payload';
+export { formatErrorLogCsv, type ErrorLogItem } from './lib/errorLog';
+export { createZip, type ZipEntry, type CreateZipOptions } from '@/packages/core/zip';
+export { sanitizeFileStem, allocateFileName, errorLogFileName } from './lib/fileNames';
 export { parseExcelToCsv } from './lib/excel';
 export { SAMPLE_CSV_TEMPLATE } from './lib/template';
 export { escapeCsvCell } from './lib/csvEscape';

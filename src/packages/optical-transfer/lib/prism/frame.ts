@@ -17,7 +17,7 @@
 */
 
 import { bytesToHex } from '@/packages/core/encoding';
-import { crc32c } from '../fountain/crc32';
+import { crc32c } from '@/packages/core/checksum';
 import { decodeBase45, encodeBase45, isBase45 } from './base45';
 
 /**
