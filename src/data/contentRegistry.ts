@@ -493,6 +493,16 @@ export const contentRegistry: Record<string, ToolContent> = {
 };
 
 export const auxiliaryRegistry: Record<string, AuxiliaryContent> = {
+  "videos": {
+    "id": "videos",
+    "name": "QRCraftly videos",
+    "seoTitle": "QR Code Videos: See the Tools at Work | QRCraftly",
+    "description": "Short videos of QRCraftly at work: styling a code, blasting one in the QR Arcade, checking a scam sticker and making a Wi-Fi code offline.",
+    "image": "/og/videos.png",
+    "imageAlt": "QRCraftly videos",
+    "personas": [TargetPersona.SecurityConsciousEnterprise],
+    "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty
+  },
   "acknowledgements": {
     "id": "acknowledgements",
     "name": "Open-Source Acknowledgements",

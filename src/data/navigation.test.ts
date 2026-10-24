@@ -14,9 +14,10 @@ describe('primary navigation model', () => {
     expect(PRIMARY_NAV_ITEMS.find((item) => item.id === 'transfer')?.tag).toBe('Beta');
   });
 
-  it('lists the guides and the pledge as help links', () => {
+  it('lists the guides, videos and the pledge as help links', () => {
     expect(HELP_LINKS).toEqual([
       ['Guides', '/guides'],
+      ['Videos', '/videos'],
       ['No-Ads Pledge', '/free-forever'],
     ]);
   });
