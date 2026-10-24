@@ -69,6 +69,33 @@ export interface Guide {
 /** The byline every guide shows: the guides are written by the project, not a named person. */
 export const GUIDE_AUTHOR = 'QRCraftly';
 
+/** A link to another guide. */
+export interface GuideLink {
+  slug: string;
+  title: string;
+}
+
+/**
+ * What a guide page renders, built at prerender time so the page ships only its own article
+ * (#1597). Browser code imports only this type.
+ */
+export interface GuideArticleContent {
+  guide: Guide;
+  /** The byline. */
+  author: string;
+  /** Reading time in whole minutes. */
+  minutes: number;
+  /** The guides to link at the end, in the order the guide lists them. */
+  related: GuideLink[];
+}
+
+/** One entry of the `/guides` hub. */
+export interface GuideSummary extends GuideLink {
+  description: string;
+  dateModified: string;
+  minutes: number;
+}
+
 export const guides: Guide[] = [
   {
     slug: 'why-qr-codes-stop-working',
@@ -997,4 +1024,33 @@ function blockText(block: GuideBlock): string {
     default:
       return block.items.join(' ');
   }
+}
+
+/**
+ * Builds what a guide page renders.
+ * @param slug - The guide's slug.
+ * @returns The article, or undefined for an unknown slug.
+ */
+export function getGuideArticle(slug: string): GuideArticleContent | undefined {
+  const guide = getGuide(slug);
+  if (!guide) return undefined;
+  const related = guide.related.flatMap((other) => {
+    const found = getGuide(other);
+    return found ? [{ slug: found.slug, title: found.title }] : [];
+  });
+  return { guide, author: GUIDE_AUTHOR, minutes: readingMinutes(guide), related };
+}
+
+/**
+ * Lists the guides for the `/guides` hub without their bodies.
+ * @returns One summary per guide, in hub order.
+ */
+export function getGuideSummaries(): GuideSummary[] {
+  return guides.map((guide) => ({
+    slug: guide.slug,
+    title: guide.title,
+    description: guide.description,
+    dateModified: guide.dateModified,
+    minutes: readingMinutes(guide),
+  }));
 }

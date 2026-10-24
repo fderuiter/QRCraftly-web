@@ -16,15 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { GuideArticle } from '@/components/GuideArticle';
-import { getGuide } from '@/data/guides';
-
-const guide = getGuide('qr-code-scams-quishing');
+import { CurrentGuideArticle } from '@/components/GuideArticle';
 
 /**
  * The guide at /guides/qr-code-scams-quishing.
  * @returns The page.
  */
 export default function Page() {
-  return guide ? <GuideArticle guide={guide} /> : null;
+  return <CurrentGuideArticle />;
 }

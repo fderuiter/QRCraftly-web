@@ -2,9 +2,10 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { axe } from '../../tests/utils/axe';
 import { auxiliaryRegistry } from '@/data/contentRegistry';
-import { guides, readingMinutes } from '@/data/guides';
+import { getGuideArticle, guides, readingMinutes } from '@/data/guides';
+import { PageContentContext } from '@/data/PageContentContext';
 import { generateGuideIndexSchema, generateGuideSchema } from '@/utils/schemaGenerator';
-import { GuideArticle, formatGuideDate, renderInline } from './GuideArticle';
+import { CurrentGuideArticle, GuideArticle, formatGuideDate, renderInline } from './GuideArticle';
 
 describe('guides data', () => {
   it('has unique slugs, registry entries and resolvable related links', () => {
@@ -34,11 +35,35 @@ describe('guides data', () => {
 describe('GuideArticle', () => {
   it('renders the title, byline, sections and sources without axe violations', async () => {
     const guide = guides[0];
-    const { container } = render(<GuideArticle guide={guide} />);
+    const { container } = render(<GuideArticle article={getGuideArticle(guide.slug)!} />);
     expect(screen.getByRole('heading', { level: 1, name: guide.title })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Sources' })).toBeInTheDocument();
-    expect(screen.getByText(/min read/)).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`${readingMinutes(guide)} min read`))).toBeInTheDocument();
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('links the related guides it is given (#1597)', () => {
+    const article = getGuideArticle(guides[0].slug)!;
+    render(<GuideArticle article={article} />);
+    expect(article.related.length).toBeGreaterThan(0);
+    for (const other of article.related) {
+      expect(screen.getByRole('link', { name: other.title })).toHaveAttribute('href', `/guides/${other.slug}`);
+    }
+  });
+
+  it('renders the page\'s own article from its prerendered content (#1597)', () => {
+    const article = getGuideArticle(guides[1].slug)!;
+    render(
+      <PageContentContext.Provider value={{ id: `guides/${article.guide.slug}`, title: article.guide.seoTitle, related: [], article }}>
+        <CurrentGuideArticle />
+      </PageContentContext.Provider>
+    );
+    expect(screen.getByRole('heading', { level: 1, name: article.guide.title })).toBeInTheDocument();
+  });
+
+  it('renders nothing outside a guide page', () => {
+    const { container } = render(<CurrentGuideArticle />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('formats dates in UTC', () => {

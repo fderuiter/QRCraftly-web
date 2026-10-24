@@ -35,7 +35,7 @@ import {
   type ToolContent,
 } from './contentRegistry';
 import type { ToolCopy } from './copy/types';
-import { getGuide } from './guides';
+import { getGuide, getGuideArticle, getGuideSummaries, type GuideArticleContent, type GuideSummary } from './guides';
 import { LANDING_GALLERIES, LANDING_PAGE_IDS, type LandingGalleryImage } from './landingPages';
 import { landingPageContent, type LandingCopy } from './landingPageContent';
 import { getExampleImage, getRelatedTypePages, TYPE_PAGE_TYPES, type RelatedPage } from './relatedPages';
@@ -66,6 +66,10 @@ export interface PageContent {
   related: RelatedPage[];
   /** Guides to link to from the page body (#1309). */
   guides?: RelatedPage[];
+  /** The article of a guide page (#1597). */
+  article?: GuideArticleContent;
+  /** The guide list of the `/guides` hub (#1597). */
+  guideIndex?: GuideSummary[];
 }
 
 /** The how-to steps and FAQs of each page that has its own copy module, by registry key. */
@@ -110,6 +114,9 @@ export function buildPageContent(pageContext: MetadataPageContext): PageContent 
   if (example) content.example = example;
   if (gallery) content.gallery = gallery;
   if (pageGuides.length > 0) content.guides = pageGuides;
+  if (id === 'guides') content.guideIndex = getGuideSummaries();
+  const article = id.startsWith('guides/') ? getGuideArticle(id.slice('guides/'.length)) : undefined;
+  if (article) content.article = article;
   return content;
 }
 

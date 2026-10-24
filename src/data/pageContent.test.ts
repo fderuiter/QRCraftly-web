@@ -87,6 +87,25 @@ describe('buildPageContent (#1058)', () => {
     expect(content.gallery?.length).toBeGreaterThan(0);
   });
 
+  it.each(guides.map((guide) => guide.slug))('gives the %s guide page only its own article (#1597)', (slug) => {
+    const content = buildPageContent({ urlPathname: `/guides/${slug}/` });
+    const guide = guides.find((entry) => entry.slug === slug)!;
+    expect(content.article?.guide).toBe(guide);
+    expect(content.article?.related.map((other) => other.slug)).toEqual(guide.related);
+    expect(content.guideIndex).toBeUndefined();
+    // Other guides contribute their titles to the related links, never their bodies.
+    const text = JSON.stringify(content);
+    for (const other of guides) if (other.slug !== slug) expect(text).not.toContain(other.lead);
+  });
+
+  it('gives the guide hub summaries without the article bodies (#1597)', () => {
+    const content = buildPageContent({ urlPathname: '/guides' });
+    expect(content.guideIndex?.map((entry) => entry.slug)).toEqual(guides.map((guide) => guide.slug));
+    expect(content.article).toBeUndefined();
+    const text = JSON.stringify(content);
+    for (const guide of guides) expect(text).not.toContain(guide.lead);
+  });
+
   it('titles the 404 page from the error entry', () => {
     expect(buildPageContent({ urlPathname: '/missing', is404: true }).title).toBe(getMetadataForPath('/_error').title);
   });

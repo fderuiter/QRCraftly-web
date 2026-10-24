@@ -18,7 +18,7 @@
 
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { formatGuideDate } from '@/components/GuideArticle';
-import { guides, readingMinutes } from '@/data/guides';
+import { usePageContent } from '@/data/PageContentContext';
 import { isDangerousUrl } from '@/packages/core/security';
 
 /**
@@ -26,6 +26,7 @@ import { isDangerousUrl } from '@/packages/core/security';
  * @returns The page.
  */
 export default function Page() {
+  const guides = usePageContent()?.guideIndex ?? [];
   return (
     <>
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -47,7 +48,7 @@ export default function Page() {
                   </h2>
                   <p className="mt-2 text-sm text-fg-soft">{guide.description}</p>
                   <p className="mt-2 text-xs text-fg-muted">
-                    <time dateTime={guide.dateModified}>{formatGuideDate(guide.dateModified)}</time> · {readingMinutes(guide)} min read
+                    <time dateTime={guide.dateModified}>{formatGuideDate(guide.dateModified)}</time> · {guide.minutes} min read
                   </p>
                 </li>
               );

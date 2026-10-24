@@ -19,7 +19,8 @@
 import type { ReactNode } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { ArticleHeading, ArticleLayout } from '@/components/ArticleLayout';
-import { GUIDE_AUTHOR, getGuide, readingMinutes, type Guide, type GuideBlock } from '@/data/guides';
+import type { GuideArticleContent, GuideBlock } from '@/data/guides';
+import { usePageContent } from '@/data/PageContentContext';
 import { isDangerousUrl } from '@/packages/core/security';
 
 const LINK_PATTERN = /\[([^\]]+)\]\(([^)\s]+)\)/g;
@@ -129,15 +130,12 @@ export function formatGuideDate(date: string): string {
  * contents, the body, the sources it rests on and links to related guides. Head renders its
  * `Article` data.
  * @param props - Component properties.
- * @param props.guide - The guide to show.
+ * @param props.article - The guide to show, with its byline, reading time and related guides.
  * @returns The article.
  */
-export function GuideArticle({ guide }: { guide: Guide }) {
+export function GuideArticle({ article }: { article: GuideArticleContent }) {
+  const { guide, author, minutes, related } = article;
   const sections = [...guide.sections.map(({ id, heading }) => ({ id, label: heading })), { id: 'sources', label: 'Sources' }];
-  const related = guide.related.flatMap((slug) => {
-    const other = getGuide(slug);
-    return other ? [other] : [];
-  });
   const updated = guide.dateModified !== guide.datePublished;
 
   return (
@@ -148,14 +146,14 @@ export function GuideArticle({ guide }: { guide: Guide }) {
           <>
             {guide.lead}
             <span className="mt-4 block text-sm text-fg-muted">
-              By {GUIDE_AUTHOR} · Published <time dateTime={guide.datePublished}>{formatGuideDate(guide.datePublished)}</time>
+              By {author} · Published <time dateTime={guide.datePublished}>{formatGuideDate(guide.datePublished)}</time>
               {updated && (
                 <>
                   {' '}
                   · Updated <time dateTime={guide.dateModified}>{formatGuideDate(guide.dateModified)}</time>
                 </>
               )}{' '}
-              · {readingMinutes(guide)} min read
+              · {minutes} min read
             </span>
           </>
         }
@@ -226,4 +224,14 @@ export function GuideArticle({ guide }: { guide: Guide }) {
       </ArticleLayout>
     </>
   );
+}
+
+/**
+ * The guide of the page being rendered, from its prerendered content (#1597), so a guide page
+ * ships only its own article.
+ * @returns The article, or nothing outside a guide page.
+ */
+export function CurrentGuideArticle() {
+  const article = usePageContent()?.article;
+  return article ? <GuideArticle article={article} /> : null;
 }
