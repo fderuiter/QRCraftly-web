@@ -21,7 +21,7 @@ import {
   REGEX_STRICT_CONTROL_CHARS,
   REGEX_PRESERVE_FORMAT_CONTROL_CHARS,
   REGEX_BIDI_CONTROL_CHARS,
-} from '@/utils/security';
+} from '@/packages/core/security';
 import { CONTAINMENT_PROFILES, identifyProtocol } from './protocol';
 import { validatePayload } from './registry';
 

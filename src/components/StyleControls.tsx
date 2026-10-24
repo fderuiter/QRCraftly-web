@@ -25,8 +25,7 @@ import {
   ColorControls,
   LogoControls,
   MosaicControls,
-  AdvancedControls,
-  BrandTemplateGallery
+  AdvancedControls
 } from './style-controls';
 import { Accordion, AccordionItem } from './ui/Accordion';
 import { Button } from './ui/Button';
@@ -42,6 +41,9 @@ const StyleGallery = lazy(() => import('./style-controls/StyleGallery'));
 const LayoutControls = lazy(() => import('./style-controls/LayoutControls').then((module) => ({ default: module.LayoutControls })));
 const BorderControls = lazy(() => import('./style-controls/BorderControls').then((module) => ({ default: module.BorderControls })));
 const FrameControls = lazy(() => import('./style-controls/FrameControls').then((module) => ({ default: module.FrameControls })));
+
+// Templates starts closed on every page, so its gallery loads when the section is first opened.
+const BrandTemplateGallery = lazy(() => import('./style-controls/BrandTemplateGallery').then((module) => ({ default: module.BrandTemplateGallery })));
 
 /**
  * Appearance sections the person has expanded or collapsed during this visit. Held in memory
@@ -97,6 +99,7 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
   const primaryAction = useContext(PresetPrimaryAction);
   const reduceMotion = usePrefersReducedMotion();
   const [galleryOpened, setGalleryOpened] = useState(false);
+  const [templatesOpened, setTemplatesOpened] = useState(sectionOpenState.get('Templates') ?? false);
   const layoutOpenAtStart = sectionOpenState.get('Layout & Border') ?? presetOpen.includes('Layout & Border');
   const [layoutOpened, setLayoutOpened] = useState(layoutOpenAtStart);
   // Each press of the call to action counts up, so the section reopens even after the person closed it.
@@ -130,9 +133,22 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
       )}
 
       {/* Brand Template Gallery */}
-      <AccordionItem title="Templates" headingLevel={3} defaultOpen={sectionOpenState.get('Templates') ?? false} onOpenChange={rememberSection('Templates')} openRequest={requestFor('Templates')}>
+      <AccordionItem
+        title="Templates"
+        headingLevel={3}
+        defaultOpen={sectionOpenState.get('Templates') ?? false}
+        onOpenChange={(open) => {
+          rememberSection('Templates')(open);
+          if (open) setTemplatesOpened(true);
+        }}
+        openRequest={requestFor('Templates')}
+      >
         <div className="pt-1">
-          <BrandTemplateGallery config={config} onChange={onChange} />
+          {templatesOpened && (
+            <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+              <BrandTemplateGallery config={config} onChange={onChange} />
+            </Suspense>
+          )}
         </div>
       </AccordionItem>
 

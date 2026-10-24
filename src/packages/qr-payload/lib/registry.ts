@@ -17,7 +17,7 @@
 */
 
 import { QRType, type QRGeneratorContract } from '@/types';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 import { identifyProtocol, CONTAINMENT_PROFILES } from './protocol';
 import { WifiContract } from './generators/wifi';
 import { EmailContract } from './generators/email';

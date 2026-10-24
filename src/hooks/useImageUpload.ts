@@ -17,7 +17,7 @@
 */
 
 import { useState, useCallback } from 'react';
-import { validateImageUpload, sanitizeSvg } from '../utils/security';
+import { validateImageUpload, sanitizeSvg } from '@/packages/core/security';
 import {
   isLowTierDevice,
   isOffThreadSupported,

@@ -19,7 +19,7 @@
 import { Badge } from './ui/Badge';
 import React, { useEffect, useRef } from 'react';
 import { Eye } from 'lucide-react';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 import { PanelErrorBoundary } from './ErrorBoundary';
 
 /** Media query matching the desktop workspace breakpoint (Tailwind `md`). */

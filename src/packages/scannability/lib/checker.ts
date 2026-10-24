@@ -17,7 +17,7 @@
 */
 
 import type { QrRead, QrReadOptions, QrReader } from '@/packages/qr-decode';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 import { simulatePrint, type OpticalScratchBuffers, type PixelFrame } from './opticalSimulation';
 import { auditModuleContrast } from './contrastAudit';
 

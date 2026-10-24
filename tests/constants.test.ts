@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { SYSTEM_LIMITS } from '../src/constants';
+import { IMAGE_UPLOAD_LIMITS } from '../src/packages/core/security';
 import { MAX_GZIPPED_SIZE_KB, MAX_PAGE_FIRST_LOAD_KB } from '../scripts/check-bundle-size.js';
 
 describe('Automated Unit Test Verification for Centralized Constants', () => {
@@ -13,11 +14,11 @@ describe('Automated Unit Test Verification for Centralized Constants', () => {
     expect(readmeContent).toContain(`Maximum logo size is ${expectedLogoSizeStr}`);
     
     // Check supported formats
-    const expectedFormatsStr = SYSTEM_LIMITS.SUPPORTED_IMAGE_FORMATS.join(', ');
+    const expectedFormatsStr = IMAGE_UPLOAD_LIMITS.SUPPORTED_IMAGE_FORMATS.join(', ');
     expect(readmeContent).toContain(`Supported custom logo formats are ${expectedFormatsStr}`);
     
     // Check max file size
-    expect(readmeContent).toContain(`Maximum file size is ${SYSTEM_LIMITS.MAX_FILE_UPLOAD_MB}MB`);
+    expect(readmeContent).toContain(`Maximum file size is ${IMAGE_UPLOAD_LIMITS.MAX_FILE_UPLOAD_MB}MB`);
   });
 
   it('should document the CI bundle size limit from scripts/check-bundle-size.js in SCALING.md', () => {

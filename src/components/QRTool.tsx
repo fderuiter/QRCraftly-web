@@ -33,7 +33,7 @@ import { useLeadingDebounce } from '@/hooks/useDebounce';
 import { useQRDownload, BLOCKED_EXPORT_MESSAGE, SCAN_VALIDATION_ERROR, type ExportStatus, type AssetOptions, type ExportFormat } from '@/hooks/useQRDownload';
 import { previewFailureMessage, type PreviewFailure } from '@/utils/previewFailure';
 import { getExportRiskPolicy } from '@/utils/exportRiskPolicy';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 import { useToast } from './ui/Toast';
 import { useScannability } from '@/hooks/useScannability';
 import { FIX_LABELS, ScannabilityIndicator } from '@/components/ScannabilityIndicator';

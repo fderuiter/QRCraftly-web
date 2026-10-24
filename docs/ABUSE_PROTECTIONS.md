@@ -22,7 +22,7 @@ Everything below runs in the browser. QRCraftly has no server, sends nothing ove
 
 ### Dangerous link schemes are refused
 
-`isDangerousUrl` (`src/utils/security.ts`, which delegates to `SafeUrlPipeline.isDangerous` in `src/utils/url.ts`) blocks `javascript:`, `vbscript:`, `jscript:`, `wscript:`, `mocha:`, `file:`, `data:`, `blob:`, `filesystem:`, `mk:`, `about:`, `intent:`, `itms-services:`, `ms-msdt:`, `search-ms:`, `ms-officecmd:`, `jar:` and `view-source:`. Before checking, it:
+`isDangerousUrl` (`src/packages/core/security.ts`, which delegates to `SafeUrlPipeline.isDangerous` in `src/packages/core/url.ts`) blocks `javascript:`, `vbscript:`, `jscript:`, `wscript:`, `mocha:`, `file:`, `data:`, `blob:`, `filesystem:`, `mk:`, `about:`, `intent:`, `itms-services:`, `ms-msdt:`, `search-ms:`, `ms-officecmd:`, `jar:` and `view-source:`. Before checking, it:
 
 - decodes up to ten layers of percent-encoding and HTML entities (`&#x6A;`, `&colon;`, `&tab;` and so on, with or without `;`),
 - removes control and zero-width characters, and leading whitespace,
@@ -48,7 +48,7 @@ A blocked payload never renders: the matrix worker and the main-thread fallback 
 
 ### Uploaded images and SVG are sanitised
 
-`sanitizeSvg` (`src/utils/security.ts`) keeps a fixed allowlist of 26 SVG elements (no `script`, `foreignObject`, `a`, `animate` or `set`), removes every `on*` attribute, drops styles that use `@import`, and only allows local references or safe `data:image/*` URIs. It runs on uploaded logos and on every exported SVG. The build's static path tracker (`scripts/static-path-tracker.js`) fails if an SVG reaches the page without passing through it.
+`sanitizeSvg` (`src/packages/core/security.ts`) keeps a fixed allowlist of 26 SVG elements (no `script`, `foreignObject`, `a`, `animate` or `set`), removes every `on*` attribute, drops styles that use `@import`, and only allows local references or safe `data:image/*` URIs. It runs on uploaded logos and on every exported SVG. The build's static path tracker (`scripts/static-path-tracker.js`) fails if an SVG reaches the page without passing through it.
 
 ### Export safety gate
 

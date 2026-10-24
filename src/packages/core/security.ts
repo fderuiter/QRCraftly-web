@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { SYSTEM_LIMITS } from '../constants';
 import { SafeUrlPipeline } from './url';
 
 const jsonLdCache = new Map<string, string>();
@@ -120,6 +119,12 @@ export const sanitizeSocialHandle = (handle: string): string => {
   return withoutAt.replace(REGEX_SOCIAL_HANDLE_STRIP, '');
 };
 
+/** Size and type limits for an uploaded image (logos and mosaic sources). */
+export const IMAGE_UPLOAD_LIMITS = {
+  MAX_FILE_UPLOAD_MB: 2,
+  SUPPORTED_IMAGE_FORMATS: ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'],
+};
+
 /**
  * Validates an uploaded image file for size and type.
  * Enforces a size limit and allows specific formats based on system limits.
@@ -127,12 +132,12 @@ export const sanitizeSocialHandle = (handle: string): string => {
  * @returns A string with an error message if invalid, or null if valid.
  */
 export const validateImageUpload = (file: File): string | null => {
-  const MAX_SIZE = SYSTEM_LIMITS.MAX_FILE_UPLOAD_MB * 1024 * 1024;
+  const MAX_SIZE = IMAGE_UPLOAD_LIMITS.MAX_FILE_UPLOAD_MB * 1024 * 1024;
   if (file.size > MAX_SIZE) {
-    return `File size exceeds the ${SYSTEM_LIMITS.MAX_FILE_UPLOAD_MB}MB limit.`;
+    return `File size exceeds the ${IMAGE_UPLOAD_LIMITS.MAX_FILE_UPLOAD_MB}MB limit.`;
   }
 
-  const allowedTypes = SYSTEM_LIMITS.SUPPORTED_IMAGE_FORMATS;
+  const allowedTypes = IMAGE_UPLOAD_LIMITS.SUPPORTED_IMAGE_FORMATS;
   if (!allowedTypes.includes(file.type)) {
     return 'Invalid file type. Only JPEG, PNG, WebP, and SVG are allowed.';
   }

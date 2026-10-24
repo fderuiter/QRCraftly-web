@@ -19,7 +19,7 @@
 import { QRType } from '@/types';
 import { identifyProtocol } from '@/packages/qr-payload';
 import { getQRTypeLabel } from '@/data/qrTypeLabels';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 import { analyseLink, type LinkFinding } from '@/packages/link-safety';
 import { hasMixedScripts, toUnicodeHostname } from '@/utils/hostname';
 import { revealInvisibleCharacters } from '@/utils/fileNames';

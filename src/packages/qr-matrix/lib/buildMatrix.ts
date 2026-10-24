@@ -17,7 +17,7 @@
 */
 
 import { QRType, type QRConfig, type QRErrorCorrectionLevel, type QRModules } from '@/types';
-import { normalizeUrl, shouldNormalizeUrl } from '@/utils/url';
+import { normalizeUrl, shouldNormalizeUrl } from '@/packages/core/url';
 
 /**
  * The part of a QR encoder that matrix building needs: Reed-Solomon encoding plus module layout.

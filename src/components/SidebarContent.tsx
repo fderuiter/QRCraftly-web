@@ -3,7 +3,7 @@ import { copy as indexCopy } from '@/data/copy/index';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { usePageContent } from '@/data/PageContentContext';
 import { getGuideFaqs } from '@/data/guideFaqs';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 import { Breadcrumbs } from './Breadcrumbs';
 import { GuideLinks } from './GuideLinks';
 import { SectionHeading } from './ui/SectionHeading';

@@ -39,6 +39,7 @@ export const LEGACY_TYPE_ASSERTION_FILES = Object.freeze([
   "src/layouts/Head.tsx",
   "src/layouts/LayoutDefault.tsx",
   "src/packages/arcade/client.ts",
+  "src/packages/core/security.ts",
   "src/packages/optical-modem/lib/ladder.ts",
   "src/packages/optical-modem/lib/render.ts",
   "src/packages/optical-scanner/lib/contracts.ts",
@@ -69,7 +70,6 @@ export const LEGACY_TYPE_ASSERTION_FILES = Object.freeze([
   "src/utils/feedback.ts",
   "src/utils/imageResizeHelper.ts",
   "src/utils/schemaGenerator.ts",
-  "src/utils/security.ts",
   "src/utils/styleFields.ts",
   "src/utils/styleFile.ts",
 ]);

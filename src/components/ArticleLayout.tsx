@@ -18,7 +18,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link2 } from 'lucide-react';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 import { AccordionItem } from './ui/Accordion';
 import { ButtonLink } from './ui/Button';
 import { Tooltip } from './ui/Tooltip';

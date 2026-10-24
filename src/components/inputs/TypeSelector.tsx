@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { finishTypeViewTransition, startTypeViewTransition } from "../../utils/typeViewTransition";
 import { QR_TYPE_ROUTES } from "../../data/navigation";
 import { QRType } from "../../types";
-import { isDangerousUrl } from "../../utils/security";
+import { isDangerousUrl } from "@/packages/core/security";
 import {
   Wifi,
   Link,

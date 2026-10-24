@@ -19,7 +19,7 @@
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { formatGuideDate } from '@/components/GuideArticle';
 import { guides, readingMinutes } from '@/data/guides';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 
 /**
  * The `/guides` index (#1038): every guide with its summary, date and reading time.

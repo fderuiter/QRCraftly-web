@@ -18,7 +18,7 @@
 
 import { type PhoneData, QRType, type QRGeneratorContract } from '@/types';
 import { parseProtocol, identifyProtocol, encodeDialString, safeDecodeURIComponent } from '../protocol';
-import { cleanPhoneNumber } from '@/utils/security';
+import { cleanPhoneNumber } from '@/packages/core/security';
 
 // An extension at the end of the number: `x89`, `ext 89`, `ext. 89`, `extension 89` or `;ext=89`.
 const EXTENSION_PATTERN = /(?:;ext=|\s*(?:ext(?:ension)?\.?|x)\s?:?)\s?(\d{1,10})\s*$/i;

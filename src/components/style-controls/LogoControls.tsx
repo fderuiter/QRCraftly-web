@@ -6,6 +6,7 @@ import { Upload, X, Square, Circle, Minus } from 'lucide-react';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
 import { useImageUpload } from '../../hooks/useImageUpload';
+import { IMAGE_UPLOAD_LIMITS } from '@/packages/core/security';
 import { SYSTEM_LIMITS } from '../../constants';
 import { MIN_LOGO_BACKING_PADDING } from '@/packages/qr-matrix';
 import { PRESET_LOGOS, PRESET_LOGO_CATEGORIES, type PresetCategory } from '../../constants/presetLogos';
@@ -140,7 +141,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
               <Upload className="size-5" aria-hidden="true" />
             </span>
             <span className="text-sm font-medium">Upload logo</span>
-            <span id="logo-upload-help" className="mt-1 text-xs text-fg-muted">{SYSTEM_LIMITS.SUPPORTED_IMAGE_FORMATS.map(t => t.replace('image/', '').replace('+xml', '').toUpperCase()).join(', ')} (Square recommended)</span>
+            <span id="logo-upload-help" className="mt-1 text-xs text-fg-muted">{IMAGE_UPLOAD_LIMITS.SUPPORTED_IMAGE_FORMATS.map(t => t.replace('image/', '').replace('+xml', '').toUpperCase()).join(', ')} (Square recommended)</span>
             {error && <span id="logo-upload-error" role="alert" className="mt-2 text-xs text-danger">{error}</span>}
           </Button>
         </>
@@ -221,7 +222,7 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
         ref={fileInputRef}
         type="file"
         aria-label="Upload logo image"
-        accept={SYSTEM_LIMITS.SUPPORTED_IMAGE_FORMATS.join(',')}
+        accept={IMAGE_UPLOAD_LIMITS.SUPPORTED_IMAGE_FORMATS.join(',')}
         className="hidden"
         onChange={handleLogoUpload}
       />

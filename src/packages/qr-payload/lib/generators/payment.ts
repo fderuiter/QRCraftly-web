@@ -17,7 +17,7 @@
 */
 
 import { type PaymentData, CryptoNetwork, QRType, type QRGeneratorContract } from '@/types';
-import { isDangerousUrl, sanitizeInput, REGEX_STRICT_CONTROL_CHARS } from '@/utils/security';
+import { isDangerousUrl, sanitizeInput, REGEX_STRICT_CONTROL_CHARS } from '@/packages/core/security';
 import { identifyProtocol, safeDecodeURIComponent } from '../protocol';
 import { paymentAmountError, WEI_DECIMALS } from '../paymentAmount';
 import { buildUpiPayload, parseUpiPayload, upiRefusal } from '../upi';

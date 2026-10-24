@@ -44,7 +44,7 @@ import {
 import { QRType } from '@/types';
 import { Button, ButtonLink } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 import type { ScanDescription } from './describeScan';
 
 const TYPE_ICONS: Record<QRType, React.ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' }>> = {

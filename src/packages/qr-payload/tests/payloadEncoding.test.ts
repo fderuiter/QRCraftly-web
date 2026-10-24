@@ -55,7 +55,7 @@ import {
   WifiEapPhase2,
   WifiEncryption,
 } from '@/types';
-import { normalizeUrl, shouldNormalizeUrl } from '@/utils/url';
+import { normalizeUrl, shouldNormalizeUrl } from '@/packages/core/url';
 
 describe('#974 case 1: tel/sms percent-encode # as %23 (RFC 3966)', () => {
   const cases: Array<{ input: string; tel: string }> = [

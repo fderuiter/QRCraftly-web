@@ -23,7 +23,7 @@ import { RangeInput } from '../ui/RangeInput';
 import { type QRConfig, QRErrorCorrectionLevel, type MosaicMode } from '../../types';
 import { Grid3x3, LayoutGrid, Upload, X } from 'lucide-react';
 import { useImageUpload } from '../../hooks/useImageUpload';
-import { SYSTEM_LIMITS } from '../../constants';
+import { IMAGE_UPLOAD_LIMITS } from '@/packages/core/security';
 import { combineIds } from '../../utils/a11y';
 import { DEFAULT_MOSAIC_OPTIONS } from '@/packages/qr-matrix/mosaic';
 
@@ -143,7 +143,7 @@ export const MosaicControls: React.FC<MosaicControlsProps> = ({ config, onChange
       <input
         ref={fileInputRef}
         type="file"
-        accept={SYSTEM_LIMITS.SUPPORTED_IMAGE_FORMATS.join(',')}
+        accept={IMAGE_UPLOAD_LIMITS.SUPPORTED_IMAGE_FORMATS.join(',')}
         className="hidden"
         aria-label="Upload mosaic design"
         onChange={handleMosaicUpload}

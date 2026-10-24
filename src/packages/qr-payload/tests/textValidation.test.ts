@@ -26,7 +26,7 @@ import {
   constructEventString,
   constructMeetingString,
 } from '../index';
-import { UNSUPPORTED_SCHEME_PREFIX } from '@/utils/security';
+import { UNSUPPORTED_SCHEME_PREFIX } from '@/packages/core/security';
 import { parseMeetingUrl } from '@/utils/meetingParsers';
 
 const textViolations = (value: string) => validateConfig({ ...DEFAULT_CONFIG, type: QRType.TEXT, value });

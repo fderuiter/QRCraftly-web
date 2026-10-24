@@ -28,7 +28,7 @@ import {
   isDangerousUrl,
   REGEX_STRICT_CONTROL_CHARS,
   REGEX_BIDI_CONTROL_CHARS,
-} from '@/utils/security';
+} from '@/packages/core/security';
 
 export type PreflightRowStatus = 'valid' | 'empty' | 'unsafe' | 'caution';
 

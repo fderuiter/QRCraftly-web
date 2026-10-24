@@ -1,7 +1,7 @@
 import React from "react";
 import type { UrlData } from "../../types";
 import { TextField } from "../ui/FormFields";
-import { looksLikeWebAddress, normalizeUrl } from "../../utils/url";
+import { looksLikeWebAddress, normalizeUrl } from "@/packages/core/url";
 import { describeViolation, SAMPLE_PAYLOADS } from "@/packages/qr-payload";
 import { QRType } from "../../types";
 import { FieldNotes, LinkHints, hintsId } from './FieldHints';

@@ -25,7 +25,7 @@ import { previewFailureMessage, tooLongMessage } from '../utils/previewFailure';
 import { handOffBlob } from '../utils/blobHandoff';
 import { useCapabilities } from './useCapabilities';
 import type { ExportOptions } from '../utils/exportRiskPolicy';
-import { isDangerousUrl } from '../utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 
 /**
  * Error-like check that also accepts `DOMException`s, which are not `Error` instances in

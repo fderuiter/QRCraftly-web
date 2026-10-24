@@ -18,7 +18,7 @@
 
 import { type SmsData, QRType, type QRGeneratorContract } from '@/types';
 import { parseProtocol, identifyProtocol, encodeDialString, safeDecodeURIComponent } from '../protocol';
-import { cleanPhoneNumber } from '@/utils/security';
+import { cleanPhoneNumber } from '@/packages/core/security';
 
 /**
  * Constructs the smsto string for SMS QR code. With no recipient it gives `''` (RFC 5724 §2.2),

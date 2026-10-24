@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { type PaymentData, CryptoNetwork } from "../../types";
 import { TextField, SelectField } from "../ui/FormFields";
-import { isDangerousUrl } from "../../utils/security";
+import { isDangerousUrl } from "@/packages/core/security";
 import { FormBlock } from "../ui/FormBlock";
 import { checkCryptoAddress, isValidIban, paymentAmountError, upiVpaError, UPI_NAME_MAX_LENGTH } from "@/packages/qr-payload";
 

@@ -76,7 +76,6 @@ const CORE = `${PACKAGES_ROOT}/core/`;
 export const LEGACY_APP_ROOT_IMPORTERS = new Set([
   'src/packages/arcade/handoff.ts',
   'src/packages/arcade/lib/matrix.ts',
-  'src/packages/arcade/lib/scanPipeline.ts',
   'src/packages/bulk-csv/lib/categorize.ts',
   'src/packages/bulk-csv/lib/fileNames.ts',
   'src/packages/bulk-csv/lib/payload.ts',
@@ -152,7 +151,6 @@ export const LEGACY_APP_ROOT_IMPORTERS = new Set([
   'src/packages/qr-payload/lib/upi.ts',
   'src/packages/qr-payload/lib/validators.ts',
   'src/packages/qr-payload/lib/vcardSocial.ts',
-  'src/packages/qr-payload/lib/violations.ts',
   'src/packages/qr-payload/tests/abuseProtections.test.ts',
   'src/packages/qr-payload/tests/bulkCsv.test.ts',
   'src/packages/qr-payload/tests/constructors.test.ts',
@@ -173,7 +171,6 @@ export const LEGACY_APP_ROOT_IMPORTERS = new Set([
   'src/packages/qr-payload/tests/wifi.test.ts',
   'src/packages/scannability/checker.ts',
   'src/packages/scannability/client.ts',
-  'src/packages/scannability/lib/checker.ts',
   'src/packages/scannability/lib/evaluator.ts',
   'src/packages/scannability/lib/scoring.ts',
   'src/packages/scannability/tests/scannability.test.ts',

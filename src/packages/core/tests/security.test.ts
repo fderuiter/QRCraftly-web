@@ -27,7 +27,7 @@ if (typeof globalThis.DOMParser === 'undefined') {
   globalThis.Node = dom.window.Node;
 }
 
-import { isDangerousUrl, safeJsonLdStringify, cleanPhoneNumber, sanitizeInput, validateImageUpload, sanitizeSvg, escapeHtml } from './security';
+import { isDangerousUrl, safeJsonLdStringify, cleanPhoneNumber, sanitizeInput, validateImageUpload, sanitizeSvg, escapeHtml } from '../security';
 
 describe('Security Utils', () => {
   describe('isDangerousUrl', () => {

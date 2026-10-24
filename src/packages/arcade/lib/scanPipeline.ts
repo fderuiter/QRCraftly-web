@@ -18,7 +18,7 @@
 
 import { assertWorkerRequest, isWorkerResponse } from '@/packages/scannability';
 import { DoubleBufferPool } from '@/packages/optical-scanner/scheduler';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 
 /** Side of the square frame handed to the scanners. */
 export const SCAN_FRAME_SIZE = 256;

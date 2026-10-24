@@ -124,8 +124,6 @@ export function buildPresetColorPatch(
  */
 export const SYSTEM_LIMITS = {
   MAX_LOGO_SIZE: 0.3,
-  MAX_FILE_UPLOAD_MB: 2,
-  SUPPORTED_IMAGE_FORMATS: ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
 };
 
 /**
