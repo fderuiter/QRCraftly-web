@@ -261,3 +261,6 @@ export function useExportFlow({ config, effectiveConfig, isEmpty, refused, previ
     },
   };
 }
+
+/** Everything `useExportFlow` returns. */
+export type ExportFlow = ReturnType<typeof useExportFlow>;
