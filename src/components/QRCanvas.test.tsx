@@ -25,7 +25,7 @@ import { EyeShape, QRStyle, type LogoPaddingStyle, QRErrorCorrectionLevel, Socia
 import { createFakeQrEncoder, useCanvasEncoder } from '../../tests/fixtures/fakeQrEncoder';
 import { qrEncoder } from '../../tests/fixtures/qrEncoder';
 import { setQrCanvasRuntime } from '../utils/qrCanvasRuntime';
-import { QrEncodeError } from '@/packages/qr-matrix';
+import { QrEncodeError, type QrEncoder } from '@/packages/qr-matrix';
 import * as qrExport from '@/packages/qr-export';
 import React from 'react';
 
@@ -1752,6 +1752,83 @@ describe('QRCanvas matrix worker failure', () => {
 
       expect(worker.terminate).toHaveBeenCalled();
       await waitFor(() => expect(encoder.create).toHaveBeenCalledWith('https://qrcraftly.com', expect.anything()));
+    } finally {
+      restoreRuntime();
+    }
+  });
+});
+
+describe('QRCanvas encoder load failure (#1586)', () => {
+  let mockContext: ReturnType<typeof createMockContext>;
+
+  beforeEach(() => {
+    mockContext = createMockContext();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(((id: string) => (id === '2d' ? mockContext : null)) as unknown as HTMLCanvasElement['getContext']);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('clears the preview and reports a failure when the encoder does not load', async () => {
+    const encoder = createFakeQrEncoder();
+    let load: () => QrEncoder | Promise<QrEncoder> = () => encoder as unknown as QrEncoder;
+    const restoreRuntime = setQrCanvasRuntime({ loadEncoder: () => load(), createMatrixWorker: () => null });
+    const onRenderFailed = vi.fn();
+    try {
+      const { rerender } = render(<QRCanvas config={{ ...DEFAULT_CONFIG, value: 'first' }} size={100} onRenderFailed={onRenderFailed} />);
+      await waitFor(() => expect(encoder.create).toHaveBeenCalledWith('first', expect.anything()));
+      expect(onRenderFailed).not.toHaveBeenCalled();
+      mockContext.clearRect.mockClear();
+
+      load = () => Promise.reject(new Error('wasm failed'));
+      rerender(<QRCanvas config={{ ...DEFAULT_CONFIG, value: 'second' }} size={100} onRenderFailed={onRenderFailed} />);
+
+      await waitFor(() => expect(onRenderFailed).toHaveBeenCalledWith('failed'));
+      // The older code is wiped rather than left on screen beside a newer config.
+      expect(mockContext.clearRect).toHaveBeenCalled();
+      expect(screen.queryByText(/Too much content/)).not.toBeInTheDocument();
+    } finally {
+      restoreRuntime();
+    }
+  });
+
+  it('plays no frames, and raises no unhandled rejection, when the animation encoder does not load', async () => {
+    const warn = vi.mocked(console.warn);
+    const restoreRuntime = setQrCanvasRuntime({ loadEncoder: () => Promise.reject(new Error('wasm failed')), createMatrixWorker: () => null });
+    try {
+      render(<QRCanvas config={{ ...DEFAULT_CONFIG, animationValues: ['frame_one', 'frame_two'], isAnimating: true, animationFps: 30 }} size={100} />);
+      await waitFor(() => expect(warn).toHaveBeenCalledWith('QR encoder failed to load for the animation:', 'Error'));
+    } finally {
+      restoreRuntime();
+    }
+  });
+
+  it('ignores a failed load for an older request once a newer one has drawn', async () => {
+    const encoder = createFakeQrEncoder();
+    let rejectOlder: ((error: Error) => void) | null = null;
+    let load: () => QrEncoder | Promise<QrEncoder> = () => new Promise<QrEncoder>((_resolve, reject) => {
+      rejectOlder = reject;
+    });
+    const restoreRuntime = setQrCanvasRuntime({ loadEncoder: () => load(), createMatrixWorker: () => null });
+    const onRenderFailed = vi.fn();
+    try {
+      const { rerender } = render(<QRCanvas config={{ ...DEFAULT_CONFIG, value: 'older' }} size={100} onRenderFailed={onRenderFailed} />);
+      await waitFor(() => expect(rejectOlder).not.toBeNull());
+
+      load = () => encoder as unknown as QrEncoder;
+      rerender(<QRCanvas config={{ ...DEFAULT_CONFIG, value: 'newer' }} size={100} onRenderFailed={onRenderFailed} />);
+      await waitFor(() => expect(encoder.create).toHaveBeenCalledWith('newer', expect.anything()));
+      mockContext.clearRect.mockClear();
+
+      await act(async () => {
+        rejectOlder?.(new Error('wasm failed'));
+        await Promise.resolve();
+      });
+
+      expect(onRenderFailed).not.toHaveBeenCalled();
+      expect(mockContext.clearRect).not.toHaveBeenCalled();
     } finally {
       restoreRuntime();
     }

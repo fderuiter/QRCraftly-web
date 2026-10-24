@@ -95,6 +95,11 @@ export function useQrAnimation({
       } catch (err) {
         console.error("Precomputing matrices failed:", err);
       }
+    }, (e: unknown) => {
+      // The encoder did not load: play no frames rather than an older sequence (#1586).
+      if (!isMounted) return;
+      cachedFramesRef.current = [];
+      console.warn("QR encoder failed to load for the animation:", e instanceof Error ? e.name : typeof e);
     });
 
     return () => {

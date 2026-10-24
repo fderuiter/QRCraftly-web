@@ -275,14 +275,19 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
       });
     } else {
       // Main-thread fallback when no matrix worker is available (blocked or unsupported)
+      /** Clears the preview and reports why, so it never shows an older code than the config (#1586). */
+      const fail = (reason: PreviewFailure) => {
+        lastModulesRef.current = null;
+        clearCanvasAndResize();
+        setIsTooLong(reason === 'too-long');
+        onRenderFailedRef.current?.(reason);
+      };
       const encodeOnMainThread = (QRCode: QrEncoder) => {
         if (currentSeqId !== sequenceIdRef.current) return;
         try {
           const violations = validateConfig(currentConfig);
           if (violations.length > 0) {
-            lastModulesRef.current = null;
-            clearCanvasAndResize();
-            onRenderFailedRef.current?.('blocked');
+            fail('blocked');
             return;
           }
 
@@ -292,17 +297,18 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
           paintMatrix(modules);
         } catch (e) {
           console.warn("QR generation failed:", e instanceof Error ? e.name : typeof e);
-          lastModulesRef.current = null;
-          clearCanvasAndResize();
-          const tooLong = e instanceof QrEncodeError && e.kind === 'too-long';
-          setIsTooLong(tooLong);
-          onRenderFailedRef.current?.(tooLong ? 'too-long' : 'failed');
+          fail(e instanceof QrEncodeError && e.kind === 'too-long' ? 'too-long' : 'failed');
         }
       };
 
       const encoder = getQrCanvasRuntime().loadEncoder();
       if (encoder instanceof Promise) {
-        encoder.then(encodeOnMainThread);
+        encoder.then(encodeOnMainThread, (e: unknown) => {
+          // A failure for an older request must not clear a newer request's result.
+          if (currentSeqId !== sequenceIdRef.current) return;
+          console.warn("QR encoder failed to load:", e instanceof Error ? e.name : typeof e);
+          fail('failed');
+        });
       } else {
         encodeOnMainThread(encoder);
       }
