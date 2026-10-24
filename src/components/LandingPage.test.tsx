@@ -57,14 +57,16 @@ describe('landing pages that preset the generator (#1035, #1037)', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Free QR Code Generator with Logo' })).toBeInTheDocument();
   });
 
-  it('starts the WhatsApp page on a wa.me link and the Instagram page on a handle field', () => {
+  it('starts the WhatsApp page on a wa.me link and the Instagram page on a handle field', async () => {
     clearRetainedAppearance();
     const whatsapp = renderLanding('whatsapp-qr-code');
     expect(screen.getByRole('textbox', { name: /url/i })).toHaveValue('https://wa.me/');
     whatsapp.unmount();
     clearRetainedAppearance();
     renderLanding('instagram-qr-code');
-    expect(screen.getByLabelText('Username / Handle')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText('Username / Handle')).toBeInTheDocument();
+    }, { timeout: 3000 });
   });
 
   it('shows the mosaic gallery with alt text, and the guide, how-to and FAQ on every page', () => {

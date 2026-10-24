@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense } from 'react';
 import type { SocialData } from '../../types';
 import { Skeleton } from '../ui/Skeleton';
 import { CONTAINER_SPACING_CLASSES } from '../ui/styles';
@@ -38,12 +38,6 @@ interface LazySocialInputProps {
 }
 
 export const LazySocialInput: React.FC<LazySocialInputProps> = (props) => {
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  if (!isMounted) return <Placeholder />;
   return (
     <Suspense fallback={<Placeholder />}>
       <SocialInput {...props} />
