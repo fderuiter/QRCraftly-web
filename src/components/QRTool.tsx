@@ -16,39 +16,29 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React, { Suspense, useState, useRef, useCallback, useEffect } from 'react';
-import { Button, ButtonLink } from "./ui/Button";
-import { Badge } from "./ui/Badge";
+import React, { Suspense, useRef, useCallback } from 'react';
+import { ButtonLink } from "./ui/Button";
 import { Tooltip } from "./ui/Tooltip";
-import { Card } from "./ui/Card";
-import { Alert } from "./ui/Alert";
-import { type QRConfig, SocialFormat } from '@/packages/core/types';
-import QRCanvas from '@/components/QRCanvas';
-import { Download, Share2, ChevronDown, CircleHelp, Copy, Check, AlertTriangle } from 'lucide-react';
-import { ExportOptions as DownloadOptions, FORMAT_LABELS, type DownloadFormat } from './ExportOptions';
-import { usePopoverDismiss } from '@/hooks/usePopoverDismiss';
-import { Modal } from './ui/Modal';
+import type { QRConfig } from '@/packages/core/types';
+import { CircleHelp } from 'lucide-react';
+import type { DownloadFormat } from './ExportOptions';
 import { useExportFlow } from '@/hooks/useExportFlow';
 import { useGeneratorPreview } from '@/hooks/useGeneratorPreview';
-import { getExportRiskPolicy } from '@/utils/exportRiskPolicy';
-import { FIX_LABELS, ScannabilityIndicator } from '@/components/ScannabilityIndicator';
 import { QRProvider, useQRStore, useQRStoreSelector } from '@/context/QRContext';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { sidebarControls } from '@/registry';
-import { StressTestButton } from './arcade/StressTestButton';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from './ToolWorkspaceLayout';
 import { usePageContent } from '@/data/PageContentContext';
 import { MiniPreview } from './MiniPreview';
-import { getScanVerdict, type ScanFix, type ScanVerdict } from '@/packages/scannability';
+import type { ScanFix } from '@/packages/scannability';
 import { fixPatch, resetPatch } from './generator/decisions';
+import { SafetyGateModal } from './generator/SafetyGateModal';
+import { PreviewCard } from './generator/PreviewCard';
+import { ExportBar } from './generator/ExportBar';
 import { GeneratorCommands } from './command/GeneratorCommands';
 import { useUndoToast } from '@/hooks/useUndoToast';
-import { SegmentedControl } from './ui/SegmentedControl';
-import { Skeleton } from './ui/Skeleton';
-import { PREVIEW_VIEWS, type PreviewView } from './mockups/previewViews';
+import { useTextEntryFocus } from '@/hooks/useTextEntryFocus';
 
-// The "In the wild" scenes, viewing test and PNG export load only when a view other than Flat is chosen.
-const MockupView = React.lazy(() => import('./mockups/MockupView'));
 // The phone wallet dialog (ADR 0048) loads only when it is opened.
 const WalletDialog = React.lazy(() => import('./wallet/WalletDialog'));
 
@@ -58,30 +48,6 @@ const GENERATOR_SUBTITLE = 'No sign-up, no ads, never expires.';
 /** Id of the generator preview region (target of the mobile jump link). */
 const PREVIEW_ID = 'qr-preview';
 
-/** Scan-safety dot shown in the mobile action bar, in the same tone as the verdict pill. */
-const STATUS_DOT_CLASSES: Record<ScanVerdict, string> = {
-  checking: 'bg-line-strong',
-  reliable: 'bg-success',
-  fragile: 'bg-warning',
-  unreliable: 'bg-danger',
-};
-
-const TEXT_ENTRY = 'input, textarea, select';
-
-/**
- * From md up the preview is a sticky, viewport-height column, so the QR is sized by the
- * screen height: 18rem is left for the site header, the heading and status row, the export row and padding, which
- * keeps the QR and the Download control on screen without scrolling (#1050).
- */
-const STAGE_SIZE_CLASSES: Record<SocialFormat, string> = {
-  [SocialFormat.SQUARE_1_1]: 'md:max-w-[calc(100dvh_-_18rem)]',
-  [SocialFormat.PORTRAIT_4_5]: 'md:max-w-[calc((100dvh_-_18rem)*0.8)]',
-  [SocialFormat.STORY_9_16]: 'md:max-w-[calc((100dvh_-_18rem)*0.5625)]',
-};
-/** Id of the empty-preview explanation referenced by disabled export buttons. */
-const EMPTY_STATE_ID = 'qr-empty-state';
-/** Id of the explanation shown while a content field holds a refused value (#1279). */
-const REFUSED_STATE_ID = 'qr-refused-state';
 /**
  * Renders the QR code generator interface with configuration controls, preview, and export actions.
  * @param title - Optional title used for the generator heading and branding.
@@ -99,43 +65,14 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   const config = useQRStoreSelector(s => s.config);
   const store = useQRStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [previewView, setPreviewView] = useState<PreviewView>('flat');
 
   const preview = useGeneratorPreview(canvasRef);
-  const { effectiveConfig, debouncedConfig, verdict: scannabilityStatus, health, noVerdict, moduleCount } = preview;
-  const flow = useExportFlow({
-    config,
-    effectiveConfig,
-    isEmpty: preview.isEmpty,
-    refused: preview.refused,
-    previewFailure: preview.previewFailure,
-    verdict: scannabilityStatus,
-    health,
-  });
-  const { downloadButtonRef, copyButtonRef, shareButtonRef, optionsButtonRef, gate, options, notifyExportsOff } = flow;
-  const { busy: busyExport, done } = flow.status;
-  const { format, setFormat, size, setSize, colorSpace, setColorSpace, filename, setFilename: setCustomFilename } = options;
-  const optionsOpen = options.open;
-  // Why every export is off, as the id of the note that says so; undefined while exports work.
-  const exportsOffReason = flow.exportsOff === 'refused' ? REFUSED_STATE_ID : flow.exportsOff === 'empty' ? EMPTY_STATE_ID : undefined;
+  const { debouncedConfig, verdict: scannabilityStatus, health, noVerdict } = preview;
+  const flow = useExportFlow({ config, ...preview });
+  const { downloadButtonRef, gate } = flow;
 
   const exportRowRef = useRef<HTMLDivElement>(null);
-  const setOptionsOpen = options.setOpen;
-  const closeOptions = useCallback(() => setOptionsOpen(false), [setOptionsOpen]);
-  usePopoverDismiss({ open: optionsOpen, containerRef: exportRowRef, triggerRef: optionsButtonRef, onClose: closeOptions });
-  // The mobile action bar and mini preview step aside while the on-screen keyboard is up,
-  // so neither covers the field being typed in (WCAG 2.4.11).
-  const [inputFocused, setInputFocused] = useState(false);
-  useEffect(() => {
-    // Fields in the Download options sit inside the bar, so they must not hide it.
-    const update = () => setInputFocused(document.activeElement instanceof Element && document.activeElement.matches(TEXT_ENTRY) && !exportRowRef.current?.contains(document.activeElement));
-    document.addEventListener('focusin', update);
-    document.addEventListener('focusout', update);
-    return () => {
-      document.removeEventListener('focusin', update);
-      document.removeEventListener('focusout', update);
-    };
-  }, []);
+  const inputFocused = useTextEntryFocus(exportRowRef);
   const { canShare } = useCapabilities();
 
   const handleFix = useCallback((fix: ScanFix) => {
@@ -148,47 +85,20 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
     notifyUndo('Colors reset');
   }, [store, notifyUndo]);
 
-  const onDownload = () => flow.run('download');
-  const onCopy = () => flow.run('copy');
-  const onCopySvg = () => flow.run('copy-svg');
-  const onShare = () => flow.run('share');
-  const onWallet = () => flow.run('wallet');
-  const copied = done?.format === 'clipboard';
   const commandActions = {
     download: (target: DownloadFormat) => flow.run('download', target),
-    copyImage: onCopy,
-    copySvg: onCopySvg,
-    share: canShare ? onShare : undefined,
+    copyImage: () => flow.run('copy'),
+    copySvg: () => flow.run('copy-svg'),
+    share: canShare ? () => flow.run('share') : undefined,
     jumpToPreview: () => {
       document.getElementById(PREVIEW_ID)?.scrollIntoView?.({ block: 'start' });
       downloadButtonRef.current?.focus();
     },
   };
 
-  const gateAdvice = gate.advice;
-
   return (
     <div className="w-full" id="top">
-      <Modal isOpen={gate.open} onClose={gate.cancel} title="This Code May Not Scan">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <AlertTriangle className="size-12 text-warning" aria-hidden="true" />
-          <p className="text-fg-soft">
-            This QR code might fail to scan in real-world conditions.{' '}
-            {gateAdvice?.message ?? 'Adjust the colors, pattern or margin, then try again.'}
-          </p>
-          <div className="mt-4 flex w-full flex-wrap gap-3">
-             {gateAdvice?.fix ? (
-               <Button variant="primary" fullWidth onClick={() => {
-                 if (gateAdvice.fix) handleFix(gateAdvice.fix);
-                 gate.cancel();
-               }}>{FIX_LABELS[gateAdvice.fix]}</Button>
-             ) : (
-               <Button variant="primary" fullWidth onClick={gate.cancel}>Go back</Button>
-             )}
-             <Button variant="outline" fullWidth onClick={gate.confirm}>Export anyway</Button>
-          </div>
-        </div>
-      </Modal>
+      <SafetyGateModal open={gate.open} advice={gate.advice} onFix={handleFix} onCancel={gate.cancel} onConfirm={gate.confirm} />
       <ToolWorkspaceLayout
         controlsLabel="QR Code Settings"
         previewLabel="QR Code Preview"
@@ -215,187 +125,32 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
           <Control.component key={Control.id} toolId={toolId} />
         ))}
         preview={
-             <Card padding="p-5">
-                {/* Heading and status share one row; the heading never wraps and the status drops below it only when there is no room. */}
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-x-3" data-testid="preview-status">
-                   <h2 className="py-1 font-semibold whitespace-nowrap text-fg-soft">Live Preview</h2>
-                   <div className="flex flex-wrap items-center gap-2">
-                   <Badge tone="success" data-testid="permanence-badge">
-                     Static · Non-expiring
-                   </Badge>
-                   {exportsOffReason === EMPTY_STATE_ID && (
-                     <Badge id={EMPTY_STATE_ID} tone="warning" data-testid="sample-preview-badge">
-                       Sample Preview
-                     </Badge>
-                   )}
-                   {exportsOffReason === REFUSED_STATE_ID && (
-                     <Badge id={REFUSED_STATE_ID} tone="danger" data-testid="refused-content-badge">
-                       Fix the highlighted field
-                     </Badge>
-                   )}
-                   <ScannabilityIndicator
-                     status={scannabilityStatus}
-                     health={health}
-                     errorCorrectionLevel={config.errorCorrectionLevel}
-                     onFix={handleFix}
-                     onResetDefault={handleResetDefault}
-                   />
-                   </div>
-                </div>
-
-                {preview.recovering && (
-                   <div className="mb-4">
-                      <Alert variant="warning" title="System Warning">
-                         A temporary background system error occurred. The validator has recovered and subsequent retries are active.
-                      </Alert>
-                   </div>
-                )}
-
-                {/* Preview stage: the QR is the largest thing on the page. */}
-                <div className="mb-4 flex justify-center rounded-xl bg-surface-sunken p-3 md:p-2" data-testid="qr-stage">
-                   {/* Pass debounced config to QRCanvas to prevent heavy rendering on every keystroke */}
-                   <QRCanvas ref={canvasRef} onRendered={preview.onRendered} onRenderFailed={preview.onRenderFailed} config={debouncedConfig} className={`rounded-lg shadow-raised ${STAGE_SIZE_CLASSES[debouncedConfig.socialFormat] ?? STAGE_SIZE_CLASSES[SocialFormat.SQUARE_1_1]}`} />
-                </div>
-
-                {/* The common formats in view, so a vector download is one click; the rest are in Download options. */}
-                <SegmentedControl<DownloadFormat>
-                   label="File format"
-                   className="mb-2 max-md:hidden"
-                   value={format}
-                   onChange={setFormat}
-                   options={[...new Set<DownloadFormat>(['png', 'svg', 'pdf', format])].map((value) => ({ value, label: FORMAT_LABELS[value] }))}
-                />
-
-                {/* One export row. Below md it docks to the bottom of the screen as a sticky action bar. */}
-                <div
-                   ref={exportRowRef}
-                   className={`fixed inset-x-0 bottom-0 z-30 flex items-center gap-2 border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-overlay md:relative md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none ${inputFocused ? 'max-md:hidden' : ''}`}
-                   data-testid="export-actions"
-                   data-docked-bar
-                >
-                   <span role="status" className="sr-only">{done?.message ?? ''}</span>
-                   <span
-                     aria-hidden="true"
-                     className={`size-2.5 shrink-0 rounded-full md:hidden ${STATUS_DOT_CLASSES[getScanVerdict({ status: scannabilityStatus, health }) ?? 'checking']}`}
-                     data-testid="export-status-dot"
-                   />
-                   <Button
-                      ref={downloadButtonRef}
-                      variant={!exportsOffReason && getExportRiskPolicy({ status: scannabilityStatus, health }) === 'unsafe' ? 'error' : 'primary'}
-                      size="bar"
-                      className="flex-1"
-                      loading={busyExport === format}
-                      aria-disabled={exportsOffReason ? 'true' : undefined}
-                      aria-describedby={exportsOffReason}
-                      onClick={exportsOffReason ? notifyExportsOff : onDownload}
-                   >
-                      {done && done.format === format ? (
-                        <>
-                          <Check className="size-4 motion-safe:animate-pop-in" aria-hidden="true" />
-                          Downloaded
-                        </>
-                      ) : (
-                        <>
-                          <Download className="size-4" aria-hidden="true" />
-                          Download {FORMAT_LABELS[format]}
-                        </>
-                      )}
-                   </Button>
-                   <Tooltip content="Download options">
-                     <Button
-                        ref={optionsButtonRef}
-                        variant="secondary"
-                        size="bar"
-                        iconOnly
-                        aria-label="Download options"
-                        aria-expanded={optionsOpen}
-                        aria-controls={optionsOpen ? 'download-options' : undefined}
-                        onClick={() => setOptionsOpen((open) => !open)}
-                     >
-                        <ChevronDown className={`size-5 motion-safe:transition-transform ${optionsOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
-                     </Button>
-                   </Tooltip>
-                   {optionsOpen && (
-                     <DownloadOptions
-                        id="download-options"
-                        format={format}
-                        onFormatChange={setFormat}
-                        size={size}
-                        onSizeChange={setSize}
-                        colorSpace={colorSpace}
-                        onColorSpaceChange={setColorSpace}
-                        filename={filename}
-                        onFilenameChange={setCustomFilename}
-                        onCopySvg={onCopySvg}
-                        copySvgBusy={busyExport === 'svg-copy'}
-                        onWallet={onWallet}
-                     />
-                   )}
-
-                   <Tooltip content={copied ? 'Copied' : 'Copy image'}>
-                     <Button
-                        ref={copyButtonRef}
-                        variant="secondary"
-                        size="bar"
-                        iconOnly
-                        onClick={onCopy}
-                        loading={busyExport === 'clipboard'}
-                        aria-label={copied ? "Copied" : "Copy QR code to clipboard"}
-                        aria-disabled={exportsOffReason ? 'true' : undefined}
-                        aria-describedby={exportsOffReason}
-                     >
-                        {copied ? <Check className="size-5 text-success motion-safe:animate-pop-in" aria-hidden="true" /> : <Copy className="size-5" aria-hidden="true" />}
-                     </Button>
-                   </Tooltip>
-
-                   {canShare && (
-                     <Tooltip content="Share">
-                       <Button
-                          ref={shareButtonRef}
-                          variant="secondary"
-                          size="bar"
-                          iconOnly
-                          onClick={onShare}
-                          loading={busyExport === 'share'}
-                          aria-label={done?.format === 'share' ? 'Shared' : 'Share QR code'}
-                          aria-disabled={exportsOffReason ? 'true' : undefined}
-                          aria-describedby={exportsOffReason}
-                       >
-                          <Share2 className="size-5" aria-hidden="true" />
-                       </Button>
-                     </Tooltip>
-                   )}
-                </div>
-
-                {/* Tertiary, after the export row so the QR and Download stay in the first screen: see the code on a poster, card, table tent, screen or sticker. */}
-                <div className="mt-5 space-y-3" data-testid="in-the-wild">
-                   <p id="preview-view-label" className="text-sm font-semibold text-fg-soft">In the wild</p>
-                   <SegmentedControl<PreviewView>
-                      appearance="tiles"
-                      labelledBy="preview-view-label"
-                      className="grid-cols-3"
-                      options={PREVIEW_VIEWS}
-                      value={previewView}
-                      onChange={setPreviewView}
-                   />
-                   {previewView !== 'flat' && (
-                      <Suspense fallback={<Skeleton className="aspect-4/3 w-full rounded-xl" />}>
-                         <MockupView sourceRef={canvasRef} renderKey={debouncedConfig} config={effectiveConfig} moduleCount={moduleCount} view={previewView} exportsOffReason={exportsOffReason} guardExport={(run) => flow.guard('download', () => run())} />
-                      </Suspense>
-                   )}
-                </div>
-
-                {/* Tertiary: playful side feature, after the export row. */}
-                {!exportsOffReason && <StressTestButton />}
-             </Card>
+          <PreviewCard
+            canvasRef={canvasRef}
+            preview={preview}
+            errorCorrectionLevel={config.errorCorrectionLevel}
+            onFix={handleFix}
+            onResetDefault={handleResetDefault}
+            guardExport={(run) => flow.guard('download', () => run())}
+            exportBar={
+              <ExportBar
+                flow={flow}
+                verdict={scannabilityStatus}
+                health={health}
+                canShare={canShare}
+                rowRef={exportRowRef}
+                inputFocused={inputFocused}
+              />
+            }
+          />
         }
       />
       {flow.wallet.open && (
         <Suspense fallback={null}>
-          <WalletDialog isOpen onClose={flow.wallet.close} config={config} filename={filename} />
+          <WalletDialog isOpen onClose={flow.wallet.close} config={config} filename={flow.options.filename} />
         </Suspense>
       )}
-      <GeneratorCommands actions={commandActions} onDownload={onDownload} />
+      <GeneratorCommands actions={commandActions} onDownload={() => flow.run('download')} />
       {/* No thumbnail while there is no code to mirror: it would be an empty box. */}
       <MiniPreview sourceRef={canvasRef} targetId={PREVIEW_ID} renderKey={debouncedConfig} suppressed={inputFocused || noVerdict} />
       {/* Keeps the last content clear of the mobile action bar. */}
