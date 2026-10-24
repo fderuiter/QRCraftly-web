@@ -38,7 +38,7 @@ import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { type QRConfig, QRStyle } from '@/packages/core/types';
 import { drawQRInternal, clearFluidCache } from '../index';
-import { RasterContext, toContext } from './rasterContext';
+import { RasterContext, toContext } from '../../../../tests/fixtures/rasterContext';
 
 const HIGH = 0.999999;
 // All small, all large, alternating, and the vertex patterns that broke the old outline range.

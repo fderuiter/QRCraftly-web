@@ -29,7 +29,7 @@ import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { type QRConfig, QRStyle, QRErrorCorrectionLevel } from '@/packages/core/types';
 import { drawQRInternal, calculateLayout, clearFluidCache } from '../index';
-import { RasterContext, toContext } from './rasterContext';
+import { RasterContext, toContext } from '../../../../tests/fixtures/rasterContext';
 
 const VALUE = 'https://example.com';
 const SIZE = 480;

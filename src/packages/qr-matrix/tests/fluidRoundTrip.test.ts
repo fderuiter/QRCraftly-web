@@ -30,7 +30,7 @@ import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from '@/packages/core/types';
 import { drawQRInternal, calculateLayout, clearFluidCache, isFinderSeparatorZone } from '../index';
-import { RasterContext, toContext } from './rasterContext';
+import { RasterContext, toContext } from '../../../../tests/fixtures/rasterContext';
 
 const baseConfig: QRConfig = {
   value: '',

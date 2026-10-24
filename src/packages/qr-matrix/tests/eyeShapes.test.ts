@@ -29,7 +29,7 @@ import { EyeShape, type QRConfig, QRErrorCorrectionLevel, QRStyle } from '@/pack
 import { calculateScannabilityHealth } from '@/packages/scannability';
 import { performScannabilityCheck } from '@/packages/scannability/checker';
 import { drawQRInternal, clearFluidCache } from '../index';
-import { RasterContext, toContext } from './rasterContext';
+import { RasterContext, toContext } from '../../../../tests/fixtures/rasterContext';
 
 const SHORT = 'https://example.com';
 const LONG = 'https://qrcraftly.com/a/much/longer/path?with=query&and=more-0123456789abcdef';
