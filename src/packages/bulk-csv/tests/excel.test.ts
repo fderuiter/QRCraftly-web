@@ -17,6 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { parseExcelToCsv } from '../index';
 
 function createStoredZip(files: { name: string; content: string }[]): Uint8Array {
@@ -171,5 +172,22 @@ describe('Excel WebAssembly Parser', () => {
   it('returns empty string for empty input', async () => {
     const result = await parseExcelToCsv(new Uint8Array(0));
     expect(result).toBe('');
+  });
+
+  it('parses a DEFLATE-compressed .xlsx written by a reference encoder (same CSV as the Rust test)', async () => {
+    // Fixture written by Python's zipfile with ZIP_DEFLATED, not by a spreadsheet app.
+    // crates/excel-parse/tests/deflated_workbook.rs checks the same expected CSV.
+    const fixture = new Uint8Array(
+      readFileSync(new URL('../../../../crates/excel-parse/tests/fixtures/deflated-workbook.xlsx', import.meta.url)),
+    );
+    const result = await parseExcelToCsv(fixture);
+    expect(result).toBe(
+      [
+        'Name,URL,,Score',
+        '"Smith, Jane",https://example.com/?a=1&b=2,,42',
+        '"Say ""hi""",https://example.com/inline,,7.5',
+        'Tom & Jerry,,,0',
+      ].join('\n'),
+    );
   });
 });

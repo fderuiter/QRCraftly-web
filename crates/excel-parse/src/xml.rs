@@ -119,13 +119,27 @@ pub fn parse_shared_strings(xml: &str) -> Vec<String> {
     strings
 }
 
+/// Excel's sheet limits: 16,384 columns (A to XFD) and 1,048,576 rows. A reference past them can
+/// only come from a crafted file, and padding a row or the sheet out to it would exhaust memory
+/// (#1584), so such cells and rows are skipped.
+pub const MAX_COLUMNS: usize = 16_384;
+pub const MAX_ROWS: usize = 1_048_576;
+
+/// Converts column letters (`A`, `AA`, `XFD`) to a 0-based index. A column past [`MAX_COLUMNS`]
+/// returns `MAX_COLUMNS`, so callers need only one bound check and the arithmetic cannot overflow.
 pub fn col_letters_to_index(col: &str) -> usize {
     let mut index = 0usize;
     for c in col.chars() {
-        if c.is_ascii_uppercase() {
-            index = index * 26 + ((c as usize) - ('A' as usize) + 1);
+        let digit = if c.is_ascii_uppercase() {
+            (c as usize) - ('A' as usize) + 1
         } else if c.is_ascii_lowercase() {
-            index = index * 26 + ((c as usize) - ('a' as usize) + 1);
+            (c as usize) - ('a' as usize) + 1
+        } else {
+            continue;
+        };
+        index = index * 26 + digit;
+        if index > MAX_COLUMNS {
+            return MAX_COLUMNS;
         }
     }
     if index > 0 {
@@ -133,6 +147,19 @@ pub fn col_letters_to_index(col: &str) -> usize {
     } else {
         0
     }
+}
+
+/// Parses a 1-based row number to a 0-based index. A number past [`MAX_ROWS`], including one too
+/// long for `usize`, returns `MAX_ROWS`.
+fn row_number_to_index(digits: &str) -> usize {
+    if digits.len() > 7 {
+        return MAX_ROWS;
+    }
+    digits
+        .parse::<usize>()
+        .unwrap_or(1)
+        .saturating_sub(1)
+        .min(MAX_ROWS)
 }
 
 pub fn parse_cell_ref(r_attr: &str) -> (usize, usize) {
@@ -146,7 +173,7 @@ pub fn parse_cell_ref(r_attr: &str) -> (usize, usize) {
     };
 
     let row_idx = if !digits.is_empty() {
-        digits.parse::<usize>().unwrap_or(1).saturating_sub(1)
+        row_number_to_index(&digits)
     } else {
         0
     };
@@ -187,8 +214,12 @@ pub fn parse_sheet_xml(xml: &str, shared_strings: &[String]) -> Vec<Vec<String>>
         let row_body = &xml[row_tag_end..row_end];
 
         let row_num = get_attribute(row_tag, "r")
-            .and_then(|s| s.parse::<usize>().ok())
-            .map(|n| n.saturating_sub(1));
+            .filter(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()))
+            .map(row_number_to_index);
+        if row_num.is_some_and(|r| r >= MAX_ROWS) {
+            pos = row_end;
+            continue;
+        }
 
         let mut row_cells: Vec<(usize, String)> = Vec::new();
         let mut cell_pos = 0;
@@ -296,7 +327,9 @@ pub fn parse_sheet_xml(xml: &str, shared_strings: &[String]) -> Vec<Vec<String>>
                 }
             };
 
-            let _ = derived_row;
+            if col_idx >= MAX_COLUMNS || derived_row.is_some_and(|r| r >= MAX_ROWS) {
+                continue;
+            }
             row_cells.push((col_idx, cell_val));
         }
 
@@ -432,6 +465,35 @@ pub fn format_matrix_to_csv(matrix: &[Vec<String>]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn skips_a_cell_past_the_last_excel_column() {
+        // ZZZZZZ1 is column 321,272,406: padding a row out to it would need gigabytes (#1584).
+        let xml = r#"<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>kept</t></is></c><c r="ZZZZZZ1" t="inlineStr"><is><t>far</t></is></c></row></sheetData></worksheet>"#;
+        let matrix = parse_sheet_xml(xml, &[]);
+        assert_eq!(matrix, vec![vec![String::from("kept")]]);
+        assert_eq!(col_letters_to_index("XFD"), MAX_COLUMNS - 1);
+        assert_eq!(col_letters_to_index("XFE"), MAX_COLUMNS);
+        assert_eq!(col_letters_to_index("ZZZZZZZZZZZZZZZZ"), MAX_COLUMNS);
+    }
+
+    #[test]
+    fn keeps_the_last_excel_column() {
+        let xml = r#"<worksheet><sheetData><row r="1"><c r="XFD1"><v>1</v></c></row></sheetData></worksheet>"#;
+        let matrix = parse_sheet_xml(xml, &[]);
+        assert_eq!(matrix.len(), 1);
+        assert_eq!(matrix[0].len(), MAX_COLUMNS);
+        assert_eq!(matrix[0][MAX_COLUMNS - 1], "1");
+    }
+
+    #[test]
+    fn skips_rows_past_the_last_excel_row() {
+        let xml = r#"<worksheet><sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="3000000"><c r="A3000000"><v>2</v></c></row><row r="2"><c r="A99999999999999999999999"><v>3</v></c></row></sheetData></worksheet>"#;
+        let matrix = parse_sheet_xml(xml, &[]);
+        assert_eq!(matrix, vec![vec![String::from("1")], Vec::new()]);
+        assert_eq!(parse_cell_ref("A1048576"), (0, MAX_ROWS - 1));
+        assert_eq!(parse_cell_ref("A1048577"), (0, MAX_ROWS));
+    }
 
     #[test]
     fn unescapes_xml_entities() {
