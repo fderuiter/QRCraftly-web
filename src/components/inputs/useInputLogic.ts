@@ -17,71 +17,26 @@
 */
 
 import { useState, useRef, useEffect, type ElementType } from "react";
-import { type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, type EmailData, CryptoNetwork } from "@/packages/qr-payload";
-import { type QRConfig, QRType, type WifiData } from "@/packages/core/types";
-import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
-import { isDangerousUrl } from "@/packages/core/security";
-import { CONTAINMENT_PROFILES, emailListError, cardFieldsFor, vCardFieldError, paymentRefusal } from "@/packages/qr-payload";
-import { findBlockingViolation } from "./linkViolations";
+import { type QRConfig, QRType } from "@/packages/core/types";
+import { INPUT_REGISTRY, constructInput, hydrateInput, validateInput, type InputDataMap, type InputProps } from "./InputRegistry";
 
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
 const COMMIT_DELAY_MS = 100;
 
-// `type` selects which member of the data union `data` is, so the casts below follow it.
-const isInputDataValid = (type: QRType, data: InputDataMap[QRType]): boolean => {
-  if (type === QRType.WIFI) {
-    const wifi = data as WifiData;
-    if (wifi.ssid && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(wifi.ssid)) {
-      return false;
-    }
-    if (wifi.password && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(wifi.password)) {
-      return false;
-    }
-    if (wifi.eapIdentity && CONTAINMENT_PROFILES.STRICT_NO_CONTROL.test(wifi.eapIdentity)) {
-      return false;
-    }
-  } else if (type === QRType.EMAIL) {
-    const emailData = data as EmailData;
-    const hasContent = [emailData.email, emailData.cc, emailData.bcc, emailData.subject, emailData.body].some((f) => f?.trim());
-    if (hasContent) {
-      const fieldErrors = [
-        emailListError(emailData.email, { required: true }),
-        emailListError(emailData.cc),
-        emailListError(emailData.bcc),
-      ];
-      if (fieldErrors.some(Boolean)) {
-        return false;
-      }
-    }
-  } else if (type === QRType.VCARD) {
-    const vcard = data as VCardData;
-    for (const field of cardFieldsFor(vcard.version)) {
-      if (vCardFieldError(field, vcard[field])) {
-        return false;
-      }
-    }
-  } else if (type === QRType.PAYMENT) {
-    const payment = data as PaymentData;
-    const address = payment.network === CryptoNetwork.EPC_SEPA ? (payment.iban || payment.address || '') : (payment.address || '');
-    if (address && isDangerousUrl(address)) {
-      return false;
-    }
-    if (paymentRefusal(payment) !== null) {
-      return false;
-    }
-  } else if (type === QRType.URL || type === QRType.MEETING || type === QRType.TEXT) {
-    if (findBlockingViolation(type, data as UrlData | MeetingData | TextData)) {
-      return false;
-    }
-  }
-  return true;
-};
+/** Form data per QR type; a type with no entry has not been touched. */
+type InputStates = { [K in QRType]?: InputDataMap[K] };
+
+/** Stores one type's form data, keeping the key and the data's type tied together. */
+const withState = <K extends QRType>(states: InputStates, type: K, data: InputDataMap[K]): InputStates => ({ ...states, [type]: data });
+
+/** A type's form data, or its starting state when the form has not been touched. */
+const stateFor = <K extends QRType>(states: InputStates, type: K): InputDataMap[K] => states[type] ?? INPUT_REGISTRY[type].initialState;
 
 /**
  * Module-scoped cache for uncommitted form field values in volatile memory.
  * Preserves user text across generator route switches without persisting to storage.
  */
-let retainedInputStates: Partial<InputDataMap> = {};
+let retainedInputStates: InputStates = {};
 
 /**
  * Forgets input states retained from earlier generator routes.
@@ -103,29 +58,25 @@ export function useInputLogic(
   config: Pick<QRConfig, 'type' | 'value'>,
   onChange: (updates: Partial<QRConfig>) => void,
   onRefusedChange?: (refused: boolean) => void,
-): { InputComponent: ElementType | null; inputProps: { data: InputDataMap[keyof InputDataMap]; onChange: (updates: Partial<InputDataMap[keyof InputDataMap]>) => void } | Record<string, never>; flush: () => void } {
+): { InputComponent: ElementType; inputProps: InputProps<QRType>; flush: () => void } {
   // Initialize state for all types from registry or volatile retained cache
-  const [inputStates, setInputStates] = useState<InputDataMap>(() => {
-    const states = {} as Partial<InputDataMap>;
-    (Object.keys(INPUT_REGISTRY) as QRType[]).forEach((key) => {
-      // Cast the key-specific assignment to never first to safely satisfy the discriminated union constraint
-      const entry = INPUT_REGISTRY[key];
-      if (retainedInputStates[key] !== undefined) {
-        states[key] = { ...retainedInputStates[key] } as never;
-      } else if (key === config.type && config.value && entry.hydrateFn && entry.canHydrateFn(config.value)) {
-        // If this is the current type and we have a value, try to hydrate
-        // This ensures that initial config values (e.g. from URL or defaults) are reflected in the inputs
+  const [inputStates, setInputStates] = useState<InputStates>(() => {
+    let states: InputStates = {};
+    for (const key of Object.values(QRType)) {
+      const retained = retainedInputStates[key];
+      if (retained !== undefined) {
+        states = withState(states, key, { ...retained });
+      } else if (key === config.type && config.value) {
+        // Initial config values (e.g. from the URL or defaults) are reflected in the inputs.
         try {
-          states[key] = entry.hydrateFn(config.value) as never;
+          const hydrated = hydrateInput(key, config.value);
+          if (hydrated) states = withState(states, key, hydrated);
         } catch (e) {
           console.warn(`Failed to hydrate state for ${key}`, e);
-          states[key] = entry.initialState as never;
         }
-      } else {
-        states[key] = entry.initialState as never;
       }
-    });
-    return states as InputDataMap;
+    }
+    return states;
   });
 
   const latestInputStates = useRef(inputStates);
@@ -146,18 +97,15 @@ export function useInputLogic(
 
   // Synchronize input states reactively when config changes externally (e.g., undo/redo or preset loaded)
   useEffect(() => {
-    const entry = INPUT_REGISTRY[config.type];
-    if (!entry) return;
-
     const prevType = prevTypeRef.current;
     prevTypeRef.current = config.type;
 
-    const currentLocalState = latestInputStates.current[config.type];
+    const currentLocalState = stateFor(latestInputStates.current, config.type);
     if (prevType !== config.type) {
       // A form kept from an earlier visit to this type may still hold a refused value.
-      onRefusedChangeRef.current?.(!isInputDataValid(config.type, currentLocalState));
+      onRefusedChangeRef.current?.(validateInput(config.type, currentLocalState) !== null);
     }
-    const currentConstructed = entry.constructFn ? entry.constructFn(currentLocalState as never) : '';
+    const currentConstructed = constructInput(config.type, currentLocalState);
 
     if (currentConstructed !== config.value) {
       if (timeoutRef.current) {
@@ -181,31 +129,28 @@ export function useInputLogic(
         return;
       }
 
-      const updateStateForType = (type: QRType, nextData: unknown) => {
+      const updateStateForType = <K extends QRType>(type: K, nextData: InputDataMap[K]) => {
         setInputStates((prev) => {
-          if (JSON.stringify(prev[type]) === JSON.stringify(nextData)) {
+          if (JSON.stringify(stateFor(prev, type)) === JSON.stringify(nextData)) {
             return prev;
           }
-          return {
-            ...prev,
-            [type]: nextData,
-          };
+          return withState(prev, type, nextData);
         });
       };
 
       // The form now shows the new content, which was never refused.
       onRefusedChangeRef.current?.(false);
-      if (entry.hydrateFn && entry.canHydrateFn(config.value)) {
-        try {
-          const hydrated = entry.hydrateFn(config.value);
+      try {
+        const hydrated = hydrateInput(config.type, config.value);
+        if (hydrated) {
           updateStateForType(config.type, hydrated);
-          retainedInputStates[config.type] = hydrated as never;
-        } catch (e) {
-          console.warn(`Failed to hydrate state for ${config.type} on external change`, e);
-          updateStateForType(config.type, entry.initialState);
+          retainedInputStates = withState(retainedInputStates, config.type, hydrated);
+        } else {
+          updateStateForType(config.type, INPUT_REGISTRY[config.type].initialState);
         }
-      } else {
-        updateStateForType(config.type, entry.initialState);
+      } catch (e) {
+        console.warn(`Failed to hydrate state for ${config.type} on external change`, e);
+        updateStateForType(config.type, INPUT_REGISTRY[config.type].initialState);
       }
     }
   }, [config.type, config.value, onChange]);
@@ -225,14 +170,10 @@ export function useInputLogic(
     type: K,
     updates: Partial<InputDataMap[K]>,
   ) => {
-    const currentData = inputStates[type];
-    const newData = { ...currentData, ...updates };
+    const newData: InputDataMap[K] = { ...stateFor(inputStates, type), ...updates };
 
-    setInputStates((prev) => ({
-      ...prev,
-      [type]: newData,
-    }));
-    retainedInputStates[type] = newData as never;
+    setInputStates((prev) => withState(prev, type, newData));
+    retainedInputStates = withState(retainedInputStates, type, newData);
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -241,19 +182,13 @@ export function useInputLogic(
     const commit = () => {
       timeoutRef.current = null;
       pendingCommitRef.current = null;
-      const entry = INPUT_REGISTRY[type];
-      if (entry) {
-        const valid = isInputDataValid(type, newData);
-        if (valid) {
-          // We know entry matches type K, so constructFn handles newData (InputDataMap[K])
-          // Using `never` as cast because TS struggles with correlating `entry` (Registry[K])
-          // and `newData` (InputDataMap[K]) inside this generic context without more verbose typing.
-          onChange({ value: entry.constructFn(newData as never) });
-        }
-        // A refused value is not written, so the store keeps the last accepted content; the
-        // flag stops the preview and exports using it until the field is fixed (#1279).
-        onRefusedChangeRef.current?.(!valid);
+      const valid = validateInput(type, newData) === null;
+      if (valid) {
+        onChange({ value: constructInput(type, newData) });
       }
+      // A refused value is not written, so the store keeps the last accepted content; the
+      // flag stops the preview and exports using it until the field is fixed (#1279).
+      onRefusedChangeRef.current?.(!valid);
     };
     // A first edit after a quiet spell goes straight to the preview, in the same render as the
     // field; only a burst of typing is held back until it pauses.
@@ -279,22 +214,12 @@ export function useInputLogic(
     commit();
   };
 
-  // Handle all types via registry
-  const registryEntry = INPUT_REGISTRY[config.type];
-  if (registryEntry) {
-    return {
-      InputComponent: registryEntry.Component,
-      inputProps: {
-        data: inputStates[config.type] || registryEntry.initialState,
-        onChange: (updates: Partial<InputDataMap[keyof InputDataMap]>) => handleInputChange(config.type, updates as unknown as Partial<InputDataMap[QRType]>),
-      },
-      flush,
-    };
-  }
-
   return {
-    InputComponent: null,
-    inputProps: {},
+    InputComponent: INPUT_REGISTRY[config.type].Component,
+    inputProps: {
+      data: stateFor(inputStates, config.type),
+      onChange: (updates) => handleInputChange(config.type, updates),
+    },
     flush,
   };
 }
