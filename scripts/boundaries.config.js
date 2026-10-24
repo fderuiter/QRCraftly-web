@@ -168,12 +168,12 @@ export const rules = [
   {
     name: 'page-content-stays-on-server',
     comment:
-      'The content registry, type guides, landing copy and schema builder describe every page. Browser code reads its own page\'s share through usePageContent() (filled by src/pages/+data.ts), and Head renders the structured data, so these modules never ship to the browser (#1058). Type-only imports are fine.',
+      'The content registry, type guides, landing copy, guides and schema builder describe every page. Browser code reads its own page\'s share through usePageContent() (filled by src/pages/+data.ts), and Head renders the structured data, so these modules never ship to the browser (#1058). Type-only imports are fine.',
     fix: 'read the page\'s share through usePageContent(), add what is missing to src/pages/+data.ts, or make the import `import type`.',
     forbids: (edge) =>
       /^src\/(components|hooks|context|layouts|pages)\//.test(edge.from) &&
       !/^src\/layouts\/Head\.tsx$|^src\/pages\/\+(data|description)\.ts$|\.test\.tsx?$/.test(edge.from) &&
-      /^src\/(data\/(contentRegistry|typeGuides|landingPageContent|relatedPages|pageContent)|utils\/schemaGenerator)\.ts$/.test(
+      /^src\/(data\/(contentRegistry|typeGuides|landingPageContent|relatedPages|pageContent|guides)|utils\/schemaGenerator)\.ts$/.test(
         edge.to,
       ) &&
       !edge.typeOnly,
