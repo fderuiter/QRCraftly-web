@@ -99,19 +99,26 @@ export const ScanResultSheet: React.FC<ScanResultSheetProps> = ({ scan, onEdit, 
   const cautions = link?.findings.filter((finding) => finding.severity === 'caution') ?? [];
   const notes = link?.findings.filter((finding) => finding.severity === 'info') ?? [];
 
-  // Move focus to the result so keyboard and screen reader users land on it.
+  /** The scan on screen, so a copy that settles after the sheet changed scan is ignored. */
+  const scanRef = useRef(scan);
+
+  // Move focus to the result so keyboard and screen reader users land on it. A new scan starts
+  // with no copy state: a "Copied" or failure note from the last one would not be true (#1588).
   useEffect(() => {
+    scanRef.current = scan;
     headingRef.current?.focus();
     setRevealed(false);
     setShareSecret(false);
+    setCopyState('idle');
   }, [scan]);
 
   const copy = async () => {
+    const copied = scan;
     try {
-      await navigator.clipboard.writeText(scan.text);
-      setCopyState('copied');
+      await navigator.clipboard.writeText(copied.text);
+      if (scanRef.current === copied) setCopyState('copied');
     } catch {
-      setCopyState('failed');
+      if (scanRef.current === copied) setCopyState('failed');
     }
   };
 
