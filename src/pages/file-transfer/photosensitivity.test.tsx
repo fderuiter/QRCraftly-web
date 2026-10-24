@@ -41,8 +41,17 @@ const sender = vi.hoisted(() => ({
 const helloFile = new File(['hello'], 'hello.txt', { type: 'text/plain' });
 const helloFiles = [helloFile];
 
-vi.mock('@/packages/optical-transfer/client', () => ({
-  useOpticalSender: () => ({
+vi.mock('@/packages/optical-transfer/client', async () => {
+  const { useReducer } = await vi.importActual<typeof import('react')>('react');
+  const { senderReducer } = await vi.importActual<typeof import('@/packages/optical-transfer')>('@/packages/optical-transfer');
+  return {
+  // The real phase reducer runs, so the reduced-motion confirm opens and closes as in the app.
+  useOpticalSender: () => {
+    const [{ phase }, dispatch] = useReducer(senderReducer, { phase: 'ready', hasFiles: true });
+    return {
+    phase,
+    askToStart: () => dispatch({ type: 'start', reducedMotion: true }),
+    cancelMotion: () => dispatch({ type: 'cancelMotion' }),
     selectedFile: helloFile,
     selectedFiles: helloFiles,
     setSelectedFile: vi.fn(),
@@ -83,8 +92,10 @@ vi.mock('@/packages/optical-transfer/client', () => ({
     resumeTransfer: sender.resumeTransfer,
     setDensity: sender.setDensity,
     setFps: sender.setFps,
-  }),
-}));
+    };
+  },
+  };
+});
 
 /** Emulates the `prefers-reduced-motion` media feature. */
 function emulateReducedMotion(reduce: boolean) {

@@ -121,6 +121,7 @@ function FileTransferToolInner() {
     keyCanvasRef,
     showKeyQr,
     hideKeyQr,
+    phase,
     isTransferring,
     isPaused,
     isVerifyingHandshake,
@@ -151,6 +152,8 @@ function FileTransferToolInner() {
     transferStats,
     canvasRef,
     startTransfer,
+    askToStart,
+    cancelMotion,
     stopTransfer,
     pauseTransfer,
     resumeTransfer,
@@ -171,7 +174,7 @@ function FileTransferToolInner() {
   // Photosensitivity safeguards (#1148).
   const reducedMotion = usePrefersReducedMotion();
   const [noticeSeen, setNoticeSeen] = React.useState(photosensitivityNoticeSeen);
-  const [confirmingMotion, setConfirmingMotion] = React.useState(false);
+  const confirmingMotion = phase === 'confirmingMotion';
   const confirmButtonRef = React.useRef<HTMLButtonElement | null>(null);
 
   // Reduced motion starts at the slowest pace.
@@ -200,12 +203,11 @@ function FileTransferToolInner() {
   const beginTransfer = () => {
     photosensitivityNoticeSeen = true;
     setNoticeSeen(true);
-    setConfirmingMotion(false);
     startTransfer();
   };
   const handleStart = () => {
     if (reducedMotion) {
-      setConfirmingMotion(true);
+      askToStart();
       return;
     }
     beginTransfer();
@@ -569,7 +571,7 @@ function FileTransferToolInner() {
                     <Button ref={confirmButtonRef} variant="primary" size="sm" onClick={beginTransfer}>
                       Start anyway
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={() => setConfirmingMotion(false)}>
+                    <Button variant="secondary" size="sm" onClick={cancelMotion}>
                       Cancel
                     </Button>
                   </div>
