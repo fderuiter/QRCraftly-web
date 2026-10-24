@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodePunycodeLabel, hasMixedScripts, toUnicodeHostname } from './hostname';
+import { decodePunycodeLabel, hasMixedScripts, toUnicodeHostname } from '../index';
 
 describe('toUnicodeHostname', () => {
   it('decodes Punycode labels and leaves ASCII labels alone', () => {

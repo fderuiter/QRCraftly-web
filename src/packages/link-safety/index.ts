@@ -18,3 +18,6 @@
 
 export { analyseLink } from './lib/analyse';
 export type { LinkFinding, LinkFindingCode, LinkFindingSeverity } from './lib/analyse';
+
+// Punycode decoding and mixed-script checks for hostnames
+export { decodePunycodeLabel, toUnicodeHostname, hasMixedScripts } from './lib/hostname';

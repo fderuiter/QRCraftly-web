@@ -74,7 +74,6 @@ const CORE = `${PACKAGES_ROOT}/core/`;
  * New files never join it, and a test fails when a listed file no longer imports app-root code.
  */
 export const LEGACY_APP_ROOT_IMPORTERS = new Set([
-  'src/packages/link-safety/lib/analyse.ts',
 ]);
 
 /**
