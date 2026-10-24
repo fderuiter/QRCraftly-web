@@ -128,6 +128,12 @@ export function generateSchema(
 
   const graph: JsonLdObject[] = [appEntity];
 
+  // Policy (#1619, checked 2026-10-24): Google no longer shows HowTo rich results and shows FAQ
+  // rich results only for government and health sites
+  // (https://developers.google.com/search/blog/2023/08/howto-faq-changes,
+  // https://developers.google.com/search/docs/appearance/structured-data/faqpage), so neither earns
+  // a rich result here. Both are kept on purpose: they are valid schema.org that Bing and answer
+  // engines still read, they mirror copy the page shows, and Google ignores them without penalty.
   if (toolContent.howTo) {
     const howToObj: JsonLdObject = {
       "@type": "HowTo",

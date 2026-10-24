@@ -31,6 +31,7 @@
 /manifest.json
   Cache-Control: public, max-age=86400
 
-# Preview and workers.dev copies of the site are never indexed; qrcraftly.com is the canonical host.
+# qrcraftly.com is production and the canonical host. The workers.dev copy (qrcraftly.fpderuiter.workers.dev)
+# and every preview URL serve the same build but are never indexed (#1619, see wrangler.jsonc).
 https://:subdomain.fpderuiter.workers.dev/*
   X-Robots-Tag: noindex

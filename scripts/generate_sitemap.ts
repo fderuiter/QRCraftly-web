@@ -23,6 +23,9 @@ const { resolvePublicUrl, getSanitizedPath } = await import('../src/utils/metada
 const { contentRegistry, auxiliaryRegistry, getLegacyRedirect } = await import('../src/data/contentRegistry');
 
 const { getGuide } = await import('../src/data/guides');
+const { landingPageMeta } = await import('../src/data/landingPageMeta');
+const { landingPageContent } = await import('../src/data/landingPageContent');
+const { typeGuides } = await import('../src/data/typeGuides');
 const { execBinary } = await import('./utils/execHelper.js');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -46,6 +49,9 @@ function findHtmlFiles(dir: string, fileList: string[] = []): string[] {
   return fileList;
 }
 
+/** Path segments that never belong in the sitemap. */
+const EXCLUDED_SEGMENTS = new Set(['_error', 'draft', 'test', 'dev-sandbox', 'quarantine', 'internal']);
+
 /**
  * Determines whether a given relative or absolute path/route should be excluded from the sitemap.
  * @param posixPath - The clean posix path of the file or route.
@@ -57,20 +63,11 @@ export function shouldExcludePath(posixPath: string): boolean {
   if (getLegacyRedirect(clean.replace(/(\/index)?\.html$/, ''))) {
     return true;
   }
-  if (
-    clean.includes('404.html') ||
-    clean.endsWith('404') ||
-    clean.includes('_error') ||
-    clean.includes('draft') ||
-    clean.includes('test') ||
-    clean.includes('dev-sandbox') ||
-    clean.includes('quarantine') ||
-    clean.includes('internal') ||
-    clean.includes('@id')
-  ) {
+  if (clean.includes('404.html') || clean.endsWith('404') || clean.includes('@id')) {
     return true;
   }
-  return false;
+  // Whole path segments only, so a public route such as /testimonials is never dropped (#1619).
+  return clean.split('/').some((segment) => EXCLUDED_SEGMENTS.has(segment.replace(/\.html$/, '')));
 }
 
 /**
@@ -194,14 +191,29 @@ function hasFullHistory(): boolean {
 }
 
 /**
- * The files whose last commit dates a route's lastmod: its page directory and, where it has
- * one, its copy block in `src/data/copy/`.
+ * The shared data modules that hold copy for many pages: a route's lastmod also follows the ones
+ * with an entry for it, so rewriting a page's meta description dates the page (#1619).
+ */
+const SHARED_COPY_SOURCES: ReadonlyArray<[string, ReadonlyArray<Record<string, unknown>>]> = [
+  ['src/data/contentRegistry.ts', [contentRegistry, auxiliaryRegistry]],
+  ['src/data/landingPageMeta.ts', [landingPageMeta]],
+  ['src/data/landingPageContent.ts', [landingPageContent]],
+  ['src/data/typeGuides.ts', [typeGuides]],
+];
+
+/**
+ * The files whose last commit dates a route's lastmod: its page directory, its copy block in
+ * `src/data/copy/` where it has one, and each shared data module with an entry for it.
  * @param cleanPath - Sanitized route such as `/` or `/wifi-qr-code`.
  * @returns Repository-relative POSIX paths that exist.
  */
 export function getPageSourcePaths(cleanPath: string): string[] {
   const id = cleanPath === '/' || cleanPath === '' ? 'index' : cleanPath.slice(1);
-  return [`src/pages/${id}`, `src/data/copy/${id}.ts`].filter((source) => fs.existsSync(path.join(REPO_ROOT, source)));
+  const own = [`src/pages/${id}`, `src/data/copy/${id}.ts`].filter((source) => fs.existsSync(path.join(REPO_ROOT, source)));
+  // A route with no page source of its own is not dated by shared copy alone.
+  if (own.length === 0) return own;
+  const shared = SHARED_COPY_SOURCES.filter(([, registries]) => registries.some((registry) => Object.hasOwn(registry, id))).map(([source]) => source);
+  return [...own, ...shared];
 }
 
 /**
