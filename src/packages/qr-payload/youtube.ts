@@ -17,7 +17,7 @@
 */
 
 import { parseProtocol, type ParsedProtocol, type SocialProfile } from './lib/protocol';
-import { SocialPlatform } from '@/types';
+import { SocialPlatform } from '@/packages/core/types';
 
 const YT_RESERVED = /^(watch|shorts|playlist|channel|c|user|feed|results|premium|gaming|music|upload|tv|about|help|terms|privacy|live|embed)$/i;
 const YOUTUBE_HANDLE_PATTERN = /^[a-zA-Z0-9_.\-/@?&=%]+$/;
