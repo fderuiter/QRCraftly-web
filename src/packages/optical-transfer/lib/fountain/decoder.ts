@@ -18,7 +18,7 @@
 
 import type { DropletMetadata } from './contracts';
 import { buildRobustSolitonCdf, getNeighborsForSeq } from './soliton';
-import { crc32 } from './crc32';
+import { crc32 } from '@/packages/core/checksum';
 import { solveGF2 } from './gf2';
 import { getFountainBcurModuleSync, loadFountainBcurModule, WasmFountainDecoder } from './wasmKernel';
 

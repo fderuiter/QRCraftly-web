@@ -17,7 +17,7 @@
 */
 
 import { CsvParseError, MAX_BULK_CSV_ROWS, parseCsv, type CsvRow } from './csv';
-import { encodeBulkCell, type BulkContentType } from './payload';
+import { encodeBulkCell, type BulkContentType } from './cell';
 
 /** Header words that usually mark the QR content column. */
 export const PAYLOAD_COLUMN_WORDS: readonly string[] = [

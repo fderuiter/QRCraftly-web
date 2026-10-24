@@ -76,6 +76,29 @@ export { constructLocationString, hydrateLocationData, coordinateError } from '.
 export { MeetingContract, constructMeetingString, hydrateMeetingData } from './lib/generators/meeting';
 export { constructSocialString, hydrateSocialData } from './lib/generators/social';
 export { BulkCsvContract, constructBulkCsvString, hydrateBulkCsvData } from './lib/generators/bulkCsv';
+// The Bulk CSV payload rules (#1599): the CSV parser, how a cell becomes a payload and the row the
+// live preview encodes. The bulk-csv package builds the batch on top of them.
+export {
+  parseCsv,
+  detectDelimiter,
+  decodeCsvBytes,
+  CsvParseError,
+  MAX_BULK_CSV_ROWS,
+  MAX_BULK_CSV_CHARS,
+  type CsvRow,
+  type CsvTable,
+  type ParseCsvOptions,
+} from './lib/bulkCsv/csv';
+export { encodeBulkCell, bulkValidationType, type BulkContentType } from './lib/bulkCsv/cell';
+export {
+  previewRow,
+  pickColumn,
+  hasPayload,
+  PAYLOAD_COLUMN_WORDS,
+  FILENAME_COLUMN_WORDS,
+  type BulkCsvPreview,
+  type PickColumnOptions,
+} from './lib/bulkCsv/preview';
 
 // Wallet address checksums (Base58Check, bech32/bech32m, EIP-55)
 export { checkCryptoAddress, type AddressCheck } from './lib/cryptoAddress';

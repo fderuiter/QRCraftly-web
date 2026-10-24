@@ -18,7 +18,7 @@
 
 import { bytesToHex, hexToBytes, sha256Hex } from '@/packages/core/encoding';
 import { FecEncoder } from '../fec/codec';
-import { crc32 } from '../fountain/crc32';
+import { crc32 } from '@/packages/core/checksum';
 import { FountainEncoder } from '../fountain/encoder';
 import {
   ALPHANUMERIC_CAPACITY,

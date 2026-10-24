@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { createZip } from '@/packages/bulk-csv';
+import { createZip } from '@/packages/core/zip';
 import { cleanPassText, type PassColors, type PassContent, type PassField } from './content';
 import { WalletPassError } from './errors';
 import type { PassSigner } from './signer';

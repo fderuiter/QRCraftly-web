@@ -31,7 +31,7 @@
  * under 100 ms.
  */
 import { WasmModuleError, compileWasmUrl, instantiateWasmSync, type WasmInstance, wasmModuleUrl } from '@/packages/wasm-runtime';
-import { crc32 } from '../fountain/crc32';
+import { crc32 } from '@/packages/core/checksum';
 import { MAX_FEC_SOURCE_SYMBOLS, MAX_FEC_SYMBOL_BYTES, MAX_RECEIVE_MESSAGE_BYTES } from '../limits';
 
 /** Default symbol size in bytes. */

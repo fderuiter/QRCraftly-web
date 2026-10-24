@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { crc32 } from '../fountain/crc32';
+import { crc32 } from '@/packages/core/checksum';
 import { cborEncode } from '../fountain/cbor';
 import { FragmentChooser } from './schedule';
 import { encodeSingleUr, encodeUrPart } from './uri';

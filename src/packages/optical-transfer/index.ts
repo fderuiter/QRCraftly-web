@@ -56,7 +56,7 @@ export {
 } from './lib/fountain/soliton';
 export { cborEncode, cborDecode, type CborValue } from './lib/fountain/cbor';
 export { encodeBytewordsMinimal, decodeBytewordsMinimal } from './lib/fountain/bytewords';
-export { crc32, crc32c, crc32Hex } from './lib/fountain/crc32';
+export { crc32, crc32c, crc32Hex } from '@/packages/core/checksum';
 export {
   type DropletMetadata,
   type FountainDroplet,

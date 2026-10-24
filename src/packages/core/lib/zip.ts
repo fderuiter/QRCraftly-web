@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { crc32 } from '@/packages/optical-transfer/checksum';
+import { crc32 } from './crc32';
 
 /** One file to store in a ZIP archive. */
 export interface ZipEntry {

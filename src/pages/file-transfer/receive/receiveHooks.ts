@@ -48,7 +48,7 @@ export function useSaveBundleZip(bundle: ReceivedBundleFile[] | null, addToast: 
   return useCallback(async () => {
     if (!bundle) return;
     try {
-      const { createZip } = await import('@/packages/bulk-csv');
+      const { createZip } = await import('@/packages/core/zip');
       const zip = createZip(bundle.map((file) => ({ name: file.name, data: file.data })));
       triggerFileDownload(zip, 'qrcraftly-files.zip', 'application/zip');
     } catch (error) {

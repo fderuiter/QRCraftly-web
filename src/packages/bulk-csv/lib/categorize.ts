@@ -17,11 +17,9 @@
 */
 
 import { DEFAULT_CONFIG } from '@/packages/core/config';
-import type { CsvRow } from './csv';
 import { escapeCsvCell } from './csvEscape';
 import { sanitizeFileStem } from './fileNames';
-import { hasPayload } from './preview';
-import { bulkValidationType, encodeBulkCell, type BulkContentType } from './payload';
+import { bulkValidationType, encodeBulkCell, hasPayload, type BulkContentType, type CsvRow } from '@/packages/qr-payload';
 import { analyseLink, type LinkFinding } from '@/packages/link-safety';
 import type { QRConfig } from '@/packages/core/types';
 import {

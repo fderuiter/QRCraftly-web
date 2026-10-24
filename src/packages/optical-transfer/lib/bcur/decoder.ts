@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { crc32 } from '../fountain/crc32';
+import { crc32 } from '@/packages/core/checksum';
 import { cborDecode } from '../fountain/cbor';
 import { decodeBytewordsMinimal } from '../fountain/bytewords';
 import { getFountainBcurModuleSync, loadFountainBcurModule, WasmBcUrDecoder } from '../fountain/wasmKernel';

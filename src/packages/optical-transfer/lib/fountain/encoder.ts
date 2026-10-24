@@ -18,7 +18,7 @@
 
 import type { FountainDroplet, FountainEncoderOptions } from './contracts';
 import { buildRobustSolitonCdf, getNeighborsForSeq } from './soliton';
-import { crc32 } from './crc32';
+import { crc32 } from '@/packages/core/checksum';
 
 /**
  * Returns the default highest sequence number for a stream of `k` source blocks.
