@@ -16,27 +16,26 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+/*
+ * The Scannability Health Evaluator (#940): its public types and the factory that wires the
+ * evaluator/* modules together (#1601). The state lives in evaluator/state.ts; the worker
+ * connection, the flight tracker, the main-thread fallback and canvas capture each have a module.
+ */
 import type { QRConfig } from '@/packages/core/types';
-import { assertWorkerRequest, isWorkerResponse } from './sharedContract';
 import type { PixelFrame, ScannabilityResult } from './checker';
-import { calculateScannabilityHealth, type HealthScore } from './scoring';
-import { getExportRiskPolicy, type ExportRisk, type ScannabilityStatus } from './exportRiskPolicy';
-import { loadPixelCheck } from './scanCheck';
+import type { HealthScore } from './scoring';
+import type { ExportRisk, ScannabilityStatus } from './exportRiskPolicy';
 import { releaseImageHandle } from './imageHandle';
-import {
-  connectScannabilityWorker,
-  type ScannabilityWorkerFactory,
-  type ScannabilityWorkerHandle,
-} from './workerFactory';
+import type { ScannabilityWorkerFactory } from './workerFactory';
+import { publish, settle, update } from './evaluator/answer';
+import { BACKPRESSURE_LATENCY_MS, IDLE_TIMEOUT_MS, positive } from './evaluator/defaults';
+import { armRecheck, armWatchdog, clearRecheck, clearWatchdog, releaseBusy, releaseTrailing } from './evaluator/flight';
+import { onWatchdog, runWithoutWorker } from './evaluator/mainThread';
+import { createEvaluatorState, type EvaluatorState, type Flight } from './evaluator/state';
+import { sendToWorker } from './evaluator/capture';
+import { getWorker, retireWorker } from './evaluator/worker';
 
-/** Budget for one worker round trip before the evaluator answers on the main thread. */
-const SCANNABILITY_WATCHDOG_MS = 1500;
-/** Worker latency above one 60 FPS frame turns on frame dropping while a check is in flight. */
-const BACKPRESSURE_LATENCY_MS = 16.6;
-/** Idle-callback timeout for canvas capture and main-thread checks. */
-const IDLE_TIMEOUT_MS = 100;
-/** How long after a design change the evaluator waits for the caller's check before checking the canvas itself. */
-const RECHECK_AFTER_CHANGE_MS = 1000;
+export { assessScannability } from './evaluator/defaults';
 
 /**
  * Injectable time source. Production uses `systemScannabilityClock`; headless tests step a fake.
@@ -51,20 +50,6 @@ export interface ScannabilityClock {
   /** Runs `callback` when the main thread is idle, or after `timeoutMs` at the latest. */
   scheduleIdle(callback: () => void, timeoutMs: number): void;
 }
-
-/** Wall-clock implementation backed by `performance.now()`, timers and `requestIdleCallback`. */
-const systemScannabilityClock: ScannabilityClock = {
-  now: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
-  setTimeout: (callback, ms) => Number(globalThis.setTimeout(callback, ms)),
-  clearTimeout: (handle) => globalThis.clearTimeout(handle),
-  scheduleIdle: (callback, timeoutMs) => {
-    if (typeof globalThis.requestIdleCallback === 'function') {
-      globalThis.requestIdleCallback(() => callback(), { timeout: timeoutMs });
-    } else {
-      globalThis.setTimeout(callback, timeoutMs);
-    }
-  },
-};
 
 /** The part of a canvas the evaluator reads. Any `HTMLCanvasElement` satisfies it. */
 export interface ScannabilityCanvas {
@@ -145,729 +130,98 @@ export interface ScannabilityEvaluator {
   destroy(): void;
 }
 
-interface LocalMetrics {
-  violations?: number;
-  minContrast?: number;
-}
-
-interface Flight {
-  seq: number;
-  request: ScannabilityCheckRequest;
-  moduleCount: number | undefined;
-  quietZoneModules: number | undefined;
-}
-
 /**
- * Combines the verification status, the heuristic health score and the export policy.
+ * Starts a check: holds it back under backpressure, or numbers it, marks the answer as checking
+ * and hands it to the worker or the main thread.
  */
-export function assessScannability(
-  status: ScannabilityStatus,
-  config: QRConfig,
-  localMetrics?: LocalMetrics,
-  workerRecoveryActive = false
-): ScannabilityAssessment {
-  const health = calculateScannabilityHealth(config, localMetrics);
-  return { status, health, exportRisk: getExportRiskPolicy({ status, health }), workerRecoveryActive };
-}
-
-function isCanvasElement(canvas: ScannabilityCanvas): canvas is HTMLCanvasElement {
-  return typeof HTMLCanvasElement !== 'undefined' && canvas instanceof HTMLCanvasElement;
-}
-
-function drawBitmap(bitmap: ImageBitmap): PixelFrame | null {
-  const width = bitmap.width || 1;
-  const height = bitmap.height || 1;
-  if (typeof OffscreenCanvas !== 'undefined') {
-    const ctx = new OffscreenCanvas(width, height).getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(bitmap, 0, 0);
-    return ctx.getImageData(0, 0, width, height);
+function startCheck(s: EvaluatorState, request: ScannabilityCheckRequest): Promise<ScannabilityAssessment | null> {
+  if (s.destroyed) {
+    releaseImageHandle(request.imageBitmap);
+    return Promise.resolve(null);
   }
-  if (typeof document !== 'undefined') {
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(bitmap, 0, 0);
-    return ctx.getImageData(0, 0, width, height);
+  clearRecheck(s);
+  const owner = getWorker(s);
+
+  // Backpressure: while the worker is busy and running slower than a display frame, hold only
+  // the newest check (releasing any older held one) and run it when the in-flight check ends.
+  if (owner && s.flight.busy && s.flight.lastLatency > BACKPRESSURE_LATENCY_MS) {
+    releaseTrailing(s);
+    return new Promise<ScannabilityAssessment | null>((resolve) => {
+      s.flight.trailing = { request, resolve };
+    });
   }
-  return null;
+
+  s.flight.sequence += 1;
+  const seq = s.flight.sequence;
+  const current: Flight = {
+    seq,
+    request,
+    moduleCount: positive(request.moduleCount) ?? positive(s.options.getModuleCount?.()),
+    quietZoneModules: request.quietZoneModules ?? s.answer.config.quietZoneModules ?? 4,
+  };
+  s.flight.current = current;
+  const answer = new Promise<ScannabilityAssessment | null>((resolve) => s.answer.pending.set(seq, resolve));
+  settle(s, seq - 1, false);
+  update(s, { status: 'checking' });
+
+  if (!owner) {
+    s.clock.scheduleIdle(() => runWithoutWorker(s, current), IDLE_TIMEOUT_MS);
+    return answer;
+  }
+  s.flight.busy = true;
+  s.flight.startedAt = s.clock.now();
+  // Armed before capture so a stalled canvas capture is caught too.
+  armWatchdog(s, seq);
+  sendToWorker(s, owner, current);
+  return answer;
 }
-
-const defaultFrameReader: ScannabilityFrameReader = {
-  captureBitmap: (canvas) =>
-    isCanvasElement(canvas) && typeof globalThis.createImageBitmap === 'function'
-      ? globalThis.createImageBitmap(canvas)
-      : null,
-  readPixels: (canvas) => {
-    if (!isCanvasElement(canvas)) return null;
-    const ctx = canvas.getContext('2d');
-    return ctx ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null;
-  },
-  bitmapToPixels: drawBitmap,
-};
-
-/**
- * The main-thread check, loaded on first use with the QR reader (#1178), so pages only download
- * the reader's WebAssembly module when a check has to run on the main thread. The loader is
- * shared with the one-shot checks in `scanCheck.ts`; a failed load is not kept.
- */
-const loadDefaultRunCheck = loadPixelCheck;
-
-const positive = (value: number | undefined) => (value && value > 0 ? value : undefined);
-
-const toStatus = (result: ScannabilityResult): ScannabilityStatus =>
-  result.success ? (result.physicalReady ? 'physical-pass' : 'digital-pass') : 'fail';
 
 /**
  * Creates a Scannability Health Evaluator. No worker is spawned until the first check.
  */
 export function createScannabilityEvaluator(options: ScannabilityEvaluatorConfig): ScannabilityEvaluator {
-  const clock = options.clock ?? systemScannabilityClock;
-  const frames = options.frames ?? defaultFrameReader;
-  const createWorker = options.createWorker ?? connectScannabilityWorker;
-  const injectedRunCheck = options.runCheck;
-  const listeners = new Set<(assessment: ScannabilityAssessment) => void>();
-  const pending = new Map<number, (assessment: ScannabilityAssessment | null) => void>();
-
-  let config = options.config;
-  let status: ScannabilityStatus = 'idle';
-  let localMetrics: LocalMetrics | undefined;
-  let workerRecoveryActive = false;
-  let assessment = assessScannability(status, config, localMetrics, workerRecoveryActive);
-
-  let worker: ScannabilityWorkerHandle | null = null;
-  let workerUnsupported = false;
-  let destroyed = false;
-  let sequence = 0;
-  let busy = false;
-  let startedAt: number | null = null;
-  let lastLatency = 0;
-  let consecutiveTimeouts = 0;
-  let offscreenDegraded = false;
-  let watchdog: { handle: number; seq: number } | null = null;
-  let flight: Flight | null = null;
-  let retiring: { owner: ScannabilityWorkerHandle; handle: number } | null = null;
-  // The newest check dropped by backpressure. It runs as soon as the in-flight check ends, in
-  // place of that check's (now outdated) verdict, so the latest design is always checked (#1250).
-  let trailing: { request: ScannabilityCheckRequest; resolve: (assessment: ScannabilityAssessment | null) => void } | null = null;
-  // Requests up to this sequence were posted for a design that has since changed: their answers
-  // are never published as the verdict for the design on screen (#1250).
-  let staleThrough = 0;
-  // Checks the canvas if no check arrives for the new design after a change.
-  let recheck: number | null = null;
-
-  // --- answer bookkeeping ----------------------------------------------------
-
-  function publish() {
-    assessment = assessScannability(status, config, localMetrics, workerRecoveryActive);
-    for (const listener of [...listeners]) listener(assessment);
-  }
-
-  function update(next: { status?: ScannabilityStatus; localMetrics?: LocalMetrics; recovery?: boolean }) {
-    let changed = false;
-    if (next.status !== undefined && next.status !== status) {
-      status = next.status;
-      changed = true;
-    }
-    if (
-      next.localMetrics !== undefined &&
-      (next.localMetrics.violations !== localMetrics?.violations ||
-        next.localMetrics.minContrast !== localMetrics?.minContrast)
-    ) {
-      localMetrics = next.localMetrics;
-      changed = true;
-    }
-    if (next.recovery !== undefined && next.recovery !== workerRecoveryActive) {
-      workerRecoveryActive = next.recovery;
-      changed = true;
-    }
-    if (changed && !destroyed) publish();
-  }
-
-  /** Resolves the request `seq` (with the current answer, or null) and every older request (null). */
-  function settle(seq: number, answered: boolean) {
-    for (const [pendingSeq, resolve] of pending) {
-      if (pendingSeq > seq) continue;
-      pending.delete(pendingSeq);
-      resolve(pendingSeq === seq && answered ? assessment : null);
-    }
-  }
-
-  /** Releases the waiting trailing check, if any, and resolves its caller with null. */
-  function releaseTrailing() {
-    if (!trailing) return;
-    const { request, resolve } = trailing;
-    trailing = null;
-    releaseImageHandle(request.imageBitmap);
-    resolve(null);
-  }
-
-  /**
-   * Starts the waiting trailing check, if any. The in-flight request then resolves with null
-   * and its verdict is never published, because it describes an older design.
-   * @returns Whether a trailing check started.
-   */
-  function runTrailing(): boolean {
-    if (!trailing || destroyed) return false;
-    const { request, resolve } = trailing;
-    trailing = null;
-    check(request).then(resolve, () => resolve(null));
-    return true;
-  }
-
-  function reportFailure(errorType: string) {
-    try {
-      options.onFail?.(errorType);
-    } catch (err) {
-      console.error('Scannability failure listener threw:', err);
-    }
-  }
-
-  const isCurrent = (seq: number) => !destroyed && seq === sequence;
-
-  /**
-   * Ends a request posted before the design changed without publishing its verdict.
-   * @returns Whether the request was outdated.
-   */
-  function dropIfOutdated(seq: number): boolean {
-    if (seq > staleThrough) return false;
-    endFlight(seq);
-    settle(seq, false);
-    return true;
-  }
-
-  function applyResult(seq: number, result: ScannabilityResult, workerHealthy: boolean) {
-    if (!isCurrent(seq)) return;
-    if (dropIfOutdated(seq)) {
-      if (workerHealthy) update({ recovery: false });
-      return;
-    }
-    update({
-      status: toStatus(result),
-      localMetrics:
-        result.localContrastViolations !== undefined
-          ? { violations: result.localContrastViolations, minContrast: result.minLocalContrast }
-          : undefined,
-      recovery: workerHealthy ? false : undefined,
-    });
-    if (!result.success && result.error) reportFailure(result.error);
-    settle(seq, true);
-  }
-
-  /** Ends the current request without a verdict of its own (`idle`) or with a bare failure. */
-  function conclude(seq: number, outcome: 'idle' | 'fail') {
-    if (!isCurrent(seq) || dropIfOutdated(seq)) return;
-    endFlight(seq);
-    update({ status: outcome });
-    settle(seq, outcome === 'fail');
-  }
-
-  // --- worker lifecycle ------------------------------------------------------
-
-  function clearWatchdog(seq?: number) {
-    if (watchdog && (seq === undefined || watchdog.seq === seq)) {
-      clock.clearTimeout(watchdog.handle);
-      watchdog = null;
-    }
-  }
-
-  function clearRecheck() {
-    if (recheck === null) return;
-    clock.clearTimeout(recheck);
-    recheck = null;
-  }
-
-  function armRecheck() {
-    clearRecheck();
-    recheck = clock.setTimeout(() => {
-      recheck = null;
-      if (!destroyed) void check();
-    }, RECHECK_AFTER_CHANGE_MS);
-  }
-
-  function armWatchdog(seq: number) {
-    clearWatchdog();
-    const handle = clock.setTimeout(() => onWatchdog(seq), SCANNABILITY_WATCHDOG_MS);
-    watchdog = { handle, seq };
-  }
-
-  function endFlight(seq: number) {
-    busy = false;
-    startedAt = null;
-    clearWatchdog(seq);
-  }
-
-  function getWorker(): ScannabilityWorkerHandle | null {
-    if (destroyed || workerUnsupported) return null;
-    if (worker) return worker;
-    let owner: ScannabilityWorkerHandle | null = null;
-    try {
-      owner = createWorker({
-        onMessage: (data) => handleMessage(owner, data),
-        onError: (reason) => handleWorkerError(owner, reason),
-      });
-    } catch (err) {
-      console.error('Failed to initialize the Scannability Worker, using the main thread:', err);
-      owner = null;
-    }
-    if (!owner) {
-      workerUnsupported = true;
-      return null;
-    }
-    worker = owner;
-    return owner;
-  }
-
-  function dropWorker() {
-    worker?.terminate();
-    worker = null;
-  }
-
-  function finishRetire() {
-    if (!retiring) return;
-    clock.clearTimeout(retiring.handle);
-    retiring.owner.terminate();
-    retiring = null;
-  }
-
-  /**
-   * Terminates the worker once its in-flight frame is answered, or after the watchdog
-   * window. Killing a worker while it draws a transferred ImageBitmap can crash WebKit's
-   * web process on hosts without GPU sync support, taking the whole page down.
-   */
-  function retireWorker() {
-    const owner = worker;
-    worker = null;
-    if (!owner) return;
-    if (!busy) {
-      owner.terminate();
-      return;
-    }
-    retiring = { owner, handle: clock.setTimeout(finishRetire, SCANNABILITY_WATCHDOG_MS) };
-  }
-
-  function post(owner: ScannabilityWorkerHandle, seq: number, moduleCount: number | undefined, quietZoneModules: number | undefined, frame: PixelFrame | ImageBitmap, size: ScannabilityCanvas) {
-    const base = {
-      width: size.width,
-      height: size.height,
-      configId: String(seq),
-      moduleCount,
-      quietZoneModules,
-    };
-    if ('data' in frame) {
-      const request = { ...base, imageData: frame };
-      assertWorkerRequest(request);
-      const buffer = frame.data.buffer;
-      owner.post(request, buffer instanceof ArrayBuffer ? [buffer] : []);
-    } else {
-      const request = { ...base, imageBitmap: frame };
-      assertWorkerRequest(request);
-      owner.post(request, [frame]);
-    }
-  }
-
-  function dispatchFailed(seq: number, err: unknown, bitmap?: ImageBitmap) {
-    console.error('Outgoing worker request validation failed:', err);
-    releaseImageHandle(bitmap);
-    conclude(seq, 'fail');
-  }
-
-  function readCanvasPixels(): PixelFrame | null {
-    const canvas = options.getCanvas?.();
-    if (!canvas || canvas.width <= 0 || canvas.height <= 0) return null;
-    try {
-      return frames.readPixels(canvas);
-    } catch (err) {
-      console.error('Failed to read canvas data for scannability evaluation:', err);
-      return null;
-    }
-  }
-
-  /**
-   * Converts a bitmap to pixels on the main thread and closes it.
-   * @param bitmap - Bitmap the evaluator owns.
-   * @returns Its pixels, or null when it cannot be drawn.
-   */
-  function convertBitmap(bitmap: ImageBitmap): PixelFrame | null {
-    try {
-      return bitmap.width > 0 && bitmap.height > 0 ? frames.bitmapToPixels(bitmap) : null;
-    } catch {
-      return null;
-    } finally {
-      releaseImageHandle(bitmap);
-    }
-  }
-
-  function pixelsFromRequest(request: ScannabilityCheckRequest): PixelFrame | null {
-    const { imageData, imageBitmap } = request;
-    // A transferred buffer is detached (byteLength 0) and a transferred bitmap reports 0x0.
-    if (imageData && imageData.data.byteLength > 0) return imageData;
-    if (imageBitmap && imageBitmap.width > 0 && imageBitmap.height > 0) {
-      try {
-        return frames.bitmapToPixels(imageBitmap);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
-
-  function handleWorkerError(owner: ScannabilityWorkerHandle | null, reason: unknown) {
-    if (owner && owner === retiring?.owner) {
-      finishRetire();
-      return;
-    }
-    if (!owner || owner !== worker) return;
-    console.error('Worker error, transitioning immediately to fail state:', reason);
-    dropWorker();
-    endFlight(sequence);
-    clearWatchdog();
-    if (trailing) {
-      update({ recovery: true });
-      reportFailure('WORKER_ERROR');
-      runTrailing();
-      return;
-    }
-    if (dropIfOutdated(sequence)) {
-      update({ recovery: true });
-      reportFailure('WORKER_ERROR');
-      return;
-    }
-    update({ status: 'fail', recovery: true });
-    reportFailure('WORKER_ERROR');
-    settle(sequence, true);
-  }
-
-  function handleMessage(owner: ScannabilityWorkerHandle | null, data: unknown) {
-    if (owner && owner === retiring?.owner) {
-      finishRetire();
-      return;
-    }
-    if (!owner || owner !== worker || destroyed) return;
-    if (!isWorkerResponse(data)) {
-      console.error('Worker response validation failed:', data);
-      endFlight(sequence);
-      clearWatchdog();
-      if (!dropIfOutdated(sequence)) update({ status: 'fail' });
-      reportFailure('VALIDATION_ERROR');
-      settle(sequence, true);
-      return;
-    }
-
-    const { configId } = data;
-    // Untracked messages carry no request identity; ignore them without touching flight state.
-    if (!configId) return;
-
-    // Superseded ACK: release backpressure; only the current request falls back to idle.
-    if ('dropped' in data && data.dropped) {
-      busy = false;
-      startedAt = null;
-      if (runTrailing()) return;
-      if (configId === String(sequence)) conclude(sequence, 'idle');
-      return;
-    }
-
-    // Late result for an older request: release backpressure, keep the current status.
-    if (configId !== String(sequence)) {
-      busy = false;
-      startedAt = null;
-      runTrailing();
-      return;
-    }
-
-    clearWatchdog(sequence);
-
-    if ('retryWithImageData' in data && data.retryWithImageData) {
-      // Worker Degradation Cache: this worker cannot draw bitmaps, so send pixels from now on.
-      offscreenDegraded = true;
-      // Resend the request's own frame (the worker hands its bitmap back); the preview canvas
-      // is only a fallback for a worker that did not.
-      const pixels = ('imageBitmap' in data && data.imageBitmap ? convertBitmap(data.imageBitmap) : null) ?? readCanvasPixels();
-      if (!pixels) {
-        conclude(sequence, 'fail');
-        return;
-      }
-      try {
-        post(owner, sequence, flight?.moduleCount, flight?.quietZoneModules, pixels, pixels);
-        armWatchdog(sequence);
-      } catch (err) {
-        dispatchFailed(sequence, err);
-      }
-      return;
-    }
-
-    if (!('success' in data)) return;
-    if (startedAt !== null) {
-      lastLatency = clock.now() - startedAt;
-    }
-    endFlight(sequence);
-    consecutiveTimeouts = 0;
-    if (runTrailing()) return;
-    applyResult(sequence, data, true);
-  }
-
-  function onWatchdog(seq: number) {
-    if (!isCurrent(seq)) return;
-    if (watchdog?.seq === seq) watchdog = null;
-    busy = false;
-    startedAt = null;
-    consecutiveTimeouts += 1;
-    update({ recovery: true });
-    if (consecutiveTimeouts > 1) dropWorker();
-    if (runTrailing()) return;
-
-    const current = flight && flight.seq === seq ? flight : null;
-    const pixels = (current && pixelsFromRequest(current.request)) || readCanvasPixels();
-    if (!pixels) {
-      conclude(seq, 'fail');
-      return;
-    }
-    runOnMainThread(seq, pixels, current?.moduleCount, current?.quietZoneModules, false);
-  }
-
-  // --- main-thread path ------------------------------------------------------
-
-  function runOnMainThread(seq: number, pixels: PixelFrame, moduleCount: number | undefined, quietZoneModules: number | undefined, workerHealthy: boolean) {
-    if (!isCurrent(seq)) return;
-    if (injectedRunCheck) {
-      finishOnMainThread(seq, () => injectedRunCheck(pixels, moduleCount, quietZoneModules), workerHealthy);
-      return;
-    }
-    loadDefaultRunCheck().then(
-      (runCheck) => finishOnMainThread(seq, () => runCheck(pixels, moduleCount, quietZoneModules), workerHealthy),
-      (err: unknown) =>
-        finishOnMainThread(
-          seq,
-          () => {
-            throw err;
-          },
-          workerHealthy
-        )
-    );
-  }
-
-  function finishOnMainThread(seq: number, check: () => ScannabilityResult, workerHealthy: boolean) {
-    if (!isCurrent(seq)) return;
-    let result: ScannabilityResult;
-    try {
-      result = check();
-    } catch (err) {
-      console.error('Main-thread fallback processing failed:', err);
-      if (isCurrent(seq)) {
-        update({ status: 'fail' });
-        reportFailure('VALIDATION_ERROR');
-        settle(seq, true);
-      }
-      return;
-    }
-    applyResult(seq, result, workerHealthy);
-  }
-
-  function runWithoutWorker(current: Flight) {
-    const { seq, request } = current;
-    try {
-      if (!isCurrent(seq)) return;
-      let pixels = pixelsFromRequest(request);
-      if (!pixels && !request.imageData && !request.imageBitmap) {
-        const canvas = options.getCanvas?.();
-        if (!canvas || canvas.width <= 0 || canvas.height <= 0) {
-          conclude(seq, 'idle');
-          return;
-        }
-        pixels = readCanvasPixels();
-      }
-      if (!pixels) {
-        conclude(seq, 'fail');
-        return;
-      }
-      runOnMainThread(seq, pixels, current.moduleCount, current.quietZoneModules, true);
-    } finally {
-      releaseImageHandle(request.imageBitmap);
-    }
-  }
-
-  // --- canvas capture --------------------------------------------------------
-
-  function sendCanvasPixels(owner: ScannabilityWorkerHandle, current: Flight) {
-    const { seq } = current;
-    if (!isCurrent(seq)) return;
-    const pixels = readCanvasPixels();
-    if (!pixels) {
-      conclude(seq, 'fail');
-      return;
-    }
-    try {
-      post(owner, seq, current.moduleCount, current.quietZoneModules, pixels, pixels);
-    } catch (err) {
-      dispatchFailed(seq, err);
-    }
-  }
-
-  function captureAndSend(owner: ScannabilityWorkerHandle, current: Flight) {
-    const { seq } = current;
-    if (!isCurrent(seq) || owner !== worker) return;
-
-    const canvas = options.getCanvas?.();
-    if (!canvas || canvas.width <= 0 || canvas.height <= 0) {
-      conclude(seq, 'idle');
-      return;
-    }
-
-    let capture: Promise<ImageBitmap> | null = null;
-    if (!offscreenDegraded) {
-      try {
-        capture = frames.captureBitmap(canvas);
-      } catch {
-        capture = null;
-      }
-    }
-    if (!capture) {
-      sendCanvasPixels(owner, current);
-      return;
-    }
-
-    const size = { width: canvas.width, height: canvas.height };
-    Promise.resolve(capture).then(
-      (bitmap) => {
-        if (!isCurrent(seq) || owner !== worker) {
-          releaseImageHandle(bitmap);
-          return;
-        }
-        try {
-          post(owner, seq, current.moduleCount, current.quietZoneModules, bitmap, size);
-        } catch (err) {
-          dispatchFailed(seq, err, bitmap);
-        }
-      },
-      (err: unknown) => {
-        if (!isCurrent(seq) || owner !== worker) return;
-        console.error('createImageBitmap failed, falling back to synchronous read:', err);
-        sendCanvasPixels(owner, current);
-      }
-    );
-  }
-
-  // --- public surface ----------------------------------------------------------
-
-  function check(request: ScannabilityCheckRequest = {}): Promise<ScannabilityAssessment | null> {
-    const { imageData, imageBitmap } = request;
-    if (destroyed) {
-      releaseImageHandle(imageBitmap);
-      return Promise.resolve(null);
-    }
-    clearRecheck();
-
-    const owner = getWorker();
-
-    // Backpressure: while the worker is busy and running slower than a display frame, hold only
-    // the newest check (releasing any older held one) and run it when the in-flight check ends.
-    if (owner && busy && lastLatency > BACKPRESSURE_LATENCY_MS) {
-      releaseTrailing();
-      return new Promise<ScannabilityAssessment | null>((resolve) => {
-        trailing = { request, resolve };
-      });
-    }
-
-    sequence += 1;
-    const seq = sequence;
-    const current: Flight = {
-      seq,
-      request,
-      moduleCount: positive(request.moduleCount) ?? positive(options.getModuleCount?.()),
-      quietZoneModules: request.quietZoneModules ?? config.quietZoneModules ?? 4,
-    };
-    flight = current;
-    const answer = new Promise<ScannabilityAssessment | null>((resolve) => pending.set(seq, resolve));
-    settle(seq - 1, false);
-    update({ status: 'checking' });
-
-    if (!owner) {
-      clock.scheduleIdle(() => runWithoutWorker(current), IDLE_TIMEOUT_MS);
-      return answer;
-    }
-
-    busy = true;
-    startedAt = clock.now();
-    // Armed before capture so a stalled canvas capture is caught too.
-    armWatchdog(seq);
-
-    if (imageBitmap && offscreenDegraded) {
-      // This worker cannot draw bitmaps: convert the caller's frame here and post it once.
-      const pixels = convertBitmap(imageBitmap);
-      if (!pixels) {
-        conclude(seq, 'fail');
-        return answer;
-      }
-      try {
-        post(owner, seq, current.moduleCount, current.quietZoneModules, pixels, pixels);
-      } catch (err) {
-        dispatchFailed(seq, err);
-      }
-      return answer;
-    }
-
-    if (imageBitmap) {
-      try {
-        post(owner, seq, current.moduleCount, current.quietZoneModules, imageBitmap, imageBitmap);
-      } catch (err) {
-        dispatchFailed(seq, err, imageBitmap);
-      }
-      return answer;
-    }
-
-    if (imageData) {
-      try {
-        post(owner, seq, current.moduleCount, current.quietZoneModules, imageData, imageData);
-      } catch (err) {
-        dispatchFailed(seq, err);
-      }
-      return answer;
-    }
-
-    clock.scheduleIdle(() => captureAndSend(owner, current), IDLE_TIMEOUT_MS);
-    return answer;
-  }
+  const s = createEvaluatorState(options);
+  const check = (request: ScannabilityCheckRequest = {}) => startCheck(s, request);
+  s.check = check;
+  s.onWatchdog = (seq) => onWatchdog(s, seq);
 
   return {
     check,
     setConfig(next) {
-      if (next === config) return;
-      config = next;
-      if (destroyed) return;
+      if (next === s.answer.config) return;
+      s.answer.config = next;
+      if (s.destroyed) return;
       // Every request posted so far describes the previous design (#1250).
-      staleThrough = sequence;
-      releaseTrailing();
-      if (status === 'idle') {
-        publish();
+      s.flight.staleThrough = s.flight.sequence;
+      releaseTrailing(s);
+      if (s.answer.status === 'idle') {
+        publish(s);
         return;
       }
       // Show "checking" until the new design has its own verdict, and check the canvas if the
       // caller sends no check for it.
-      if (status === 'checking') publish();
-      else update({ status: 'checking' });
-      armRecheck();
+      if (s.answer.status === 'checking') publish(s);
+      else update(s, { status: 'checking' });
+      armRecheck(s);
     },
-    getAssessment: () => assessment,
+    getAssessment: () => s.answer.assessment,
     subscribe(listener) {
-      listeners.add(listener);
+      s.answer.listeners.add(listener);
       return () => {
-        listeners.delete(listener);
+        s.answer.listeners.delete(listener);
       };
     },
     destroy() {
-      if (destroyed) return;
-      destroyed = true;
-      clearWatchdog();
-      clearRecheck();
-      retireWorker();
-      busy = false;
-      startedAt = null;
-      flight = null;
-      releaseTrailing();
-      listeners.clear();
-      settle(Number.POSITIVE_INFINITY, false);
+      if (s.destroyed) return;
+      s.destroyed = true;
+      clearWatchdog(s);
+      clearRecheck(s);
+      retireWorker(s);
+      releaseBusy(s);
+      s.flight.current = null;
+      releaseTrailing(s);
+      s.answer.listeners.clear();
+      settle(s, Number.POSITIVE_INFINITY, false);
     },
   };
 }
