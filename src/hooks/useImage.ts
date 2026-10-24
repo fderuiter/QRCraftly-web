@@ -17,7 +17,7 @@
 */
 
 import { useState, useEffect } from 'react';
-import { setCachedAsset, convertImageToBase64 } from '../utils/assetCache';
+import { setCachedAsset, convertImageToBase64 } from '@/packages/qr-export';
 
 /**
  * Hook to load an image asynchronously.

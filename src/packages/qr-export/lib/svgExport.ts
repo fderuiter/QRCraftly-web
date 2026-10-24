@@ -22,7 +22,7 @@ import { drawWithTemplate, SOCIAL_DIMENSIONS } from './templateRenderer';
 import { getQrTypeLabel, getQrTypeDescription } from '@/packages/qr-payload';
 
 import { SafeUrlPipeline, normalizeUrl } from '@/packages/core/url';
-import { getCachedAsset, setCachedAsset } from '@/utils/assetCache';
+import { getCachedAsset, setCachedAsset } from './assetCache';
 import { sanitizeSvg } from '@/packages/core/security';
 
 import { validateConfig } from '@/packages/qr-payload';

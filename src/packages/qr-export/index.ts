@@ -61,3 +61,6 @@ export {
   type WalletCardPlan,
   type WalletCardText,
 } from './lib/walletCard';
+
+// In-memory cache of logo images as data URLs, shared by the preview and SVG export
+export { getCachedAsset, setCachedAsset, clearAssetCache, convertImageToBase64 } from './lib/assetCache';
