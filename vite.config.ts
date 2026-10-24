@@ -167,6 +167,8 @@ export default defineConfig(({ command }) => {
                 '**/node_modules/**',
                 '**/dist/**',
                 'e2e/**',
+                // Reads the real build; runs after it with `pnpm run test:build` (#1609).
+                'tests/build-output/**',
                 // Agent worktrees are copies of the repository, not part of it.
                 '.claude/**',
               ],

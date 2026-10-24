@@ -108,15 +108,6 @@ describe('PWA Manifest & Static Brand Icon Compliance Suite', () => {
     expect(maskableSizes).toContain('512x512');
   });
 
-  it('Requirement 4 & AC5: Post-build Service Worker precaches all static brand icon assets with revision hashes', () => {
-    const swPath = path.join(__dirname, '../dist/client/sw.js');
-    if (fs.existsSync(swPath)) {
-      const swContent = fs.readFileSync(swPath, 'utf8');
-      const manifestContent = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-
-      for (const icon of manifestContent.icons) {
-        expect(swContent).toContain(icon.src);
-      }
-    }
-  });
+  // Requirement 4 & AC5, that the built service worker precaches every icon, reads dist/client and
+  // runs after the build: tests/build-output/built_output.test.ts (#1609).
 });

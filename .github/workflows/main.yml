@@ -365,6 +365,9 @@ jobs:
       - name: Check Bundle Size
         run: node scripts/check-bundle-size.js
 
+      - name: Test Build Output
+        run: pnpm run test:build
+
       - name: Generate Resource Quota Report
         if: github.event_name == 'pull_request'
         run: node scripts/resource-quota-report.js
