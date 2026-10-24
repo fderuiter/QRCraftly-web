@@ -19,8 +19,10 @@
 /**
  * Byte, hex, SHA-256 and colour helpers shared by the packages and the app (ADR 0052).
  */
-export { bytesToHex, concatBytes, hexToBytes } from './lib/bytes';
-export { sha256, sha256Digest, sha256Hex } from './lib/sha256';
+export { concatBytes } from './lib/bytes';
+export { sha256Digest, sha256Hex } from './lib/digest';
+export { bytesToHex, hexToBytes } from './lib/hex';
+export { sha256 } from './lib/sha256';
 export {
   getContrastRatio,
   getLuminance,
