@@ -123,4 +123,33 @@ describe('useImage', () => {
     expect(mockImg.onload).toBeNull();
     expect(mockImg.onerror).toBeNull();
   });
+  it('returns null while a new url loads, never the previous image (#1587)', () => {
+    const images: any[] = [];
+    window.Image = class {
+      onload: any;
+      onerror: any;
+      src = '';
+      complete = false;
+      naturalHeight = 0;
+      constructor() {
+        images.push(this);
+      }
+    } as any;
+
+    const { result, rerender } = renderHook(({ url }) => useImage(url), { initialProps: { url: 'http://example.com/a.png' } });
+    act(() => {
+      images[0].onload();
+    });
+    expect(result.current).toBe(images[0]);
+
+    rerender({ url: 'http://example.com/b.png' });
+    expect(result.current).toBeNull();
+    // The abandoned request can no longer set state.
+    expect(images[0].onload).toBeNull();
+
+    act(() => {
+      images[1].onload();
+    });
+    expect(result.current).toBe(images[1]);
+  });
 });

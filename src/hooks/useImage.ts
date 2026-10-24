@@ -21,16 +21,18 @@ import { setCachedAsset, convertImageToBase64 } from '@/packages/qr-export';
 
 /**
  * Hook to load an image asynchronously.
- * Returns the HTMLImageElement once loaded, or null.
+ * Returns the HTMLImageElement once loaded, or null. While a new url loads it returns null, never
+ * the previous url's image, so a repaint cannot draw the old logo under the new config (#1587).
  */
 export const useImage = (url: string | null) => {
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [loaded, setLoaded] = useState<{ url: string; img: HTMLImageElement } | null>(null);
 
   useEffect(() => {
     if (!url) {
-      setImage(null);
+      setLoaded(null);
       return;
     }
+    const setImage = (img: HTMLImageElement | null) => setLoaded(img ? { url, img } : null);
 
     const img = new Image();
     img.crossOrigin = 'Anonymous';
@@ -66,5 +68,5 @@ export const useImage = (url: string | null) => {
     };
   }, [url]);
 
-  return image;
+  return loaded && loaded.url === url ? loaded.img : null;
 };

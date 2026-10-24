@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { validateImageUpload, sanitizeSvg } from '@/packages/core/security';
 import {
   isLowTierDevice,
@@ -69,9 +69,23 @@ const isDrawableSvg = (svg: string): boolean => {
  */
 export function useImageUpload(): UseImageUploadReturn {
   const [error, setError] = useState<string | null>(null);
+  /** The latest upload's id: a decode that finishes after a newer pick, or after unmount, is dropped (#1587). */
+  const latestUploadRef = useRef(0);
+
+  useEffect(() => () => {
+    latestUploadRef.current += 1;
+  }, []);
 
   const handleUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>, onSuccess: (dataUrl: string) => void) => {
     const file = e.target.files?.[0];
+    const id = ++latestUploadRef.current;
+    const isCurrent = () => id === latestUploadRef.current;
+    const succeed = (dataUrl: string) => {
+      if (isCurrent()) onSuccess(dataUrl);
+    };
+    const fail = (message: string) => {
+      if (isCurrent()) setError(message);
+    };
     setError(null);
     if (file) {
       const validationError = validateImageUpload(file);
@@ -88,19 +102,19 @@ export function useImageUpload(): UseImageUploadReturn {
           const sanitizedSvg = sanitizeSvg(rawSvg);
           if (!isDrawableSvg(sanitizedSvg)) {
             // Keep the current logo rather than cutting a hole for an image that never draws.
-            setError(UNDRAWABLE_SVG_MESSAGE);
+            fail(UNDRAWABLE_SVG_MESSAGE);
             return;
           }
           const base64 = btoa(unescape(encodeURIComponent(sanitizedSvg)));
           const dataUrl = `data:image/svg+xml;base64,${base64}`;
-          onSuccess(dataUrl);
+          succeed(dataUrl);
         };
         reader.readAsText(file);
       } else if (isFileReaderMocked()) {
         // Fallback for tests that explicitly mock FileReader to return a controlled result
         const reader = new FileReader();
         reader.onload = (event) => {
-          onSuccess(event.target?.result as string);
+          succeed(event.target?.result as string);
         };
         reader.readAsDataURL(file);
       } else {
@@ -109,20 +123,17 @@ export function useImageUpload(): UseImageUploadReturn {
 
         const proceedWithMainThread = () => {
           processImageOnMainThread(file, maxDim)
-            .then((dataUrl) => {
-              onSuccess(dataUrl);
-            })
+            .then(succeed)
             .catch((err) => {
-              setError(err?.message || 'Error processing image');
+              fail(err?.message || 'Error processing image');
             });
         };
 
         if (isOffThreadSupported()) {
           processImageOffThread(file, maxDim)
-            .then((dataUrl) => {
-              onSuccess(dataUrl);
-            })
+            .then(succeed)
             .catch((err) => {
+              if (!isCurrent()) return;
               console.warn('Off-thread image processing failed, falling back to main-thread canvas:', err);
               proceedWithMainThread();
             });

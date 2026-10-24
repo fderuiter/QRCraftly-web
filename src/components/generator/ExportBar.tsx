@@ -54,7 +54,7 @@ export interface ExportBarProps {
  */
 export function ExportBar({ flow, verdict, health, canShare, rowRef, inputFocused }: ExportBarProps) {
   const { downloadButtonRef, copyButtonRef, shareButtonRef, optionsButtonRef, options, notifyExportsOff, run } = flow;
-  const { busy: busyExport, done } = flow.status;
+  const { isBusy, done } = flow.status;
   const { format, setFormat, size, setSize, colorSpace, setColorSpace, filename, setFilename: setCustomFilename } = options;
   const optionsOpen = options.open;
   const exportsOffReason = exportsOffNoteId(flow.exportsOff === 'refused', flow.exportsOff === 'empty');
@@ -98,7 +98,7 @@ export function ExportBar({ flow, verdict, health, canShare, rowRef, inputFocuse
             variant={!exportsOffReason && getExportRiskPolicy({ status: verdict, health }) === 'unsafe' ? 'error' : 'primary'}
             size="bar"
             className="flex-1"
-            loading={busyExport === format}
+            loading={isBusy(format)}
             aria-disabled={exportsOffReason ? 'true' : undefined}
             aria-describedby={exportsOffReason}
             onClick={exportsOffReason ? notifyExportsOff : onDownload}
@@ -141,7 +141,7 @@ export function ExportBar({ flow, verdict, health, canShare, rowRef, inputFocuse
               filename={filename}
               onFilenameChange={setCustomFilename}
               onCopySvg={onCopySvg}
-              copySvgBusy={busyExport === 'svg-copy'}
+              copySvgBusy={isBusy('svg-copy')}
               onWallet={onWallet}
            />
          )}
@@ -153,7 +153,7 @@ export function ExportBar({ flow, verdict, health, canShare, rowRef, inputFocuse
               size="bar"
               iconOnly
               onClick={onCopy}
-              loading={busyExport === 'clipboard'}
+              loading={isBusy('clipboard')}
               aria-label={copied ? "Copied" : "Copy QR code to clipboard"}
               aria-disabled={exportsOffReason ? 'true' : undefined}
               aria-describedby={exportsOffReason}
@@ -170,7 +170,7 @@ export function ExportBar({ flow, verdict, health, canShare, rowRef, inputFocuse
                 size="bar"
                 iconOnly
                 onClick={onShare}
-                loading={busyExport === 'share'}
+                loading={isBusy('share')}
                 aria-label={done?.format === 'share' ? 'Shared' : 'Share QR code'}
                 aria-disabled={exportsOffReason ? 'true' : undefined}
                 aria-describedby={exportsOffReason}

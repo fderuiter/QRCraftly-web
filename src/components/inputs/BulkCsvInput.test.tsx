@@ -30,10 +30,14 @@ import * as qrExport from '@/packages/qr-export';
 import * as bulkCsv from '@/packages/bulk-csv';
 import { MAX_BULK_CSV_ROWS, SAMPLE_CSV_TEMPLATE } from '@/packages/bulk-csv';
 
-// The real row check, wrapped so a test can count how often it runs.
+// The real row check and Excel parser, wrapped so a test can count calls or hold one open.
 vi.mock('@/packages/bulk-csv', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/packages/bulk-csv')>();
-  return { ...actual, categorizeCsvRows: vi.fn(actual.categorizeCsvRows) };
+  return {
+    ...actual,
+    categorizeCsvRows: vi.fn(actual.categorizeCsvRows),
+    parseExcelToCsv: vi.fn(actual.parseExcelToCsv),
+  };
 });
 
 /** Lists the entry names in the central directory of a stored ZIP archive. */
@@ -1175,5 +1179,55 @@ describe('Excel Spreadsheet Parsing (.xlsx)', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Could not read blank.xlsx. Choose the file again.');
     });
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('keeps the last file picked when an earlier .xlsx finishes after a later .csv (#1587)', async () => {
+    let finishExcel!: (csv: string) => void;
+    vi.mocked(bulkCsv.parseExcelToCsv).mockClear();
+    vi.mocked(bulkCsv.parseExcelToCsv).mockReturnValueOnce(
+      new Promise<string>((resolve) => {
+        finishExcel = resolve;
+      })
+    );
+
+    const onChange = vi.fn();
+    renderWithToasts(<BulkCsvInput data={initialData} onChange={onChange} />);
+    const input = screen.getByLabelText('Upload CSV, TXT, or Excel file');
+
+    const xlsx = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'first.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    fireEvent.change(input, { target: { files: [xlsx] } });
+    await waitFor(() => {
+      expect(bulkCsv.parseExcelToCsv).toHaveBeenCalledTimes(1);
+    });
+
+    const csvContent = 'URL,Name\nhttps://example.com/csv,Csv';
+    fireEvent.change(input, { target: { files: [new File([csvContent], 'second.csv', { type: 'text/csv' })] } });
+    expect(await screen.findByText('Loaded second.csv.')).toBeInTheDocument();
+    expect(onChange).toHaveBeenLastCalledWith({ csvContent, fileName: 'second.csv' });
+
+    // The slower .xlsx load finishes last; its result must be dropped.
+    await act(async () => {
+      finishExcel('URL,Name\nhttps://example.com/xlsx,Xlsx');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(onChange).toHaveBeenLastCalledWith({ csvContent, fileName: 'second.csv' });
+    expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ fileName: 'first.xlsx' }));
+    expect(document.body).not.toHaveTextContent('first.xlsx');
+  });
+
+  it('loads a single picked CSV and shows its success toast', async () => {
+    const onChange = vi.fn();
+    renderWithToasts(<BulkCsvInput data={initialData} onChange={onChange} />);
+
+    const csvContent = 'URL,Name\nhttps://example.com/solo,Solo';
+    fireEvent.change(screen.getByLabelText('Upload CSV, TXT, or Excel file'), {
+      target: { files: [new File([csvContent], 'solo.csv', { type: 'text/csv' })] },
+    });
+
+    expect(await screen.findByText('Loaded solo.csv.')).toBeInTheDocument();
+    expect(onChange).toHaveBeenLastCalledWith({ csvContent, fileName: 'solo.csv' });
   });
 });

@@ -135,9 +135,43 @@ describe('useExportFlow', () => {
     exportAsset.mockImplementationOnce(() => new Promise<ExportStatus>((resolve) => { finish = resolve; }));
     const { result } = renderFlow();
     act(() => result.current.run('copy'));
-    expect(result.current.status.busy).toBe('clipboard');
+    expect(result.current.status.isBusy('clipboard')).toBe(true);
     await act(async () => finish({ success: true, format: 'clipboard' }));
-    expect(result.current.status.busy).toBeNull();
+    expect(result.current.status.isBusy('clipboard')).toBe(false);
+  });
+
+  it('keeps the download busy when an overlapping copy finishes first (#1587)', async () => {
+    let finishCopy: (status: ExportStatus) => void = () => {};
+    let finishDownload: (status: ExportStatus) => void = () => {};
+    exportAsset
+      .mockImplementationOnce(() => new Promise<ExportStatus>((resolve) => { finishCopy = resolve; }))
+      .mockImplementationOnce(() => new Promise<ExportStatus>((resolve) => { finishDownload = resolve; }));
+    const { result } = renderFlow();
+    act(() => result.current.run('copy'));
+    act(() => result.current.run('download'));
+    expect(result.current.status.isBusy('clipboard')).toBe(true);
+    expect(result.current.status.isBusy('png')).toBe(true);
+    await act(async () => finishCopy({ success: true, format: 'clipboard' }));
+    expect(result.current.status.isBusy('clipboard')).toBe(false);
+    expect(result.current.status.isBusy('png')).toBe(true);
+    await act(async () => finishDownload({ success: true, format: 'png' }));
+    expect(result.current.status.isBusy('png')).toBe(false);
+  });
+
+  it('clears a busy format only when its own export settles (#1587)', async () => {
+    let finishCopy: (status: ExportStatus) => void = () => {};
+    let finishDownload: (status: ExportStatus) => void = () => {};
+    exportAsset
+      .mockImplementationOnce(() => new Promise<ExportStatus>((resolve) => { finishCopy = resolve; }))
+      .mockImplementationOnce(() => new Promise<ExportStatus>((resolve) => { finishDownload = resolve; }));
+    const { result } = renderFlow();
+    act(() => result.current.run('copy'));
+    act(() => result.current.run('download'));
+    await act(async () => finishDownload({ success: true, format: 'png' }));
+    expect(result.current.status.isBusy('png')).toBe(false);
+    expect(result.current.status.isBusy('clipboard')).toBe(true);
+    await act(async () => finishCopy({ success: true, format: 'clipboard' }));
+    expect(result.current.status.isBusy('clipboard')).toBe(false);
   });
 
   it('clears the done mark after 2 seconds', async () => {
