@@ -16,35 +16,31 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React, { Suspense, useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import React, { Suspense, useState, useRef, useCallback, useEffect } from 'react';
 import { Button, ButtonLink } from "./ui/Button";
 import { Badge } from "./ui/Badge";
 import { Tooltip } from "./ui/Tooltip";
 import { Card } from "./ui/Card";
 import { Alert } from "./ui/Alert";
-import { type QRConfig, SocialFormat, QRType } from '@/packages/core/types';
+import { type QRConfig, SocialFormat } from '@/packages/core/types';
 import QRCanvas from '@/components/QRCanvas';
 import { Download, Share2, ChevronDown, CircleHelp, Copy, Check, AlertTriangle } from 'lucide-react';
-import { ExportOptions as DownloadOptions, FORMAT_LABELS, clampSize, type DownloadFormat } from './ExportOptions';
+import { ExportOptions as DownloadOptions, FORMAT_LABELS, type DownloadFormat } from './ExportOptions';
 import { usePopoverDismiss } from '@/hooks/usePopoverDismiss';
 import { Modal } from './ui/Modal';
-import { useLeadingDebounce } from '@/hooks/useDebounce';
-import { useQRDownload, BLOCKED_EXPORT_MESSAGE, type AssetOptions, type ExportFormat } from '@/hooks/useQRDownload';
-import { previewFailureMessage, type PreviewFailure } from '@/utils/previewFailure';
+import { useExportFlow } from '@/hooks/useExportFlow';
+import { useGeneratorPreview } from '@/hooks/useGeneratorPreview';
 import { getExportRiskPolicy } from '@/utils/exportRiskPolicy';
-import { useToast } from './ui/Toast';
-import { useScannability } from '@/hooks/useScannability';
 import { FIX_LABELS, ScannabilityIndicator } from '@/components/ScannabilityIndicator';
 import { QRProvider, useQRStore, useQRStoreSelector } from '@/context/QRContext';
-import { getSamplePayload, hydrateWifiData } from '@/packages/qr-payload';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { sidebarControls } from '@/registry';
 import { StressTestButton } from './arcade/StressTestButton';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from './ToolWorkspaceLayout';
 import { usePageContent } from '@/data/PageContentContext';
 import { MiniPreview } from './MiniPreview';
-import { getScanAdvice, getScanVerdict, type ScanFix, type ScanVerdict } from '@/packages/scannability';
-import { deriveVerdict, exportBlockReason, exportDecision, fixPatch, isEmptyValue, resetPatch, resolveEffectiveConfig, type ExportAction } from './generator/decisions';
+import { getScanVerdict, type ScanFix, type ScanVerdict } from '@/packages/scannability';
+import { fixPatch, resetPatch } from './generator/decisions';
 import { GeneratorCommands } from './command/GeneratorCommands';
 import { useUndoToast } from '@/hooks/useUndoToast';
 import { SegmentedControl } from './ui/SegmentedControl';
@@ -86,33 +82,6 @@ const STAGE_SIZE_CLASSES: Record<SocialFormat, string> = {
 const EMPTY_STATE_ID = 'qr-empty-state';
 /** Id of the explanation shown while a content field holds a refused value (#1279). */
 const REFUSED_STATE_ID = 'qr-refused-state';
-/** Message shown when there is nothing to export yet. */
-export const EMPTY_CONTENT_MESSAGE = 'Enter content to generate a QR code.';
-
-/** Last download choices, kept in memory only (no storage key) while the tab is open. */
-const lastDownload: { format: DownloadFormat; size: number } = { format: 'png', size: 2048 };
-
-/** How long a finished export shows its check mark. */
-const DONE_MS = 2000;
-
-/**
- * Suggests a file name from the QR type and a harmless hint from the content: the host of
- * a URL or the network name of a WiFi code, for example `wifi-HomeNetwork`.
- * @param config - Current configuration.
- * @returns A file name without extension.
- */
-export function suggestFilename(config: Pick<QRConfig, 'type' | 'value'>): string {
-  let hint = '';
-  try {
-    if (config.type === QRType.URL) hint = new URL(config.value).hostname.replace(/^www\./, '');
-    if (config.type === QRType.WIFI) hint = hydrateWifiData(config.value).ssid;
-  } catch {
-    // Not a complete URL or WiFi code yet.
-  }
-  hint = hint.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
-  return `${config.type.toLowerCase()}-${hint || 'qr-code'}`;
-}
-
 /**
  * Renders the QR code generator interface with configuration controls, preview, and export actions.
  * @param title - Optional title used for the generator heading and branding.
@@ -129,56 +98,30 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   const heading = usePageContent()?.tool?.heading ?? title ?? 'QRCraftly';
   const config = useQRStoreSelector(s => s.config);
   const store = useQRStore();
-  const setModuleCount = store.setModuleCount;
-  const { addToast } = useToast();
-  
-  const [showSafetyGate, setShowSafetyGate] = useState(false);
-  const [gateAction, setGateAction] = useState<(() => void | Promise<void>) | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [previewView, setPreviewView] = useState<PreviewView>('flat');
-  const moduleCount = useQRStoreSelector(s => s.moduleCount);
 
-  // Focus preservation refs for originating buttons
-  const downloadButtonRef = useRef<HTMLButtonElement>(null);
-  const copyButtonRef = useRef<HTMLButtonElement>(null);
-  const shareButtonRef = useRef<HTMLButtonElement>(null);
-  const isEmpty = isEmptyValue(config.value);
-  // A field holds a value the form refused, so the config still has the previous content: draw
-  // nothing rather than a code that no longer matches the form (#1279).
-  const contentRefused = useQRStoreSelector(s => s.contentRefused);
-  const samplePayload = useMemo(() => getSamplePayload(config.type), [config.type]);
-  const effectiveConfig = useMemo(
-    () => resolveEffectiveConfig(config, { refused: contentRefused, isEmpty, sample: samplePayload }),
-    [config, contentRefused, isEmpty, samplePayload],
-  );
+  const preview = useGeneratorPreview(canvasRef);
+  const { effectiveConfig, debouncedConfig, verdict: scannabilityStatus, health, noVerdict, moduleCount } = preview;
+  const flow = useExportFlow({
+    config,
+    effectiveConfig,
+    isEmpty: preview.isEmpty,
+    refused: preview.refused,
+    previewFailure: preview.previewFailure,
+    verdict: scannabilityStatus,
+    health,
+  });
+  const { downloadButtonRef, copyButtonRef, shareButtonRef, optionsButtonRef, gate, options, notifyExportsOff } = flow;
+  const { busy: busyExport, done } = flow.status;
+  const { format, setFormat, size, setSize, colorSpace, setColorSpace, filename, setFilename: setCustomFilename } = options;
+  const optionsOpen = options.open;
+  // Why every export is off, as the id of the note that says so; undefined while exports work.
+  const exportsOffReason = flow.exportsOff === 'refused' ? REFUSED_STATE_ID : flow.exportsOff === 'empty' ? EMPTY_STATE_ID : undefined;
 
-  const { exportAsset: runExport } = useQRDownload(effectiveConfig);
-  // Which export is encoding right now; its button shows a loading state until it finishes.
-  const [busyExport, setBusyExport] = useState<ExportFormat | null>(null);
-  const exportAsset = useCallback(async (format: ExportFormat, options?: AssetOptions) => {
-    setBusyExport(format);
-    try {
-      return await runExport(format, options);
-    } finally {
-      setBusyExport(null);
-    }
-  }, [runExport]);
-  // The export that just finished: its button shows a check and the status region says so.
-  const [done, setDone] = useState<{ format: ExportFormat; message: string } | null>(null);
-  useEffect(() => {
-    if (!done) return;
-    const timer = setTimeout(() => setDone(null), DONE_MS);
-    return () => clearTimeout(timer);
-  }, [done]);
-  const [format, setFormat] = useState<DownloadFormat>(lastDownload.format);
-  const [size, setSize] = useState(lastDownload.size);
-  const [colorSpace, setColorSpace] = useState<'rgb' | 'cmyk'>('rgb');
-  const [customFilename, setCustomFilename] = useState<string | null>(null);
-  const filename = customFilename ?? suggestFilename(config);
-  const [optionsOpen, setOptionsOpen] = useState(false);
   const exportRowRef = useRef<HTMLDivElement>(null);
-  const optionsButtonRef = useRef<HTMLButtonElement>(null);
-  const closeOptions = useCallback(() => setOptionsOpen(false), []);
+  const setOptionsOpen = options.setOpen;
+  const closeOptions = useCallback(() => setOptionsOpen(false), [setOptionsOpen]);
   usePopoverDismiss({ open: optionsOpen, containerRef: exportRowRef, triggerRef: optionsButtonRef, onClose: closeOptions });
   // The mobile action bar and mini preview step aside while the on-screen keyboard is up,
   // so neither covers the field being typed in (WCAG 2.4.11).
@@ -195,30 +138,6 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   }, []);
   const { canShare } = useCapabilities();
 
-  // Scannability
-  const { status: rawScannabilityStatus, checkScannability, health: rawHealth, workerRecoveryActive } = useScannability(canvasRef, effectiveConfig);
-
-  // Why the preview has no code to show (blocked or too much content), if it has none (#1251).
-  const [previewFailure, setPreviewFailure] = useState<PreviewFailure | null>(null);
-
-  const { noVerdict, status: scannabilityStatus, health } = deriveVerdict(rawScannabilityStatus, rawHealth, {
-    isEmpty,
-    refused: contentRefused,
-    previewFailed: previewFailure !== null,
-  });
-  // Why exports are off as asked, if they are; the same check gates every export surface.
-  const blockFor = (action: ExportAction) => exportBlockReason({
-    config,
-    refused: contentRefused,
-    isEmpty,
-    previewFailure,
-    verdict: { status: scannabilityStatus, health },
-    action,
-  });
-  // Why every export is off, as the id of the note that says so; undefined while exports work.
-  const offKind = blockFor('download')?.kind;
-  const exportsOffReason = offKind === 'refused' ? REFUSED_STATE_ID : offKind === 'empty' ? EMPTY_STATE_ID : undefined;
-
   const handleFix = useCallback((fix: ScanFix) => {
     store.updateConfig(fixPatch(fix));
   }, [store]);
@@ -229,54 +148,14 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
     notifyUndo('Colors reset');
   }, [store, notifyUndo]);
 
-  
-  const handleRendered = useCallback((info: { moduleCount: number, virtualImageData?: ImageData, virtualImageBitmap?: ImageBitmap } = { moduleCount: 0 }) => {
-    setPreviewFailure(null);
-    if (info.moduleCount) setModuleCount(info.moduleCount);
-    if (info.virtualImageBitmap) {
-      checkScannability(undefined, info.virtualImageBitmap, info.moduleCount);
-    } else if (info.virtualImageData) {
-      checkScannability(info.virtualImageData, undefined, info.moduleCount);
-    }
-  }, [setModuleCount, checkScannability]);
-
-  // Debounce the effective config for QRCanvas to prevent lag during rapid typing or style changes.
-  const debouncedConfig = useLeadingDebounce(effectiveConfig, 100);
-
-  /**
-   * Returns focus to the button that started an export and reports the result: success
-   * shows on the button itself and in the polite status region, errors raise a toast.
-   */
-  const exportWith = (target: ExportFormat, buttonRef: React.RefObject<HTMLButtonElement | null>, message: string) => {
-    const action: ExportAction = target === 'clipboard' || target === 'svg-copy' ? 'copy' : target === 'share' ? 'share' : 'download';
-    const run = async (options?: AssetOptions) => {
-      const result = await exportAsset(target, { ...options, size: clampSize(size), filename, colorSpace });
-      const decision = exportDecision(result, options?.allowUnsafe);
-      if (decision.retryWithAllowUnsafe) {
-        // The finished image failed the scan check: offer the same choice as the pre-flight gate
-        // instead of a raw error (#1255).
-        setGateAction(() => () => run({ ...options, allowUnsafe: true }));
-        setShowSafetyGate(true);
-        return;
-      }
-      buttonRef.current?.focus();
-      decision.toasts.forEach(addToast);
-      if (decision.markDone && result.format) setDone({ format: result.format, message });
-    };
-    executeWithSafetyGate(action, run);
-  };
-
-  const onDownload = () => {
-    lastDownload.format = format;
-    lastDownload.size = clampSize(size);
-    exportWith(format, downloadButtonRef, `${FORMAT_LABELS[format]} downloaded`);
-  };
-  const onCopy = () => exportWith('clipboard', copyButtonRef, 'Copied');
-  const onCopySvg = () => exportWith('svg-copy', optionsButtonRef, 'SVG code copied');
-  const onShare = () => exportWith('share', shareButtonRef, 'Shared');
+  const onDownload = () => flow.run('download');
+  const onCopy = () => flow.run('copy');
+  const onCopySvg = () => flow.run('copy-svg');
+  const onShare = () => flow.run('share');
+  const onWallet = () => flow.run('wallet');
   const copied = done?.format === 'clipboard';
   const commandActions = {
-    download: (target: DownloadFormat) => exportWith(target, downloadButtonRef, `${FORMAT_LABELS[target]} downloaded`),
+    download: (target: DownloadFormat) => flow.run('download', target),
     copyImage: onCopy,
     copySvg: onCopySvg,
     share: canShare ? onShare : undefined,
@@ -286,57 +165,11 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
     },
   };
 
-  const notifyExportsOff = () => {
-    if (contentRefused) {
-      addToast({ type: 'error', message: previewFailureMessage('blocked', config.errorCorrectionLevel), duration: 6000 });
-      return;
-    }
-    addToast({
-      type: 'info',
-      message: `${EMPTY_CONTENT_MESSAGE} Exports are available once there is something to encode.`,
-      duration: 5000,
-    });
-  };
-
-  /**
-   * Whether this export may go ahead now. A refusal says why; a scan risk returns 'gate' so the
-   * caller asks first.
-   */
-  const checkExport = (action: ExportAction): 'go' | 'gate' | 'refused' => {
-    const block = blockFor(action);
-    if (!block) return 'go';
-    if (block.kind === 'scan-risk') return 'gate';
-    if (block.kind === 'refused' || block.kind === 'empty') notifyExportsOff();
-    else if (block.kind === 'preview-failure') addToast({ type: 'error', message: previewFailureMessage(block.failure, config.errorCorrectionLevel), duration: 6000 });
-    else addToast({ type: 'error', message: BLOCKED_EXPORT_MESSAGE, duration: 6000 });
-    return 'refused';
-  };
-
-  // The wallet card draws a plain black-on-white code, so the design's scan risk does not apply to it.
-  const [walletOpen, setWalletOpen] = useState(false);
-  const onWallet = () => {
-    if (checkExport('wallet') !== 'go') return;
-    setOptionsOpen(false);
-    setWalletOpen(true);
-  };
-
-  const executeWithSafetyGate = (exportAction: ExportAction, action: (options?: AssetOptions) => void | Promise<void>) => {
-    const check = checkExport(exportAction);
-    if (check === 'refused') return;
-    if (check === 'gate') {
-      setGateAction(() => () => action({ allowUnsafe: true }));
-      setShowSafetyGate(true);
-    } else {
-      action();
-    }
-  };
-
-  // The safety gate names the top problem and offers its one-tap fix, the same advice as the badge.
-  const gateAdvice = showSafetyGate ? getScanAdvice({ status: scannabilityStatus, health, errorCorrectionLevel: config.errorCorrectionLevel }) : null;
+  const gateAdvice = gate.advice;
 
   return (
     <div className="w-full" id="top">
-      <Modal isOpen={showSafetyGate} onClose={() => setShowSafetyGate(false)} title="This Code May Not Scan">
+      <Modal isOpen={gate.open} onClose={gate.cancel} title="This Code May Not Scan">
         <div className="flex flex-col items-center gap-4 text-center">
           <AlertTriangle className="size-12 text-warning" aria-hidden="true" />
           <p className="text-fg-soft">
@@ -347,15 +180,12 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
              {gateAdvice?.fix ? (
                <Button variant="primary" fullWidth onClick={() => {
                  if (gateAdvice.fix) handleFix(gateAdvice.fix);
-                 setShowSafetyGate(false);
+                 gate.cancel();
                }}>{FIX_LABELS[gateAdvice.fix]}</Button>
              ) : (
-               <Button variant="primary" fullWidth onClick={() => setShowSafetyGate(false)}>Go back</Button>
+               <Button variant="primary" fullWidth onClick={gate.cancel}>Go back</Button>
              )}
-             <Button variant="outline" fullWidth onClick={() => {
-               setShowSafetyGate(false);
-               if (gateAction) gateAction();
-             }}>Export anyway</Button>
+             <Button variant="outline" fullWidth onClick={gate.confirm}>Export anyway</Button>
           </div>
         </div>
       </Modal>
@@ -413,7 +243,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                    </div>
                 </div>
 
-                {workerRecoveryActive && (
+                {preview.recovering && (
                    <div className="mb-4">
                       <Alert variant="warning" title="System Warning">
                          A temporary background system error occurred. The validator has recovered and subsequent retries are active.
@@ -424,7 +254,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                 {/* Preview stage: the QR is the largest thing on the page. */}
                 <div className="mb-4 flex justify-center rounded-xl bg-surface-sunken p-3 md:p-2" data-testid="qr-stage">
                    {/* Pass debounced config to QRCanvas to prevent heavy rendering on every keystroke */}
-                   <QRCanvas ref={canvasRef} onRendered={handleRendered} onRenderFailed={setPreviewFailure} config={debouncedConfig} className={`rounded-lg shadow-raised ${STAGE_SIZE_CLASSES[debouncedConfig.socialFormat] ?? STAGE_SIZE_CLASSES[SocialFormat.SQUARE_1_1]}`} />
+                   <QRCanvas ref={canvasRef} onRendered={preview.onRendered} onRenderFailed={preview.onRenderFailed} config={debouncedConfig} className={`rounded-lg shadow-raised ${STAGE_SIZE_CLASSES[debouncedConfig.socialFormat] ?? STAGE_SIZE_CLASSES[SocialFormat.SQUARE_1_1]}`} />
                 </div>
 
                 {/* The common formats in view, so a vector download is one click; the rest are in Download options. */}
@@ -550,7 +380,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                    />
                    {previewView !== 'flat' && (
                       <Suspense fallback={<Skeleton className="aspect-4/3 w-full rounded-xl" />}>
-                         <MockupView sourceRef={canvasRef} renderKey={debouncedConfig} config={effectiveConfig} moduleCount={moduleCount} view={previewView} exportsOffReason={exportsOffReason} guardExport={(run) => executeWithSafetyGate('download', () => run())} />
+                         <MockupView sourceRef={canvasRef} renderKey={debouncedConfig} config={effectiveConfig} moduleCount={moduleCount} view={previewView} exportsOffReason={exportsOffReason} guardExport={(run) => flow.guard('download', () => run())} />
                       </Suspense>
                    )}
                 </div>
@@ -560,9 +390,9 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
              </Card>
         }
       />
-      {walletOpen && (
+      {flow.wallet.open && (
         <Suspense fallback={null}>
-          <WalletDialog isOpen onClose={() => { setWalletOpen(false); optionsButtonRef.current?.focus(); }} config={config} filename={filename} />
+          <WalletDialog isOpen onClose={flow.wallet.close} config={config} filename={filename} />
         </Suspense>
       )}
       <GeneratorCommands actions={commandActions} onDownload={onDownload} />
