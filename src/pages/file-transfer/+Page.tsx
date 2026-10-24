@@ -17,60 +17,42 @@
 */
 
 import React from 'react';
-import { Play, Square, Pause, Upload, FileUp, FolderUp, Cpu, Sliders, Activity } from 'lucide-react';
-import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Progress } from '@/components/ui/Progress';
+import { Upload } from 'lucide-react';
 import { SectionHeading } from '@/components/ui/SectionHeading';
-import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Card } from '@/components/ui/Card';
-import { RangeInput } from '@/components/ui/RangeInput';
-import { Alert } from '@/components/ui/Alert';
-import { AccordionItem } from '@/components/ui/Accordion';
 import { PairingGuide } from '@/components/transfer/PairingGuide';
-import { TRANSFER_SPEEDS, formatFileSize, matchTransferSpeed } from '@/utils/transferSpeed';
+import { TransferStatusBadge } from '@/components/transfer/TransferStatusBadge';
+import { HandshakeErrorAlert } from '@/components/transfer/send/SendAlerts';
+import { DevSimulateButton } from '@/components/transfer/send/DevSimulateButton';
+import { MotionConfirm } from '@/components/transfer/send/MotionConfirm';
+import { SendControls } from '@/components/transfer/send/SendControls';
+import { SendDropZone } from '@/components/transfer/send/SendDropZone';
+import { SendPreview } from '@/components/transfer/send/SendPreview';
+import { SendSettings } from '@/components/transfer/send/SendSettings';
+import { SenderKeyPanel } from '@/components/transfer/send/SenderKeyPanel';
+import { SendEmptyState } from '@/components/transfer/send/SendEmptyState';
+import { SendStatus } from '@/components/transfer/send/SendStatus';
+import { phaseSections } from '@/components/transfer/send/phaseNotice';
+import { TransferStats } from '@/components/transfer/send/TransferStats';
+import { TRANSFER_SPEEDS } from '@/utils/transferSpeed';
 import { useFileDrop } from '@/hooks/useFileDrop';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { BetaNotice } from '@/components/BetaNotice';
-import { QrIllustration } from '@/components/QrIllustration';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from '@/components/ToolWorkspaceLayout';
 import { TransferModeSwitcher } from '@/components/TransferModeSwitcher';
 import { useOpticalSender } from '@/packages/optical-transfer/client';
 import { SidebarContent } from '@/components/SidebarContent';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { copy } from '@/data/copy/file-transfer';
-import {
-  estimateTransferFrames,
-  formatDuration,
-  neededSymbols,
-  steerMessage,
-  type TransferDensity,
-} from '@/packages/optical-transfer';
+import { steerMessage } from '@/packages/optical-transfer';
 import { paintTransferFrame } from './paintTransferFrame';
+import { useSendSummary } from './sendSummary';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
-import {
-  PAUSED_ANNOUNCEMENT,
-  PAUSE_HINT,
-  PHOTOSENSITIVITY_NOTICE,
-  REDUCED_MOTION_CONFIRM_BODY,
-  REDUCED_MOTION_CONFIRM_TITLE,
-} from '@/utils/photosensitivity';
 
 /**
  * Set when the first transfer of this page visit starts, so the photosensitivity notice shows only
  * once per visit. Kept in memory: nothing is stored, and a reload shows the notice again.
  */
 let photosensitivityNoticeSeen = false;
-
-/** `webkitdirectory` is not in React's input types; browsers that support it list the picked folder's files. */
-const FOLDER_INPUT_PROPS: React.InputHTMLAttributes<HTMLInputElement> & { webkitdirectory: string } = { webkitdirectory: '' };
-
-const DENSITY_OPTIONS: ReadonlyArray<{ value: TransferDensity; label: string; hint: string }> = [
-  { value: 'reliable', label: 'Reliable', hint: 'Small QR codes for older phones, dim rooms or a shaky hand.' },
-  { value: 'balanced', label: 'Balanced', hint: 'Medium QR codes. Works for most phones held steady.' },
-  { value: 'fast', label: 'Fast', hint: 'Large QR codes. Needs a sharp camera close to a bright screen.' },
-];
 
 /**
  * Opens this device's webcam for the back channel (#1146): the front camera, at a size that reads a
@@ -82,89 +64,13 @@ function openSenderWebcam(): Promise<MediaStream> {
 }
 
 /**
- * Button handlers that show something only while the button is held, by pointer or with Space or
- * Enter, and hide it when the button is let go or loses focus.
- * @param show - Shows it.
- * @param hide - Hides it.
- * @returns Props for a `Button`.
- */
-function holdToShow(show: () => void, hide: () => void) {
-  return {
-    onPointerDown: show,
-    onPointerUp: hide,
-    onPointerLeave: hide,
-    onPointerCancel: hide,
-    onBlur: hide,
-    onKeyDown: (event: React.KeyboardEvent) => {
-      if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) show();
-    },
-    onKeyUp: hide,
-  };
-}
-
-/**
  * High-Performance Animated QR File Transfer Tool - Sender only view
  * @returns The FileTransferToolInner component.
  */
 function FileTransferToolInner() {
-  // The key words show only while their button is held, never beside the stream by default.
-  const [showingKeyCode, setShowingKeyCode] = React.useState(false);
+  const sender = useOpticalSender({ renderFrame: paintTransferFrame, requestWebcam: openSenderWebcam });
+  const { selectedFile, selectedFiles, setSelectedFiles, phase, isTransferring, isPaused, settingsLocked, handshakeError, fountainInfo, setDensity, setFps, stopTransfer, startTransfer } = sender;
 
-  // Hook into the unified animated QR sender
-  const {
-    selectedFile,
-    selectedFiles,
-    setSelectedFiles,
-    isPrivate,
-    setIsPrivate,
-    keyFrame,
-    keyCanvasRef,
-    showKeyQr,
-    hideKeyQr,
-    phase,
-    isTransferring,
-    isPaused,
-    isVerifyingHandshake,
-    settingsLocked,
-    handshakeError,
-    progress,
-    currentFrameIndex,
-    totalFrames,
-    density,
-    setDensity,
-    outerCode,
-    setOuterCode,
-    multiCode,
-    setMultiCode,
-    tileInfo,
-    steer,
-    setSteer,
-    steerState,
-    steeredProfile,
-    steeringReceivers,
-    autoStopped,
-    walletCompat,
-    setWalletCompat,
-    fps,
-    setFps,
-    currentPass,
-    fountainInfo,
-    transferStats,
-    canvasRef,
-    startTransfer,
-    askToStart,
-    cancelMotion,
-    stopTransfer,
-    pauseTransfer,
-    resumeTransfer,
-    handleFileChange,
-    simulate50MBFile,
-  } = useOpticalSender({
-    renderFrame: paintTransferFrame,
-    requestWebcam: openSenderWebcam,
-  });
-
-  const folderInputRef = React.useRef<HTMLInputElement | null>(null);
   // Only some browsers can pick a folder; the button appears once the page knows.
   const [folderSupported, setFolderSupported] = React.useState(false);
   React.useEffect(() => {
@@ -174,8 +80,6 @@ function FileTransferToolInner() {
   // Photosensitivity safeguards (#1148).
   const reducedMotion = usePrefersReducedMotion();
   const [noticeSeen, setNoticeSeen] = React.useState(photosensitivityNoticeSeen);
-  const confirmingMotion = phase === 'confirmingMotion';
-  const confirmButtonRef = React.useRef<HTMLButtonElement | null>(null);
 
   // Reduced motion starts at the slowest pace.
   React.useEffect(() => {
@@ -185,21 +89,6 @@ function FileTransferToolInner() {
     setFps(slowest.fps);
   }, [reducedMotion, setDensity, setFps]);
 
-  // Escape stops the flashing at once, wherever focus is.
-  React.useEffect(() => {
-    if (!isTransferring || isPaused) return undefined;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') pauseTransfer();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isTransferring, isPaused, pauseTransfer]);
-
-  // The confirm opens under the Start button: move focus to it so keyboard users land on the choice.
-  React.useEffect(() => {
-    if (confirmingMotion) confirmButtonRef.current?.focus();
-  }, [confirmingMotion]);
-
   const beginTransfer = () => {
     photosensitivityNoticeSeen = true;
     setNoticeSeen(true);
@@ -207,34 +96,15 @@ function FileTransferToolInner() {
   };
   const handleStart = () => {
     if (reducedMotion) {
-      askToStart();
+      sender.askToStart();
       return;
     }
     beginTransfer();
   };
   const showNotice = !noticeSeen && selectedFile !== null && !isTransferring;
 
-  // Upper bound before compression: text-like files usually need far fewer frames.
-  const selectedSize = React.useMemo(() => selectedFiles.reduce((sum, item) => sum + item.size, 0), [selectedFiles]);
-  const selectedLabel = selectedFiles.length > 1 ? `${selectedFiles.length} files` : (selectedFile?.name ?? '');
-  const estimate = React.useMemo(() => {
-    if (!selectedFile) return null;
-    try {
-      return estimateTransferFrames(selectedSize, density, outerCode);
-    } catch {
-      return null;
-    }
-  }, [selectedFile, selectedSize, density, outerCode]);
-  // Fountain streams never end: show frames against the typical number a receiver needs.
-  const framesNeeded = fountainInfo ? neededSymbols(fountainInfo.k, fountainInfo.outerCode) : totalFrames;
-  const senderPercent = fountainInfo
-    ? Math.min(100, Math.round((currentFrameIndex / Math.max(1, framesNeeded)) * 100))
-    : progress;
+  const { selectedSize, selectedLabel, estimate, framesNeeded, senderPercent, estimatedSeconds } = useSendSummary(sender);
   const hasFile = selectedFile !== null || isTransferring;
-  const activeDensityHint = DENSITY_OPTIONS.find(option => option.value === density)?.hint ?? '';
-  const activeSpeed = matchTransferSpeed(density, fps);
-  // Seconds the stream takes: the exact need once a fountain session exists, an upper bound before.
-  const estimatedSeconds = fountainInfo ? (fountainInfo.k * 1.15) / fps : estimate ? estimate.frames / fps : null;
 
   const { isDragging: isDraggingFile, inputRef: fileInputRef, dropProps } = useFileDrop({
     onFiles: (dropped) => {
@@ -244,6 +114,8 @@ function FileTransferToolInner() {
     multiple: true,
     disabled: settingsLocked,
   });
+
+  const { notice, alert } = phaseSections(phase, <MotionConfirm onConfirm={beginTransfer} onCancel={sender.cancelMotion} />);
 
   return (
     <div className="w-full">
@@ -267,214 +139,31 @@ function FileTransferToolInner() {
             {/* File Selection & Pacing Section */}
             <section className="space-y-4">
               <SectionHeading icon={<Upload className="size-4 text-accent" aria-hidden="true" />} eyebrow="1. Choose a File" />
-              
-              <div className="flex flex-col gap-3">
-                <label
-                  {...dropProps}
-                  className={`flex min-h-24 w-full min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-3 transition-colors ${
-                    settingsLocked
-                      ? 'cursor-not-allowed border-line bg-surface-sunken opacity-60'
-                      : isDraggingFile
-                        ? 'cursor-copy border-accent bg-accent-soft'
-                        : 'cursor-pointer border-line bg-surface-sunken hover:bg-surface-hover'
-                  }`}
-                >
-                  <FileUp className="size-6 text-fg-muted" aria-hidden="true" />
-                  <span className="max-w-full truncate text-xs font-medium text-fg-muted">
-                    {selectedFile ? selectedLabel : 'Choose files or drag & drop'}
-                  </span>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    aria-label="Choose a file to send"
-                    multiple
-                    onChange={handleFileChange}
-                    disabled={settingsLocked}
-                  />
-                </label>
-
-                {folderSupported && (
-                  <>
-                    <Button variant="outline" onClick={() => folderInputRef.current?.click()} disabled={settingsLocked} fullWidth>
-                      <FolderUp className="size-4" aria-hidden="true" />
-                      Send a folder
-                    </Button>
-                    <input
-                      ref={folderInputRef}
-                      type="file"
-                      className="hidden"
-                      aria-label="Choose a folder to send"
-                      onChange={handleFileChange}
-                      disabled={settingsLocked}
-                      {...FOLDER_INPUT_PROPS}
-                    />
-                  </>
-                )}
-
-                {import.meta.env.DEV && (
-                  <Button
-                    variant="outline"
-                    onClick={simulate50MBFile}
-                    disabled={settingsLocked}
-                    fullWidth
-                  >
-                    <Cpu className="size-4" />
-                    Simulate 50MB High-Load File
-                  </Button>
-                )}
-              </div>
-
-              {selectedFile && (
-                <div className="space-y-2 rounded-xl border border-line-subtle bg-surface-sunken p-4 text-xs">
-                  <div className="flex justify-between gap-3">
-                    <span className="text-fg-muted">{selectedFiles.length > 1 ? 'Files:' : 'Name:'}</span>
-                    <span className="max-w-45 truncate font-semibold text-fg-soft">{selectedLabel}</span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-fg-muted">Size:</span>
-                    <span className="font-mono text-fg-soft">{formatFileSize(selectedSize)}</span>
-                  </div>
-                </div>
-              )}
+              <SendDropZone
+                dropProps={dropProps}
+                isDragging={isDraggingFile}
+                inputRef={fileInputRef}
+                disabled={settingsLocked}
+                selectedLabel={selectedLabel}
+                selectedSize={selectedFile ? selectedSize : null}
+                several={selectedFiles.length > 1}
+                folderSupported={folderSupported}
+                onChange={sender.handleFileChange}
+              >
+                <DevSimulateButton onSimulate={sender.simulate50MBFile} disabled={settingsLocked} />
+              </SendDropZone>
             </section>
 
             <div className="h-px bg-surface-hover" />
 
-            {/* Live Streaming Speed / Pacing controls */}
-            <section className="space-y-6">
-              <SectionHeading icon={<Sliders className="size-4 text-accent" aria-hidden="true" />} eyebrow="2. Transfer Settings" />
-
-              <div className="space-y-2">
-                <span id="speed-label" className="block text-sm font-medium text-fg-soft">
-                  Speed
-                </span>
-                <SegmentedControl<string>
-                  labelledBy="speed-label"
-                  value={activeSpeed?.id ?? ''}
-                  onChange={(id) => {
-                    const speed = TRANSFER_SPEEDS.find((candidate) => candidate.id === id);
-                    if (!speed) return;
-                    setDensity(speed.density);
-                    setFps(speed.fps);
-                  }}
-                  disabled={settingsLocked}
-                  options={TRANSFER_SPEEDS.map((speed) => ({ value: speed.id, label: speed.label }))}
-                />
-                <p className="text-xs text-fg-muted">{activeSpeed?.hint ?? 'Custom values set under Advanced.'}</p>
-                <p className="text-sm font-semibold text-fg" data-testid="speed-estimate" aria-live="polite">
-                  {estimatedSeconds !== null && selectedFile
-                    ? `~${formatDuration(estimatedSeconds, 'short')} for ${selectedFiles.length > 1 ? `these ${selectedFiles.length} files` : 'this'} ${formatFileSize(selectedSize)}${selectedFiles.length > 1 ? '' : ' file'}`
-                    : 'Choose a file to see how long it will take.'}
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <ToggleSwitch id="private-transfer" label="Private transfer" checked={isPrivate} onChange={setIsPrivate} disabled={settingsLocked} />
-                <p className="text-xs text-fg-muted">
-                  Encrypts the file and its name. You read a key code to the receiver, who enters it before the file opens. Someone filming the stream cannot read the file without the code.
-                </p>
-              </div>
-
-              <AccordionItem title="Advanced" headingLevel={3}>
-                <div className="space-y-6">
-                  <RangeInput
-                    id="fps-slider"
-                    label="Transfer speed"
-                    min={1}
-                    max={60}
-                    step={1}
-                    value={fps}
-                    onChange={setFps}
-                    formatValue={(v) => `${v} frames/sec`}
-                  />
-
-                  <div className="space-y-2">
-                    <span id="density-label" className="block text-sm font-medium text-fg-soft">
-                      QR density
-                    </span>
-                    <SegmentedControl<TransferDensity>
-                      labelledBy="density-label"
-                      value={density}
-                      onChange={setDensity}
-                      disabled={settingsLocked}
-                      options={DENSITY_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-                    />
-                    <p className="text-xs text-fg-muted">{activeDensityHint}</p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <ToggleSwitch
-                      id="outer-code"
-                      label="New transfer format (preview)"
-                      checked={outerCode === 'fec'}
-                      onChange={(checked) => setOuterCode(checked ? 'fec' : 'lt')}
-                      disabled={settingsLocked}
-                    />
-                    <p className="text-xs text-fg-muted" data-testid="outer-code-hint">
-                      {fountainInfo && outerCode === 'fec' && fountainInfo.outerCode === 'lt'
-                        ? 'This transfer uses the standard format: it is too large for the new one, or this browser cannot run it.'
-                        : 'Copes better with missed frames: the receiver needs only a few frames beyond the file’s size, where the standard format can need 15% more. The receiving device needs the latest QRCraftly.'}
-                    </p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <ToggleSwitch
-                      id="multi-code"
-                      label="Several codes per frame (preview)"
-                      checked={multiCode}
-                      onChange={setMultiCode}
-                      disabled={settingsLocked}
-                    />
-                    <p className="text-xs text-fg-muted" data-testid="multi-code-hint">
-                      {fountainInfo && multiCode && !fountainInfo.tiles
-                        ? 'This screen is too small for several codes, so this transfer shows one at a time.'
-                        : 'Shows up to four large codes at once, timed to the display, with one bigger code every few frames for cameras that cannot read them. Turn on “Read several codes per frame” on the receiving device.'}
-                    </p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <ToggleSwitch
-                      id="steer-speed"
-                      label="Let the receiver steer (preview)"
-                      checked={steer && multiCode}
-                      onChange={setSteer}
-                      disabled={settingsLocked || !multiCode}
-                    />
-                    <p className="text-xs text-fg-muted" data-testid="steer-hint">
-                      {multiCode
-                        ? 'Uses this device’s camera to read a small code on the receiving screen, so the transfer speeds up or slows down for it and stops once it has the file. The camera is asked for when you start, and nothing it sees leaves this device. Turn on “Help the sender pick its speed” on the receiving device.'
-                        : 'Needs “Several codes per frame”.'}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <ToggleSwitch
-                      id="wallet-bcur"
-                      label="Wallet-compatible (BC-UR)"
-                      checked={walletCompat && !isPrivate}
-                      onChange={setWalletCompat}
-                      disabled={settingsLocked || isPrivate}
-                    />
-                    <p className="text-xs text-fg-muted" data-testid="wallet-bcur-hint">
-                      {isPrivate
-                        ? 'Not available for a private transfer: BC-UR has no encryption.'
-                        : 'Sends the file as a standard BC-UR animated QR (ur:bytes) that hardware wallets and other BC-UR apps can read, as well as QRCraftly. It is slower, carries only the file’s bytes, not its name, and sends one file at a time. The other options above do not apply to it.'}
-                    </p>
-                  </div>
-                  <p className="text-xs text-fg-muted" data-testid="fountain-symbol-info">
-                    {walletCompat && !isPrivate
-                      ? 'A wallet-compatible stream carries fewer bytes per QR than QRCraftly’s own format, so it takes longer. It repeats until you stop it.'
-                      : fountainInfo?.tiles
-                      ? `Each code carries ${fountainInfo.symbolSize}-byte pieces (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). How fast it goes depends on the receiving camera.`
-                      : fountainInfo
-                      ? `Each QR carries ${fountainInfo.symbolSize} bytes (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). The receiver needs about ${framesNeeded} frames, ${formatDuration(framesNeeded / fps, 'long')} at ${fps} frames/sec.`
-                      : estimate
-                        ? `Estimated transfer time: up to ${formatDuration(estimate.frames / fps, 'long')} at ${fps} frames/sec (${estimate.symbolSize} bytes per QR). Text and other compressible files go faster.`
-                        : 'Choose a file to see how long the transfer will take.'}
-                  </p>
-                </div>
-              </AccordionItem>
-            </section>
+            <SendSettings
+              {...sender}
+              locked={settingsLocked}
+              framesNeeded={framesNeeded}
+              estimate={estimate}
+              estimatedSeconds={estimatedSeconds}
+              selection={selectedFile ? { count: selectedFiles.length, size: selectedSize } : null}
+            />
 
             {/* Beta notice after the primary actions so they stay in the first mobile viewport. */}
             <BetaNotice />
@@ -486,224 +175,54 @@ function FileTransferToolInner() {
                 <h2 className="font-semibold text-fg-soft">
                   Transfer QR
                 </h2>
-                {hasFile && (
-                  <Badge tone={isTransferring && !isPaused ? 'success' : 'neutral'}>
-                    <span aria-hidden="true" className={`size-1.5 rounded-full ${isTransferring && !isPaused ? 'bg-success motion-safe:animate-pulse' : 'bg-line-strong'}`} />
-                    {isPaused ? 'Paused' : isTransferring ? 'Transmitting' : 'Ready'}
-                  </Badge>
-                )}
+                {hasFile && <TransferStatusBadge active={isTransferring && !isPaused} label={isPaused ? 'Paused' : isTransferring ? 'Transmitting' : 'Ready'} />}
               </div>
 
-              {!hasFile && (
-                <div
-                  {...dropProps}
-                  data-testid="send-empty-state"
-                >
-                  <EmptyState
-                    level={3}
-                    className={`aspect-square transition-colors ${isDraggingFile ? 'border-accent bg-accent-soft' : ''}`}
-                    illustration={<QrIllustration className={`size-7 text-accent ${isDraggingFile ? 'motion-safe:animate-pulse' : ''}`} />}
-                    title="Drop a file to beam it"
-                    body="Pick a file in step 1, or drop one here. It plays as animated QR codes for the other device's camera. Nothing is uploaded."
-                  />
-                </div>
-              )}
+              {!hasFile && <SendEmptyState dropProps={dropProps} isDragging={isDraggingFile} />}
 
               {/* Start / Pause / Stop come before the stream so they follow the settings directly on mobile. */}
-              <div className={`mb-4 flex gap-3 ${hasFile ? '' : 'hidden'}`}>
-                {!isTransferring ? (
-                  <Button
-                    variant="primary"
-                    fullWidth
-                    onClick={handleStart}
-                    disabled={isVerifyingHandshake}
-                    aria-label="Start file transfer"
-                    aria-describedby={showNotice ? 'photosensitivity-notice' : undefined}
-                  >
-                    <Play className="size-4" aria-hidden="true" />
-                    {isVerifyingHandshake ? 'Checking QR…' : 'Start transfer'}
-                  </Button>
-                ) : (
-                  <>
-                    <Button
-                      variant="secondary"
-                      fullWidth
-                      onClick={isPaused ? resumeTransfer : pauseTransfer}
-                      aria-keyshortcuts={isPaused ? undefined : 'Escape'}
-                    >
-                      {isPaused ? <Play className="size-4" aria-hidden="true" /> : <Pause className="size-4" aria-hidden="true" />}
-                      {isPaused ? 'Resume' : 'Pause'}
-                    </Button>
-                    <Button variant="error" fullWidth onClick={stopTransfer} aria-label="Stop file transfer">
-                      <Square className="size-4" aria-hidden="true" />
-                      Stop transfer
-                    </Button>
-                  </>
-                )}
-              </div>
+              <SendControls
+                running={isTransferring}
+                paused={isPaused}
+                checking={sender.isVerifyingHandshake}
+                hidden={!hasFile}
+                describedBy={showNotice ? 'photosensitivity-notice' : undefined}
+                onStart={handleStart}
+                onPause={sender.pauseTransfer}
+                onResume={sender.resumeTransfer}
+                onStop={stopTransfer}
+              />
 
-              {/* A live region that is always present, so the notice is announced when it appears. */}
-              <div role="status" aria-live="polite">
-                {showNotice && (
-                  <p
-                    id="photosensitivity-notice"
-                    className="mb-4 rounded-xl border border-warning-line bg-warning-soft p-3 text-sm text-warning"
-                    data-testid="photosensitivity-notice"
-                  >
-                    {PHOTOSENSITIVITY_NOTICE}
-                  </p>
-                )}
-                {isPaused && <p className="sr-only">{PAUSED_ANNOUNCEMENT}</p>}
-              </div>
+              <SendStatus showNotice={showNotice} paused={isPaused} />
 
-              {confirmingMotion && !isTransferring && (
-                <div
-                  role="group"
-                  aria-labelledby="motion-confirm-title"
-                  className="mb-4 rounded-xl border border-warning-line bg-warning-soft p-3 text-sm text-warning"
-                  data-testid="reduced-motion-confirm"
-                >
-                  <p id="motion-confirm-title" className="font-semibold">
-                    {REDUCED_MOTION_CONFIRM_TITLE}
-                  </p>
-                  <p className="mt-1">{REDUCED_MOTION_CONFIRM_BODY}</p>
-                  <div className="mt-3 flex gap-3">
-                    <Button ref={confirmButtonRef} variant="primary" size="sm" onClick={beginTransfer}>
-                      Start anyway
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={cancelMotion}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {isTransferring && (
-                <p className="mb-4 text-xs text-fg-muted" data-testid="pause-hint">
-                  {PAUSE_HINT}
-                </p>
-              )}
+              {notice}
 
               {selectedFile && !isTransferring && !handshakeError && <PairingGuide />}
 
-              {autoStopped && !isTransferring && (
-                <div className="mb-4">
-                  <Alert variant="info" title="Transfer stopped" role="status">
-                    Every receiver in view has the file, so the sender stopped.
-                  </Alert>
-                </div>
-              )}
+              {alert}
 
               {/* Handshake scannability failure alert */}
-              {handshakeError && (
-                <div className="mb-4">
-                  <Alert variant="error" title="Transfer Paused" role="alert">
-                    {handshakeError}
-                  </Alert>
-                </div>
-              )}
+              {handshakeError && <HandshakeErrorAlert message={handshakeError} />}
 
               {/* Active Transfer Stats */}
               {isTransferring && (
-                <div className="mb-4 space-y-3 rounded-xl border border-line-subtle bg-surface-sunken p-4 text-xs" data-testid="sender-progress">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1 font-medium text-fg-muted">
-                      <Activity className="size-3.5 text-accent" aria-hidden="true" /> {fountainInfo ? 'First pass:' : 'Progress:'}
-                    </span>
-                    <span className="font-mono font-bold text-fg">{senderPercent}%</span>
-                  </div>
-                  
-                  <Progress size="sm" label="Transfer progress" value={senderPercent} />
-
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div>
-                      <div className="text-fg-muted">{fountainInfo ? 'Frames shown' : `Current QR (Pass ${currentPass})`}</div>
-                      <div className="font-mono text-sm font-semibold text-fg-soft" data-testid="sender-frames">
-                        {fountainInfo ? `${currentFrameIndex} of ~${framesNeeded}` : `${currentFrameIndex} / ${totalFrames}`}
-                        {!fountainInfo && (
-                          <span className="ml-1 text-xs text-accent">
-                            {currentPass === 1 ? '(Seq)' : '(Shuffled)'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1 text-fg-muted">
-                        <Cpu className="size-3 text-accent" aria-hidden="true" /> Frame buffer
-                      </div>
-                      <div className="font-mono text-sm font-semibold text-fg-soft">{transferStats.frameBufferMemory}</div>
-                    </div>
-                  </div>
-                  {fountainInfo?.keyCode && (
-                    <div className="space-y-2 rounded-lg border border-line bg-surface p-3" data-testid="sender-key-panel">
-                      <p className="font-semibold text-fg">Key code</p>
-                      <p className="font-mono text-sm font-semibold break-words text-fg-soft" aria-live="polite">
-                        {showingKeyCode ? (
-                          <span data-testid="sender-key-code">{fountainInfo.keyCode}</span>
-                        ) : (
-                          <span className="font-sans font-normal text-fg-muted" data-testid="sender-key-code-hidden">
-                            Hidden while the stream plays.
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-fg-muted">
-                        Hold a button to show the eight words to read to the receiver, or a QR code they can scan. Anyone filming this screen while the key shows can read the file, so show it only out of view of other cameras.
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" {...holdToShow(() => setShowingKeyCode(true), () => setShowingKeyCode(false))}>
-                          Hold to show key code
-                        </Button>
-                        <Button variant="outline" {...holdToShow(showKeyQr, hideKeyQr)}>
-                          Hold to show key QR
-                        </Button>
-                      </div>
-                      <canvas
-                        ref={keyCanvasRef}
-                        className={`mx-auto aspect-square w-48 rounded-lg bg-surface ${keyFrame ? '' : 'hidden'}`}
-                        role="img"
-                        aria-label="Key code QR"
-                        width={512}
-                        height={512}
-                      />
-                    </div>
+                <TransferStats
+                  percent={senderPercent}
+                  fountain={fountainInfo !== null}
+                  currentFrameIndex={sender.currentFrameIndex}
+                  framesNeeded={framesNeeded}
+                  totalFrames={sender.totalFrames}
+                  currentPass={sender.currentPass}
+                  frameBufferMemory={sender.transferStats.frameBufferMemory}
+                  keyPanel={fountainInfo?.keyCode && (
+                    <SenderKeyPanel keyCode={fountainInfo.keyCode} showingKeyQr={sender.keyFrame !== null} keyCanvasRef={sender.keyCanvasRef} onShowKeyQr={sender.showKeyQr} onHideKeyQr={sender.hideKeyQr} />
                   )}
-                  {fountainInfo && (
-                    <p className="text-fg-muted" data-testid="sender-fingerprint">
-                      Transfer code <span className="font-mono font-semibold text-fg-soft">{fountainInfo.fingerprint}</span>. The receiver shows the same four words once it has read the transfer details. If they differ, it is reading another device.
-                    </p>
-                  )}
-                  {steerState.status !== 'off' && (
-                    <p className="text-fg-muted" role="status" data-testid="steer-status">
-                      {steerMessage(steerState, steeredProfile, steeringReceivers)}
-                    </p>
-                  )}
-                  {fountainInfo && (
-                    <p className="text-fg-muted">
-                      The stream keeps going after the first pass so a receiver can join late or miss frames. Stop once the receiver shows Transfer Complete.
-                    </p>
-                  )}
-                </div>
+                  fingerprint={fountainInfo?.fingerprint ?? null}
+                  steerStatus={sender.steerState.status !== 'off' ? steerMessage(sender.steerState, sender.steeredProfile, sender.steeringReceivers) : null}
+                />
               )}
 
-              {/* Recycled UI Canvas Container */}
-              <div className={`mb-4 flex items-center justify-center rounded-2xl border border-line-subtle bg-surface-sunken p-4 sm:p-6 ${hasFile ? '' : 'hidden'}`}>
-                <div className="relative w-full overflow-hidden rounded-lg">
-                  <canvas
-                    ref={canvasRef}
-                    className={`aspect-square w-full rounded-lg bg-surface object-contain shadow-sm ${tileInfo ? 'max-h-[85vh]' : 'max-h-[60vh]'}`}
-                    role="img"
-                    aria-label="Transfer QR code"
-                    width={512}
-                    height={512}
-                  />
-                  {/* A soft band sweeps the sending QR while it plays (motion-safe only). */}
-                  {isTransferring && !isPaused && (
-                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden motion-reduce:hidden">
-                      <div className="h-1/3 w-full bg-linear-to-b from-transparent via-accent/20 to-transparent motion-safe:animate-scan-sweep" />
-                    </div>
-                  )}
-                </div>
-              </div>
+              <SendPreview canvasRef={sender.canvasRef} hidden={!hasFile} tiled={sender.tileInfo !== null} playing={isTransferring && !isPaused} />
 
               {hasFile && (
                 <p className="text-xs text-fg-muted">

@@ -49,7 +49,6 @@ vi.mock('@/packages/optical-transfer/client', async () => {
   useOpticalSender: () => {
     const [{ phase }, dispatch] = useReducer(senderReducer, { phase: 'ready', hasFiles: true });
     return {
-    phase,
     askToStart: () => dispatch({ type: 'start', reducedMotion: true }),
     cancelMotion: () => dispatch({ type: 'cancelMotion' }),
     selectedFile: helloFile,
@@ -86,6 +85,8 @@ vi.mock('@/packages/optical-transfer/client', async () => {
     handleFileChange: vi.fn(),
     simulate50MBFile: vi.fn(),
     ...sender.state,
+    // A test that sets a running stream gets the phase the real hook would report with it.
+    phase: sender.state.isTransferring ? (sender.state.isPaused ? 'paused' : 'transmitting') : phase,
     startTransfer: sender.startTransfer,
     stopTransfer: sender.stopTransfer,
     pauseTransfer: sender.pauseTransfer,
