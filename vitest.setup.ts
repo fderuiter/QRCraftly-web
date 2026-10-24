@@ -133,6 +133,7 @@ declare global {
     setResponseOverride: (response: any) => void;
     setConcurrencyLimit: (limit: number) => void;
     getInstances: () => any[];
+    runningCount: () => number;
     reset: () => void;
     activeWorker: any;
   };
@@ -156,15 +157,21 @@ const mockConfig: WorkerMockConfig = {
   activeWorker: null,
 };
 
+// reset() bumps the epoch, so tasks started before it can neither release a slot nor run.
+let epoch = 0;
 let runningTasksCount = 0;
-const pendingTasks: Array<() => Promise<void>> = [];
+const pendingTasks: Array<(taskEpoch: number) => Promise<void>> = [];
+// Delay timers of started tasks, cleared by reset() so they never reach execute().
+const delayTimers = new Set<ReturnType<typeof setTimeout>>();
 
 function runNextTasks() {
   while (pendingTasks.length > 0 && runningTasksCount < mockConfig.concurrencyLimit) {
     const nextTask = pendingTasks.shift();
     if (nextTask) {
+      const taskEpoch = epoch;
       runningTasksCount++;
-      nextTask().finally(() => {
+      nextTask(taskEpoch).finally(() => {
+        if (taskEpoch !== epoch) return;
         runningTasksCount--;
         runNextTasks();
       });
@@ -172,7 +179,7 @@ function runNextTasks() {
   }
 }
 
-function enqueueTask(task: () => Promise<void>) {
+function enqueueTask(task: (taskEpoch: number) => Promise<void>) {
   pendingTasks.push(task);
   runNextTasks();
 }
@@ -215,11 +222,17 @@ class MockWorker extends InThreadWorker {
       await this.deliverToWorker(message);
     };
     enqueueTask(
-      () =>
+      taskEpoch =>
         new Promise<void>(resolve => {
-          setTimeout(() => {
+          const timer = setTimeout(() => {
+            delayTimers.delete(timer);
+            if (taskEpoch !== epoch) {
+              resolve();
+              return;
+            }
             execute().then(resolve, resolve);
           }, delay);
+          delayTimers.add(timer);
         }),
     );
   });
@@ -320,6 +333,7 @@ globalThis.mockWorkerControl = {
     mockConfig.concurrencyLimit = limit;
   },
   getInstances: () => mockConfig.instances,
+  runningCount: () => runningTasksCount,
   get activeWorker() {
     return mockConfig.activeWorker;
   },
@@ -331,8 +345,11 @@ globalThis.mockWorkerControl = {
     mockConfig.delayMs = 0;
     mockConfig.responseOverride = null;
     mockConfig.concurrencyLimit = Infinity;
+    epoch++;
     runningTasksCount = 0;
     pendingTasks.length = 0;
+    for (const timer of delayTimers) clearTimeout(timer);
+    delayTimers.clear();
     mockConfig.instances = [];
     mockConfig.activeWorker = null;
   }
@@ -790,6 +807,9 @@ afterEach(async () => {
     globalThis.mockWorkerControl.reset();
   }
   terminateScannerWorker();
+  // Imported here rather than at the top: a static import would load the generator's context and
+  // inputs into every jsdom test file, which slowed the scannability fallback test past its wait
+  // (#1608). After the first test these resolve from the module cache.
   const [{ clearRetainedAppearance }, { clearRetainedInputStates }] = await Promise.all([
     import('./src/context/QRContext'),
     import('./src/components/inputs/useInputLogic'),

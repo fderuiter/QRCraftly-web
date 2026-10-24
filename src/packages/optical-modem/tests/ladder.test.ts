@@ -162,7 +162,7 @@ describe('link tracker', () => {
 });
 
 describe('observing real decodes', () => {
-  it('turns a decoded frame into an observation, and a failure into a reason', { timeout: 60000 }, () => {
+  it('turns a decoded frame into an observation, and a failure into a reason', { timeout: 30_000 }, () => {
     const profile = MODEM_PROFILES[0];
     const capture = simulateCapture(encodeModemFrame(profile, new Uint8Array(frameCapacity(profile).payloadBytes).fill(9), 1, 7, 4), 'studio', { pixelsPerCell: 6, cellPitch: 4, seed: 1 });
     const read = observeDecode(250, decodeModemFrame(capture));

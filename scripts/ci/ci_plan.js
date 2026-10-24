@@ -18,12 +18,15 @@
  *   PRs still pass together on the newest main.
  * - schedule (nightly on main): the full tier, or nothing at all when main has
  *   not moved since the last successful nightly run.
+ * - slow tests (`pnpm run test:slow`, #1608): the full tier, and a ready pull
+ *   request whose diff touches the optical transfer code they cover
+ *   ({@link SLOW_TEST_PATHS}) or cannot be computed.
  * - workflow_dispatch: the PR tier, or the full tier when `full` is true.
  *
  * Inputs come from the step's `env:` block: EVENT_NAME, IS_DRAFT, HEAD_REF,
  * LABELS (JSON array of label names), FULL_INPUT, BASE_REF, HEAD_SHA and
  * LAST_NIGHTLY_SHA. Outputs go to $GITHUB_OUTPUT: run_checks, code_changed,
- * unit_tests, e2e (none, pr or full) and lighthouse (none, sample or full).
+ * unit_tests, slow_tests, e2e (none, pr or full) and lighthouse (none, sample or full).
  */
 
 import fs from 'node:fs';
@@ -42,6 +45,36 @@ export function isDocsOnlyFile(file) {
 }
 
 /**
+ * Paths whose changes the slow tests (`*.slow.test.ts`, run by `pnpm run test:slow`) cover, so a
+ * pull request that touches one runs them before it merges instead of waiting for the nightly run.
+ */
+export const SLOW_TEST_PATHS = [
+  'src/packages/optical-modem/',
+  'src/packages/optical-transfer/',
+  'src/packages/wasm-runtime/',
+  'src/wasm/modem.wasm',
+  'src/wasm/qr-decode.wasm',
+  'crates/core/',
+  'crates/modem/',
+  'crates/qr-decode/',
+  'tests/fixtures/modem-golden.json.gz',
+  'tests/foundry/differential.ts',
+  'tests/foundry/modemBattery.ts',
+  'tests/foundry/modemCorpus.ts',
+  'tests/utils/colourBench.ts',
+  'vitest.slow.config.ts',
+];
+
+/**
+ * Whether a change to this file can change what a slow test sees.
+ * @param {string} file POSIX path relative to the repository root.
+ * @returns {boolean}
+ */
+export function isSlowTestTrigger(file) {
+  return file.endsWith('.slow.test.ts') || SLOW_TEST_PATHS.some((prefix) => file === prefix || (prefix.endsWith('/') && file.startsWith(prefix)));
+}
+
+/**
  * Parses the LABELS input, tolerating an empty or malformed value.
  * @param {string | undefined} raw
  * @returns {string[]}
@@ -56,21 +89,21 @@ function parseLabels(raw) {
 }
 
 /** @type {CiPlan} */
-const NOTHING = { runChecks: false, codeChanged: false, unitTests: false, e2e: 'none', lighthouse: 'none' };
+const NOTHING = { runChecks: false, codeChanged: false, unitTests: false, slowTests: false, e2e: 'none', lighthouse: 'none' };
 
 /**
- * @typedef {{ runChecks: boolean, codeChanged: boolean, unitTests: boolean, e2e: 'none' | 'pr' | 'full', lighthouse: 'none' | 'sample' | 'full' }} CiPlan
+ * @typedef {{ runChecks: boolean, codeChanged: boolean, unitTests: boolean, slowTests: boolean, e2e: 'none' | 'pr' | 'full', lighthouse: 'none' | 'sample' | 'full' }} CiPlan
  */
 
 /** @type {CiPlan} */
-const FULL = { runChecks: true, codeChanged: true, unitTests: true, e2e: 'full', lighthouse: 'full' };
+const FULL = { runChecks: true, codeChanged: true, unitTests: true, slowTests: true, e2e: 'full', lighthouse: 'full' };
 /** @type {CiPlan} */
-const PR = { runChecks: true, codeChanged: true, unitTests: true, e2e: 'pr', lighthouse: 'sample' };
+const PR = { runChecks: true, codeChanged: true, unitTests: true, slowTests: false, e2e: 'pr', lighthouse: 'sample' };
 /**
  * Static checks, the audit and the builds: what a draft runs.
  * @type {CiPlan}
  */
-const QUICK = { runChecks: true, codeChanged: true, unitTests: false, e2e: 'none', lighthouse: 'none' };
+const QUICK = { runChecks: true, codeChanged: true, unitTests: false, slowTests: false, e2e: 'none', lighthouse: 'none' };
 
 /**
  * Works out the plan for one run.
@@ -95,11 +128,11 @@ export function planRun({ eventName = '', isDraft = '', headRef = '', labels = '
   if (eventName !== 'pull_request') return FULL;
 
   if (changedFiles && changedFiles.length > 0 && changedFiles.every(isDocsOnlyFile)) {
-    return { runChecks: true, codeChanged: false, unitTests: true, e2e: 'none', lighthouse: 'none' };
+    return { runChecks: true, codeChanged: false, unitTests: true, slowTests: false, e2e: 'none', lighthouse: 'none' };
   }
   if (headRef.startsWith('release/') || parseLabels(labels).includes(FULL_E2E_LABEL)) return FULL;
   if (isDraft === 'true') return QUICK;
-  return PR;
+  return { ...PR, slowTests: !changedFiles || changedFiles.length === 0 || changedFiles.some(isSlowTestTrigger) };
 }
 
 /**
@@ -108,7 +141,7 @@ export function planRun({ eventName = '', isDraft = '', headRef = '', labels = '
  * @returns {string}
  */
 export function formatPlan(plan) {
-  return `run_checks=${plan.runChecks}\ncode_changed=${plan.codeChanged}\nunit_tests=${plan.unitTests}\ne2e=${plan.e2e}\nlighthouse=${plan.lighthouse}\n`;
+  return `run_checks=${plan.runChecks}\ncode_changed=${plan.codeChanged}\nunit_tests=${plan.unitTests}\nslow_tests=${plan.slowTests}\ne2e=${plan.e2e}\nlighthouse=${plan.lighthouse}\n`;
 }
 
 async function main() {

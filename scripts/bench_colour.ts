@@ -181,7 +181,7 @@ function render(rows: Row[], fallback: ColourRunResult, correction: Array<Array<
               : 'Not met in the simulation.',
         ],
         ['At least 200 KB/s on a recent iPhone and a recent Android', 'Not measured. No phone was used.', 'Not met. Open: the items are in the device checklist, and the profile stays off until they pass.'],
-        ['If colour fails to decode, the transfer still completes from the mono beacons', 'Tested twice in `tests/colourTransfer.test.ts`: a decoder that reads no colour, and a camera that cannot separate the channels.', 'Met, tested.'],
+        ['If colour fails to decode, the transfer still completes from the mono beacons', 'Tested twice in `tests/colourTransfer.slow.test.ts`: a decoder that reads no colour, and a camera that cannot separate the channels.', 'Met, tested.'],
       ]
     ),
     ''

@@ -169,6 +169,8 @@ export default defineConfig(({ command }) => {
                 'e2e/**',
                 // Reads the real build; runs after it with `pnpm run test:build` (#1609).
                 'tests/build-output/**',
+                // Tests of 5 s or more run with `pnpm run test:slow` (vitest.slow.config.ts, #1608).
+                '**/*.slow.test.ts',
                 // Agent worktrees are copies of the repository, not part of it.
                 '.claude/**',
               ],
@@ -217,8 +219,11 @@ export default defineConfig(({ command }) => {
             'src/hooks/**/*.ts',
             'src/pages/**/*.{ts,tsx}',
           ],
+          // Test fixtures under a tests/ folder and vitest bench files do not ship, so they are not measured.
           exclude: [
             '**/*.test.{ts,tsx}',
+            '**/*.bench.ts',
+            '**/tests/**',
             '**/*.d.ts',
           ],
         }

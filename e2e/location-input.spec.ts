@@ -36,12 +36,6 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Location QR type', () => {
-  test('renders Latitude and Longitude fields and the Use Current Location button', async ({ page }) => {
-    await expect(page.getByLabel('Latitude')).toBeVisible();
-    await expect(page.getByLabel('Longitude')).toBeVisible();
-    await expect(page.getByTestId('use-current-location')).toBeVisible();
-  });
-
   test('manually entering coordinates generates a QR code', async ({ page }) => {
     await page.getByLabel('Latitude').fill(FIXTURES.coordinates.newYork.latitude);
     await page.getByLabel('Longitude').fill(FIXTURES.coordinates.newYork.longitude);

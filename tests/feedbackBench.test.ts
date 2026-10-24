@@ -33,13 +33,13 @@ describe('webcam back channel simulation (#1146)', () => {
     const run = await runFeedbackBench({ mode: { kind: 'steered' }, receivers: [receiver], fileBytes: FILE_BYTES, seed: 1 });
     expect(run.complete).toBe(true);
     expect(run.timeline[run.timeline.length - 1].profile).toBe(best);
-  }, 120_000);
+  }, 30_000);
 
   it('raises goodput for a strong receiver above what the default profile gives', async () => {
     const fixed = await runFeedbackBench({ mode: { kind: 'fixed', profile: 'balanced' }, receivers: [strong], fileBytes: FILE_BYTES, seed: 1 });
     const steered = await runFeedbackBench({ mode: { kind: 'steered' }, receivers: [strong], fileBytes: FILE_BYTES, seed: 1 });
     expect(steered.goodputKBps[0]).toBeGreaterThan(fixed.goodputKBps[0] * 1.5);
-  }, 120_000);
+  }, 30_000);
 
   it('beats guessing too fast for a weak receiver and costs little against the best fixed profile', async () => {
     const wrongGuess = await runFeedbackBench({ mode: { kind: 'fixed', profile: 'balanced' }, receivers: [weak], fileBytes: 200_000, seed: 2 });
@@ -47,13 +47,13 @@ describe('webcam back channel simulation (#1146)', () => {
     const steered = await runFeedbackBench({ mode: { kind: 'steered' }, receivers: [weak], fileBytes: 200_000, seed: 2 });
     expect(steered.goodputKBps[0]).toBeGreaterThan(wrongGuess.goodputKBps[0] * 2);
     expect(steered.goodputKBps[0]).toBeGreaterThan(best.goodputKBps[0] * 0.8);
-  }, 120_000);
+  }, 30_000);
 
   it.each([1, 2, 3, 4, 5])('stops within 1 s of done on the default back channel (seed %i)', async (seed) => {
     const run = await runFeedbackBench({ mode: { kind: 'steered' }, receivers: [strong], fileBytes: FILE_BYTES, seed });
     expect(run.stopDelayMs).not.toBeNull();
     expect(run.stopDelayMs ?? Infinity).toBeLessThanOrEqual(1000);
-  }, 120_000);
+  }, 30_000);
 
   it('stops only after every receiver in sight is done, and follows the weakest', async () => {
     const run = await runFeedbackBench({ mode: { kind: 'steered' }, receivers: [strong, middle], fileBytes: FILE_BYTES, seed: 3 });
@@ -62,7 +62,7 @@ describe('webcam back channel simulation (#1146)', () => {
     expect(run.stoppedAtMs ?? 0).toBeGreaterThanOrEqual(lastDone);
     expect(run.stopDelayMs ?? Infinity).toBeLessThanOrEqual(1000);
     expect(run.timeline[run.timeline.length - 1].profile).toBe('balanced');
-  }, 120_000);
+  }, 30_000);
 
   it('never stops a one-way stream by itself and never sends feedback', async () => {
     const run = await runFeedbackBench({ mode: { kind: 'fixed', profile: 'balanced' }, receivers: [strong], fileBytes: 100_000, seed: 1 });
@@ -71,10 +71,10 @@ describe('webcam back channel simulation (#1146)', () => {
     expect(run.stopDelayMs).toBeNull();
     expect(run.feedbackSent).toBe(0);
     expect(run.timeline).toHaveLength(1);
-  }, 120_000);
+  }, 30_000);
 
   it('is repeatable: the same seed gives the same run', async () => {
     const options = { mode: { kind: 'steered' }, receivers: [middle], fileBytes: 150_000, seed: 4 } as const;
     expect(await runFeedbackBench(options)).toEqual(await runFeedbackBench(options));
-  }, 120_000);
+  }, 30_000);
 });

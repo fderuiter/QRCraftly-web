@@ -31,7 +31,7 @@ describe('multi-code transfer simulation (#1142)', () => {
     // Four tiles per camera frame, and a tile held for two refreshes is read again by the camera.
     expect(result.decodes).toBeGreaterThan(result.cameraFrames * 3);
     expect(result.goodputKBps).toBeGreaterThan(20);
-  }, 120_000);
+  }, 30_000);
 
   it('keeps at least half the tiles of a torn frame when staggered, and fewer when every tile changes together', async () => {
     const staggered = await runTearScenario('2x2-v25', screenFor('2x2-v25'), 2, true, 3);
@@ -39,10 +39,10 @@ describe('multi-code transfer simulation (#1142)', () => {
     expect(staggered.worst).toBeGreaterThanOrEqual(0.5);
     expect(staggered.mean).toBeGreaterThan(together.mean);
     expect(together.worst).toBeLessThanOrEqual(0.5);
-  }, 120_000);
+  }, 30_000);
 
   it('still finishes when every frame is torn', async () => {
     const result = await runTileTransfer({ layoutId: '2x2-v25', screen: screenFor('2x2-v25'), bytes: 20_000, hold: 2, staggered: true, tear: true });
     expect(result.complete).toBe(true);
-  }, 120_000);
+  }, 30_000);
 });

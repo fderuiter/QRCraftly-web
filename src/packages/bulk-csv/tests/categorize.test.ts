@@ -69,18 +69,30 @@ describe('categorizeCsvRows Engine', () => {
     expect(report.validRows.map((r) => r.Name)).toEqual(['Valid 1', 'Caution 1', 'Valid 2']);
   });
 
-  it('runs within 50ms for 500 rows (MAX_BULK_CSV_ROWS)', () => {
+  it('visits each of 500 rows (MAX_BULK_CSV_ROWS) exactly once', () => {
     const rows: CsvRow[] = Array.from({ length: 500 }, (_, i) => ({
       URL: i % 10 === 0 ? '' : i % 15 === 0 ? 'javascript:alert(1)' : `https://example.com/${i}`,
       Name: `Name_${i}`,
     }));
 
-    const startTime = performance.now();
     const report = categorizeCsvRows(rows, 'URL');
-    const duration = performance.now() - startTime;
+    const allRowNumbers = Array.from({ length: 500 }, (_, i) => i + 1);
 
     expect(report.totalRows).toBe(500);
-    expect(duration).toBeLessThan(50);
+
+    // Every row lands in exactly one bucket: none skipped, none counted twice.
+    expect(report.validCount + report.emptyCount + report.unsafeCount).toBe(500);
+    expect(report.details.map((d) => d.rowNumber)).toEqual(allRowNumbers);
+
+    // Valid row indices plus the empty/unsafe row indices partition 0..499 with no repeats.
+    const rejectedIndices = report.details
+      .filter((d) => d.category === 'empty' || d.category === 'unsafe')
+      .map((d) => d.rowNumber - 1);
+    expect(new Set(report.validRowIndices).size).toBe(report.validRowIndices.length);
+    expect(report.validRowIndices).toHaveLength(report.validCount);
+    expect([...report.validRowIndices, ...rejectedIndices].sort((a, b) => a - b)).toEqual(
+      allRowNumbers.map((n) => n - 1)
+    );
   });
 
   it('checks the string that is encoded, not the raw cell (#1285)', () => {

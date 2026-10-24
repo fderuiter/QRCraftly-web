@@ -17,7 +17,7 @@
 */
 
 /**
- * The fiducial search's acquisition sets (#1161, ADR 0047), shared by `acquisition.test.ts` and
+ * The fiducial search's acquisition sets (#1161, ADR 0047), shared by `acquisition.slow.test.ts` and
  * `pnpm run bench:optical-finder`.
  *
  * Positives are frames of the shipped 4-colour profiles (Steady, Wide, Ultra) and of the two

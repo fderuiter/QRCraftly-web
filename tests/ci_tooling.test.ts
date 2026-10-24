@@ -46,7 +46,7 @@ describe('CI triggers and tiers (main.yml, ADR 0050)', () => {
 
   it('fails the CI aggregate on a failed plan or job but passes planned skips', () => {
     const ci = jobBlock('ci');
-    expect(ci).toMatch(/needs: \[plan, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse\]/);
+    expect(ci).toMatch(/needs: \[plan, dependency-audit, static-validation, test, slow-tests, wasm-reproducible, e2e, build, lighthouse\]/);
     expect(ci).toContain('if: ${{ !cancelled() }}');
     expect(ci).toContain('[ "$PLAN_RESULT" != "success" ]');
     expect(ci).toContain('[ "$result" != "skipped" ]');
