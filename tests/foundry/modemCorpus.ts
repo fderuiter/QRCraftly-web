@@ -19,7 +19,7 @@
 /**
  * The seeded inputs of the optical modem's differential test (#1198). The golden outputs in
  * `tests/fixtures/modem-golden.json.gz` were recorded once by running these inputs through the
- * TypeScript kernels the Rust module `crates/modem` replaced; `modem.test.ts` runs the same inputs
+ * TypeScript kernels the Rust module `crates/modem` replaced; `modem.slow.test.ts` runs the same inputs
  * through the module. Everything here is deterministic: seeded generators and integer maths.
  */
 import { createRandom } from '../utils/scannerCorpus';

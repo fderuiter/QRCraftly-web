@@ -125,7 +125,7 @@ function renderFluidUncached(value: string, ecLevel: QRErrorCorrectionLevel, pxP
 
 const isDark = (rgb: [number, number, number]): boolean => rgb[0] + rgb[1] + rgb[2] < 384;
 
-describe('Fluid Ink round-trip (real pixels)', { timeout: 60_000 }, () => {
+describe('Fluid Ink round-trip (real pixels)', { timeout: 30_000 }, () => {
   // Two module sizes: before the fluid eyeball became a squircle, a round eyeball made
   // jsQR (the decoder before #1178) miss the finder patterns at 8 and 16 px per module for some payloads.
   for (const { name, value } of payloads) {

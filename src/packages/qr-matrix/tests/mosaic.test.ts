@@ -397,7 +397,7 @@ describe('Mosaic QR decodes', () => {
           }
         }
         expect(failures).toEqual([]);
-      }, 60_000);
+      }, 30_000);
     }
   }
 

@@ -64,7 +64,7 @@ describe('modem frames', () => {
     expect(hash(a)).toBe(PINNED_FRAME_HASH);
   });
 
-  it.each(MODEM_PROFILES.map((p) => [`P${p.id} ${p.name}`, p] as const))('round-trips %s through a good channel, with the header read from the frame', { timeout: 60000 }, (_, profile) => {
+  it.each(MODEM_PROFILES.map((p) => [`P${p.id} ${p.name}`, p] as const))('round-trips %s through a good channel, with the header read from the frame', { timeout: 30_000 }, (_, profile) => {
     const payload = payloadFor(profile, profile.id);
     const capture = simulateCapture(encodeModemFrame(profile, payload, SESSION, 3, PITCH), 'studio', { pixelsPerCell: 6, cellPitch: PITCH, seed: 5 });
     const result = decodeModemFrame(capture);
@@ -74,7 +74,7 @@ describe('modem frames', () => {
     expect(result.header).toMatchObject({ profile: profile.id, session: SESSION, seq: 3, packetBytes: profile.packetBytes, parity: profile.parity, cols: profile.cols, rows: profile.rows });
   });
 
-  it('survives a stripe lost across the whole frame because blocks are interleaved', { timeout: 60000 }, () => {
+  it('survives a stripe lost across the whole frame because blocks are interleaved', { timeout: 30_000 }, () => {
     const profile = MODEM_PROFILES[1];
     const payload = payloadFor(profile, 2);
     const capture = simulateCapture(encodeModemFrame(profile, payload, SESSION, 4, PITCH), 'studio', { pixelsPerCell: 6, cellPitch: PITCH, seed: 2 });
@@ -87,7 +87,7 @@ describe('modem frames', () => {
     expect(repairedAll(decodeModemFrame(damaged), payload, profile)).toBe(true);
   });
 
-  it('repairs at least as many blocks with erasures as without on a hard channel, and never returns wrong data', { timeout: 120000 }, () => {
+  it('repairs at least as many blocks with erasures as without on a hard channel, and never returns wrong data', { timeout: 30_000 }, () => {
     const profile = MODEM_PROFILES[2];
     let hard = 0;
     let soft = 0;
@@ -110,7 +110,7 @@ describe('modem frames', () => {
     expect(soft).toBeGreaterThan(0);
   });
 
-  it('reports an image without a frame, and a frame of a size the receiver does not know', { timeout: 60000 }, () => {
+  it('reports an image without a frame, and a frame of a size the receiver does not know', { timeout: 30_000 }, () => {
     const blank: RgbaImage = { width: 320, height: 240, data: new Uint8ClampedArray(320 * 240 * 4).fill(200) };
     expect(decodeModemFrame(blank)).toEqual({ ok: false, reason: 'no-fiducials' });
     const profile = MODEM_PROFILES[0];

@@ -45,6 +45,7 @@ jobs:
       run_checks: ${{ steps.plan.outputs.run_checks }}
       code_changed: ${{ steps.plan.outputs.code_changed }}
       unit_tests: ${{ steps.plan.outputs.unit_tests }}
+      slow_tests: ${{ steps.plan.outputs.slow_tests }}
       e2e: ${{ steps.plan.outputs.e2e }}
       lighthouse: ${{ steps.plan.outputs.lighthouse }}
     steps:
@@ -232,6 +233,23 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
         run: node scripts/ci/coverage_summary.js
+
+  # Tests of 5 s or more and the benchmarks (#1608), kept out of the shards: nightly, on the full
+  # tier, and on ready PRs that touch the optical transfer code they cover (scripts/ci/ci_plan.js).
+  slow-tests:
+    name: Slow Tests
+    needs: plan
+    if: needs.plan.outputs.slow_tests == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+
+      - name: Run the slow tests and benchmarks
+        run: pnpm run test:slow
 
   # JOB: Rust WebAssembly modules (#1182, ADR 0033). Installs the toolchain pinned in
   # crates/rust-toolchain.toml with the runner's own rustup, checks the crates, and
@@ -522,7 +540,7 @@ jobs:
   # superseded run does not wait in the runner queue just to report a failure.
   ci:
     name: CI
-    needs: [plan, dependency-audit, static-validation, test, wasm-reproducible, e2e, build, lighthouse]
+    needs: [plan, dependency-audit, static-validation, test, slow-tests, wasm-reproducible, e2e, build, lighthouse]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
