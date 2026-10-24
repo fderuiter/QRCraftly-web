@@ -31,6 +31,11 @@
   --color-surface-hover: var(--color-slate-100);
   --color-scrim: rgb(0 0 0 / 0.5);
 
+  /* Camera viewfinder (#1603): drawn over the live picture, so the same in both themes. */
+  --color-camera: var(--color-black);
+  --color-on-camera: var(--color-white);
+  --color-camera-lock: var(--color-emerald-400);
+
   /* Borders: dividers, component outlines, and form controls (3:1 against surface). */
   --color-line-subtle: var(--color-slate-100);
   --color-line: var(--color-slate-200);
