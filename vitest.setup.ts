@@ -23,10 +23,17 @@ import { InThreadWorker, assertStructuredCloneable } from './tests/utils/inThrea
 import { qrEncoder } from './tests/fixtures/qrEncoder';
 import { setQrCanvasRuntime } from './src/utils/qrCanvasRuntime';
 import { domMatchers } from './tests/utils/domMatchers';
+import { configure } from '@testing-library/react';
 
 
 // Our own DOM matchers (#1188) and axe matcher (#1186), in place of jest-dom and vitest-axe.
 expect.extend({ ...domMatchers, toHaveNoViolations });
+
+// The generator loads its input fields and style sections on demand (React.lazy). Under
+// coverage on a busy CI shard, a full generator render plus one of those chunks can take
+// several seconds, so the 1 s default made findBy* and waitFor fail at random. 10 s stays
+// below the 15 s test timeout, so a real failure still reports its own message.
+configure({ asyncUtilTimeout: 10_000 });
 
 function createMemoryStorage(): Storage {
   let store: Record<string, string> = {};
