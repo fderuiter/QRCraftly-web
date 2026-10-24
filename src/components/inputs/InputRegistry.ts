@@ -15,7 +15,7 @@ import { PaymentInput } from "./PaymentInput";
 import { LazyEventInput } from "./LazyEventInput";
 import { LocationInput } from "./LocationInput";
 import { MeetingInput } from "./MeetingInput";
-import { SocialInput } from "./SocialInput";
+import { LazySocialInput } from "./LazySocialInput";
 import { LazyBulkCsvInput } from "./LazyBulkCsvInput";
 
 export type InputDataMap = {
@@ -180,7 +180,7 @@ export const INPUT_REGISTRY: Registry = {
     canHydrateFn: QR_GENERATORS[QRType.MEETING].matches,
   },
   [QRType.SOCIAL]: {
-    Component: SocialInput,
+    Component: LazySocialInput,
     initialState: {
       platform: SocialPlatform.INSTAGRAM,
       handle: "",

@@ -369,3 +369,18 @@ export const TemplateStyle = {
   WIFI_CARD: 'wifi_card',
 } as const;
 export type TemplateStyle = (typeof TemplateStyle)[keyof typeof TemplateStyle];
+
+/**
+ * Supported social media platforms for deep links.
+ */
+export const SocialPlatform = {
+  INSTAGRAM: 'instagram',
+  TWITTER: 'twitter',
+  TIKTOK: 'tiktok',
+  LINKEDIN: 'linkedin',
+  YOUTUBE: 'youtube',
+  FACEBOOK: 'facebook',
+  WHATSAPP: 'whatsapp',
+  GITHUB: 'github',
+} as const;
+export type SocialPlatform = (typeof SocialPlatform)[keyof typeof SocialPlatform];
