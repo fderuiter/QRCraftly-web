@@ -35,7 +35,8 @@ export const CONTENT_FIELDS: ReadonlySet<keyof QRConfig> = new Set<keyof QRConfi
 ]);
 
 /**
- * Extracts visual style parameters from a QRConfig, stripping all content/payload fields.
+ * Extracts visual style parameters from a QRConfig. STYLE_FIELDS in styleFields.ts is the one list
+ * of what a template keeps, so a saved template holds exactly what an import accepts (#1583).
  * @param config - Full QRConfig.
  * @returns Partial QRConfig with visual style properties only.
  */
@@ -43,7 +44,7 @@ export function extractStyleConfig(config: QRConfig): Partial<QRConfig> {
   const styleConfig: Partial<QRConfig> = {};
   const keys = Object.keys(config) as (keyof QRConfig)[];
   for (const key of keys) {
-    if (!CONTENT_FIELDS.has(key)) {
+    if (isStyleField(key)) {
       (styleConfig as Record<string, unknown>)[key] = config[key];
     }
   }
@@ -63,7 +64,7 @@ export function applyTemplateToConfig(
   const updates: Partial<QRConfig> = {};
   const keys = Object.keys(templateConfig) as (keyof QRConfig)[];
   for (const key of keys) {
-    if (!CONTENT_FIELDS.has(key)) {
+    if (isStyleField(key)) {
       (updates as Record<string, unknown>)[key] = templateConfig[key];
     }
   }
