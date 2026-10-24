@@ -35,7 +35,7 @@ Boundary checks run automatically during `pnpm run lint` and CI. The check is ou
 
 Packages may not import the app root: `src/types.ts`, `src/constants.ts`, `src/types/`, `src/constants/` or `src/utils/` (`packages-must-not-import-app-root`, [ADR 0052](../../docs/adr/0052-shared-core-package.md)). The rule checks resolved paths, so a relative escape such as `../../../utils/x` counts too. Code that two or more packages share belongs in [`core`](./core/README.md), which imports nothing else in `src` (`core-is-a-leaf`). Code that one package uses belongs in that package.
 
-The files that still import the app root are listed in `LEGACY_APP_ROOT_IMPORTERS` in `scripts/boundaries.config.js`. The list only shrinks. When a file stops importing the app root, take it off the list: `tests/scripts/check_boundaries.test.ts` fails while a clean file stays on it. Never add a file to it.
+The rule has no exceptions. The move into `core` and the packages finished in #1529, and the allowlist that tracked it is gone. The app root keeps only app code: `src/types.ts` holds the brand template types, and `src/constants.ts` and `src/utils/` hold what only the app uses.
 
 ## Registered Packages
 
