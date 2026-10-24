@@ -42,7 +42,8 @@ import { getExampleImage, getRelatedTypePages, TYPE_PAGE_TYPES, type RelatedPage
 import { getGuideFaqs, guideFaqAnswer } from './guideFaqs';
 import { getPageGuides } from './pageGuides';
 import { typeGuides, type TypeGuide } from './typeGuides';
-import { generateGuideIndexSchema, generateGuideSchema, generateSchema } from '../utils/schemaGenerator';
+import { generateGuideIndexSchema, generateGuideSchema, generateSchema, generateVideoPageSchema } from '../utils/schemaGenerator';
+import { SITE_VIDEOS } from './videos';
 import { resolveDomainForPath, type JsonLdObject } from '../utils/metadataEngine';
 
 /** Everything a page renders from the shared content modules, for that page alone. */
@@ -121,6 +122,7 @@ export function getPageSchema(urlPathname: string): JsonLdObject | undefined {
   const id = getRegistryKeyForPath(urlPathname);
   const domain = resolveDomainForPath(urlPathname);
   if (id === 'guides') return generateGuideIndexSchema(auxiliaryRegistry.guides.description, domain);
+  if (id === 'videos') return generateVideoPageSchema(auxiliaryRegistry.videos.description, SITE_VIDEOS, domain);
   if (id.startsWith('guides/')) {
     const guide = getGuide(id.slice('guides/'.length));
     return guide ? generateGuideSchema(guide, domain) : undefined;

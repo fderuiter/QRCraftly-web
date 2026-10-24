@@ -194,6 +194,7 @@ export const formatPathName = (segment: string): string => {
     'privacy': 'App Privacy Policy',
     'support': 'App Support',
     'guides': 'Guides',
+    'videos': 'Videos',
     'why-qr-codes-stop-working': 'Why QR Codes Stop Working',
     'static-vs-dynamic-qr-codes': 'Static vs Dynamic QR Codes',
     'how-to-print-a-qr-code-that-scans': 'Printing a QR Code That Scans',
