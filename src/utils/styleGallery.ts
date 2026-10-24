@@ -1,6 +1,6 @@
 import type { QRConfig } from '../types';
 import { LOW_RELIABILITY_PATTERNS, MIN_CONTRAST_THRESHOLD, PATTERNS, PRESET_COLORS } from '../constants';
-import { getContrastRatio } from './colorUtils';
+import { getContrastRatio } from '@/packages/core/encoding';
 
 /** The settings a gallery tile or "Surprise me" changes. */
 export type StyleChoice = Pick<QRConfig, 'style' | 'fgColor' | 'bgColor' | 'eyeColor' | 'eyeFrameColor' | 'eyeBallColor'>;

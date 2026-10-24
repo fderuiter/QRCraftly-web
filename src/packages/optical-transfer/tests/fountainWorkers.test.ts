@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { sha256Hex } from '@/packages/core/encoding';
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import type { QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
 import {
@@ -23,7 +24,6 @@ import {
   createPrng,
   crc32,
   decodeFrame,
-  sha256Hex,
   MAX_RECEIVE_BYTES,
   FLAG_BEACON,
   TILE_LAYOUTS,

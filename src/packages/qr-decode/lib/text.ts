@@ -23,7 +23,7 @@
  * generator write today) and Latin-1 otherwise (the standard's default).
  */
 
-import { concatBytes } from '@/utils/bytes';
+import { concatBytes } from '@/packages/core/encoding';
 
 export type QrReadMode = 'numeric' | 'alphanumeric' | 'byte' | 'kanji' | 'hanzi';
 

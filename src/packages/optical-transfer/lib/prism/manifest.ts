@@ -16,9 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { sha256 } from '@/utils/sha256';
+import { bytesToHex, hexToBytes } from '@/packages/core/encoding';
+import { sha256 } from '@/packages/core/encoding';
 import { cborDecode, cborEncode } from '../fountain/cbor';
-import { bytesToHex, hexToBytes, type TransferCompression } from '../fountain/session';
+import { type TransferCompression } from '../fountain/session';
 import { planBlocks, type FecLayout } from '../fec/codec';
 import {
   MAX_BUNDLE_ENTRIES,

@@ -24,6 +24,7 @@
  * Node reads it from disk). Tests and scripts that need it synchronously can
  * call {@link createQrReader} on an instance.
  */
+import { ECC_LEVELS, type EccLevel } from '@/packages/core/ecc';
 import { WASM_STATUS, WasmModuleError, compileWasmUrl, instantiateWasm, type WasmInstance } from '@/packages/wasm-runtime';
 import { decodeSegments, type QrReadSegment } from './text';
 
@@ -39,7 +40,7 @@ function moduleUrl(): URL {
   return here.startsWith('file:') ? new URL('../../../wasm/qr-decode.wasm', here) : QR_DECODE_WASM_URL;
 }
 
-export type QrReadLevel = 'L' | 'M' | 'Q' | 'H';
+export type QrReadLevel = EccLevel;
 
 export interface QrPoint {
   x: number;
@@ -114,7 +115,6 @@ export interface QrReader {
   readTracked(pixels: Uint8ClampedArray | Uint8Array, width: number, height: number, tiles: readonly QrTile[]): Array<QrRead | null>;
 }
 
-const LEVELS: readonly QrReadLevel[] = ['L', 'M', 'Q', 'H'];
 const REQUEST_HEADER = 12;
 const TILE_RECORD = 4 + 8 * 4;
 const ANY_LEVEL = 255;
@@ -178,7 +178,7 @@ function parseResult(out: Uint8Array): Array<QrRead | null> {
       bytes,
       segments,
       version: out[at],
-      level: LEVELS[out[at + 1]] ?? 'L',
+      level: ECC_LEVELS[out[at + 1]] ?? 'L',
       mask: out[at + 2],
       mirrored: (flags & RESULT_MIRRORED) !== 0,
       inverted: (flags & RESULT_INVERTED) !== 0,
@@ -260,7 +260,7 @@ export function createQrReader(instance: WasmInstance): QrReader {
           throw new WasmModuleError('status', `Expected a version from 1 to 40, got ${tile.version}.`);
         }
         const at = REQUEST_HEADER + t * TILE_RECORD;
-        header.set([tile.version, tile.level === undefined ? ANY_LEVEL : LEVELS.indexOf(tile.level), tile.inverted ? FLAG_INVERTED : 0, 0], at);
+        header.set([tile.version, tile.level === undefined ? ANY_LEVEL : ECC_LEVELS.indexOf(tile.level), tile.inverted ? FLAG_INVERTED : 0, 0], at);
         tile.corners.forEach((corner, k) => {
           view.setFloat32(at + 4 + k * 8, corner.x, true);
           view.setFloat32(at + 8 + k * 8, corner.y, true);

@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { bytesToHex, hexToBytes, sha256Hex } from '@/packages/core/encoding';
 import { FecEncoder } from '../fec/codec';
 import { crc32 } from '../fountain/crc32';
 import { FountainEncoder } from '../fountain/encoder';
@@ -26,9 +27,6 @@ import {
   TRANSFER_DENSITY_PROFILES,
   compressForTransfer,
   decompressTransferPayload,
-  sha256Hex,
-  bytesToHex,
-  hexToBytes,
   type FountainSessionHeader,
   type StreamErrorCorrection,
   type TransferDensity,

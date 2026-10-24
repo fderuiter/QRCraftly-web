@@ -17,6 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
+import { sha256Hex } from '@/packages/core/encoding';
 import {
   FountainEncoder,
   FountainDecoder,
@@ -34,7 +35,6 @@ import {
   solveGF2,
   compressForTransfer,
   decompressTransferPayload,
-  sha256Hex,
   TRANSFER_DENSITY_PROFILES,
   DEFAULT_TRANSFER_DENSITY,
   resolveTransferDensity,

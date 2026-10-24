@@ -16,10 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { bytesToHex } from '@/packages/core/encoding';
 import { FecDecoder } from '../fec/codec';
 import { FountainDecoder } from '../fountain/decoder';
 import type { FountainProgress } from '../fountain/reassembler';
-import { bytesToHex } from '../fountain/session';
 import { LARGE_BLOCK_COUNT, formatLimit, MAX_RECEIVE_BYTES } from '../limits';
 import { ENCRYPTION_AES_GCM, deriveKeys, privateSessionId, type PrivateKeys } from './crypto';
 import { FLAG_ENCRYPTED, FLAG_OUTER_CODE, decodeFrame, type PrismFrame } from './frame';

@@ -16,9 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { bytesToHex, sha256Hex } from '@/packages/core/encoding';
 import { loadQrEncoder, type QrEccLetter, type QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
 import { loadFecModule } from './lib/fec/codec';
-import { TRANSFER_DENSITY_PROFILES, bytesToHex, resolveTransferDensity, sha256Hex } from './lib/fountain/session';
+import { TRANSFER_DENSITY_PROFILES, resolveTransferDensity } from './lib/fountain/session';
 import { SWITCHABLE_SYMBOL_SIZE } from './lib/feedback/controller';
 import { TILE_LAYOUTS, tileFrameCapacity, type TileLayout, type TileLayoutId } from './lib/multicode/layout';
 import { FRAME_OVERHEAD } from './lib/prism/frame';

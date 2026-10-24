@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { getContrastRatio, normalizeHex, hexToRgba, srgbToLinear, linearToSrgb, getLuminanceFromLinearRgb, getLuminanceFromRgb, rgbToCmyk } from './colorUtils';
+import { getContrastRatio, normalizeHex, hexToRgba, srgbToLinear, linearToSrgb, getLuminanceFromLinearRgb, getLuminanceFromRgb, rgbToCmyk } from '../encoding';
 
 describe('colorUtils', () => {
   describe('getContrastRatio', () => {

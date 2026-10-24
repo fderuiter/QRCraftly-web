@@ -19,7 +19,7 @@
 import { type QRConfig, type QRModules, QRType, SocialFormat, TemplateStyle, WifiEncryption, type WifiData } from '@/types';
 import { drawQRInternal, type ModuleRenderOptions, type MazeData } from '@/packages/qr-matrix';
 import { drawRoundRect } from '@/packages/qr-matrix/canvas';
-import { hexToRgba, getContrastRatio } from '@/utils/colorUtils';
+import { hexToRgba, getContrastRatio } from '@/packages/core/encoding';
 import { hydrateWifiData } from '@/packages/qr-payload';
 
 /**

@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { sha256 } from '../../../../utils/sha256';
+import { sha256 } from '@/packages/core/encoding';
 
 const MASK = (1n << 64n) - 1n;
 const TWO_POW_64 = 18446744073709551616;

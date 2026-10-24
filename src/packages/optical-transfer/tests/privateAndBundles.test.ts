@@ -18,6 +18,7 @@
 
 
 import { describe, expect, it } from 'vitest';
+import { sha256Hex } from '@/packages/core/encoding';
 import {
   FountainReassembler,
   KEY_CODE_WORDS,
@@ -45,7 +46,6 @@ import {
   parseKeyQr,
   privateSessionId,
   sanitizeRelativePath,
-  sha256Hex,
   unpackBundle,
   wordsToBytes,
 } from '../index';

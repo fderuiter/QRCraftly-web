@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import { loadWorkerModule, type InThreadWorkerScope, type WorkerModuleUnderTest } from './utils/inThreadWorker';
 import { fakeQrRead } from './utils/fakeQrRead';
-import { getLuminanceFromRgb } from '@/utils/colorUtils';
+import { getLuminanceFromRgb } from '@/packages/core/encoding';
 
 const qrRead = vi.hoisted(() => vi.fn());
 vi.mock('@/packages/qr-decode', () => ({ loadQrReader: () => Promise.resolve({ read: qrRead }) }));
 
 // Spy on the luminance helper the contrast audit uses, so a test can make processing crash.
-vi.mock('@/utils/colorUtils', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/utils/colorUtils')>();
+vi.mock('@/packages/core/encoding', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/packages/core/encoding')>();
   return { ...actual, getLuminanceFromRgb: vi.fn(actual.getLuminanceFromRgb) };
 });
 

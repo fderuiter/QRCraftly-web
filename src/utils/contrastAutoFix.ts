@@ -1,5 +1,5 @@
 import type { QRConfig } from '../types';
-import { normalizeHex, getContrastRatio, getLuminance } from './colorUtils';
+import { normalizeHex, getContrastRatio, getLuminance } from '@/packages/core/encoding';
 
 /**
  * Converts sRGB channels (0..255) to HSL color space.

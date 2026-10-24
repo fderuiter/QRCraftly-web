@@ -24,7 +24,7 @@ import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
 import { TextField } from '../ui/FormFields';
 import { ToggleSwitch } from '../ui/ToggleSwitch';
-import { getContrastRatio } from '../../utils/colorUtils';
+import { getContrastRatio } from '@/packages/core/encoding';
 import { MIN_CONTRAST_THRESHOLD } from '../../constants';
 import { ContrastBadge, ContrastBanner } from './ContrastWarning';
 

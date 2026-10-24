@@ -17,9 +17,10 @@
 */
 
 
+import { sha256Hex } from '@/packages/core/encoding';
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import type { QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
-import { createPrng, parseKeyCode, sha256Hex } from '../index';
+import { createPrng, parseKeyCode } from '../index';
 
 type Handler = (event: { data: unknown }) => Promise<void> | void;
 type Posted = { type: string; [key: string]: unknown };

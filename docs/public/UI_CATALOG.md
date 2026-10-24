@@ -147,21 +147,21 @@ Feature-level building blocks shared by several routes. Reuse these instead of r
 
 ---
 
-## 5. Shared Utilities & Renderers (`src/utils/colorUtils.ts` & `src/packages/qr-matrix/`)
+## 5. Shared Utilities & Renderers (`src/packages/core/encoding.ts` & `src/packages/qr-matrix/`)
 
 These utility functions handle hex conversion, relative luminance, contrast checks, and specialized QR module canvas drawing routines. **Do not write custom math, hex formatting, or bespoke path-drawing logic under any circumstances.**
 
-- `hexToRgba(hex: string, alpha: number): string` (`src/utils/colorUtils.ts`)
+- `hexToRgba(hex: string, alpha: number): string` (`src/packages/core/encoding.ts`)
   - **Description:** Converts a hex colour to a CSS `rgba()` string (used by export templates); invalid input falls back to black.
-- `normalizeHex(val: string): string | null` (`src/utils/colorUtils.ts`)
+- `normalizeHex(val: string): string | null` (`src/packages/core/encoding.ts`)
   - **Description:** Normalizes custom hex inputs (supports shorthand `#abc`, converts to `#aabbcc`, formats casing, and appends a `#` prefix if absent).
-- `getContrastRatio(fg: string, bg: string): number` (`src/utils/colorUtils.ts`)
+- `getContrastRatio(fg: string, bg: string): number` (`src/packages/core/encoding.ts`)
   - **Description:** Computes the contrast ratio between foreground and background sRGB colors based on WCAG 2.0 relative luminance formulas.
 - `renderModules` (`src/packages/qr-matrix/lib/modules.ts`, imported from `@/packages/qr-matrix`)
   - **Description:** Central vector module drawing orchestrator executing batched two-pass drawing across standard, geometric, and artistic styles.
 - `renderFluidModules` (`src/packages/qr-matrix/lib/fluid.ts`, imported from `@/packages/qr-matrix`)
   - **Description:** High-performance fluid vector renderer evaluating 4-neighbor matrix module connectivity to draw continuous bezier curve bridges for the Fluid Ink style without impacting corner finder patterns.
-- `getLuminance(hex: string): number` and `getLuminanceFromRgb(r: number, g: number, b: number): number` (`src/utils/colorUtils.ts`)
+- `getLuminance(hex: string): number` and `getLuminanceFromRgb(r: number, g: number, b: number): number` (`src/packages/core/encoding.ts`)
   - **Description:** WCAG relative luminance of a hex colour or of 0–255 RGB channels. Use these instead of writing luminance weights.
 - Shared form class strings (`src/components/ui/styles.ts`)
   - **Description:** Tailwind class constants for inputs, fieldsets, legends and grids (for example `TEXT_FIELD_CLASSES`, `GRID_TWO_COLUMNS_CLASSES`). Reuse them so custom fields match `TextField` and `FormFields`.
@@ -174,6 +174,6 @@ To avoid duplicate controls and logical divergence:
 
 1.  **Do Not Create Custom Sliders:** All range selectors must be configured via the existing `RangeInput` component.
 2.  **Do Not Duplicate Pickers:** All color pickers must rely on `ColorInput` and its internal validators.
-3.  **Do Not Code Custom Color Math:** Do not write custom contrast checks, relative luminance weights, or hex parsers. Import `normalizeHex` or `getContrastRatio` directly from `src/utils/colorUtils.ts`.
+3.  **Do Not Code Custom Color Math:** Do not write custom contrast checks, relative luminance weights, or hex parsers. Import `normalizeHex` or `getContrastRatio` directly from `src/packages/core/encoding.ts`.
 4.  **Audit Before Submitting:** If you are building a new feature, compare the required controls against this index. If a component matches, import and wrap it instead of replicating it.
 5.  **Test Components With the Shared Helpers:** Each component's companion test checks accessibility with `axe` from `tests/utils/axe.ts` (`expect(await axe(container)).toHaveNoViolations()`), and the DOM matchers (`toBeInTheDocument`, `toHaveAttribute`, `toHaveAccessibleName` and the rest) come from `tests/utils/domMatchers.ts`, registered in `vitest.setup.ts`.

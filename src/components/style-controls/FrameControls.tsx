@@ -27,7 +27,7 @@ import {
 } from '../../types';
 import { SelectField, TextField } from '../ui/FormFields';
 import { ColorInput } from '../ui/ColorInput';
-import { getContrastRatio } from '../../utils/colorUtils';
+import { getContrastRatio } from '@/packages/core/encoding';
 import { MIN_CONTRAST_THRESHOLD } from '../../constants';
 import { ContrastBadge } from './ContrastWarning';
 

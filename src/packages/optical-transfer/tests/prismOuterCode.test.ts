@@ -20,6 +20,7 @@
 // round-robin symbols over several blocks, and the receiver's handling of a missing module.
 
 import { beforeAll, describe, expect, it } from 'vitest';
+import { sha256Hex } from '@/packages/core/encoding';
 import {
   FLAG_OUTER_CODE,
   FountainReassembler,
@@ -41,7 +42,6 @@ import {
   neededSymbols,
   parseKeyCode,
   planBlocks,
-  sha256Hex,
   type PrismManifest,
   type PrismStream,
 } from '../index';

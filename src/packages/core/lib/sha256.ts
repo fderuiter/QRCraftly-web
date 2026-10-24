@@ -17,8 +17,9 @@
 */
 
 /**
- * Synchronous SHA-256. The Web Crypto digest is asynchronous, and some callers (wallet checksums,
- * transfer session IDs) need an answer inside a synchronous parser.
+ * Synchronous pure TypeScript SHA-256. The Web Crypto digest is asynchronous, and some callers
+ * (wallet checksums, transfer session IDs) need an answer inside a synchronous parser. The Web
+ * Crypto forms, faster on large input, are in digest.ts.
  */
 
 const SHA256_K = new Uint32Array([

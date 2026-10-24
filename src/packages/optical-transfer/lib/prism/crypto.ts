@@ -17,8 +17,8 @@
 */
 
 
-import { concatBytes } from '@/utils/bytes';
-import { sha256 } from '@/utils/sha256';
+import { concatBytes } from '@/packages/core/encoding';
+import { sha256 } from '@/packages/core/encoding';
 import { SESSION_ID_BYTES } from './frame';
 import { KEY_SECRET_BYTES } from './words';
 
