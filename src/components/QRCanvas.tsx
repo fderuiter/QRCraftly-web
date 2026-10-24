@@ -220,18 +220,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
       ctx.save();
       ctx.scale(dims.pixelRatio, dims.pixelRatio);
 
-      drawWithTemplate(
-        ctx,
-        modules,
-        currentConfig,
-        currentLogoImg,
-        currentBorderLogoImg,
-        dims.displayWidth,
-        dims.displayHeight,
-        modules.size,
-        false,
-        computedMazeDataRef.current
-      );
+      drawWithTemplate(ctx, modules, currentConfig, { logoImg: currentLogoImg, borderLogoImg: currentBorderLogoImg, width: dims.displayWidth, height: dims.displayHeight, moduleCount: modules.size, mazeData: computedMazeDataRef.current });
 
       ctx.restore();
     } else {

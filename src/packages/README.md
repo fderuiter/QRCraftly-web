@@ -56,13 +56,13 @@ The rule has no exceptions. The move into `core` and the packages finished in #1
   - `encoder.ts`: The QR encoder on its own, for workers and scripts (#1177): `loadQrEncoder` (fetches and instantiates `src/wasm/qr-encode.wasm` once; under Node it reads the file), `createQrEncoder` (a synchronous encoder over an instance), `QrEncodeError` and the symbol, segment and option types. The encoder is our Rust module `crates/qr-encode`.
   - `mosaic.ts`: Mosaic QR engine ([ADR 0019](../../docs/adr/0019-mosaic-qr-module-level-image-tiling.md)): `planMosaic`, `renderMosaic`, `rasterizeMosaic`, `sampleMosaicGrid`, `resolveMosaicThresholds`, `isMosaicFunctionModule`, and the in-memory image cache (`loadMosaicSource`, `getMosaicSource`).
   - `maze.ts`: `generateMaze`, `getMazeCacheKey`, `getCachedMaze`, `storeMaze`, `clearMazeCache`, `getStyleAdaptiveMazePathWidth`, `renderMaze`, `MazeData`, bridge validation helpers (`isBridgeCell`, `isFinderPatternWithMargin`), and the Maze Worker contract (`isMazeWorkerRequest`, `assertMazeWorkerRequest`, `isMazeWorkerResponse`, `assertMazeWorkerResponse`). The halo mask (`applyMazeHaloMask`) is private to `lib/maze.ts`.
-  - `canvas.ts`: Canvas drawing primitives (`clampCornerRadius`, `drawRoundRect`, `drawPoly`, `drawStar`, `drawRoughRect`, `drawScribble`, and the module shape painters).
+  - `canvas.ts`: Canvas drawing primitives (`clampCornerRadius`, `drawRoundRect`, `drawPoly`, `drawStar`, `drawRoughRect`, `drawScribble`, and the module shape painters) and `RenderSurface`, the canvas-or-SVG drawing type every renderer takes (#1604).
   - `worker-matrix.ts`: Background Web Worker that validates a configuration and serializes its `buildMatrix` output. Spawn it only through `createMatrixWorker()`.
   - `worker-maze.ts`: Background Web Worker running maze generation and A* pathfinding. Spawn it only through `createMazeWorker()`.
 
 ### `qr-export` (`@/packages/qr-export`)
 
-- **Purpose**: Social template composition and self-contained SVG export: a `CanvasRenderingContext2D`-compatible SVG recorder, template frames and text, logo inlining, SVG sanitization and the offscreen scannability check before download.
+- **Purpose**: Social template composition and self-contained SVG export: an SVG recorder that satisfies the `RenderSurface` drawing type from `qr-matrix/canvas`, template frames and text, logo inlining, SVG sanitization and the offscreen scannability check before download.
 - **Entry Points**:
   - `index.ts`: `generateQRSvg`, `rasterizeSvgToCanvas`, `validateSvgScannability`, `SvgContext`, `drawWithTemplate`, `SOCIAL_DIMENSIONS`, and the Wallet card (`renderWalletCard`, `planWalletCard`, `paintWalletCard`, `walletRefusalReason`; [ADR 0048](../../docs/adr/0048-wallet-passes-built-in-the-browser.md)).
 

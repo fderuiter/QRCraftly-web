@@ -18,7 +18,7 @@
 
 import { type QRConfig, type QRModules, QRType, SocialFormat, TemplateStyle, WifiEncryption, type WifiData } from '@/packages/core/types';
 import { drawQRInternal, type ModuleRenderOptions, type MazeData } from '@/packages/qr-matrix';
-import { drawRoundRect } from '@/packages/qr-matrix/canvas';
+import { drawRoundRect, type RenderSurface } from '@/packages/qr-matrix/canvas';
 import { hexToRgba, getContrastRatio } from '@/packages/core/encoding';
 import { hydrateWifiData } from '@/packages/qr-payload';
 
@@ -57,7 +57,7 @@ function resolveTemplateText(config: QRConfig): string {
  * Used for TemplateStyle.NONE – no decorative chrome, just a solid colour.
  */
 function drawNoneBackground(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   config: QRConfig,
   width: number,
   height: number
@@ -75,7 +75,7 @@ function drawNoneBackground(
  * subtext below the QR zone.
  */
 function drawMinimalistBackground(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   config: QRConfig,
   width: number,
   height: number
@@ -105,7 +105,7 @@ function drawMinimalistBackground(
  * improves contrast for the QR code zone.
  */
 function drawGradientBlurBackground(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   config: QRConfig,
   width: number,
   height: number
@@ -139,7 +139,7 @@ function drawGradientBlurBackground(
  * as the inner background.
  */
 function drawSolidFrameBackground(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   config: QRConfig,
   width: number,
   height: number
@@ -161,7 +161,7 @@ function drawSolidFrameBackground(
  * Wi-Fi Display Card template: fills the background and draws an outer sign border.
  */
 function drawWifiCardBackground(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   config: QRConfig,
   width: number,
   height: number
@@ -190,7 +190,7 @@ function drawWifiCardBackground(
 // ---------------------------------------------------------------------------
 
 function drawTemplateText(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   config: QRConfig,
   displayWidth: number,
   displayHeight: number,
@@ -225,7 +225,7 @@ function drawTemplateText(
  * Renders the Wi-Fi card sign header (Wi-Fi badge icon & heading) and network detail badges.
  */
 function drawWifiCardChrome(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   config: QRConfig,
   displayWidth: number,
   displayHeight: number,
@@ -405,7 +405,7 @@ function drawWifiCardChrome(
  * Strategy map for template background rendering.
  */
 type BackgroundPainter = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   config: QRConfig,
   width: number,
   height: number
@@ -423,6 +423,26 @@ const BACKGROUND_PAINTERS: Record<TemplateStyle, BackgroundPainter> = {
 // Main public API
 // ---------------------------------------------------------------------------
 
+/** What {@link drawWithTemplate} draws and at which size (#1604). */
+export interface TemplateTarget {
+  /** Logical display width in px (no devicePixelRatio applied). */
+  width: number;
+  /** Logical display height in px. */
+  height: number;
+  /** Number of QR modules per row/column. */
+  moduleCount: number;
+  /** Pre-loaded centre logo image. */
+  logoImg?: HTMLImageElement | null;
+  /** Pre-loaded border logo image. */
+  borderLogoImg?: HTMLImageElement | null;
+  /** True when drawing off screen (SVG export, virtual canvas). */
+  isVirtual?: boolean;
+  /** Pre-computed maze overlay. */
+  mazeData?: MazeData | null;
+  /** Module rendering options (luminance masking inputs). */
+  renderOptions?: ModuleRenderOptions;
+}
+
 /**
  * Composes a full-canvas social-media export by:
  *  1. Painting the chosen template background.
@@ -436,28 +456,22 @@ const BACKGROUND_PAINTERS: Record<TemplateStyle, BackgroundPainter> = {
  * direct `drawQRInternal` call, so it can replace the existing code path
  * without visual regression.
  *
- * @param ctx           The 2-D drawing context (canvas or SVG-context).
- * @param modules       The raw QR module matrix.
- * @param config        Full QR configuration including template settings.
- * @param logoImg       Pre-loaded centre logo image (or null).
- * @param borderLogoImg Pre-loaded border logo image (or null).
- * @param displayWidth  Logical display width in px (no devicePixelRatio applied).
- * @param displayHeight Logical display height in px.
- * @param moduleCount   Number of QR modules per row/column.
+ * @param ctx     The drawing surface (a canvas context or the SVG context).
+ * @param modules The raw QR module matrix.
+ * @param config  Full QR configuration including template settings.
+ * @param target  Where and what to draw: size, module count, images and render options.
  */
-export function drawWithTemplate(
-  ctx: CanvasRenderingContext2D,
-  modules: QRModules,
-  config: QRConfig,
-  logoImg: HTMLImageElement | null,
-  borderLogoImg: HTMLImageElement | null,
-  displayWidth: number,
-  displayHeight: number,
-  moduleCount: number,
-  isVirtual: boolean = false,
-  mazeData?: MazeData | null,
-  options?: ModuleRenderOptions
-): void {
+export function drawWithTemplate(ctx: RenderSurface, modules: QRModules, config: QRConfig, target: TemplateTarget): void {
+  const {
+    logoImg = null,
+    borderLogoImg = null,
+    width: displayWidth,
+    height: displayHeight,
+    moduleCount,
+    isVirtual = false,
+    mazeData,
+    renderOptions,
+  } = target;
   ctx.clearRect(0, 0, displayWidth, displayHeight);
 
   // Fallback WIFI_CARD to SOLID_FRAME if payload type is not QRType.WIFI
@@ -521,31 +535,7 @@ export function drawWithTemplate(
   // drawQRInternal works in the logical [0, displayWidth] × [0, displayWidth]
   // coordinate space; we pass displayWidth as both width and height because
   // the QR is always square.
-  if (mazeData !== undefined || options !== undefined) {
-    drawQRInternal(
-      ctx as unknown as CanvasRenderingContext2D,
-      modules,
-      config,
-      logoImg,
-      borderLogoImg,
-      displayWidth,
-      moduleCount,
-      isVirtual,
-      mazeData,
-      options
-    );
-  } else {
-    drawQRInternal(
-      ctx as unknown as CanvasRenderingContext2D,
-      modules,
-      config,
-      logoImg,
-      borderLogoImg,
-      displayWidth,
-      moduleCount,
-      isVirtual
-    );
-  }
+  drawQRInternal(ctx, modules, config, logoImg, borderLogoImg, displayWidth, moduleCount, isVirtual, mazeData, renderOptions);
 
   ctx.restore();
 

@@ -156,14 +156,14 @@ describe('drawWithTemplate', () => {
   it('calls drawQRInternal exactly once', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
-    drawWithTemplate(ctx, modules, baseConfig, null, null, 1080, 1080, modules.size);
+    drawWithTemplate(ctx, modules, baseConfig, { width: 1080, height: 1080, moduleCount: modules.size });
     expect(drawQRInternalSpy).toHaveBeenCalledTimes(1);
   });
 
   it('calls save() before and restore() after drawQRInternal', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
-    drawWithTemplate(ctx, modules, baseConfig, null, null, 1080, 1080, modules.size);
+    drawWithTemplate(ctx, modules, baseConfig, { width: 1080, height: 1080, moduleCount: modules.size });
 
     const saveIdx = (ctx as any)._calls.findIndex((c: any) => c.method === 'save');
     const restoreIdx = (ctx as any)._calls.findIndex((c: any) => c.method === 'restore');
@@ -175,7 +175,7 @@ describe('drawWithTemplate', () => {
   it('translates to (0, 0) for NONE + SQUARE (fills entire canvas)', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
-    drawWithTemplate(ctx, modules, baseConfig, null, null, 1080, 1080, modules.size);
+    drawWithTemplate(ctx, modules, baseConfig, { width: 1080, height: 1080, moduleCount: modules.size });
 
     const translateCall = (ctx as any)._calls.find((c: any) => c.method === 'translate');
     expect(translateCall).toBeDefined();
@@ -194,7 +194,7 @@ describe('drawWithTemplate', () => {
 
     const displayWidth = 1080;
     const displayHeight = 1920;
-    drawWithTemplate(ctx, modules, config, null, null, displayWidth, displayHeight, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: displayWidth, height: displayHeight, moduleCount: modules.size });
 
     // Default scale=1.0 → qrSize = displayWidth * 0.5 * 1.0 = 540
     const qrSize = displayWidth * 0.5; // 540
@@ -218,7 +218,7 @@ describe('drawWithTemplate', () => {
 
     const displayWidth = 1080;
     const displayHeight = 1920;
-    drawWithTemplate(ctx, modules, config, null, null, displayWidth, displayHeight, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: displayWidth, height: displayHeight, moduleCount: modules.size });
 
     // Default scale=1.0 → ctxScale = (displayWidth * 0.5 * 1.0) / displayWidth = 0.5
     const expectedCtxScale = (displayWidth * 0.5) / displayWidth; // 0.5
@@ -235,7 +235,7 @@ describe('drawWithTemplate', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(ctx, modules, baseConfig, logoImg, borderLogoImg, 1080, 1080, modules.size);
+    drawWithTemplate(ctx, modules, baseConfig, { logoImg, borderLogoImg, width: 1080, height: 1080, moduleCount: modules.size });
 
     expect(drawQRInternalSpy).toHaveBeenCalledWith(
       expect.anything(),
@@ -245,7 +245,9 @@ describe('drawWithTemplate', () => {
       borderLogoImg,
       expect.any(Number),
       modules.size,
-      false
+      false,
+      undefined,
+      undefined
     );
   });
 });
@@ -271,7 +273,7 @@ describe('drawWithTemplate – templateQrScale', () => {
     const modules = makeModules();
 
     const displayWidth = 1080;
-    drawWithTemplate(ctx, modules, config, null, null, displayWidth, 1920, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: displayWidth, height: 1920, moduleCount: modules.size });
 
     // Expected: qrSize = displayWidth * 0.5 * 0.5 = 270
     const expectedQrSize = displayWidth * 0.5 * 0.5;
@@ -290,7 +292,7 @@ describe('drawWithTemplate – templateQrScale', () => {
 
     const displayWidth = 1080;
     const displayHeight = 1920;
-    drawWithTemplate(ctx, modules, config, null, null, displayWidth, displayHeight, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: displayWidth, height: displayHeight, moduleCount: modules.size });
 
     // qrSize = 1080 * 0.5 * 0.5 = 270
     const qrSize = displayWidth * 0.5 * 0.5;
@@ -312,8 +314,8 @@ describe('drawWithTemplate – templateQrScale', () => {
     const ctxLarge = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(ctxDefault, modules, defaultConfig, null, null, displayWidth, 1920, modules.size);
-    drawWithTemplate(ctxLarge, modules, largeConfig, null, null, displayWidth, 1920, modules.size);
+    drawWithTemplate(ctxDefault, modules, defaultConfig, { width: displayWidth, height: 1920, moduleCount: modules.size });
+    drawWithTemplate(ctxLarge, modules, largeConfig, { width: displayWidth, height: 1920, moduleCount: modules.size });
 
     const scaleDefault = (ctxDefault as any)._calls.find((c: any) => c.method === 'scale');
     const scaleLarge = (ctxLarge as any)._calls.find((c: any) => c.method === 'scale');
@@ -327,7 +329,7 @@ describe('drawWithTemplate – templateQrScale', () => {
     const modules = makeModules();
 
     const displayWidth = 1080;
-    drawWithTemplate(ctx, modules, config, null, null, displayWidth, 1920, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: displayWidth, height: 1920, moduleCount: modules.size });
 
     // Clamped to 0.5 → qrSize = displayWidth * 0.5 * 0.5 = 270
     const expectedCtxScale = (displayWidth * 0.5 * 0.5) / displayWidth;
@@ -341,7 +343,7 @@ describe('drawWithTemplate – templateQrScale', () => {
     const modules = makeModules();
 
     const displayWidth = 1080;
-    drawWithTemplate(ctx, modules, config, null, null, displayWidth, 1920, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: displayWidth, height: 1920, moduleCount: modules.size });
 
     // Clamped to 1.5 → qrSize = displayWidth * 0.5 * 1.5 = 810
     const expectedCtxScale = (displayWidth * 0.5 * 1.5) / displayWidth;
@@ -356,7 +358,7 @@ describe('drawWithTemplate – templateQrScale', () => {
     const modules = makeModules();
 
     const displayWidth = 1080;
-    drawWithTemplate(ctx, modules, config, null, null, displayWidth, 1920, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: displayWidth, height: 1920, moduleCount: modules.size });
 
     // Default 1.0 → qrSize = displayWidth * 0.5 * 1.0 = 540
     const expectedCtxScale = (displayWidth * 0.5) / displayWidth; // 0.5
@@ -385,7 +387,7 @@ describe('drawWithTemplate – color resolution', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(ctx, modules, config, null, null, 1080, 1920, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: 1080, height: 1920, moduleCount: modules.size });
 
     // templateBgColor should appear in the fillStyle history for the background fill
     expect((ctx as any)._fillStyleHistory).toContain('#1a1a2e');
@@ -406,7 +408,7 @@ describe('drawWithTemplate – color resolution', () => {
 
     // Should not throw and fillRect should be called
     expect(() =>
-      drawWithTemplate(ctx, modules, config, null, null, 1080, 1920, modules.size)
+      drawWithTemplate(ctx, modules, config, { width: 1080, height: 1920, moduleCount: modules.size })
     ).not.toThrow();
     expect(ctx.fillRect).toHaveBeenCalled();
   });
@@ -423,7 +425,7 @@ describe('drawWithTemplate – color resolution', () => {
     const modules = makeModules();
 
     expect(() =>
-      drawWithTemplate(ctx, modules, config, null, null, 1080, 1920, modules.size)
+      drawWithTemplate(ctx, modules, config, { width: 1080, height: 1920, moduleCount: modules.size })
     ).not.toThrow();
   });
 
@@ -438,7 +440,7 @@ describe('drawWithTemplate – color resolution', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(ctx, modules, config, null, null, 1080, 1920, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: 1080, height: 1920, moduleCount: modules.size });
 
     // strokeStyle should have been set to templateTextColor at some point (Minimalist frame)
     expect((ctx as any)._strokeStyleHistory).toContain('#ff6600');
@@ -468,17 +470,7 @@ describe('drawWithTemplate - Standard SVG Export Precision', () => {
       socialFormat: SocialFormat.SQUARE_1_1,
     };
 
-    drawWithTemplate(
-      ctx as unknown as CanvasRenderingContext2D,
-      modules,
-      config,
-      null,
-      null,
-      svgWidth,
-      svgHeight,
-      size,
-      true // isVirtual
-    );
+    drawWithTemplate(ctx, modules, config, { width: svgWidth, height: svgHeight, moduleCount: size, isVirtual: true });
 
     const svgString = ctx.serialize();
     expect(svgString).toContain('<svg');
@@ -500,17 +492,7 @@ describe('drawWithTemplate - Standard SVG Export Precision', () => {
       fillStyle: '',
     } as unknown as CanvasRenderingContext2D;
 
-    drawWithTemplate(
-      testCtx,
-      modules,
-      config,
-      null,
-      null,
-      svgWidth,
-      svgHeight,
-      size,
-      true // isVirtual
-    );
+    drawWithTemplate(testCtx, modules, config, { width: svgWidth, height: svgHeight, moduleCount: size, isVirtual: true });
 
     // Sort the rect calls by y and then by x
     rectCalls.sort((a, b) => a.y - b.y || a.x - b.x);
@@ -568,17 +550,7 @@ describe('drawWithTemplate - Standard SVG Export Precision', () => {
       fillStyle: '',
     } as unknown as CanvasRenderingContext2D;
 
-    drawWithTemplate(
-      testCtx,
-      modules,
-      config,
-      null,
-      null,
-      1080,
-      1080,
-      size,
-      false // isVirtual = false
-    );
+    drawWithTemplate(testCtx, modules, config, { width: 1080, height: 1080, moduleCount: size });
 
     const { cellSize } = calculateLayout(config, 1080, size);
     const ceilCellSize = Math.ceil(cellSize);
@@ -604,7 +576,7 @@ describe('drawWithTemplate – transparent background', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: 1080, height: 1080, moduleCount: modules.size });
 
     expect(ctx.fillRect).not.toHaveBeenCalled();
   });
@@ -619,7 +591,7 @@ describe('drawWithTemplate – transparent background', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(ctx, modules, config, null, null, 1080, 1920, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: 1080, height: 1920, moduleCount: modules.size });
 
     // Safe zone rounded rect should be filled with #ffffff
     expect(ctx._fillStyleHistory).toContain('#ffffff');
@@ -642,7 +614,7 @@ describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(ctx, modules, config, null, null, 1080, 1350, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: 1080, height: 1350, moduleCount: modules.size });
 
     const filledTexts = getFilledTexts(ctx);
     expect(filledTexts).toContain('Connect to Wi-Fi');
@@ -663,7 +635,7 @@ describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: 1080, height: 1080, moduleCount: modules.size });
 
     const filledTexts = getFilledTexts(ctx);
     expect(filledTexts).toContain('FreeCafe');
@@ -683,7 +655,7 @@ describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: 1080, height: 1080, moduleCount: modules.size });
 
     const filledTexts = getFilledTexts(ctx);
     expect(filledTexts).not.toContain('Connect to Wi-Fi');
@@ -703,7 +675,7 @@ describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: 1080, height: 1080, moduleCount: modules.size });
 
     const filledTexts = getFilledTexts(ctx);
     expect(filledTexts).not.toContain('No password needed');
@@ -731,8 +703,8 @@ describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
     const longCtx = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(shortCtx, modules, shortConfig, null, null, 1080, 1080, modules.size);
-    drawWithTemplate(longCtx, modules, longConfig, null, null, 1080, 1080, modules.size);
+    drawWithTemplate(shortCtx, modules, shortConfig, { width: 1080, height: 1080, moduleCount: modules.size });
+    drawWithTemplate(longCtx, modules, longConfig, { width: 1080, height: 1080, moduleCount: modules.size });
 
     const shortCall = shortCtx._filledCalls.find((c) => c.text === '12345678');
     const longCall = longCtx._filledCalls.find((c) => c.text.startsWith('1234567890'));
@@ -757,7 +729,7 @@ describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: 1080, height: 1080, moduleCount: modules.size });
 
     const filledTexts = getFilledTexts(ctx);
     expect(filledTexts).toContain('Cafe;Guest');
@@ -775,7 +747,7 @@ describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
     const svgCtx = new SvgContext(1080, 1080);
     const modules = makeModules();
 
-    drawWithTemplate(svgCtx as unknown as CanvasRenderingContext2D, modules, config, null, null, 1080, 1080, modules.size);
+    drawWithTemplate(svgCtx, modules, config, { width: 1080, height: 1080, moduleCount: modules.size });
 
     const svgXml = svgCtx.serialize();
     expect(svgXml).toContain('Connect to Wi-Fi');
@@ -799,7 +771,7 @@ describe('drawWithTemplate – TemplateStyle.WIFI_CARD', () => {
     const ctx = makeMockCtx();
     const modules = makeModules();
 
-    drawWithTemplate(ctx, modules, config, null, null, 1080, 1080, modules.size);
+    drawWithTemplate(ctx, modules, config, { width: 1080, height: 1080, moduleCount: modules.size });
 
     // The last drawRoundRect call in drawWifiCardChrome is for badge2
     expect(drawRoundRectSpy).toHaveBeenCalled();

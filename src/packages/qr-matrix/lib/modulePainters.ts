@@ -17,6 +17,7 @@
 */
 
 import { drawRoundRect } from './canvasHelpers';
+import type { RenderSurface } from './surface';
 
 /**
  * Draws a circular module (for Swiss/Fluid themes).
@@ -27,7 +28,7 @@ import { drawRoundRect } from './canvasHelpers';
  * @param scale The exact scale factor overlap (e.g. 1.05 or 1.1).
  */
 export const drawCircularModule = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   cx: number,
   cy: number,
   cellSize: number,
@@ -52,7 +53,7 @@ export const drawCircularModule = (
  * @param hasRight Adjacent module presence states.
  */
 export const drawCircuitModule = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   x: number,
   y: number,
   cx: number,
@@ -93,7 +94,7 @@ export const drawCircuitModule = (
  * @param isVirtual Whether rendering for svg or custom contexts requiring rounding.
  */
 export const drawStandardModule = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   x: number,
   y: number,
   cellSize: number,

@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import type { RenderSurface } from './surface';
+
 /**
  * Clamps the corner radius so it doesn't exceed half of the width or height,
  * and is never negative.
@@ -40,7 +42,7 @@ export const clampCornerRadius = (r: number, w: number, h: number): number => {
  * @param h The height of the rectangle.
  * @param r The corner radius.
  */
-export const drawRoundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
+export const drawRoundRect = (ctx: RenderSurface, x: number, y: number, w: number, h: number, r: number) => {
   drawCornerRect(ctx, x, y, w, h, [r, r, r, r]);
 };
 
@@ -54,7 +56,7 @@ export const drawRoundRect = (ctx: CanvasRenderingContext2D, x: number, y: numbe
  * @param radii The top-left, top-right, bottom-right and bottom-left corner radii.
  */
 export const drawCornerRect = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   x: number,
   y: number,
   w: number,
@@ -103,7 +105,7 @@ const STAR_5_OFFSETS = (() => {
  * @param fill Whether to fill the polygon (default: true).
  * @param addToPath Whether to add to the current path without starting a new one or filling (default: false).
  */
-export const drawPoly = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, sides: number, rotate: number = 0, fill: boolean = true, addToPath: boolean = false) => {
+export const drawPoly = (ctx: RenderSurface, x: number, y: number, r: number, sides: number, rotate: number = 0, fill: boolean = true, addToPath: boolean = false) => {
   if (!addToPath) ctx.beginPath();
   if (sides === 6 && rotate === 0) {
     ctx.moveTo(x + r * HEX_OFFSETS[0].cos, y + r * HEX_OFFSETS[0].sin);
@@ -136,7 +138,7 @@ export const drawPoly = (ctx: CanvasRenderingContext2D, x: number, y: number, r:
  * @param fill Whether to fill the star (default: true).
  * @param addToPath Whether to add to the current path without starting a new one or filling (default: false).
  */
-export const drawStar = (ctx: CanvasRenderingContext2D, cx: number, cy: number, outerR: number, innerR: number, spikes: number, fill: boolean = true, addToPath: boolean = false) => {
+export const drawStar = (ctx: RenderSurface, cx: number, cy: number, outerR: number, innerR: number, spikes: number, fill: boolean = true, addToPath: boolean = false) => {
   if (!addToPath) ctx.beginPath();
   if (spikes === 5) {
     ctx.moveTo(cx + STAR_5_OFFSETS[0].cos * outerR, cy + STAR_5_OFFSETS[0].sin * outerR);
@@ -185,7 +187,7 @@ const ROUGH_RECT_SIN = Math.sin(ROUGH_RECT_ROTATION);
  * @param h The height.
  * @param addToPath Whether to add to the current path instead of filling immediately (default: false).
  */
-export const drawRoughRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, addToPath: boolean = false) => {
+export const drawRoughRect = (ctx: RenderSurface, x: number, y: number, w: number, h: number, addToPath: boolean = false) => {
   const hw = w / 2;
   const hh = h / 2;
   const cx = x + hw;
@@ -233,7 +235,7 @@ export const drawRoughRect = (ctx: CanvasRenderingContext2D, x: number, y: numbe
  * render and export (#1397). Never pass `Math.random`.
  */
 export const drawScribble = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   x: number,
   y: number,
   s: number,

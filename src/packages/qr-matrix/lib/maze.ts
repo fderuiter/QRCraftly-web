@@ -10,6 +10,7 @@ import {
 } from './canvasHelpers';
 import { drawCircularModule, drawCircuitModule } from './modulePainters';
 import { SHAPE_SIZES } from './shapeSizes';
+import type { RenderSurface } from './surface';
 
 interface MazeNode {
   r: number;
@@ -435,7 +436,7 @@ export function getStyleAdaptiveMazePathWidth(style?: QRStyle, configPathWidth?:
  * Applied during canvas halo masking pass to erase overlapping maze paths.
  */
 function drawModuleHaloPath(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   style: QRStyle,
   x: number,
   y: number,
@@ -508,7 +509,7 @@ function drawModuleHaloPath(
  * Preserves finder pattern eyes, quiet zones, and logo cutout bounds.
  */
 function applyMazeHaloMask(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   modules: QRModules,
   config: QRConfig,
   drawX: number,
@@ -557,7 +558,7 @@ function applyMazeHaloMask(
  * Renders the maze overlay directly on the canvas context.
  */
 export function renderMaze(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   modules: QRModules,
   config: QRConfig,
   drawX: number,

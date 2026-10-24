@@ -19,6 +19,7 @@
 import { EyeShape, QRStyle } from '@/packages/core/types';
 import { drawCornerRect, drawPoly, drawRoughRect, drawRoundRect, drawScribble, drawStar } from './canvasHelpers';
 import { seedRandom } from './prng';
+import type { RenderSurface } from './surface';
 
 /** One of the three finder eyes, by the corner it sits in. */
 export interface EyePosition {
@@ -56,7 +57,7 @@ const EYE_CURVE_RATIO = 0.45;
  * that runs through the code's centre, so the three leaves mirror each other.
  */
 const traceEyeShape = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   shape: EyeShape,
   x: number,
   y: number,
@@ -97,7 +98,7 @@ const traceEyeShape = (
  * @param bgColor Background color to clear/punch holes.
  */
 export const drawEyeFrame = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   x: number,
   y: number,
   size: number,
@@ -218,7 +219,7 @@ export const drawEyeFrame = (
  * Grunge scribble, so each eye has its own shape that never changes between renders.
  */
 export const drawEyeball = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   x: number,
   y: number,
   size: number,

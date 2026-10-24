@@ -95,7 +95,7 @@ export async function renderQRRaster(config: QRConfig, width: number): Promise<H
   if (!ctx) throw new Error('Canvas is not available in this browser.');
 
   if (useTemplate) {
-    drawWithTemplate(ctx, modules, config, logoImg, borderLogoImg, outWidth, outHeight, moduleCount, false, mazeData);
+    drawWithTemplate(ctx, modules, config, { logoImg, borderLogoImg, width: outWidth, height: outHeight, moduleCount, mazeData });
   } else {
     ctx.clearRect(0, 0, outWidth, outHeight);
     drawQRInternal(ctx, modules, config, logoImg, borderLogoImg, outWidth, moduleCount, false, mazeData);

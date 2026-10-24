@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import type { RenderSurface } from './surface';
+
 interface Point {
   x: number;
   y: number;
@@ -522,7 +524,7 @@ function buildFluidContourPaths(contours: Contour[], cellSize: number): FluidCon
  * Executes precomputed fluid paths directly onto the canvas context.
  */
 function drawFluidPaths(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   paths: FluidContourPath[]
 ): void {
   for (let p = 0; p < paths.length; p++) {
@@ -548,7 +550,7 @@ function drawFluidPaths(
  * @param cellSize Physical size of a single QR module.
  */
 export function drawFluidContours(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   contours: Contour[],
   cellSize: number
 ): void {
@@ -567,7 +569,7 @@ export function drawFluidContours(
  * @param moduleCount Module count along one dimension.
  */
 export function renderFluidModules(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   activeGrid: Uint8Array,
   drawX: number,
   drawY: number,

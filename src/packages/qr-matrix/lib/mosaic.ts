@@ -35,6 +35,7 @@
 import type { QRModules, MosaicMode } from '@/packages/core/types';
 import { srgbToLinear, linearToSrgb, getLuminanceFromLinearRgb } from '@/packages/core/encoding';
 import { isAlignmentPatternZone } from './utils';
+import type { RenderSurface } from './surface';
 
 /** Engine options. */
 export interface MosaicOptions {
@@ -277,7 +278,7 @@ const hex2 = (v: number) => v.toString(16).padStart(2, '0');
  * @param skipModule - Optional predicate for modules to leave empty (e.g. under a logo).
  */
 export function renderMosaic(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   plan: MosaicPlan,
   drawX: number,
   drawY: number,
