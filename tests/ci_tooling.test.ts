@@ -301,4 +301,15 @@ describe('visual baseline refresh (#1426)', () => {
     expect(workflow).toContain('git add e2e/visual-regression.spec.ts-snapshots');
     expect(workflow).not.toMatch(/git add (-A|\.|--all)/);
   });
+
+  it('keeps the write token out of the steps that run the branch code (#1592)', () => {
+    expect(workflow).toMatch(/actions\/checkout@[^\n]+\n\s+with:\n(?:\s+(?:#[^\n]*|ref:[^\n]*)\n)*\s+persist-credentials: false/);
+    // Only the push step is given the token, and it never writes it to git config.
+    const steps = workflow.split(/\n {6}- /);
+    const withToken = steps.filter((step) => step.includes('github.token'));
+    expect(withToken.map((step) => step.split(/\r?\n/)[0])).toEqual(['name: Push changed baselines', 'name: Remove label']);
+    const push = withToken[0];
+    expect(push).toContain('git -c "http.https://github.com/.extraheader=');
+    expect(push).not.toMatch(/git config[^\n]*extraheader/);
+  });
 });

@@ -99,7 +99,7 @@ The jobs:
 
 #### Refreshing visual baselines
 
-The screenshots in `e2e/visual-regression.spec.ts-snapshots/` must come from a CI runner, because fonts and rendering differ on every other machine. When a change moves the layout on purpose, add the `update-snapshots` label to the pull request (or run **Update Visual Baselines** by hand on the branch). The `update-snapshots.yml` workflow runs only the visual spec with `--update-snapshots` for Chromium, Firefox and WebKit and commits the changed baselines to the branch. GitHub holds the CI runs for that bot commit until a maintainer approves them on the PR's Checks tab. Add `full-e2e` before the `update-snapshots` label, because CI reads the labels from the push event, so that Firefox and WebKit are checked before the merge.
+The screenshots in `e2e/visual-regression.spec.ts-snapshots/` must come from a CI runner, because fonts and rendering differ on every other machine. When a change moves the layout on purpose, add the `update-snapshots` label to the pull request (or run **Update Visual Baselines** by hand on the branch). The `update-snapshots.yml` workflow runs only the visual spec with `--update-snapshots` for Chromium, Firefox and WebKit and commits the changed baselines to the branch. The checkout keeps no token, so the install, build and Playwright steps that run the branch's code have no write credential; only the final push step gets one, for that one command (#1592). GitHub holds the CI runs for that bot commit until a maintainer approves them on the PR's Checks tab. Add `full-e2e` before the `update-snapshots` label, because CI reads the labels from the push event, so that Firefox and WebKit are checked before the merge.
 
 ### Step 5: Ephemeral Branch Preview Verification
 

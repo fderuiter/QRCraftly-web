@@ -47,6 +47,16 @@ jobs:
         with:
           # The branch itself, not the PR merge commit, so the commit can be pushed back.
           ref: ${{ github.head_ref || github.ref_name }}
+          # The install, build and Playwright steps run the branch's code, so they get no write
+          # token: only the push step below is given one (#1592).
+          persist-credentials: false
+
+      - name: Check no credential is stored
+        run: |
+          if git config --list --show-origin | grep -Ei 'extraheader|credential'; then
+            echo "::error::The checkout left a credential in git config."
+            exit 1
+          fi
 
       - name: Setup Environment
         uses: ./.github/actions/setup
@@ -89,8 +99,8 @@ jobs:
           pnpm exec playwright test e2e/visual-regression.spec.ts "${args[@]}" --update-snapshots --retries=0
 
       - name: Commit changed baselines
+        id: commit
         env:
-          BRANCH: ${{ github.head_ref || github.ref_name }}
           PROJECTS: ${{ steps.projects.outputs.list }}
         run: |
           git add e2e/visual-regression.spec.ts-snapshots
@@ -102,7 +112,19 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m "test(e2e): refresh visual baselines on CI ($PROJECTS)"
-          git push origin "HEAD:$BRANCH"
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Push changed baselines
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The token is used for this one command and never written to git config.
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+            push "https://github.com/${GITHUB_REPOSITORY}.git" "HEAD:$BRANCH"
 
       - name: Remove label
         if: always() && github.event_name == 'pull_request'
