@@ -16,21 +16,30 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { classifyCameraError, type CameraErrorState } from '@/packages/optical-scanner';
 import type { CameraPermission } from './feedback/link';
 
 /**
- * What asking for the sender's webcam came back with: a refusal and a missing camera are told apart.
+ * What asking for the sender's webcam came back with. The error names are classified once, by
+ * the scanner's Camera Session (#1585), so a camera in use reads as busy on every page.
  * @param error - The error `getUserMedia` rejected with.
- * @returns 'denied' or 'unavailable'.
- * @throws The error itself when it is neither, so the caller reports it as a failure.
+ * @returns 'denied', 'unavailable' or 'busy'.
+ * @throws The error itself when it is none of them, so the caller reports it as a failure.
  */
 export function permissionOf(error: unknown): CameraPermission {
-  // A DOMException is not an Error everywhere, so read its name as a plain property.
-  const name = typeof error === 'object' && error !== null && 'name' in error ? String(error.name) : '';
-  if (name === 'NotAllowedError' || name === 'SecurityError') return 'denied';
-  if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'NotReadableError') return 'unavailable';
+  const { status } = classifyCameraError(error);
+  if (status === 'denied' || status === 'busy') return status;
+  if (status === 'unavailable' || status === 'unsupported') return 'unavailable';
   throw error;
 }
+
+/** What to tell the person for each camera problem, with what to do next. */
+const CAMERA_ERROR_COPY: Record<Exclude<CameraErrorState['status'], 'error'>, string> = {
+  denied: 'Camera access was blocked. Allow the camera for this site in your browser settings, then activate the scanner again.',
+  unavailable: 'No camera was found on this device.',
+  busy: 'The camera is in use by another app or tab. Close it there, then activate the scanner again.',
+  unsupported: 'This camera cannot stream at a size the scanner can use. Try another camera, then activate the scanner again.',
+};
 
 /**
  * Explains a failed camera request in plain words, with what to do next.
@@ -38,18 +47,6 @@ export function permissionOf(error: unknown): CameraPermission {
  * @returns A user-facing explanation.
  */
 export function describeCameraError(error: Error): string {
-  switch (error.name) {
-    case 'NotAllowedError':
-    case 'PermissionDeniedError':
-    case 'SecurityError':
-      return 'Camera access was blocked. Allow the camera for this site in your browser settings, then activate the scanner again.';
-    case 'NotFoundError':
-    case 'OverconstrainedError':
-      return 'No camera was found on this device.';
-    case 'NotReadableError':
-    case 'TrackStartError':
-      return 'The camera is in use by another app or tab. Close it there, then activate the scanner again.';
-    default:
-      return error.message || 'The camera could not be started.';
-  }
+  const { status } = classifyCameraError(error);
+  return status === 'error' ? error.message || 'The camera could not be started.' : CAMERA_ERROR_COPY[status];
 }

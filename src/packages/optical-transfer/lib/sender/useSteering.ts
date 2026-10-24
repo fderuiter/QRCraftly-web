@@ -66,11 +66,15 @@ export function useSteering(refs: SenderRefs, { requestWebcam, onAllDone, runTil
   const webcamRef = useRef<{ stream: MediaStream; video: HTMLVideoElement } | null>(null);
   const feedbackReaderRef = useRef<TileReader | null>(null);
   const steerTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** Removes the back channel's visibility listener. */
+  const stopWatchingVisibilityRef = useRef<(() => void) | null>(null);
   /** Applies a speed decision; set below, read by the webcam reader and the steering timer. */
   const applyDecisionRef = useRef<(decision: ControllerDecision) => void>(() => {});
 
   /** Turns the back channel off and lets the webcam go. */
   const endSteering = useCallback(() => {
+    stopWatchingVisibilityRef.current?.();
+    stopWatchingVisibilityRef.current = null;
     if (steerTimerRef.current) clearInterval(steerTimerRef.current);
     steerTimerRef.current = null;
     feedbackReaderRef.current?.stop();
@@ -206,7 +210,50 @@ export function useSteering(refs: SenderRefs, { requestWebcam, onAllDone, runTil
       });
       feedbackReaderRef.current = reader;
       reader.start();
+      // The back-channel webcam follows the Camera Session's rule (ADR 0016): it is let go while
+      // the tab is hidden and asked for again when the tab is shown (#1585).
+      let hidden = false;
+      // One request at a time, so a quick hide and show cannot open a second stream.
+      let asking = false;
+      const onVisibilityChange = () => {
+        if (linkRef.current !== link || link.state.status !== 'listening') return;
+        if (document.hidden) {
+          hidden = true;
+          reader.stop();
+          releaseCamera();
+          return;
+        }
+        if (!hidden || asking) return;
+        asking = true;
+        void requestCamera().then((permission) => {
+          asking = false;
+          if (linkRef.current !== link || link.state.status !== 'listening') {
+            releaseCamera();
+            return;
+          }
+          if (document.hidden) {
+            // Hidden again before the camera answered: keep waiting for the tab to be shown.
+            releaseCamera();
+            return;
+          }
+          hidden = false;
+          if (permission !== 'granted') {
+            link.cameraLost();
+            setSteerState(link.state);
+            return;
+          }
+          webcamRef.current = webcam;
+          reader.start();
+        });
+      };
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      stopWatchingVisibilityRef.current = () => {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+        releaseCamera();
+      };
       steerTimerRef.current = setInterval(() => {
+        // A hidden tab has no camera on purpose; the controller waits until it is shown.
+        if (hidden) return;
         const live = webcamRef.current?.stream.getVideoTracks().some((track) => track.readyState === 'live') ?? false;
         if (!live) {
           // The camera went away: carry on one way with the profile on screen, and no auto-stop.

@@ -32,6 +32,8 @@ export {
 export {
   createCameraSession,
   cameraConstraints,
+  classifyCameraError,
+  type CameraErrorState,
   type CameraInfo,
   type CameraDevice,
   type CameraMediaDevices,

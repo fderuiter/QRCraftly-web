@@ -129,16 +129,25 @@ const IDLE: CameraSessionState = { status: 'idle' };
 
 function toError(caught: unknown): Error {
   if (caught instanceof Error) return caught;
-  if (typeof caught === 'object' && caught !== null && 'name' in caught && 'message' in caught) {
-    const error = new Error(String(caught.message));
+  if (typeof caught === 'object' && caught !== null && 'name' in caught) {
+    const error = new Error('message' in caught ? String(caught.message) : '');
     error.name = String(caught.name);
     return error;
   }
   return new Error(String(caught));
 }
 
-/** Maps a `getUserMedia` rejection to the state the UI explains. */
-function failureState(caught: unknown): CameraSessionState {
+/** A camera problem that a failed `getUserMedia` call can cause. */
+export type CameraErrorState = Extract<CameraSessionState, { status: 'denied' | 'unavailable' | 'busy' | 'unsupported' | 'error' }>;
+
+/**
+ * Maps a `getUserMedia` rejection to the state the UI explains. This is the one table of camera
+ * error names in the repository: the scanner, the file-transfer receiver and the sender's back
+ * channel all classify through it, so the same error reads the same everywhere (#1585).
+ * @param caught - What `getUserMedia` rejected with (a DOMException is not an Error everywhere).
+ * @returns The state, with the error as an `Error`.
+ */
+export function classifyCameraError(caught: unknown): CameraErrorState {
   const error = toError(caught);
   switch (error.name) {
     case 'NotAllowedError':
@@ -340,7 +349,7 @@ export function createCameraSession(config: CameraSessionConfig): CameraSession 
       } catch (caught) {
         const overconstrained = toError(caught).name === 'OverconstrainedError';
         if (overconstrained && step < CAPTURE_SIZES.length - 1 && ticket === generation) continue;
-        if (ticket === generation) setState(failureState(caught));
+        if (ticket === generation) setState(classifyCameraError(caught));
         return;
       }
     }

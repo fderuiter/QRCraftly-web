@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import {
   cameraConstraints,
+  classifyCameraError,
   createCameraSession,
   type CameraSessionState,
   type CameraVideoElement,
@@ -465,5 +466,31 @@ describe('createCameraSession', () => {
       expect(camera.tracks).toHaveLength(2);
       expect(camera.tracks[0].live).toBe(false);
     });
+  });
+});
+
+describe('classifyCameraError (#1585)', () => {
+  it.each([
+    ['NotAllowedError', 'denied'],
+    ['PermissionDeniedError', 'denied'],
+    ['SecurityError', 'denied'],
+    ['NotFoundError', 'unavailable'],
+    ['DevicesNotFoundError', 'unavailable'],
+    ['NotReadableError', 'busy'],
+    ['TrackStartError', 'busy'],
+    ['OverconstrainedError', 'unsupported'],
+    ['ConstraintNotSatisfiedError', 'unsupported'],
+    ['AbortError', 'error'],
+  ])('reads %s as %s', (name, status) => {
+    const state = classifyCameraError(Object.assign(new Error('refused'), { name }));
+    expect(state.status).toBe(status);
+    expect(state.error.name).toBe(name);
+  });
+
+  it('turns a value that is not an Error into one', () => {
+    const state = classifyCameraError({ name: 'NotAllowedError' });
+    expect(state.status).toBe('denied');
+    expect(state.error).toBeInstanceOf(Error);
+    expect(classifyCameraError('broken').status).toBe('error');
   });
 });
