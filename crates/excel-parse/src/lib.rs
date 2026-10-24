@@ -102,7 +102,82 @@ pub fn excel_bytes_to_csv(data: &[u8]) -> Vec<u8> {
     Vec::new()
 }
 
+/// The last conversion, keyed by the input's length and FNV-1a hash. Callers ask for the size
+/// first and then call again with a buffer; the second call copies this result instead of
+/// converting the workbook a second time (#1584).
+struct Converted {
+    len: usize,
+    hash: u64,
+    csv: Vec<u8>,
+}
+
+fn fnv1a(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for &b in bytes {
+        hash = (hash ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash
+}
+
+#[cfg(target_arch = "wasm32")]
+mod last {
+    use super::Converted;
+    use core::cell::UnsafeCell;
+
+    struct Slot(UnsafeCell<Option<Converted>>);
+    // WebAssembly modules here are single threaded: no shared memory, no atomics.
+    unsafe impl Sync for Slot {}
+    static LAST: Slot = Slot(UnsafeCell::new(None));
+
+    pub fn with<R>(f: impl FnOnce(&mut Option<Converted>) -> R) -> R {
+        // SAFETY: single threaded, and the reference does not outlive this call.
+        f(unsafe { &mut *LAST.0.get() })
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+mod last {
+    use super::Converted;
+    use std::cell::RefCell;
+
+    std::thread_local! {
+        // One slot per thread, so host tests running in parallel never share it.
+        static LAST: RefCell<Option<Converted>> = const { RefCell::new(None) };
+        pub static CONVERSIONS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
+    }
+
+    pub fn with<R>(f: impl FnOnce(&mut Option<Converted>) -> R) -> R {
+        LAST.with(|slot| f(&mut slot.borrow_mut()))
+    }
+}
+
+/// Runs `f` on the CSV for `src`, converting only when the last conversion was of other bytes.
+/// `f` returns its result and whether to keep the CSV for a following call. Dropping it after
+/// the copy matters: the module's bump allocator reuses memory only once nothing is live.
+fn with_converted<R>(src: &[u8], f: impl FnOnce(&[u8]) -> (R, bool)) -> R {
+    let hash = fnv1a(src);
+    last::with(|slot| {
+        let fresh = !matches!(slot, Some(c) if c.len == src.len() && c.hash == hash);
+        if fresh {
+            #[cfg(not(target_arch = "wasm32"))]
+            last::CONVERSIONS.with(|n| n.set(n.get() + 1));
+            *slot = Some(Converted {
+                len: src.len(),
+                hash,
+                csv: excel_bytes_to_csv(src),
+            });
+        }
+        let (result, keep) = f(slot.as_ref().map(|c| c.csv.as_slice()).unwrap_or(&[]));
+        if !keep {
+            *slot = None;
+        }
+        result
+    })
+}
+
 /// Parses an Excel spreadsheet (XLSX, SpreadsheetML) and writes normalized CSV text to `out_ptr`.
+/// Call it once with a null `out_ptr` to learn the size, then with a buffer of that size; the
+/// workbook is converted once for both calls.
 ///
 /// # Safety
 /// `in_ptr..in_ptr + in_len` must be readable linear memory and `out_ptr..out_ptr + out_max_len` writable.
@@ -115,7 +190,26 @@ pub unsafe extern "C" fn excel_parse_to_csv(
     out_len_ptr: *mut u32,
 ) -> i32 {
     let src = unsafe { input(in_ptr, in_len) };
-    let csv_bytes = excel_bytes_to_csv(src);
+    with_converted(src, |csv_bytes| {
+        let status = unsafe { write_csv(csv_bytes, out_ptr, out_max_len, out_len_ptr) };
+        // Keep the CSV only for the copy that follows a size probe.
+        (
+            status,
+            status == STATUS_BUFFER_TOO_SMALL && !csv_bytes.is_empty(),
+        )
+    })
+}
+
+/// Reports the CSV size and copies the CSV when the buffer is large enough.
+///
+/// # Safety
+/// As for [`excel_parse_to_csv`].
+unsafe fn write_csv(
+    csv_bytes: &[u8],
+    out_ptr: *mut u8,
+    out_max_len: usize,
+    out_len_ptr: *mut u32,
+) -> i32 {
     let needed = csv_bytes.len();
 
     if !out_len_ptr.is_null() {
@@ -136,6 +230,47 @@ pub unsafe extern "C" fn excel_parse_to_csv(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Probes for the size, then copies, the way `excelWasm.ts` calls the module.
+    fn probe_then_copy(src: &[u8]) -> Vec<u8> {
+        let mut len = 0u32;
+        let status = unsafe {
+            excel_parse_to_csv(src.as_ptr(), src.len(), core::ptr::null_mut(), 0, &mut len)
+        };
+        if len == 0 {
+            return Vec::new();
+        }
+        assert_eq!(status, STATUS_BUFFER_TOO_SMALL);
+        let mut out = alloc::vec![0u8; len as usize];
+        let status = unsafe {
+            excel_parse_to_csv(
+                src.as_ptr(),
+                src.len(),
+                out.as_mut_ptr(),
+                out.len(),
+                &mut len,
+            )
+        };
+        assert_eq!(status, STATUS_OK);
+        out
+    }
+
+    #[test]
+    fn converts_once_for_a_probe_and_a_copy() {
+        let input = b"<table><tr><td>Name</td><td>URL</td></tr><tr><td>A</td><td>https://a.example</td></tr></table>";
+        let before = last::CONVERSIONS.with(|n| n.get());
+        let csv = probe_then_copy(input);
+        assert_eq!(
+            String::from_utf8(csv).unwrap(),
+            "Name,URL\nA,https://a.example"
+        );
+        assert_eq!(last::CONVERSIONS.with(|n| n.get()) - before, 1);
+        // The copy dropped the kept CSV, so the next import converts again.
+        last::with(|slot| assert!(slot.is_none()));
+        let other = b"<table><tr><td>Other</td></tr></table>";
+        assert_eq!(probe_then_copy(other), b"Other");
+        assert_eq!(last::CONVERSIONS.with(|n| n.get()) - before, 2);
+    }
 
     #[test]
     fn rejects_plain_text_passthrough() {
