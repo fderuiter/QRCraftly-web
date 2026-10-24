@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { auditDesignTokens, LEGACY_PALETTE_FILES } from '../scripts/design_token_audit.js';
 
@@ -51,5 +52,12 @@ describe('design token audit', () => {
         { file: 'src/components/ui/Thing.tsx', source: '// e.g. text-[12px] or bg-slate-900\n<div className="max-h-[90vh] grid-cols-[30rem_minmax(0,1fr)]" />' },
       ]),
     ).toEqual([]);
+  });
+
+  it('only lists files that still use a raw palette colour, so the list shrinks (#1615)', () => {
+    const clean = [...LEGACY_PALETTE_FILES].filter(
+      (file) => fs.existsSync(file) && auditDesignTokens([{ file: 'src/stale-check.tsx', source: fs.readFileSync(file, 'utf8') }]).length === 0,
+    );
+    expect(clean, 'Fix: remove these files from LEGACY_PALETTE_FILES in scripts/design_token_audit.js').toEqual([]);
   });
 });
