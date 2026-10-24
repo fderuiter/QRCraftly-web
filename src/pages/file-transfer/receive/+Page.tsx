@@ -17,7 +17,7 @@
 */
 
 import React, { useState, useCallback, useEffect, useEffectEvent, useMemo, useRef } from 'react';
-import { createPrismSession, TRANSFER_DENSITY_PROFILES } from '@/packages/optical-transfer';
+import { createPrismSession, describeCameraError, formatDuration, TRANSFER_DENSITY_PROFILES } from '@/packages/optical-transfer';
 import { Play, Square, Camera, Activity, Cpu, Trash2, Upload, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -43,35 +43,12 @@ import { LockOnBrackets } from '@/components/transfer/LockOnBrackets';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { playChime, unlockChime, vibrate } from '@/utils/feedback';
 import { analyseReceivedFile } from '@/packages/core/files';
-import { formatEta, formatFileSize } from '@/utils/transferSpeed';
-
-/**
- * Explains a failed camera request in plain words, with what to do next.
- * @param error The error `getUserMedia` rejected with.
- * @returns A user-facing explanation.
- */
-function describeCameraError(error: Error): string {
-  switch (error.name) {
-    case 'NotAllowedError':
-    case 'PermissionDeniedError':
-    case 'SecurityError':
-      return 'Camera access was blocked. Allow the camera for this site in your browser settings, then activate the scanner again.';
-    case 'NotFoundError':
-    case 'OverconstrainedError':
-      return 'No camera was found on this device.';
-    case 'NotReadableError':
-    case 'TrackStartError':
-      return 'The camera is in use by another app or tab. Close it there, then activate the scanner again.';
-    default:
-      return error.message || 'The camera could not be started.';
-  }
-}
+import { formatFileSize } from '@/utils/transferSpeed';
+import { useFileDrop } from '@/hooks/useFileDrop';
 
 function FileTransferReceiveInner() {
   const { addToast } = useToast();
 
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
   // Use the unified animated QR receiver hook
@@ -143,38 +120,11 @@ function FileTransferReceiveInner() {
     }
   }, [bundle, addToast]);
 
-  // Drag and drop handlers for video file upload
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      handleFileUpload(files[0]);
-    }
-  }, [handleFileUpload]);
-
-  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      handleFileUpload(files[0]);
-    }
-    if (e.target) {
-      e.target.value = '';
-    }
-  }, [handleFileUpload]);
+  // Drag and drop, or a click, Enter or Space to browse, for the video file upload.
+  const { isDragging, inputRef: fileInputRef, dropProps, inputProps, browseProps } = useFileDrop({
+    onFiles: ([file]) => handleFileUpload(file),
+    accept: 'video/*',
+  });
 
   // A short buzz when the file arrives, and a chime only if the person turned sound on.
   const [soundOn, setSoundOn] = useState(false);
@@ -281,7 +231,9 @@ function FileTransferReceiveInner() {
                           ? 'A private transfer'
                           : switchOffer.bundle
                             ? `${switchOffer.entryCount > 0 ? `${switchOffer.entryCount} files` : 'Several files'}`
-                            : analyseReceivedFile(switchOffer.files[0].name, switchOffer.files[0].mimeType).safeName}{' '}
+                            : switchOffer.files[0]
+                              ? analyseReceivedFile(switchOffer.files[0].name, switchOffer.files[0].mimeType).safeName
+                              : 'Another file'}{' '}
                         ({switchOffer.fingerprint}) is also on screen. Switching drops what you have received so far.
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -366,18 +318,8 @@ function FileTransferReceiveInner() {
                 ) : (
                   <div className="space-y-3">
                     <div
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          fileInputRef.current?.click();
-                        }
-                      }}
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                      onClick={() => fileInputRef.current?.click()}
+                      {...browseProps}
+                      {...dropProps}
                       className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center transition-colors ${
                         isDragging
                           ? 'border-accent bg-accent-soft'
@@ -390,13 +332,11 @@ function FileTransferReceiveInner() {
                         {videoFile ? videoFile.name : 'Drop video file here or click to browse'}
                       </p>
                       <p className="mt-1 text-xs text-fg-muted">
-                        {videoFile ? `${(videoFile.size / (1024 * 1024)).toFixed(2)} MB` : 'MP4, WebM, MOV, etc.'}
+                        {videoFile ? formatFileSize(videoFile.size) : 'MP4, WebM, MOV, etc.'}
                       </p>
                       <input
-                        type="file"
+                        {...inputProps}
                         ref={fileInputRef}
-                        accept="video/*"
-                        onChange={handleFileInputChange}
                         className="hidden"
                         data-testid="video-file-input"
                       />
@@ -523,7 +463,7 @@ function FileTransferReceiveInner() {
 
               {fountainStats ? (
                 <div className="space-y-4 rounded-xl border border-line-subtle bg-surface-sunken p-4 text-xs" data-testid="fountain-telemetry">
-                  <ChunkConstellation total={fountainStats.k} received={fountainStats.rank} etaSeconds={fountainStats.etaSeconds} formatEta={formatEta} label="Blocks decoded" />
+                  <ChunkConstellation total={fountainStats.k} received={fountainStats.rank} etaSeconds={fountainStats.etaSeconds} formatEta={(seconds) => formatDuration(seconds, 'eta')} label="Blocks decoded" />
 
                   <dl className="grid grid-cols-2 gap-4 pt-2">
                     <div>
@@ -547,7 +487,7 @@ function FileTransferReceiveInner() {
                     <div>
                       <dt className="text-fg-muted">Time left</dt>
                       <dd className="font-mono text-sm font-semibold text-fg-soft" data-testid="fountain-eta">
-                        {formatEta(fountainStats.etaSeconds)}
+                        {formatDuration(fountainStats.etaSeconds, 'eta')}
                       </dd>
                     </div>
                   </dl>
@@ -635,18 +575,8 @@ function FileTransferReceiveInner() {
                   </>
                 ) : receiverMode === 'file' ? (
                   <div
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        fileInputRef.current?.click();
-                      }
-                    }}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
+                    {...browseProps}
+                    {...dropProps}
                     className={`flex size-full cursor-pointer flex-col items-center justify-center gap-3 border-2 border-dashed p-6 text-center transition-colors ${
                       isDragging
                         ? 'border-teal-500 bg-teal-950/40 text-teal-300'

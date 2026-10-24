@@ -290,3 +290,8 @@ export {
   type ColourStats,
   type DecodedCode,
 } from './lib/colour/receiver';
+export { formatDuration, type DurationStyle } from './lib/format';
+export { transferProgress, fountainStatsFrom, type TransferProgress } from './lib/progress';
+export { permissionOf, describeCameraError } from './lib/camera';
+export { steerMessage } from './lib/feedback/steerMessage';
+export { validateReceivedFile, type UploadedFile } from './lib/receiver/videoFile';

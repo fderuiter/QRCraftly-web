@@ -59,11 +59,3 @@ export function playQuietly(video: HTMLVideoElement): void {
     playPromise.catch(() => {});
   }
 }
-
-/**
- * Checks whether an uploaded file is a video the receiver can scan.
- * @param file The uploaded file.
- */
-export function isVideoFile(file: File): boolean {
-  return file.type ? file.type.startsWith('video/') : /\.(mp4|webm|ogg|mov|mkv|avi|3gp|m4v)$/i.test(file.name);
-}

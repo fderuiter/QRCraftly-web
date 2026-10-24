@@ -63,7 +63,6 @@ export const LEGACY_TYPE_ASSERTION_FILES = Object.freeze([
   "src/packages/wallet-pass/lib/pkpass.ts",
   "src/packages/wallet-pass/lib/signer.ts",
   "src/pages/+title.ts",
-  "src/pages/file-transfer/+Page.tsx",
   "src/utils/brandTemplateManager.ts",
   "src/utils/feedback.ts",
   "src/utils/imageResizeHelper.ts",

@@ -26,7 +26,6 @@ import { FountainRateTracker, type FountainTelemetry } from '../fountain/reassem
 import { layerHint } from '../multicode/layerHint';
 import { frameLayer } from '../multicode/multirate';
 import { decoderPoolSize } from '../multicode/pool';
-import { MAX_VIDEO_UPLOAD_BYTES, formatLimit } from '../limits';
 import { FEEDBACK_NONCE_BYTES, encodeFeedbackFrame, looksLikePrismFrame } from '../prism/frame';
 import { createFeedbackMeter } from '../feedback/meter';
 import { paintBeacon } from '../sender/tiles';
@@ -34,7 +33,9 @@ import { loadQrEncoder, type QrSymbolEncoder } from '@/packages/qr-matrix/encode
 import { looksLikeKeyQr } from '../prism/words';
 import type { PrismManifestInfo } from '../prism/manifest';
 import { analyseReceivedFile } from '@/packages/core/files';
-import { detachVideoSource, isVideoFile, playQuietly, spawnReassemblyWorker, spawnTileWorker } from './media';
+import { detachVideoSource, playQuietly, spawnReassemblyWorker, spawnTileWorker } from './media';
+import { validateReceivedFile } from './videoFile';
+import { fountainStatsFrom } from '../progress';
 import { createTileReader, type TileReader } from './tileReader';
 
 type ReceiverToast = {
@@ -313,7 +314,7 @@ export function useOpticalReceiver({
       // Several files: each was verified against its own hash in the worker. They are saved one by
       // one or as an archive, never automatically.
       setBundle(files.map(({ buffer: data, handshake: hs }) => ({ name: hs.fileName, mimeType: hs.mimeType, size: hs.fileSize, sha256: hs.sha256, data: new Uint8Array(data) })));
-      setFountainStats(prev => (prev ? { ...prev, rank: prev.k, resolved: prev.k, progress: 100, etaSeconds: 0 } : prev));
+      setFountainStats(fountainStatsFrom);
       setIsScanning(false);
       stopStream();
       setReceiverSuccess(true);
@@ -323,7 +324,7 @@ export function useOpticalReceiver({
     if (workerHandshake) {
       handshakeRef.current = workerHandshake;
       setHandshake(workerHandshake);
-      setFountainStats(prev => (prev ? { ...prev, rank: prev.k, resolved: prev.k, progress: 100, etaSeconds: 0 } : prev));
+      setFountainStats(fountainStatsFrom);
       setIsScanning(false);
       stopStream();
     }
@@ -459,19 +460,10 @@ export function useOpticalReceiver({
   const handleFileUpload = useCallback((file: File) => {
     if (!file) return false;
 
-    if (!isVideoFile(file)) {
+    const errorMsg = validateReceivedFile(file);
+    if (errorMsg) {
       revokeVideoUrl();
       setVideoFile(null);
-      const errorMsg = 'Invalid file type. Please upload a supported video file (e.g. MP4, WebM).';
-      setFileValidationError(errorMsg);
-      addToast?.({ type: 'error', message: errorMsg, duration: 5000 });
-      return false;
-    }
-
-    if (file.size > MAX_VIDEO_UPLOAD_BYTES) {
-      revokeVideoUrl();
-      setVideoFile(null);
-      const errorMsg = `This video is too large to scan. The limit is ${formatLimit(MAX_VIDEO_UPLOAD_BYTES)}.`;
       setFileValidationError(errorMsg);
       addToast?.({ type: 'error', message: errorMsg, duration: 5000 });
       return false;

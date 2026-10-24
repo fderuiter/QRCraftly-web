@@ -29,7 +29,8 @@ import { RangeInput } from '@/components/ui/RangeInput';
 import { Alert } from '@/components/ui/Alert';
 import { AccordionItem } from '@/components/ui/Accordion';
 import { PairingGuide } from '@/components/transfer/PairingGuide';
-import { TRANSFER_SPEEDS, formatApproximateDuration, formatFileSize, formatShortDuration, matchTransferSpeed } from '@/utils/transferSpeed';
+import { TRANSFER_SPEEDS, formatFileSize, matchTransferSpeed } from '@/utils/transferSpeed';
+import { useFileDrop } from '@/hooks/useFileDrop';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { BetaNotice } from '@/components/BetaNotice';
 import { QrIllustration } from '@/components/QrIllustration';
@@ -40,11 +41,10 @@ import { SidebarContent } from '@/components/SidebarContent';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { copy } from '@/data/copy/file-transfer';
 import {
-  MULTI_RATE_PROFILES,
   estimateTransferFrames,
+  formatDuration,
   neededSymbols,
-  type FeedbackLinkState,
-  type MultiRateProfileName,
+  steerMessage,
   type TransferDensity,
 } from '@/packages/optical-transfer';
 import { paintTransferFrame } from './paintTransferFrame';
@@ -82,34 +82,6 @@ function openSenderWebcam(): Promise<MediaStream> {
 }
 
 /**
- * What the sender says about the back channel while it sends.
- * @param state - The back channel's state.
- * @param profile - The profile on screen.
- * @param receivers - Receivers whose code the camera reads.
- * @returns One sentence.
- */
-function steerMessage(state: FeedbackLinkState, profile: MultiRateProfileName | null, receivers: number): string {
-  if (state.status === 'requesting') return 'Asking for the camera so the receiver can steer the speed.';
-  if (state.status === 'listening') {
-    const speed = profile ? `${MULTI_RATE_PROFILES[profile].label} speed` : 'The chosen speed';
-    if (receivers === 0) return `${speed}. Point this device’s camera at the receiving screen’s small code.`;
-    return `${speed}, steered by ${receivers} receiver${receivers === 1 ? '' : 's'}.`;
-  }
-  if (state.status === 'one-way') {
-    const why =
-      state.reason === 'denied'
-        ? 'Camera access was refused'
-        : state.reason === 'unavailable'
-          ? 'No camera was found'
-          : state.reason === 'camera-lost'
-            ? 'The camera stopped'
-            : 'The camera could not start';
-    return `${why}, so this transfer runs at the speed you chose and does not stop by itself.`;
-  }
-  return '';
-}
-
-/**
  * Button handlers that show something only while the button is held, by pointer or with Space or
  * Enter, and hide it when the button is let go or loses focus.
  * @param show - Shows it.
@@ -135,7 +107,6 @@ function holdToShow(show: () => void, hide: () => void) {
  * @returns The FileTransferToolInner component.
  */
 function FileTransferToolInner() {
-  const [isDraggingFile, setIsDraggingFile] = React.useState(false);
   // The key words show only while their button is held, never beside the stream by default.
   const [showingKeyCode, setShowingKeyCode] = React.useState(false);
 
@@ -190,7 +161,6 @@ function FileTransferToolInner() {
     requestWebcam: openSenderWebcam,
   });
 
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const folderInputRef = React.useRef<HTMLInputElement | null>(null);
   // Only some browsers can pick a folder; the button appears once the page knows.
   const [folderSupported, setFolderSupported] = React.useState(false);
@@ -264,36 +234,14 @@ function FileTransferToolInner() {
   // Seconds the stream takes: the exact need once a fountain session exists, an upper bound before.
   const estimatedSeconds = fountainInfo ? (fountainInfo.k * 1.15) / fps : estimate ? estimate.frames / fps : null;
 
-  const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
-    event.preventDefault();
-    if (!settingsLocked) {
-      event.dataTransfer.dropEffect = 'copy';
-      setIsDraggingFile(true);
-    }
-  };
-
-  const handleDragLeave = (event: React.DragEvent<HTMLElement>) => {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-      setIsDraggingFile(false);
-    }
-  };
-
-  const handleDrop = (event: React.DragEvent<HTMLElement>) => {
-    event.preventDefault();
-    setIsDraggingFile(false);
-
-    if (settingsLocked) return;
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-
-    const dropped = Array.from(event.dataTransfer.files ?? []);
-    if (dropped.length > 0) {
+  const { isDragging: isDraggingFile, inputRef: fileInputRef, dropProps } = useFileDrop({
+    onFiles: (dropped) => {
       setSelectedFiles(dropped);
       stopTransfer();
-    }
-  };
+    },
+    multiple: true,
+    disabled: settingsLocked,
+  });
 
   return (
     <div className="w-full">
@@ -320,10 +268,7 @@ function FileTransferToolInner() {
               
               <div className="flex flex-col gap-3">
                 <label
-                  onDragEnter={handleDragOver}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
+                  {...dropProps}
                   className={`flex min-h-24 w-full min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-3 transition-colors ${
                     settingsLocked
                       ? 'cursor-not-allowed border-line bg-surface-sunken opacity-60'
@@ -417,7 +362,7 @@ function FileTransferToolInner() {
                 <p className="text-xs text-fg-muted">{activeSpeed?.hint ?? 'Custom values set under Advanced.'}</p>
                 <p className="text-sm font-semibold text-fg" data-testid="speed-estimate" aria-live="polite">
                   {estimatedSeconds !== null && selectedFile
-                    ? `~${formatShortDuration(estimatedSeconds)} for ${selectedFiles.length > 1 ? `these ${selectedFiles.length} files` : 'this'} ${formatFileSize(selectedSize)}${selectedFiles.length > 1 ? '' : ' file'}`
+                    ? `~${formatDuration(estimatedSeconds, 'short')} for ${selectedFiles.length > 1 ? `these ${selectedFiles.length} files` : 'this'} ${formatFileSize(selectedSize)}${selectedFiles.length > 1 ? '' : ' file'}`
                     : 'Choose a file to see how long it will take.'}
                 </p>
               </div>
@@ -520,9 +465,9 @@ function FileTransferToolInner() {
                       : fountainInfo?.tiles
                       ? `Each code carries ${fountainInfo.symbolSize}-byte pieces (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). How fast it goes depends on the receiving camera.`
                       : fountainInfo
-                      ? `Each QR carries ${fountainInfo.symbolSize} bytes (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). The receiver needs about ${framesNeeded} frames, ${formatApproximateDuration(framesNeeded / fps)} at ${fps} frames/sec.`
+                      ? `Each QR carries ${fountainInfo.symbolSize} bytes (${fountainInfo.compression === 'deflate-raw' ? 'compressed' : 'uncompressed'}). The receiver needs about ${framesNeeded} frames, ${formatDuration(framesNeeded / fps, 'long')} at ${fps} frames/sec.`
                       : estimate
-                        ? `Estimated transfer time: up to ${formatApproximateDuration(estimate.frames / fps)} at ${fps} frames/sec (${estimate.symbolSize} bytes per QR). Text and other compressible files go faster.`
+                        ? `Estimated transfer time: up to ${formatDuration(estimate.frames / fps, 'long')} at ${fps} frames/sec (${estimate.symbolSize} bytes per QR). Text and other compressible files go faster.`
                         : 'Choose a file to see how long the transfer will take.'}
                   </p>
                 </div>
@@ -549,10 +494,7 @@ function FileTransferToolInner() {
 
               {!hasFile && (
                 <div
-                  onDragEnter={handleDragOver}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
+                  {...dropProps}
                   data-testid="send-empty-state"
                 >
                   <EmptyState
