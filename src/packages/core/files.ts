@@ -171,6 +171,14 @@ const RISKY_EXTENSIONS: ReadonlySet<string> = new Set([
   'mht', 'mhtml', 'xht', 'shtml', 'dotm', 'xltm', 'xlam', 'potm', 'ppsm', 'ppam',
   // Unix and macOS scripts and launchers.
   'sh', 'command', 'desktop', 'py',
+  // Legacy Office formats that carry VBA macros (#1590).
+  'doc', 'dot', 'xls', 'xla', 'xlt', 'xlsb', 'ppt', 'pps', 'pot',
+  // Python and Node scripts, and compressed SVG (#1590).
+  'pyw', 'mjs', 'cjs', 'svgz',
+  // Windows script components and setup information (#1590).
+  'wsc', 'sct', 'inf',
+  // Unix scripts (#1590).
+  'pl', 'php', 'rb',
 ]);
 
 /** MIME types that are active content whatever the extension says. */

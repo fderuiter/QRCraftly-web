@@ -17,7 +17,7 @@
 */
 
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Check, File as FileIcon, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -47,7 +47,8 @@ const baseName = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
 
 /**
  * The finish of a multi-file receive: the list of files, each saved on its own (with the same
- * second look for risky types as a single file) or all together as a ZIP archive.
+ * second look for risky types as a single file) or all together as a ZIP archive, which asks for
+ * the same second look when it holds a risky file.
  * @param props - Component properties.
  * @param props.files - The verified files.
  * @param props.onSaveFile - Saves one file.
@@ -56,9 +57,23 @@ const baseName = (path: string): string => path.slice(path.lastIndexOf('/') + 1)
  * @returns The completion panel.
  */
 export function BundleComplete({ files, onSaveFile, onSaveAll, onReceiveAnother }: BundleCompleteProps) {
-  // Index of a risky file whose save the person is confirming.
-  const [confirming, setConfirming] = useState<number | null>(null);
+  // Index of a risky file whose save the person is confirming, or 'all' for the archive.
+  const [confirming, setConfirming] = useState<number | 'all' | null>(null);
   const total = files.reduce((sum, file) => sum + file.size, 0);
+  // The archive holds every file, so it gets the same second look when any of them is risky (#1590).
+  const riskyNames = useMemo(
+    () => files.filter((file) => analyseReceivedFile(baseName(file.name), file.mimeType).risky).map((file) => file.name),
+    [files]
+  );
+
+  const saveAll = () => {
+    if (riskyNames.length > 0 && confirming !== 'all') {
+      setConfirming('all');
+      return;
+    }
+    setConfirming(null);
+    onSaveAll();
+  };
 
   const save = (index: number) => {
     const file = files[index];
@@ -107,9 +122,14 @@ export function BundleComplete({ files, onSaveFile, onSaveAll, onReceiveAnother 
           </li>
         ))}
       </ul>
+      {confirming === 'all' && (
+        <p id="bundle-risky-note" role="alert" className="max-w-sm text-xs text-fg-muted">
+          The archive holds files that can run programs on your device: {riskyNames.join(', ')}. Only save it if you trust the sender.
+        </p>
+      )}
       <div className="flex flex-wrap justify-center gap-2">
-        <Button variant="primary" onClick={onSaveAll}>
-          Save all (.zip)
+        <Button variant="primary" onClick={saveAll} aria-describedby={confirming === 'all' ? 'bundle-risky-note' : undefined}>
+          {confirming === 'all' ? 'Save all anyway' : 'Save all (.zip)'}
         </Button>
         <Button variant="outline" onClick={onReceiveAnother}>
           Receive another file
