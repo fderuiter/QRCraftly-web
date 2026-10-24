@@ -143,19 +143,13 @@ describe('SocialInput', () => {
       platform: SocialPlatform.YOUTUBE,
       handle: '',
     };
-    let container: HTMLElement | undefined;
-    await act(async () => {
-      const res = render(<SocialInput data={youtubeData} onChange={mockOnChange} />);
-      container = res.container;
-    });
+    const { container } = render(<SocialInput data={youtubeData} onChange={mockOnChange} />);
 
-    const handleInput = screen.getByLabelText('Username / Channel / Video Link') as HTMLInputElement;
+    const handleInput = (await screen.findByLabelText('Username / Channel / Video Link')) as HTMLInputElement;
     expect(handleInput).toBeInTheDocument();
     expect(handleInput.getAttribute('placeholder')).toBe('@channel, video link, or channel ID');
     expect(handleInput.getAttribute('maxLength')).toBe('256');
 
-    if (container) {
-      expect(await axe(container)).toHaveNoViolations();
-    }
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

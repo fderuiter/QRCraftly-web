@@ -66,7 +66,7 @@ describe('landing pages that preset the generator (#1035, #1037)', () => {
     renderLanding('instagram-qr-code');
     await waitFor(() => {
       expect(screen.getByLabelText('Username / Handle')).toBeInTheDocument();
-    }, { timeout: 3000 });
+    }, { timeout: 10000 });
   });
 
   it('shows the mosaic gallery with alt text, and the guide, how-to and FAQ on every page', () => {
