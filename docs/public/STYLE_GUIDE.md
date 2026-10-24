@@ -29,22 +29,23 @@ QRCraftly uses Tailwind CSS v4 without a `tailwind.config.js` file:
 
 Colour roles are CSS variables. A `.dark` block redefines their values, so a component writes `bg-surface text-fg` once and needs no `dark:` variant.
 
-| Role           | Utility                                                                     | Light                  | Dark                              | Use                                                   |
-| -------------- | --------------------------------------------------------------------------- | ---------------------- | --------------------------------- | ----------------------------------------------------- |
-| Page           | `bg-page`                                                                   | slate-50               | slate-950                         | The one page background on every route                |
-| Surface        | `bg-surface`                                                                | white                  | slate-900                         | Panels, cards, form fields, headers, footers          |
-| Raised surface | `bg-surface-raised`                                                         | white                  | slate-800                         | Menus, popovers, accordions, outline buttons          |
-| Sunken surface | `bg-surface-sunken`                                                         | slate-50               | slate-950                         | Wells inside a surface                                |
-| Hover          | `bg-surface-hover`                                                          | slate-100              | slate-800                         | Hover state of rows, menu items, quiet buttons        |
-| Scrim          | `bg-scrim`                                                                  | black 50%              | black 50%                         | Modal backdrop                                        |
-| Lines          | `border-line-subtle`, `border-line`, `border-line-strong`                   | slate-100, 200, 600    | slate-800, 700, 400               | Dividers, outlines, form controls (3:1)               |
-| Text           | `text-fg`, `text-fg-soft`, `text-fg-muted`                                  | slate-900, 700, 600    | slate-100, 300, 400               | Headings, body, secondary text                        |
-| Accent         | `text-accent`, `text-accent-strong`, `bg-accent-soft`, `border-accent-line` | teal-700, 800, 50, 200 | teal-400, 300, 950, 800           | Brand text, icons, selected and info tints            |
-| Action         | `bg-action`, `hover:bg-action-hover`, `text-on-action`                      | teal-700, 800, white   | same                              | Filled primary buttons                                |
-| Danger         | `text-danger`, `bg-danger-soft`, `border-danger-line`, `bg-danger-action`   | rose-700, 50, 200, 700 | rose-400, rose-900 30%, 800, 700  | Errors and destructive actions (rose only; never red) |
-| Success        | `text-success`, `bg-success-soft`, `border-success-line`                    | emerald-800, 50, 200   | emerald-300, emerald-900 30%, 800 | Success messages                                      |
-| Warning        | `text-warning`, `bg-warning-soft`, `border-warning-line`                    | amber-800, 50, 200     | amber-400, amber-950 30%, 900     | Warnings                                              |
-| Focus          | `ring-focus`                                                                | teal-700               | teal-400                          | The one keyboard focus ring                           |
+| Role           | Utility                                                                     | Light                     | Dark                              | Use                                                   |
+| -------------- | --------------------------------------------------------------------------- | ------------------------- | --------------------------------- | ----------------------------------------------------- |
+| Page           | `bg-page`                                                                   | slate-50                  | slate-950                         | The one page background on every route                |
+| Surface        | `bg-surface`                                                                | white                     | slate-900                         | Panels, cards, form fields, headers, footers          |
+| Raised surface | `bg-surface-raised`                                                         | white                     | slate-800                         | Menus, popovers, accordions, outline buttons          |
+| Sunken surface | `bg-surface-sunken`                                                         | slate-50                  | slate-950                         | Wells inside a surface                                |
+| Hover          | `bg-surface-hover`                                                          | slate-100                 | slate-800                         | Hover state of rows, menu items, quiet buttons        |
+| Scrim          | `bg-scrim`                                                                  | black 50%                 | black 50%                         | Modal backdrop                                        |
+| Camera         | `bg-camera`, `text-on-camera`, `text-camera-lock`                           | black, white, emerald-400 | same (never themed)               | Scanner viewfinder over the live camera picture       |
+| Lines          | `border-line-subtle`, `border-line`, `border-line-strong`                   | slate-100, 200, 600       | slate-800, 700, 400               | Dividers, outlines, form controls (3:1)               |
+| Text           | `text-fg`, `text-fg-soft`, `text-fg-muted`                                  | slate-900, 700, 600       | slate-100, 300, 400               | Headings, body, secondary text                        |
+| Accent         | `text-accent`, `text-accent-strong`, `bg-accent-soft`, `border-accent-line` | teal-700, 800, 50, 200    | teal-400, 300, 950, 800           | Brand text, icons, selected and info tints            |
+| Action         | `bg-action`, `hover:bg-action-hover`, `text-on-action`                      | teal-700, 800, white      | same                              | Filled primary buttons                                |
+| Danger         | `text-danger`, `bg-danger-soft`, `border-danger-line`, `bg-danger-action`   | rose-700, 50, 200, 700    | rose-400, rose-900 30%, 800, 700  | Errors and destructive actions (rose only; never red) |
+| Success        | `text-success`, `bg-success-soft`, `border-success-line`                    | emerald-800, 50, 200      | emerald-300, emerald-900 30%, 800 | Success messages                                      |
+| Warning        | `text-warning`, `bg-warning-soft`, `border-warning-line`                    | amber-800, 50, 200        | amber-400, amber-950 30%, 900     | Warnings                                              |
+| Focus          | `ring-focus`                                                                | teal-700                  | teal-400                          | The one keyboard focus ring                           |
 
 The brand scale is also available as `brand-50` to `brand-950` (teal). Indigo is not used anywhere.
 
