@@ -17,97 +17,28 @@
 */
 
 
-import { hexToBytes, sha256Hex } from '@/packages/core/encoding';
-import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from 'react';
-import { useQrScanner, type CameraInfo, type ScanCorners } from '@/packages/optical-scanner/client';
+import { useState, useEffect, useRef, useCallback, useReducer } from 'react';
 import type { BcUrDecoder, BcUrResult } from '../../bcur';
-import type { HandshakeInfo } from '../contracts';
-import { FountainRateTracker, type FountainTelemetry } from '../fountain/reassembler';
-import { layerHint } from '../multicode/layerHint';
-import { frameLayer } from '../multicode/multirate';
-import { decoderPoolSize } from '../multicode/pool';
-import { FEEDBACK_NONCE_BYTES, encodeFeedbackFrame, looksLikePrismFrame } from '../prism/frame';
-import { createFeedbackMeter } from '../feedback/meter';
-import { paintBeacon } from '../sender/tiles';
-import { loadQrEncoder, type QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
+import type { FountainTelemetry } from '../fountain/reassembler';
+import { looksLikePrismFrame } from '../prism/frame';
 import { looksLikeKeyQr } from '../prism/words';
 import type { PrismManifestInfo } from '../prism/manifest';
-import { analyseReceivedFile } from '@/packages/core/files';
-import { detachVideoSource, playQuietly, spawnReassemblyWorker, spawnTileWorker } from './media';
-import { validateReceivedFile } from './videoFile';
 import { fountainStatsFrom } from '../progress';
 import { describeCameraError } from '../camera';
-import { initialReceiverState, receiverReducer, type ReceivedBundleFile, type ReceiverFailure } from './machine';
-import { createTileReader, type TileReader } from './tileReader';
-
-type ReceiverToast = {
-  type: 'success' | 'info' | 'error' | 'warning';
-  message: string;
-  duration?: number;
-};
-
-/** Hands a verified file to the user. Injected by the page (e.g. the app's download manager). */
-export type ReceivedFileSaver = (data: Uint8Array, fileName: string, mimeType: string) => void;
-
-export interface UseOpticalReceiverOptions {
-  /** Saves a verified file. */
-  saveFile: ReceivedFileSaver;
-  addToast?: (toast: ReceiverToast) => void;
-  autoDownload?: boolean;
-  initialMode?: 'camera' | 'file';
-}
-
-/** One finished file as the worker posts it. */
-interface WorkerFile {
-  buffer: ArrayBuffer;
-  handshake: HandshakeInfo;
-}
-
-/** Messages posted by the reassembly worker. */
-interface ReassemblyWorkerMessage {
-  type?: 'PROGRESS' | 'COMPLETE' | 'ERROR' | 'MANIFEST' | 'KEY_STATUS' | 'SWITCH_OFFER';
-  progress?: number;
-  current?: number;
-  total?: number;
-  buffer?: ArrayBuffer;
-  error?: string;
-  handshake?: HandshakeInfo | null;
-  isFountain?: boolean;
-  /** Key of the session that just completed. */
-  session?: string | null;
-  rank?: number;
-  dropletsReceived?: number;
-  /** The transfer's manifest, announced as soon as it is accepted. */
-  manifest?: PrismManifestInfo;
-  /** With MANIFEST: the transfer is private and still waiting for its key code. */
-  needsKey?: boolean;
-  /** With KEY_STATUS: whether the key code was readable. */
-  accepted?: boolean;
-  /** With SWITCH_OFFER: another stream in view. */
-  offer?: PrismManifestInfo;
-  /** With COMPLETE: the files of a bundle. */
-  files?: WorkerFile[];
-}
-
-/** Longest pause between camera samples while receiving a stream. */
-const STREAM_MAX_SAMPLING_DELAY_MS = 150;
-/** How long the lock-on brackets stay after the last code the camera read. */
-const LOCK_ON_HOLD_MS = 400;
-/** Frames per second the multi-code receiver asks the camera for, as an ideal (#1142). */
-const MULTI_CODE_FRAME_RATE = 60;
-/** Camera frames the layer hint looks back over (#1143). */
-const LAYER_WINDOW_FRAMES = 30;
-/** How often the feedback code is repainted: the back channel's simulation assumes 4 a second. */
-const FEEDBACK_REFRESH_MS = 250;
+import { initialReceiverState, receiverReducer, type ReceiverFailure } from './machine';
+import type { UseOpticalReceiverOptions } from './receiverTypes';
+import { useDelivery } from './useDelivery';
+import { useFrameSource } from './useFrameSource';
+import { useReassemblyWorker } from './useReassemblyWorker';
+import { useReceiverTelemetry } from './useReceiverTelemetry';
 
 /** Shown once when a wallet-style stream claims more than this receiver takes. */
 const BCUR_TOO_LARGE = 'A wallet-style stream is in view, but it is too large for this receiver, so it is ignored.';
 
-const FILE_RECEIVED_MESSAGE = 'File completely received & offline binary reconstruction triggered!';
-
 /**
  * Headless React hook to handle camera streams, video file uploads, adaptive scanning,
- * and data reassembly for the receiver.
+ * and data reassembly for the receiver. Composes the frame source, the reassembly worker,
+ * delivery and telemetry (#1514) over the phase reducer (#1513).
  */
 export function useOpticalReceiver({
   saveFile,
@@ -115,23 +46,11 @@ export function useOpticalReceiver({
   autoDownload = true,
   initialMode = 'camera',
 }: UseOpticalReceiverOptions) {
-  const [receiverMode, setReceiverModeState] = useState<'camera' | 'file'>(initialMode);
   /** Where the receive stands, as one value (#1513). The flags below stay as they were for now. */
   const [receiverState, dispatch] = useReducer(receiverReducer, initialMode, initialReceiverState);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoObjectUrl, setVideoObjectUrl] = useState<string | null>(null);
-  const [fileValidationError, setFileValidationError] = useState<string | null>(null);
-
-  const [handshake, setHandshake] = useState<HandshakeInfo | null>(null);
   /** What the sender announced, available before any data has been decoded. */
   const [manifest, setManifest] = useState<PrismManifestInfo | null>(null);
   const [receiverError, setReceiverError] = useState<string | null>(null);
-  const [receiverSuccess, setReceiverSuccess] = useState<boolean>(false);
-  const [isVerifying, setIsVerifying] = useState<boolean>(false);
-  const [downloadTriggered, setDownloadTriggered] = useState<boolean>(false);
-  const [isScanning, setIsScanning] = useState<boolean>(false);
-  const [reassembledData, setReassembledData] = useState<Uint8Array | null>(null);
-  const [compilationStatus, setCompilationStatus] = useState<string | null>(null);
   const [fountainStats, setFountainStats] = useState<FountainTelemetry | null>(null);
   // A stream in the real BC-UR format (what wallets show), read next to our own (#1149).
   const [bcur, setBcur] = useState<BcUrResult | null>(null);
@@ -144,404 +63,99 @@ export function useOpticalReceiver({
   const [keyAccepted, setKeyAccepted] = useState<boolean | null>(null);
   /** Another stream the receiver offers to switch to. */
   const [switchOffer, setSwitchOffer] = useState<PrismManifestInfo | null>(null);
-  /** The files of a finished multi-file transfer. */
-  const [bundle, setBundle] = useState<ReceivedBundleFile[] | null>(null);
-  const rateTrackerRef = useRef(new FountainRateTracker());
-
-  const workerRef = useRef<Worker | null>(null);
-  /** Bumped whenever the worker stops (Clear, a reset), so a completion still being checked is dropped (#1304). */
-  const workerRunRef = useRef(0);
-  /** True once the Prism stream in view has a manifest or progress: a wallet code must not end it (#1300). */
-  const prismActiveRef = useRef(false);
   /** Whether the person was told a wallet-style stream is over the limits, so it is said once (#1302). */
   const reportedBcurTooLargeRef = useRef(false);
-  /** The last session received, so a fresh worker ignores its frames. */
-  const finishedSessionRef = useRef<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const handshakeRef = useRef<HandshakeInfo | null>(null);
-  const videoObjectUrlRef = useRef<string | null>(null);
-  const reassembledDataRef = useRef<Uint8Array | null>(null);
-
-  const autoDownloadRef = useRef(autoDownload);
-  useEffect(() => {
-    autoDownloadRef.current = autoDownload;
-  }, [autoDownload]);
-
-  const addToastRef = useRef(addToast);
-  useEffect(() => {
-    addToastRef.current = addToast;
-  }, [addToast]);
-
-  const saveFileRef = useRef(saveFile);
-  useEffect(() => {
-    saveFileRef.current = saveFile;
-  }, [saveFile]);
-
-  // Where the code the camera last read sits in the frame, for the lock-on brackets. It clears
-  // when no code was read for a moment, so the brackets do not hang on an empty frame.
-  const [lockOn, setLockOn] = useState<ScanCorners | null>(null);
-  const lockOnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const markLockOn = useCallback((corners: ScanCorners | null) => {
-    if (lockOnTimer.current) clearTimeout(lockOnTimer.current);
-    setLockOn(corners);
-    if (corners) lockOnTimer.current = setTimeout(() => setLockOn(null), LOCK_ON_HOLD_MS);
-  }, []);
-  useEffect(() => () => {
-    if (lockOnTimer.current) clearTimeout(lockOnTimer.current);
-  }, []);
-
-  // The scanner's Camera Session owns the camera stream (#1097); frames go to handleFrame.
-  const handleFrameRef = useRef<(decodedText: string) => void>(() => {});
   /** Read several codes per camera frame (#1142), chosen under Advanced. Off by default. */
   const [multiCode, setMultiCode] = useState(false);
-  /** What the multi-code receiver tells the person about the layer it reads (#1143), or null. */
-  const [layerHintText, setLayerHintText] = useState<string | null>(null);
-  /** The layers of the last camera frames that read a transfer code. */
-  const layerWindowRef = useRef<Array<'dense' | 'beacon'>>([]);
-  /** When the transfer last made progress (a manifest or a higher rank), or null before it started. */
-  const lastProgressRef = useRef<number | null>(null);
-  const lastRankRef = useRef(0);
-  /** Show a feedback code the sender's webcam can read to pick its speed and stop (#1146). Off by default. */
-  const [steerSender, setSteerSender] = useState(false);
-  /** The canvas the feedback code is painted on, in a corner of the page. */
-  const feedbackCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const feedbackMeterRef = useRef(createFeedbackMeter());
-  // The multi-code reader takes the camera's frames in place of the scanner's one-code loop.
-  const tileReaderRef = useRef<TileReader | null>(null);
-  const tileReader = useMemo<TileReader>(
-    () => ({
-      start: () => {
-        tileReaderRef.current ??= createTileReader({
-          getVideo: () => videoRef.current,
-          poolSize: decoderPoolSize(typeof navigator === 'undefined' ? undefined : navigator.hardwareConcurrency),
-          onText: (text) => handleFrameRef.current(text),
-          onCorners: (corners) => markLockOn(corners),
-          onFrameRead: (codes) => {
-            feedbackMeterRef.current.record(codes);
-            const layer = frameLayer(codes.map((code) => code.text));
-            if (!layer) return;
-            const recent = layerWindowRef.current;
-            recent.push(layer);
-            if (recent.length > LAYER_WINDOW_FRAMES) recent.shift();
-          },
-          spawnWorker: spawnTileWorker,
-        });
-        tileReaderRef.current.start();
-      },
-      stop: () => tileReaderRef.current?.stop(),
-    }),
-    [markLockOn]
-  );
-  const {
-    state: cameraState,
-    start: startCamera,
-    stop: stopStream,
-    startScanning: startAdaptiveScanning,
-    stopScanning: stopAdaptiveScanning,
-  } = useQrScanner({
-    videoRef,
-    onScanSuccess: (data, result) => {
-      markLockOn(result?.corners ?? null);
-      handleFrameRef.current(data);
-    },
-    // An animated stream changes frame every ~66 ms, so sampling may never back off
-    // to the single-code scanner's 1 fps floor. The worker's backpressure still bounds load.
-    maxSamplingDelay: STREAM_MAX_SAMPLING_DELAY_MS,
-    // Every frame of a transfer stream is a different payload with its own checksum, and a repeated
-    // frame is harmless: take each decode at once instead of waiting for a second agreeing one.
-    confirmations: 1,
-    repeatHoldMs: 0,
-    frameLoop: multiCode ? tileReader : null,
+
+  const handleFrameRef = useRef<(decodedText: string) => void>(() => {});
+  /** Ends the worker on unmount, between releasing the video and revoking its URL. Set below. */
+  const releaseBox = useRef<() => void>(() => {});
+  const recordFrameReadBox = useRef<Parameters<typeof useFrameSource>[0]['onFrameRead']>(() => {});
+  const source = useFrameSource({
+    initialMode,
+    multiCode,
+    dispatch,
+    addToast,
+    onFrame: (text) => handleFrameRef.current(text),
+    onFrameRead: (codes) => recordFrameReadBox.current(codes),
+    onRelease: () => releaseBox.current(),
   });
-  const cameraError = 'error' in cameraState ? cameraState.error : null;
-  /** What the camera actually streams at, once it streams. */
-  const camera: CameraInfo | null = cameraState.status === 'streaming' ? cameraState.camera : null;
+  const { isScanning, setIsScanning, stopStream, cameraError } = source;
 
-  /** Saves a verified file under its announced name and tells the user. */
-  const deliverFile = useCallback((data: Uint8Array, hs: HandshakeInfo | null) => {
-    setDownloadTriggered(true);
-    // The name and type are chosen by whoever is showing the stream: save the sanitised name and a
-    // MIME type that agrees with it.
-    const analysis = analyseReceivedFile(
-      hs?.fileName || `received_file_${Date.now()}.bin`,
-      hs?.mimeType || 'application/octet-stream'
-    );
-    saveFileRef.current(data, analysis.safeName, analysis.mimeType);
-    addToastRef.current?.({ type: 'success', message: FILE_RECEIVED_MESSAGE, duration: 5000 });
-  }, []);
+  const worker = useReassemblyWorker({
+    onManifest: (announced, locked) => {
+      telemetry.noteManifest();
+      setReceiverError(null);
+      setManifest(announced);
+      setNeedsKey(locked);
+      dispatch({ type: 'manifest', needsKey: locked });
+      // A transfer that still waits for its key has not been opened by any earlier code (#1303).
+      if (locked) setKeyAccepted(null);
+    },
+    onKeyStatus: (accepted) => {
+      setKeyAccepted(accepted);
+      dispatch({ type: 'keyStatus', accepted });
+    },
+    onSwitchOffer: setSwitchOffer,
+    onProgress: ({ progress, current, total, rank, dropletsReceived }) => {
+      const stats = { k: total ?? 0, rank: rank ?? 0, resolved: current ?? 0, dropletsReceived: dropletsReceived ?? 0, progress: progress ?? 0 };
+      const next = telemetry.noteProgress(stats);
+      // A fresh decode (after a failed one) clears the old error.
+      dispatch({ type: 'progress' });
+      setReceiverError(null);
+      setFountainStats(next);
+    },
+    onComplete: (message) => {
+      setNeedsKey(false);
+      setSwitchOffer(null);
+      void delivery.handleWorkerComplete(message);
+    },
+    onError: (message) => delivery.resetAfterWorkerError(message),
+  });
+  const { initWorker, terminateWorker, prismActive } = worker;
 
-  /** Records a failed reassembly or verification and tells the user. */
-  const failReassembly = useCallback((err: unknown) => {
-    const errMsg = (err instanceof Error && err.message) || 'Verification or reassembly failed.';
-    dispatch({ type: 'fail', error: { source: 'receiver', message: errMsg } });
-    setReceiverError(errMsg);
-    setReceiverSuccess(false);
-    setReassembledData(null);
-    reassembledDataRef.current = null;
-    addToastRef.current?.({ type: 'error', message: errMsg, duration: 5000 });
-  }, []);
-
-  /** Clears state after a worker-side failure. */
-  const resetAfterWorkerError = useCallback((message: string) => {
-    dispatch({ type: 'fail', error: { source: 'receiver', message } });
-    setReceiverError(message);
-    setReceiverSuccess(false);
-    setReassembledData(null);
-    reassembledDataRef.current = null;
-    setDownloadTriggered(false);
-    setCompilationStatus(null);
-    setIsVerifying(false);
-  }, []);
-
-  /** Checks bytes against the SHA-256 the transfer announced. */
-  const assertIntegrity = useCallback(async (data: Uint8Array, expected: string) => {
-    const actual = await sha256Hex(data);
-    if (actual.toLowerCase() !== expected.toLowerCase()) {
-      throw new Error(`Integrity validation failed! SHA-256 hash does not match.\nExpected: ${expected}\nActual: ${actual}`);
-    }
-  }, []);
-
-  const handleWorkerComplete = useCallback(async (message: ReassemblyWorkerMessage) => {
-    const { buffer, handshake: workerHandshake, session, files } = message;
-    const run = workerRunRef.current;
-    if (session) finishedSessionRef.current = session;
-    setNeedsKey(false);
-    setSwitchOffer(null);
-    if (files) {
-      // Several files: each was verified against its own hash in the worker. They are saved one by
-      // one or as an archive, never automatically.
-      const received = files.map(({ buffer: data, handshake: hs }) => ({ name: hs.fileName, mimeType: hs.mimeType, size: hs.fileSize, sha256: hs.sha256, data: new Uint8Array(data) }));
-      setBundle(received);
-      dispatch({ type: 'complete', result: { kind: 'bundle', files: received } });
+  const delivery = useDelivery({
+    dispatch,
+    saveFile,
+    addToast,
+    autoDownload,
+    setReceiverError,
+    currentRun: worker.currentRun,
+    onStreamDone: () => {
       setFountainStats(fountainStatsFrom);
       setIsScanning(false);
       stopStream();
-      setReceiverSuccess(true);
-      setReceiverError(null);
-      return;
-    }
-    if (workerHandshake) {
-      handshakeRef.current = workerHandshake;
-      setHandshake(workerHandshake);
-      setFountainStats(fountainStatsFrom);
-      setIsScanning(false);
-      stopStream();
-    }
-    dispatch({ type: 'verify' });
-    try {
-      setCompilationStatus('Finalizing download...');
-      const reassembled = new Uint8Array(buffer ?? new ArrayBuffer(0));
-      reassembledDataRef.current = reassembled;
-      setReassembledData(reassembled);
+    },
+  });
+  const { receiverSuccess, isVerifying, reset: resetDelivery } = delivery;
 
-      const activeHandshake = workerHandshake || handshakeRef.current;
-      if (activeHandshake?.sha256) {
-        await assertIntegrity(reassembled, activeHandshake.sha256);
-      }
-      // Clear was pressed while the file was checked: the receiver is already waiting for the next one.
-      if (run !== workerRunRef.current) return;
-
-      dispatch({ type: 'complete', result: { kind: 'file', handshake: activeHandshake, data: reassembled } });
-      setReceiverSuccess(true);
-      setReceiverError(null);
-      // Risky types (executables, scripts, active documents) are never saved without the person
-      // confirming on the completion panel, so auto-download skips them.
-      const risky = analyseReceivedFile(activeHandshake?.fileName ?? '', activeHandshake?.mimeType ?? '').risky;
-      if (autoDownloadRef.current && !risky) {
-        deliverFile(reassembled, activeHandshake);
-      }
-    } catch (err) {
-      if (run === workerRunRef.current) failReassembly(err);
-    } finally {
-      if (run === workerRunRef.current) {
-        setCompilationStatus(null);
-        setIsVerifying(false);
-      }
-    }
-  }, [stopStream, deliverFile, failReassembly, assertIntegrity]);
-
-  const initWorker = useCallback(() => {
-    if (!workerRef.current) {
-      const worker = spawnReassemblyWorker();
-
-      worker.onmessage = (e: MessageEvent<ReassemblyWorkerMessage>) => {
-        // A worker that was stopped (a reset, or a BC-UR stream that turned out to be the real one)
-        // may still have messages in flight; they no longer describe this receiver.
-        if (workerRef.current !== worker) return;
-        const message = e.data;
-        const { type, progress, current, total, rank, dropletsReceived } = message;
-
-        if (type === 'MANIFEST' && message.manifest) {
-          lastProgressRef.current ??= performance.now();
-          prismActiveRef.current = true;
-          setReceiverError(null);
-          setManifest(message.manifest);
-          setNeedsKey(Boolean(message.needsKey));
-          dispatch({ type: 'manifest', needsKey: Boolean(message.needsKey) });
-          // A transfer that still waits for its key has not been opened by any earlier code (#1303).
-          if (message.needsKey) setKeyAccepted(null);
-        } else if (type === 'KEY_STATUS') {
-          setKeyAccepted(Boolean(message.accepted));
-          dispatch({ type: 'keyStatus', accepted: Boolean(message.accepted) });
-        } else if (type === 'SWITCH_OFFER' && message.offer) {
-          setSwitchOffer(message.offer);
-        } else if (type === 'PROGRESS') {
-          prismActiveRef.current = true;
-          if ((rank ?? 0) > lastRankRef.current) {
-            lastRankRef.current = rank ?? 0;
-            lastProgressRef.current = performance.now();
-          }
-          // A fresh decode (after a failed one) clears the old error.
-          dispatch({ type: 'progress' });
-          setReceiverError(null);
-          setFountainStats(
-            rateTrackerRef.current.telemetry(
-              { k: total ?? 0, rank: rank ?? 0, resolved: current ?? 0, dropletsReceived: dropletsReceived ?? 0, progress: progress ?? 0 },
-              performance.now()
-            )
-          );
-        } else if (type === 'COMPLETE') {
-          void handleWorkerComplete(message);
-        } else if (type === 'ERROR') {
-          resetAfterWorkerError(message.error || 'Failed to compile binary content.');
-        }
-      };
-
-      worker.onerror = (e) => {
-        if (workerRef.current !== worker) return;
-        resetAfterWorkerError(e.message || 'Background worker error.');
-      };
-
-      // A camera still pointed at the stream that just finished must not receive it again.
-      if (finishedSessionRef.current) worker.postMessage({ type: 'IGNORE_SESSION', session: finishedSessionRef.current });
-      workerRef.current = worker;
-    }
-    return workerRef.current;
-  }, [handleWorkerComplete, resetAfterWorkerError]);
-
-  const terminateWorker = useCallback(() => {
-    workerRunRef.current += 1;
-    prismActiveRef.current = false;
-    if (workerRef.current) {
-      try {
-        workerRef.current.postMessage({ type: 'CLEAR' });
-      } catch {
-        // The worker may already be gone.
-      }
-      workerRef.current.terminate();
-      workerRef.current = null;
-    }
-  }, []);
-
-  const flushVideoHardware = useCallback(() => {
-    detachVideoSource(videoRef.current, { release: true });
-  }, []);
-
-  const revokeVideoUrl = useCallback(() => {
-    if (videoObjectUrlRef.current) {
-      try {
-        URL.revokeObjectURL(videoObjectUrlRef.current);
-      } catch {
-        // Already revoked.
-      }
-      videoObjectUrlRef.current = null;
-      setVideoObjectUrl(null);
-    }
-  }, []);
-
-  const setReceiverMode = useCallback((mode: 'camera' | 'file') => {
-    setReceiverModeState(mode);
-    dispatch({ type: 'chooseMode', mode });
-    setFileValidationError(null);
-    if (mode === 'camera') {
-      revokeVideoUrl();
-      setVideoFile(null);
-    }
-    stopStream();
-    setIsScanning(false);
-    detachVideoSource(videoRef.current);
-  }, [revokeVideoUrl, stopStream]);
-
-  const handleFileUpload = useCallback((file: File) => {
-    if (!file) return false;
-
-    const errorMsg = validateReceivedFile(file);
-    if (errorMsg) {
-      revokeVideoUrl();
-      setVideoFile(null);
-      setFileValidationError(errorMsg);
-      dispatch({ type: 'fail', error: { source: 'file', message: errorMsg } });
-      addToast?.({ type: 'error', message: errorMsg, duration: 5000 });
-      return false;
-    }
-
-    setFileValidationError(null);
-    revokeVideoUrl();
-
-    const url = URL.createObjectURL(file);
-    videoObjectUrlRef.current = url;
-    setVideoFile(file);
-    setVideoObjectUrl(url);
-    setIsScanning(true);
-    dispatch({ type: 'loadVideo' });
-
-    addToast?.({ type: 'info', message: `Video file loaded: ${file.name}`, duration: 3000 });
-
-    return true;
-  }, [addToast, revokeVideoUrl]);
+  const telemetry = useReceiverTelemetry({ multiCode, isScanning, receiverSuccess, sessionId: manifest?.sessionId ?? null, fountainStats });
+  const { recordFrameRead, reset: resetTelemetry, recordDroplet, resetRate } = telemetry;
+  const { clearVideo, startCameraStream } = source;
+  useEffect(() => {
+    releaseBox.current = terminateWorker;
+    recordFrameReadBox.current = recordFrameRead;
+  }, [terminateWorker, recordFrameRead]);
 
   const handleClear = useCallback(() => {
     terminateWorker();
     dispatch({ type: 'clear' });
-    layerWindowRef.current = [];
-    feedbackMeterRef.current.reset();
-    lastProgressRef.current = null;
-    lastRankRef.current = 0;
-    setLayerHintText(null);
+    resetTelemetry();
     setFountainStats(null);
     setManifest(null);
     setNeedsKey(false);
     setKeyAccepted(null);
     setSwitchOffer(null);
-    setBundle(null);
     setBcur(null);
     setBcurProgress(null);
     bcurDecoderRef.current?.reset();
     reportedBcurTooLargeRef.current = false;
-    rateTrackerRef.current.reset();
-    setHandshake(null);
-    handshakeRef.current = null;
     setReceiverError(null);
-    setFileValidationError(null);
-    setReceiverSuccess(false);
-    setIsVerifying(false);
-    setDownloadTriggered(false);
-    setReassembledData(null);
-    reassembledDataRef.current = null;
-    setCompilationStatus(null);
-    revokeVideoUrl();
-    setVideoFile(null);
+    resetDelivery();
+    clearVideo();
     addToast?.({ type: 'info', message: 'Receiver state has been reset.', duration: 3000 });
-  }, [addToast, terminateWorker, revokeVideoUrl]);
-
-  /** Saves the received file, after checking it once more against the announced SHA-256. */
-  const saveReceivedFile = useCallback(async () => {
-    try {
-      setIsVerifying(true);
-      setReceiverError(null);
-      const data = reassembledDataRef.current;
-      const hs = handshakeRef.current;
-      if (!data || !hs) return;
-      await assertIntegrity(data, hs.sha256);
-      setReceiverSuccess(true);
-      deliverFile(data, hs);
-    } catch (err) {
-      failReassembly(err);
-    } finally {
-      setIsVerifying(false);
-      setCompilationStatus(null);
-    }
-  }, [assertIntegrity, deliverFile, failReassembly]);
+  }, [addToast, terminateWorker, resetTelemetry, resetDelivery, clearVideo]);
 
   const handleFrame = useCallback((decodedText: string) => {
     if (!decodedText || receiverSuccess || isVerifying || bcur) return;
@@ -551,7 +165,7 @@ export function useOpticalReceiver({
       void (bcurLoadingRef.current ??= import('../../bcur').then(({ BcUrDecoder: Decoder }) => new Decoder())).then((decoder) => {
         bcurDecoderRef.current = decoder;
         // A Prism transfer in progress is not ended by a wallet code that happens to be in view (#1300).
-        if (prismActiveRef.current) return;
+        if (prismActive()) return;
         const outcome = decoder.ingest(decodedText);
         if (outcome.status === 'progress') {
           setBcurProgress({ received: outcome.received, total: outcome.total });
@@ -580,9 +194,9 @@ export function useOpticalReceiver({
     if (!looksLikePrismFrame(decodedText) && !looksLikeKeyQr(decodedText)) return;
     // Frames are always accepted, even after an error: the worker starts a fresh decode, so a
     // failed transfer recovers by simply scanning on.
-    rateTrackerRef.current.record(performance.now());
+    recordDroplet();
     initWorker().postMessage({ type: 'FOUNTAIN_DROPLET', droplet: decodedText });
-  }, [receiverSuccess, isVerifying, bcur, initWorker, stopStream, terminateWorker]);
+  }, [receiverSuccess, isVerifying, bcur, initWorker, stopStream, terminateWorker, setIsScanning, prismActive, recordDroplet]);
 
   useEffect(() => {
     handleFrameRef.current = handleFrame;
@@ -603,143 +217,18 @@ export function useOpticalReceiver({
     if (accept) {
       setManifest(offer);
       setFountainStats(null);
-      rateTrackerRef.current.reset();
+      resetRate();
     }
-  }, [switchOffer, initWorker]);
+  }, [switchOffer, initWorker, resetRate]);
 
-  useEffect(() => {
-    // Camera mode is started by startCameraSession: the session attaches the stream and runs the
-    // frame loop itself. This effect plays a loaded video file and stops whatever ran before.
-    const video = videoRef.current;
-    if (isScanning && receiverMode === 'file' && videoObjectUrl && video) {
-      video.srcObject = null;
-      if (video.src !== videoObjectUrl) {
-        video.src = videoObjectUrl;
-      }
-      video.loop = true;
-      playQuietly(video);
-      startAdaptiveScanning();
-    } else if (!isScanning) {
-      stopStream();
-      stopAdaptiveScanning();
-      flushVideoHardware();
-    }
-  }, [isScanning, receiverMode, videoObjectUrl, stopStream, startAdaptiveScanning, stopAdaptiveScanning, flushVideoHardware]);
-
-  // Report the camera session's outcome: a toast once it streams, back to idle when it fails.
-  const cameraStatus = cameraState.status;
-  useEffect(() => {
-    if (cameraStatus === 'streaming') {
-      addToastRef.current?.({ type: 'success', message: 'Camera scanner activated.', duration: 3000 });
-    } else if (cameraStatus === 'denied' || cameraStatus === 'unavailable' || cameraStatus === 'error') {
-      setIsScanning(false);
-    }
-  }, [cameraStatus]);
   useEffect(() => {
     if (cameraError) dispatch({ type: 'fail', error: { source: 'camera', message: describeCameraError(cameraError) } });
   }, [cameraError]);
 
   const startCameraSession = useCallback(async () => {
     initWorker();
-    setIsScanning(true);
-    dispatch({ type: 'startCamera' });
-    const video = videoRef.current;
-    if (video?.hasAttribute('src')) video.removeAttribute('src');
-    await startCamera(multiCode ? { frameRate: MULTI_CODE_FRAME_RATE } : undefined);
-  }, [startCamera, initWorker, multiCode]);
-
-  // Switching the reader while the camera streams restarts it, with the frame rate the reader wants.
-  const cameraStatusRef = useRef(cameraState.status);
-  useEffect(() => {
-    cameraStatusRef.current = cameraState.status;
-  }, [cameraState.status]);
-  const appliedMultiCode = useRef(multiCode);
-  useEffect(() => {
-    if (appliedMultiCode.current === multiCode) return;
-    appliedMultiCode.current = multiCode;
-    if (cameraStatusRef.current === 'streaming') void startCamera(multiCode ? { frameRate: MULTI_CODE_FRAME_RATE } : {});
-  }, [multiCode, startCamera]);
-
-  // The feedback code (#1146): four times a second while the person lets the sender steer, the
-  // receiver repaints a small code with its progress, how well it reads, and done once it has the file.
-  const feedbackSession = multiCode && steerSender && (isScanning || receiverSuccess) ? (manifest?.sessionId ?? null) : null;
-  const fractionRef = useRef(0);
-  const doneRef = useRef(false);
-  useEffect(() => {
-    fractionRef.current = fountainStats && fountainStats.k > 0 ? Math.min(1, fountainStats.rank / fountainStats.k) : 0;
-    doneRef.current = receiverSuccess;
-  }, [fountainStats, receiverSuccess]);
-  useEffect(() => {
-    if (!feedbackSession) return undefined;
-    // A new random nonce per receive: it tells this receiver apart from others and names nobody.
-    const nonce = crypto.getRandomValues(new Uint8Array(FEEDBACK_NONCE_BYTES));
-    const sessionId = hexToBytes(feedbackSession);
-    let cancelled = false;
-    let encoder: QrSymbolEncoder | null = null;
-    const paint = () => {
-      const canvas = feedbackCanvasRef.current;
-      if (!encoder || !canvas) return;
-      const text = encodeFeedbackFrame({
-        sessionId,
-        nonce,
-        fractionDecoded: doneRef.current ? 1 : fractionRef.current,
-        ...feedbackMeterRef.current.measure(),
-        done: doneRef.current,
-      });
-      paintBeacon(canvas, encoder.create(text, { errorCorrectionLevel: 'M' }).modules);
-    };
-    loadQrEncoder().then(
-      (loaded) => {
-        if (cancelled) return;
-        encoder = loaded;
-        paint();
-      },
-      () => undefined
-    );
-    const timer = setInterval(paint, FEEDBACK_REFRESH_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [feedbackSession]);
-
-  // Once a second, the multi-code receiver says which layer it reads and whether progress stalled.
-  const hintActive = multiCode && isScanning && !receiverSuccess;
-  useEffect(() => {
-    if (!hintActive) {
-      setLayerHintText(null);
-      return undefined;
-    }
-    const timer = setInterval(() => {
-      const recent = layerWindowRef.current;
-      const since = lastProgressRef.current;
-      const hint = layerHint({
-        denseFrames: recent.filter((layer) => layer === 'dense').length,
-        beaconFrames: recent.filter((layer) => layer === 'beacon').length,
-        secondsWithoutProgress: since === null ? 0 : Math.floor((performance.now() - since) / 1000),
-      });
-      setLayerHintText((current) => (current === hint ? current : hint));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [hintActive]);
-
-  const stopCameraSession = useCallback(() => {
-    setIsScanning(false);
-    dispatch({ type: 'stop' });
-    stopStream();
-    flushVideoHardware();
-    addToast?.({ type: 'info', message: 'Camera scanner deactivated.', duration: 3000 });
-  }, [stopStream, addToast, flushVideoHardware]);
-
-  useEffect(() => {
-    return () => {
-      stopAdaptiveScanning();
-      stopStream();
-      flushVideoHardware();
-      terminateWorker();
-      revokeVideoUrl();
-    };
-  }, [stopAdaptiveScanning, stopStream, terminateWorker, flushVideoHardware, revokeVideoUrl]);
+    await startCameraStream();
+  }, [initWorker, startCameraStream]);
 
   const { phase } = receiverState;
   const result = receiverState.phase === 'complete' ? receiverState.result : null;
@@ -752,54 +241,54 @@ export function useOpticalReceiver({
     result,
     /** Why the receive failed and which part failed, while `phase` is 'failed'. */
     failure,
-    handshake,
+    handshake: delivery.handshake,
     manifest,
     needsKey,
     keyAccepted,
     submitKeyCode,
     switchOffer,
     answerSwitch,
-    bundle,
+    bundle: delivery.bundle,
     receiverError,
     receiverSuccess,
     isVerifying,
-    downloadTriggered,
+    downloadTriggered: delivery.downloadTriggered,
     isScanning,
     /** Why the camera could not be started (denied, missing, in use), or null. */
     cameraError,
     /** The streaming camera's size and frame rate, or null. */
-    camera,
+    camera: source.camera,
     /** Whether several codes are read per camera frame (#1142). */
     multiCode,
     setMultiCode,
     /** Which layer of a multi-rate stream the camera reads, or that progress stalled (#1143); null when all is well. */
-    layerHint: layerHintText,
+    layerHint: telemetry.layerHint,
     /** Show a feedback code so the sender's webcam can steer its speed and stop (#1146). */
-    steerSender,
-    setSteerSender,
+    steerSender: telemetry.steerSender,
+    setSteerSender: telemetry.setSteerSender,
     /** True while the feedback code is shown: the page puts `feedbackCanvasRef` in a corner. */
-    feedbackActive: feedbackSession !== null,
-    feedbackCanvasRef,
+    feedbackActive: telemetry.feedbackActive,
+    feedbackCanvasRef: telemetry.feedbackCanvasRef,
     /** Corners of the code the camera read a moment ago (for the lock-on brackets), or null. */
-    lockOn,
+    lockOn: source.lockOn,
     /** A finished real BC-UR stream (type and content), or null. */
     bcur,
     /** Fragments seen of the BC-UR stream being read, or null. */
     bcurProgress,
-    reassembledData,
-    videoRef,
+    reassembledData: delivery.reassembledData,
+    videoRef: source.videoRef,
     handleClear,
     handleFrame,
     startCameraSession,
-    stopCameraSession,
-    saveReceivedFile,
-    compilationStatus,
+    stopCameraSession: source.stopCameraSession,
+    saveReceivedFile: delivery.saveReceivedFile,
+    compilationStatus: delivery.compilationStatus,
     fountainStats,
-    receiverMode,
-    setReceiverMode,
-    videoFile,
-    videoObjectUrl,
-    fileValidationError,
-    handleFileUpload,
+    receiverMode: source.receiverMode,
+    setReceiverMode: source.setReceiverMode,
+    videoFile: source.videoFile,
+    videoObjectUrl: source.videoObjectUrl,
+    fileValidationError: source.fileValidationError,
+    handleFileUpload: source.handleFileUpload,
   };
 }

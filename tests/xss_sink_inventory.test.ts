@@ -31,7 +31,7 @@ const INVENTORY: Record<string, string[]> = {
   ],
   'object URL': [
     'src/components/transfer/TransferComplete.tsx', // received file: safe types only open in a tab
-    'src/packages/optical-transfer/lib/receiver/useOpticalReceiver.ts', // a chosen video file
+    'src/packages/optical-transfer/lib/receiver/useFrameSource.ts', // a chosen video file
     'src/packages/qr-export/lib/svgExport.ts', // rasterises our own SVG
     'src/utils/blobHandoff.ts', // handOffBlob: blob: URL downloads
     'src/utils/imageResizeHelper.ts', // decodes an uploaded image

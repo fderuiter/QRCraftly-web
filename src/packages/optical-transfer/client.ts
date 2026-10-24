@@ -38,9 +38,11 @@ export {
   type TransferFrameRenderer,
 } from './lib/sender/senderTypes';
 
-export {
-  useOpticalReceiver,
-  type UseOpticalReceiverOptions,
-  type ReceivedFileSaver,
-} from './lib/receiver/useOpticalReceiver';
+export { useOpticalReceiver } from './lib/receiver/useOpticalReceiver';
+export type { UseOpticalReceiverOptions, ReceivedFileSaver, ReceiverToast } from './lib/receiver/receiverTypes';
+// The receiver's parts (#1514), composed by `useOpticalReceiver`. Exported so each can be tested on its own.
+export { useReassemblyWorker, type ReassemblyWorkerEvents } from './lib/receiver/useReassemblyWorker';
+export { useFrameSource, type FrameSourceOptions } from './lib/receiver/useFrameSource';
+export { useReceiverTelemetry, type ReceiverTelemetryInputs } from './lib/receiver/useReceiverTelemetry';
+export { useDelivery, type DeliveryOptions } from './lib/receiver/useDelivery';
 export type { ReceivedBundleFile } from './lib/receiver/machine';
