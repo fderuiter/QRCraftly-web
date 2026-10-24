@@ -18,7 +18,7 @@
 
 import { loadQrEncoder } from '@/packages/qr-matrix/encoder';
 import { ALPHANUMERIC_CAPACITY, TRANSFER_DENSITY_PROFILES, type StreamErrorCorrection, type TransferDensity } from '../fountain/session';
-import type { TransferFrame } from './useOpticalSender';
+import type { TransferFrame } from './senderTypes';
 
 /**
  * Characters a multipart UR adds around its fragment, at most: `UR:BYTES/` (9), a sequence
