@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import type { QRConfig, QRStyle } from '@/packages/core/types';
-import { PATTERNS, LOW_RELIABILITY_PATTERNS } from '../../constants';
+import { PATTERNS } from '../../constants';
+import { LOW_RELIABILITY_PATTERNS } from '@/packages/scannability';
 import { PatternModule } from '../ui/PatternModule';
 import { Alert } from '../ui/Alert';
 import { SegmentedControl } from '../ui/SegmentedControl';

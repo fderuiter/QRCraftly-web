@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { SYSTEM_LIMITS } from '../src/constants';
+import { SYSTEM_LIMITS } from '../src/packages/scannability';
 import { IMAGE_UPLOAD_LIMITS } from '../src/packages/core/security';
 import { MAX_GZIPPED_SIZE_KB, MAX_PAGE_FIRST_LOAD_KB } from '../scripts/check-bundle-size.js';
 

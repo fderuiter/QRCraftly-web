@@ -34,8 +34,6 @@ export const PATTERNS = [
   { id: QRStyle.STARBURST, label: 'Starburst' },
 ];
 
-export const LOW_RELIABILITY_PATTERNS: readonly QRStyle[] = [QRStyle.GRUNGE, QRStyle.CIRCUIT, QRStyle.STARBURST];
-
 import colorsData from './colors.json' with { type: 'json' };
 
 /**
@@ -71,14 +69,6 @@ export function buildPresetColorPatch(
     ],
   };
 }
-
-/**
- * Centralized system limits to keep user interface, validation rules,
- * and documentation perfectly synchronized.
- */
-export const SYSTEM_LIMITS = {
-  MAX_LOGO_SIZE: 0.3,
-};
 
 /**
  * The minimum WCAG AA color contrast threshold for readability and accessibility.

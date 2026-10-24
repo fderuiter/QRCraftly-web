@@ -17,7 +17,7 @@
 */
 
 import type { QRConfig } from '@/packages/core/types';
-import { LOW_RELIABILITY_PATTERNS, SYSTEM_LIMITS } from '@/constants';
+import { LOW_RELIABILITY_PATTERNS, SYSTEM_LIMITS } from './constants';
 import { getContrastRatio } from '@/packages/core/encoding';
 
 export interface HealthScore {
