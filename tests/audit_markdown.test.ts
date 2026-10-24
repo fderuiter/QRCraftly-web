@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { getFilesToAudit, reportError, REMEDIATION_HINTS, slugify, checkPlaceholders, buildFileHeadings, verifyLinks, resetErrors, checkCodeSnippets, existsSyncCaseSensitive, checkPublishApproved } from '../scripts/audit_markdown.js';
+import { getFilesToAudit, reportError, REMEDIATION_HINTS, slugify, checkPlaceholders, buildFileHeadings, verifyLinks, resetErrors, checkCodeSnippets, existsSyncCaseSensitive, checkPublishApproved, checkInlinePaths } from '../scripts/audit_markdown.js';
 
 describe('audit_markdown', () => {
   beforeEach(() => {
@@ -126,6 +126,48 @@ describe('audit_markdown', () => {
 
       const hasLinkErrors = verifyLinks('test.md', content, fileHeadings);
       expect(hasLinkErrors).toBe(true);
+    });
+  });
+
+  describe('checkInlinePaths', () => {
+    const realPath = path.join('src', 'packages', 'optical-scanner', 'lib', 'cameraSession.ts');
+    let existsSpy;
+
+    beforeEach(() => {
+      // Only the real repository location exists on disk.
+      existsSpy = vi.spyOn(fs, 'existsSync').mockImplementation(p => String(p).endsWith(realPath));
+    });
+
+    afterEach(() => {
+      existsSpy.mockRestore();
+    });
+
+    it('fails when a backticked path in CONTEXT.md does not exist', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const content = 'The owner of the stream (`lib/cameraSession.ts`) stops every track.';
+        expect(checkInlinePaths('CONTEXT.md', content)).toBe(true);
+        const message = String(errorSpy.mock.calls[0][0]);
+        expect(message).toContain("Error in CONTEXT.md: Inline path 'lib/cameraSession.ts' does not exist in the repository.");
+        expect(message).toContain(`Fix: ${REMEDIATION_HINTS.inlinePath}`);
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('passes when the backticked path is the corrected repository-relative path', () => {
+      const content = `The owner of the stream (\`${realPath.split(path.sep).join('/')}\`) stops every track.`;
+      expect(checkInlinePaths('CONTEXT.md', content)).toBe(false);
+    });
+
+    it('ignores paths inside fenced code blocks', () => {
+      const content = '```text\nsee `lib/missing.ts` for details\n```\n';
+      expect(checkInlinePaths('AGENTS.md', content)).toBe(false);
+    });
+
+    it('ignores globs such as src/**/*.ts', () => {
+      const content = 'Run the checks on `src/**/*.ts` before committing.';
+      expect(checkInlinePaths('AGENTS.md', content)).toBe(false);
     });
   });
 
@@ -315,7 +357,7 @@ describe('audit_markdown', () => {
       try {
         const kinds: Array<keyof typeof REMEDIATION_HINTS> = [
           'missingFile', 'publishApproved', 'placeholder', 'outsideRoot',
-          'brokenFile', 'brokenAnchor', 'snippet', 'unsupported'
+          'brokenFile', 'brokenAnchor', 'snippet', 'unsupported', 'inlinePath'
         ];
         expect([...kinds].sort()).toEqual(Object.keys(REMEDIATION_HINTS).sort());
         for (const kind of kinds) {

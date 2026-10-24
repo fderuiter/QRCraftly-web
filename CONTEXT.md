@@ -99,7 +99,7 @@ An off-thread Web Worker acknowledgement confirming a stale scan frame was dropp
 _Avoid_: Stale frame response, dropped signal, busy unlock event
 
 **Optical Detection Engine**:
-A consolidated deep module encapsulating real-time webcam frame acquisition, image-file decoding (photos and screenshots, decoded in the worker with their EXIF orientation), and off-thread Web Worker barcode decoding behind a unified entry-point seam. It does not read video files.
+A consolidated deep module encapsulating real-time webcam frame acquisition, image-file decoding (photos and screenshots, decoded in the worker with their EXIF orientation), and off-thread Web Worker barcode decoding behind a unified entry-point seam. The scanner page does not read video files; the file-transfer receiver can play a recorded video file and run the Camera Scanner Engine on it as if it were a camera (ADR 0016 and ADR 0017 amendments).
 _Avoid_: Camera frame provider, QR scanner helper, scanner utility
 
 **Camera Scanner Engine**:
@@ -107,7 +107,7 @@ The headless component of the Optical Detection Engine that owns the live camera
 _Avoid_: Camera frame provider, scanner loop hook, worker ref
 
 **Camera Session**:
-The single owner of a live camera stream for scanning (`lib/cameraSession.ts`): it requests the camera, attaches it to the video element, runs the Camera Scanner Engine while streaming, and stops every track on `stop()`, unmount or when the tab is hidden. `start()` and `stop()` are idempotent, so React effects that run twice cannot leave a camera running. Its state is `idle`, `requesting`, `streaming`, `denied`, `unavailable` or `error`, exposed as `state`, `start` and `stop` by `useQrScanner`.
+The single owner of a live camera stream for scanning (`src/packages/optical-scanner/lib/cameraSession.ts`): it requests the camera, attaches it to the video element, runs the Camera Scanner Engine while streaming, and stops every track on `stop()`, unmount or when the tab is hidden. `start()` and `stop()` are idempotent, so React effects that run twice cannot leave a camera running. Its state is `idle`, `requesting`, `streaming`, `denied`, `unavailable` or `error`, exposed as `state`, `start` and `stop` by `useQrScanner`.
 _Avoid_: Camera hook, stream manager, useCamera
 
 **Adaptive Frame Scheduler**:
@@ -133,7 +133,7 @@ A dual-layer error mitigation scheme combining intra-frame Reed-Solomon codeword
 _Avoid_: Double ECC, dual error recovery, two-way ECC
 
 **Stateless Stream Entry**:
-The receiver capability to start capturing and decoding an optical stream at an arbitrary point in time without an explicit preparatory handshake phase.
+The receiver capability to start capturing and decoding an optical stream at an arbitrary point in time without an explicit preparatory handshake phase, from the live camera or from a recorded video file.
 _Avoid_: Mid-stream scan, instant sync, handshake-free mode
 
 **Droplet Symbol**:

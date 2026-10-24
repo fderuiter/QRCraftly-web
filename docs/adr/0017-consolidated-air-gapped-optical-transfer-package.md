@@ -65,3 +65,7 @@ The package no longer imports the app's React layers or app renderers. The file-
 - `verifyHandshakeFrame` renders with `@/packages/qr-matrix`, checks with the Scannability Worker from `@/packages/scannability`, and takes injected worker, checker and canvas factories instead of detecting the test environment. The worker verdict wins whenever it arrives within the 1500ms watchdog; the main-thread check runs only when the worker is unavailable, fails, drops the request, or misses the watchdog.
 - The sender reports the real size of its preallocated frame pool (`transferStats.frameBufferMemory`) instead of an estimated heap figure.
 - The package-boundary check (dependency-cruiser at the time, `scripts/check_boundaries.js` since #1196) forbids packages from importing app layers with no exemptions, and forbids relative imports from one package into another (`cross-package-imports-use-alias`).
+
+## Amendment: receiving from a video file (issue #1614)
+
+The receiver has two frame sources: the live camera and a video file the person loads (MP4, WebM, MOV and other `video/*` types, up to `MAX_VIDEO_UPLOAD_BYTES`). `validateReceivedFile` in `lib/receiver/videoFile.ts` checks the type and the size. A loaded file plays in the receiver's `<video>` element, and the Camera Scanner Engine reads it like a camera (`lib/receiver/useFrameSource.ts`). The scanner page itself still refuses video files (ADR 0016, amended).

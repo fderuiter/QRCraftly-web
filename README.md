@@ -148,7 +148,7 @@ Runtime dependencies are only React, React DOM, Vike, vike-react and lucide-reac
 
 ### Deep modules
 
-Core features live in deep modules under `src/packages/`. App code imports a package only through its root entry points, and our own checker (`scripts/check_boundaries.js`) enforces the boundaries ([ADR 0007](docs/adr/0007-deep-modules-dependency-cruiser.md), [src/packages/README.md](src/packages/README.md)).
+Core features live in deep modules under `src/packages/`. App code imports a package only through its root entry points, and our own checker (`scripts/check_boundaries.js`) enforces the boundaries ([ADR 0007](docs/adr/0007-deep-modules-dependency-cruiser.md), [ADR 0052](docs/adr/0052-shared-core-package.md), [src/packages/README.md](src/packages/README.md)).
 
 | Package            | Responsibility                                                                                              |
 | ------------------ | ----------------------------------------------------------------------------------------------------------- |
@@ -182,6 +182,7 @@ Core features live in deep modules under `src/packages/`. App code imports a pac
 ```text
 .
 ├── AGENTS.md            Invariants for contributors and AI agents
+├── CLAUDE.md            Claude Code memory; imports AGENTS.md
 ├── CONTEXT.md           Domain glossary (use these terms)
 ├── RELEASING.md         Release, deployment and rollback runbook
 ├── crates/              Rust sources for the WebAssembly modules
@@ -221,7 +222,7 @@ Before every commit, our own pre-commit hook (`.githooks/pre-commit`) formats an
 
 ## Contributing
 
-1. **Read the guardrails.** [AGENTS.md](AGENTS.md) holds the invariants: client-side only, the storage allowlist, reuse of shared UI components, semantic design tokens, hardened workflows and in-house first. Use the vocabulary in [CONTEXT.md](CONTEXT.md), and check [docs/adr](docs/adr/) before changing a settled decision.
+1. **Read the guardrails.** [AGENTS.md](AGENTS.md) holds the invariants ([CLAUDE.md](CLAUDE.md) imports it, so Claude Code sessions load it automatically): client-side only, the storage allowlist, reuse of shared UI components, semantic design tokens, hardened workflows and in-house first. Use the vocabulary in [CONTEXT.md](CONTEXT.md), and check [docs/adr](docs/adr/) before changing a settled decision.
 2. **Branch from `main`** with a prefix: `feat/`, `fix/`, `docs/`, `refactor/`, `chore/` or `agent/` (a Claude session keeps the `claude/` branch it is given). `main` is the only long-lived branch ([ADR 0020](docs/adr/0020-trunk-based-releases-on-main.md)).
 3. **Reuse before you build.** Check [UI_CATALOG.md](docs/public/UI_CATALOG.md) before adding a visual element; sliders, buttons and colour pickers have shared components, and colour maths lives in `src/packages/core/encoding.ts`.
 4. **Keep docs in step.** Run `pnpm run docs:sync` after changing shared UI or a public doc, and record a new architectural decision as an ADR ([docs-maintenance.md](docs/agents/docs-maintenance.md)).

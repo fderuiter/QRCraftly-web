@@ -10,7 +10,7 @@ description: How to drive a QRCraftly pull request to merged. Use when opening a
 ## Before the first push
 
 1. Branch from current `main` with a prefix: `feat/`, `fix/`, `docs/`, `refactor/`, `chore/`, `agent/`, or `claude/` for the branch a Claude session is given.
-2. Run the checks a contributor runs locally, in this order, and fix everything before pushing:
+2. While you work, use the targeted commands in the "Fast loop" section of `AGENTS.md`. Before pushing, run the checks a contributor runs locally, in this order, and fix everything:
    - `pnpm run lint`
    - `pnpm test -- --run`
    - `pnpm build` when the change touches the build, routing, the generator or `public/`

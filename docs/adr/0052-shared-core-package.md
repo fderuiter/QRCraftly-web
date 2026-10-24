@@ -25,7 +25,7 @@ status: accepted
 
 - Create `src/packages/core`: the code two or more packages share. It has one entry point per concern and no barrel: `types.ts` (cross-package domain types such as `QRConfig`, ECC levels and module styles), `security.ts` (URL, SVG and phone sanitizers), `url.ts`, and `encoding.ts` (bytes, hex, SHA-256, colour parsing). Code used by one package moves into that package instead. `src/types.ts`, `src/constants.ts` and `src/utils/` stay as app modules.
 - `core` is a leaf: it imports no other package and no app code (boundary rule `core-is-a-leaf`).
-- Packages may not import `src/types`, `src/constants` or `src/utils` (boundary rule `packages-must-not-import-app-root`). The rule checks resolved paths, so relative escapes count too. Today's offenders are listed in `LEGACY_APP_ROOT_IMPORTERS` in `scripts/boundaries.config.js`. The list only shrinks: a test fails when a listed file no longer imports app-root code, and new files never join it. This is the same pattern as `LEGACY_PALETTE_FILES` in the design-token audit.
+- Packages may not import `src/types`, `src/constants` or `src/utils` (boundary rule `packages-must-not-import-app-root`). The rule checks resolved paths, so relative escapes count too. During the migration the offenders sat on a shrink-only allowlist. The last of them moved out in #1529 and the allowlist was deleted, so the rule (`packages-must-not-import-app-root` in `scripts/boundaries.config.js`) has no exceptions.
 - Move the code one slice per PR (#1521-#1529), and delete the allowlist when it is empty.
 - The Arcade stays a package like any other (its removal in #1503 was dropped).
 

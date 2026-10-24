@@ -36,12 +36,31 @@ Single-context layout (`CONTEXT.md` and `docs/adr/` at repo root). Always consul
 
 Packages are deep modules: see [src/packages/README.md](./src/packages/README.md) before adding or importing one.
 
+### Shared skills
+
+`.agents/skills/` holds general-purpose agent skills, one folder each with a `SKILL.md` that says when to use it. The ones that fit this repository most often: `tdd` (test-first features and fixes), `diagnosing-bugs` (hard bugs and performance regressions), `resolving-merge-conflicts`, `code-review`, `triage` (issue triage roles, with `docs/agents/triage-labels.md`), `release` (with `RELEASING.md`, which wins where they differ) and `migrate-to-shoehorn` (removing `as` from tests). Claude Code skills for this repository are in `.claude/skills/`: `steward` (drive a PR to merged) and `run-qrcraftly` (build, run and screenshot the app).
+
 ### Documentation checks
 
 - Run `pnpm run docs:sync` after changing a UI component in `src/components/ui/`, `src/components/inputs/` or `src/components/style-controls/`. It regenerates `docs/public/UI_CATALOG.md` entries. Commit what it changes. The `/security` page's docs are compiled from `docs/public/` and `docs/SECURITY.md` at build time (`virtual:docs-manifest`), so nothing is committed for them.
 - Run `pnpm run docs:lint` after editing any Markdown. It checks links, anchors, unfinished-work placeholder markers and TS snippets in `docs/`, `docs/public/`, `docs/adr/`, `docs/agents/`, `docs/optical-transfer/`, `README.md`, `CONTEXT.md` and `AGENTS.md`; ADR file names and gap-free numbering; and the UI catalog. Every error prints a `Fix:` hint. `pnpm run lint`, CI and the pre-commit hook (for staged `*.md` files) run the same checks.
 
 See `docs/agents/docs-maintenance.md`.
+
+### Fast loop
+
+The full gate (`pnpm run lint`, about 2 minutes, and `pnpm test --run`, 4 to 6) is for the end. While you work, run the check that covers what you changed (times measured on a cloud session, 2026-10-24):
+
+| Change                   | Command                               | Time                   |
+| ------------------------ | ------------------------------------- | ---------------------- |
+| Any code or test         | `pnpm exec vitest run <test-file>...` | a few seconds per file |
+| TypeScript types         | `pnpm run typecheck`                  | ~20 s                  |
+| Imports between packages | `pnpm run lint:boundaries`            | ~4 s                   |
+| UI classes or colours    | `node scripts/design_token_audit.js`  | <1 s                   |
+| Code style in a folder   | `pnpm exec eslint <paths>`            | ~3 s per package       |
+| Markdown                 | `pnpm run docs:lint`                  | ~3 s                   |
+
+The pre-commit hook still runs the duplication audit, the typecheck and the full test suite on every commit, so commit when a step is done, not after each edit. Run the full `pnpm run lint` and `pnpm test --run` before a PR leaves draft (Definition of Done below).
 
 ## Architecture & Deep Topic Pointers
 
@@ -53,7 +72,7 @@ See `docs/agents/docs-maintenance.md`.
 
 ## Quality & Development Standards
 
-- **TypeScript**: Strict typing across all files, tests included. Never use `any` or loose type assertions (`as`); ESLint rejects new ones in `src/` (`as const` is fine), and `eslint/legacy-type-assertions.js` lists the older files that still have some. That list may only shrink. When the same logic is needed twice, extract a helper instead of copying it.
+- **TypeScript**: Strict typing across all files. Never use `any`, tests included. Outside tests, never use loose type assertions (`as`): ESLint rejects new ones in `src/` (`as const` is fine), and `eslint/legacy-type-assertions.js` lists the older files that still have some. That list may only shrink. Test files are exempt from that lint rule on purpose (`TEST_FILES` in `eslint.config.js`), but avoid `as` there too: build typed fixtures or partial objects instead. `.agents/skills/migrate-to-shoehorn/SKILL.md` shows the pattern; `@total-typescript/shoehorn` itself is not a dependency, so adding it follows the In-House First rule. When the same logic is needed twice, extract a helper instead of copying it.
 - **Earlier Decisions**: Before changing existing behaviour, run `git log -S` on the lines you touch and check `docs/adr/`. Do not undo something an earlier PR set on purpose (for example, toast offsets that keep the mobile Download bar clear) without saying why in the PR.
 - **Accessibility (a11y)**: Validate WCAG 2.1 SC 1.4.11 contrast compliance for UI states and generated QR codes. Test components with the axe helper in `tests/utils/axe.ts` (`expect(await axe(container)).toHaveNoViolations()`) and screen-reader accessible labels. Validation errors and live regions must not fire while the user is still typing a value that could become valid.
 - **Tests**: Test behaviour, not CSS class names. Count calls when the contract says "only on change", and cover blank, whitespace and boundary input.
