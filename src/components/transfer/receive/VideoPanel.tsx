@@ -69,7 +69,6 @@ export function VideoPanel({ videoFile, drop, canClear, onClear }: VideoPanelPro
           variant="outline"
           fullWidth
           onClick={() => inputRef.current?.click()}
-          aria-label="Select Video File"
         >
           <Upload className="size-4" />
           {videoFile ? 'Replace Video' : 'Select Video File'}

@@ -249,6 +249,19 @@ describe('Arcade Blaster (#923)', () => {
     expect(screen.getByTestId('arcade-durability')).toHaveTextContent('100%');
   });
 
+  it('is an interactive arena with its instructions, and reports hits (#1593)', async () => {
+    render(<ArcadeApp />);
+    const canvas = screen.getByTestId('arcade-blaster-canvas');
+    expect(canvas).toHaveAttribute('role', 'application');
+    expect(canvas).toHaveAccessibleName('Arcade blaster arena');
+    expect(canvas).toHaveAccessibleDescription(/keys 1, 2 and 3 switch weapons and Space fires/);
+
+    fireEvent.pointerMove(canvas, { clientX: 104, clientY: 64 });
+    fireEvent.keyDown(document.body, { key: ' ', code: 'Space' });
+    fireEvent.keyUp(document.body, { key: ' ', code: 'Space' });
+    await waitFor(() => expect(screen.getByTestId('arcade-announcer')).toHaveTextContent('Plasma Blaster hit: 1 micro-cell destroyed.'), { timeout: 4000 });
+  });
+
   it('fires plasma bolts with Space that collide with the target', async () => {
     render(<ArcadeApp />);
     const canvas = screen.getByTestId('arcade-blaster-canvas');
@@ -325,6 +338,19 @@ describe('Damage Simulator (#924)', () => {
     fireEvent.keyDown(canvas, { key: 'ArrowRight' });
     fireEvent.keyDown(canvas, { key: 'Enter' });
     expect(destroyed()).toBe(1);
+  });
+
+  it('is an interactive board with its instructions, and says what each strike hit (#1593)', () => {
+    const canvas = openSimulator();
+    expect(canvas).toHaveAttribute('role', 'application');
+    expect(canvas).toHaveAccessibleName('Damage simulator board, 21 by 21 modules');
+    expect(canvas).toHaveAccessibleDescription(/move with the arrow keys and strike with Enter or Space/);
+
+    canvas.focus();
+    fireEvent.keyDown(canvas, { key: 'Enter' });
+    expect(screen.getByTestId('arcade-announcer')).toHaveTextContent('Pinpoint Laser strike at row 11, column 11: 1 module destroyed.');
+    fireEvent.keyDown(canvas, { key: 'Enter' });
+    expect(screen.getByTestId('arcade-announcer')).toHaveTextContent('row 11, column 11: no new modules hit.');
   });
 });
 

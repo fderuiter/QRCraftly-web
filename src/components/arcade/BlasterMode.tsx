@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { HeartPulse } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -63,6 +63,8 @@ import { useArcadeStatus } from './useArcadeStatus';
 import { useScanFrameCapture } from './useScanFrameCapture';
 
 const A = BLASTER_ARENA;
+/** The least time between two spoken hit reports. */
+const SHOT_REPORT_INTERVAL_MS = 1000;
 
 /** Durability statistics shown in the HUD. */
 interface Durability {
@@ -216,6 +218,7 @@ function drawScene(ctx: CanvasRenderingContext2D, s: Scene) {
  * @returns The blaster.
  */
 export function BlasterMode({ target, encoder, settings, announce }: ModeProps) {
+  const instructionsId = useId();
   const matrix = useMemo(
     () => (encoder ? buildTargetMatrix(target.payload, target.ecc, encoder) : blankTargetMatrix(target.payload, target.ecc)),
     [target.payload, target.ecc, encoder]
@@ -283,10 +286,27 @@ export function BlasterMode({ target, encoder, settings, announce }: ModeProps) 
     if (current !== 'laser') fire(current);
   }, [fire, live]);
 
+  // Hits are summed and told to screen readers at most once a second, so the laser and
+  // rapid fire do not flood the live region (#1593).
+  const shotReportRef = useRef<{ weapon: Impact['kind']; cells: number } | null>(null);
+  const lastReportAtRef = useRef(-Infinity);
+  const reportShots = useCallback((now: number) => {
+    const report = shotReportRef.current;
+    if (!report || now - lastReportAtRef.current < SHOT_REPORT_INTERVAL_MS) return;
+    shotReportRef.current = null;
+    lastReportAtRef.current = now;
+    const name = BLASTER_WEAPONS.find((w) => w.id === report.weapon)?.name ?? 'Shot';
+    announce(`${name} hit: ${report.cells} micro-cell${report.cells === 1 ? '' : 's'} destroyed.`);
+  }, [announce]);
+
   const handleImpacts = useCallback((impacts: Impact[]) => {
     if (impacts.length === 0) return;
     const { reducedMotion: calm } = live.current;
     for (const impact of impacts) {
+      if (impact.destroyed.length > 0) {
+        const pending = shotReportRef.current;
+        shotReportRef.current = { weapon: impact.kind, cells: (pending?.cells ?? 0) + impact.destroyed.length };
+      }
       if (!calm) {
         const origin = { x: impact.x, y: impact.y };
         if (impact.kind === 'rocket') {
@@ -318,6 +338,7 @@ export function BlasterMode({ target, encoder, settings, announce }: ModeProps) 
       if (state.autoFire && state.weapon === 'plasma' && tickRef.current % 5 === 0) fire('plasma');
       impacts.push(...stepProjectiles(projectilesRef.current, state.grid, A));
       handleImpacts(impacts);
+      reportShots(performance.now());
       if (state.reducedMotion) particlesRef.current.length = 0;
       else if (tickRef.current % 2 === 0) {
         for (const p of projectilesRef.current) {
@@ -347,7 +368,7 @@ export function BlasterMode({ target, encoder, settings, announce }: ModeProps) 
     return () => {
       if (frame !== null) cancelAnimationFrame(frame);
     };
-  }, [draw, fire, handleImpacts, live, scanRef]);
+  }, [draw, fire, handleImpacts, reportShots, live, scanRef]);
 
   const selectWeapon = useCallback(
     (id: BlasterWeaponId) => {
@@ -444,8 +465,10 @@ export function BlasterMode({ target, encoder, settings, announce }: ModeProps) 
               width={A.width}
               height={A.height}
               tabIndex={0}
-              role="img"
-              aria-label="Arcade blaster arena. Aim with the pointer and click or tap to fire; keys 1, 2 and 3 switch weapons and Space fires."
+              // It takes focus and keys, so it is an application, not a picture (#1593).
+              role="application"
+              aria-label="Arcade blaster arena"
+              aria-describedby={instructionsId}
               className="block aspect-[5/6] w-full cursor-crosshair rounded-lg focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none"
               style={{ touchAction: 'none' }}
               data-testid="arcade-blaster-canvas"
@@ -478,6 +501,9 @@ export function BlasterMode({ target, encoder, settings, announce }: ModeProps) 
                 };
               }}
             />
+            <p id={instructionsId} className="sr-only">
+              Aim with the pointer or the arrow keys and click or tap to fire; keys 1, 2 and 3 switch weapons and Space fires.
+            </p>
           </div>
         }
         quickBar={
