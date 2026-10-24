@@ -42,5 +42,5 @@ export {
   useOpticalReceiver,
   type UseOpticalReceiverOptions,
   type ReceivedFileSaver,
-  type ReceivedBundleFile,
 } from './lib/receiver/useOpticalReceiver';
+export type { ReceivedBundleFile } from './lib/receiver/machine';

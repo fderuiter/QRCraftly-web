@@ -296,3 +296,13 @@ export { permissionOf, describeCameraError } from './lib/camera';
 export { steerMessage } from './lib/feedback/steerMessage';
 export { validateReceivedFile, type UploadedFile } from './lib/receiver/videoFile';
 export { senderReducer, INITIAL_SENDER_STATE, type SenderPhase, type SenderEvent, type SenderState } from './lib/sender/machine';
+export {
+  receiverReducer,
+  initialReceiverState,
+  type ReceiverPhase,
+  type ReceiverMode,
+  type ReceiverEvent,
+  type ReceiverState,
+  type ReceiverResult,
+  type ReceiverFailure,
+} from './lib/receiver/machine';
