@@ -2,8 +2,8 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BrandTemplateGallery } from './BrandTemplateGallery';
-import { DEFAULT_CONFIG } from '../../constants';
-import { type QRConfig, QRStyle } from '../../types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { type QRConfig, QRStyle } from '@/packages/core/types';
 import { BRAND_TEMPLATES_STORAGE_KEY } from '../../utils/brandTemplateManager';
 
 describe('BrandTemplateGallery Component', () => {

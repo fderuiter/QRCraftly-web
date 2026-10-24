@@ -18,7 +18,7 @@
 
 
 import React, { createContext, lazy, Suspense, useContext, useEffect, useState } from 'react';
-import type { QRConfig } from '../types';
+import type { QRConfig } from '@/packages/core/types';
 import type { LandingPrimaryAction } from '../data/landingPages';
 import {
   PatternControls,

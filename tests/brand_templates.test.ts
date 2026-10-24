@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { DEFAULT_CONFIG } from '../src/constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { PREBUILT_TEMPLATES } from '../src/data/brandTemplates';
-import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel } from '../src/types';
+import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel } from '@/packages/core/types';
 import {
   BRAND_TEMPLATES_STORAGE_KEY,
   MAX_CUSTOM_TEMPLATES,

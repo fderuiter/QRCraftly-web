@@ -17,9 +17,9 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { validatePayload, validateConfig, sanitizeConfig, describeViolation } from '../index';
-import { DEFAULT_CONFIG } from '@/constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { UNSUPPORTED_SCHEME_PREFIX } from '@/packages/core/security';
 
 describe('dangerous schemes are refused in every QR type (#1153)', () => {

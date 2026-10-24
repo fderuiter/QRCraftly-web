@@ -19,7 +19,7 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { instantiateWasmSync } from '@/packages/wasm-runtime';
-import { QRErrorCorrectionLevel } from '@/types';
+import { QRErrorCorrectionLevel } from '@/packages/core/types';
 import { QR_ENCODE_WASM_URL, QrEncodeError, createQrEncoder, loadQrEncoder, type QrSymbol } from '../encoder';
 
 const wasm = fs.readFileSync(new URL('../../../wasm/qr-encode.wasm', import.meta.url));

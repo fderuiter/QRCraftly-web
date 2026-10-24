@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { type QrEncoder } from '@/packages/qr-matrix';
 import { qrEncoder } from '../../tests/fixtures/qrEncoder';
 import { getQrCanvasRuntime, setQrCanvasRuntime } from './qrCanvasRuntime';
-import { QRErrorCorrectionLevel } from '../types';
+import { QRErrorCorrectionLevel } from '@/packages/core/types';
 
 describe('qrCanvasRuntime', () => {
   it('spawns no workers where Web Workers do not exist', () => {

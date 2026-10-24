@@ -20,8 +20,8 @@ import { describe, it, expect } from 'vitest';
 // @ts-expect-error - jsdom type declarations might not be installed
 import { JSDOM } from 'jsdom';
 import { generateQRSvg } from '../index';
-import { DEFAULT_CONFIG } from '@/constants';
-import type { QRConfig } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import type { QRConfig } from '@/packages/core/types';
 
 if (typeof globalThis.DOMParser === 'undefined') {
   const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {

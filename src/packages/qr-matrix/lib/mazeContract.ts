@@ -1,4 +1,4 @@
-import type { QRConfig } from '@/types';
+import type { QRConfig } from '@/packages/core/types';
 import type { MazeData } from './maze';
 
 export interface MazeWorkerRequest {

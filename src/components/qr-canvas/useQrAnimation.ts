@@ -17,7 +17,7 @@
 */
 
 import { useEffect, useRef, type RefObject } from 'react';
-import type { QRConfig, QRModules } from '@/types';
+import type { QRConfig, QRModules } from '@/packages/core/types';
 import { drawWithTemplate } from '@/packages/qr-export';
 import { buildMatrix, drawQR } from '@/packages/qr-matrix';
 import type { MazeData } from '@/packages/qr-matrix/maze';

@@ -42,7 +42,7 @@ import { KeyCodeEntry } from '@/components/transfer/KeyCodeEntry';
 import { LockOnBrackets } from '@/components/transfer/LockOnBrackets';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { playChime, unlockChime, vibrate } from '@/utils/feedback';
-import { analyseReceivedFile } from '@/utils/fileNames';
+import { analyseReceivedFile } from '@/packages/core/files';
 import { formatEta, formatFileSize } from '@/utils/transferSpeed';
 
 /**

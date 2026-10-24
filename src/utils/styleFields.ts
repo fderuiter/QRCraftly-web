@@ -1,22 +1,4 @@
-import {
-  type BorderLogoPosition,
-  type BorderStyle,
-  type BorderTextPosition,
-  type FrameIcon,
-  FRAME_FONT_FAMILIES,
-  type FramePosition,
-  type FrameStyle,
-  type ColorStop,
-  EyeShape,
-  type GradientType,
-  type LogoPaddingStyle,
-  type MosaicMode,
-  type QRConfig,
-  QRErrorCorrectionLevel,
-  QRStyle,
-  SocialFormat,
-  TemplateStyle,
-} from '../types';
+import { type BorderLogoPosition, type BorderStyle, type BorderTextPosition, type FrameIcon, FRAME_FONT_FAMILIES, type FramePosition, type FrameStyle, type ColorStop, EyeShape, type GradientType, type LogoPaddingStyle, type MosaicMode, type QRConfig, QRErrorCorrectionLevel, QRStyle, SocialFormat, TemplateStyle } from '@/packages/core/types';
 import { normalizeHex } from '@/packages/core/encoding';
 
 type FieldRule =

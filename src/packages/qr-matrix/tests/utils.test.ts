@@ -26,8 +26,8 @@ import {
   isAlignmentPatternZone,
   ALIGNMENT_PATTERN_COORDINATES,
 } from '../index';
-import { DEFAULT_CONFIG } from '@/constants';
-import { type QRConfig, QRErrorCorrectionLevel } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { type QRConfig, QRErrorCorrectionLevel } from '@/packages/core/types';
 
 describe('QR Renderer Utils', () => {
   describe('calculateLayout', () => {

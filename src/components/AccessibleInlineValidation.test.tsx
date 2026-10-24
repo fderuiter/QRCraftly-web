@@ -4,7 +4,8 @@ import { TextField } from './ui/TextField';
 import { WifiInput } from './inputs/WifiInput';
 import { VCardInput } from './inputs/VCardInput';
 import { PaymentInput } from './inputs/PaymentInput';
-import { WifiEncryption, CryptoNetwork } from '../types';
+import { CryptoNetwork } from '../types';
+import { WifiEncryption } from '@/packages/core/types';
 
 describe('Accessible Inline Validation and Accessible Fields', () => {
   it('displays exactly 1 character used when numeric zero (0) is input', () => {

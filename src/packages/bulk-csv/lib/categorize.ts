@@ -16,14 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { DEFAULT_CONFIG } from '@/constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import type { CsvRow } from './csv';
 import { escapeCsvCell } from './csvEscape';
 import { sanitizeFileStem } from './fileNames';
 import { hasPayload } from './preview';
 import { bulkValidationType, encodeBulkCell, type BulkContentType } from './payload';
 import { analyseLink, type LinkFinding } from '@/packages/link-safety';
-import type { QRConfig } from '@/types';
+import type { QRConfig } from '@/packages/core/types';
 import {
   isDangerousUrl,
   REGEX_STRICT_CONTROL_CHARS,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GENERATOR_FOOTER_LINKS, HELP_LINKS, PRIMARY_NAV_ITEMS, QR_TYPE_ROUTES, getCurrentPrimaryNavId, normalizePathname } from './navigation';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 
 describe('primary navigation model', () => {
   it('contains the five primary destinations in order', () => {

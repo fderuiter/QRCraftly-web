@@ -20,7 +20,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QRProvider } from '@/context/QRContext';
-import { QRErrorCorrectionLevel, QRType } from '@/types';
+import { QRErrorCorrectionLevel, QRType } from '@/packages/core/types';
 import { clearStagedArcadeTarget, stageArcadeTarget } from '@/packages/arcade/handoff';
 import { ArcadeApp } from './ArcadeApp';
 

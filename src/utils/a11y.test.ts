@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { combineIds, getQrTypeLabel, getQrTypeDescription, announcePolitely } from './a11y';
-import { QRType } from '../types';
+import { QRType } from '@/packages/core/types';
 import { QR_GENERATORS } from '@/packages/qr-payload';
 
 describe('a11y - Accessibility Helpers', () => {

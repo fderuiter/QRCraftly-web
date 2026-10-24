@@ -31,18 +31,8 @@ import {
   constructSocialString,
   constructUrlString,
 } from '../index';
-import {
-  type WifiData,
-  type EmailData,
-  type VCardData,
-  type PhoneData,
-  type SmsData,
-  type PaymentData,
-  type EventData,
-  WifiEncryption,
-  CryptoNetwork,
-  SocialPlatform,
-} from '@/types';
+import { type EmailData, type VCardData, type PhoneData, type SmsData, type PaymentData, type EventData, CryptoNetwork, SocialPlatform } from '@/types';
+import { type WifiData, WifiEncryption } from '@/packages/core/types';
 
 describe('QR Helpers', () => {
   describe('constructWifiString', () => {

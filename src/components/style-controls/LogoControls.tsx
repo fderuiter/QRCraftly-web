@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import { type QRConfig, type LogoPaddingStyle, QRErrorCorrectionLevel } from '../../types';
+import { type QRConfig, type LogoPaddingStyle, QRErrorCorrectionLevel } from '@/packages/core/types';
 import { Upload, X, Square, Circle, Minus } from 'lucide-react';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';

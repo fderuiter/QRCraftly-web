@@ -11,6 +11,7 @@ export const MAPPING = {
   'src/packages/scannability/lib/sharedContract.ts': 'docs/public/SCALING.md',
   'src/components/InputPanel.tsx': 'src/components/inputs/README.md',
   'src/types.ts': ['docs/SECURITY.md', 'docs/public/COMPLIANCE.md', 'src/components/inputs/README.md'],
+  'src/packages/core/types.ts': ['docs/SECURITY.md', 'docs/public/COMPLIANCE.md', 'src/components/inputs/README.md'],
   'semgrep.yml': ['docs/SECURITY.md', 'docs/public/COMPLIANCE.md'],
   // colors.json holds the palette values behind the design tokens and QR presets; only the style guide documents them.
   'src/colors.json': 'docs/public/STYLE_GUIDE.md',

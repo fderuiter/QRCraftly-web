@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { QRConfig } from '../types';
+import type { QRConfig } from '@/packages/core/types';
 import { createScannabilityEvaluator, type PixelFrame, type ScannabilityStatus } from '@/packages/scannability';
 import { formatDistance } from './printGuidance';
 

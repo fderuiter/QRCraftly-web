@@ -19,8 +19,8 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LayoutControls } from './LayoutControls';
-import { DEFAULT_CONFIG } from '../../constants';
-import { type QRConfig, QRType, TemplateStyle } from '../../types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { type QRConfig, QRType, TemplateStyle } from '@/packages/core/types';
 import { axe } from '../../../tests/utils/axe';
 
 describe('LayoutControls - Contrast Warnings', () => {

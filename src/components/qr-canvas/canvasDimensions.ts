@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type QRConfig, SocialFormat, TemplateStyle } from '@/types';
+import { type QRConfig, SocialFormat, TemplateStyle } from '@/packages/core/types';
 import { SOCIAL_DIMENSIONS } from '@/packages/qr-export';
 
 /**

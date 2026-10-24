@@ -20,8 +20,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from './ui/Toast';
 import QRTool from './QRTool';
-import { DEFAULT_CONFIG } from '@/constants';
-import { QRType, type QRConfig } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { QRType, type QRConfig } from '@/packages/core/types';
 import { getSamplePayload } from '@/packages/qr-payload';
 import { clearRetainedInputStates } from './inputs/useInputLogic';
 

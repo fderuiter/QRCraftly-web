@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 
 /**
  * One destination in the site-wide primary navigation.

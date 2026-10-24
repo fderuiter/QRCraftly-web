@@ -21,8 +21,8 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useScannability } from './useScannability';
 import { QRProvider, useQRStore } from '@/context/QRContext';
-import { DEFAULT_CONFIG } from '@/constants';
-import { type QRConfig, QRStyle } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { type QRConfig, QRStyle } from '@/packages/core/types';
 
 // ---------------------------------------------------------------------------
 // Helpers

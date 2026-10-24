@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validateConfig } from '../index';
-import { type QRConfig, QRType, QRErrorCorrectionLevel, SocialFormat, TemplateStyle, QRStyle } from '@/types';
+import { type QRConfig, QRType, QRErrorCorrectionLevel, SocialFormat, TemplateStyle, QRStyle } from '@/packages/core/types';
 
 const getBaseConfig = (): QRConfig => ({
   type: QRType.TEXT,

@@ -22,8 +22,8 @@ import {
   drawWithTemplate,
   SvgContext,
 } from '../index';
-import { DEFAULT_CONFIG } from '@/constants';
-import { SocialFormat, TemplateStyle, type QRConfig, QRStyle, QRType } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { SocialFormat, TemplateStyle, type QRConfig, QRStyle, QRType } from '@/packages/core/types';
 import * as qrMatrix from '@/packages/qr-matrix';
 import * as qrMatrixCanvas from '@/packages/qr-matrix/canvas';
 import { calculateLayout } from '@/packages/qr-matrix';

@@ -39,11 +39,11 @@ import {
 } from '../mosaic';
 import { drawQRInternal } from '../index';
 import { getLuminanceFromRgb } from '@/packages/core/encoding';
-import { DEFAULT_CONFIG } from '@/constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { SvgContext } from '@/packages/qr-export';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
-import type { QRConfig, QRModules, QRErrorCorrectionLevel } from '@/types';
+import type { QRConfig, QRModules, QRErrorCorrectionLevel } from '@/packages/core/types';
 
 /** Encodes a payload with the real `qrcode` encoder. */
 function encode(payload: string, ecl: QRErrorCorrectionLevel | 'L' | 'M' | 'Q' | 'H' = 'H'): QRModules {

@@ -20,8 +20,8 @@ import { describe, it, expect } from 'vitest';
 import { calculateScannabilityHealth, getExportRiskPolicy, auditModuleContrast } from '../index';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { evaluateScannability, performScannabilityCheck } from '../checker';
-import { type QRConfig, QRType, QRErrorCorrectionLevel, QRStyle, SocialFormat, TemplateStyle } from '@/types';
-import { DEFAULT_CONFIG } from '@/constants';
+import { type QRConfig, QRType, QRErrorCorrectionLevel, QRStyle, SocialFormat, TemplateStyle } from '@/packages/core/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { renderCorpusFrame } from '../../../../tests/utils/scannerCorpus';
 
 const getBaseConfig = (): QRConfig => ({

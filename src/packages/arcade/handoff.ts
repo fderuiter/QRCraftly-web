@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { QRStyle } from '@/types';
+import type { QRStyle } from '@/packages/core/types';
 import type { EccLevel } from './lib/matrix';
 
 /**

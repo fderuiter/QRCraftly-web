@@ -1,4 +1,3 @@
-import { getPublicDomain } from "./utils/metadataEngine";
 /*
     QRCraftly
     Copyright (C) 2025 fderuiter
@@ -18,52 +17,7 @@ import { getPublicDomain } from "./utils/metadataEngine";
 */
 
 
-import { QRStyle, QRType, QRErrorCorrectionLevel, SocialFormat, TemplateStyle, type QRConfig } from './types';
-
-/**
- * The default configuration settings for the QR code generator.
- * Used to initialize the application state.
- */
-export const DEFAULT_CONFIG = {
-  value: getPublicDomain(),
-  type: QRType.URL,
-  fgColor: '#000000',
-  bgColor: '#ffffff',
-  style: QRStyle.STANDARD,
-  logoUrl: null,
-  logoSize: 0.2,
-  logoPaddingStyle: 'square' as const,
-  logoPadding: 1,
-  logoBackgroundColor: '#ffffff',
-  eyeColor: '#000000',
-  errorCorrectionLevel: QRErrorCorrectionLevel.H,
-  isBorderEnabled: false,
-  borderSize: 0.05,
-  borderColor: '#000000',
-  borderStyle: 'solid' as const,
-  borderText: '',
-  borderTextPosition: 'bottom-center' as const,
-  borderTextColor: '#ffffff',
-  borderLogoUrl: null,
-  borderLogoPosition: 'bottom-center' as const,
-  socialFormat: SocialFormat.SQUARE_1_1,
-  templateStyle: TemplateStyle.NONE,
-  templateHeadline: '',
-  templateSubtext: '',
-  templateQrScale: 1.0,
-  isMazeEnabled: false,
-  isMazeBridgesEnabled: true,
-  mazeColor: '#3b82f6',
-  showMazeSolution: false,
-  frameStyle: 'none' as const,
-  frameText: '',
-  frameTextColor: '#ffffff',
-  frameBgColor: '#000000',
-  framePosition: 'bottom' as const,
-  frameIcon: 'none' as const,
-  frameFontFamily: 'sans-serif' as const,
-  quietZoneModules: 4,
-};
+import { QRStyle, type QRConfig } from '@/packages/core/types';
 
 /**
  * List of available QR code pattern styles with display labels.

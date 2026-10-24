@@ -17,8 +17,8 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { QRType } from '@/types';
-import { DEFAULT_CONFIG } from '@/constants';
+import { QRType } from '@/packages/core/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import {
   validatePayload,
   validateConfig,

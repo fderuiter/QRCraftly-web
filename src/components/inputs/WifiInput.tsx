@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { type WifiData, WifiEncryption, WifiEapMethod, WifiEapPhase2 } from "../../types";
+import { type WifiData, WifiEncryption, WifiEapMethod, WifiEapPhase2 } from "@/packages/core/types";
 import { TextField, SelectField, CheckboxField } from "../ui/FormFields";
 import { CONTAINMENT_PROFILES, wifiPassphraseProblem } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";

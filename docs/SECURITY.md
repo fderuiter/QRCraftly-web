@@ -103,7 +103,7 @@ To prevent custom SVG logo uploads and native vector exports from exposing users
 
 ## Persistent Browser Storage Allowlist
 
-The build and pre-commit pipelines run static AST analysis (`scripts/storage_privacy_ast_auditor.js`) on source code before compilation. It scans for browser persistent storage operations (`localStorage`, `sessionStorage`, `indexedDB`, `document.cookie`, `caches`) and enforces an explicit allowlist of authorized keys (`qrcraftly:theme`, `qrcraftly:brand-templates`, `__test__`). The `qrcraftly:theme` key stores only the visitor's colour-theme preference (`light`, `dark` or `system`). The `qrcraftly:brand-templates` key stores user-saved visual brand templates (capped at 50 templates; visual styling parameters only, never QR payload content, border or template text, or uploaded images). Any attempts to persist transient QR payload data or use unapproved keys immediately abort the build. A saved template stores its style choices (pattern, error correction level, social format, template style) as the string values defined in `src/types.ts`. Those value sets are `as const` objects since ADR 0045; the change kept every value, so templates saved before it load unchanged, and the template importer still checks each field against `Object.values` of its set. The Wi-Fi Card template style (`wifi_card`) is saved as that style value only; the network name and password it shows are read from the current Wi-Fi payload at draw time and never stored in a template. The WPA3-only Wi-Fi type (`WifiEncryption.SAE`, encoded as `T:SAE`) is a payload value only; it adds no stored field, and its password is held in memory like every other Wi-Fi password.
+The build and pre-commit pipelines run static AST analysis (`scripts/storage_privacy_ast_auditor.js`) on source code before compilation. It scans for browser persistent storage operations (`localStorage`, `sessionStorage`, `indexedDB`, `document.cookie`, `caches`) and enforces an explicit allowlist of authorized keys (`qrcraftly:theme`, `qrcraftly:brand-templates`, `__test__`). The `qrcraftly:theme` key stores only the visitor's colour-theme preference (`light`, `dark` or `system`). The `qrcraftly:brand-templates` key stores user-saved visual brand templates (capped at 50 templates; visual styling parameters only, never QR payload content, border or template text, or uploaded images). Any attempts to persist transient QR payload data or use unapproved keys immediately abort the build. A saved template stores its style choices (pattern, error correction level, social format, template style) as the string values defined in `src/packages/core/types.ts`. Those value sets are `as const` objects since ADR 0045; the change kept every value, so templates saved before it load unchanged, and the template importer still checks each field against `Object.values` of its set. The Wi-Fi Card template style (`wifi_card`) is saved as that style value only; the network name and password it shows are read from the current Wi-Fi payload at draw time and never stored in a template. The WPA3-only Wi-Fi type (`WifiEncryption.SAE`, encoded as `T:SAE`) is a payload value only; it adds no stored field, and its password is held in memory like every other Wi-Fi password.
 
 ## Wallet Pass Keys
 
@@ -115,27 +115,27 @@ Google Wallet passes are signed the same way with the person's own service-accou
 
 ## QR Animation Loops
 
-Animation configuration structures in `types.ts` are strictly statically typed to prevent any runtime execution or script-injection pathways during high-frequency loop playbacks.
+Animation configuration structures in `QRConfig` (`src/packages/core/types.ts`) are strictly statically typed to prevent any runtime execution or script-injection pathways during high-frequency loop playbacks.
 
 ## Playable Maze Overlay & Web Calendar Integration
 
-Maze overlay configurations in `types.ts` (e.g., `isMazeEnabled`, `isMazeBridgesEnabled`, `mazeColor`, `mazePathWidth`, `showMazeSolution`) are statically typed and strictly validated at runtime. This prevents injection or path manipulation during maze rendering. Web calendar providers and iCalendar event types (`EventData` and `CalendarProvider` in `types.ts`) construct direct calendar URLs and VEVENT payloads with optional explicit IANA / UTC timezones, validating all parameter links with `isDangerousUrl` to prevent URI injection attacks.
+Maze overlay configurations in `QRConfig` (`src/packages/core/types.ts`) (e.g., `isMazeEnabled`, `isMazeBridgesEnabled`, `mazeColor`, `mazePathWidth`, `showMazeSolution`) are statically typed and strictly validated at runtime. This prevents injection or path manipulation during maze rendering. Web calendar providers and iCalendar event types (`EventData` and `CalendarProvider` in `src/types.ts`) construct direct calendar URLs and VEVENT payloads with optional explicit IANA / UTC timezones, validating all parameter links with `isDangerousUrl` to prevent URI injection attacks.
 
 ## Independent Eye Colors
 
-Finder pattern color properties in `types.ts` (`eyeFrameColor` and `eyeBallColor`) are statically typed visual parameters. They allow distinct outer frame and inner eyeball styling while falling back safely to `eyeColor`.
+Finder pattern color properties in `src/packages/core/types.ts` (`eyeFrameColor` and `eyeBallColor`) are statically typed visual parameters. They allow distinct outer frame and inner eyeball styling while falling back safely to `eyeColor`.
 
 ## Eye Shapes
 
-`eyeFrameShape` and `eyeBallShape` in `types.ts` take one of the fixed `EyeShape` values (`square`, `rounded`, `circle`, `leaf`). Style files and brand templates accept only those values (`src/utils/styleFields.ts`); anything else is skipped. An unset shape draws the eye exactly as the module pattern does. Shapes are drawn on the device like every other part of the code, and the scannability check decodes the result.
+`eyeFrameShape` and `eyeBallShape` in `src/packages/core/types.ts` take one of the fixed `EyeShape` values (`square`, `rounded`, `circle`, `leaf`). Style files and brand templates accept only those values (`src/utils/styleFields.ts`); anything else is skipped. An unset shape draws the eye exactly as the module pattern does. Shapes are drawn on the device like every other part of the code, and the scannability check decodes the result.
 
 ## Custom Frame Shapes and CTA Badges
 
-Custom frame shape and call-to-action (CTA) badge configurations in `types.ts` (e.g., `frameStyle`, `frameText`, `frameTextColor`, `frameBgColor`, `framePosition`, `frameIcon`) are strictly statically typed. The `frameText` field is validated via `validateConfig()` to reject control or BiDi characters, sanitized client-side without external persistence, and checked for minimum WCAG AA contrast (>= 4.5:1) in real time.
+Custom frame shape and call-to-action (CTA) badge configurations in `src/packages/core/types.ts` (e.g., `frameStyle`, `frameText`, `frameTextColor`, `frameBgColor`, `framePosition`, `frameIcon`) are strictly statically typed. The `frameText` field is validated via `validateConfig()` to reject control or BiDi characters, sanitized client-side without external persistence, and checked for minimum WCAG AA contrast (>= 4.5:1) in real time.
 
 ## Gradient Color Controls
 
-Gradient color configurations in `types.ts` (`gradientType`, `gradientColorStops`, `gradientAngle`) are strictly statically typed and validated on the client side during canvas matrix rendering, preserving local processing with zero external script execution.
+Gradient color configurations in `src/packages/core/types.ts` (`gradientType`, `gradientColorStops`, `gradientAngle`) are strictly statically typed and validated on the client side during canvas matrix rendering, preserving local processing with zero external script execution.
 
 ## JSON-LD Caching & Performance Security
 

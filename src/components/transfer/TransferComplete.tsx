@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { formatFileSize } from '@/utils/transferSpeed';
 import { handOffBlob } from '@/utils/blobHandoff';
-import { analyseReceivedFile } from '@/utils/fileNames';
+import { analyseReceivedFile } from '@/packages/core/files';
 
 /** Image types shown as a thumbnail. SVG is left out so no received markup is ever rendered. */
 const THUMBNAIL_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);

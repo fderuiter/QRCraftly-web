@@ -32,7 +32,7 @@
  * information) are always drawn as whole tiles at full contrast.
  */
 
-import type { QRModules, MosaicMode } from '@/types';
+import type { QRModules, MosaicMode } from '@/packages/core/types';
 import { srgbToLinear, linearToSrgb, getLuminanceFromLinearRgb } from '@/packages/core/encoding';
 import { isAlignmentPatternZone } from './utils';
 

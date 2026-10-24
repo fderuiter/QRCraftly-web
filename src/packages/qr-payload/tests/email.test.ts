@@ -18,7 +18,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { constructEmailString, hydrateEmailData, EmailContract, emailListError } from '../index';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 
 describe('Email generator', () => {
   it('constructs and hydrates successfully', () => {

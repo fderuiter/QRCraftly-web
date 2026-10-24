@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type PaymentData, CryptoNetwork, QRType, type QRGeneratorContract } from '@/types';
+import { type PaymentData, CryptoNetwork, type QRGeneratorContract } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { isDangerousUrl, sanitizeInput, REGEX_STRICT_CONTROL_CHARS } from '@/packages/core/security';
 import { identifyProtocol, safeDecodeURIComponent } from '../protocol';
 import { paymentAmountError, WEI_DECIMALS } from '../paymentAmount';

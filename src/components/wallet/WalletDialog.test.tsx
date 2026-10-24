@@ -19,8 +19,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
-import { DEFAULT_CONFIG } from '@/constants';
-import { type QRConfig, QRType } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { type QRConfig, QRType } from '@/packages/core/types';
 import { ToastProvider } from '../ui/Toast';
 import WalletDialog, { suggestWalletTitle, WALLET_SCAN_FAILED } from './WalletDialog';
 

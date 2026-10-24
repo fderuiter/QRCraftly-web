@@ -20,7 +20,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { WifiInput } from './WifiInput';
-import { type WifiData, WifiEapMethod, WifiEapPhase2, WifiEncryption } from '../../types';
+import { type WifiData, WifiEapMethod, WifiEapPhase2, WifiEncryption } from '@/packages/core/types';
 
 const enterprise: WifiData = {
   ssid: 'Corp',

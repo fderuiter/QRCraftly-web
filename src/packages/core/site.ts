@@ -49,3 +49,8 @@ export const getConfiguredPublicDomain = (environment?: PublicEnvironment): stri
 
   return viteDomain || nodeDomain || DEFAULT_PUBLIC_DOMAIN;
 };
+
+/** The public domain without a trailing slash, as page metadata and the default URL code use it. */
+export const getPublicDomain = (): string => {
+  return getConfiguredPublicDomain().replace(/\/+$/, '');
+};

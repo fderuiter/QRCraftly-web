@@ -6,8 +6,8 @@ import QRTool from '@/components/QRTool';
 import StyleControls from '@/components/StyleControls';
 import { TypeSelector } from '@/components/inputs/TypeSelector';
 import { generateQRSvg } from '@/packages/qr-export';
-import { DEFAULT_CONFIG } from '@/constants';
-import { QRType, type QRConfig, TemplateStyle } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { QRType, type QRConfig, TemplateStyle } from '@/packages/core/types';
 import { expandAppearanceSections } from './utils/expandAppearanceSections';
 
 // Controls for mock values

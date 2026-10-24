@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type PhoneData, QRType, type QRGeneratorContract } from '@/types';
+import { type PhoneData, type QRGeneratorContract } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { parseProtocol, identifyProtocol, encodeDialString, safeDecodeURIComponent } from '../protocol';
 import { cleanPhoneNumber } from '@/packages/core/security';
 

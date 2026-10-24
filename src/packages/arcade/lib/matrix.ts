@@ -18,7 +18,7 @@
 
 import type { EccLevel } from '@/packages/core/ecc';
 import { buildMatrix, isFinderPattern, type QrEncoder } from '@/packages/qr-matrix';
-import { QRErrorCorrectionLevel, QRType } from '@/types';
+import { QRErrorCorrectionLevel, QRType } from '@/packages/core/types';
 
 export { ECC_LEVELS, type EccLevel } from '@/packages/core/ecc';
 

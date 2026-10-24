@@ -20,8 +20,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from '../../tests/utils/axe';
 import { ToastProvider } from './ui/Toast';
 import QRTool from './QRTool';
-import { DEFAULT_CONFIG } from '@/constants';
-import { QRType } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { QRType } from '@/packages/core/types';
 import { getSamplePayload } from '@/packages/qr-payload';
 
 // The sample fallback needs its own module mocks: a scannability result left

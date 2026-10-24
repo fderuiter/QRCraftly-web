@@ -18,7 +18,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Download, FlaskConical, X } from 'lucide-react';
-import type { QRConfig } from '../../types';
+import type { QRConfig } from '@/packages/core/types';
 import { Alert } from '../ui/Alert';
 import { Button } from '../ui/Button';
 import { RangeInput } from '../ui/RangeInput';

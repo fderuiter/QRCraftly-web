@@ -2,8 +2,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BorderControls } from './BorderControls';
-import { DEFAULT_CONFIG } from '../../constants';
-import type { QRConfig } from '../../types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import type { QRConfig } from '@/packages/core/types';
 
 describe('BorderControls', () => {
   const mockOnChange = vi.fn();

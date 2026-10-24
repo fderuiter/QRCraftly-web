@@ -18,7 +18,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { constructVCardString, hydrateVCardData, VCardContract, vCardFieldError, CARD_FIELDS, cardFieldsFor, VCARD_SOCIAL_FIELDS, socialProfileUrl, type VCardSocialField } from '../index';
-import { QRType, type VCardData } from '@/types';
+import { type VCardData } from '@/types';
+import { QRType } from '@/packages/core/types';
 
 describe('VCard generator', () => {
   it('constructs and hydrates successfully', () => {

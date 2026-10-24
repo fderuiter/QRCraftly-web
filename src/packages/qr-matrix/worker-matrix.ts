@@ -1,5 +1,5 @@
 import { validateConfig } from '@/packages/qr-payload';
-import type { QRConfig } from '@/types';
+import type { QRConfig } from '@/packages/core/types';
 import { buildMatrix } from './lib/buildMatrix';
 import { loadQrEncoder, QrEncodeError } from './lib/encoder';
 

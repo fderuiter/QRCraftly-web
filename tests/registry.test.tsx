@@ -20,7 +20,7 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, afterAll, afterEach } from 'vitest';
 import { QRProvider, useQRStore } from '@/context/QRContext';
-import { DEFAULT_CONFIG } from '@/constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { sidebarControls } from '@/registry';
 
 const ContentControl = sidebarControls[0].component;

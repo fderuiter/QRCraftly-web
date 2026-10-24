@@ -18,7 +18,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { UrlContract, constructUrlString } from '../index';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 
 describe('Url generator and contract', () => {
   it('constructs url string with normalization', () => {

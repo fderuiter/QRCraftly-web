@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { QRConfig } from '@/types';
+import type { QRConfig } from '@/packages/core/types';
 import { LOW_RELIABILITY_PATTERNS, SYSTEM_LIMITS } from '@/constants';
 import { getContrastRatio } from '@/packages/core/encoding';
 

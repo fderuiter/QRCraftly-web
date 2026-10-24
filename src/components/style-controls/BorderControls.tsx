@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useEffect } from 'react';
 import { Button } from '../ui/Button';
-import type { QRConfig, BorderStyle, BorderTextPosition, BorderLogoPosition } from '../../types';
+import type { QRConfig, BorderStyle, BorderTextPosition, BorderLogoPosition } from '@/packages/core/types';
 import { Upload, X } from 'lucide-react';
 import { getContrastRatio } from '@/packages/core/encoding';
 import { ColorInput } from '../ui/ColorInput';

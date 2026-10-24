@@ -1,18 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  CalendarProvider,
-  CryptoNetwork,
-  EyeShape,
-  QRErrorCorrectionLevel,
-  QRStyle,
-  QRType,
-  SocialFormat,
-  SocialPlatform,
-  TemplateStyle,
-  WifiEapMethod,
-  WifiEapPhase2,
-  WifiEncryption,
-} from '../src/types';
+import { CalendarProvider, CryptoNetwork, SocialPlatform } from '../src/types';
+import { EyeShape, QRErrorCorrectionLevel, QRStyle, QRType, SocialFormat, TemplateStyle, WifiEapMethod, WifiEapPhase2, WifiEncryption } from '@/packages/core/types';
 import { SchemaCategory, SchemaType, StrategicValueCategory, TargetPersona } from '../src/data/contentRegistry';
 
 // The former string enums, member by member, in declaration order, as they were before ADR 0045

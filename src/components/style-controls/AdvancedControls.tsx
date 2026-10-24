@@ -2,7 +2,7 @@ import React from 'react';
 import { AccordionItem } from '../ui/Accordion';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { RangeInput } from '../ui/RangeInput';
-import { type QRConfig, QRErrorCorrectionLevel } from '../../types';
+import { type QRConfig, QRErrorCorrectionLevel } from '@/packages/core/types';
 
 interface AdvancedControlsProps {
   config: QRConfig;

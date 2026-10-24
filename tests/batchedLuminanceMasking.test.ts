@@ -8,7 +8,7 @@ import { renderModules, sampleCellLuminances, type ModuleRenderOptions } from '@
 import { drawQRInternal } from '../src/packages/qr-matrix';
 import { auditModuleContrast } from '@/packages/scannability';
 import { generateQRSvg } from '@/packages/qr-export';
-import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from '../src/types';
+import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from '@/packages/core/types';
 
 describe('Module-Group Batched Luminance Masking Suite', () => {
   const moduleCount = 21;

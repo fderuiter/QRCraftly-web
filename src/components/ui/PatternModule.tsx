@@ -1,5 +1,5 @@
 import React from 'react';
-import { QRStyle } from '../../types';
+import { QRStyle } from '@/packages/core/types';
 
 const patternRenderers: Record<QRStyle, React.ReactNode> = {
   [QRStyle.STARBURST]: (

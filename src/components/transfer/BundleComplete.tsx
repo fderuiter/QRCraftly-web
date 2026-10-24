@@ -21,7 +21,7 @@ import { useState } from 'react';
 import { Check, File as FileIcon, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { analyseReceivedFile } from '@/utils/fileNames';
+import { analyseReceivedFile } from '@/packages/core/files';
 import { formatFileSize } from '@/utils/transferSpeed';
 
 /** One received file, held in memory. */

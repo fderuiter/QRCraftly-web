@@ -20,17 +20,8 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach, onTestFinished, type Mock } from 'vitest';
 import QRCanvas from './QRCanvas';
 import { calculateCanvasDimensions } from './qr-canvas/canvasDimensions';
-import { DEFAULT_CONFIG } from '../constants';
-import {
-  EyeShape,
-  QRStyle,
-  type LogoPaddingStyle,
-  QRErrorCorrectionLevel,
-  SocialFormat,
-  TemplateStyle,
-  QRType,
-  type QRConfig,
-} from '../types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { EyeShape, QRStyle, type LogoPaddingStyle, QRErrorCorrectionLevel, SocialFormat, TemplateStyle, QRType, type QRConfig } from '@/packages/core/types';
 import { createFakeQrEncoder, useCanvasEncoder } from '../../tests/fixtures/fakeQrEncoder';
 import { qrEncoder } from '../../tests/fixtures/qrEncoder';
 import { setQrCanvasRuntime } from '../utils/qrCanvasRuntime';

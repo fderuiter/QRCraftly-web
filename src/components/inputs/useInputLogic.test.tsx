@@ -1,16 +1,8 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { useInputLogic, clearRetainedInputStates } from "./useInputLogic";
-import {
-  type QRConfig,
-  QRType,
-  QRStyle,
-  QRErrorCorrectionLevel,
-  SocialFormat,
-  TemplateStyle,
-  CryptoNetwork,
-  type EmailData,
-} from "../../types";
+import { CryptoNetwork, type EmailData } from "../../types";
+import { type QRConfig, QRType, QRStyle, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from "@/packages/core/types";
 
 const createMockConfig = (type: QRType, value: string): QRConfig => ({
   value,

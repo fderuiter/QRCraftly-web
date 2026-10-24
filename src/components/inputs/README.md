@@ -15,7 +15,7 @@ Each input component follows a consistent pattern:
 
 ```tsx
 import React from 'react';
-import type { WifiData } from '../../types';
+import type { WifiData } from '@/packages/core/types';
 
 interface WifiInputProps {
   data: WifiData;
@@ -60,18 +60,18 @@ Frame shapes (`frameStyle`), call-to-action text (`frameText`), positions (`fram
 
 ## Adding a New Input Type
 
-1.  Define the data structure in `src/types.ts` and add the type to `QRType`. `QRType` and the other fixed value sets there are `as const` objects with a type of the same name, not `enum`s: the build runs scripts that import `src/` on Node's own type stripping, which cannot run an `enum` ([ADR 0045](../../../docs/adr/0045-typescript-scripts-on-node-type-stripping.md)). Use `typeof QRType.URL` where a type names one member.
+1.  Define the data structure in `src/types.ts` and add the type to `QRType` in `src/packages/core/types.ts`. `QRType` and the other fixed value sets are `as const` objects with a type of the same name, not `enum`s: the build runs scripts that import `src/` on Node's own type stripping, which cannot run an `enum` ([ADR 0045](../../../docs/adr/0045-typescript-scripts-on-node-type-stripping.md)). Use `typeof QRType.URL` where a type names one member.
 2.  Create the payload generator (construction, hydration, and parsing) in `src/packages/qr-payload/lib/generators/` and register it in `src/packages/qr-payload/lib/registry.ts`. Import generators from `@/packages/qr-payload`; there is no `utils` shim.
 3.  Create a new component file in this directory (e.g., `NewTypeInput.tsx`).
 4.  Register the component, its initial state, and helpers in `src/components/inputs/InputRegistry.ts`.
 5.  Add the new type to the `TypeSelector` options and its route to `QR_TYPE_ROUTES` in `src/data/navigation.ts` (with a matching page under `src/pages/`).
 6.  Add its display name to `QR_TYPE_LABELS` in `src/data/qrTypeLabels.ts`. Announcements ("WiFi input loaded"), the scan result sheet and the scan toast use these labels, never raw enum values. The map is typed `Record<QRType, string>`, so `tsc` fails until the new type has a label.
 
-Input data never leaves the browser. `src/types.ts` has no telemetry or reporting schema, and new input types must not add one (see [the QRCraftly Pledge](../../../docs/PLEDGE.md)).
+Input data never leaves the browser. Neither `src/types.ts` nor `src/packages/core/types.ts` has a telemetry or reporting schema, and new input types must not add one (see [the QRCraftly Pledge](../../../docs/PLEDGE.md)).
 
 ## Gradient Color Controls
 
-`src/types.ts` defines `GradientType` and `ColorStop` interfaces for linear and radial gradient fill settings on QR code modules. Gradient configuration (`gradientType`, `gradientColorStops`, `gradientAngle`) operates purely client-side without storing user payloads.
+`src/packages/core/types.ts` defines `GradientType` and `ColorStop` interfaces for linear and radial gradient fill settings on QR code modules. Gradient configuration (`gradientType`, `gradientColorStops`, `gradientAngle`) operates purely client-side without storing user payloads.
 
 ## Brand Design Templates
 
@@ -79,7 +79,7 @@ Input data never leaves the browser. `src/types.ts` has no telemetry or reportin
 
 ## QR Animation Configurations
 
-The centralized config structure in `src/types.ts` has optional fields for `animationValues`, `isAnimating`, and `animationFps` to drive high-performance frame playbacks in the canvas.
+The centralized config structure (`QRConfig` in `src/packages/core/types.ts`) has optional fields for `animationValues`, `isAnimating`, and `animationFps` to drive high-performance frame playbacks in the canvas.
 
 ## QR Scanner Integration
 
@@ -96,7 +96,7 @@ The standalone `/qr-code-scanner` page uses the same component with the camera o
 
 ## Playable Maze Overlay Configuration
 
-The centralized configuration in `src/types.ts` also contains parameters for generating a solvable maze overlay directly on the QR code:
+The centralized configuration in `src/packages/core/types.ts` also contains parameters for generating a solvable maze overlay directly on the QR code:
 
 - `isMazeEnabled`: Enables/disables maze overlay rendering.
 - `isMazeBridgesEnabled`: Enables scannability-audited bridge channels in maze generation.
@@ -113,7 +113,7 @@ These parameters are controlled via `AdvancedControls.tsx`.
 
 ## Independent Eye Frame and Ball Configuration
 
-`QRConfig` in `src/types.ts` includes optional `eyeFrameColor` and `eyeBallColor` properties for setting distinct outer finder frame and inner eyeball colors, falling back to `eyeColor` when omitted. Optional `eyeFrameShape` and `eyeBallShape` (`EyeShape`: square, rounded, circle or leaf) shape the frame and the eyeball apart from the module pattern; when omitted, the eyes follow `style` exactly as before. They are style fields, controlled by `EyeShapeControls.tsx`.
+`QRConfig` in `src/packages/core/types.ts` includes optional `eyeFrameColor` and `eyeBallColor` properties for setting distinct outer finder frame and inner eyeball colors, falling back to `eyeColor` when omitted. Optional `eyeFrameShape` and `eyeBallShape` (`EyeShape`: square, rounded, circle or leaf) shape the frame and the eyeball apart from the module pattern; when omitted, the eyes follow `style` exactly as before. They are style fields, controlled by `EyeShapeControls.tsx`.
 
 ## Template Export Configuration
 

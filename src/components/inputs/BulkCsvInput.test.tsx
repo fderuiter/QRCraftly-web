@@ -21,7 +21,8 @@ import { act, render, screen, fireEvent, waitFor, within } from '@testing-librar
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BulkCsvInput } from './BulkCsvInput';
 import { LazyBulkCsvInput } from './LazyBulkCsvInput';
-import { type BulkCsvData, SocialFormat } from '@/types';
+import { type BulkCsvData } from '@/types';
+import { SocialFormat } from '@/packages/core/types';
 import { QRProvider, useQRStore, type QRStore } from '@/context/QRContext';
 import { ToastProvider } from '../ui/Toast';
 import * as downloadManager from '@/utils/downloadManager';

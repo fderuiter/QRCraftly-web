@@ -18,7 +18,7 @@
 
 import { X509Certificate, createPublicKey, verify } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 import {
   buildApplePass,
   buildPassJson,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LOW_RELIABILITY_PATTERNS, PRESET_COLORS } from '../constants';
-import { QRStyle } from '../types';
+import { QRStyle } from '@/packages/core/types';
 import { styleScanTone, surpriseStyle, type StyleChoice } from './styleGallery';
 
 /** Small seeded generator (mulberry32) so the test is repeatable. */

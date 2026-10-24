@@ -17,7 +17,7 @@
 */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { QRConfig } from '@/types';
+import type { QRConfig } from '@/packages/core/types';
 import {
   assessScannability,
   createScannabilityEvaluator,

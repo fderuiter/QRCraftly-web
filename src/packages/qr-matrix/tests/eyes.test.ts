@@ -18,7 +18,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { renderEyes } from '../index';
-import { QRStyle } from '@/types';
+import { QRStyle } from '@/packages/core/types';
 
 describe('renderEyes', () => {
   const createMockCtx = () => {
