@@ -21,30 +21,8 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { sha256Hex } from '@/packages/core/encoding';
-import {
-  FLAG_OUTER_CODE,
-  FountainReassembler,
-  MANIFEST_INTERVAL,
-  MANIFEST_VERSION_FEC,
-  MAX_FEC_BLOCKS,
-  OUTER_CODE_UNAVAILABLE,
-  PrismReceiver,
-  TRANSFER_DENSITY_PROFILES,
-  createPrismBundleSession,
-  createPrismSession,
-  createPrng,
-  decodeFrame,
-  decodeManifest,
-  encodeDataFrame,
-  encodeManifest,
-  estimateTransferFrames,
-  loadFecModule,
-  neededSymbols,
-  parseKeyCode,
-  planBlocks,
-  type PrismManifest,
-  type PrismStream,
-} from '../index';
+import { FLAG_OUTER_CODE, FountainReassembler, MANIFEST_INTERVAL, MANIFEST_VERSION_FEC, MAX_FEC_BLOCKS, OUTER_CODE_UNAVAILABLE, PrismReceiver, createPrismBundleSession, createPrng, decodeFrame, decodeManifest, encodeDataFrame, encodeManifest, loadFecModule, parseKeyCode, planBlocks, type PrismManifest, type PrismStream } from '../protocol';
+import { TRANSFER_DENSITY_PROFILES, createPrismSession, estimateTransferFrames, neededSymbols } from '../index';
 
 let module: WebAssembly.Module;
 beforeAll(async () => {

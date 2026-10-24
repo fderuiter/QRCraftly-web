@@ -29,13 +29,11 @@ import fs from 'node:fs';
 import type { QrPoint } from '@/packages/qr-decode';
 import { qrReader } from '../fixtures/qrReader';
 import { qrEncoder as QRCode } from '../fixtures/qrEncoder';
+import { PrismReceiver, PrismStream } from '../../src/packages/optical-transfer/protocol';
 import {
-  PrismReceiver,
-  PrismStream,
   TILE_LAYOUTS,
   TILE_QUIET_MODULES,
   TileTracker,
-  createPrismSession,
   createSymbolDedup,
   layoutFootprint,
   tileFrameIndex,
@@ -43,7 +41,8 @@ import {
   type Rect,
   type TileLayout,
   type TileLayoutId,
-} from '../../src/packages/optical-transfer/index';
+} from '../../src/packages/optical-transfer/multicode';
+import { createPrismSession } from '../../src/packages/optical-transfer/index';
 import { createRandom } from './scannerCorpus';
 
 const LIGHT = 232;

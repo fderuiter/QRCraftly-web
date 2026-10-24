@@ -23,7 +23,7 @@
  * Everything here is seeded, so the overhead numbers (frames needed divided by K) are
  * identical between runs and machines. Only the decode times depend on the machine.
  */
-import { FecDecoder, FecEncoder, FountainDecoder, FountainEncoder } from '../../src/packages/optical-transfer/index';
+import { FecDecoder, FecEncoder, FountainDecoder, FountainEncoder } from '../../src/packages/optical-transfer/protocol';
 import { createRandom } from './scannerCorpus';
 
 /** How frames are lost between the sender's screen and the receiver's decoder. */

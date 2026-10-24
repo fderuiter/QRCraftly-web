@@ -22,7 +22,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import Page from './+Page';
 import { ToastProvider } from '@/components/ui/Toast';
-import { FountainReassembler, TRANSFER_DENSITY_PROFILES, createPrismSession } from '@/packages/optical-transfer';
+import { FountainReassembler } from '@/packages/optical-transfer/protocol';
+import { TRANSFER_DENSITY_PROFILES, createPrismSession } from '@/packages/optical-transfer';
 import { playChime, vibrate } from '@/utils/feedback';
 
 /** A Prism stream for a text file, as a sender would show it. */

@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { PreallocatedFramePool, shuffleInPlace } from '@/packages/optical-transfer';
+import { PreallocatedFramePool, shuffleInPlace } from '@/packages/optical-transfer/protocol';
 
 describe('PreallocatedFramePool', () => {
   it('pre-allocates contiguous memory and stores/retrieves frames accurately', () => {

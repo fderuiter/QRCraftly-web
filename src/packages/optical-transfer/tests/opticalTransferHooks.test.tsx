@@ -21,7 +21,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { useOpticalSender, useOpticalReceiver } from '../client';
-import { FountainReassembler, PrismStream, TRANSFER_DENSITY_PROFILES, createPrismSession, crc32 } from '../index';
+import { FountainReassembler, PrismStream, crc32 } from '../protocol';
+import { TRANSFER_DENSITY_PROFILES, createPrismSession } from '../index';
 import { receiverOptions, senderOptions } from './fixtures';
 
 

@@ -18,11 +18,7 @@
 
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import {
-  verifyHandshakeFrame,
-  HANDSHAKE_WATCHDOG_MS,
-  type HandshakeVerifierDeps,
-} from '../index';
+import { verifyHandshakeFrame, HANDSHAKE_WATCHDOG_MS, type HandshakeVerifierDeps } from '../protocol';
 
 /** A Scannability Worker stand-in the test answers by hand. */
 class FakeWorker {

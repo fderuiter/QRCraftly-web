@@ -17,7 +17,8 @@
 */
 
 import { describe, expect, it } from 'vitest';
-import { initialReceiverState, receiverReducer, type ReceiverEvent, type ReceiverMode, type ReceiverPhase, type ReceiverState } from '../index';
+import { initialReceiverState, receiverReducer, type ReceiverEvent, type ReceiverMode, type ReceiverState } from '../protocol';
+import { type ReceiverPhase } from '../index';
 
 const FILE_RESULT = { kind: 'file', handshake: null, data: new Uint8Array([1]) } as const;
 const FAILURE = { source: 'receiver', message: 'Broken' } as const;

@@ -21,7 +21,8 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useOpticalReceiver, type UseOpticalReceiverOptions } from '../client';
-import { PrismStream, TRANSFER_DENSITY_PROFILES, createPrismBundleSession, createPrismSession, crc32, type ReceiverPhase } from '../index';
+import { PrismStream, createPrismBundleSession, crc32 } from '../protocol';
+import { TRANSFER_DENSITY_PROFILES, createPrismSession, type ReceiverPhase } from '../index';
 import { receiverOptions } from './fixtures';
 import reference from './fixtures/bcur/reference-streams.json';
 

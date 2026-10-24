@@ -18,7 +18,7 @@
 
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { crc32 } from '@/packages/optical-transfer';
+import { crc32 } from '@/packages/optical-transfer/protocol';
 import { committedModuleBytes, loadCommittedModule, runDifferential, seededBytes } from './differential';
 import { SELFTEST_BATTERY_SHA256, runSelftestBattery } from './selftestBattery';
 

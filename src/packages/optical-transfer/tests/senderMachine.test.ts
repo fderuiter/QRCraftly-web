@@ -17,7 +17,8 @@
 */
 
 import { describe, expect, it } from 'vitest';
-import { INITIAL_SENDER_STATE, senderReducer, type SenderEvent, type SenderPhase, type SenderState } from '../index';
+import { INITIAL_SENDER_STATE, senderReducer, type SenderEvent, type SenderState } from '../protocol';
+import { type SenderPhase } from '../index';
 
 const EVENTS: Record<string, SenderEvent> = {
   select: { type: 'select' },

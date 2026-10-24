@@ -27,19 +27,10 @@
  * The back channel is a delay and a loss rate. None of it is a measurement of a camera, a screen or a
  * webcam; it tests the control logic, not the optics. Time is simulated, so the run is repeatable.
  */
-import {
-  PrismReceiver,
-  SPEED_LADDER,
-  createMultiRateSender,
-  createPrismSession,
-  createSpeedController,
-  decodeFrame,
-  encodeFeedbackFrame,
-  switchableProfile,
-  type FeedbackLayer,
-  type MultiRateProfileName,
-  type MultiRateSender,
-} from '../../src/packages/optical-transfer/index';
+import { PrismReceiver, decodeFrame, encodeFeedbackFrame, type FeedbackLayer } from '../../src/packages/optical-transfer/protocol';
+import { SPEED_LADDER, createSpeedController, switchableProfile } from '../../src/packages/optical-transfer/feedback';
+import { createMultiRateSender, type MultiRateProfileName, type MultiRateSender } from '../../src/packages/optical-transfer/multicode';
+import { createPrismSession } from '../../src/packages/optical-transfer/index';
 import { createRandom } from './scannerCorpus';
 
 /** A simulated receiver: the densest profile its camera can read. */

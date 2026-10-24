@@ -21,18 +21,8 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useOpticalReceiver } from '../client';
 import { sha256Hex } from '@/packages/core/encoding';
-import {
-  PrismStream,
-  TRANSFER_DENSITY_PROFILES,
-  KEY_SECRET_BYTES,
-  cborEncode,
-  createPrismSession,
-  createPrng,
-  deriveKeys,
-  encodeBytewordsMinimal,
-  keyQrText,
-  parseKeyCode,
-} from '../index';
+import { PrismStream, KEY_SECRET_BYTES, cborEncode, createPrng, deriveKeys, encodeBytewordsMinimal, keyQrText, parseKeyCode } from '../protocol';
+import { TRANSFER_DENSITY_PROFILES, createPrismSession } from '../index';
 import { receiverOptions } from './fixtures';
 
 const balanced = TRANSFER_DENSITY_PROFILES.balanced;

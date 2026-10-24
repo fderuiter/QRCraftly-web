@@ -17,7 +17,7 @@
 */
 
 import { describe, expect, it } from 'vitest';
-import { TILE_LAYOUTS, modulePxFor } from '../src/packages/optical-transfer/index';
+import { TILE_LAYOUTS, modulePxFor } from '../src/packages/optical-transfer/multicode';
 import { runTearScenario, runTileTransfer } from './utils/tileBench';
 
 const FRAME = { width: 1920, height: 1080 };

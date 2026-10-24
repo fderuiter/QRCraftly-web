@@ -38,7 +38,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { UR, UREncoder, URDecoder } from '@ngraveio/bc-ur';
 import { BcUrEncoder } from '../../src/packages/optical-transfer/bcur';
-import { cborEncode } from '../../src/packages/optical-transfer/index';
+import { cborEncode } from '../../src/packages/optical-transfer/protocol';
 
 // The package's deep modules are CommonJS with a `default` export.
 const requireReference = createRequire(import.meta.url);

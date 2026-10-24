@@ -35,30 +35,32 @@ import { qrEncoder as QRCode } from '../fixtures/qrEncoder';
 import {
   COLOUR_PROFILE,
   ColourReceiver,
-  MULTI_RATE_PROFILES,
-  PrismReceiver,
-  TILE_QUIET_MODULES,
-  TileTracker,
   composeBeacon,
   composeColourTile,
   createColourSender,
-  createMultiRateSender,
-  createPrismSession,
-  createSymbolDedup,
   loadCrossTalkKernels,
-  qrModuleCount,
   tileRectsFromBeacon,
   type ColourFallbackReason,
   type ColourState,
   type DecodedCode,
   type GreyPlane,
   type Matrix3,
-  type Rect,
   type Rgb,
   type RgbaImage,
+} from '../../src/packages/optical-transfer/colour';
+import {
+  MULTI_RATE_PROFILES,
+  TILE_QUIET_MODULES,
+  TileTracker,
+  createMultiRateSender,
+  createSymbolDedup,
+  qrModuleCount,
+  type Rect,
   type TileCrop,
   type TileLayout,
-} from '../../src/packages/optical-transfer/index';
+} from '../../src/packages/optical-transfer/multicode';
+import { PrismReceiver } from '../../src/packages/optical-transfer/protocol';
+import { createPrismSession } from '../../src/packages/optical-transfer/index';
 import type { QrPoint } from '../../src/packages/qr-decode';
 import { createRandom } from './scannerCorpus';
 import { boundingBox } from './tileBench';

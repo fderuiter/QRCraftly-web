@@ -19,19 +19,9 @@
 import { sha256Hex } from '@/packages/core/encoding';
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import type { QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
-import {
-  PrismStream,
-  createPrng,
-  crc32,
-  decodeFrame,
-  MAX_RECEIVE_BYTES,
-  FLAG_BEACON,
-  TILE_LAYOUTS,
-  loadFecModule,
-  TRANSFER_DENSITY_PROFILES,
-  type PrismManifest,
-  type TransferDensity,
-} from '../index';
+import { PrismStream, createPrng, crc32, decodeFrame, MAX_RECEIVE_BYTES, FLAG_BEACON, loadFecModule, type PrismManifest } from '../protocol';
+import { TILE_LAYOUTS } from '../multicode';
+import { TRANSFER_DENSITY_PROFILES, type TransferDensity } from '../index';
 
 type Handler = (event: { data: unknown }) => Promise<void> | void;
 type Posted = { type: string; [key: string]: unknown };

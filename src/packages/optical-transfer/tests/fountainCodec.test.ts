@@ -18,30 +18,8 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { sha256Hex } from '@/packages/core/encoding';
-import {
-  FountainEncoder,
-  FountainDecoder,
-  FountainRateTracker,
-  buildRobustSolitonCdf,
-  sampleDegreeFromCdf,
-  getNeighborsForSeq,
-  createPrng,
-  cborEncode,
-  cborDecode,
-  encodeBytewordsMinimal,
-  decodeBytewordsMinimal,
-  crc32,
-  crc32Hex,
-  solveGF2,
-  compressForTransfer,
-  decompressTransferPayload,
-  TRANSFER_DENSITY_PROFILES,
-  DEFAULT_TRANSFER_DENSITY,
-  resolveTransferDensity,
-  estimateTransferFrames,
-  MANIFEST_INTERVAL,
-  type FountainDroplet,
-} from '../index';
+import { FountainEncoder, FountainDecoder, FountainRateTracker, buildRobustSolitonCdf, sampleDegreeFromCdf, getNeighborsForSeq, createPrng, cborEncode, cborDecode, encodeBytewordsMinimal, decodeBytewordsMinimal, crc32, crc32Hex, solveGF2, compressForTransfer, decompressTransferPayload, DEFAULT_TRANSFER_DENSITY, resolveTransferDensity, MANIFEST_INTERVAL, type FountainDroplet } from '../protocol';
+import { TRANSFER_DENSITY_PROFILES, estimateTransferFrames } from '../index';
 
 /** Deterministic pseudo-random bytes (incompressible). */
 function randomBytes(length: number, seed = 1): Uint8Array {
