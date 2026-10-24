@@ -62,6 +62,11 @@ const STYLE_FIELDS: Partial<Record<keyof QRConfig, FieldRule>> = {
   mosaicMode: enumOf(['tiles', 'halftone'] satisfies MosaicMode[]),
   mosaicContrast: { kind: 'number', min: 0, max: 1 },
   quietZoneModules: { kind: 'number', min: 2, max: 10 },
+  animationFps: { kind: 'number', min: 1, max: 60 },
+  isLuminanceMaskingEnabled: { kind: 'boolean' },
+  fgColorDark: { kind: 'color' },
+  fgColorLight: { kind: 'color' },
+  luminanceThreshold: { kind: 'number', min: 0, max: 1 },
 };
 
 /**

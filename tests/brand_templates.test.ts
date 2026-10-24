@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import fs from 'node:fs';
+import path from 'node:path';
+import ts from 'typescript';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { PREBUILT_TEMPLATES } from '../src/data/brandTemplates';
@@ -16,7 +19,9 @@ import {
   addImportedTemplate,
   isTemplateStorageAvailable,
   TEMPLATE_STORAGE_ERROR,
+  CONTENT_FIELDS,
 } from '../src/utils/brandTemplateManager';
+import { isStyleField } from '../src/utils/styleFields';
 
 describe('Brand Template Gallery & Persistence System', () => {
   beforeEach(() => {
@@ -322,6 +327,53 @@ describe('Brand Template Gallery & Persistence System', () => {
       const result = addImportedTemplate(validation.template);
       expect(result.success).toBe(true);
       expect(getStoredTemplates().map(t => t.name)).toEqual(['Imported', 'Existing']);
+    });
+  });
+
+  describe('one classification for every config key (#1583)', () => {
+    /** The property names of QRConfig, read from its declaration so a new field cannot be missed. */
+    function qrConfigKeys(): string[] {
+      const file = path.resolve(__dirname, '../src/packages/core/types.ts');
+      const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest);
+      const keys: string[] = [];
+      source.forEachChild((node) => {
+        if (ts.isInterfaceDeclaration(node) && node.name.text === 'QRConfig') {
+          for (const member of node.members) if (member.name) keys.push(member.name.getText(source));
+        }
+      });
+      return keys;
+    }
+
+    it('puts each QRConfig key in exactly one of CONTENT_FIELDS and STYLE_FIELDS', () => {
+      const keys = qrConfigKeys();
+      expect(keys.length).toBeGreaterThan(50);
+      const misclassified = keys.filter((key) => CONTENT_FIELDS.has(key as keyof QRConfig) === isStyleField(key));
+      expect(misclassified, 'Fix: add the key to STYLE_FIELDS in src/utils/styleFields.ts (with its rule) or to CONTENT_FIELDS in src/utils/brandTemplateManager.ts').toEqual([]);
+    });
+
+    it('keeps the luminance masking and animation settings through save, export and import', () => {
+      const config: QRConfig = {
+        ...DEFAULT_CONFIG,
+        isLuminanceMaskingEnabled: true,
+        fgColorDark: '#112233',
+        fgColorLight: '#eeddcc',
+        luminanceThreshold: 0.4,
+        animationFps: 12,
+      };
+      const saved = saveCustomTemplate('Masked', undefined, config);
+      expect(saved.success).toBe(true);
+      const exported = JSON.parse(JSON.stringify({ version: '1.0', type: 'qrcraftly-brand-template', template: saved.template }));
+      const imported = validateTemplateJson(exported);
+      expect(imported.valid).toBe(true);
+      expect(imported.skipped).toBe(0);
+      expect(imported.template?.config).toMatchObject({
+        isLuminanceMaskingEnabled: true,
+        fgColorDark: '#112233',
+        fgColorLight: '#eeddcc',
+        luminanceThreshold: 0.4,
+        animationFps: 12,
+      });
+      expect(imported.template?.config).toEqual(saved.template?.config);
     });
   });
 });
