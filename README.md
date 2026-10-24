@@ -210,7 +210,8 @@ Core features live in deep modules under `src/packages/`. App code imports a pac
 
 CI also runs the unit tests with coverage, the end-to-end tests, the build with its post-build security scripts (bundle AST audit, CSP hashing), a reproducibility check of the committed WebAssembly, a dependency audit and Lighthouse. Size budgets, checked by `pnpm run check-bundle-size`:
 
-- The check fails if any page's first load (HTML, CSS and startup scripts, gzipped) exceeds 260 KB.
+- The check fails if any page's first load (HTML, CSS and startup scripts, gzipped) exceeds 260 KB, or 308 KB once the Rust modules the page fetches on open are added (the generator pages fetch the QR encoder and decoder).
+- It fails if React and react-dom are not in their own `vendor` chunk, which stays cached across app-only releases.
 - It fails if all shipped JavaScript and CSS together exceed 650 KB gzipped.
 - Each Rust module has its own gzipped budget, for example 32 KB for `qr-decode` and 10 KB for `prism-fec`.
 
