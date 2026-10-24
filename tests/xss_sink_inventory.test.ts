@@ -26,7 +26,7 @@ const INVENTORY: Record<string, string[]> = {
   ],
   'markup parser': [
     'src/hooks/useImageUpload.ts', // inert SVG document, then sanitizeSvg
-    'src/packages/qr-export/lib/vectorScene.ts', // our own SVG export, read for EPS and PDF
+    'src/packages/qr-export/lib/sceneReader.ts', // our own SVG export, read for EPS and PDF
     'src/packages/core/security.ts', // sanitizeSvg itself
   ],
   'object URL': [

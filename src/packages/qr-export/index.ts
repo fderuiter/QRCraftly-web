@@ -26,15 +26,8 @@ export {
 } from './lib/svgExport';
 export { generateQREps, convertSvgToEps } from './lib/epsExport';
 export { generateQRPdf, convertSvgToPdf } from './lib/pdfExport';
-export {
-  formatNum,
-  parseColor,
-  parseTransform,
-  readSvgScene,
-  shadingDictionary,
-  textWidth,
-  toLatin1Codes,
-} from './lib/vectorScene';
+export { parseColor, parseTransform, readSvgScene } from './scene';
+export { formatNum, shadingDictionary, textWidth, toLatin1Codes } from './lib/vectorScene';
 export {
   alphaToMask,
   decodeSceneImages,
