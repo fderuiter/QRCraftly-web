@@ -21,7 +21,7 @@
  * signatures need. Only definite lengths are read or written, as DER requires.
  */
 
-import { concatBytes } from '@/utils/bytes';
+import { concatBytes } from '@/packages/core/encoding';
 
 /** Universal tags used by certificates and CMS. */
 export const TAG = {

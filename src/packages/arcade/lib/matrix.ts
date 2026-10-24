@@ -16,14 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import type { EccLevel } from '@/packages/core/ecc';
 import { buildMatrix, isFinderPattern, type QrEncoder } from '@/packages/qr-matrix';
 import { QRErrorCorrectionLevel, QRType } from '@/types';
 
-/** Reed-Solomon error correction tier. */
-export type EccLevel = 'L' | 'M' | 'Q' | 'H';
-
-/** All error correction tiers, weakest first. */
-export const ECC_LEVELS: readonly EccLevel[] = ['L', 'M', 'Q', 'H'];
+export { ECC_LEVELS, type EccLevel } from '@/packages/core/ecc';
 
 /** Payload encoded when the requested payload cannot be encoded. */
 export const FALLBACK_PAYLOAD = 'https://qrcraftly.com';

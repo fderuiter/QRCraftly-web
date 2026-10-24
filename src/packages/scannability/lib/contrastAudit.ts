@@ -28,7 +28,7 @@ export interface ModuleContrastAuditResult {
   lowContrastCells: LowContrastCell[];
 }
 
-import { getLuminanceFromRgb } from '@/utils/colorUtils';
+import { getLuminanceFromRgb } from '@/packages/core/encoding';
 
 
 /**

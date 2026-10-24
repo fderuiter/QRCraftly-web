@@ -17,7 +17,7 @@ import {
   SocialFormat,
   TemplateStyle,
 } from '../types';
-import { normalizeHex } from './colorUtils';
+import { normalizeHex } from '@/packages/core/encoding';
 
 type FieldRule =
   | { kind: 'enum'; values: readonly string[] }

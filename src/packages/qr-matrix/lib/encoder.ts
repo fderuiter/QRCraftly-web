@@ -25,7 +25,8 @@
  * code does not wait on a fetch after typing begins. Tests and scripts that need
  * it synchronously can call {@link createQrEncoder} on an instance.
  */
-import { concatBytes } from '@/utils/bytes';
+import { ECC_LEVELS, type EccLevel } from '@/packages/core/ecc';
+import { concatBytes } from '@/packages/core/encoding';
 import { WASM_STATUS, WasmModuleError, compileWasmUrl, instantiateWasm, type WasmInstance } from '@/packages/wasm-runtime';
 import type { QRErrorCorrectionLevel, QRModules } from '@/types';
 
@@ -42,7 +43,7 @@ function moduleUrl(): URL {
   return here.startsWith('file:') ? new URL('../../../wasm/qr-encode.wasm', here) : QR_ENCODE_WASM_URL;
 }
 
-export type QrEccLetter = 'L' | 'M' | 'Q' | 'H';
+export type QrEccLetter = EccLevel;
 export type QrSegmentMode = 'numeric' | 'alphanumeric' | 'byte' | 'kanji';
 
 /** A segment supplied by the caller. Kanji data is big-endian Shift JIS byte pairs. */
@@ -106,7 +107,6 @@ export interface QrSymbolEncoder {
   create(value: string | readonly QrSegmentInput[], options?: QrEncodeOptions): QrSymbol;
 }
 
-const ECC_LETTERS: readonly QrEccLetter[] = ['L', 'M', 'Q', 'H'];
 const MODE_CODES: Record<QrSegmentMode, number> = { numeric: 1, alphanumeric: 2, byte: 4, kanji: 8 };
 const MODES_BY_CODE: Record<number, QrSegmentMode | 'eci'> = { 1: 'numeric', 2: 'alphanumeric', 4: 'byte', 8: 'kanji', 7: 'eci' };
 const AUTO_MASK = 8;
@@ -121,7 +121,7 @@ const textEncoder = new TextEncoder();
 
 function eccIndex(level: QrEncodeOptions['errorCorrectionLevel']): number {
   if (level === undefined) return 1;
-  const letters: readonly string[] = ECC_LETTERS;
+  const letters: readonly string[] = ECC_LEVELS;
   const index = letters.indexOf(level);
   if (index < 0) throw new QrEncodeError('invalid', `Unknown error correction level: ${String(level)}`);
   return index;
@@ -226,7 +226,7 @@ export function createQrEncoder(instance: WasmInstance): QrSymbolEncoder {
           return {
             modules: moduleGrid(size, modules),
             version: header.getUint8(0),
-            errorCorrectionLevel: ECC_LETTERS[header.getUint8(1)] ?? 'M',
+            errorCorrectionLevel: ECC_LEVELS[header.getUint8(1)] ?? 'M',
             maskPattern: header.getUint8(2),
             dataBits: header.getUint32(8, true),
             segments,

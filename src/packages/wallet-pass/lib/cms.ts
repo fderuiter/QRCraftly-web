@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { concatBytes } from '@/utils/bytes';
+import { concatBytes, sha256Digest } from '@/packages/core/encoding';
 import { algorithm, contextTag, integer, octetString, oid, sequence, setOf, time } from './der';
 import type { CertificateInfo } from './certificate';
 
@@ -45,16 +45,12 @@ export interface DetachedSignatureInput {
   signingTime: Date;
 }
 
-async function sha256(data: Uint8Array): Promise<Uint8Array> {
-  return new Uint8Array(await crypto.subtle.digest('SHA-256', data as BufferSource));
-}
-
 /** The signed attributes as a DER SET: what is actually signed (RFC 5652 section 5.4). */
 export async function signedAttributes(content: Uint8Array, signingTime: Date): Promise<Uint8Array> {
   return setOf(
     sequence(oid(CMS_OIDS.contentType), setOf(oid(CMS_OIDS.data))),
     sequence(oid(CMS_OIDS.signingTime), setOf(time(signingTime))),
-    sequence(oid(CMS_OIDS.messageDigest), setOf(octetString(await sha256(content))))
+    sequence(oid(CMS_OIDS.messageDigest), setOf(octetString(await sha256Digest(content))))
   );
 }
 

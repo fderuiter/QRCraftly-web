@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Tooltip } from './Tooltip';
-import { normalizeHex } from '../../utils/colorUtils';
+import { normalizeHex } from '@/packages/core/encoding';
 import { FieldWrapper } from './FieldWrapper';
 import { mergeClasses, ERROR_INPUT_CLASSES } from './styles';
 

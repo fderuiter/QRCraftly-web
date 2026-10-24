@@ -60,7 +60,6 @@ export const LEGACY_TYPE_ASSERTION_FILES = Object.freeze([
   "src/packages/qr-payload/lib/registry.ts",
   "src/packages/scannability/lib/sharedContract.ts",
   "src/packages/scannability/lib/worker.ts",
-  "src/packages/wallet-pass/lib/cms.ts",
   "src/packages/wallet-pass/lib/google.ts",
   "src/packages/wallet-pass/lib/pkpass.ts",
   "src/packages/wallet-pass/lib/signer.ts",

@@ -40,7 +40,7 @@ describe('Dependency Compliance Guardrail', () => {
     fs.writeFileSync(
       tempCleanFile,
       `
-      import { getContrastRatio } from '../src/utils/colorUtils';
+      import { getContrastRatio } from '../src/packages/core/encoding';
       export function generateColors() {
         return getContrastRatio('#000000', '#ffffff');
       }

@@ -22,7 +22,7 @@
  * writer only has to say how to draw a path, a text line or an image.
  */
 
-import { normalizeHex, rgbToCmyk, type CmykColor } from '@/utils/colorUtils';
+import { normalizeHex, rgbToCmyk, type CmykColor } from '@/packages/core/encoding';
 import { parseSvgPath, type PathCommandVisitor } from './pathParser';
 
 export type { CmykColor };

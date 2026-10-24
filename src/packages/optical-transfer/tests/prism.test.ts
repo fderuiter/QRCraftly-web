@@ -18,6 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
+import { sha256Hex } from '@/packages/core/encoding';
 import {
   FLAG_ENCRYPTED,
   FRAME_OVERHEAD,
@@ -44,7 +45,6 @@ import {
   prismFrameCapacity,
   prismSymbolSize,
   sessionIdOf,
-  sha256Hex,
   type PrismManifest,
   type TransferDensity,
 } from '../index';
