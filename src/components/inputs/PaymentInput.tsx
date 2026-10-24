@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { type PaymentData, CryptoNetwork } from "../../types";
+import { type PaymentData, CryptoNetwork } from "@/packages/qr-payload";
 import { TextField, SelectField } from "../ui/FormFields";
 import { isDangerousUrl } from "@/packages/core/security";
 import { FormBlock } from "../ui/FormBlock";

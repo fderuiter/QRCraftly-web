@@ -45,7 +45,7 @@ import {
 } from '@/packages/bulk-csv';
 import { BulkCsvPreflightSummary } from './BulkCsvPreflightSummary';
 import { BulkCsvRowPreview } from './BulkCsvRowPreview';
-import { type BulkCsvData } from '@/types';
+import type { BulkCsvData } from '@/packages/qr-payload';
 import { type QRConfig, QRType } from '@/packages/core/types';
 import { Alert } from '../ui/Alert';
 import { Button } from '../ui/Button';

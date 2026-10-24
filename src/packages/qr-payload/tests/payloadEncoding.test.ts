@@ -45,7 +45,7 @@ import {
   hydrateWifiData,
   parsePayload,
 } from '../index';
-import { CryptoNetwork, type EventData, type VCardData } from '@/types';
+import { CryptoNetwork, type EventData, type VCardData } from '../index';
 import { QRType, type WifiData, WifiEapMethod, WifiEapPhase2, WifiEncryption } from '@/packages/core/types';
 import { normalizeUrl, shouldNormalizeUrl } from '@/packages/core/url';
 

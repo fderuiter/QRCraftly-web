@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type QRGeneratorContract } from '@/types';
+import type { QRGeneratorContract } from '../types';
 import { type WifiData, WifiEncryption, WifiEapMethod, WifiEapPhase2, QRType } from '@/packages/core/types';
 import { identifyProtocol } from '../protocol';
 

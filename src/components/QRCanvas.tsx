@@ -27,7 +27,7 @@ import { loadMosaicSource } from '@/packages/qr-matrix/mosaic';
 import { buildMatrix, drawQR, QrEncodeError, type QrEncoder } from '@/packages/qr-matrix';
 import { getQrCanvasRuntime } from '../utils/qrCanvasRuntime';
 import { tooLongMessage, type PreviewFailure } from '../utils/previewFailure';
-import { getQrTypeLabel } from '../utils/a11y';
+import { getQrTypeLabel } from '@/packages/qr-payload';
 import { calculateCanvasDimensions } from './qr-canvas/canvasDimensions';
 import { crossfadeFrom } from './qr-canvas/crossfade';
 import { scheduleVirtualRender, type RenderedInfo, type ScheduledRender } from './qr-canvas/virtualRender';

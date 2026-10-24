@@ -21,7 +21,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { VCardInput } from './VCardInput';
-import type { VCardData } from '../../types';
+import type { VCardData } from '@/packages/qr-payload';
 
 const blankCard = (overrides: Partial<VCardData> = {}): VCardData => ({
   version: '3.0',

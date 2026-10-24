@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type QRGeneratorContract } from '@/types';
+import type { QRGeneratorContract } from './types';
 import { QRType } from '@/packages/core/types';
 import { isDangerousUrl } from '@/packages/core/security';
 import { identifyProtocol, CONTAINMENT_PROFILES } from './protocol';

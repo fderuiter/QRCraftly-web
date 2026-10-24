@@ -1,5 +1,5 @@
 import React from "react";
-import type { SmsData } from "../../types";
+import type { SmsData } from "@/packages/qr-payload";
 import { TextField, TextAreaField } from "../ui/FormFields";
 import { CONTAINER_SPACING_CLASSES } from "../ui/styles";
 import { FieldNotes, hintsId } from "./FieldHints";

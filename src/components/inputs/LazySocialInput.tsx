@@ -17,7 +17,7 @@
 */
 
 import React, { Suspense } from 'react';
-import type { SocialData } from '../../types';
+import type { SocialData } from '@/packages/qr-payload';
 import { Skeleton } from '../ui/Skeleton';
 import { CONTAINER_SPACING_CLASSES } from '../ui/styles';
 

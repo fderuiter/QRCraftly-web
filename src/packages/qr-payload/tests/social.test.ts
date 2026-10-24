@@ -18,7 +18,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { constructSocialString, hydrateSocialData, identifyProtocol } from '../index';
-import { SocialPlatform } from '@/types';
+import { SocialPlatform } from '../index';
 import { QRType } from '@/packages/core/types';
 
 describe('Social generator', () => {

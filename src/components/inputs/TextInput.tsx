@@ -1,5 +1,5 @@
 import React from "react";
-import { type TextData } from "../../types";
+import type { TextData } from "@/packages/qr-payload";
 import { QRType } from "@/packages/core/types";
 import { describeViolation } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";

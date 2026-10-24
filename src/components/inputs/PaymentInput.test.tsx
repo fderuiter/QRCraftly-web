@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
-import { CryptoNetwork, type PaymentData } from '../../types';
+import { CryptoNetwork, type PaymentData } from '@/packages/qr-payload';
 import { PaymentInput } from './PaymentInput';
 
 const renderPayment = (overrides: Partial<PaymentData>) => {

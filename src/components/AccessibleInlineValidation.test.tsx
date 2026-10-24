@@ -4,7 +4,7 @@ import { TextField } from './ui/TextField';
 import { WifiInput } from './inputs/WifiInput';
 import { VCardInput } from './inputs/VCardInput';
 import { PaymentInput } from './inputs/PaymentInput';
-import { CryptoNetwork } from '../types';
+import { CryptoNetwork } from '@/packages/qr-payload';
 import { WifiEncryption } from '@/packages/core/types';
 
 describe('Accessible Inline Validation and Accessible Fields', () => {

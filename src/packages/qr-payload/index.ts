@@ -82,3 +82,29 @@ export { checkCryptoAddress, type AddressCheck } from './lib/cryptoAddress';
 
 // IBAN validation (ISO 13616 mod-97)
 export { isValidIban } from './lib/iban';
+
+// Meeting invite URL parsing (Zoom, Teams, Google Meet)
+export { parseMeetingUrl } from './lib/meetingParsers';
+
+// Screen-reader labels and descriptions for QR types
+export { getQrTypeLabel, getQrTypeDescription } from './lib/labels';
+
+// Payload data types and the generator contract
+export {
+  CalendarProvider,
+  CryptoNetwork,
+  SocialPlatform,
+  type BulkCsvData,
+  type EmailData,
+  type EventData,
+  type LocationData,
+  type MeetingData,
+  type PaymentData,
+  type PhoneData,
+  type QRGeneratorContract,
+  type SmsData,
+  type SocialData,
+  type TextData,
+  type UrlData,
+  type VCardData,
+} from './lib/types';

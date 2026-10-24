@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { parseMeetingUrl } from './meetingParsers';
+import { parseMeetingUrl } from '../index';
 
 describe('meetingParsers', () => {
   describe('parseMeetingUrl', () => {

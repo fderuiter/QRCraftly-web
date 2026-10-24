@@ -1,5 +1,5 @@
 import React from "react";
-import type { PhoneData } from "../../types";
+import type { PhoneData } from "@/packages/qr-payload";
 import { TextField } from "../ui/FormFields";
 import { FieldNotes, hintsId } from "./FieldHints";
 import { droppedPhoneCharacters } from "@/packages/qr-payload";

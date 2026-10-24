@@ -20,7 +20,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { EmailInput } from './EmailInput';
-import type { EmailData } from '../../types';
+import type { EmailData } from '@/packages/qr-payload';
 import { hydrateEmailData } from '@/packages/qr-payload';
 
 describe('EmailInput', () => {

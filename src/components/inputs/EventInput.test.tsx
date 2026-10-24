@@ -20,7 +20,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { EventInput, toggleAllDay, webCalendarNotes } from './EventInput';
-import { CalendarProvider, type EventData } from '../../types';
+import { CalendarProvider, type EventData } from '@/packages/qr-payload';
 
 const event: EventData = {
   title: 'Launch',

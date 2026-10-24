@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type LocationData, type QRGeneratorContract } from '@/types';
+import type { LocationData, QRGeneratorContract } from '../types';
 import { QRType } from '@/packages/core/types';
 import { identifyProtocol, PLAIN_GEO_URI } from '../protocol';
 

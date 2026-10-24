@@ -17,7 +17,7 @@
 */
 
 import { useState, useRef, useEffect, type ElementType } from "react";
-import { type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, type EmailData, CryptoNetwork } from "../../types";
+import { type VCardData, type PaymentData, type UrlData, type MeetingData, type TextData, type EmailData, CryptoNetwork } from "@/packages/qr-payload";
 import { type QRConfig, QRType, type WifiData } from "@/packages/core/types";
 import { INPUT_REGISTRY, type InputDataMap } from "./InputRegistry";
 import { isDangerousUrl } from "@/packages/core/security";

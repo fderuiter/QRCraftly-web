@@ -18,7 +18,7 @@
 
 
 import { describe, it, expect } from 'vitest';
-import { CryptoNetwork, type PaymentData } from '@/types';
+import { CryptoNetwork, type PaymentData } from '../index';
 import { QRType } from '@/packages/core/types';
 import { constructPaymentString, hydratePaymentData, paymentAmountError, validatePayload } from '../index';
 
