@@ -197,6 +197,7 @@ describe('Social generator', () => {
       })
     ).toBe('https://instagram.com/user_name.test-123');
   });
+
   it('leaves an http profile link as a Website code so its scheme survives (#1481)', () => {
     expect(identifyProtocol('http://github.com/fderuiter')).not.toBe(QRType.SOCIAL);
     expect(identifyProtocol('https://github.com/fderuiter')).toBe(QRType.SOCIAL);

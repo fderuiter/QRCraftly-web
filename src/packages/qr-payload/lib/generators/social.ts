@@ -42,6 +42,9 @@ const SOCIAL_PLATFORM_URLS: Record<SocialPlatform, (handle: string) => string> =
  */
 export const constructSocialString = (data: SocialData): string => {
   if (!data) return '';
+  if (data.platform === SocialPlatform.YOUTUBE && /^https?:\/\//i.test(data.handle.trim())) {
+    return data.handle.trim();
+  }
   const cleanHandle = sanitizeSocialHandle(data.handle);
   if (!cleanHandle) return '';
 

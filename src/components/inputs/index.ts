@@ -9,6 +9,7 @@ export * from './PaymentInput';
 export * from './PhoneInput';
 export * from './SmsInput';
 export * from './SocialInput';
+export * from './LazySocialInput';
 export * from './TextInput';
 export * from './TypeSelector';
 export * from './UrlInput';

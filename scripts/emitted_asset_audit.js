@@ -62,6 +62,7 @@ export const REVIEWED_HOSTS = {
   'linkedin.com': 'Social profile payload links',
   'tiktok.com': 'Social profile payload links',
   'youtube.com': 'Social profile payload links',
+  'youtu.be': 'YouTube short link payload links',
   'paypal.me': 'Payment payload links',
   'venmo.com': 'Payment payload links',
   'cash.app': 'Payment payload links',
