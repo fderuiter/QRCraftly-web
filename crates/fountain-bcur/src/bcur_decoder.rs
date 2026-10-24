@@ -191,8 +191,10 @@ impl BcUrDecoder {
                 && part.checksum == self.checksum
                 && part.data.len() == self.fragment_length
         } else {
-            let expected_len = part.message_len.div_ceil(part.data.len());
-            part.seq_len == expected_len
+            // The sender splits the message into seq_len equal fragments of
+            // ceil(message_len / seq_len) bytes, so a first part fixes both numbers.
+            part.seq_len == part.message_len.div_ceil(part.data.len())
+                && part.data.len() == part.message_len.div_ceil(part.seq_len)
         }
     }
 
@@ -422,22 +424,11 @@ pub fn decode_ur_part(body: &str) -> Option<BcUrPart> {
         if items.len() != 5 {
             return None;
         }
-        let seq_num = match items[0] {
-            CborValue::Uint(u) => u as usize,
-            _ => return None,
-        };
-        let seq_len = match items[1] {
-            CborValue::Uint(u) => u as usize,
-            _ => return None,
-        };
-        let message_len = match items[2] {
-            CborValue::Uint(u) => u as usize,
-            _ => return None,
-        };
-        let checksum = match items[3] {
-            CborValue::Uint(u) => u as u32,
-            _ => return None,
-        };
+        // usize is 32 bits on wasm32: a value that does not fit is malformed, never truncated.
+        let seq_num = uint::<u32>(&items[0])? as usize;
+        let seq_len = uint::<usize>(&items[1])?;
+        let message_len = uint::<usize>(&items[2])?;
+        let checksum = uint::<u32>(&items[3])?;
         let data = match &items[4] {
             CborValue::Bytes(b) => b.clone(),
             _ => return None,
@@ -456,6 +447,14 @@ pub fn decode_ur_part(body: &str) -> Option<BcUrPart> {
         })
     } else {
         None
+    }
+}
+
+/// Reads a CBOR unsigned integer that fits `T`.
+fn uint<T: TryFrom<u64>>(value: &CborValue) -> Option<T> {
+    match value {
+        CborValue::Uint(u) => T::try_from(*u).ok(),
+        _ => None,
     }
 }
 

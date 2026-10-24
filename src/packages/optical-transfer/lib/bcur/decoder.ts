@@ -209,7 +209,12 @@ export class BcUrDecoder {
         part.data.length === this.fragmentLength
       );
     }
-    return part.seqLen === Math.ceil(part.messageLen / part.data.length);
+    // The sender splits the message into seqLen equal fragments of ceil(messageLen / seqLen)
+    // bytes, so a first part fixes both numbers (matches crates/fountain-bcur, #1611).
+    return (
+      part.seqLen === Math.ceil(part.messageLen / part.data.length) &&
+      part.data.length === Math.ceil(part.messageLen / part.seqLen)
+    );
   }
 
   /** True when a first part claims more fragments or a longer message than this receiver takes. */

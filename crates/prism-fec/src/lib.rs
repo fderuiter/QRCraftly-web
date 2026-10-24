@@ -30,7 +30,7 @@
 //!
 //! Exports, over the shared calling convention (`crates/core/src/abi.rs`). An
 //! instance holds one encoder or decoder at a time, because the module
-//! allocator only reclaims memory once everything is freed; the TypeScript
+//! allocator rewinds its whole heap only once everything is freed; the TypeScript
 //! wrapper in `src/packages/optical-transfer/lib/fec/` creates one instance per
 //! block.
 //!

@@ -153,7 +153,8 @@ mod last {
 
 /// Runs `f` on the CSV for `src`, converting only when the last conversion was of other bytes.
 /// `f` returns its result and whether to keep the CSV for a following call. Dropping it after
-/// the copy matters: the module's bump allocator reuses memory only once nothing is live.
+/// the copy matters: the module's allocator rewinds to its base once nothing is live, which
+/// keeps a large CSV from leaving its block behind for the next conversion.
 fn with_converted<R>(src: &[u8], f: impl FnOnce(&[u8]) -> (R, bool)) -> R {
     let hash = fnv1a(src);
     last::with(|slot| {

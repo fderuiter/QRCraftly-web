@@ -20,10 +20,11 @@
 //! a panic handler and the `alloc`/`free`/`abi_version` exports. A module gets
 //! all of them with one line, `qrcraftly_core::module_exports!();`.
 //!
-//! The allocator is a bump allocator that rewinds when every allocation has been
-//! freed. Calls into a module allocate, work and free, so memory is reused call
-//! after call without a free list. Linear memory only grows; it never shrinks.
+//! The allocator is [`Heap`]: size-class free lists over a bump pointer that
+//! rewinds when every allocation has been freed. A long-lived handle no longer
+//! pins the memory freed around it (#1611). Linear memory only grows; it never shrinks.
 
+use crate::heap::{Heap, Region};
 use core::alloc::{GlobalAlloc, Layout};
 use core::arch::wasm32;
 use core::cell::UnsafeCell;
@@ -35,70 +36,58 @@ extern "C" {
     static __heap_base: u8;
 }
 
-struct State {
-    next: usize,
-    live: usize,
+/// The module's linear memory above the stack and static data.
+struct LinearMemory;
+
+impl Region for LinearMemory {
+    fn base(&self) -> usize {
+        // Only the symbol's address is taken; it is never read.
+        core::ptr::addr_of!(__heap_base) as usize
+    }
+
+    fn reserve(&mut self, end: usize) -> bool {
+        let have = wasm32::memory_size(0) * PAGE;
+        end <= have || wasm32::memory_grow(0, (end - have).div_ceil(PAGE)) != usize::MAX
+    }
 }
 
 /// The module allocator. Use it through [`module_exports!`].
-pub struct BumpAllocator {
-    state: UnsafeCell<State>,
+pub struct ModuleAllocator {
+    heap: UnsafeCell<Heap>,
 }
 
 // WebAssembly modules here are single threaded: no shared memory, no atomics.
-unsafe impl Sync for BumpAllocator {}
+unsafe impl Sync for ModuleAllocator {}
 
-impl BumpAllocator {
+impl ModuleAllocator {
     pub const fn new() -> Self {
         Self {
-            state: UnsafeCell::new(State { next: 0, live: 0 }),
+            heap: UnsafeCell::new(Heap::new()),
         }
     }
 }
 
-impl Default for BumpAllocator {
+impl Default for ModuleAllocator {
     fn default() -> Self {
         Self::new()
     }
 }
 
-fn heap_base() -> usize {
-    // Only the symbol's address is taken; it is never read.
-    core::ptr::addr_of!(__heap_base) as usize
-}
-
-unsafe impl GlobalAlloc for BumpAllocator {
+unsafe impl GlobalAlloc for ModuleAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        // SAFETY: single threaded, and no reference to the state outlives this call.
-        let state = unsafe { &mut *self.state.get() };
-        if state.next == 0 || state.live == 0 {
-            state.next = heap_base();
-        }
-        let align = layout.align();
-        let start = match state.next.checked_add(align - 1) {
-            Some(v) => v & !(align - 1),
-            None => return core::ptr::null_mut(),
-        };
-        let end = match start.checked_add(layout.size()) {
-            Some(v) => v,
-            None => return core::ptr::null_mut(),
-        };
-        let have = wasm32::memory_size(0) * PAGE;
-        if end > have {
-            let pages = (end - have).div_ceil(PAGE);
-            if wasm32::memory_grow(0, pages) == usize::MAX {
-                return core::ptr::null_mut();
-            }
-        }
-        state.next = end;
-        state.live += 1;
-        start as *mut u8
+        // SAFETY: single threaded, no reference to the heap outlives this call, and
+        // linear memory above `__heap_base` belongs to this allocator alone.
+        unsafe { (*self.heap.get()).alloc(layout, &mut LinearMemory) }
     }
 
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
-        // SAFETY: as in `alloc`.
-        let state = unsafe { &mut *self.state.get() };
-        state.live = state.live.saturating_sub(1);
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        // SAFETY: as in `alloc`; the caller passes back a block from it.
+        unsafe { (*self.heap.get()).dealloc(ptr, layout) }
+    }
+
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        // SAFETY: as in `dealloc`; GlobalAlloc's contract bounds `new_size`.
+        unsafe { (*self.heap.get()).realloc(ptr, layout, new_size, &mut LinearMemory) }
     }
 }
 
@@ -108,7 +97,7 @@ unsafe impl GlobalAlloc for BumpAllocator {
 macro_rules! module_exports {
     () => {
         #[global_allocator]
-        static ALLOCATOR: $crate::wasm::BumpAllocator = $crate::wasm::BumpAllocator::new();
+        static ALLOCATOR: $crate::wasm::ModuleAllocator = $crate::wasm::ModuleAllocator::new();
 
         /// A panic traps; the loader reports it as a typed error.
         #[panic_handler]
