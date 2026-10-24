@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import stagedRules from '../scripts/hooks/staged.config.js';
+import { LINT_GROUPS, report, runLintGroups } from '../scripts/lint.js';
 
 const root = process.cwd();
 const read = (relative: string) => fs.readFileSync(path.join(root, relative), 'utf8');
@@ -82,7 +83,7 @@ describe('documentation checks wiring', () => {
   });
 
   it('runs docs:lint from lint, and builds the docs manifest in Vite instead of committing it', () => {
-    expect(pkg.scripts.lint).toContain('pnpm run docs:lint');
+    expect(LINT_GROUPS.flat().map((command) => command.join(' '))).toContain('pnpm run docs:lint');
     for (const script of Object.values(pkg.scripts)) {
       expect(script).not.toContain('compile_docs_manifest.js');
     }
@@ -311,5 +312,59 @@ describe('visual baseline refresh (#1426)', () => {
     const push = withToken[0];
     expect(push).toContain('git -c "http.https://github.com/.extraheader=');
     expect(push).not.toMatch(/git config[^\n]*extraheader/);
+  });
+});
+
+describe('lint runs its checks in parallel groups (#1616)', () => {
+  const workflow = read('.github/workflows/main.yml');
+  // The serial `&&` chain `pnpm run lint` ran before #1616, step for step.
+  const SERIAL_CHAIN = [
+    'node scripts/dependency_compliance.js',
+    'node scripts/rust_no_deps_check.js',
+    'node scripts/git_lineage_auditor.js',
+    'node scripts/storage_privacy_ast_auditor.js',
+    'node scripts/path_invariance_auditor.js',
+    'node scripts/static-path-tracker.js',
+    'pnpm run docs:lint',
+    'tsc --noEmit',
+    'pnpm run lint:boundaries',
+    'eslint . --max-warnings 0',
+    'knip',
+    'knip --production --include files',
+    'node scripts/contrast_check.js',
+    'node scripts/design_token_audit.js',
+    'prettier --check .',
+    'node scripts/check-duplication.js',
+  ];
+
+  it('is the only lint entry point', () => {
+    expect(pkg.scripts.lint).toBe('node scripts/lint.js');
+    expect(pkg.scripts['audit:paths']).toBeUndefined();
+    expect(pkg.scripts['format:check']).toBeUndefined();
+  });
+
+  it('runs exactly the commands of the old chain, each once', () => {
+    const commands = LINT_GROUPS.flat().map((command) => command.join(' '));
+    expect([...commands].sort()).toEqual([...SERIAL_CHAIN].sort());
+  });
+
+  it('runs every command after a failure and names each failed one', async () => {
+    const groups = [[['a']], [['b'], ['c', '--x']], [['d']]];
+    const ran: string[] = [];
+    const results = await runLintGroups(groups, async (file, args) => {
+      ran.push(file);
+      return { status: file === 'b' || file === 'd' ? 1 : 0, output: `${file} said hi\n` };
+    });
+    expect([...ran].sort()).toEqual(['a', 'b', 'c', 'd']);
+    expect(results.map((r) => r.command)).toEqual(['a', 'b', 'c --x', 'd']);
+    const lines: string[] = [];
+    expect(report(results, (line) => lines.push(line))).toEqual(['b', 'd']);
+    expect(lines.join('\n')).toContain('$ c --x\nc said hi');
+    expect(lines.at(-1)).toBe('\n❌ 2 lint step(s) failed: b; d');
+  });
+
+  it('calls test:semgrep from CI instead of repeating its command', () => {
+    expect(workflow).not.toContain('semgrep --test');
+    expect(workflow).toContain('pnpm run test:semgrep');
   });
 });

@@ -120,7 +120,7 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
         run: node scripts/ci/changed_files.js
 
-      - name: Run Sequential Static Validation
+      - name: Run Static Validation
         run: pnpm run lint
 
       - name: Run ShellCheck Static Analysis
@@ -149,7 +149,7 @@ jobs:
           SEMGREP_APP_TOKEN: "" # Local run only
 
       - name: Test Semgrep rules
-        run: semgrep --test --config semgrep.yml tests/semgrep/semgrep.tsx --metrics=off --disable-version-check
+        run: pnpm run test:semgrep
 
   # JOB 3: Unit Tests, split into shards that run in parallel. Each shard writes a
   # Vitest blob report with its coverage; `Unit Tests` merges them and checks the
