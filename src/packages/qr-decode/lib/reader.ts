@@ -25,20 +25,11 @@
  * call {@link createQrReader} on an instance.
  */
 import { ECC_LEVELS, type EccLevel } from '@/packages/core/ecc';
-import { WASM_STATUS, WasmModuleError, compileWasmUrl, instantiateWasm, type WasmInstance } from '@/packages/wasm-runtime';
+import { WASM_STATUS, WasmModuleError, compileWasmUrl, instantiateWasm, type WasmInstance, wasmModuleUrl } from '@/packages/wasm-runtime';
 import { decodeSegments, type QrReadSegment } from './text';
 
 /** The module's URL in a build: Vite emits the file as an asset next to the bundle. */
 const QR_DECODE_WASM_URL = new URL('../../../wasm/qr-decode.wasm', import.meta.url);
-
-/**
- * Where to load the module from. Run from source under Node (tests, scripts), this
- * file has a `file:` URL and the module is read from `src/wasm/` beside it.
- */
-function moduleUrl(): URL {
-  const here = import.meta.url;
-  return here.startsWith('file:') ? new URL('../../../wasm/qr-decode.wasm', here) : QR_DECODE_WASM_URL;
-}
 
 export type QrReadLevel = EccLevel;
 
@@ -279,7 +270,7 @@ let loading: Promise<QrReader> | null = null;
  */
 export function loadQrReader(): Promise<QrReader> {
   if (!loading) {
-    loading = compileWasmUrl(moduleUrl())
+    loading = compileWasmUrl(wasmModuleUrl(QR_DECODE_WASM_URL, 'qr-decode.wasm'))
       .then(instantiateWasm)
       .then(createQrReader)
       .catch((error: unknown) => {

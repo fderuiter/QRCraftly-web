@@ -63,12 +63,12 @@ let keyQr: string | null = null;
 // Start loading the encoder with the worker; a failed load is retried by the next START.
 loadQrEncoder().catch(() => undefined);
 
-/** The outer code's module, loaded on the first transfer that asks for it; null if it cannot load. */
-let fecModule: Promise<WebAssembly.Module | null> | null = null;
-
+/**
+ * The outer code's module, loaded on the first transfer that asks for it; null if it cannot load.
+ * wasm-runtime caches the compile and forgets a failure, so a later transfer retries.
+ */
 function outerCodeModule(): Promise<WebAssembly.Module | null> {
-  fecModule ??= loadFecModule().catch(() => null);
-  return fecModule;
+  return loadFecModule().catch(() => null);
 }
 
 // Keyed by the Blob/File instance so a cached hash can never be reused for different content.

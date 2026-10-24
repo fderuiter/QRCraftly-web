@@ -16,65 +16,35 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { compileWasmUrl, instantiateWasmSync, WasmInstance } from '@/packages/wasm-runtime';
+import { compileWasmFileSync, compileWasmUrl, instantiateWasmSync, WasmInstance, wasmModuleUrl } from '@/packages/wasm-runtime';
 import type { GF2Equation, GF2Solution } from './gf2';
 import type { DropletMetadata } from './contracts';
 import type { BcUrIngest, BcUrResult, BcUrContent } from '../bcur/decoder';
 import { cborDecode } from './cbor';
 
 const FOUNTAIN_BCUR_WASM_URL = new URL('../../../../wasm/fountain-bcur.wasm', import.meta.url);
+const MODULE_URL = wasmModuleUrl(FOUNTAIN_BCUR_WASM_URL, 'fountain-bcur.wasm');
 
-function moduleUrl(): URL {
-  const here = import.meta.url;
-  return here.startsWith('file:') ? new URL('../../../../wasm/fountain-bcur.wasm', here) : FOUNTAIN_BCUR_WASM_URL;
-}
-
+/**
+ * The compiled module, once loaded: the one handle the fountain and bc-ur decoders read
+ * synchronously. Compiles go through wasm-runtime's per-URL cache, so there is no second promise.
+ */
 let cachedModule: WebAssembly.Module | null = null;
-let loadingPromise: Promise<WebAssembly.Module> | null = null;
 
-function isRecord(val: unknown): val is Record<string, unknown> {
-  return typeof val === 'object' && val !== null;
-}
-
-function readNodeFileSync(url: URL): Uint8Array | null {
-  const proc = globalThis.process;
-  if (!isRecord(proc) || typeof proc.getBuiltinModule !== 'function') return null;
-  try {
-    const fs = proc.getBuiltinModule('node:fs');
-    if (!isRecord(fs) || typeof fs.readFileSync !== 'function') return null;
-    const bytes = fs.readFileSync(url);
-    if (!ArrayBuffer.isView(bytes)) return null;
-    return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  } catch {
-    return null;
-  }
-}
-
-/** Synchronously returns the compiled WebAssembly module under Node/Vitest if available. */
+/** Synchronously returns the compiled module: once loaded, or straight from disk under Node/Vitest. */
 export function getFountainBcurModuleSync(): WebAssembly.Module | null {
-  if (cachedModule) return cachedModule;
-  if (import.meta.url.startsWith('file:')) {
-    const bytes = readNodeFileSync(moduleUrl());
-    if (bytes) {
-      try {
-        cachedModule = new WebAssembly.Module(bytes);
-        return cachedModule;
-      } catch {
-        // Fall back to async compileWasmUrl
-      }
-    }
-  }
-  return null;
+  cachedModule ??= compileWasmFileSync(MODULE_URL);
+  return cachedModule;
 }
 
 /** Compiles the fountain-bcur WebAssembly module once. */
 export function loadFountainBcurModule(): Promise<WebAssembly.Module> {
   const sync = getFountainBcurModuleSync();
   if (sync) return Promise.resolve(sync);
-  return (loadingPromise ??= compileWasmUrl(moduleUrl()).then((m) => {
+  return compileWasmUrl(MODULE_URL).then((m) => {
     cachedModule = m;
     return m;
-  }));
+  });
 }
 
 /** Solves a GF(2) equation system using the compiled WebAssembly kernel. */

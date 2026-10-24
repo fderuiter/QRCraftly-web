@@ -27,8 +27,9 @@
  *
  * Compile once per URL (cached), then instantiate inside the worker that uses
  * the module. A compiled `WebAssembly.Module` can also be posted to a worker.
- * Under Node (tests, scripts, pre-rendering) a `file:` URL is read from disk, so
- * `new URL('…/x.wasm', import.meta.url)` works in both places.
+ * Under Node (tests, scripts, pre-rendering) a `file:` URL is read from disk, and
+ * {@link wasmModuleUrl} is the one place that picks between the built asset and
+ * the file in `src/wasm/` (#1598).
  */
 
 /** The shared calling convention, matching `crates/core/src/abi.rs`. */
@@ -122,6 +123,40 @@ function nodeFileUrl(url: string | URL): URL | null {
   if (typeof url === 'string' && !url.startsWith('file:')) return null;
   const parsed = new URL(url);
   return parsed.protocol === 'file:' ? parsed : null;
+}
+
+/**
+ * Where to load a module from: the one place that tells a build from source (#1598).
+ *
+ * The caller writes `new URL('<relative path>/<file>.wasm', import.meta.url)` itself, so Vite sees
+ * the literal and emits the module as an asset, and passes it as `built`. Run from source under
+ * Node (tests, scripts), this file has a `file:` URL and the module is read from `src/wasm/`
+ * instead, because Vitest and Vite's dev server point `built` at their own origin.
+ * @param built - The caller's `new URL(…, import.meta.url)` for the module.
+ * @param fileName - The module's file name in `src/wasm/`, for example `qr-encode.wasm`.
+ * @returns The URL to compile.
+ */
+export function wasmModuleUrl(built: URL, fileName: string): URL {
+  const here = import.meta.url;
+  return here.startsWith('file:') ? new URL(`../../wasm/${fileName}`, here) : built;
+}
+
+/**
+ * Compiles a module synchronously when it can be read from disk (Node, tests), for code that
+ * must have the module before it can return. Browsers get null and load with
+ * {@link compileWasmUrl}.
+ * @param url - The module's URL, from {@link wasmModuleUrl}.
+ * @returns The compiled module, or null when it is not a readable `file:` URL.
+ */
+export function compileWasmFileSync(url: URL): WebAssembly.Module | null {
+  const file = nodeFileUrl(url);
+  const readFile = file ? nodeReadFile() : null;
+  if (!file || !readFile) return null;
+  try {
+    return new WebAssembly.Module(readFile(file));
+  } catch {
+    return null;
+  }
 }
 
 async function fetchAndCompile(url: URL, fetchImpl: typeof fetch | undefined): Promise<WebAssembly.Module> {
