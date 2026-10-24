@@ -102,6 +102,8 @@ export default tseslint.config(
       "react/display-name": "off",
       "react/no-unescaped-entities": "off",
       "react/no-danger": "error",
+      // A focusable canvas game board is a keyboard application, not a picture (#1593).
+      "jsx-a11y/no-interactive-element-to-noninteractive-role": ["error", { tr: ["none", "presentation"], canvas: ["img", "application"] }],
 
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/ban-ts-comment": "off",

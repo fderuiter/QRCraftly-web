@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Play, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -145,6 +145,8 @@ export function SimulatorMode({ target, encoder, settings, announce }: ModeProps
   }, [damage]);
 
   const weapon = SIMULATOR_WEAPONS.find((w) => w.id === weaponId) ?? SIMULATOR_WEAPONS[0];
+  const weaponName = weapon.name;
+  const instructionsId = useId();
   const analysis = useMemo(() => analyzeDamage(damage, matrix.size, matrix.ecc), [damage, matrix]);
 
   const capture = useScanFrameCapture((ctx) =>
@@ -208,6 +210,7 @@ export function SimulatorMode({ target, encoder, settings, announce }: ModeProps
       const start = performance.now();
       let next: ReadonlySet<number> = damageRef.current;
       const cell = BOARD / matrix.size;
+      const before = next.size;
       for (const strike of strikes) {
         next = applyBlast(next, matrix.size, strike.row, strike.col, strike.radius);
         if (!reducedMotion) {
@@ -219,8 +222,14 @@ export function SimulatorMode({ target, encoder, settings, announce }: ModeProps
       setLatency(Number(((performance.now() - start) / Math.max(1, strikes.length)).toFixed(2)));
       if (!reducedMotion) animateRings();
       requestScan();
+      // A single strike says what it hit; a barrage announces itself (#1593).
+      if (strikes.length === 1) {
+        const [{ row, col }] = strikes;
+        const hit = next.size - before;
+        announce(`${weaponName} strike at row ${row + 1}, column ${col + 1}: ${hit === 0 ? 'no new modules hit' : `${hit} module${hit === 1 ? '' : 's'} destroyed`}.`);
+      }
     },
-    [matrix.size, reducedMotion, animateRings, requestScan]
+    [matrix.size, reducedMotion, animateRings, requestScan, announce, weaponName]
   );
 
   const strikeAt = (event: { clientX: number; clientY: number }) => {
@@ -303,8 +312,10 @@ export function SimulatorMode({ target, encoder, settings, announce }: ModeProps
               width={BOARD}
               height={BOARD}
               tabIndex={0}
-              role="img"
-              aria-label={`Damage simulator board, ${matrix.size} by ${matrix.size} modules. Click or drag to strike with the ${weapon.name}; with the keyboard, move with the arrow keys and strike with Enter or Space.`}
+              // It takes focus and keys, so it is an application, not a picture (#1593).
+              role="application"
+              aria-label={`Damage simulator board, ${matrix.size} by ${matrix.size} modules`}
+              aria-describedby={instructionsId}
               className="block aspect-square w-full cursor-crosshair rounded-lg focus-visible:ring-2 focus-visible:ring-focus focus-visible:outline-none"
               style={{ touchAction: 'none' }}
               data-testid="arcade-simulator-canvas"
@@ -328,6 +339,9 @@ export function SimulatorMode({ target, encoder, settings, announce }: ModeProps
               onKeyDown={handleKeyDown}
               onBlur={() => setCursor(null)}
             />
+            <p id={instructionsId} className="sr-only">
+              Click or drag to strike with the {weapon.name}; with the keyboard, move with the arrow keys and strike with Enter or Space.
+            </p>
           </div>
         }
         quickBar={
