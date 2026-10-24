@@ -22,7 +22,7 @@ describe('Reduced motion guards (WCAG 2.3.3)', () => {
   });
 
   it('gates the receiver compilation-status spinner behind motion-safe:', () => {
-    const lines = read('src/pages/file-transfer/receive/+Page.tsx').split(/\r?\n/);
+    const lines = read('src/components/transfer/receive/ReceiveTelemetry.tsx').split(/\r?\n/);
     const start = lines.findIndex(line => line.includes('data-testid="compilation-status"'));
     expect(start).toBeGreaterThan(-1);
     const block = lines.slice(start, start + 2);

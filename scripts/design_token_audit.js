@@ -34,7 +34,7 @@ export const LEGACY_PALETTE_FILES = new Set([
   // Draws over the live camera picture, which is never themed.
   'src/components/QRScanner.tsx',
   // Camera viewport and its dark drop zone, like QRScanner, stay fixed-dark.
-  'src/pages/file-transfer/receive/+Page.tsx',
+  'src/components/transfer/receive/ReceiveViewport.tsx',
 ]);
 
 /**
