@@ -78,7 +78,8 @@ function FileTransferReceiveInner() {
     handshake,
     compilationStatus,
     fountainStats,
-    receiverSuccess,
+    phase,
+    result,
     receiverMode,
     setReceiverMode,
     videoFile,
@@ -97,7 +98,8 @@ function FileTransferReceiveInner() {
     autoDownload: false,
   });
 
-  const isComplete = fountainStats !== null && receiverSuccess;
+  // A wallet-style stream has its own completion view, picked by `bcur` below.
+  const isComplete = phase === 'complete' && result?.kind !== 'bcur';
   // Clearing only makes sense once something has been received or loaded.
   const hasProgress = fountainStats !== null || manifest !== null || videoFile !== null || isComplete;
   // The name comes from whoever is showing the stream: show the sanitised form.

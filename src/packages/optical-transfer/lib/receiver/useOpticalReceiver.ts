@@ -18,7 +18,7 @@
 
 
 import { hexToBytes, sha256Hex } from '@/packages/core/encoding';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from 'react';
 import { useQrScanner, type CameraInfo, type ScanCorners } from '@/packages/optical-scanner/client';
 import type { BcUrDecoder, BcUrResult } from '../../bcur';
 import type { HandshakeInfo } from '../contracts';
@@ -36,6 +36,8 @@ import { analyseReceivedFile } from '@/packages/core/files';
 import { detachVideoSource, playQuietly, spawnReassemblyWorker, spawnTileWorker } from './media';
 import { validateReceivedFile } from './videoFile';
 import { fountainStatsFrom } from '../progress';
+import { describeCameraError } from '../camera';
+import { initialReceiverState, receiverReducer, type ReceivedBundleFile, type ReceiverFailure } from './machine';
 import { createTileReader, type TileReader } from './tileReader';
 
 type ReceiverToast = {
@@ -53,15 +55,6 @@ export interface UseOpticalReceiverOptions {
   addToast?: (toast: ReceiverToast) => void;
   autoDownload?: boolean;
   initialMode?: 'camera' | 'file';
-}
-
-/** One file of a finished bundle, held in memory until the person saves it. */
-export interface ReceivedBundleFile {
-  name: string;
-  mimeType: string;
-  size: number;
-  sha256: string;
-  data: Uint8Array;
 }
 
 /** One finished file as the worker posts it. */
@@ -123,6 +116,8 @@ export function useOpticalReceiver({
   initialMode = 'camera',
 }: UseOpticalReceiverOptions) {
   const [receiverMode, setReceiverModeState] = useState<'camera' | 'file'>(initialMode);
+  /** Where the receive stands, as one value (#1513). The flags below stay as they were for now. */
+  const [receiverState, dispatch] = useReducer(receiverReducer, initialMode, initialReceiverState);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoObjectUrl, setVideoObjectUrl] = useState<string | null>(null);
   const [fileValidationError, setFileValidationError] = useState<string | null>(null);
@@ -278,6 +273,7 @@ export function useOpticalReceiver({
   /** Records a failed reassembly or verification and tells the user. */
   const failReassembly = useCallback((err: unknown) => {
     const errMsg = (err instanceof Error && err.message) || 'Verification or reassembly failed.';
+    dispatch({ type: 'fail', error: { source: 'receiver', message: errMsg } });
     setReceiverError(errMsg);
     setReceiverSuccess(false);
     setReassembledData(null);
@@ -287,6 +283,7 @@ export function useOpticalReceiver({
 
   /** Clears state after a worker-side failure. */
   const resetAfterWorkerError = useCallback((message: string) => {
+    dispatch({ type: 'fail', error: { source: 'receiver', message } });
     setReceiverError(message);
     setReceiverSuccess(false);
     setReassembledData(null);
@@ -313,7 +310,9 @@ export function useOpticalReceiver({
     if (files) {
       // Several files: each was verified against its own hash in the worker. They are saved one by
       // one or as an archive, never automatically.
-      setBundle(files.map(({ buffer: data, handshake: hs }) => ({ name: hs.fileName, mimeType: hs.mimeType, size: hs.fileSize, sha256: hs.sha256, data: new Uint8Array(data) })));
+      const received = files.map(({ buffer: data, handshake: hs }) => ({ name: hs.fileName, mimeType: hs.mimeType, size: hs.fileSize, sha256: hs.sha256, data: new Uint8Array(data) }));
+      setBundle(received);
+      dispatch({ type: 'complete', result: { kind: 'bundle', files: received } });
       setFountainStats(fountainStatsFrom);
       setIsScanning(false);
       stopStream();
@@ -328,6 +327,7 @@ export function useOpticalReceiver({
       setIsScanning(false);
       stopStream();
     }
+    dispatch({ type: 'verify' });
     try {
       setCompilationStatus('Finalizing download...');
       const reassembled = new Uint8Array(buffer ?? new ArrayBuffer(0));
@@ -341,6 +341,7 @@ export function useOpticalReceiver({
       // Clear was pressed while the file was checked: the receiver is already waiting for the next one.
       if (run !== workerRunRef.current) return;
 
+      dispatch({ type: 'complete', result: { kind: 'file', handshake: activeHandshake, data: reassembled } });
       setReceiverSuccess(true);
       setReceiverError(null);
       // Risky types (executables, scripts, active documents) are never saved without the person
@@ -376,10 +377,12 @@ export function useOpticalReceiver({
           setReceiverError(null);
           setManifest(message.manifest);
           setNeedsKey(Boolean(message.needsKey));
+          dispatch({ type: 'manifest', needsKey: Boolean(message.needsKey) });
           // A transfer that still waits for its key has not been opened by any earlier code (#1303).
           if (message.needsKey) setKeyAccepted(null);
         } else if (type === 'KEY_STATUS') {
           setKeyAccepted(Boolean(message.accepted));
+          dispatch({ type: 'keyStatus', accepted: Boolean(message.accepted) });
         } else if (type === 'SWITCH_OFFER' && message.offer) {
           setSwitchOffer(message.offer);
         } else if (type === 'PROGRESS') {
@@ -389,6 +392,7 @@ export function useOpticalReceiver({
             lastProgressRef.current = performance.now();
           }
           // A fresh decode (after a failed one) clears the old error.
+          dispatch({ type: 'progress' });
           setReceiverError(null);
           setFountainStats(
             rateTrackerRef.current.telemetry(
@@ -447,6 +451,7 @@ export function useOpticalReceiver({
 
   const setReceiverMode = useCallback((mode: 'camera' | 'file') => {
     setReceiverModeState(mode);
+    dispatch({ type: 'chooseMode', mode });
     setFileValidationError(null);
     if (mode === 'camera') {
       revokeVideoUrl();
@@ -465,6 +470,7 @@ export function useOpticalReceiver({
       revokeVideoUrl();
       setVideoFile(null);
       setFileValidationError(errorMsg);
+      dispatch({ type: 'fail', error: { source: 'file', message: errorMsg } });
       addToast?.({ type: 'error', message: errorMsg, duration: 5000 });
       return false;
     }
@@ -477,6 +483,7 @@ export function useOpticalReceiver({
     setVideoFile(file);
     setVideoObjectUrl(url);
     setIsScanning(true);
+    dispatch({ type: 'loadVideo' });
 
     addToast?.({ type: 'info', message: `Video file loaded: ${file.name}`, duration: 3000 });
 
@@ -485,6 +492,7 @@ export function useOpticalReceiver({
 
   const handleClear = useCallback(() => {
     terminateWorker();
+    dispatch({ type: 'clear' });
     layerWindowRef.current = [];
     feedbackMeterRef.current.reset();
     lastProgressRef.current = null;
@@ -550,16 +558,19 @@ export function useOpticalReceiver({
         } else if (outcome.status === 'rejected' && outcome.reason === 'too-large') {
           if (reportedBcurTooLargeRef.current) return;
           reportedBcurTooLargeRef.current = true;
+          dispatch({ type: 'fail', error: { source: 'receiver', message: BCUR_TOO_LARGE } });
           setReceiverError(BCUR_TOO_LARGE);
         } else if (outcome.status === 'complete') {
           // Stop any Prism decode an earlier frame started, and drop its error.
           terminateWorker();
           setReceiverError(null);
           setBcur(outcome.result);
+          dispatch({ type: 'complete', result: { kind: 'bcur', result: outcome.result } });
           setBcurProgress(null);
           setIsScanning(false);
           stopStream();
         } else if (outcome.status === 'failed') {
+          dispatch({ type: 'fail', error: { source: 'receiver', message: outcome.reason } });
           setReceiverError(outcome.reason);
         }
       });
@@ -624,10 +635,14 @@ export function useOpticalReceiver({
       setIsScanning(false);
     }
   }, [cameraStatus]);
+  useEffect(() => {
+    if (cameraError) dispatch({ type: 'fail', error: { source: 'camera', message: describeCameraError(cameraError) } });
+  }, [cameraError]);
 
   const startCameraSession = useCallback(async () => {
     initWorker();
     setIsScanning(true);
+    dispatch({ type: 'startCamera' });
     const video = videoRef.current;
     if (video?.hasAttribute('src')) video.removeAttribute('src');
     await startCamera(multiCode ? { frameRate: MULTI_CODE_FRAME_RATE } : undefined);
@@ -710,6 +725,7 @@ export function useOpticalReceiver({
 
   const stopCameraSession = useCallback(() => {
     setIsScanning(false);
+    dispatch({ type: 'stop' });
     stopStream();
     flushVideoHardware();
     addToast?.({ type: 'info', message: 'Camera scanner deactivated.', duration: 3000 });
@@ -725,7 +741,17 @@ export function useOpticalReceiver({
     };
   }, [stopAdaptiveScanning, stopStream, terminateWorker, flushVideoHardware, revokeVideoUrl]);
 
+  const { phase } = receiverState;
+  const result = receiverState.phase === 'complete' ? receiverState.result : null;
+  const failure: ReceiverFailure | null = receiverState.phase === 'failed' ? receiverState.error : null;
+
   return {
+    /** Where the receive stands (#1513). */
+    phase,
+    /** What a finished receive holds, while `phase` is 'complete'. */
+    result,
+    /** Why the receive failed and which part failed, while `phase` is 'failed'. */
+    failure,
     handshake,
     manifest,
     needsKey,
