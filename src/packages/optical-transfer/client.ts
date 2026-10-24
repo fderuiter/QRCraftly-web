@@ -23,14 +23,20 @@
  * file saving) are injected by the caller; the package never imports the app layers.
  */
 
+export { useOpticalSender } from './lib/sender/useOpticalSender';
+// The sender's parts (#1511), composed by `useOpticalSender`. Exported so each can be tested on its own.
+export { useSenderRefs, type SenderRefs } from './lib/sender/senderRefs';
+export { useFrameLoop } from './lib/sender/useFrameLoop';
+export { useSliceWorker, type SliceWorkerEvents } from './lib/sender/useSliceWorker';
+export { useSteering, type SteeringOptions } from './lib/sender/useSteering';
+export { useSenderSettings, planStream, PROFILE_FOR_DENSITY, type StreamPlan } from './lib/sender/useSenderSettings';
 export {
-  useOpticalSender,
   type UseOpticalSenderOptions,
   type SenderFountainInfo,
   type SenderTileInfo,
   type TransferFrame,
   type TransferFrameRenderer,
-} from './lib/sender/useOpticalSender';
+} from './lib/sender/senderTypes';
 
 export {
   useOpticalReceiver,
