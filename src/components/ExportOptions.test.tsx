@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { axe } from '../../tests/utils/axe';
 import { QRType } from '@/packages/core/types';
 import { ExportOptions, clampSize, printHint, type DownloadFormat } from './ExportOptions';
-import { suggestFilename } from './QRTool';
+import { suggestFilename } from '@/hooks/useExportFlow';
 
 function renderOptions(format: DownloadFormat = 'png', size = 2048) {
   const handlers = { onFormatChange: vi.fn(), onSizeChange: vi.fn(), onFilenameChange: vi.fn(), onCopySvg: vi.fn(), onWallet: vi.fn() };
