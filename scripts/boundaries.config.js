@@ -62,19 +62,11 @@ const PACKAGE_TESTS = new RegExp(`^${PACKAGES_ROOT}/([^/]+)/tests/`);
 /** App layers that packages must never import (see packages-must-not-import-app-layers). */
 const APP_LAYERS = /^src\/(context|hooks|components|pages)\/|^src\/registry\.tsx?$/;
 
-/** App-root modules that packages are moving off (see packages-must-not-import-app-root, ADR 0052). */
+/** App-root modules that packages never import (see packages-must-not-import-app-root, ADR 0052). */
 const APP_ROOT = /^src\/(types|constants|utils)\/|^src\/(types|constants)\.tsx?$/;
 
 /** The shared leaf package (ADR 0052). */
 const CORE = `${PACKAGES_ROOT}/core/`;
-
-/**
- * Package files that still import app-root code (`src/types`, `src/constants`, `src/utils`) (ADR 0052).
- * The list only shrinks: move a file's imports into `core` or its own package, then take it off.
- * New files never join it, and a test fails when a listed file no longer imports app-root code.
- */
-export const LEGACY_APP_ROOT_IMPORTERS = new Set([
-]);
 
 /**
  * The package a file belongs to, or null outside the packages root.
@@ -151,10 +143,9 @@ export const rules = [
   {
     name: 'packages-must-not-import-app-root',
     comment:
-      'Packages do not import the app root (src/types, src/constants, src/utils). Code that two or more packages share lives in src/packages/core; the rest belongs to its own package (ADR 0052). Files on LEGACY_APP_ROOT_IMPORTERS are the only exceptions, and that list only shrinks.',
-    fix: 'import the type or helper from `@/packages/core/<entry>`, or move it into this package; never add the file to LEGACY_APP_ROOT_IMPORTERS.',
-    forbids: (edge) =>
-      packageOf(edge.from) !== null && APP_ROOT.test(edge.to) && !LEGACY_APP_ROOT_IMPORTERS.has(edge.from),
+      'Packages do not import the app root (src/types, src/constants, src/utils). Code that two or more packages share lives in src/packages/core; the rest belongs to its own package (ADR 0052).',
+    fix: 'import the type or helper from `@/packages/core/<entry>`, or move it into this package.',
+    forbids: (edge) => packageOf(edge.from) !== null && APP_ROOT.test(edge.to),
   },
   {
     name: 'core-is-a-leaf',

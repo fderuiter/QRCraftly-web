@@ -40,4 +40,5 @@ status: accepted
 - Packages can be tested and audited alone. The security sanitizers sit behind one entry point, and Knip can find dead shared types.
 - Open PRs that touch package imports will conflict with the move slices, so each slice is small and covers one area.
 - The boundary checker gains two rules and an allowlist. The allowlist has to be maintained until it is empty.
+- **Done (#1529):** the migration is complete. Every package file is off the app root, the allowlist and its shrink-only test are deleted, and `packages-must-not-import-app-root` has no exceptions. `src/types.ts` keeps only `BrandTemplate` and `BrandTemplateExportPayload`.
 - **To revisit:** whether `core/security` should absorb `link-safety`'s URL checks. Decide after the move, not before.
