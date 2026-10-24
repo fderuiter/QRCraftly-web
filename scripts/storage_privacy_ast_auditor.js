@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
+import { walkFiles } from './utils/sourceFiles.js';
 
 const require = createRequire(import.meta.url);
 // typescript ships as CJS without an `exports` field; use createRequire so the
@@ -244,25 +245,11 @@ export function runStorageAudit() {
   if (process.argv.length > 2) {
     filesToScan = process.argv.slice(2).map(f => path.resolve(f));
   } else {
-    const walk = (dir) => {
-      let results = [];
-      const list = fs.readdirSync(dir);
-      list.forEach(file => {
-        const fullPath = path.join(dir, file);
-        const stat = fs.statSync(fullPath);
-        const relPath = path.relative(repoRoot, fullPath).replace(/\\/g, '/');
-        if (EXCLUDE_DIRS.some(d => relPath.split('/').includes(d))) return;
-        if (stat && stat.isDirectory()) {
-          results = results.concat(walk(fullPath));
-        } else {
-          results.push(fullPath);
-        }
-      });
-      return results;
-    };
-
+    const srcDir = path.join(repoRoot, 'src');
     try {
-      filesToScan = walk(path.join(repoRoot, 'src'));
+      // walkFiles reports a missing root as empty; a missing src/ must still fail the scan.
+      if (!fs.existsSync(srcDir)) throw new Error(`ENOENT: no such file or directory, scandir '${srcDir}'`);
+      filesToScan = walkFiles(srcDir, { excludeDirs: EXCLUDE_DIRS });
     } catch (err) {
       console.error('❌ [Pre-Build Storage Privacy AST Auditor] Error scanning directory:', err.message);
       process.exit(1);

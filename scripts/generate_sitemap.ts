@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { loadEnv } from 'vite';
+import { walkFiles } from './utils/sourceFiles.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,20 +34,8 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const DIST_DIR = process.env.SITEMAP_DIST_DIR ? path.resolve(process.env.SITEMAP_DIST_DIR) : path.resolve(__dirname, '../dist/client');
 
 
-function findHtmlFiles(dir: string, fileList: string[] = []): string[] {
-  if (!fs.existsSync(dir)) return fileList;
-  
-  const files = fs.readdirSync(dir);
-  for (const file of files) {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-    if (stat.isDirectory()) {
-      findHtmlFiles(filePath, fileList);
-    } else if (filePath.endsWith('.html')) {
-      fileList.push(filePath);
-    }
-  }
-  return fileList;
+function findHtmlFiles(dir: string): string[] {
+  return walkFiles(dir, { exts: ['.html'] });
 }
 
 /** Path segments that never belong in the sitemap. */

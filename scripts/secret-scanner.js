@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { execBinary } from './utils/execHelper.js';
+import { walkFiles } from './utils/sourceFiles.js';
 import { fileURLToPath } from 'url';
 
 // Excluded files or directories
@@ -429,25 +430,10 @@ function main() {
     } catch {
       // Fallback: search directory recursively if not in a git repo
       console.warn('⚠️  Could not run git ls-files. Falling back to simple file scan.');
-      function walk(dir) {
-        let results = [];
-        const list = fs.readdirSync(dir);
-        list.forEach(file => {
-          const fullPath = path.join(dir, file);
-          const stat = fs.statSync(fullPath);
-          const relPath = path.relative(process.cwd(), fullPath);
-          const segments = relPath.replace(/\\/g, '/').split('/');
-          if (EXCLUDE_DIRS.some(d => segments.includes(d))) return;
-          if (stat && stat.isDirectory()) {
-            results = results.concat(walk(fullPath));
-          } else {
-            results.push(relPath);
-          }
-        });
-        return results;
-      }
       try {
-        filesToScan = walk(process.cwd());
+        filesToScan = walkFiles(process.cwd(), { excludeDirs: EXCLUDE_DIRS })
+          .map(fullPath => path.relative(process.cwd(), fullPath))
+          .filter(relPath => !EXCLUDE_DIRS.some(d => relPath.replace(/\\/g, '/').split('/').includes(d)));
       } catch (walkErr) {
         console.error('Error walking directory:', walkErr);
         process.exit(1);

@@ -35,6 +35,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AWS_REGEX, GCP_REGEX, GITHUB_REGEX, STRIPE_REGEX } from './secret-scanner.js';
+import { walkFiles } from './utils/sourceFiles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_CLIENT_DIR = path.join(__dirname, '..', 'dist', 'client');
@@ -216,18 +217,6 @@ export function auditSecrets(text, file) {
   return SECRET_PATTERNS.filter(([, pattern]) => pattern.test(text)).map(([name]) => ({ file, rule: 'secret', detail: name }));
 }
 
-/**
- * Lists every file under a directory.
- * @param {string} dir - Directory.
- * @returns {string[]} Absolute paths.
- */
-function listFiles(dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(dir, entry.name);
-    return entry.isDirectory() ? listFiles(full) : [full];
-  });
-}
-
 const TEXT_EXTENSIONS = new Set(['.html', '.js', '.mjs', '.css', '.json', '.txt', '.xml', '.webmanifest', '.svg', '.map']);
 
 /**
@@ -237,7 +226,7 @@ const TEXT_EXTENSIONS = new Set(['.html', '.js', '.mjs', '.css', '.json', '.txt'
  */
 export function auditClientDir(clientDir) {
   const violations = [];
-  for (const full of listFiles(clientDir)) {
+  for (const full of walkFiles(clientDir, { excludeDirs: [] })) {
     const file = path.relative(clientDir, full).split(path.sep).join('/');
     const extension = path.extname(full).toLowerCase();
     const textual = TEXT_EXTENSIONS.has(extension) || ['_headers', '_redirects'].includes(path.basename(full));

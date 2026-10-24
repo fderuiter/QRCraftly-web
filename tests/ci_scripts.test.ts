@@ -56,6 +56,7 @@ describe('CI Modular Shell Scripts Validation', () => {
   });
 
   it('should halt immediately with non-zero exit code on simulated intermediate piped failures', () => {
+    // path-invariance: allow -- the piped-failure fixture needs a POSIX shell
     if (process.platform === 'win32') {
       // Windows cmd does not support bash pipefail semantics natively
       return;

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
+import { walkFiles } from './utils/sourceFiles.js';
 
 const require = createRequire(import.meta.url);
 // typescript ships as CJS; use createRequire so pnpm hoisting works.
@@ -85,24 +86,11 @@ function main() {
     filesToScan = process.argv.slice(2).map(f => path.resolve(f));
   } else {
     // Walk through src directory recursively
-    const walk = (dir) => {
-      let results = [];
-      const list = fs.readdirSync(dir);
-      list.forEach(file => {
-        const fullPath = path.join(dir, file);
-        const stat = fs.statSync(fullPath);
-        const relPath = path.relative(process.cwd(), fullPath);
-        if (EXCLUDE_DIRS.some(d => relPath.split(path.sep).includes(d))) return;
-        if (stat && stat.isDirectory()) {
-          results = results.concat(walk(fullPath));
-        } else {
-          results.push(fullPath);
-        }
-      });
-      return results;
-    };
+    const srcDir = path.join(process.cwd(), 'src');
     try {
-      filesToScan = walk(path.join(process.cwd(), 'src'));
+      // walkFiles reports a missing root as empty; a missing src/ must still fail the scan.
+      if (!fs.existsSync(srcDir)) throw new Error(`ENOENT: no such file or directory, scandir '${srcDir}'`);
+      filesToScan = walkFiles(srcDir, { excludeDirs: EXCLUDE_DIRS });
     } catch (err) {
       console.error('Error walking src directory:', err);
       process.exit(1);

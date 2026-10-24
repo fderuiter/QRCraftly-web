@@ -19,6 +19,15 @@ const TEST_FILES = [
 ];
 
 // Node-side tooling: build/audit scripts and root config files.
+/**
+ * Files that still use raw palette colours (#1366), for `qrcraftly/design-tokens`. The list only
+ * shrinks: move a file to tokens, then take it off. New files never join it.
+ */
+export const LEGACY_PALETTE_FILES = [
+  // Camera viewport and its dark drop zone stay fixed-dark.
+  "src/components/transfer/receive/ReceiveViewport.tsx"
+];
+
 const NODE_FILES = ["scripts/**/*.{js,ts,cjs}", "*.config.{js,ts}"];
 
 // JSDoc rules that catch real documentation bugs. The stylistic "require-*" rules are deliberately
@@ -220,6 +229,16 @@ export default tseslint.config(
     plugins: { qrcraftly },
     rules: {
       "qrcraftly/tailwind-classes": "error"
+    }
+  },
+  {
+    // Semantic design tokens only (#1045, #1617): no raw palette colours, no arbitrary colour or
+    // size values. The legacy list only shrinks: move a file to tokens, then take it off.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/**/*.test.{ts,tsx}"],
+    plugins: { qrcraftly },
+    rules: {
+      "qrcraftly/design-tokens": ["error", { legacyFiles: LEGACY_PALETTE_FILES }]
     }
   }
 );

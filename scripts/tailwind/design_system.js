@@ -20,6 +20,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execBinary } from '../utils/execHelper.js';
+import { walkFiles } from '../utils/sourceFiles.js';
 
 /** Bump when the snapshot layout changes. */
 const SCHEMA_VERSION = 1;
@@ -343,28 +344,17 @@ async function loadDesignSystem(cssFile) {
 export function seedStrings(cwd, dirs) {
   const lists = [];
   const literal = /"((?:[^"\\\r\n]|\\.)*)"|'((?:[^'\\\r\n]|\\.)*)'|`((?:[^`\\]|\\.)*)`/g;
-  const visit = (dir) => {
-    let entries;
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (!SEED_SKIP_DIRS.has(entry.name)) visit(full);
-      } else if (SEED_EXTENSIONS.has(path.extname(entry.name))) {
-        const text = fs.readFileSync(full, 'utf8');
-        for (const match of text.matchAll(literal)) {
-          const body = (match[1] ?? match[2] ?? match[3] ?? '').replace(/\$\{[^}]*\}/g, ' ');
-          const tokens = body.split(/\s+/).filter((t) => t.length > 0 && t.length <= 120);
-          if (tokens.length > 0) lists.push(tokens);
-        }
+  for (const dir of dirs) {
+    const files = walkFiles(path.resolve(cwd, dir), { exts: [...SEED_EXTENSIONS], excludeDirs: [...SEED_SKIP_DIRS] });
+    for (const full of files) {
+      const text = fs.readFileSync(full, 'utf8');
+      for (const match of text.matchAll(literal)) {
+        const body = (match[1] ?? match[2] ?? match[3] ?? '').replace(/\$\{[^}]*\}/g, ' ');
+        const tokens = body.split(/\s+/).filter((t) => t.length > 0 && t.length <= 120);
+        if (tokens.length > 0) lists.push(tokens);
       }
     }
-  };
-  for (const dir of dirs) visit(path.resolve(cwd, dir));
+  }
   return lists;
 }
 

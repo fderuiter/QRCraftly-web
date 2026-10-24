@@ -12,9 +12,13 @@
  *
  * `no-type-assertions` is `@typescript-eslint/consistent-type-assertions` with a message that says
  * how to fix the error and where the legacy list lives (#1607).
+ *
+ * `design-tokens` rejects raw palette colours and arbitrary colour or size values in the same
+ * class strings (#1045, #1617); it replaces `scripts/design_token_audit.js`.
  */
 import tseslint from 'typescript-eslint';
 import { findUnsafeRegex } from './regexAnalysis.js';
+import designTokens from './design-tokens.js';
 import tailwindClasses from './tailwind-classes.js';
 
 /** The only modules allowed to import `child_process`. */
@@ -205,5 +209,6 @@ export default {
     'exec-through-helper': execThroughHelper,
     'tailwind-classes': tailwindClasses,
     'no-type-assertions': noTypeAssertions,
+    'design-tokens': designTokens,
   },
 };

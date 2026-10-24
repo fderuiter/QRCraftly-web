@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { walkFiles } from './utils/sourceFiles.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,24 +23,12 @@ const DIST_CLIENT_DIR = path.join(__dirname, '../dist/client');
 export const BASE_CSP_PATTERN = "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';";
 
 /**
- * Recursively search for HTML files in a directory.
+ * Search a directory recursively for HTML files.
  * @param {string} dir - Directory path to search.
  * @returns {string[]} List of HTML file paths.
  */
 export function getHtmlFiles(dir) {
-  let results = [];
-  if (!fs.existsSync(dir)) return results;
-  const list = fs.readdirSync(dir);
-  for (const file of list) {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-    if (stat && stat.isDirectory()) {
-      results = results.concat(getHtmlFiles(filePath));
-    } else if (file.endsWith('.html')) {
-      results.push(filePath);
-    }
-  }
-  return results;
+  return walkFiles(dir, { exts: ['.html'], excludeDirs: [] });
 }
 
 /**

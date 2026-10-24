@@ -21,7 +21,7 @@ Import types with `import type` or an inline `type` modifier (`import { type QRC
 
 These low-level, primitive UI elements are designed to be extremely customizable, fully accessible, and unified in appearance.
 
-They style themselves only with the semantic design tokens from `src/layouts/index.css` (`bg-surface`, `text-fg-muted`, `border-line`, `bg-action`, `ring-focus` ...), which switch with the theme, so they carry no raw palette classes and no `dark:` colour variants. The token table is in [`STYLE_GUIDE.md`](STYLE_GUIDE.md#2-design-tokens); `scripts/design_token_audit.js` enforces it.
+They style themselves only with the semantic design tokens from `src/layouts/index.css` (`bg-surface`, `text-fg-muted`, `border-line`, `bg-action`, `ring-focus` ...), which switch with the theme, so they carry no raw palette classes and no `dark:` colour variants. The token table is in [`STYLE_GUIDE.md`](STYLE_GUIDE.md#2-design-tokens); the `qrcraftly/design-tokens` ESLint rule enforces it.
 
 Their class lists, `mergeClasses(...)` arguments included, are kept in Tailwind's official order by the `qrcraftly/tailwind-classes` ESLint rule; `pnpm run format:classes` fixes the order ([ADR 0046](../adr/0046-own-tailwind-class-rule.md)).
 
