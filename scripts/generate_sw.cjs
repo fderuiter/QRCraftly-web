@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('node:crypto');
 
-const DIST_DIR = path.join(__dirname, '../dist/client');
+// SW_DIST_DIR points the script at another build, which the tests use for fixtures.
+const DIST_DIR = process.env.SW_DIST_DIR ? path.resolve(process.env.SW_DIST_DIR) : path.join(__dirname, '../dist/client');
 const OUTPUT_FILE = path.join(DIST_DIR, 'sw.js');
 
 function getFilesRecursively(dir) {
@@ -393,6 +394,23 @@ function computeBuildHash(precacheManifest, readRuleFile) {
   return hash.digest('hex').substring(0, 12);
 }
 
+/**
+ * Finds built assets the precache lists more than once with the same content, which a first
+ * visit would download twice (one WebAssembly module emitted under two URLs, #1595). Install
+ * files outside `/assets/` keep fixed URLs and may share content on purpose (the favicon is the
+ * small app icon).
+ * @param {{ url: string, revision: string }[]} manifest Precache entries; the revision is a content hash.
+ * @returns {string[][]} Each group of URLs that share content, empty when every asset is unique.
+ */
+function findDuplicateContent(manifest) {
+  const byRevision = new Map();
+  for (const { url, revision } of manifest) {
+    if (!url.startsWith('/assets/')) continue;
+    byRevision.set(revision, [...(byRevision.get(revision) ?? []), url]);
+  }
+  return [...byRevision.values()].filter((urls) => urls.length > 1);
+}
+
 function generateSW() {
   if (!fs.existsSync(DIST_DIR)) {
     console.error('dist/client directory does not exist. Run build first.');
@@ -420,6 +438,13 @@ function generateSW() {
     });
   });
 
+  const duplicates = findDuplicateContent(precacheManifest);
+  if (duplicates.length > 0) {
+    for (const urls of duplicates) console.error(`The precache lists the same file under ${urls.length} URLs: ${urls.join(', ')}`);
+    console.error('Load each asset through one URL (see vite.config.ts worker.rollupOptions).');
+    process.exit(1);
+  }
+
   // The build hash covers the shell files and the host's rules for them, so a deploy that only
   // changes headers (a CSP or Permissions-Policy fix) or redirects still ships a new worker and
   // replaces the cached homepage (#1261). This runs last in postbuild, after every step that
@@ -438,4 +463,4 @@ if (require.main === module) {
   generateSW();
 }
 
-module.exports = { buildSwContent, toPrecacheUrl, readRedirectSources, isRuntimeCached, selectShell, readAssetReferences, readWorkerReferences, computeBuildHash };
+module.exports = { buildSwContent, toPrecacheUrl, readRedirectSources, isRuntimeCached, selectShell, readAssetReferences, readWorkerReferences, computeBuildHash, findDuplicateContent };

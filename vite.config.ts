@@ -131,6 +131,13 @@ export default defineConfig(({ command }) => {
       worker: {
         // Packages bundled into workers ship too, so they are listed on the acknowledgements page.
         plugins: () => [licenses.workerPlugin()],
+        // The same name pattern as the page build's assets (Vike's), so a WebAssembly module that
+        // a worker and the page both load is one file at one URL, not two copies (#1595).
+        rollupOptions: {
+          output: {
+            assetFileNames: 'assets/static/[name].[hash][extname]',
+          },
+        },
       },
       build: {
         target: "es2022",

@@ -3,6 +3,7 @@ import { createRequire } from 'module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFile } from './utils/execHelper';
 
 const require = createRequire(import.meta.url);
 const {
@@ -14,6 +15,7 @@ const {
   readAssetReferences,
   readWorkerReferences,
   computeBuildHash,
+  findDuplicateContent,
 } = require('../scripts/generate_sw.cjs') as {
   buildSwContent: (manifest: Array<{ url: string; revision: string }>, hash: string) => string;
   toPrecacheUrl: (relativePath: string) => string;
@@ -23,6 +25,7 @@ const {
   readAssetReferences: (relativePath: string, source: string) => string[];
   readWorkerReferences: (relativePath: string, source: string) => string[];
   computeBuildHash: (manifest: Array<{ url: string; revision: string }>, readRuleFile: (name: string) => string) => string;
+  findDuplicateContent: (manifest: Array<{ url: string; revision: string }>) => string[][];
 };
 
 type Listener = (event: FakeEvent) => void;
@@ -522,5 +525,68 @@ describe('service worker precache manifest', () => {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+  describe('one URL per built file (#1595)', () => {
+    it('groups built assets that share content, and leaves install files alone', () => {
+      expect(
+        findDuplicateContent([
+          { url: '/assets/qr-encode-AAAA.wasm', revision: 'h1' },
+          { url: '/assets/static/qr-encode.AAAA.wasm', revision: 'h1' },
+          { url: '/assets/static/other.wasm', revision: 'h2' },
+          { url: '/favicon.png', revision: 'h3' },
+          { url: '/icon-192x192.png', revision: 'h3' },
+        ])
+      ).toEqual([['/assets/qr-encode-AAAA.wasm', '/assets/static/qr-encode.AAAA.wasm']]);
+    });
+
+    /** Runs the generator on a fixture build and returns its exit code and output. */
+    function generate(files: Record<string, string>) {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sw-duplicates-'));
+      try {
+        for (const [name, content] of Object.entries(files)) {
+          fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
+          fs.writeFileSync(path.join(dir, name), content);
+        }
+        let status = 0;
+        let stderr = '';
+        try {
+          execFile(process.execPath, [path.join(__dirname, '../scripts/generate_sw.cjs')], { env: { ...process.env, SW_DIST_DIR: dir }, stdio: 'pipe' });
+        } catch (error) {
+          const failed = error as { status?: number; stderr?: Buffer | string };
+          status = failed.status ?? 1;
+          stderr = String(failed.stderr ?? '');
+        }
+        return { status, stderr, wrote: fs.existsSync(path.join(dir, 'sw.js')) };
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    const page = '<script type="module" src="/assets/entries/e.js"></script>';
+
+    it('fails the build when the shell holds one module under two URLs', () => {
+      const result = generate({
+        'index.html': page,
+        'assets/entries/e.js': 'new URL("/assets/worker-1.js",import.meta.url);new URL("/assets/static/m.H.wasm",import.meta.url);',
+        'assets/worker-1.js': 'new URL("/assets/m-H.wasm",self.location.href);',
+        'assets/static/m.H.wasm': 'same bytes',
+        'assets/m-H.wasm': 'same bytes',
+      });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/same file under 2 URLs: .*\/assets\/static\/m\.H\.wasm/);
+      expect(result.stderr).toContain('/assets/m-H.wasm');
+      expect(result.wrote).toBe(false);
+    });
+
+    it('writes the worker when every module has one URL', () => {
+      const result = generate({
+        'index.html': page,
+        'assets/entries/e.js': 'new URL("/assets/worker-1.js",import.meta.url);new URL("/assets/static/m.H.wasm",import.meta.url);',
+        'assets/worker-1.js': 'new URL("/assets/static/m.H.wasm",self.location.href);',
+        'assets/static/m.H.wasm': 'same bytes',
+      });
+      expect(result.status).toBe(0);
+      expect(result.wrote).toBe(true);
+    });
   });
 });
