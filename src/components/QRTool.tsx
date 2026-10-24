@@ -22,18 +22,16 @@ import { Badge } from "./ui/Badge";
 import { Tooltip } from "./ui/Tooltip";
 import { Card } from "./ui/Card";
 import { Alert } from "./ui/Alert";
-import { DEFAULT_CONFIG } from '@/packages/core/config';
-import { type QRConfig, SocialFormat, QRStyle, QRErrorCorrectionLevel, QRType } from '@/packages/core/types';
+import { type QRConfig, SocialFormat, QRType } from '@/packages/core/types';
 import QRCanvas from '@/components/QRCanvas';
 import { Download, Share2, ChevronDown, CircleHelp, Copy, Check, AlertTriangle } from 'lucide-react';
 import { ExportOptions as DownloadOptions, FORMAT_LABELS, clampSize, type DownloadFormat } from './ExportOptions';
 import { usePopoverDismiss } from '@/hooks/usePopoverDismiss';
 import { Modal } from './ui/Modal';
 import { useLeadingDebounce } from '@/hooks/useDebounce';
-import { useQRDownload, BLOCKED_EXPORT_MESSAGE, SCAN_VALIDATION_ERROR, type ExportStatus, type AssetOptions, type ExportFormat } from '@/hooks/useQRDownload';
+import { useQRDownload, BLOCKED_EXPORT_MESSAGE, type AssetOptions, type ExportFormat } from '@/hooks/useQRDownload';
 import { previewFailureMessage, type PreviewFailure } from '@/utils/previewFailure';
 import { getExportRiskPolicy } from '@/utils/exportRiskPolicy';
-import { isDangerousUrl } from '@/packages/core/security';
 import { useToast } from './ui/Toast';
 import { useScannability } from '@/hooks/useScannability';
 import { FIX_LABELS, ScannabilityIndicator } from '@/components/ScannabilityIndicator';
@@ -45,7 +43,8 @@ import { StressTestButton } from './arcade/StressTestButton';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from './ToolWorkspaceLayout';
 import { usePageContent } from '@/data/PageContentContext';
 import { MiniPreview } from './MiniPreview';
-import { getScanAdvice, getScanVerdict, SYSTEM_LIMITS, type ScanFix, type ScanVerdict } from '@/packages/scannability';
+import { getScanAdvice, getScanVerdict, type ScanFix, type ScanVerdict } from '@/packages/scannability';
+import { deriveVerdict, exportBlockReason, exportDecision, fixPatch, isEmptyValue, resetPatch, resolveEffectiveConfig, type ExportAction } from './generator/decisions';
 import { GeneratorCommands } from './command/GeneratorCommands';
 import { useUndoToast } from '@/hooks/useUndoToast';
 import { SegmentedControl } from './ui/SegmentedControl';
@@ -143,17 +142,15 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   const downloadButtonRef = useRef<HTMLButtonElement>(null);
   const copyButtonRef = useRef<HTMLButtonElement>(null);
   const shareButtonRef = useRef<HTMLButtonElement>(null);
-  const isEmpty = !config.value || !config.value.trim();
+  const isEmpty = isEmptyValue(config.value);
   // A field holds a value the form refused, so the config still has the previous content: draw
   // nothing rather than a code that no longer matches the form (#1279).
   const contentRefused = useQRStoreSelector(s => s.contentRefused);
   const samplePayload = useMemo(() => getSamplePayload(config.type), [config.type]);
-  const effectiveConfig = useMemo(() => {
-    if (contentRefused) return { ...config, value: '' };
-    return isEmpty ? { ...config, value: samplePayload } : config;
-  }, [config, contentRefused, isEmpty, samplePayload]);
-  // Why every export is off, as the id of the note that says so; undefined while exports work.
-  const exportsOffReason = contentRefused ? REFUSED_STATE_ID : isEmpty ? EMPTY_STATE_ID : undefined;
+  const effectiveConfig = useMemo(
+    () => resolveEffectiveConfig(config, { refused: contentRefused, isEmpty, sample: samplePayload }),
+    [config, contentRefused, isEmpty, samplePayload],
+  );
 
   const { exportAsset: runExport } = useQRDownload(effectiveConfig);
   // Which export is encoding right now; its button shows a loading state until it finishes.
@@ -204,39 +201,31 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
   // Why the preview has no code to show (blocked or too much content), if it has none (#1251).
   const [previewFailure, setPreviewFailure] = useState<PreviewFailure | null>(null);
 
-  // In sample fallback mode, or when the preview could not draw a code, report 'idle' status so
-  // no verdict is shown for a code that does not exist (#1251).
-  const noVerdict = isEmpty || contentRefused || previewFailure !== null;
-  const scannabilityStatus = noVerdict ? 'idle' : rawScannabilityStatus;
-  const health = noVerdict ? undefined : rawHealth;
+  const { noVerdict, status: scannabilityStatus, health } = deriveVerdict(rawScannabilityStatus, rawHealth, {
+    isEmpty,
+    refused: contentRefused,
+    previewFailed: previewFailure !== null,
+  });
+  // Why exports are off as asked, if they are; the same check gates every export surface.
+  const blockFor = (action: ExportAction) => exportBlockReason({
+    config,
+    refused: contentRefused,
+    isEmpty,
+    previewFailure,
+    verdict: { status: scannabilityStatus, health },
+    action,
+  });
+  // Why every export is off, as the id of the note that says so; undefined while exports work.
+  const offKind = blockFor('download')?.kind;
+  const exportsOffReason = offKind === 'refused' ? REFUSED_STATE_ID : offKind === 'empty' ? EMPTY_STATE_ID : undefined;
 
   const handleFix = useCallback((fix: ScanFix) => {
-    if (fix === 'raise-error-correction') {
-      store.updateConfig({ errorCorrectionLevel: QRErrorCorrectionLevel.H });
-    } else if (fix === 'standard-pattern') {
-      store.updateConfig({ style: QRStyle.STANDARD });
-    } else if (fix === 'smaller-logo') {
-      store.updateConfig({ logoSize: SYSTEM_LIMITS.MAX_LOGO_SIZE });
-    } else {
-      store.updateConfig({
-        fgColor: '#000000',
-        bgColor: '#ffffff',
-        eyeColor: '#000000',
-        eyeFrameColor: '#000000',
-        eyeBallColor: '#000000',
-      });
-    }
+    store.updateConfig(fixPatch(fix));
   }, [store]);
 
   const notifyUndo = useUndoToast();
   const handleResetDefault = useCallback(() => {
-    store.updateConfig({
-      fgColor: DEFAULT_CONFIG.fgColor,
-      bgColor: DEFAULT_CONFIG.bgColor,
-      eyeColor: DEFAULT_CONFIG.eyeColor,
-      eyeFrameColor: undefined,
-      eyeBallColor: undefined,
-    });
+    store.updateConfig(resetPatch());
     notifyUndo('Colors reset');
   }, [store, notifyUndo]);
 
@@ -258,44 +247,23 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
    * Returns focus to the button that started an export and reports the result: success
    * shows on the button itself and in the polite status region, errors raise a toast.
    */
-  const handleExportResult = useCallback((result: ExportStatus, buttonRef: React.RefObject<HTMLButtonElement | null>, message: string) => {
-    buttonRef.current?.focus();
-    if (result.success) {
-      if (result.fallbackTriggered) {
-        addToast({ type: 'info', message: 'This browser cannot share images, so the image was downloaded instead.', duration: 5000 });
-      }
-      if (result.logoOmitted) {
-        addToast({
-          type: 'warning',
-          message: 'The logo was left out of this file because it could not be loaded from its web address. Upload the logo as an image file to include it.',
-          duration: 7000,
-        });
-      }
-      if (result.format) setDone({ format: result.format, message });
-      return;
-    }
-    // A cancelled picker or share sheet needs no message.
-    if (result.error?.name === 'AbortError') return;
-    addToast({
-      type: 'error',
-      message: result.error?.message || `Could not export the QR code${result.format ? ` as ${result.format.toUpperCase()}` : ''}. Try again, or pick another format.`,
-      duration: 5000,
-    });
-  }, [addToast]);
-
   const exportWith = (target: ExportFormat, buttonRef: React.RefObject<HTMLButtonElement | null>, message: string) => {
+    const action: ExportAction = target === 'clipboard' || target === 'svg-copy' ? 'copy' : target === 'share' ? 'share' : 'download';
     const run = async (options?: AssetOptions) => {
       const result = await exportAsset(target, { ...options, size: clampSize(size), filename, colorSpace });
-      if (result.error?.name === SCAN_VALIDATION_ERROR && !options?.allowUnsafe) {
+      const decision = exportDecision(result, options?.allowUnsafe);
+      if (decision.retryWithAllowUnsafe) {
         // The finished image failed the scan check: offer the same choice as the pre-flight gate
         // instead of a raw error (#1255).
         setGateAction(() => () => run({ ...options, allowUnsafe: true }));
         setShowSafetyGate(true);
         return;
       }
-      handleExportResult(result, buttonRef, message);
+      buttonRef.current?.focus();
+      decision.toasts.forEach(addToast);
+      if (decision.markDone && result.format) setDone({ format: result.format, message });
     };
-    executeWithSafetyGate(run);
+    executeWithSafetyGate(action, run);
   };
 
   const onDownload = () => {
@@ -330,36 +298,32 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
     });
   };
 
-  /** Whether there is content that may be exported at all; says why not when there is none. */
-  const contentExportable = () => {
-    if (exportsOffReason) {
-      notifyExportsOff();
-      return false;
-    }
-    if (previewFailure) {
-      // There is no code to export: say why, with no "Export Anyway" (#1251).
-      addToast({ type: 'error', message: previewFailureMessage(previewFailure, config.errorCorrectionLevel), duration: 6000 });
-      return false;
-    }
-    if (isDangerousUrl(config.value)) {
-      // A script or data link is refused outright: no "Export Anyway" for it.
-      addToast({ type: 'error', message: BLOCKED_EXPORT_MESSAGE, duration: 6000 });
-      return false;
-    }
-    return true;
+  /**
+   * Whether this export may go ahead now. A refusal says why; a scan risk returns 'gate' so the
+   * caller asks first.
+   */
+  const checkExport = (action: ExportAction): 'go' | 'gate' | 'refused' => {
+    const block = blockFor(action);
+    if (!block) return 'go';
+    if (block.kind === 'scan-risk') return 'gate';
+    if (block.kind === 'refused' || block.kind === 'empty') notifyExportsOff();
+    else if (block.kind === 'preview-failure') addToast({ type: 'error', message: previewFailureMessage(block.failure, config.errorCorrectionLevel), duration: 6000 });
+    else addToast({ type: 'error', message: BLOCKED_EXPORT_MESSAGE, duration: 6000 });
+    return 'refused';
   };
 
   // The wallet card draws a plain black-on-white code, so the design's scan risk does not apply to it.
   const [walletOpen, setWalletOpen] = useState(false);
   const onWallet = () => {
-    if (!contentExportable()) return;
+    if (checkExport('wallet') !== 'go') return;
     setOptionsOpen(false);
     setWalletOpen(true);
   };
 
-  const executeWithSafetyGate = (action: (options?: AssetOptions) => void | Promise<void>) => {
-    if (!contentExportable()) return;
-    if (getExportRiskPolicy({ status: scannabilityStatus, health }) === 'unsafe') {
+  const executeWithSafetyGate = (exportAction: ExportAction, action: (options?: AssetOptions) => void | Promise<void>) => {
+    const check = checkExport(exportAction);
+    if (check === 'refused') return;
+    if (check === 'gate') {
       setGateAction(() => () => action({ allowUnsafe: true }));
       setShowSafetyGate(true);
     } else {
@@ -586,7 +550,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
                    />
                    {previewView !== 'flat' && (
                       <Suspense fallback={<Skeleton className="aspect-4/3 w-full rounded-xl" />}>
-                         <MockupView sourceRef={canvasRef} renderKey={debouncedConfig} config={effectiveConfig} moduleCount={moduleCount} view={previewView} exportsOffReason={exportsOffReason} guardExport={(run) => executeWithSafetyGate(() => run())} />
+                         <MockupView sourceRef={canvasRef} renderKey={debouncedConfig} config={effectiveConfig} moduleCount={moduleCount} view={previewView} exportsOffReason={exportsOffReason} guardExport={(run) => executeWithSafetyGate('download', () => run())} />
                       </Suspense>
                    )}
                 </div>
