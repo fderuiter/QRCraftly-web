@@ -105,3 +105,7 @@ The camera stream used to be acquired by the app's `useCamera` hook and attached
 - Zero dependency violations reported by `depcruise src` across all 388 modules.
 - Complete backwards compatibility preserved for existing test harnesses and subpages via minimal re-export shims.
 - All 193 test suites (1,910 tests) and Playwright E2E suites pass with zero regressions.
+
+## Amendment: video files in the file-transfer receiver (issue #1614)
+
+"Video files are refused" applies to the scanner's file path (`lib/sourceExtractor.ts` and the QR Code Scanner page). It does not mean the engine never sees video. The file-transfer receiver still lets a person load a recorded MP4, WebM or MOV of a transfer: it plays the file in a `<video>` element and runs the Camera Scanner Engine on that element as if it were a camera (`useFrameSource.ts` in `optical-transfer`). Its type and size checks are `validateReceivedFile` in `lib/receiver/videoFile.ts`. Video upload stays: a person can record the sending screen with any camera app and decode the recording later. ADR 0017 records it on the transfer side.

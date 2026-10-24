@@ -60,6 +60,18 @@ export const AUDITED_DOC_FILES = [
 ];
 
 /**
+ * Files (and directories, by prefix) whose inline code spans are checked as repository paths.
+ * Limited to the agent and domain docs so that examples elsewhere do not produce noise.
+ */
+export const INLINE_PATH_SCOPE = {
+  files: ['AGENTS.md', 'CONTEXT.md'],
+  dirs: ['docs/agents/']
+};
+
+/** File extensions that mark an inline code span as a repository path. */
+export const INLINE_PATH_EXTENSIONS = ['.ts', '.tsx', '.js', '.cjs', '.mjs', '.md', '.json', '.yml', '.yaml', '.toml', '.rs', '.sh', '.css', '.html'];
+
+/**
  * Remediation hints printed with every audit error, keyed by error kind.
  */
 export const REMEDIATION_HINTS = {
@@ -69,6 +81,7 @@ export const REMEDIATION_HINTS = {
   outsideRoot: 'Link to a file inside the repository, or use an absolute https:// URL for external resources.',
   brokenFile: "Fix the relative path (it resolves from the linking file's folder and is case-sensitive), or restore the target file.",
   brokenAnchor: "Point the fragment at an existing heading slug in the target file (lowercase, spaces become '-', punctuation dropped).",
+  inlinePath: 'Correct the path (inline paths resolve from the repository root), or link the file.',
   snippet: 'Make the snippet type-check against tsconfig.json, or fence it as ```text if it is only illustrative.',
   unsupported: 'Rewrite the construct with the Markdown subset scripts/utils/markdown supports (ATX headings, lists, tables, fenced code, links), or extend that parser with tests.'
 };
@@ -190,6 +203,55 @@ export function checkPlaceholders(file, content) {
     reportError(file, `Found placeholder string '${match[0]}'`, 'placeholder');
     localHasErrors = true;
   }
+  return localHasErrors;
+}
+
+/**
+ * Whether a file is in INLINE_PATH_SCOPE.
+ * @param {string} file Repository-relative POSIX path.
+ * @returns {boolean} True when inline code paths in the file are checked.
+ */
+export function isInlinePathScope(file) {
+  return INLINE_PATH_SCOPE.files.includes(file)
+    || (INLINE_PATH_SCOPE.dirs.some(dir => file.startsWith(dir)) && file.endsWith('.md'));
+}
+
+/**
+ * Whether an inline code span has the shape of a repository path (see INLINE_PATH_EXTENSIONS).
+ * @param {string} span Code span text, without a line suffix.
+ * @returns {boolean} True when the span should be checked against the file system.
+ */
+export function looksLikeRepoPath(span) {
+  if (!span.includes('/')) return false;
+  if (/\s/.test(span)) return false;
+  if (/[*<>{}$]/.test(span)) return false;
+  if (span.includes('://')) return false;
+  if (/^[@~/.]/.test(span)) return false;
+  return INLINE_PATH_EXTENSIONS.some(ext => span.endsWith(ext));
+}
+
+/**
+ * Checks that inline code spans in prose that look like repository paths exist relative to the
+ * repository root. Fenced code blocks are not inline code and are not checked.
+ * @param {string} file Repository-relative file name.
+ * @param {string} content Full file content.
+ * @returns {boolean} True when an error was reported.
+ */
+export function checkInlinePaths(file, content) {
+  if (isQuarantined(file) || !isInlinePathScope(file)) {
+    return false;
+  }
+  let localHasErrors = false;
+  walk(tokensFor(file, content), token => {
+    if (token.type !== 'codespan') return;
+    const span = token.text.trim();
+    const candidate = span.replace(/:\d+(-\d+)?$/, '');
+    if (!looksLikeRepoPath(candidate)) return;
+    if (!fs.existsSync(path.join(repoRoot, candidate))) {
+      reportError(file, `Inline path '${span}' does not exist in the repository.`, 'inlinePath');
+      localHasErrors = true;
+    }
+  });
   return localHasErrors;
 }
 
@@ -466,6 +528,7 @@ export function runAudit() {
     const { content } = getParsedFile(file);
     checkPublishApproved(file, content);
     checkPlaceholders(file, content);
+    checkInlinePaths(file, content);
     fileHeadings[file] = buildFileHeadings(file, content);
   }
   
