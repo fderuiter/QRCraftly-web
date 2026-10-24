@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type VCardData, QRType, type QRGeneratorContract } from '@/types';
+import { type VCardData, type QRGeneratorContract } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { normalizeUrl } from '@/packages/core/url';
 import { isDangerousUrl } from '@/packages/core/security';
 import { identifyProtocol, CONTAINMENT_PROFILES } from '../protocol';

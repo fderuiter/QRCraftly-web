@@ -27,8 +27,8 @@ import {
   useQRStoreSelector,
   useOptionalQRStoreSelector,
 } from './QRContext';
-import { DEFAULT_CONFIG } from '@/constants';
-import { type QRConfig, QRErrorCorrectionLevel, QRType, SocialFormat } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { type QRConfig, QRErrorCorrectionLevel, QRType, SocialFormat } from '@/packages/core/types';
 
 // ---------------------------------------------------------------------------
 // Helper wrapper

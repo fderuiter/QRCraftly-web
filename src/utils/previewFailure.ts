@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRErrorCorrectionLevel } from '../types';
+import { QRErrorCorrectionLevel } from '@/packages/core/types';
 
 /**
  * Why the preview could not draw a code (#1251): the content is blocked by validation, it is

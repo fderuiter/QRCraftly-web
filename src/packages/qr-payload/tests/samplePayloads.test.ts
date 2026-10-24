@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { getSamplePayload, SAMPLE_PAYLOADS, validatePayload, parsePayload } from '../index';
 
 describe('Type-Aware Fallback Sample Payloads', () => {

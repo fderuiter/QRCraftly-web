@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { sanitizeFileName } from '@/utils/fileNames';
+import { sanitizeFileName } from '@/packages/core/files';
 
 const MAX_STEM_LENGTH = 100;
 /** Leaves room in the 255-byte name limit for a `_500` suffix and the extension. */

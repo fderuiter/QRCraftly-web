@@ -18,7 +18,7 @@
 
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Download, Share2 } from 'lucide-react';
-import { type QRConfig, QRType } from '@/types';
+import { type QRConfig, QRType } from '@/packages/core/types';
 import { renderWalletCard, walletRefusalReason, WALLET_CARD_TEXT_LIMITS, WALLET_CARD_SIZE } from '@/packages/qr-export';
 import { hydrateWifiData } from '@/packages/qr-payload';
 import { getQRTypeLabel } from '@/data/qrTypeLabels';

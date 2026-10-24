@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { QRConfig } from '@/types';
+import type { QRConfig } from '@/packages/core/types';
 import { drawEyeFrame, drawEyeball, EYE_POSITIONS, type EyePosition } from './canvasHelpers';
 import { type ModuleRenderOptions, sampleCellLuminances } from './modules';
 import { getLuminance } from '@/packages/core/encoding';

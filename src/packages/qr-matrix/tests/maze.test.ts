@@ -10,7 +10,7 @@ import {
   storeMaze,
   clearMazeCache,
 } from '../maze';
-import { QRStyle, QRType, QRErrorCorrectionLevel } from '@/types';
+import { QRStyle, QRType, QRErrorCorrectionLevel } from '@/packages/core/types';
 
 describe('isFinderPatternWithMargin', () => {
   it('identifies top-left finder eye zone correctly', () => {

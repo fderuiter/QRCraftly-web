@@ -18,7 +18,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { constructMeetingString, hydrateMeetingData, MeetingContract } from '../index';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 
 describe('Meeting generator', () => {
   it('constructs and hydrates successfully', () => {

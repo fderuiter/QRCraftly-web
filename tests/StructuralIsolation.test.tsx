@@ -6,8 +6,8 @@ import { PatternControls } from '../src/components/style-controls/PatternControl
 import QRCanvas from '../src/components/QRCanvas';
 import QRTool from '../src/components/QRTool';
 import { ToastProvider } from '../src/components/ui/Toast';
-import { DEFAULT_CONFIG } from '../src/constants';
-import { QRStyle, type QRConfig } from '../src/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { QRStyle, type QRConfig } from '@/packages/core/types';
 
 describe('Structural Isolation and Reserved Space for QR Preview', () => {
   

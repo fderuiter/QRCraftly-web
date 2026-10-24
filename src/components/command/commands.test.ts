@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildCommands, filterCommands, type CommandHost } from './commands';
-import { QRStyle } from '../../types';
+import { QRStyle } from '@/packages/core/types';
 import type { QRStore } from '../../context/QRContext';
-import { DEFAULT_CONFIG } from '../../constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 
 function host(overrides: Partial<CommandHost> = {}, state: Partial<ReturnType<QRStore['getState']>> = {}) {
   const store = {

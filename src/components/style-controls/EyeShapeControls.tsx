@@ -1,5 +1,5 @@
 import React from 'react';
-import { EyeShape, type QRConfig } from '../../types';
+import { EyeShape, type QRConfig } from '@/packages/core/types';
 import { PatternModule } from '../ui/PatternModule';
 import { SegmentedControl } from '../ui/SegmentedControl';
 

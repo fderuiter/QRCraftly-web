@@ -1,5 +1,6 @@
-import { QRErrorCorrectionLevel } from '../../types';
-import { DEFAULT_CONFIG, PATTERNS, PRESET_COLORS, buildPresetColorPatch } from '../../constants';
+import { QRErrorCorrectionLevel } from '@/packages/core/types';
+import { PATTERNS, PRESET_COLORS, buildPresetColorPatch } from '../../constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import type { QRStore } from '../../context/QRContext';
 import type { DownloadFormat } from '../ExportOptions';
 import { surpriseStyle } from '../../utils/styleGallery';

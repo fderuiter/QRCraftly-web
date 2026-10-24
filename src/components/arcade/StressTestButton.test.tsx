@@ -21,7 +21,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { navigate } from 'vike/client/router';
 import { QRProvider } from '@/context/QRContext';
-import { QRErrorCorrectionLevel, QRType } from '@/types';
+import { QRErrorCorrectionLevel, QRType } from '@/packages/core/types';
 import { clearStagedArcadeTarget, getStagedArcadeTarget } from '@/packages/arcade/handoff';
 import { StressTestButton } from './StressTestButton';
 

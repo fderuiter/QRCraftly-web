@@ -25,7 +25,7 @@ import { LandingPage } from '@/components/LandingPage';
 import { clearRetainedAppearance } from '@/context/QRContext';
 import { getMetadataForPath } from '@/data/contentRegistry';
 import { LANDING_PRESETS } from '@/data/landingPages';
-import { QRErrorCorrectionLevel } from '@/types';
+import { QRErrorCorrectionLevel } from '@/packages/core/types';
 import { withPageContent } from '../../tests/utils/pageContent';
 
 function renderLanding(id: string) {

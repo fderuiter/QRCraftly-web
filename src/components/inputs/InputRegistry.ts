@@ -1,25 +1,7 @@
-import { getPublicDomain } from "../../utils/metadataEngine";
+import { getPublicDomain } from "@/packages/core/site";
 import type React from "react";
-import {
-  QRType,
-  WifiEncryption,
-  CryptoNetwork,
-  SocialPlatform,
-  type UrlData,
-  type TextData,
-  type WifiData,
-  type EmailData,
-  type VCardData,
-  type PhoneData,
-  type SmsData,
-  type PaymentData,
-  type EventData,
-  CalendarProvider,
-  type LocationData,
-  type MeetingData,
-  type SocialData,
-  type BulkCsvData,
-} from "../../types";
+import { CryptoNetwork, SocialPlatform, type UrlData, type TextData, type EmailData, type VCardData, type PhoneData, type SmsData, type PaymentData, type EventData, CalendarProvider, type LocationData, type MeetingData, type SocialData, type BulkCsvData } from "../../types";
+import { QRType, WifiEncryption, type WifiData } from "@/packages/core/types";
 import { QR_GENERATORS } from "@/packages/qr-payload";
 
 import { UrlInput } from "./UrlInput";

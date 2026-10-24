@@ -18,7 +18,7 @@
 
 import { createPublicKey, verify } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { buildGoogleSaveLink, describePassContent, googleSaveClaims, isIssuerId, passColorsFrom, readServiceAccount, WalletPassError, type GoogleServiceAccount } from '../index';
 import { makeTestPki, type TestPki } from './testPki';
 

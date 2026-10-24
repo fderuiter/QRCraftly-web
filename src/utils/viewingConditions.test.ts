@@ -20,7 +20,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import type { PixelFrame, ScannabilityStatus } from '@/packages/scannability';
-import { DEFAULT_CONFIG } from '@/constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { pixelsAcross, renderCondition, runViewingTest, testViewingConditions, viewingConditions } from './viewingConditions';
 
 const frame: PixelFrame = { data: new Uint8ClampedArray(4), width: 1, height: 1 };

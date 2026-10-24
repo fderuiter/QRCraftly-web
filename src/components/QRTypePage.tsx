@@ -18,8 +18,8 @@
 
 import React from 'react';
 import QRTool from '@/components/QRTool';
-import { DEFAULT_CONFIG } from '@/constants';
-import { QRType, type QRConfig } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { QRType, type QRConfig } from '@/packages/core/types';
 import { PresetOpenSections, PresetPrimaryAction } from '@/components/StyleControls';
 import type { LandingPrimaryAction } from '@/data/landingPages';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';

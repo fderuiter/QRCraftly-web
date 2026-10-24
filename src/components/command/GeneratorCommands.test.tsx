@@ -6,7 +6,7 @@ import { GeneratorCommands } from './GeneratorCommands';
 import { buildCommands, type GeneratorActions } from './commands';
 import { QRProvider, useQRStore } from '@/context/QRContext';
 import { ToastProvider } from '@/components/ui/Toast';
-import { DEFAULT_CONFIG } from '@/constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { STYLE_FILE_FORMAT } from '@/utils/styleFile';
 
 vi.mock('./commands', async (importOriginal) => {

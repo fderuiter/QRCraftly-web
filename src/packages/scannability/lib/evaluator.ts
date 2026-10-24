@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { QRConfig } from '@/types';
+import type { QRConfig } from '@/packages/core/types';
 import { assertWorkerRequest, isWorkerResponse } from './sharedContract';
 import type { PixelFrame, ScannabilityResult } from './checker';
 import { calculateScannabilityHealth, type HealthScore } from './scoring';

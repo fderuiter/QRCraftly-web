@@ -19,8 +19,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
-import { DEFAULT_CONFIG } from '@/constants';
-import { QRType } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { QRType } from '@/packages/core/types';
 import { ToastProvider } from '../ui/Toast';
 import ApplePassPanel from './ApplePassPanel';
 

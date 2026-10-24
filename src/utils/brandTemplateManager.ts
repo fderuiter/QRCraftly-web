@@ -1,4 +1,5 @@
-import type { BrandTemplate, BrandTemplateExportPayload, QRConfig } from '../types';
+import type { BrandTemplate, BrandTemplateExportPayload } from '../types';
+import type { QRConfig } from '@/packages/core/types';
 import { isStyleField, pickStyle } from './styleFields';
 import { handOffBlob } from './blobHandoff';
 

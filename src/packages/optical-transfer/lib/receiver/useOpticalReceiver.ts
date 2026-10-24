@@ -33,7 +33,7 @@ import { paintBeacon } from '../sender/tiles';
 import { loadQrEncoder, type QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
 import { looksLikeKeyQr } from '../prism/words';
 import type { PrismManifestInfo } from '../prism/manifest';
-import { analyseReceivedFile } from '@/utils/fileNames';
+import { analyseReceivedFile } from '@/packages/core/files';
 import { detachVideoSource, isVideoFile, playQuietly, spawnReassemblyWorker, spawnTileWorker } from './media';
 import { createTileReader, type TileReader } from './tileReader';
 

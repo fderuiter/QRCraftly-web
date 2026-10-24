@@ -19,9 +19,9 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { EyeShapeControls } from './EyeShapeControls';
-import { DEFAULT_CONFIG } from '../../constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { axe } from '../../../tests/utils/axe';
-import { EyeShape, type QRConfig } from '../../types';
+import { EyeShape, type QRConfig } from '@/packages/core/types';
 
 const config = (overrides: Partial<QRConfig> = {}): QRConfig => ({ ...DEFAULT_CONFIG, ...overrides });
 

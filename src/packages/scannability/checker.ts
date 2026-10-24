@@ -23,7 +23,7 @@
  * on first use, so generator pages download neither up front.
  */
 import type { QrReader } from '@/packages/qr-decode';
-import type { QRConfig } from '@/types';
+import type { QRConfig } from '@/packages/core/types';
 import { performScannabilityCheck, type ScannabilityResult } from './lib/checker';
 import { calculateScannabilityHealth, type HealthScore } from './lib/scoring';
 import { getExportRiskPolicy, type ExportRisk, type ScannabilityStatus } from './lib/exportRiskPolicy';

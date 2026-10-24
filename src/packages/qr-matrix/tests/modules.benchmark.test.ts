@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { getLogoMetrics, renderModules } from '../index';
-import { DEFAULT_CONFIG } from '@/constants';
-import { type QRConfig, QRErrorCorrectionLevel, QRStyle } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { type QRConfig, QRErrorCorrectionLevel, QRStyle } from '@/packages/core/types';
 
 describe('Performance Benchmark: renderModules', () => {
   const runBenchmark = (style: QRStyle, name: string) => {

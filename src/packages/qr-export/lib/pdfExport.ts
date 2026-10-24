@@ -17,7 +17,7 @@
 */
 
 import { concatBytes } from '@/packages/core/encoding';
-import type { QRConfig } from '@/types';
+import type { QRConfig } from '@/packages/core/types';
 import { generateQRSvg } from './svgExport';
 import { type ModuleRenderOptions } from '@/packages/qr-matrix';
 import {

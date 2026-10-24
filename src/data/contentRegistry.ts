@@ -1,4 +1,5 @@
-import { getPublicDomain, getSanitizedPath } from "../utils/metadataEngine";
+import { getSanitizedPath } from "../utils/metadataEngine";
+import { getPublicDomain } from "@/packages/core/site";
 import { landingPageMeta } from "./landingPageMeta";
 
 export const SchemaType = {

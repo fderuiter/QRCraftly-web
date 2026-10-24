@@ -19,8 +19,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
-import { DEFAULT_CONFIG } from '@/constants';
-import { QRErrorCorrectionLevel } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { QRErrorCorrectionLevel } from '@/packages/core/types';
 import MockupView from './MockupView';
 import { MOCKUP_SCENES } from './scenes';
 import { PREVIEW_VIEWS } from './previewViews';

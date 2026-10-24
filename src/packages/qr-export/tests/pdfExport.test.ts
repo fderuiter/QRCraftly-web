@@ -30,8 +30,8 @@ if (typeof globalThis.DOMParser === 'undefined') {
 }
 
 import { generateQRPdf, convertSvgToPdf, MissingImageError, PayloadRejectedError } from '../index';
-import { DEFAULT_CONFIG } from '@/constants';
-import { EyeShape, type QRConfig, QRType } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { EyeShape, type QRConfig, QRType } from '@/packages/core/types';
 
 describe('PDF Vector Export', () => {
   it('generates a valid PDF document with standard structure and xref table', async () => {

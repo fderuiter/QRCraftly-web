@@ -28,7 +28,7 @@
 import { ECC_LEVELS, type EccLevel } from '@/packages/core/ecc';
 import { concatBytes } from '@/packages/core/encoding';
 import { WASM_STATUS, WasmModuleError, compileWasmUrl, instantiateWasm, type WasmInstance } from '@/packages/wasm-runtime';
-import type { QRErrorCorrectionLevel, QRModules } from '@/types';
+import type { QRErrorCorrectionLevel, QRModules } from '@/packages/core/types';
 
 /** The module's URL in a build: Vite emits the file as an asset next to the bundle. */
 export const QR_ENCODE_WASM_URL = new URL('../../../wasm/qr-encode.wasm', import.meta.url);

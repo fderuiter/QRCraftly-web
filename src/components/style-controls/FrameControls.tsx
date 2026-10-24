@@ -17,14 +17,7 @@
 */
 
 import React, { useMemo } from 'react';
-import {
-  type QRConfig,
-  type FrameStyle,
-  type FramePosition,
-  type FrameIcon,
-  type FrameFontFamily,
-  FRAME_FONT_FAMILIES,
-} from '../../types';
+import { type QRConfig, type FrameStyle, type FramePosition, type FrameIcon, type FrameFontFamily, FRAME_FONT_FAMILIES } from '@/packages/core/types';
 import { SelectField, TextField } from '../ui/FormFields';
 import { ColorInput } from '../ui/ColorInput';
 import { getContrastRatio } from '@/packages/core/encoding';

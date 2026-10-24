@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { DEFAULT_CONFIG } from '@/constants';
-import type { QRConfig } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import type { QRConfig } from '@/packages/core/types';
 import { resolveEncodedValue } from '@/packages/qr-matrix';
 import type { ArcadeTarget } from '@/packages/arcade/handoff';
 

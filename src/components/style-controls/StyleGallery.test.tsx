@@ -6,8 +6,9 @@ import { describe, expect, it, vi } from 'vitest';
 import StyleGallery from './StyleGallery';
 import { QRProvider, useQRStore, useQRStoreSelector } from '../../context/QRContext';
 import { ToastProvider } from '../ui/Toast';
-import { DEFAULT_CONFIG, PATTERNS, PRESET_COLORS } from '../../constants';
-import { QRStyle } from '../../types';
+import { PATTERNS, PRESET_COLORS } from '../../constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { QRStyle } from '@/packages/core/types';
 
 vi.mock('@/packages/qr-export', () => ({
   generateQRSvg: vi.fn(async () => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>'),

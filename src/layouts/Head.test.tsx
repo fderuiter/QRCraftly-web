@@ -36,8 +36,8 @@ vi.mock('vike-react/usePageContext', () => ({
 }));
 
 // Mock getPublicDomain
-vi.mock('@/utils/metadataEngine', async () => {
-  const actual = await vi.importActual('@/utils/metadataEngine');
+vi.mock('@/packages/core/site', async () => {
+  const actual = await vi.importActual('@/packages/core/site');
   return {
     ...actual,
     getPublicDomain: mockGetPublicDomain

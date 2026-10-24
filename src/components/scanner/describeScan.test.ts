@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { describeScan, scanHeadline } from './describeScan';
 
 describe('describeScan', () => {

@@ -1,4 +1,4 @@
-import { type QRConfig, type QRModules, QRStyle } from '@/types';
+import { type QRConfig, type QRModules, QRStyle } from '@/packages/core/types';
 import { getLogoMetrics, getIsCoveredByLogo, isAlignmentPatternZone } from './utils';
 import { renderModules } from './modules';
 import { seedRandom } from './prng';

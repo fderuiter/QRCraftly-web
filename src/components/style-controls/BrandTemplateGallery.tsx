@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BookmarkPlus, Download, Upload, Trash2, Edit3, Check, Sparkles } from 'lucide-react';
-import type { QRConfig, BrandTemplate } from '../../types';
+import type { BrandTemplate } from '../../types';
+import type { QRConfig } from '@/packages/core/types';
 import { PREBUILT_TEMPLATES } from '../../data/brandTemplates';
 import {
   getStoredTemplates,

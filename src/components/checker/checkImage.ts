@@ -21,8 +21,8 @@ import type { ScanCorners } from '@/packages/optical-scanner';
 import type { PixelFrame, ScannabilityStatus } from '@/packages/scannability';
 import { createScannabilityEvaluator } from '@/packages/scannability';
 import { describeScan, type ScanDescription } from '@/components/scanner/describeScan';
-import { DEFAULT_CONFIG } from '@/constants';
-import type { QRConfig } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import type { QRConfig } from '@/packages/core/types';
 
 /** Side of the square the code is redrawn into for the print simulation, in pixels. */
 const CHECK_SIZE = 512;

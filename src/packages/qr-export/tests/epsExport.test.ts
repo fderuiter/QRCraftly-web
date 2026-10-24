@@ -30,8 +30,8 @@ if (typeof globalThis.DOMParser === 'undefined') {
 }
 
 import { generateQREps, convertSvgToEps, MissingImageError, PayloadRejectedError } from '../index';
-import { DEFAULT_CONFIG } from '@/constants';
-import { EyeShape, type QRConfig, QRType } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { EyeShape, type QRConfig, QRType } from '@/packages/core/types';
 
 describe('EPS Vector Export', () => {
   it('generates a valid EPS document with standard headers and footer', async () => {

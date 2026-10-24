@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { analyseReceivedFile } from '@/utils/fileNames';
+import { analyseReceivedFile } from '@/packages/core/files';
 import { formatFileSize } from '@/utils/transferSpeed';
 
 /** What a finished wallet-style (BC-UR) stream holds. */

@@ -35,7 +35,7 @@ const { contentRegistry, auxiliaryRegistry } = await import('../src/data/content
 const { TYPE_PAGE_TYPES } = await import('../src/data/relatedPages');
 const { buildMatrix, loadQrEncoder } = await import('../src/packages/qr-matrix');
 const { getSamplePayload } = await import('../src/packages/qr-payload');
-const { QRType, QRErrorCorrectionLevel } = await import('../src/types');
+const { QRType, QRErrorCorrectionLevel } = await import('../src/packages/core/types');
 const { resolvePublicUrl } = await import('../src/utils/metadataEngine');
 const { renderExampleSvg, renderMosaicExamplePng, renderShareImage } = await import('./utils/shareImages');
 

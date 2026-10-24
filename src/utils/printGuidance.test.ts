@@ -17,7 +17,7 @@
 */
 
 import { describe, expect, it } from 'vitest';
-import { QRErrorCorrectionLevel } from '../types';
+import { QRErrorCorrectionLevel } from '@/packages/core/types';
 import { MIN_MODULE_MM, formatDistance, formatDistanceBoth, formatWidth, getPrintGuidance, moduleSizeMm, widthForDistance } from './printGuidance';
 
 describe('print guidance', () => {

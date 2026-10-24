@@ -1,6 +1,6 @@
 import { generateMaze } from './lib/maze';
 import { assertMazeWorkerRequest, assertMazeWorkerResponse, type MazeWorkerResponse } from './lib/mazeContract';
-import type { QRModules } from '@/types';
+import type { QRModules } from '@/packages/core/types';
 
 let latestSequenceId = -1;
 

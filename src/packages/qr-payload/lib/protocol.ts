@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { CalendarProvider, QRType, SocialPlatform } from '@/types';
+import { CalendarProvider, SocialPlatform } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { splitCompoundField } from './rfcHelper';
 import { isRebuildableUpiPayload } from './upi';
 

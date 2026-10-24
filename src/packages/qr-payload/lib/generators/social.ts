@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type SocialData, SocialPlatform, QRType, type QRGeneratorContract } from '@/types';
+import { type SocialData, SocialPlatform, type QRGeneratorContract } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { parseProtocol, parseSocialProfile, identifyProtocol } from '../protocol';
 import { sanitizeSocialHandle } from '@/packages/core/security';
 

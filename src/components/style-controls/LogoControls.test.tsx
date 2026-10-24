@@ -19,9 +19,9 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { LogoControls } from './LogoControls';
 import { ToastProvider } from '../ui/Toast';
-import { DEFAULT_CONFIG } from '../../constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { PRESET_LOGOS } from '../../constants/presetLogos';
-import { QRErrorCorrectionLevel, type QRConfig } from '../../types';
+import { QRErrorCorrectionLevel, type QRConfig } from '@/packages/core/types';
 
 const renderControls = (configOverrides: Partial<QRConfig> = {}, onChange = vi.fn()) =>
   render(

@@ -24,8 +24,8 @@
 import { describe, it, expect } from 'vitest';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
-import { DEFAULT_CONFIG } from '@/constants';
-import { EyeShape, type QRConfig, QRErrorCorrectionLevel, QRStyle } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { EyeShape, type QRConfig, QRErrorCorrectionLevel, QRStyle } from '@/packages/core/types';
 import { calculateScannabilityHealth } from '@/packages/scannability';
 import { performScannabilityCheck } from '@/packages/scannability/checker';
 import { drawQRInternal, clearFluidCache } from '../index';

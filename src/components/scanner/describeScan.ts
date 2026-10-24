@@ -16,13 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { identifyProtocol } from '@/packages/qr-payload';
 import { getQRTypeLabel } from '@/data/qrTypeLabels';
 import { isDangerousUrl } from '@/packages/core/security';
 import { analyseLink, type LinkFinding } from '@/packages/link-safety';
 import { hasMixedScripts, toUnicodeHostname } from '@/utils/hostname';
-import { revealInvisibleCharacters } from '@/utils/fileNames';
+import { revealInvisibleCharacters } from '@/packages/core/files';
 import { describeContent, type ScanSummaryRow } from './contentNotes';
 
 export type { ScanSummaryRow } from './contentNotes';

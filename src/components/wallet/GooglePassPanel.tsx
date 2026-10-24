@@ -18,7 +18,7 @@
 
 import { useEffect, useState } from 'react';
 import { BadgeCheck, ExternalLink } from 'lucide-react';
-import type { QRConfig } from '@/types';
+import type { QRConfig } from '@/packages/core/types';
 import { buildGoogleSaveLink, describePassContent, isIssuerId, passColorsFrom, readServiceAccount, WalletPassError, type GoogleServiceAccount } from '@/packages/wallet-pass';
 import { Button } from '../ui/Button';
 import { Alert } from '../ui/Alert';

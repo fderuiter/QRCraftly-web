@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRErrorCorrectionLevel, QRType, type QRConfig } from '@/types';
+import { QRErrorCorrectionLevel, QRType, type QRConfig } from '@/packages/core/types';
 
 /** A call to action above the generator's controls: opens an appearance section and focuses one control in it. */
 export interface LandingPrimaryAction {

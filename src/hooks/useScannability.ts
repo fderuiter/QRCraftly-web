@@ -17,7 +17,7 @@
 */
 
 import { useCallback } from 'react';
-import type { QRConfig } from '@/types';
+import type { QRConfig } from '@/packages/core/types';
 import { useQRStore } from '@/context/QRContext';
 import {
   useScannability as useScannabilityHealth,

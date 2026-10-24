@@ -17,8 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { sanitizeFileName, stripInvisibleCharacters, hasInvisibleCharacters, analyseReceivedFile } from './fileNames';
-import { sanitizeFileStem } from '@/packages/bulk-csv';
+import { sanitizeFileName, stripInvisibleCharacters, hasInvisibleCharacters, analyseReceivedFile } from '../files';
 
 // Built from code points so no bidirectional character appears in this source file.
 const u = (...codes: number[]): string => String.fromCharCode(...codes);
@@ -91,26 +90,6 @@ describe('invisible character helpers', () => {
     expect(hasInvisibleCharacters('plain')).toBe(false);
     expect(hasInvisibleCharacters(`a${RLO}b`)).toBe(true);
     expect(stripInvisibleCharacters(`a${RLO}b${ZWSP}c`)).toBe('abc');
-  });
-});
-
-describe('sanitizeFileStem (bulk CSV) covers the extra character classes', () => {
-  it('handles C1 controls, bidi characters, trailing dots and spaces', () => {
-    expect(sanitizeFileStem(`name${u(0x85)}x`)).toBe('name_x');
-    expect(sanitizeFileStem(`a${RLO}b`)).toBe('ab');
-    expect(sanitizeFileStem('report. . ')).toBe('report');
-  });
-
-  it('prefixes Windows reserved names', () => {
-    expect(sanitizeFileStem('CON')).toBe('_CON');
-    expect(sanitizeFileStem('NUL')).toBe('_NUL');
-    expect(sanitizeFileStem('COM1')).toBe('_COM1');
-    expect(sanitizeFileStem('lpt3')).toBe('_lpt3');
-    expect(sanitizeFileStem('CONSOLE')).toBe('CONSOLE');
-  });
-
-  it('keeps the 100 character cap', () => {
-    expect(sanitizeFileStem('x'.repeat(300))).toHaveLength(100);
   });
 });
 

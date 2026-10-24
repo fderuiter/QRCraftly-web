@@ -17,8 +17,8 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_CONFIG } from '@/constants';
-import { QRErrorCorrectionLevel, QRType } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { QRErrorCorrectionLevel, QRType } from '@/packages/core/types';
 import { resolveEncodedValue } from '@/packages/qr-matrix';
 import { targetFromConfig } from './target';
 

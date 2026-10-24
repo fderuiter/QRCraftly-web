@@ -22,7 +22,7 @@ import { ButtonLink } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { QrIllustration } from '@/components/QrIllustration';
 import { QR_TYPE_ROUTES, TOOL_LINKS } from '@/data/navigation';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 
 /** The most used generators and the file-transfer tools, offered on the 404 page. */
 const QUICK_LINKS: readonly (readonly [string, string])[] = [

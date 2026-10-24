@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CONFIG } from '../constants';
-import { EyeShape, type QRConfig, QRStyle, QRType } from '../types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { EyeShape, type QRConfig, QRStyle, QRType } from '@/packages/core/types';
 import { pickStyle } from './styleFields';
 import { MAX_STYLE_FILE_BYTES, parseStyleFile, serializeStyle, STYLE_FILE_FORMAT } from './styleFile';
 

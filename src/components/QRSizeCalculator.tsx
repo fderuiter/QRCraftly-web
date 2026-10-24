@@ -21,7 +21,7 @@ import { loadQrEncoder, QrEncodeError, type QrSymbolEncoder } from '@/packages/q
 import { TextAreaField } from '@/components/ui/FormFields';
 import { RangeInput } from '@/components/ui/RangeInput';
 import { SegmentedControl, type SegmentedOption } from '@/components/ui/SegmentedControl';
-import { QRErrorCorrectionLevel } from '@/types';
+import { QRErrorCorrectionLevel } from '@/packages/core/types';
 import { formatDistanceBoth, formatWidth, getPrintGuidance, MIN_MODULE_MM, widthForDistance } from '@/utils/printGuidance';
 
 /** What the calculator starts with: a typical short link. */

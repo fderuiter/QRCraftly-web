@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { drawQR } from '../index';
-import { DEFAULT_CONFIG } from '@/constants';
-import { QRStyle } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { QRStyle } from '@/packages/core/types';
 
 describe('drawQR', () => {
   let mockContext: any;

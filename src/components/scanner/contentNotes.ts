@@ -16,9 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRType, WifiEncryption } from '@/types';
+import { QRType, WifiEncryption } from '@/packages/core/types';
 import { QR_GENERATORS, checkCryptoAddress, parseProtocol } from '@/packages/qr-payload';
-import { hasInvisibleCharacters, revealInvisibleCharacters } from '@/utils/fileNames';
+import { hasInvisibleCharacters, revealInvisibleCharacters } from '@/packages/core/files';
 
 /** One line of the readable summary, for example "Network: Cafe guest". */
 export interface ScanSummaryRow {

@@ -73,8 +73,8 @@ if (typeof globalThis.DOMParser === 'undefined') {
 }
 
 import { generateQRSvg, PayloadRejectedError, rasterizeSvgToCanvas, validateSvgScannability, preflightLogoCheck } from '../index';
-import { DEFAULT_CONFIG } from '@/constants';
-import { EyeShape, QRStyle, type QRConfig, SocialFormat, TemplateStyle, QRType } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { EyeShape, QRStyle, type QRConfig, SocialFormat, TemplateStyle, QRType } from '@/packages/core/types';
 
 function parseAndAssertValidSvg(svgString: string): Document {
   const parser = new DOMParser();

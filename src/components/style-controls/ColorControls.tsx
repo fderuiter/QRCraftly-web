@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { GradientType, QRConfig } from '../../types';
+import type { GradientType, QRConfig } from '@/packages/core/types';
 import { PRESET_COLORS, MIN_CONTRAST_THRESHOLD, buildPresetColorPatch, DEFAULT_GRADIENT_END_COLOR } from '../../constants';
 import { getContrastRatio } from '@/packages/core/encoding';
 import { announcePolitely } from '../../utils/a11y';

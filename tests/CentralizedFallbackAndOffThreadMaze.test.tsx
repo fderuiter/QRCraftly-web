@@ -11,8 +11,8 @@ import { QRProvider, useQRStore } from '@/context/QRContext';
 import { useOpticalSender } from '@/packages/optical-transfer/client';
 import QRCanvas from '@/components/QRCanvas';
 import { generateMaze, getCachedMaze, clearMazeCache, getMazeCacheKey } from '@/packages/qr-matrix/maze';
-import { DEFAULT_CONFIG } from '@/constants';
-import type { QRConfig } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import type { QRConfig } from '@/packages/core/types';
 
 describe('Centralized Fallback Store & Off-Thread Maze Execution Suite', () => {
   beforeEach(() => {

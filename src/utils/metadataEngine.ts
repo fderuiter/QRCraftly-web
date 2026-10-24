@@ -1,4 +1,4 @@
-import { getConfiguredPublicDomain } from './publicEnvironment';
+import { getPublicDomain } from '@/packages/core/site';
 
 /** A value inside a schema.org JSON-LD document (`undefined` members are dropped when serialised). */
 export type JsonLdValue = string | number | boolean | null | undefined | JsonLdObject | JsonLdValue[];
@@ -7,10 +7,6 @@ export type JsonLdValue = string | number | boolean | null | undefined | JsonLdO
 export interface JsonLdObject {
   [key: string]: JsonLdValue;
 }
-
-export const getPublicDomain = (): string => {
-  return getConfiguredPublicDomain().replace(/\/+$/, '');
-};
 
 /**
  * Upper bound on each memoization cache. Paths come from request URLs, so an

@@ -18,7 +18,7 @@
 
 import { useEffect, useState } from 'react';
 import { BadgeCheck, Download } from 'lucide-react';
-import type { QRConfig } from '@/types';
+import type { QRConfig } from '@/packages/core/types';
 import { buildApplePass, createPassSigner, describePassContent, passColorsFrom, WalletPassError, type PassSigner } from '@/packages/wallet-pass';
 import { triggerFileDownload } from '@/utils/downloadManager';
 import { Button } from '../ui/Button';

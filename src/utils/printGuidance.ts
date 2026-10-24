@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRErrorCorrectionLevel } from '../types';
+import { QRErrorCorrectionLevel } from '@/packages/core/types';
 
 /** Smallest module a print head and a phone camera handle reliably, in millimetres. */
 export const MIN_MODULE_MM = 0.4;

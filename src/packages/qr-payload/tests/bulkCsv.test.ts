@@ -18,7 +18,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { BulkCsvContract, constructBulkCsvString, hydrateBulkCsvData } from '../index';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { encodeBulkCell, parseCsv } from '@/packages/bulk-csv';
 
 describe('BulkCsvContract', () => {

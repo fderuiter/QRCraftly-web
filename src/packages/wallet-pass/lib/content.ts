@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type QRConfig, QRType, WifiEncryption } from '@/types';
+import { type QRConfig, QRType, WifiEncryption } from '@/packages/core/types';
 import { hydrateWifiData } from '@/packages/qr-payload';
 import { resolveEncodedValue } from '@/packages/qr-matrix';
 import { getContrastRatio, normalizeHex } from '@/packages/core/encoding';

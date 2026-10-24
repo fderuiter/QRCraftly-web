@@ -18,7 +18,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { constructWifiString, hydrateWifiData, WifiContract, wifiPassphraseProblem } from '../index';
-import { WifiEncryption, WifiEapMethod, WifiEapPhase2, QRType } from '@/types';
+import { WifiEncryption, WifiEapMethod, WifiEapPhase2, QRType } from '@/packages/core/types';
 
 describe('Wifi generator', () => {
   it('constructs and hydrates successfully', () => {

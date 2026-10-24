@@ -17,7 +17,7 @@
 */
 
 import { QRTypePage } from '@/components/QRTypePage';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { copy } from '@/data/copy/bulk-csv-qr-code';
 
 /**

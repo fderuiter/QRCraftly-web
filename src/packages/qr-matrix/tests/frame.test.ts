@@ -18,8 +18,8 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { calculateLayout, renderFrame, FRAME_FONT_STACKS } from '../index';
-import { DEFAULT_CONFIG } from '@/constants';
-import type { QRConfig } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import type { QRConfig } from '@/packages/core/types';
 
 function createMockContext(): CanvasRenderingContext2D {
   return {

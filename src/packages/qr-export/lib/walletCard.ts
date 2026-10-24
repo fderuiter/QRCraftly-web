@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type QRConfig, type QRModules, QRType } from '@/types';
+import { type QRConfig, type QRModules, QRType } from '@/packages/core/types';
 import { validateConfig } from '@/packages/qr-payload';
 import { buildMatrix, loadQrEncoder } from '@/packages/qr-matrix';
 import { REGEX_BIDI_CONTROL_CHARS, REGEX_STRICT_CONTROL_CHARS } from '@/packages/core/security';

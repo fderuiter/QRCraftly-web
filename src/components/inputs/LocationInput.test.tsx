@@ -422,8 +422,8 @@ describe('LocationInput component', () => {
       const { render: rRender, screen: rScreen, fireEvent: rFire, waitFor: rWait } =
         await import('@testing-library/react');
       const { default: InputPanel } = await import('../InputPanel');
-      const { DEFAULT_CONFIG } = await import('../../constants');
-      const { QRType } = await import('../../types');
+      const { DEFAULT_CONFIG } = await import('@/packages/core/config');
+      const { QRType } = await import('@/packages/core/types');
 
       Object.defineProperty(navigator, 'geolocation', {
         value: {

@@ -63,8 +63,10 @@ export default [
         run: ['node', 'scripts/static-path-tracker.js'],
       },
       {
+        // Runs once on the git status: a code file and the doc it maps to can land in different chunks of a large commit.
         label: 'git lineage auditor',
         run: ['node', 'scripts/git_lineage_auditor.js'],
+        files: false,
       },
     ],
   },

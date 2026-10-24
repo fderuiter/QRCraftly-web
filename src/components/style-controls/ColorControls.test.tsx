@@ -18,7 +18,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { ColorControls } from './ColorControls';
-import { DEFAULT_CONFIG } from '../../constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 
 describe('ColorControls', () => {
   it('renders with correct accessibility attributes', () => {

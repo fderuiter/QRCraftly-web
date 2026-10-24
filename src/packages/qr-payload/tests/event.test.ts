@@ -18,7 +18,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { constructEventString, hydrateEventData, EventContract, identifyProtocol } from '../index';
-import { QRType, CalendarProvider } from '@/types';
+import { CalendarProvider } from '@/types';
+import { QRType } from '@/packages/core/types';
 
 describe('Event generator', () => {
   it('constructs and hydrates successfully', () => {

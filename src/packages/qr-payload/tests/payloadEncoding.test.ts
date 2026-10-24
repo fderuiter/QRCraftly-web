@@ -45,16 +45,8 @@ import {
   hydrateWifiData,
   parsePayload,
 } from '../index';
-import {
-  CryptoNetwork,
-  type EventData,
-  QRType,
-  type VCardData,
-  type WifiData,
-  WifiEapMethod,
-  WifiEapPhase2,
-  WifiEncryption,
-} from '@/types';
+import { CryptoNetwork, type EventData, type VCardData } from '@/types';
+import { QRType, type WifiData, WifiEapMethod, WifiEapPhase2, WifiEncryption } from '@/packages/core/types';
 import { normalizeUrl, shouldNormalizeUrl } from '@/packages/core/url';
 
 describe('#974 case 1: tel/sms percent-encode # as %23 (RFC 3966)', () => {

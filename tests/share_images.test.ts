@@ -2,7 +2,7 @@ import zlib from 'node:zlib';
 import { qrReader } from './fixtures/qrReader';
 import { describe, expect, it } from 'vitest';
 import { buildMatrix, loadQrEncoder } from '@/packages/qr-matrix';
-import { QRErrorCorrectionLevel, QRType } from '@/types';
+import { QRErrorCorrectionLevel, QRType } from '@/packages/core/types';
 import { drawable, textWidth, wrapText } from '../scripts/utils/pixelImage';
 import { SHARE_IMAGE_HEIGHT, SHARE_IMAGE_WIDTH, renderExampleSvg, renderMosaicExamplePng, renderShareImage } from '../scripts/utils/shareImages';
 

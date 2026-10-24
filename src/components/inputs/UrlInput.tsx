@@ -3,7 +3,7 @@ import type { UrlData } from "../../types";
 import { TextField } from "../ui/FormFields";
 import { looksLikeWebAddress, normalizeUrl } from "@/packages/core/url";
 import { describeViolation, SAMPLE_PAYLOADS } from "@/packages/qr-payload";
-import { QRType } from "../../types";
+import { QRType } from "@/packages/core/types";
 import { FieldNotes, LinkHints, hintsId } from './FieldHints';
 import { findBlockingViolation } from "./linkViolations";
 

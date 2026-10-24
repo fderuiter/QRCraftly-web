@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type LocationData, QRType, type QRGeneratorContract } from '@/types';
+import { type LocationData, type QRGeneratorContract } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { identifyProtocol, PLAIN_GEO_URI } from '../protocol';
 
 /** Which coordinate a value is: latitude takes N/S, longitude takes E/W. */

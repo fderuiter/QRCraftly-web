@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { sanitizeFileName } from './fileNames';
+import { sanitizeFileName } from '@/packages/core/files';
 import { handOffBlob } from './blobHandoff';
 
 /**

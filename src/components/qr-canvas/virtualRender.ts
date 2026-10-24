@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { QRConfig, QRModules } from '@/types';
+import type { QRConfig, QRModules } from '@/packages/core/types';
 import type { MazeData } from '@/packages/qr-matrix/maze';
 import { drawQRInternal } from '@/packages/qr-matrix';
 

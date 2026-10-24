@@ -1,4 +1,4 @@
-import type { QRConfig } from '../types';
+import type { QRConfig } from '@/packages/core/types';
 import { normalizeHex, getContrastRatio, getLuminance } from '@/packages/core/encoding';
 
 /**

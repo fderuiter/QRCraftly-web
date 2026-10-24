@@ -2,8 +2,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AdvancedControls } from './AdvancedControls';
-import { DEFAULT_CONFIG } from '../../constants';
-import type { QRConfig } from '../../types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import type { QRConfig } from '@/packages/core/types';
 
 describe('AdvancedControls', () => {
   const mockOnChange = vi.fn();

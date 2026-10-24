@@ -1,4 +1,4 @@
-import { QRType } from '../types';
+import { QRType } from '@/packages/core/types';
 import { QR_GENERATORS, type QRPayloadDataMap } from '@/packages/qr-payload';
 
 export function combineIds(...ids: (string | undefined | null | false)[]): string | undefined {

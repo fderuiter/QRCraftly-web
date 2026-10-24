@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
-import type { QRConfig, QRStyle } from '../../types';
+import type { QRConfig, QRStyle } from '@/packages/core/types';
 import { PATTERNS, LOW_RELIABILITY_PATTERNS } from '../../constants';
 import { PatternModule } from '../ui/PatternModule';
 import { Alert } from '../ui/Alert';

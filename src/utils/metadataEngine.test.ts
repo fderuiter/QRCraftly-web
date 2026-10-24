@@ -1,13 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  getPublicDomain,
-  resolveDomainForPath,
-  getSanitizedPath,
-  resolvePublicUrl,
-  resolveImageUrl,
-  formatPathName,
-  compileBreadcrumbSchema,
-} from './metadataEngine';
+import { resolveDomainForPath, getSanitizedPath, resolvePublicUrl, resolveImageUrl, formatPathName, compileBreadcrumbSchema } from './metadataEngine';
+import { getPublicDomain } from '@/packages/core/site';
 
 describe('metadataEngine', () => {
   beforeEach(() => {

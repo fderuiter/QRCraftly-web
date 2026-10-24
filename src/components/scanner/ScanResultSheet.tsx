@@ -41,7 +41,7 @@ import {
   Video,
   Wifi,
 } from 'lucide-react';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { Button, ButtonLink } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { isDangerousUrl } from '@/packages/core/security';

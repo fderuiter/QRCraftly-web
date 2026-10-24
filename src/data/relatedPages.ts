@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 import { contentRegistry } from '@/data/contentRegistry';
 import { LANDING_PAGE_IDS } from '@/data/landingPages';
 

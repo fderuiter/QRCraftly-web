@@ -19,7 +19,7 @@
 import { describe, expect, it } from 'vitest';
 import { qrEncoder } from '../../../../tests/fixtures/qrEncoder';
 import { loadQrReader } from '@/packages/qr-decode';
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 import {
   cleanCardText,
   paintWalletCard,

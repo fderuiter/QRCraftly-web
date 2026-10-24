@@ -17,7 +17,7 @@
 */
 
 import { useCallback, useEffect } from 'react';
-import { type QRConfig, TemplateStyle, SocialFormat } from '../types';
+import { type QRConfig, TemplateStyle, SocialFormat } from '@/packages/core/types';
 import { generateQRSvg, PayloadRejectedError, renderQRRaster, validateSvgScannability } from '@/packages/qr-export';
 import { QrEncodeError } from '@/packages/qr-matrix';
 import { describeViolation } from '@/packages/qr-payload';

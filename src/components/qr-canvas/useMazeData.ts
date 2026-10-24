@@ -17,7 +17,7 @@
 */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import type { QRConfig, QRModules } from '@/types';
+import type { QRConfig, QRModules } from '@/packages/core/types';
 import {
   generateMaze,
   getMazeCacheKey,

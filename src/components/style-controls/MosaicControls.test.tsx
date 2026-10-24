@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { MosaicControls } from './MosaicControls';
-import { DEFAULT_CONFIG } from '../../constants';
-import { type QRConfig, QRErrorCorrectionLevel } from '../../types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { type QRConfig, QRErrorCorrectionLevel } from '@/packages/core/types';
 
 describe('MosaicControls', () => {
   const onChange = vi.fn();

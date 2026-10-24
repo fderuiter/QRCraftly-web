@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRType } from '@/types';
+import { QRType } from '@/packages/core/types';
 
 /** Human-readable names for QR types, used in announcements and toasts (never raw enum values). */
 const QR_TYPE_LABELS: Record<QRType, string> = {

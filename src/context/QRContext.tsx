@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react';
-import type { QRConfig } from '@/types';
-import { DEFAULT_CONFIG } from '@/constants';
+import type { QRConfig } from '@/packages/core/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { sanitizeConfig } from '@/packages/qr-payload';
 
 /**

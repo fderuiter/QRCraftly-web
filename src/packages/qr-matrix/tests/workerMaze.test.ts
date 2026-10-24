@@ -6,7 +6,7 @@ import {
   isMazeWorkerResponse,
   assertMazeWorkerResponse,
 } from '../maze';
-import { QRStyle, QRType, QRErrorCorrectionLevel } from '@/types';
+import { QRStyle, QRType, QRErrorCorrectionLevel } from '@/packages/core/types';
 
 describe('Maze Worker & Contract Validation', () => {
   let workerHandler: WorkerModuleUnderTest['handle'];

@@ -23,6 +23,7 @@ import type { EccLevel as ArcadeEccLevel } from '@/packages/arcade';
 import type { QrReadLevel } from '@/packages/qr-decode';
 import type { QrEccLetter } from '@/packages/qr-matrix/encoder';
 import type { StreamErrorCorrection } from '@/packages/optical-transfer';
+import type { QRErrorCorrectionLevel } from '@/packages/core/types';
 
 describe('error correction levels', () => {
   it('is the one core type behind every former local alias', () => {
@@ -30,5 +31,6 @@ describe('error correction levels', () => {
     expectTypeOf<QrReadLevel>().toEqualTypeOf<EccLevel>();
     expectTypeOf<ArcadeEccLevel>().toEqualTypeOf<EccLevel>();
     expectTypeOf<StreamErrorCorrection>().toEqualTypeOf<EccLevel>();
+    expectTypeOf<QRErrorCorrectionLevel>().toEqualTypeOf<EccLevel>();
   });
 });

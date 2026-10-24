@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { QRConfig, QRModules } from '@/types';
+import type { QRConfig, QRModules } from '@/packages/core/types';
 import { calculateLayout, getLogoMetrics, getIsCoveredByLogo } from './utils';
 import { renderBorder, renderBorderDecoration } from './border';
 import { renderModules, type ModuleRenderOptions } from './modules';

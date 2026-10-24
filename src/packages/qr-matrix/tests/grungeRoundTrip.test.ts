@@ -35,8 +35,8 @@ vi.mock('../lib/prng', () => ({
 
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
-import { DEFAULT_CONFIG } from '@/constants';
-import { type QRConfig, QRStyle } from '@/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { type QRConfig, QRStyle } from '@/packages/core/types';
 import { drawQRInternal, clearFluidCache } from '../index';
 import { RasterContext, toContext } from './rasterContext';
 

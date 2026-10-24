@@ -28,7 +28,7 @@ import {
   type BatchRow,
   type RunBatchOptions,
 } from '../index';
-import { DEFAULT_CONFIG } from '@/constants';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
 
 const noPause = () => Promise.resolve();
 

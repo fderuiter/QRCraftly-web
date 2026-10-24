@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { getConfiguredPublicDomain } from './publicEnvironment';
+import { getConfiguredPublicDomain } from '../site';
 
 describe('getConfiguredPublicDomain', () => {
   it('uses the Vite domain when both environments provide one', () => {

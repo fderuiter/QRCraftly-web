@@ -17,7 +17,7 @@
 */
 
 import React, { Suspense, useState, useEffect } from 'react';
-import type { QRConfig } from '../types';
+import type { QRConfig } from '@/packages/core/types';
 import { TypeSelector, useInputLogic } from './inputs';
 import { useDynamicFocus } from '../hooks/useDynamicFocus';
 import { Button } from './ui/Button';

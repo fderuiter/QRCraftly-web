@@ -18,8 +18,8 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { PatternControls } from './PatternControls';
-import { DEFAULT_CONFIG } from '../../constants';
-import { QRStyle } from '../../types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { QRStyle } from '@/packages/core/types';
 
 describe('PatternControls', () => {
   it('renders with correct accessibility attributes', () => {

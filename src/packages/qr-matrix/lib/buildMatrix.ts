@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { QRType, type QRConfig, type QRErrorCorrectionLevel, type QRModules } from '@/types';
+import { QRType, type QRConfig, type QRErrorCorrectionLevel, type QRModules } from '@/packages/core/types';
 import { normalizeUrl, shouldNormalizeUrl } from '@/packages/core/url';
 
 /**

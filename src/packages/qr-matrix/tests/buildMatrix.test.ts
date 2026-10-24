@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect, vi } from 'vitest';
-import { QRErrorCorrectionLevel, QRType } from '@/types';
+import { QRErrorCorrectionLevel, QRType } from '@/packages/core/types';
 import { qrEncoder } from '../../../../tests/fixtures/qrEncoder';
 import { buildMatrix, loadQrEncoder, resolveEncodedValue, type QrEncoder } from '../index';
 
