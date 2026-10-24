@@ -118,6 +118,20 @@ describe('analyseReceivedFile (#1155)', () => {
     expect(analyseReceivedFile(name, 'application/octet-stream').risky).toBe(true);
   });
 
+  it.each([
+    ['invoice.xls', 'application/vnd.ms-excel'], ['letter.doc', 'application/msword'], ['deck.ppt', 'application/vnd.ms-powerpoint'],
+    ['a.dot', ''], ['a.xla', ''], ['a.xlt', ''], ['book.xlsb', 'application/vnd.ms-excel.sheet.binary.macroenabled.12'],
+    ['a.pps', ''], ['a.pot', ''], ['tool.pyw', 'text/plain'], ['a.mjs', 'text/plain'], ['a.cjs', 'text/plain'],
+    ['logo.svgz', 'application/octet-stream'], ['a.wsc', ''], ['a.sct', ''], ['setup.inf', ''], ['a.pl', ''], ['a.php', ''], ['a.rb', ''],
+  ])('flags %s as risky whatever its type says (#1590)', (name, mimeType) => {
+    expect(analyseReceivedFile(name, mimeType).risky).toBe(true);
+  });
+
+  it('calls out a macro spreadsheet hiding behind a photo name (#1590)', () => {
+    expect(analyseReceivedFile('photo.jpg.xls', 'image/jpeg').doubleExtension).toBe(true);
+    expect(analyseReceivedFile('report.pdf', 'application/pdf').risky).toBe(false);
+  });
+
   it.each(['a.pdf', 'a.png', 'a.txt', 'a.csv', 'a.zip'])('leaves %s unflagged', (name) => {
     expect(analyseReceivedFile(name, 'application/octet-stream').risky).toBe(false);
   });

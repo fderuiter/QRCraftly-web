@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { sha256Hex } from '@/packages/core/encoding';
 import {
   FountainEncoder,
@@ -358,6 +358,26 @@ describe('Fountain session layer', () => {
     expect(compression).toBe('deflate-raw');
     expect(data.length).toBeLessThan(text.length * 0.95);
     expect(await decompressTransferPayload(data, compression)).toEqual(text);
+  });
+
+  it('refuses a declared size no DEFLATE stream of that length can produce, before allocating it (#1590)', async () => {
+    const payload = new Uint8Array(1024);
+    // The output buffer is made only once the stream runs, so no stream means no 100 MiB buffer.
+    const stream = vi.spyOn(globalThis, 'DecompressionStream');
+    try {
+      await expect(decompressTransferPayload(payload, 'deflate-raw', 100 * 1024 * 1024)).rejects.toMatchObject({ name: 'DecompressionLimitError' });
+      expect(stream).not.toHaveBeenCalled();
+    } finally {
+      stream.mockRestore();
+    }
+  });
+
+  it('still decompresses a highly compressible file at the size it declares (#1590)', async () => {
+    // Zeros compress about as far as DEFLATE allows, so this is the ratio check's edge.
+    const zeros = new Uint8Array(256 * 1024);
+    const packed = await compressForTransfer(zeros, 'application/octet-stream');
+    expect(packed.compression).toBe('deflate-raw');
+    expect(await decompressTransferPayload(packed.data, packed.compression, zeros.length)).toEqual(zeros);
   });
 
   it('bypasses compression for incompressible or pre-compressed payloads and flags them', async () => {

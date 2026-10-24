@@ -43,8 +43,8 @@ export interface FountainSessionHeader {
 
 /** Thrown when decompressed output passes the size the session header declared. */
 export class DecompressionLimitError extends Error {
-  constructor(limit: number) {
-    super(`The transfer expands to more than the ${limit} bytes it declared, so it was stopped.`);
+  constructor(limit: number, message = `The transfer expands to more than the ${limit} bytes it declared, so it was stopped.`) {
+    super(message);
     this.name = 'DecompressionLimitError';
   }
 }
@@ -119,13 +119,19 @@ export async function compressForTransfer(
   return { data: bytes, compression: 'none' };
 }
 
+/** The most a DEFLATE stream can expand its input (a 258-byte match per 2 bits, rounded up). */
+const MAX_DEFLATE_RATIO = 1032;
+/** Headroom for a tiny stream, whose block headers dominate its size. */
+const DEFLATE_RATIO_SLACK = 1024;
+
 /**
  * Reverses {@link compressForTransfer} with `DecompressionStream('deflate-raw')`.
  * @param data Received payload.
  * @param compression Compression flag from the session header.
  * @param expectedSize Size the header declares. Decompression stops as soon as the output passes it.
  * @returns The original file bytes.
- * @throws DecompressionLimitError when the output would exceed `expectedSize`.
+ * @throws DecompressionLimitError when the output would exceed `expectedSize`, or when no DEFLATE
+ * stream of this length could produce `expectedSize` bytes.
  */
 export async function decompressTransferPayload(
   data: Uint8Array,
@@ -133,6 +139,11 @@ export async function decompressTransferPayload(
   expectedSize?: number
 ): Promise<Uint8Array> {
   if (compression === 'none') return data;
+  // DEFLATE expands its input at most about 1032 times, so a larger declared size is impossible
+  // and is refused before any buffer of that size is made (#1590).
+  if (expectedSize !== undefined && expectedSize > data.length * MAX_DEFLATE_RATIO + DEFLATE_RATIO_SLACK) {
+    throw new DecompressionLimitError(expectedSize, `The transfer declares ${expectedSize} bytes, more than its ${data.length} compressed bytes can hold, so it was stopped.`);
+  }
   if (typeof DecompressionStream === 'undefined') {
     throw new Error('This browser cannot decompress the transfer (DecompressionStream unavailable).');
   }

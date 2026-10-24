@@ -54,14 +54,35 @@ describe('BundleComplete', () => {
     expect(onSaveFile).toHaveBeenCalledWith(files[1].data, 'setup.exe', 'application/octet-stream');
   });
 
-  it('offers the archive and receiving another', () => {
+  it('offers the archive in one click when no file is risky, and receiving another', () => {
+    const harmless = [
+      { name: 'docs/report.pdf', mimeType: 'application/pdf', size: 10, data: bytes(5) },
+      { name: 'photos/b.png', mimeType: 'image/png', size: 10, data: bytes(6) },
+    ];
     const onSaveAll = vi.fn();
     const onReceiveAnother = vi.fn();
-    render(<BundleComplete files={files} onSaveFile={vi.fn()} onSaveAll={onSaveAll} onReceiveAnother={onReceiveAnother} />);
+    render(<BundleComplete files={harmless} onSaveFile={vi.fn()} onSaveAll={onSaveAll} onReceiveAnother={onReceiveAnother} />);
     fireEvent.click(screen.getByRole('button', { name: 'Save all (.zip)' }));
     fireEvent.click(screen.getByRole('button', { name: 'Receive another file' }));
     expect(onSaveAll).toHaveBeenCalledOnce();
     expect(onReceiveAnother).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('asks again before saving an archive that holds a risky file, naming each one (#1590)', async () => {
+    const withMacros = [...files, { name: 'docs/invoice.xls', mimeType: 'application/vnd.ms-excel', size: 10, data: bytes(7) }];
+    const onSaveAll = vi.fn();
+    const { container } = render(<BundleComplete files={withMacros} onSaveFile={vi.fn()} onSaveAll={onSaveAll} onReceiveAnother={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Save all (.zip)' }));
+    expect(onSaveAll).not.toHaveBeenCalled();
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('tools/setup.exe, docs/invoice.xls');
+    expect(alert).not.toHaveTextContent('photos/a.jpg');
+    expect(await axe(container)).toHaveNoViolations();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save all anyway' }));
+    expect(onSaveAll).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('has no axe violations', async () => {
