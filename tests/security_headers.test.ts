@@ -98,4 +98,20 @@ describe('public/_headers caching', () => {
     const content = fs.readFileSync(HEADERS_PATH, 'utf8');
     expect(content).toMatch(/^\/assets\/\*\r?\n\s+Cache-Control: public, max-age=31536000, immutable$/m);
   });
+
+  it.each(['/media/*', '/og/*', '/examples/*', '/og-image.png', '/icon-*', '/favicon.png', '/manifest.json'])(
+    'lets browsers keep %s, which has a fixed name, for a day (#1596)',
+    (route) => {
+      const content = fs.readFileSync(HEADERS_PATH, 'utf8');
+      const escaped = route.replace(/[.*/]/g, (char) => `\\${char}`);
+      expect(content).toMatch(new RegExp(`^${escaped}\\r?\\n\\s+Cache-Control: public, max-age=86400$`, 'm'));
+    }
+  );
+
+  it('sets no cache lifetime for pages or the service worker, so a new build is seen at once (#1596)', () => {
+    const content = fs.readFileSync(HEADERS_PATH, 'utf8');
+    const routes = [...content.matchAll(/^(\S+)\r?\n\s+Cache-Control:/gm)].map((match) => match[1]);
+    expect(routes).not.toContain('/*');
+    expect(routes.some((route) => route === '/sw.js' || route.endsWith('.html'))).toBe(false);
+  });
 });

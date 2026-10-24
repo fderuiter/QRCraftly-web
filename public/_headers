@@ -13,6 +13,24 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Media, social images, example codes, icons and the manifest keep fixed names, so a browser keeps
+# them for a day rather than asking again on every use (#1596). HTML and /sw.js are left to
+# revalidate, so a new build is seen at once.
+/media/*
+  Cache-Control: public, max-age=86400
+/og/*
+  Cache-Control: public, max-age=86400
+/examples/*
+  Cache-Control: public, max-age=86400
+/og-image.png
+  Cache-Control: public, max-age=86400
+/icon-*
+  Cache-Control: public, max-age=86400
+/favicon.png
+  Cache-Control: public, max-age=86400
+/manifest.json
+  Cache-Control: public, max-age=86400
+
 # Preview and workers.dev copies of the site are never indexed; qrcraftly.com is the canonical host.
 https://:subdomain.fpderuiter.workers.dev/*
   X-Robots-Tag: noindex
