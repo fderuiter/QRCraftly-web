@@ -36,6 +36,15 @@ beforeAll(() => {
   }
 });
 
+describe('Built WebAssembly modules (#1595)', () => {
+  it('ships each module once, at the URL the page and its workers share', () => {
+    const files = (fs.readdirSync(path.join(DIST_DIR, 'assets'), { recursive: true }) as string[]).map((file) => file.replace(/\\/g, '/'));
+    const modules = files.filter((file) => file.endsWith('.wasm')).map((file) => path.basename(file).replace(/[.-][\w-]{8}\.wasm$/, ''));
+    expect(modules.length).toBeGreaterThan(0);
+    expect(new Set(modules).size).toBe(modules.length);
+  });
+});
+
 describe('Built service worker', () => {
   it('precaches every icon the manifest declares', () => {
     const sw = readBuilt('sw.js');
