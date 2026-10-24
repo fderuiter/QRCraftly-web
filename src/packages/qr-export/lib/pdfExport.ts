@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { concatBytes } from '@/utils/bytes';
+import { concatBytes } from '@/packages/core/encoding';
 import type { QRConfig } from '@/types';
 import { generateQRSvg } from './svgExport';
 import { type ModuleRenderOptions } from '@/packages/qr-matrix';

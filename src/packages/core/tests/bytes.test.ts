@@ -17,7 +17,7 @@
 */
 
 import { describe, expect, it } from 'vitest';
-import { concatBytes } from './bytes';
+import { concatBytes } from '../encoding';
 
 describe('concatBytes', () => {
   it('handles empty input array', () => {

@@ -17,10 +17,9 @@
 */
 
 
+import { bytesToHex, hexToBytes, sha256Hex } from '@/packages/core/encoding';
 import { analyseReceivedFile, sanitizeFileName } from '@/utils/fileNames';
 import { cborDecode, cborEncode } from '../fountain/cbor';
-import { sha256Hex } from '../fountain/session';
-import { bytesToHex, hexToBytes } from '../fountain/session';
 import { MAX_BUNDLE_ENTRIES, MAX_INDEX_BYTES, MAX_RECEIVE_BYTES } from '../limits';
 import { MAX_MANIFEST_MIME_BYTES, fitFileName, type PrismFileEntry } from './manifest';
 

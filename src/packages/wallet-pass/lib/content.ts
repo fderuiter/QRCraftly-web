@@ -19,7 +19,7 @@
 import { type QRConfig, QRType, WifiEncryption } from '@/types';
 import { hydrateWifiData } from '@/packages/qr-payload';
 import { resolveEncodedValue } from '@/packages/qr-matrix';
-import { getContrastRatio, normalizeHex } from '@/utils/colorUtils';
+import { getContrastRatio, normalizeHex } from '@/packages/core/encoding';
 import { REGEX_BIDI_CONTROL_CHARS, REGEX_STRICT_CONTROL_CHARS } from '@/utils/security';
 import { WalletPassError } from './errors';
 

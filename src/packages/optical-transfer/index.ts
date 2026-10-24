@@ -68,7 +68,6 @@ export {
   resolveTransferDensity,
   TRANSFER_DENSITY_PROFILES,
   DEFAULT_TRANSFER_DENSITY,
-  sha256Hex,
   type FountainSessionHeader,
   type TransferCompression,
   type TransferDensity,

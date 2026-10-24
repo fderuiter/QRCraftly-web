@@ -23,7 +23,7 @@ import {
   adjustColorForContrast,
   calculateAutoFixColorPatch,
 } from './contrastAutoFix';
-import { getContrastRatio } from './colorUtils';
+import { getContrastRatio } from '@/packages/core/encoding';
 
 describe('contrastAutoFix', () => {
   describe('rgbToHsl', () => {

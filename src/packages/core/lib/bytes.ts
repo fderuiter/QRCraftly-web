@@ -31,3 +31,24 @@ export function concatBytes(parts: readonly Uint8Array[]): Uint8Array<ArrayBuffe
   }
   return out;
 }
+
+/**
+ * Lowercase hex string to bytes. A string that is not even-length hex gives an empty array.
+ * @param hex - Hex digits, two per byte.
+ * @returns The decoded bytes.
+ */
+export function hexToBytes(hex: string): Uint8Array {
+  const clean = /^[0-9a-f]*$/i.test(hex) && hex.length % 2 === 0 ? hex : '';
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
+
+/**
+ * Bytes to a lowercase hex string, two digits per byte.
+ * @param bytes - The bytes to encode.
+ * @returns The hex string.
+ */
+export function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}

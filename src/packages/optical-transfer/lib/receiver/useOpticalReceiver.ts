@@ -17,6 +17,7 @@
 */
 
 
+import { hexToBytes, sha256Hex } from '@/packages/core/encoding';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQrScanner, type CameraInfo, type ScanCorners } from '@/packages/optical-scanner/client';
 import type { BcUrDecoder, BcUrResult } from '../../bcur';
@@ -25,7 +26,6 @@ import { FountainRateTracker, type FountainTelemetry } from '../fountain/reassem
 import { layerHint } from '../multicode/layerHint';
 import { frameLayer } from '../multicode/multirate';
 import { decoderPoolSize } from '../multicode/pool';
-import { hexToBytes, sha256Hex } from '../fountain/session';
 import { MAX_VIDEO_UPLOAD_BYTES, formatLimit } from '../limits';
 import { FEEDBACK_NONCE_BYTES, encodeFeedbackFrame, looksLikePrismFrame } from '../prism/frame';
 import { createFeedbackMeter } from '../feedback/meter';

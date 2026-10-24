@@ -19,8 +19,8 @@
 /**
  * Offline checksum validation of wallet addresses (#1158, #1159). A typo in an address sends
  * money nowhere, so a code that carries one is worth a warning before it is printed or paid.
- * Pure and synchronous: SHA-256 and Keccak-256 are implemented here because the Web Crypto
- * API is asynchronous and has no Keccak.
+ * Pure and synchronous, because the Web Crypto API is asynchronous and has no Keccak: Keccak-256
+ * is implemented here, and SHA-256 is the synchronous one from `@/packages/core/encoding`.
  */
 
 export type AddressCheck =
@@ -31,7 +31,7 @@ export type AddressCheck =
   /** The format has no checksum to check (an all-lower-case Ethereum address, a Solana key). */
   | 'unchecked';
 
-import { sha256 } from '@/utils/sha256';
+import { sha256 } from '@/packages/core/encoding';
 
 const BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const BECH32 = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';

@@ -33,7 +33,7 @@
  */
 
 import type { QRModules, MosaicMode } from '@/types';
-import { srgbToLinear, linearToSrgb, getLuminanceFromLinearRgb } from '@/utils/colorUtils';
+import { srgbToLinear, linearToSrgb, getLuminanceFromLinearRgb } from '@/packages/core/encoding';
 import { isAlignmentPatternZone } from './utils';
 
 /** Engine options. */

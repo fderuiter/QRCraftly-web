@@ -18,7 +18,7 @@
 
 import type { QRConfig } from '@/types';
 import { LOW_RELIABILITY_PATTERNS, SYSTEM_LIMITS } from '@/constants';
-import { getContrastRatio } from '@/utils/colorUtils';
+import { getContrastRatio } from '@/packages/core/encoding';
 
 export interface HealthScore {
   score: number;

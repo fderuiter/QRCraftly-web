@@ -17,9 +17,11 @@
 */
 
 /**
- * Synchronous SHA-256. The Web Crypto digest is asynchronous, and some callers (wallet checksums,
- * transfer session IDs) need an answer inside a synchronous parser.
+ * SHA-256 in two forms. `sha256` is synchronous pure TypeScript: the Web Crypto digest is
+ * asynchronous, and some callers (wallet checksums, transfer session IDs) need an answer inside a
+ * synchronous parser. `sha256Digest` and `sha256Hex` use Web Crypto, which is faster on large input.
  */
+import { bytesToHex } from './bytes';
 
 const SHA256_K = new Uint32Array([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be,
@@ -79,4 +81,22 @@ export function sha256(message: Uint8Array): Uint8Array {
   const outView = new DataView(out.buffer);
   state.forEach((word, i) => outView.setUint32(i * 4, word));
   return out;
+}
+
+/**
+ * SHA-256 with Web Crypto.
+ * @param bytes - The bytes to hash.
+ * @returns The 32-byte digest.
+ */
+export async function sha256Digest(bytes: Uint8Array): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(bytes)));
+}
+
+/**
+ * Lowercase hex SHA-256 with Web Crypto.
+ * @param bytes - The bytes to hash.
+ * @returns The 64-character hex digest.
+ */
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  return bytesToHex(await sha256Digest(bytes));
 }

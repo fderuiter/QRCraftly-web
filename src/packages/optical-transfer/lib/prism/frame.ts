@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { bytesToHex } from '@/packages/core/encoding';
 import { crc32c } from '../fountain/crc32';
-import { bytesToHex } from '../fountain/session';
 import { decodeBase45, encodeBase45, isBase45 } from './base45';
 
 /**

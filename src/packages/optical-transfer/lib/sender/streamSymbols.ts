@@ -21,11 +21,12 @@
  * frame, so left to itself the encoder gives it a smaller code, and on a fixed-size canvas that
  * code's larger modules and wider quiet zone make the picture shrink every 16th frame.
  */
+import { ECC_LEVELS } from '@/packages/core/ecc';
 import { QrEncodeError, type QrEccLetter, type QrSymbol, type QrSymbolEncoder } from '@/packages/qr-matrix/encoder';
 import { ALPHANUMERIC_CAPACITY } from '../fountain/session';
 
-/** Levels from strongest to weakest. */
-const LEVELS: readonly QrEccLetter[] = ['H', 'Q', 'M', 'L'];
+/** Levels from strongest to weakest: the stream tries the strongest level that still fits first. */
+const LEVELS: readonly QrEccLetter[] = [...ECC_LEVELS].reverse();
 
 /** Frame texts a version is chosen from: frame 0 is a manifest and frame 1 a data frame. */
 export interface StreamFrameSource {

@@ -38,7 +38,7 @@ import {
   type MosaicSource,
 } from '../mosaic';
 import { drawQRInternal } from '../index';
-import { getLuminanceFromRgb } from '@/utils/colorUtils';
+import { getLuminanceFromRgb } from '@/packages/core/encoding';
 import { DEFAULT_CONFIG } from '@/constants';
 import { SvgContext } from '@/packages/qr-export';
 import { qrReader } from '../../../../tests/fixtures/qrReader';

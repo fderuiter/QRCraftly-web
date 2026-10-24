@@ -20,6 +20,7 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useOpticalReceiver } from '../client';
+import { sha256Hex } from '@/packages/core/encoding';
 import {
   PrismStream,
   TRANSFER_DENSITY_PROFILES,
@@ -31,7 +32,6 @@ import {
   encodeBytewordsMinimal,
   keyQrText,
   parseKeyCode,
-  sha256Hex,
 } from '../index';
 import { receiverOptions } from './fixtures';
 
