@@ -27,8 +27,7 @@ if (typeof globalThis.DOMParser === 'undefined') {
   globalThis.Node = dom.window.Node;
 }
 
-import { getCachedAsset, setCachedAsset, clearAssetCache, convertImageToBase64 } from './assetCache';
-import { generateQRSvg } from '@/packages/qr-export';
+import { getCachedAsset, setCachedAsset, clearAssetCache, convertImageToBase64, generateQRSvg } from '../index';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import type { QRConfig } from '@/packages/core/types';
 
