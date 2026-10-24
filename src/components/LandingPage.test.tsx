@@ -51,8 +51,7 @@ describe('landing pages that preset the generator (#1035, #1037)', () => {
     await import('@/components/inputs/SocialInput');
     clearRetainedAppearance();
     renderLanding('instagram-qr-code');
-    // A full generator render on a busy shard can pass findBy's default 1 s, so allow 5 s.
-    expect(await screen.findByLabelText('Username / Handle', {}, { timeout: 5_000 })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Username / Handle')).toBeInTheDocument();
   });
 
   it('shows the mosaic gallery with alt text, and the guide, how-to and FAQ on every page', () => {

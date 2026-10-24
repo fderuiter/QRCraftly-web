@@ -130,7 +130,7 @@ describe('QRTool Component', () => {
     expect(screen.queryByTestId('mockup-view')).not.toBeInTheDocument();
 
     fireEvent.click(views.getByRole('radio', { name: 'Table tent' }));
-    expect(await screen.findByTestId('mockup-view', {}, { timeout: 5_000 })).toBeInTheDocument();
+    expect(await screen.findByTestId('mockup-view')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /table tent/i })).toBeInTheDocument();
     // The flat preview stays on screen above: the scene copies from it and the exports read it.
     expect(screen.getByTestId('qr-stage')).toBeVisible();
