@@ -19,7 +19,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { MAX_FEC_SOURCE_SYMBOLS, MAX_FEC_SYMBOL_BYTES } from '@/packages/optical-transfer';
+import { MAX_FEC_SOURCE_SYMBOLS, MAX_FEC_SYMBOL_BYTES } from '@/packages/optical-transfer/protocol';
 import { committedModuleBytes } from './differential';
 import { PRISM_FEC_BATTERY_SHA256, decodePrismFecJob, makePrismFecJob, runPrismFecBattery } from './prismFecBattery';
 

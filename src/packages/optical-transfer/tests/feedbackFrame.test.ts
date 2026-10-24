@@ -17,18 +17,8 @@
 */
 
 import { describe, expect, it } from 'vitest';
-import {
-  PrismReceiver,
-  createPrismSession,
-  createReceiverNonce,
-  crc32c,
-  decodeBase45,
-  decodeFrame,
-  encodeBase45,
-  encodeFeedbackFrame,
-  looksLikePrismFrame,
-  type FeedbackLayer,
-} from '../index';
+import { PrismReceiver, createReceiverNonce, crc32c, decodeBase45, decodeFrame, encodeBase45, encodeFeedbackFrame, looksLikePrismFrame, type FeedbackLayer } from '../protocol';
+import { createPrismSession } from '../index';
 
 const SESSION = Uint8Array.from([1, 2, 3, 4, 5, 6]);
 const NONCE = Uint8Array.from([0xde, 0xad, 0xbe, 0xef]);

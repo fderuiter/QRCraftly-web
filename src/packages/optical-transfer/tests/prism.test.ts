@@ -19,35 +19,8 @@
 import { describe, expect, it } from 'vitest';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { sha256Hex } from '@/packages/core/encoding';
-import {
-  FLAG_ENCRYPTED,
-  FRAME_OVERHEAD,
-  FountainReassembler,
-  MANIFEST_INTERVAL,
-  MAX_MANIFEST_NAME_BYTES,
-  MAX_RECEIVE_BYTES,
-  PRISM_VERSION,
-  TRANSFER_DENSITY_PROFILES,
-  base45Length,
-  createPrng,
-  createPrismSession,
-  crc32c,
-  decodeBase45,
-  decodeFrame,
-  decodeManifest,
-  encodeBase45,
-  encodeDataFrame,
-  encodeManifest,
-  encodeManifestFrame,
-  estimateTransferFrames,
-  fitFileName,
-  looksLikePrismFrame,
-  prismFrameCapacity,
-  prismSymbolSize,
-  sessionIdOf,
-  type PrismManifest,
-  type TransferDensity,
-} from '../index';
+import { FLAG_ENCRYPTED, FRAME_OVERHEAD, FountainReassembler, MANIFEST_INTERVAL, MAX_MANIFEST_NAME_BYTES, MAX_RECEIVE_BYTES, PRISM_VERSION, base45Length, createPrng, crc32c, decodeBase45, decodeFrame, decodeManifest, encodeBase45, encodeDataFrame, encodeManifest, encodeManifestFrame, fitFileName, looksLikePrismFrame, prismFrameCapacity, prismSymbolSize, sessionIdOf, type PrismManifest } from '../protocol';
+import { TRANSFER_DENSITY_PROFILES, createPrismSession, estimateTransferFrames, type TransferDensity } from '../index';
 import { BcUrEncoder } from '../bcur';
 
 const text = (value: string) => new TextEncoder().encode(value);

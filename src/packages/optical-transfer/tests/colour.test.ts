@@ -1,35 +1,10 @@
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { beforeAll, describe, it, expect } from 'vitest';
-import {
-  CALIBRATION_SWATCHES,
-  COLOUR_FALLBACK_BEACONS,
-  COLOUR_PROFILE,
-  ColourCalibrator,
-  EMIT_DARK,
-  EMIT_LIGHT,
-  MULTI_RATE_PROFILES,
-  TILE_LAYOUTS,
-  beaconPatchRects,
-  composeBeacon,
-  composeColourTile,
-  createColourSender,
-  createPrismSession,
-  createPrng,
-  decodeFrame,
-  fitCrossTalk,
-  isBeaconFrame,
-  meanColour,
-  qrModuleCount,
-  samplePatch,
-  shouldFallBackToMono,
-  splitChannels,
-  tileRectsFromBeacon,
-  type Matrix3,
-  type Rgb,
-  type RgbaImage,
-  loadCrossTalkKernels,
-} from '../index';
+import { CALIBRATION_SWATCHES, COLOUR_FALLBACK_BEACONS, COLOUR_PROFILE, ColourCalibrator, EMIT_DARK, EMIT_LIGHT, beaconPatchRects, composeBeacon, composeColourTile, createColourSender, fitCrossTalk, meanColour, samplePatch, shouldFallBackToMono, splitChannels, tileRectsFromBeacon, type Matrix3, type Rgb, type RgbaImage, loadCrossTalkKernels } from '../colour';
+import { MULTI_RATE_PROFILES, TILE_LAYOUTS, isBeaconFrame, qrModuleCount } from '../multicode';
+import { createPrismSession } from '../index';
+import { createPrng, decodeFrame } from '../protocol';
 
 const MATRIX: Matrix3 = [
   [0.8, 0.14, 0.06],

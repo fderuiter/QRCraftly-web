@@ -22,7 +22,7 @@ import type { EccLevel } from '@/packages/core/ecc';
 import type { EccLevel as ArcadeEccLevel } from '@/packages/arcade';
 import type { QrReadLevel } from '@/packages/qr-decode';
 import type { QrEccLetter } from '@/packages/qr-matrix/encoder';
-import type { StreamErrorCorrection } from '@/packages/optical-transfer';
+import type { StreamErrorCorrection } from '@/packages/optical-transfer/protocol';
 import type { QRErrorCorrectionLevel } from '@/packages/core/types';
 
 describe('error correction levels', () => {

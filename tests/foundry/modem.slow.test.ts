@@ -68,7 +68,7 @@ import {
   type ProbeReport,
   type RgbaImage,
 } from '@/packages/optical-modem';
-import { ColourCalibrator, fitCrossTalk, loadCrossTalkKernels, splitChannels, type CrossTalkModel, type Rgb } from '@/packages/optical-transfer';
+import { ColourCalibrator, fitCrossTalk, loadCrossTalkKernels, splitChannels, type CrossTalkModel, type Rgb } from '@/packages/optical-transfer/colour';
 import type { WasmInstance } from '@/packages/wasm-runtime';
 import { committedModuleBytes, loadCommittedModule } from './differential';
 import { MODEM_BATTERY_SHA256, runModemBattery } from './modemBattery';

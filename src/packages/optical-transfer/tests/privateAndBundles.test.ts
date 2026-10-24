@@ -19,36 +19,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { sha256Hex } from '@/packages/core/encoding';
-import {
-  FountainReassembler,
-  KEY_CODE_WORDS,
-  KEY_SECRET_BYTES,
-  MANIFEST_INTERVAL,
-  MAX_BUNDLE_ENTRIES,
-  TRANSFER_DENSITY_PROFILES,
-  bytesToWords,
-  createPrismBundleSession,
-  createPrismSession,
-  createPrng,
-  decodeFrame,
-  decryptBlock,
-  deriveKeys,
-  encodeDataFrame,
-  encryptBlock,
-  fingerprintWords,
-  formatKeyCode,
-  generateSecret,
-  hkdfSha256,
-  hmacSha256,
-  keyQrText,
-  packBundle,
-  parseKeyCode,
-  parseKeyQr,
-  privateSessionId,
-  sanitizeRelativePath,
-  unpackBundle,
-  wordsToBytes,
-} from '../index';
+import { FountainReassembler, KEY_CODE_WORDS, KEY_SECRET_BYTES, MANIFEST_INTERVAL, MAX_BUNDLE_ENTRIES, bytesToWords, createPrismBundleSession, createPrng, decodeFrame, decryptBlock, deriveKeys, encodeDataFrame, encryptBlock, fingerprintWords, formatKeyCode, generateSecret, hkdfSha256, hmacSha256, keyQrText, packBundle, parseKeyCode, parseKeyQr, privateSessionId, sanitizeRelativePath, unpackBundle, wordsToBytes } from '../protocol';
+import { TRANSFER_DENSITY_PROFILES, createPrismSession } from '../index';
 
 const text = (value: string) => new TextEncoder().encode(value);
 const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');

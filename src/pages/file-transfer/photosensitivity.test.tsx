@@ -43,7 +43,7 @@ const helloFiles = [helloFile];
 
 vi.mock('@/packages/optical-transfer/client', async () => {
   const { useReducer } = await vi.importActual<typeof import('react')>('react');
-  const { senderReducer } = await vi.importActual<typeof import('@/packages/optical-transfer')>('@/packages/optical-transfer');
+  const { senderReducer } = await vi.importActual<typeof import('@/packages/optical-transfer/protocol')>('@/packages/optical-transfer/protocol');
   return {
   // The real phase reducer runs, so the reduced-motion confirm opens and closes as in the app.
   useOpticalSender: () => {

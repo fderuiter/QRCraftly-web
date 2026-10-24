@@ -17,7 +17,7 @@
 */
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { loadFecModule } from '@/packages/optical-transfer';
+import { loadFecModule } from '@/packages/optical-transfer/protocol';
 import baseline from './fixtures/transfer-baseline.json';
 import { BASELINE_MAX_K, CODEC_BLOCK_SIZE, ERASURE_CHANNELS, benchCodec, codecTrials, runCodecTrial } from './utils/transferBench';
 

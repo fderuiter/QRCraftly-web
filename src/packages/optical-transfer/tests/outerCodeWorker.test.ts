@@ -17,7 +17,8 @@
 */
 
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { MANIFEST_INTERVAL, OUTER_CODE_UNAVAILABLE, TRANSFER_DENSITY_PROFILES, createPrismSession, createPrng, loadFecModule } from '../index';
+import { MANIFEST_INTERVAL, OUTER_CODE_UNAVAILABLE, createPrng, loadFecModule } from '../protocol';
+import { TRANSFER_DENSITY_PROFILES, createPrismSession } from '../index';
 
 type Handler = (event: { data: unknown }) => Promise<void> | void;
 type Posted = { type: string; [key: string]: unknown };

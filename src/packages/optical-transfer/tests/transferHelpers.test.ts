@@ -17,16 +17,8 @@
 */
 
 import { describe, expect, it } from 'vitest';
-import {
-  describeCameraError,
-  formatDuration,
-  fountainStatsFrom,
-  permissionOf,
-  steerMessage,
-  transferProgress,
-  validateReceivedFile,
-  type DurationStyle,
-} from '../index';
+import { describeCameraError, formatDuration, steerMessage } from '../index';
+import { fountainStatsFrom, permissionOf, transferProgress, validateReceivedFile, type DurationStyle } from '../protocol';
 
 /** The receiver's upload limit, 500 MB. */
 const MAX_VIDEO_UPLOAD_BYTES = 500 * 1024 * 1024;

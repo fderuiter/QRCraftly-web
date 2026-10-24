@@ -18,7 +18,16 @@
 
 import { qrEncoder as QRCode } from './fixtures/qrEncoder';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { COLOUR_FALLBACK_HINT, composeBeacon, composeColourTile, fitCrossTalk, loadCrossTalkKernels, qrModuleCount, samplePatch, splitChannels } from '../src/packages/optical-transfer/index';
+import {
+  COLOUR_FALLBACK_HINT,
+  composeBeacon,
+  composeColourTile,
+  fitCrossTalk,
+  loadCrossTalkKernels,
+  samplePatch,
+  splitChannels,
+} from '../src/packages/optical-transfer/colour';
+import { qrModuleCount } from '../src/packages/optical-transfer/multicode';
 import { CLEAN_CHANNEL, COLOUR_BLIND_CHANNEL, REFERENCE_CHANNEL, capture, qrDecoders, runColourTransfer } from './utils/colourBench';
 import { createRandom } from './utils/scannerCorpus';
 

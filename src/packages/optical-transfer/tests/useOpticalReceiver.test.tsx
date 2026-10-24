@@ -21,24 +21,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { useOpticalReceiver } from '../client';
-import {
-  PrismStream,
-  TRANSFER_DENSITY_PROFILES,
-  createPrismSession,
-  crc32,
-  crc32c,
-  decodeBase45,
-  encodeBase45,
-  encodeDataFrame,
-  createPrismBundleSession,
-  createPrng,
-  keyQrText,
-  parseKeyCode,
-  STALL_HINT,
-  STALL_HINT_SECONDS,
-} from '../index';
+import { PrismStream, crc32, crc32c, decodeBase45, encodeBase45, encodeDataFrame, createPrismBundleSession, createPrng, keyQrText, parseKeyCode } from '../protocol';
+import { TRANSFER_DENSITY_PROFILES, createPrismSession } from '../index';
+import { STALL_HINT, STALL_HINT_SECONDS } from '../multicode';
 import { receiverOptions } from './fixtures';
-import { decodeFrame } from '../index';
+import { decodeFrame } from '../protocol';
 
 /** The feedback code's text, as the receiver hands it to the QR encoder (#1146). */
 const encoded = vi.hoisted(() => ({ texts: [] as string[] }));

@@ -17,7 +17,7 @@
 */
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { loadCrossTalkKernels } from '../src/packages/optical-transfer/index';
+import { loadCrossTalkKernels } from '../src/packages/optical-transfer/colour';
 import { CLEAN_CHANNEL, COLOUR_BLIND_CHANNEL, runColourTransfer } from './utils/colourBench';
 
 // The full-size colour runs live in colourTransfer.slow.test.ts (#1608). These small runs keep the

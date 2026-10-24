@@ -17,7 +17,7 @@
 */
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { FecDecoder, FecEncoder, MAX_FEC_SOURCE_SYMBOLS, isValidFecLayout, loadFecModule, planBlocks, type FecLayout } from '../index';
+import { FecDecoder, FecEncoder, MAX_FEC_SOURCE_SYMBOLS, isValidFecLayout, loadFecModule, planBlocks, type FecLayout } from '../protocol';
 
 let module: WebAssembly.Module;
 

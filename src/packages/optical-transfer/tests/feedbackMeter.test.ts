@@ -17,16 +17,10 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import {
-  FEEDBACK_WINDOW_FRAMES,
-  TILE_LAYOUTS,
-  createFeedbackMeter,
-  createMultiRateSender,
-  createPrismSession,
-  createPrng,
-  switchableProfile,
-  type MultiRateProfileName,
-} from '../index';
+import { FEEDBACK_WINDOW_FRAMES, createFeedbackMeter, switchableProfile } from '../feedback';
+import { TILE_LAYOUTS, createMultiRateSender, type MultiRateProfileName } from '../multicode';
+import { createPrismSession } from '../index';
+import { createPrng } from '../protocol';
 
 /** The dense tiles and a beacon of one profile, each with its QR version. */
 async function codesOf(name: MultiRateProfileName) {

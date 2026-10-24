@@ -17,7 +17,7 @@
 */
 
 import { describe, expect, it, vi } from 'vitest';
-import { createFeedbackLink, type CameraPermission } from '../index';
+import { createFeedbackLink, type CameraPermission } from '../feedback';
 
 /** A camera request the test settles by hand, like a permission prompt. */
 function prompt() {

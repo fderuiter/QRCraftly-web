@@ -1,19 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import {
-  MULTI_RATE_PROFILES,
-  PrismReceiver,
-  TILE_LAYOUTS,
-  ROBUST_LAYER_HINT,
-  STALL_HINT,
-  frameLayer,
-  createMultiRateSender,
-  createPrismSession,
-  createPrng,
-  holdForTargetFps,
-  isBeaconFrame,
-  layerHint,
-  type MultiRateProfileName,
-} from '../index';
+import { MULTI_RATE_PROFILES, TILE_LAYOUTS, ROBUST_LAYER_HINT, STALL_HINT, frameLayer, createMultiRateSender, holdForTargetFps, isBeaconFrame, layerHint, type MultiRateProfileName } from '../multicode';
+import { PrismReceiver, createPrng } from '../protocol';
+import { createPrismSession } from '../index';
 
 async function senderFor(name: MultiRateProfileName, size = 6000) {
   const random = createPrng(5);

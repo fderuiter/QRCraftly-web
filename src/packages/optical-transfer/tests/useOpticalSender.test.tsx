@@ -22,7 +22,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { useOpticalSender } from '../client';
 import { senderOptions } from './fixtures';
-import { encodeFeedbackFrame } from '../index';
+import { encodeFeedbackFrame } from '../protocol';
 
 /**
  * Gives a canvas a 2D context that only takes fills. The multi-code tests check the timeline, not

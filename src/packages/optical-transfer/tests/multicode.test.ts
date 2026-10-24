@@ -17,42 +17,9 @@
 */
 
 import { describe, expect, it } from 'vitest';
-import {
-  FRAME_OVERHEAD,
-  MIN_MODULE_CSS_PX,
-  TILE_LAYOUTS,
-  TILE_QUIET_MODULES,
-  TileTracker,
-  alphanumericCapacityL,
-  createDecoderPool,
-  createPrismSession,
-  createSymbolDedup,
-  createVsyncPacer,
-  decoderPoolSize,
-  effectiveFps,
-  holdForTargetFps,
-  layoutFootprint,
-  measureRefreshInterval,
-  modulePxFor,
-  planMultiCode,
-  predictTileRects,
-  prismFrameCapacity,
-  qrModuleCount,
-  refreshRateFromInterval,
-  selectLayout,
-  tileFrameCapacity,
-  tileFrameIndex,
-  tileGroup,
-  tileSlot,
-  tileSymbolPlan,
-  tilesChangingAt,
-  tilesIntactAcross,
-  worstIntactFraction,
-  type FrameClock,
-  type PacerTick,
-  type Rect,
-  type TileLayoutId,
-} from '../index';
+import { FRAME_OVERHEAD, prismFrameCapacity } from '../protocol';
+import { MIN_MODULE_CSS_PX, TILE_LAYOUTS, TILE_QUIET_MODULES, TileTracker, alphanumericCapacityL, createDecoderPool, createSymbolDedup, createVsyncPacer, decoderPoolSize, effectiveFps, holdForTargetFps, layoutFootprint, measureRefreshInterval, modulePxFor, planMultiCode, predictTileRects, qrModuleCount, refreshRateFromInterval, selectLayout, tileFrameCapacity, tileFrameIndex, tileGroup, tileSlot, tileSymbolPlan, tilesChangingAt, tilesIntactAcross, worstIntactFraction, type FrameClock, type PacerTick, type Rect, type TileLayoutId } from '../multicode';
+import { createPrismSession } from '../index';
 
 describe('multi-code layouts (#1142)', () => {
   it('agrees with the existing capacity table up to version 20 and knows the large versions', () => {

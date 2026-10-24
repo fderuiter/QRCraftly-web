@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { BcUrDecoder, BcUrEncoder, isBcUr, type BcUrIngest } from '../bcur';
-import { cborEncode } from '../index';
+import { cborEncode } from '../protocol';
 import reference from './fixtures/bcur/reference-streams.json';
 import published from './fixtures/bcur/published.json';
 import crossChecks from './fixtures/bcur/ours-decoded-by-reference.json';

@@ -19,21 +19,9 @@
 import { describe, expect, it } from 'vitest';
 import { qrEncoder } from '../../../../tests/fixtures/qrEncoder';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
-import {
-  TILE_LAYOUTS,
-  TILE_QUIET_MODULES,
-  TileReadSession,
-  createPrismSession,
-  createTileReader,
-  layoutForCodes,
-  tileFrameIndex,
-  type PrismStream,
-  type TileCode,
-  type TileLayout,
-  type TileReadRequest,
-  type TileReadResponse,
-  type TileWorker,
-} from '../index';
+import { TILE_LAYOUTS, TILE_QUIET_MODULES, TileReadSession, createTileReader, layoutForCodes, tileFrameIndex, type TileCode, type TileLayout, type TileReadRequest, type TileReadResponse, type TileWorker } from '../multicode';
+import { createPrismSession } from '../index';
+import { type PrismStream } from '../protocol';
 
 const layout = TILE_LAYOUTS['2x2-v20'];
 const MODULE_PX = 3;

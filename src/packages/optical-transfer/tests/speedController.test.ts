@@ -17,19 +17,9 @@
 */
 
 import { describe, expect, it } from 'vitest';
-import {
-  MAX_RECEIVERS,
-  MULTI_RATE_PROFILES,
-  RECEIVER_EXPIRY_MS,
-  RISE_AFTER_MS,
-  SETTLE_MS,
-  SWITCHABLE_SYMBOL_SIZE,
-  createSpeedController,
-  switchableProfile,
-  type FeedbackLayer,
-  type FeedbackReport,
-  type MultiRateProfileName,
-} from '../index';
+import { MAX_RECEIVERS, RECEIVER_EXPIRY_MS, RISE_AFTER_MS, SETTLE_MS, SWITCHABLE_SYMBOL_SIZE, createSpeedController, switchableProfile } from '../feedback';
+import { MULTI_RATE_PROFILES, type MultiRateProfileName } from '../multicode';
+import { type FeedbackLayer, type FeedbackReport } from '../protocol';
 
 const SESSION = 'aabbccddeeff';
 
