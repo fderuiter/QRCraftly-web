@@ -19,6 +19,15 @@
 import { MULTI_RATE_PROFILES, type MultiRateProfileName } from '../multicode/multirate';
 import type { FeedbackLinkState } from './link';
 
+/** Why the back channel is one-way, as the start of a sentence. */
+const ONE_WAY_REASONS: Record<Extract<FeedbackLinkState, { status: 'one-way' }>['reason'], string> = {
+  denied: 'Camera access was refused',
+  unavailable: 'No camera was found',
+  busy: 'The camera is in use by another app or tab',
+  'camera-lost': 'The camera stopped',
+  error: 'The camera could not start',
+};
+
 /**
  * What the sender says about the back channel while it sends.
  * @param state - The back channel's state.
@@ -34,14 +43,7 @@ export function steerMessage(state: FeedbackLinkState, profile: MultiRateProfile
     return `${speed}, steered by ${receivers} receiver${receivers === 1 ? '' : 's'}.`;
   }
   if (state.status === 'one-way') {
-    const why =
-      state.reason === 'denied'
-        ? 'Camera access was refused'
-        : state.reason === 'unavailable'
-          ? 'No camera was found'
-          : state.reason === 'camera-lost'
-            ? 'The camera stopped'
-            : 'The camera could not start';
+    const why = ONE_WAY_REASONS[state.reason];
     return `${why}, so this transfer runs at the speed you chose and does not stop by itself.`;
   }
   return '';

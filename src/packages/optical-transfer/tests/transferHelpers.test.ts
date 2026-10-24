@@ -111,8 +111,12 @@ describe('permissionOf', () => {
     expect(permissionOf(named(name))).toBe('denied');
   });
 
-  it.each(['NotFoundError', 'OverconstrainedError', 'NotReadableError'])('reads %s as unavailable', (name) => {
+  it.each(['NotFoundError', 'OverconstrainedError'])('reads %s as unavailable', (name) => {
     expect(permissionOf({ name })).toBe('unavailable');
+  });
+
+  it.each(['NotReadableError', 'TrackStartError'])('reads %s as busy (#1585)', (name) => {
+    expect(permissionOf({ name })).toBe('busy');
   });
 
   it('throws anything else back', () => {
@@ -128,7 +132,7 @@ describe('describeCameraError', () => {
     ['PermissionDeniedError', /blocked/],
     ['SecurityError', /blocked/],
     ['NotFoundError', /No camera was found/],
-    ['OverconstrainedError', /No camera was found/],
+    ['OverconstrainedError', /cannot stream at a size/],
     ['NotReadableError', /in use by another app/],
     ['TrackStartError', /in use by another app/],
   ])('explains %s', (name, expected) => {
@@ -156,6 +160,8 @@ describe('steerMessage', () => {
   it.each([
     ['denied', 'Camera access was refused'],
     ['unavailable', 'No camera was found'],
+    ['busy', 'The camera is in use by another app or tab'],
+    ['error', 'The camera could not start'],
     ['camera-lost', 'The camera stopped'],
   ] as const)('explains a one-way stream after %s', (reason, why) => {
     expect(steerMessage({ status: 'one-way', reason }, null, 0)).toBe(`${why}, so this transfer runs at the speed you chose and does not stop by itself.`);

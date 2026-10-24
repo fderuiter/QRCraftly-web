@@ -401,6 +401,56 @@ describe('useOpticalSender', () => {
       expect(result.current.steerState).toEqual({ status: 'off' });
     });
 
+    /** Hides or shows the tab, as the browser does when the user switches away and back. */
+    function setTabHidden(hidden: boolean) {
+      vi.spyOn(document, 'hidden', 'get').mockReturnValue(hidden);
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+    }
+
+    it('lets the webcam go while the tab is hidden and asks for it again when shown (#1585)', async () => {
+      const webcams = [fakeWebcam(), fakeWebcam()];
+      const requestWebcam = vi.fn(async () => webcams[requestWebcam.mock.calls.length - 1].stream);
+      const { result } = await startSteered(requestWebcam);
+      act(() => result.current.startTransfer());
+      await waitFor(() => expect(result.current.steerState).toEqual({ status: 'listening' }));
+
+      setTabHidden(true);
+      expect(webcams[0].track.stop).toHaveBeenCalledTimes(1);
+      expect(requestWebcam).toHaveBeenCalledTimes(1);
+      // A hidden tab has no camera on purpose: the link does not fall back to one way.
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      expect(result.current.steerState).toEqual({ status: 'listening' });
+
+      setTabHidden(false);
+      await waitFor(() => expect(requestWebcam).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(result.current.steeringReceivers).toBe(1));
+      expect(result.current.steerState).toEqual({ status: 'listening' });
+      expect(webcams[1].track.readyState).toBe('live');
+
+      act(() => result.current.stopTransfer());
+      expect(webcams[1].track.stop).toHaveBeenCalledTimes(1);
+    });
+
+    it('carries on one way when the webcam is busy after the tab is shown again (#1585)', async () => {
+      const webcam = fakeWebcam();
+      let calls = 0;
+      const requestWebcam = vi.fn(async (): Promise<MediaStream> => {
+        calls += 1;
+        if (calls === 1) return webcam.stream;
+        throw new DOMException('Could not start video source', 'NotReadableError');
+      });
+      const { result } = await startSteered(requestWebcam);
+      act(() => result.current.startTransfer());
+      await waitFor(() => expect(result.current.steerState).toEqual({ status: 'listening' }));
+
+      setTabHidden(true);
+      setTabHidden(false);
+      await waitFor(() => expect(result.current.steerState).toEqual({ status: 'one-way', reason: 'camera-lost' }));
+      expect(result.current.isTransferring).toBe(true);
+    });
+
     it('carries on one way at the chosen speed when the webcam is refused', async () => {
       const requestWebcam = vi.fn(async (): Promise<MediaStream> => {
         throw new DOMException('Permission denied', 'NotAllowedError');

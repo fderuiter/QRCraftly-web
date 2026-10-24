@@ -29,13 +29,13 @@
 import type { MultiRateProfileName } from '../multicode/multirate';
 
 /** What asking for the camera came back with. */
-export type CameraPermission = 'granted' | 'denied' | 'unavailable';
+export type CameraPermission = 'granted' | 'denied' | 'unavailable' | 'busy';
 
 export type FeedbackLinkState =
   | { status: 'off' }
   | { status: 'requesting' }
   | { status: 'listening' }
-  | { status: 'one-way'; reason: 'denied' | 'unavailable' | 'camera-lost' | 'error' };
+  | { status: 'one-way'; reason: 'denied' | 'unavailable' | 'busy' | 'camera-lost' | 'error' };
 
 export interface FeedbackLinkOptions {
   /** Asks for the camera. Called only from `enable()`. A rejection counts as an error. */

@@ -179,7 +179,7 @@ export function useFrameSource(options: FrameSourceOptions) {
   useEffect(() => {
     if (cameraStatus === 'streaming') {
       optionsRef.current.addToast?.({ type: 'success', message: 'Camera scanner activated.', duration: 3000 });
-    } else if (cameraStatus === 'denied' || cameraStatus === 'unavailable' || cameraStatus === 'error') {
+    } else if (cameraStatus === 'denied' || cameraStatus === 'unavailable' || cameraStatus === 'busy' || cameraStatus === 'unsupported' || cameraStatus === 'error') {
       setIsScanning(false);
     }
   }, [cameraStatus]);
