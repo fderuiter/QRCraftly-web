@@ -20,8 +20,7 @@ import { QRType } from '@/packages/core/types';
 import { identifyProtocol } from '@/packages/qr-payload';
 import { getQRTypeLabel } from '@/data/qrTypeLabels';
 import { isDangerousUrl } from '@/packages/core/security';
-import { analyseLink, type LinkFinding } from '@/packages/link-safety';
-import { hasMixedScripts, toUnicodeHostname } from '@/utils/hostname';
+import { analyseLink, hasMixedScripts, toUnicodeHostname, type LinkFinding } from '@/packages/link-safety';
 import { revealInvisibleCharacters } from '@/packages/core/files';
 import { describeContent, type ScanSummaryRow } from './contentNotes';
 

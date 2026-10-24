@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { hasMixedScripts, toUnicodeHostname } from '@/utils/hostname';
+import { hasMixedScripts, toUnicodeHostname } from './hostname';
 import { BRANDS, CONFUSABLES, MULTI_LABEL_SUFFIXES, SHORTENERS, type Brand } from './data';
 
 /** How much a finding should weigh: `info` is context, `caution` is a reason to stop and check. */
