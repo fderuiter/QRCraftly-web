@@ -30,7 +30,7 @@
  * arrive, about a second of work for a full 8192-symbol block, and the last symbol's solve takes
  * under 100 ms.
  */
-import { WasmModuleError, compileWasmUrl, instantiateWasmSync, type WasmInstance } from '@/packages/wasm-runtime';
+import { WasmModuleError, compileWasmUrl, instantiateWasmSync, type WasmInstance, wasmModuleUrl } from '@/packages/wasm-runtime';
 import { crc32 } from '../fountain/crc32';
 import { MAX_FEC_SOURCE_SYMBOLS, MAX_FEC_SYMBOL_BYTES, MAX_RECEIVE_MESSAGE_BYTES } from '../limits';
 
@@ -50,15 +50,9 @@ const ADDED_COMPLETE = 2;
 /** The module's URL in a build: Vite emits the file as an asset next to the bundle. */
 const PRISM_FEC_WASM_URL = new URL('../../../../wasm/prism-fec.wasm', import.meta.url);
 
-/** Under Node (tests, scripts) this file has a `file:` URL and the module is read from `src/wasm/`. */
-function moduleUrl(): URL {
-  const here = import.meta.url;
-  return here.startsWith('file:') ? new URL('../../../../wasm/prism-fec.wasm', here) : PRISM_FEC_WASM_URL;
-}
-
-/** Compiles the module once per page or worker. */
+/** Compiles the module once per page or worker (wasm-runtime caches it per URL and retries a failure). */
 export function loadFecModule(): Promise<WebAssembly.Module> {
-  return compileWasmUrl(moduleUrl());
+  return compileWasmUrl(wasmModuleUrl(PRISM_FEC_WASM_URL, 'prism-fec.wasm'));
 }
 
 /** How a message is cut into source blocks. Everything a receiver needs to decode it. */

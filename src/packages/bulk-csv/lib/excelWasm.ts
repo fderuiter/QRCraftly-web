@@ -16,21 +16,21 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { checkStatus, compileWasmUrl, instantiateWasm, type WasmInstance } from '@/packages/wasm-runtime';
+import { checkStatus, compileWasmUrl, instantiateWasm, type WasmInstance, wasmModuleUrl } from '@/packages/wasm-runtime';
 
 const EXCEL_PARSE_WASM_URL = new URL('../../../wasm/excel-parse.wasm', import.meta.url);
 
-function moduleUrl(): URL {
-  const here = import.meta.url;
-  return here.startsWith('file:') ? new URL('../../../wasm/excel-parse.wasm', here) : EXCEL_PARSE_WASM_URL;
-}
 
 let loadedInstance: Promise<WasmInstance> | null = null;
 
+/** Loads the parser once. A failed load is forgotten, so the next file can retry. */
 async function getExcelParser(): Promise<WasmInstance> {
-  if (!loadedInstance) {
-    loadedInstance = compileWasmUrl(moduleUrl()).then((mod) => instantiateWasm(mod));
-  }
+  loadedInstance ??= compileWasmUrl(wasmModuleUrl(EXCEL_PARSE_WASM_URL, 'excel-parse.wasm'))
+    .then((mod) => instantiateWasm(mod))
+    .catch((error: unknown) => {
+      loadedInstance = null;
+      throw error;
+    });
   return loadedInstance;
 }
 

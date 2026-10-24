@@ -24,19 +24,9 @@ import { MAX_RECEIVE_MESSAGE_BYTES } from '../limits';
 import { FragmentChooser } from './schedule';
 import { decodeUrPart, parseUr, type BcUrPart } from './uri';
 
-let cachedWasmModule: WebAssembly.Module | null = getFountainBcurModuleSync();
-let wasmModulePromise: Promise<WebAssembly.Module> | null = null;
-
-function ensureWasmModule(): Promise<WebAssembly.Module> {
-  if (cachedWasmModule) return Promise.resolve(cachedWasmModule);
-  return (wasmModulePromise ??= loadFountainBcurModule().then((m) => {
-    cachedWasmModule = m;
-    return m;
-  }));
-}
-
 if (typeof __FOUNDRY_FOUNTAIN_BCUR__ !== 'undefined' && __FOUNDRY_FOUNTAIN_BCUR__ === 'wasm') {
-  void ensureWasmModule();
+  // Warm the shared module; until it loads, or if it cannot, the decoder runs in JavaScript.
+  loadFountainBcurModule().catch(() => undefined);
 }
 
 /** Source block count above which a claimed stream is refused (bounds alias-table and mixing work). */
@@ -135,9 +125,9 @@ export class BcUrDecoder {
   private done: BcUrResult | null = null;
 
   constructor() {
-    cachedWasmModule ??= getFountainBcurModuleSync();
-    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm' && cachedWasmModule) {
-      this.wasmDecoder = new WasmBcUrDecoder(cachedWasmModule);
+    const module = getFountainBcurModuleSync();
+    if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm' && module) {
+      this.wasmDecoder = new WasmBcUrDecoder(module);
     }
   }
 
@@ -148,10 +138,8 @@ export class BcUrDecoder {
    */
   public ingest(text: string): BcUrIngest {
     if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm') {
-      cachedWasmModule ??= getFountainBcurModuleSync();
-      if (!this.wasmDecoder && cachedWasmModule) {
-        this.wasmDecoder = new WasmBcUrDecoder(cachedWasmModule);
-      }
+      const module = this.wasmDecoder ? null : getFountainBcurModuleSync();
+      if (module) this.wasmDecoder = new WasmBcUrDecoder(module);
       if (this.wasmDecoder) {
         return this.wasmDecoder.ingest(text);
       }

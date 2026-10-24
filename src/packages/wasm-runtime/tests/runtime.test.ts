@@ -27,10 +27,12 @@ import {
   checkStatus,
   clearWasmCache,
   compileWasmBytes,
+  compileWasmFileSync,
   compileWasmUrl,
   instantiateWasm,
   instantiateWasmSync,
   resolveSameOrigin,
+  wasmModuleUrl,
 } from '../index';
 import { pathToFileURL } from 'url';
 
@@ -194,5 +196,28 @@ describe('fetching modules', () => {
     const url = pathToFileURL(path.resolve(here, 'missing.wasm'));
     await expect(compileWasmUrl(url)).rejects.toThrow();
     await expect(compileWasmUrl(url)).rejects.toThrow();
+  });
+});
+
+describe('module URLs (#1598)', () => {
+  const built = new URL('https://qrcraftly.com/assets/static/selftest.abc123.wasm');
+
+  it('reads the module from src/wasm when run from source', () => {
+    const url = wasmModuleUrl(built, 'selftest.wasm');
+    expect(url.protocol).toBe('file:');
+    expect(fileURLToPath(url)).toBe(path.resolve(here, '../../../wasm/selftest.wasm'));
+  });
+
+  it('every module file it names exists in src/wasm', () => {
+    for (const name of ['qr-encode', 'qr-decode', 'modem', 'fountain-bcur', 'prism-fec', 'excel-parse']) {
+      expect(fs.existsSync(wasmModuleUrl(built, `${name}.wasm`))).toBe(true);
+    }
+  });
+
+  it('compiles a file: URL synchronously and returns null for anything else', () => {
+    const module = compileWasmFileSync(wasmModuleUrl(built, 'selftest.wasm'));
+    expect(module).toBeInstanceOf(WebAssembly.Module);
+    expect(compileWasmFileSync(built)).toBeNull();
+    expect(compileWasmFileSync(pathToFileURL(path.resolve(here, 'missing.wasm')))).toBeNull();
   });
 });

@@ -26,7 +26,7 @@
  * frame allocates nothing in the module once the buffers have grown to the frame size. Small
  * arguments and results travel through its `io` block of 256 doubles.
  */
-import { WasmModuleError, checkStatus, compileWasmBytes, compileWasmUrl, instantiateWasm, type WasmInstance } from '@/packages/wasm-runtime';
+import { WasmModuleError, checkStatus, compileWasmBytes, compileWasmUrl, instantiateWasm, type WasmInstance, wasmModuleUrl } from '@/packages/wasm-runtime';
 import type { GridGeometry, RgbaImage } from './layout';
 
 /**
@@ -578,12 +578,6 @@ export class ModemKernels {
 /** The module's URL in a build: Vite emits the file as an asset next to the bundle. */
 const MODEM_WASM_URL = new URL('../../../wasm/modem.wasm', import.meta.url);
 
-/** Under Node (tests, scripts) this file has a `file:` URL and the module is read from `src/wasm/`. */
-function moduleUrl(): URL {
-  const here = import.meta.url;
-  return here.startsWith('file:') ? new URL('../../../wasm/modem.wasm', here) : MODEM_WASM_URL;
-}
-
 let kernels: ModemKernels | null = null;
 let loading: Promise<void> | null = null;
 
@@ -596,7 +590,7 @@ let loading: Promise<void> | null = null;
  */
 export function loadModemKernels(bytes?: BufferSource): Promise<void> {
   if (kernels) return Promise.resolve();
-  loading ??= (bytes ? compileWasmBytes(bytes) : compileWasmUrl(moduleUrl()))
+  loading ??= (bytes ? compileWasmBytes(bytes) : compileWasmUrl(wasmModuleUrl(MODEM_WASM_URL, 'modem.wasm')))
     .then(instantiateWasm)
     .then((instance) => {
       kernels = new ModemKernels(instance);

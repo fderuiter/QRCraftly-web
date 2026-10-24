@@ -22,19 +22,9 @@ import { crc32 } from './crc32';
 import { solveGF2 } from './gf2';
 import { getFountainBcurModuleSync, loadFountainBcurModule, WasmFountainDecoder } from './wasmKernel';
 
-let cachedFountainWasmModule: WebAssembly.Module | null = getFountainBcurModuleSync();
-let fountainWasmModulePromise: Promise<WebAssembly.Module> | null = null;
-
-function ensureFountainWasmModule(): Promise<WebAssembly.Module> {
-  if (cachedFountainWasmModule) return Promise.resolve(cachedFountainWasmModule);
-  return (fountainWasmModulePromise ??= loadFountainBcurModule().then((m) => {
-    cachedFountainWasmModule = m;
-    return m;
-  }));
-}
-
 if (typeof __FOUNDRY_FOUNTAIN_BCUR__ !== 'undefined' && __FOUNDRY_FOUNTAIN_BCUR__ === 'wasm') {
-  void ensureFountainWasmModule();
+  // Warm the shared module; until it loads, or if it cannot, the decoder runs in JavaScript.
+  loadFountainBcurModule().catch(() => undefined);
 }
 
 interface PendingEquation {
@@ -180,9 +170,9 @@ export class FountainDecoder {
   public ingest(meta: DropletMetadata, data: Uint8Array): boolean {
     if (__FOUNDRY_FOUNTAIN_BCUR__ === 'wasm') {
       if (this.k === null) this.init(meta, data.length);
-      cachedFountainWasmModule ??= getFountainBcurModuleSync();
-      if (!this.wasmDecoder && cachedFountainWasmModule && this.k !== null && this.messageLength !== null && this.checksum !== null && this.blockSize !== null) {
-        this.wasmDecoder = new WasmFountainDecoder(cachedFountainWasmModule, this.k, this.messageLength, this.checksum, this.blockSize);
+      const module = this.wasmDecoder ? null : getFountainBcurModuleSync();
+      if (module && this.k !== null && this.messageLength !== null && this.checksum !== null && this.blockSize !== null) {
+        this.wasmDecoder = new WasmFountainDecoder(module, this.k, this.messageLength, this.checksum, this.blockSize);
       }
       if (this.wasmDecoder) {
         if (!this.receivedSeqNumbers.has(meta.seq)) {

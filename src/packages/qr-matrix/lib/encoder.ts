@@ -27,21 +27,11 @@
  */
 import { ECC_LEVELS, type EccLevel } from '@/packages/core/ecc';
 import { concatBytes } from '@/packages/core/encoding';
-import { WASM_STATUS, WasmModuleError, compileWasmUrl, instantiateWasm, type WasmInstance } from '@/packages/wasm-runtime';
+import { WASM_STATUS, WasmModuleError, compileWasmUrl, instantiateWasm, type WasmInstance, wasmModuleUrl } from '@/packages/wasm-runtime';
 import type { QRErrorCorrectionLevel, QRModules } from '@/packages/core/types';
 
 /** The module's URL in a build: Vite emits the file as an asset next to the bundle. */
 export const QR_ENCODE_WASM_URL = new URL('../../../wasm/qr-encode.wasm', import.meta.url);
-
-/**
- * Where to load the module from. Run from source under Node (tests, scripts), this
- * file has a `file:` URL and the module is read from `src/wasm/` beside it; Vite's
- * dev server would otherwise point {@link QR_ENCODE_WASM_URL} at its own origin.
- */
-function moduleUrl(): URL {
-  const here = import.meta.url;
-  return here.startsWith('file:') ? new URL('../../../wasm/qr-encode.wasm', here) : QR_ENCODE_WASM_URL;
-}
 
 export type QrEccLetter = EccLevel;
 export type QrSegmentMode = 'numeric' | 'alphanumeric' | 'byte' | 'kanji';
@@ -247,7 +237,7 @@ let loading: Promise<QrSymbolEncoder> | null = null;
  */
 export function loadQrEncoder(): Promise<QrSymbolEncoder> {
   if (!loading) {
-    loading = compileWasmUrl(moduleUrl())
+    loading = compileWasmUrl(wasmModuleUrl(QR_ENCODE_WASM_URL, 'qr-encode.wasm'))
       .then(instantiateWasm)
       .then(createQrEncoder)
       .catch((error: unknown) => {
