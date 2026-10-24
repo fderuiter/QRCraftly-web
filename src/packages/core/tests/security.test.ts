@@ -218,6 +218,33 @@ describe('Security Utils', () => {
           expect(cleaned).toContain('rect');
       });
 
+      it('neutralises external url() in presentation attributes (#1591)', () => {
+          const raw = `<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url(https://evil.example/x.svg#p)"/></svg>`;
+          expect(sanitizeSvg(raw)).not.toContain('evil.example');
+      });
+
+      it.each(['fill', 'stroke', 'filter', 'mask', 'clip-path', 'marker-start', 'marker-end'])('checks url() in %s by its value (#1591)', (name) => {
+          const raw = `<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0" ${name}="URL( 'https://evil.example/a.svg#x' )"/></svg>`;
+          const cleaned = sanitizeSvg(raw);
+          expect(cleaned).not.toContain('evil.example');
+          expect(cleaned).toContain('<path');
+      });
+
+      it('keeps local and safe data references in presentation attributes (#1591)', () => {
+          const raw = `<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="grad"/></defs><rect fill="url(#grad)" stroke="url(&quot;#grad&quot;)" mask="url(data:image/png;base64,iVBORw0KGgo=)"/></svg>`;
+          const cleaned = sanitizeSvg(raw);
+          expect(cleaned).toContain('fill="url(#grad)"');
+          expect(cleaned).toContain('#grad');
+          expect(cleaned).toContain('data:image/png;base64,iVBORw0KGgo=');
+      });
+
+      it('drops a presentation attribute whose url() cannot be read (#1591)', () => {
+          const raw = `<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url('https://evil.example/x" width="10"/></svg>`;
+          const cleaned = sanitizeSvg(raw);
+          expect(cleaned).not.toContain('evil.example');
+          expect(cleaned).toContain('width="10"');
+      });
+
       it('removes external resource requests from href and xlink:href', () => {
           const raw = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><image href="https://example.com/malicious.png" xlink:href="http://attacker.com/evil.png" /><image href="data:image/png;base64,iVBORw0KGgo=" xlink:href="#local-ref" /></svg>`;
           const cleaned = sanitizeSvg(raw);

@@ -283,9 +283,37 @@ const isSafeDataUri = (uri: string): boolean => {
   return true;
 };
 
+/** The start of a CSS `url(` reference, in any case and with any spacing. */
+const CSS_URL_START = /url\s*\(/i;
+
+/** A complete `url()` reference, as {@link neutraliseCssUrls} reads it. */
+const CSS_URL = /url\s*\(\s*['"]?([^'")]*)['"]?\s*\)/gi;
+
+/**
+ * Whether text still has a `url(` once every complete reference is taken out.
+ * @param css - Text {@link neutraliseCssUrls} already cleaned.
+ * @returns True when a reference is malformed.
+ */
+const hasUnreadableCssUrl = (css: string): boolean => CSS_URL_START.test(css.replace(CSS_URL, ''));
+
+/**
+ * Keeps CSS `url()` references to a local fragment (`url(#grad)`) or a safe data URI, and turns
+ * every other one into `url(#)`, so the markup never asks another host for a resource.
+ * @param css - A style attribute, a style block or a presentation attribute's value.
+ * @returns The same text with external references neutralised.
+ */
+const neutraliseCssUrls = (css: string): string =>
+  css.replace(CSS_URL, (match, urlContent: string) => {
+    const trimmedUrl = urlContent.trim();
+    if (trimmedUrl.startsWith('data:')) return isSafeDataUri(trimmedUrl) ? match : 'url(#)';
+    if (trimmedUrl.startsWith('#') || trimmedUrl === '') return match;
+    return 'url(#)';
+  });
+
 /**
  * Sanitizes an SVG string to prevent DOM-XSS and structural XML injection.
- * Removes all script elements, script events, and external resource requests.
+ * Removes all script elements, script events, and external resource requests (href, and url() in
+ * style and in every other attribute).
  * Standard presentation attributes, clip paths, linear gradients, and responsive viewBox configurations are allowed.
  *
  * @param svgText The raw, potentially unsafe SVG string.
@@ -342,20 +370,7 @@ export const sanitizeSvg = (svgText: string): string => {
               element.removeAttribute(attr.name);
             } else {
               // Otherwise, sanitize allowed urls (like url(#...)) and nested data URIs
-              const cleanStyle = styleVal.replace(/url\s*\(\s*['"]?([^'")]*)['"]?\s*\)/gi, (match, urlContent) => {
-                const trimmedUrl = urlContent.trim();
-                if (trimmedUrl.startsWith('data:')) {
-                  if (isSafeDataUri(trimmedUrl)) {
-                    return match;
-                  }
-                  return 'url(#)';
-                }
-                if (trimmedUrl.startsWith('#') || trimmedUrl === '') {
-                  return match;
-                }
-                return 'url(#)';
-              });
-              element.setAttribute(attr.name, cleanStyle);
+              element.setAttribute(attr.name, neutraliseCssUrls(styleVal));
             }
           }
           // 5. Remove/neutralize external resource requests in href / xlink:href. The local
@@ -368,25 +383,23 @@ export const sanitizeSvg = (svgText: string): string => {
               element.removeAttribute(attr.name);
             }
           }
+          // 6. Any other attribute that takes url() (fill, stroke, filter, mask, clip-path,
+          // marker-*...) gets the same rule as style, checked by value rather than by name (#1591).
+          else if (CSS_URL_START.test(attr.value)) {
+            const cleanValue = hasUnsafeCss(attr.value) ? null : neutraliseCssUrls(attr.value);
+            // A url( the rule cannot read (an unclosed one, say) is dropped with its attribute.
+            if (cleanValue === null || hasUnreadableCssUrl(cleanValue)) {
+              element.removeAttribute(attr.name);
+            } else {
+              element.setAttribute(attr.name, cleanValue);
+            }
+          }
         }
 
-        // 6. Sanitize style blocks that do not contain @import
+        // 7. Sanitize style blocks that do not contain @import
         if (tagName === 'style') {
           const styleContent = element.textContent || '';
-          const cleanContent = styleContent.replace(/url\s*\(\s*['"]?([^'")]*)['"]?\s*\)/gi, (match, urlContent) => {
-            const trimmedUrl = urlContent.trim();
-            if (trimmedUrl.startsWith('data:')) {
-              if (isSafeDataUri(trimmedUrl)) {
-                return match;
-              }
-              return 'url(#)';
-            }
-            if (trimmedUrl.startsWith('#') || trimmedUrl === '') {
-              return match;
-            }
-            return 'url(#)';
-          });
-          element.textContent = cleanContent;
+          element.textContent = neutraliseCssUrls(styleContent);
         }
       }
 
