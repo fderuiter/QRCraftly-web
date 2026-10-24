@@ -26,6 +26,7 @@ import { handOffBlob } from '../utils/blobHandoff';
 import { useCapabilities } from './useCapabilities';
 import type { ExportOptions } from '../utils/exportRiskPolicy';
 import { isDangerousUrl } from '@/packages/core/security';
+import { isCanvasScannable, warmScanCheck } from '@/packages/scannability/scan';
 
 /**
  * Error-like check that also accepts `DOMException`s, which are not `Error` instances in
@@ -89,18 +90,9 @@ const blockedExport = (
 ): ExportStatus | null =>
   isDangerousUrl(config.value) ? { success: false, format, error: new Error(BLOCKED_EXPORT_MESSAGE) } : null;
 
-/**
- * The export check and our QR reader (#1178) are loaded on demand rather than with the page.
- * The hook warms them up once the browser is idle, so a copy or share keeps its user gesture.
- */
-const loadScannabilityCheck = () =>
-  Promise.all([import('@/packages/scannability/checker'), import('@/packages/qr-decode').then(({ loadQrReader }) => loadQrReader())]).then(
-    ([{ performScannabilityCheck }, reader]) => ({ performScannabilityCheck, reader })
-  );
-
 /** Loads the export check once the main thread is idle after the page has loaded. */
 function warmScannabilityCheck(): () => void {
-  const load = () => void loadScannabilityCheck().catch(() => undefined);
+  const load = () => void warmScanCheck().catch(() => undefined);
   if (typeof window.requestIdleCallback === 'function') {
     const handle = window.requestIdleCallback(load, { timeout: 5000 });
     return () => window.cancelIdleCallback(handle);
@@ -205,12 +197,7 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
       return true;
     }
     try {
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return false;
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const { performScannabilityCheck, reader } = await loadScannabilityCheck();
-      const result = performScannabilityCheck(reader, imageData, canvas.width, canvas.height);
-      return result.success;
+      return await isCanvasScannable(canvas);
     } catch (err) {
       console.error('Scannability validation failed:', err);
       return false;

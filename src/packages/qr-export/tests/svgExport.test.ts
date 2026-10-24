@@ -72,6 +72,9 @@ if (typeof globalThis.DOMParser === 'undefined') {
   }
 }
 
+const { isCanvasScannable } = vi.hoisted(() => ({ isCanvasScannable: vi.fn<(canvas: HTMLCanvasElement) => Promise<boolean>>() }));
+vi.mock('@/packages/scannability/scan', () => ({ isCanvasScannable }));
+
 import { generateQRSvg, PayloadRejectedError, rasterizeSvgToCanvas, validateSvgScannability, preflightLogoCheck } from '../index';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { EyeShape, QRStyle, type QRConfig, SocialFormat, TemplateStyle, QRType } from '@/packages/core/types';
@@ -615,11 +618,7 @@ describe('generateQRSvg', () => {
     });
 
     it('validateSvgScannability passes when offscreen raster decodes successfully', async () => {
-      const mockScannabilityChecker = await import('@/packages/scannability/checker');
-      const spy = vi.spyOn(mockScannabilityChecker, 'performScannabilityCheck').mockReturnValueOnce({
-        success: true,
-        physicalReady: true,
-      });
+      const spy = isCanvasScannable.mockClear().mockResolvedValueOnce(true);
 
       const svgString = await generateQRSvg(DEFAULT_CONFIG as QRConfig);
       const isScannable = await validateSvgScannability(svgString, DEFAULT_CONFIG as QRConfig);
@@ -638,12 +637,7 @@ describe('generateQRSvg', () => {
     });
 
     it('validateSvgScannability returns false when pixel scannability check fails', async () => {
-      const mockScannabilityChecker = await import('@/packages/scannability/checker');
-      const spy = vi.spyOn(mockScannabilityChecker, 'performScannabilityCheck').mockReturnValueOnce({
-        success: false,
-        physicalReady: false,
-        error: 'NOT_FOUND',
-      });
+      const spy = isCanvasScannable.mockClear().mockResolvedValueOnce(false);
 
       const svgString = await generateQRSvg(DEFAULT_CONFIG as QRConfig);
       const isScannable = await validateSvgScannability(svgString, DEFAULT_CONFIG as QRConfig);
@@ -652,8 +646,7 @@ describe('generateQRSvg', () => {
     });
 
     it('validateSvgScannability returns true when allowUnsafe is true even if pixel scannability check fails', async () => {
-      const mockScannabilityChecker = await import('@/packages/scannability/checker');
-      const spy = vi.spyOn(mockScannabilityChecker, 'performScannabilityCheck').mockClear();
+      const spy = isCanvasScannable.mockClear();
 
       const svgString = await generateQRSvg(DEFAULT_CONFIG as QRConfig);
       const isScannable = await validateSvgScannability(svgString, DEFAULT_CONFIG as QRConfig, { allowUnsafe: true });
@@ -662,12 +655,7 @@ describe('generateQRSvg', () => {
     });
 
     it('validateSvgScannability returns false when allowUnsafe is false and pixel scannability check fails', async () => {
-      const mockScannabilityChecker = await import('@/packages/scannability/checker');
-      const spy = vi.spyOn(mockScannabilityChecker, 'performScannabilityCheck').mockClear().mockReturnValueOnce({
-        success: false,
-        physicalReady: false,
-        error: 'NOT_FOUND',
-      });
+      const spy = isCanvasScannable.mockClear().mockResolvedValueOnce(false);
 
       const svgString = await generateQRSvg(DEFAULT_CONFIG as QRConfig);
       const isScannable = await validateSvgScannability(svgString, DEFAULT_CONFIG as QRConfig, { allowUnsafe: false });

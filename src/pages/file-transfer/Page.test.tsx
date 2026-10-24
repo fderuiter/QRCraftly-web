@@ -21,7 +21,6 @@ import { render, screen, fireEvent, act, waitFor, within } from '@testing-librar
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import Page from './+Page';
-import type { ScannabilityResult } from '@/packages/scannability';
 
 // The first-frame scannability gate runs on the main thread with a passing verdict, so the test
 // does not depend on canvas pixels or the Scannability Worker.
@@ -30,10 +29,7 @@ vi.mock('@/packages/scannability', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/packages/scannability')>()),
   createScannabilityWorker: () => null,
 }));
-vi.mock('@/packages/scannability/checker', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/packages/scannability/checker')>()),
-  performScannabilityCheck: (): ScannabilityResult => ({ success: mainThreadVerdict.success, physicalReady: mainThreadVerdict.success }),
-}));
+vi.mock('@/packages/scannability/scan', () => ({ isFrameScannable: async () => mainThreadVerdict.success }));
 
 // Mock the crypto APIs if missing in test environment
 const mockSubtle = {

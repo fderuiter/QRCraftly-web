@@ -19,8 +19,7 @@
 import { type QRConfig, QRErrorCorrectionLevel, QRStyle, QRType, SocialFormat, TemplateStyle } from '@/packages/core/types';
 import { drawQRInternal } from '@/packages/qr-matrix';
 import { createScannabilityWorker, isWorkerResponse } from '@/packages/scannability';
-import { performScannabilityCheck } from '@/packages/scannability/checker';
-import { loadQrReader } from '@/packages/qr-decode';
+import { isFrameScannable } from '@/packages/scannability/scan';
 
 /** Side length, in CSS pixels, of the canvas the handshake frame is rendered onto for checking. */
 const DISPLAY_SIZE = 512;
@@ -54,8 +53,7 @@ export interface HandshakeVerifierDeps {
 /** Production capabilities: the real Scannability Worker and checker from `@/packages/scannability`. */
 const defaultHandshakeVerifierDeps: HandshakeVerifierDeps = {
   createWorker: createScannabilityWorker,
-  checkOnMainThread: async ({ imageData, width, height, moduleCount }) =>
-    performScannabilityCheck(await loadQrReader(), imageData, width, height, moduleCount).success,
+  checkOnMainThread: isFrameScannable,
   createCanvas: () => document.createElement('canvas'),
   watchdogMs: HANDSHAKE_WATCHDOG_MS,
 };

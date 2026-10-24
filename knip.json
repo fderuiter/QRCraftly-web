@@ -24,8 +24,7 @@
     "tests/scripts/boundaries/fixtures/**"
   ],
   "ignoreIssues": {
-    "src/packages/*/*.ts": ["types"],
-    "src/packages/scannability/**": ["exports", "types"]
+    "src/packages/*/*.ts": ["types"]
   },
   "ignoreBinaries": ["shellcheck", "semgrep"],
   "ignoreDependencies": ["wrangler", "@ngraveio/bc-ur", "marked"],

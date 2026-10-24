@@ -66,13 +66,13 @@ export const PRINT_PX_PER_MODULE = 6;
 /** Quiet zone kept around the code, in modules (the size the standard asks for). */
 export const PRINT_QUIET_ZONE_MODULES = 4;
 /** Ink spread plus a slightly soft camera, as a Gaussian standard deviation in modules. */
-export const PRINT_BLUR_MODULES = 0.3;
+const PRINT_BLUR_MODULES = 0.3;
 /** Grey level of white paper in a photo. */
-export const PRINT_PAPER_LEVEL = 235;
+const PRINT_PAPER_LEVEL = 235;
 /** Grey level of black ink in a photo. */
-export const PRINT_INK_LEVEL = 25;
+const PRINT_INK_LEVEL = 25;
 /** Sensor noise, peak to peak, in grey levels. */
-export const PRINT_NOISE_LEVEL = 10;
+const PRINT_NOISE_LEVEL = 10;
 
 /** Seed for the sensor noise. Fixed, so a design always gets the same verdict. */
 const NOISE_SEED = 0x51c0de;
@@ -123,7 +123,7 @@ function sampleLuma(plane: Float32Array, width: number, height: number, x: numbe
  * @param sigma - Standard deviation in pixels.
  * @returns One odd width for each of the {@link GAUSS_PASSES} passes.
  */
-export function gaussianBoxWidths(sigma: number): number[] {
+function gaussianBoxWidths(sigma: number): number[] {
   const n = GAUSS_PASSES;
   const ideal = Math.sqrt((12 * sigma * sigma) / n + 1);
   let lower = Math.floor(ideal);
