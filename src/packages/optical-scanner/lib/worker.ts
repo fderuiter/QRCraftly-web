@@ -27,18 +27,17 @@ interface WorkerScope {
 }
 
 /**
- * `self` as the dedicated worker scope. The app compiles against the DOM lib (not the WebWorker
- * lib), which types `self` as `Window`, whose `postMessage` has no transfer-list overload.
- * `self` is read on every call rather than captured once at module load, so the scope that is
- * current when a message is posted is the one that receives it.
+ * Posts to the worker's own scope. The app compiles against the DOM lib (not the WebWorker lib),
+ * which types `self` as `Window`; the options form `postMessage(message, { transfer })` exists on
+ * both, so no cast is needed. `self` is read on every call rather than captured once at module
+ * load, so the scope that is current when a message is posted is the one that receives it.
  */
 const workerScope: WorkerScope = {
   postMessage(message, transfer) {
-    const scope = self as unknown as WorkerScope;
     if (transfer) {
-      scope.postMessage(message, transfer);
+      self.postMessage(message, { transfer });
     } else {
-      scope.postMessage(message);
+      self.postMessage(message);
     }
   },
 };

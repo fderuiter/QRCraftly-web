@@ -109,7 +109,20 @@ export function mapCorners(
   return [map(corners[0]), map(corners[1]), map(corners[2]), map(corners[3])];
 }
 
-const DECODERS: readonly ScanDecoder[] = ['native', 'qr-decode'];
+/** Whether a value is a non-null object whose fields can be read one by one. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/** Whether a value is a finite number. */
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+/** Whether a value names one of the decoders. */
+function isScanDecoder(value: unknown): value is ScanDecoder {
+  return value === 'native' || value === 'qr-decode';
+}
 
 /** Checks the optional rich-result fields of a worker response. */
 function richFieldsError(d: Record<string, unknown>): string | null {
@@ -123,7 +136,7 @@ function richFieldsError(d: Record<string, unknown>): string | null {
   ) {
     return 'Scanner response corners must be eight numbers or null';
   }
-  if (d.decoder !== undefined && !DECODERS.includes(d.decoder as ScanDecoder)) {
+  if (d.decoder !== undefined && !isScanDecoder(d.decoder)) {
     return 'Scanner response decoder must be native or qr-decode';
   }
   return null;
@@ -139,8 +152,8 @@ export interface ScanOptions {
  */
 export function isValidScanOptions(options: unknown): options is ScanOptions {
   if (options === undefined || options === null) return true;
-  if (typeof options !== 'object') return false;
-  const o = options as Record<string, unknown>;
+  if (!isRecord(options)) return false;
+  const o = options;
   if (o.signal !== undefined && !(o.signal instanceof AbortSignal)) return false;
   if (
     o.maxDimension !== undefined &&
@@ -156,10 +169,10 @@ export function isValidScanOptions(options: unknown): options is ScanOptions {
  */
 export function assertScanOptions(options: unknown): asserts options is ScanOptions {
   if (options === undefined || options === null) return;
-  if (typeof options !== 'object') {
+  if (!isRecord(options)) {
     throw new Error('ScanOptions must be an object');
   }
-  const o = options as Record<string, unknown>;
+  const o = options;
   if (o.signal !== undefined && !(o.signal instanceof AbortSignal)) {
     throw new Error('ScanOptions signal must be an AbortSignal instance');
   }
@@ -205,8 +218,8 @@ export function getDownscaledDimensions(
  * Type-guard function for validating the Scanner Worker Request structure.
  */
 export function isValidScannerRequest(data: unknown): data is ScannerRequest {
-  if (typeof data !== 'object' || data === null) return false;
-  const d = data as Record<string, unknown>;
+  if (!isRecord(data)) return false;
+  const d = data;
   if (typeof ImageBitmap === 'undefined' || !(d.image instanceof ImageBitmap)) return false;
   if (typeof d.width !== 'number' || !Number.isFinite(d.width) || d.width <= 0) return false;
   if (typeof d.height !== 'number' || !Number.isFinite(d.height) || d.height <= 0) return false;
@@ -218,23 +231,19 @@ export function isValidScannerRequest(data: unknown): data is ScannerRequest {
 
 /** Whether a value is a {@link ScanRegion} with a positive size. */
 function isScanRegion(value: unknown): value is ScanRegion {
-  if (typeof value !== 'object' || value === null) return false;
-  const r = value as Record<string, unknown>;
-  return (
-    [r.x, r.y, r.width, r.height].every((n) => typeof n === 'number' && Number.isFinite(n)) &&
-    (r.width as number) > 0 &&
-    (r.height as number) > 0
-  );
+  if (!isRecord(value)) return false;
+  const { x, y, width, height } = value;
+  return isFiniteNumber(x) && isFiniteNumber(y) && isFiniteNumber(width) && isFiniteNumber(height) && width > 0 && height > 0;
 }
 
 /**
  * Assertion function for Scanner Worker Request.
  */
 export function assertScannerRequest(data: unknown): asserts data is ScannerRequest {
-  if (typeof data !== 'object' || data === null) {
+  if (!isRecord(data)) {
     throw new Error('Scanner request must be a non-null object');
   }
-  const d = data as Record<string, unknown>;
+  const d = data;
   if (typeof ImageBitmap === 'undefined' || !(d.image instanceof ImageBitmap)) {
     throw new Error('Scanner request must contain a valid ImageBitmap');
   }
@@ -259,8 +268,8 @@ export function assertScannerRequest(data: unknown): asserts data is ScannerRequ
  * Type-guard function for validating the Scanner Worker Response structure.
  */
 export function isValidScannerResponse(data: unknown): data is ScannerResponse {
-  if (typeof data !== 'object' || data === null) return false;
-  const d = data as Record<string, unknown>;
+  if (!isRecord(data)) return false;
+  const d = data;
   if (d.status !== 'pass' && d.status !== 'fail') return false;
   if (typeof d.sequenceId !== 'number' || !Number.isFinite(d.sequenceId)) return false;
   if (d.decodedData !== undefined && d.decodedData !== null && typeof d.decodedData !== 'string') return false;
@@ -274,10 +283,10 @@ export function isValidScannerResponse(data: unknown): data is ScannerResponse {
  * Assertion function for Scanner Worker Response.
  */
 export function assertScannerResponse(data: unknown): asserts data is ScannerResponse {
-  if (typeof data !== 'object' || data === null) {
+  if (!isRecord(data)) {
     throw new Error('Scanner response must be a non-null object');
   }
-  const d = data as Record<string, unknown>;
+  const d = data;
   if (d.status !== 'pass' && d.status !== 'fail') {
     throw new Error('Scanner response status must be either "pass" or "fail"');
   }

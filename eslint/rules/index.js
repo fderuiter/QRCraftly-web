@@ -9,7 +9,11 @@
  *
  * `tailwind-classes` checks Tailwind class order, duplicates, contradictions, shorthands and
  * needless arbitrary values (ADR 0046, #1194); it replaces `eslint-plugin-tailwindcss`.
+ *
+ * `no-type-assertions` is `@typescript-eslint/consistent-type-assertions` with a message that says
+ * how to fix the error and where the legacy list lives (#1607).
  */
+import tseslint from 'typescript-eslint';
 import { findUnsafeRegex } from './regexAnalysis.js';
 import tailwindClasses from './tailwind-classes.js';
 
@@ -176,6 +180,22 @@ const execThroughHelper = {
   },
 };
 
+const stockTypeAssertions = tseslint.plugin.rules['consistent-type-assertions'];
+
+/** What the type assertion error says, so whoever hits it knows the fix (#1607). */
+export const TYPE_ASSERTION_MESSAGE =
+  'Do not use `as` to assert a type. Fix: parse or narrow the value with a type guard (see src/packages/core for examples) or use `as const`. Loose assertions in src/ are only allowed for files in eslint/legacy-type-assertions.js, which may only shrink.';
+
+/**
+ * The stock rule unchanged, with its `never` message replaced. ESLint reads a report's text from
+ * the registered rule's `meta.messages`, so the stock `create` can be reused as is.
+ * @type {import('eslint').Rule.RuleModule}
+ */
+const noTypeAssertions = {
+  ...stockTypeAssertions,
+  meta: { ...stockTypeAssertions.meta, messages: { ...stockTypeAssertions.meta.messages, never: TYPE_ASSERTION_MESSAGE } },
+};
+
 export default {
   meta: { name: 'qrcraftly' },
   rules: {
@@ -184,5 +204,6 @@ export default {
     'no-bidi-characters': noBidiCharacters,
     'exec-through-helper': execThroughHelper,
     'tailwind-classes': tailwindClasses,
+    'no-type-assertions': noTypeAssertions,
   },
 };
