@@ -60,14 +60,14 @@ Frame shapes (`frameStyle`), call-to-action text (`frameText`), positions (`fram
 
 ## Adding a New Input Type
 
-1.  Define the data structure in `src/types.ts` and add the type to `QRType` in `src/packages/core/types.ts`. `QRType` and the other fixed value sets are `as const` objects with a type of the same name, not `enum`s: the build runs scripts that import `src/` on Node's own type stripping, which cannot run an `enum` ([ADR 0045](../../../docs/adr/0045-typescript-scripts-on-node-type-stripping.md)). Use `typeof QRType.URL` where a type names one member.
+1.  Define the data structure in `src/packages/qr-payload/lib/types.ts`, export it from `src/packages/qr-payload/index.ts`, and add the type to `QRType` in `src/packages/core/types.ts`. `QRType` and the other fixed value sets are `as const` objects with a type of the same name, not `enum`s: the build runs scripts that import `src/` on Node's own type stripping, which cannot run an `enum` ([ADR 0045](../../../docs/adr/0045-typescript-scripts-on-node-type-stripping.md)). Use `typeof QRType.URL` where a type names one member.
 2.  Create the payload generator (construction, hydration, and parsing) in `src/packages/qr-payload/lib/generators/` and register it in `src/packages/qr-payload/lib/registry.ts`. Import generators from `@/packages/qr-payload`; there is no `utils` shim.
 3.  Create a new component file in this directory (e.g., `NewTypeInput.tsx`).
 4.  Register the component, its initial state, and helpers in `src/components/inputs/InputRegistry.ts`.
 5.  Add the new type to the `TypeSelector` options and its route to `QR_TYPE_ROUTES` in `src/data/navigation.ts` (with a matching page under `src/pages/`).
 6.  Add its display name to `QR_TYPE_LABELS` in `src/data/qrTypeLabels.ts`. Announcements ("WiFi input loaded"), the scan result sheet and the scan toast use these labels, never raw enum values. The map is typed `Record<QRType, string>`, so `tsc` fails until the new type has a label.
 
-Input data never leaves the browser. Neither `src/types.ts` nor `src/packages/core/types.ts` has a telemetry or reporting schema, and new input types must not add one (see [the QRCraftly Pledge](../../../docs/PLEDGE.md)).
+Input data never leaves the browser. None of `src/types.ts`, `src/packages/core/types.ts` and `src/packages/qr-payload/lib/types.ts` has a telemetry or reporting schema, and new input types must not add one (see [the QRCraftly Pledge](../../../docs/PLEDGE.md)).
 
 ## Gradient Color Controls
 

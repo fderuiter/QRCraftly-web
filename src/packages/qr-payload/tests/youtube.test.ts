@@ -18,8 +18,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { parseYouTubeInput, parseYouTubeProfile } from '../youtube';
-import { parseProtocol } from '../index';
-import { SocialPlatform } from '@/packages/core/types';
+import { parseProtocol, SocialPlatform } from '../index';
 
 describe('YouTube URL & handle generator (youtube.ts)', () => {
   it('parses handles, channel IDs, custom URLs, video links, playlists, and youtu.be links', () => {

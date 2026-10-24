@@ -1,11 +1,11 @@
 import React, { useMemo, useEffect, useRef } from "react";
-import { type MeetingData } from "../../types";
+import type { MeetingData } from "@/packages/qr-payload";
 import { QRType } from "@/packages/core/types";
 import { describeViolation } from "@/packages/qr-payload";
 import { findBlockingViolation } from "./linkViolations";
 import { TextField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
-import { parseMeetingUrl } from "../../utils/meetingParsers";
+import { parseMeetingUrl } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
 import { announcePolitely } from "../../utils/a11y";
 

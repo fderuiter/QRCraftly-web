@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "../ui/Button";
 import { Alert } from "../ui/Alert";
-import type { LocationData } from "../../types";
+import type { LocationData } from "@/packages/qr-payload";
 import { TextField } from "../ui/FormFields";
 import { FormBlock } from "../ui/FormBlock";
 import { announcePolitely } from "../../utils/a11y";

@@ -1,5 +1,5 @@
 import React from "react";
-import { type EventData, CalendarProvider } from "../../types";
+import { type EventData, CalendarProvider } from "@/packages/qr-payload";
 import { TextField, TextAreaField, SelectField } from "../ui/FormFields";
 import { FieldNotes, LinkHints, firstWebAddress, hintsId } from "./FieldHints";
 import { CONTAINER_SPACING_CLASSES } from "../ui/styles";

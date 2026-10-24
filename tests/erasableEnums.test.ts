@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CalendarProvider, CryptoNetwork, SocialPlatform } from '../src/types';
+import { CalendarProvider, CryptoNetwork, SocialPlatform } from '@/packages/qr-payload';
 import { EyeShape, QRErrorCorrectionLevel, QRStyle, QRType, SocialFormat, TemplateStyle, WifiEapMethod, WifiEapPhase2, WifiEncryption } from '@/packages/core/types';
 import { SchemaCategory, SchemaType, StrategicValueCategory, TargetPersona } from '../src/data/contentRegistry';
 

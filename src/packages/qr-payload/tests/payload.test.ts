@@ -27,7 +27,7 @@ import {
   canHydrate,
   QR_GENERATORS,
 } from '../index';
-import { CryptoNetwork, SocialPlatform } from '@/types';
+import { CryptoNetwork, SocialPlatform } from '../index';
 import { QRType, type QRConfig, QRErrorCorrectionLevel, QRStyle, SocialFormat, TemplateStyle, WifiEncryption } from '@/packages/core/types';
 
 const getBaseConfig = (): QRConfig => ({

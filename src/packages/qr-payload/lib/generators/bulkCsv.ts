@@ -17,7 +17,7 @@
 */
 
 import { previewRow } from '@/packages/bulk-csv';
-import { type BulkCsvData, type QRGeneratorContract } from '@/types';
+import type { BulkCsvData, QRGeneratorContract } from '../types';
 import { QRType } from '@/packages/core/types';
 
 /**

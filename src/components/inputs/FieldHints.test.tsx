@@ -20,7 +20,7 @@
 import { describe, it, expect } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { axe } from '../../../tests/utils/axe';
-import { CryptoNetwork, type MeetingData } from '@/types';
+import { CryptoNetwork, type MeetingData } from '@/packages/qr-payload';
 import { QRType } from '@/packages/core/types';
 import { UrlInput } from './UrlInput';
 import { MeetingInput } from './MeetingInput';

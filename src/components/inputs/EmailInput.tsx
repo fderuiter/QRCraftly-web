@@ -1,5 +1,5 @@
 import React from "react";
-import type { EmailData } from "../../types";
+import type { EmailData } from "@/packages/qr-payload";
 import { TextField, TextAreaField } from "../ui/FormFields";
 import { CONTAINER_SPACING_CLASSES } from "../ui/styles";
 import { emailListError } from "@/packages/qr-payload";

@@ -25,7 +25,7 @@ import {
   PaymentContract,
   paymentRefusal,
 } from '../index';
-import { CryptoNetwork, type PaymentData } from '@/types';
+import { CryptoNetwork, type PaymentData } from '../index';
 import { QRType } from '@/packages/core/types';
 
 describe('Payment generator', () => {

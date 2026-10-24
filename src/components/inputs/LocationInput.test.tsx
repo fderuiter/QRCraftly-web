@@ -19,7 +19,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LocationInput } from './LocationInput';
-import type { LocationData } from '../../types';
+import type { LocationData } from '@/packages/qr-payload';
 import { announcePolitely } from '../../utils/a11y';
 import { axe } from '../../../tests/utils/axe';
 

@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { CryptoNetwork, SocialPlatform } from '@/types';
+import { CryptoNetwork, SocialPlatform } from './types';
 import { QRType, WifiEncryption } from '@/packages/core/types';
 import { formatPayload } from './registry';
 

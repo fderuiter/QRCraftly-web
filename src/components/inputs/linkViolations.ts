@@ -1,4 +1,4 @@
-import { type UrlData, type MeetingData, type TextData } from "../../types";
+import type { UrlData, MeetingData, TextData } from "@/packages/qr-payload";
 import { QRType } from "@/packages/core/types";
 import { QR_GENERATORS, validatePayload } from "@/packages/qr-payload";
 import { UNSUPPORTED_SCHEME_PREFIX } from "@/packages/core/security";

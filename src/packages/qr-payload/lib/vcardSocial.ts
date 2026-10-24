@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { VCardData } from '@/types';
+import type { VCardData } from './types';
 import { isDangerousUrl } from '@/packages/core/security';
 
 /** A social network a contact card can link to. */

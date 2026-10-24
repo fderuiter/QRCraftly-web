@@ -19,7 +19,7 @@
 import { type QRConfig, TemplateStyle, SocialFormat } from '@/packages/core/types';
 import { SvgContext } from './svgContext';
 import { drawWithTemplate, SOCIAL_DIMENSIONS } from './templateRenderer';
-import { getQrTypeLabel, getQrTypeDescription } from '@/utils/a11y';
+import { getQrTypeLabel, getQrTypeDescription } from '@/packages/qr-payload';
 
 import { SafeUrlPipeline, normalizeUrl } from '@/packages/core/url';
 import { getCachedAsset, setCachedAsset } from '@/utils/assetCache';

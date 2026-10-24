@@ -17,7 +17,7 @@
 */
 
 import React, { Suspense, useEffect, useState } from 'react';
-import type { EventData } from '../../types';
+import type { EventData } from '@/packages/qr-payload';
 import { Skeleton } from '../ui/Skeleton';
 import { CONTAINER_SPACING_CLASSES } from '../ui/styles';
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { SocialInput } from './SocialInput';
-import { type SocialData, SocialPlatform } from '../../types';
+import { type SocialData, SocialPlatform } from '@/packages/qr-payload';
 import { axe } from '../../../tests/utils/axe';
 
 describe('SocialInput', () => {

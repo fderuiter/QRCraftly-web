@@ -18,7 +18,7 @@
 
 
 import { describe, it, expect } from 'vitest';
-import { CalendarProvider, SocialPlatform } from '@/types';
+import { CalendarProvider, SocialPlatform } from '../index';
 import { QRType } from '@/packages/core/types';
 import {
   constructEmailString,

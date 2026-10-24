@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { CryptoNetwork } from '@/types';
+import { CryptoNetwork } from './types';
 
 /** Number of wei in one ether (10^18), as used by EIP-681 `value=`. */
 export const WEI_DECIMALS = 18;

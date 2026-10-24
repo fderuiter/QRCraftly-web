@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { VCardData } from "../../types";
+import type { VCardData } from "@/packages/qr-payload";
 import { TextField, SelectField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
 import { vCardFieldError, VCARD_SOCIAL_FIELDS, VCARD_SOCIAL_NETWORKS } from "@/packages/qr-payload";

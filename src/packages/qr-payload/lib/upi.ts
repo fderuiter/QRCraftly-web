@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { CryptoNetwork, type PaymentData } from '@/types';
+import { CryptoNetwork, type PaymentData } from './types';
 import { REGEX_STRICT_CONTROL_CHARS } from '@/packages/core/security';
 import { paymentAmountError } from './paymentAmount';
 

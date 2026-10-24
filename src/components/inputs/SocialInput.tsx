@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { type SocialData, SocialPlatform } from '../../types';
+import { type SocialData, SocialPlatform } from '@/packages/qr-payload';
 import { TextField, SelectField, TextAreaField } from '../ui/FormFields';
 import { FormBlock } from '../ui/FormBlock';
 
