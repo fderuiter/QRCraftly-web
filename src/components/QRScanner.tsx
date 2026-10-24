@@ -438,6 +438,9 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   /** Scans an image that arrived by paste or drop, showing image mode so errors are visible. */
   const scanImage = (file: File | undefined) => {
     cancelPendingLock();
+    // Every entry point retires the scan still running, so it cannot overwrite this one (#1588).
+    cancelFileScan();
+    setFileProcessing(false);
     setMode('file');
     setResult(null);
     if (!file || !file.type.startsWith('image/')) {
@@ -465,6 +468,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
   const pasteFromClipboard = async () => {
     cancelPendingLock();
+    cancelFileScan();
+    setFileProcessing(false);
     setMode('file');
     setResult(null);
     setFileError(null);

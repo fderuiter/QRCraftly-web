@@ -1047,6 +1047,111 @@ describe('QRScanner Component', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('The clipboard has no image');
     });
 
+    /** Image decodes wait until the test releases them, as a large image does. */
+    const holdImageDecodes = (data: string) => {
+      const pending: Array<() => void> = [];
+      globalThis.mockWorkerControl.setInterceptor((msg, worker) => {
+        pending.push(() => worker.dispatchMessage({ status: 'pass', sequenceId: msg.sequenceId, decodedData: data, buffer: msg.buffer || new ArrayBuffer(0) }));
+      });
+      qrRead.mockReturnValue([fakeQrRead(data)]);
+      return {
+        started: () => pending.length > 0,
+        release: () => act(async () => {
+          pending.splice(0).forEach((send) => send());
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }),
+      };
+    };
+
+    it('keeps the error for a dropped non-image when an earlier scan finishes later (#1588)', async () => {
+      const decodes = holdImageDecodes('EARLIER');
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      fireEvent.click(screen.getByRole('radio', { name: 'Image' }));
+      const scanner = screen.getByTestId('qr-scanner');
+      await act(async () => {
+        fireEvent.drop(scanner, { dataTransfer: { files: [new File(['png'], 'code.png', { type: 'image/png' })] } });
+      });
+      await waitFor(() => expect(decodes.started()).toBe(true));
+      expect(screen.getByText('Processing file...')).toBeInTheDocument();
+
+      fireEvent.drop(scanner, { dataTransfer: { files: [new File(['text'], 'notes.txt', { type: 'text/plain' })] } });
+      expect(screen.queryByText('Processing file...')).not.toBeInTheDocument();
+      await decodes.release();
+
+      expect(screen.getByRole('alert')).toHaveTextContent('Please drop an image file.');
+      expect(screen.queryByRole('heading', { name: 'QR code found' })).not.toBeInTheDocument();
+      expect(mockOnScanSuccess).not.toHaveBeenCalled();
+    });
+
+    it('leaves no earlier result behind when the clipboard has no image (#1588)', async () => {
+      const decodes = holdImageDecodes('EARLIER');
+      const read = vi.fn().mockResolvedValue([{ types: ['text/plain'], getType: vi.fn() }]);
+      Object.defineProperty(navigator, 'clipboard', { value: { read }, configurable: true });
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      fireEvent.click(screen.getByRole('radio', { name: 'Image' }));
+      await act(async () => {
+        fireEvent.drop(screen.getByTestId('qr-scanner'), { dataTransfer: { files: [new File(['png'], 'code.png', { type: 'image/png' })] } });
+      });
+      await waitFor(() => expect(decodes.started()).toBe(true));
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Paste image' }));
+      });
+      await decodes.release();
+
+      expect(screen.getByRole('alert')).toHaveTextContent('The clipboard has no image');
+      expect(screen.queryByRole('heading', { name: 'QR code found' })).not.toBeInTheDocument();
+      expect(mockOnScanSuccess).not.toHaveBeenCalled();
+    });
+
+    it('starts each scan in the history with a fresh Copy button (#1588)', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      const { unmount } = render(<QRScanner />);
+      await settle();
+      await decode('https://example.com/one');
+      unmount();
+
+      render(<QRScanner />);
+      await settle();
+      await decode('https://example.org/two');
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+      });
+      expect(screen.getByRole('button', { name: 'Copied' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'URL, example.com' }));
+      expect(screen.getByTestId('scan-result-host')).toHaveTextContent('example.com');
+      expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Copied' })).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+      });
+      expect(writeText).toHaveBeenLastCalledWith('https://example.com/one');
+      expect(screen.getByRole('button', { name: 'Copied' })).toBeInTheDocument();
+    });
+
+    it('drops a copy failure when the next scan opens (#1588)', async () => {
+      const writeText = vi.fn().mockRejectedValue(new Error('denied'));
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+      const { unmount } = render(<QRScanner />);
+      await settle();
+      await decode('https://example.com/one');
+      unmount();
+
+      render(<QRScanner />);
+      await settle();
+      await decode('https://example.org/two');
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+      });
+      expect(screen.getByText(/did not allow copying/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'URL, example.com' }));
+      expect(screen.queryByText(/did not allow copying/)).not.toBeInTheDocument();
+    });
+
     it('accepts an image dropped anywhere on the scanner, even over the camera', async () => {
       decodeImagesAs('DROPPED');
       render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
