@@ -295,3 +295,4 @@ export { transferProgress, fountainStatsFrom, type TransferProgress } from './li
 export { permissionOf, describeCameraError } from './lib/camera';
 export { steerMessage } from './lib/feedback/steerMessage';
 export { validateReceivedFile, type UploadedFile } from './lib/receiver/videoFile';
+export { senderReducer, INITIAL_SENDER_STATE, type SenderPhase, type SenderEvent, type SenderState } from './lib/sender/machine';

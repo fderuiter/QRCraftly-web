@@ -18,7 +18,7 @@
 
 
 import type React from 'react';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from 'react';
 import { PreallocatedFramePool } from '../framePool';
 import { verifyHandshakeFrame, type HandshakeFrameVerifier } from '../handshake';
 import type { BeaconPlan, SliceWorkerOutgoingMessage, TransferStats } from '../contracts';
@@ -35,6 +35,7 @@ import { decodeFrame } from '../prism/frame';
 import { spawnTileWorker } from '../receiver/media';
 import { permissionOf } from '../camera';
 import { transferProgress } from '../progress';
+import { INITIAL_SENDER_STATE, senderReducer } from './machine';
 import { createTileReader, type TileReader } from '../receiver/tileReader';
 import { clearTile, paintBeacon, paintTile, prepareTileCanvas, tileScreenOf } from './tiles';
 import { formatMegabytes, spawnSliceWorker } from './workers';
@@ -117,17 +118,23 @@ export function useOpticalSender({
   verifyFrame = verifyHandshakeFrame,
   requestWebcam,
 }: UseOpticalSenderOptions) {
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [{ phase }, dispatch] = useReducer(senderReducer, INITIAL_SENDER_STATE);
+  const [selectedFiles, setSelectedFilesState] = useState<File[]>([]);
+  const setSelectedFiles = useCallback((files: File[]) => {
+    setSelectedFilesState(files);
+    dispatch({ type: files.length > 0 ? 'select' : 'clear' });
+  }, []);
   /** Encrypt the next transfer under a key code (#1144). */
   const [isPrivate, setIsPrivateState] = useState(false);
   /** The key QR, while the person holds the button that shows it. */
   const [keyFrame, setKeyFrame] = useState<TransferFrame | null>(null);
   const selectedFile = selectedFiles[0] ?? null;
-  const setSelectedFile = useCallback((file: File | null) => setSelectedFiles(file ? [file] : []), []);
-  const [isTransferring, setIsTransferring] = useState(false);
+  const setSelectedFile = useCallback((file: File | null) => setSelectedFiles(file ? [file] : []), [setSelectedFiles]);
+  // The flags below are read from the phase, so they cannot disagree.
+  const isTransferring = phase === 'transmitting' || phase === 'paused';
   /** True while a running stream is paused: the last frame stays on screen and nothing animates (#1148). */
-  const [isPaused, setIsPaused] = useState(false);
-  const [isVerifyingHandshake, setIsVerifyingHandshake] = useState(false);
+  const isPaused = phase === 'paused';
+  const isVerifyingHandshake = phase === 'verifying';
   const [handshakeError, setHandshakeError] = useState<string | null>(null);
   const [handshakeVerified, setHandshakeVerified] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -149,7 +156,7 @@ export function useOpticalSender({
   /** Receivers whose feedback code the webcam reads. */
   const [steeringReceivers, setSteeringReceivers] = useState(0);
   /** True when the sender stopped because every receiver it could see had the file. */
-  const [autoStopped, setAutoStopped] = useState(false);
+  const autoStopped = phase === 'autoStopped';
   /** Sends real BC-UR parts that wallets can read, in place of Prism (#1149). */
   const [walletCompat, setWalletCompatState] = useState(false);
   const [fountainInfo, setFountainInfo] = useState<SenderFountainInfo | null>(null);
@@ -292,12 +299,10 @@ export function useOpticalSender({
     }
   }, [keyFrame]);
 
-  const stopTransfer = useCallback(() => {
-    setIsTransferring(false);
+  /** Ends whatever plays or starts and resets the stream; the caller says why with its own event. */
+  const teardown = useCallback(() => {
     isTransferringRef.current = false;
-    setIsPaused(false);
     isPausedRef.current = false;
-    setIsVerifyingHandshake(false);
     isVerifyingHandshakeRef.current = false;
     settingsLockedRef.current = false;
     setHandshakeError(null);
@@ -334,6 +339,11 @@ export function useOpticalSender({
     setCurrentFrameIndex(0);
     setProgress(0);
   }, [endSteering]);
+
+  const stopTransfer = useCallback(() => {
+    teardown();
+    dispatch({ type: 'stop' });
+  }, [teardown]);
 
   const runAnimationLoop = useCallback(() => {
     const loop = () => {
@@ -436,7 +446,7 @@ export function useOpticalSender({
     const fail = (message: string) => {
       if (run !== walletRunRef.current) return;
       isVerifyingHandshakeRef.current = false;
-      setIsVerifyingHandshake(false);
+      dispatch({ type: 'handshakeFailed' });
       setHandshakeError(message);
     };
     file
@@ -456,9 +466,8 @@ export function useOpticalSender({
         setTotalFrames(wallet.fragmentCount);
         setFountainInfo(null);
         isVerifyingHandshakeRef.current = false;
-        setIsVerifyingHandshake(false);
         setHandshakeVerified(true);
-        setIsTransferring(true);
+        dispatch({ type: 'handshakeOk' });
         isTransferringRef.current = true;
         paint(first);
         setCurrentFrameIndex(1);
@@ -592,12 +601,10 @@ export function useOpticalSender({
     // The first frame is checked as it will be shown. Tiles are painted by the sender itself, so they skip the check.
     const isScannable = tilePlanRef.current ? true : await verifyFrameRef.current(frame);
 
-    setIsVerifyingHandshake(false);
-
     if (isScannable) {
       setHandshakeVerified(true);
       setHandshakeError(null);
-      setIsTransferring(true);
+      dispatch({ type: 'handshakeOk' });
       isTransferringRef.current = true;
       if (tilePlanRef.current) runTileLoop(tilePlanRef.current);
       else runAnimationLoop();
@@ -606,7 +613,7 @@ export function useOpticalSender({
 
     setHandshakeVerified(false);
     setHandshakeError(`Transfer QR frame ${HANDSHAKE_FAILURE_SUFFIX}`);
-    setIsTransferring(false);
+    dispatch({ type: 'handshakeFailed' });
     isTransferringRef.current = false;
     if (workerRef.current) {
       workerRef.current.postMessage({ type: 'STOP' });
@@ -661,13 +668,13 @@ export function useOpticalSender({
     if (!link || !current) return;
     setSteeringReceivers(decision.receivers);
     if (link.shouldStop(decision.stop)) {
-      stopTransfer();
-      setAutoStopped(true);
+      teardown();
+      dispatch({ type: 'autoStop' });
       return;
     }
     const wanted = link.profileFor(current, decision.profile);
     if (wanted !== current) requestSwitch(wanted);
-  }, [stopTransfer, requestSwitch]);
+  }, [teardown, requestSwitch]);
 
   /**
    * Opens the back channel for a steerable transfer: asks for the webcam, then reads the receivers'
@@ -813,23 +820,25 @@ export function useOpticalSender({
       }
 
       case 'ERROR': {
-        stopTransfer();
+        teardown();
         setHandshakeError(message.message);
+        dispatch({ type: 'error' });
         break;
       }
 
       default:
         break;
     }
-  }, [gateFirstFrame, stopTransfer]);
+  }, [gateFirstFrame, teardown]);
 
   const startTransfer = useCallback(() => {
     if (selectedFiles.length === 0) return;
 
     stopTransfer();
-    setAutoStopped(false);
+    // From the motion confirm this is the confirmed start; from anywhere else, a plain one.
+    dispatch({ type: 'confirmMotion' });
+    dispatch({ type: 'start', reducedMotion: false });
 
-    setIsVerifyingHandshake(true);
     isVerifyingHandshakeRef.current = true;
     settingsLockedRef.current = true;
     setHandshakeError(null);
@@ -851,7 +860,7 @@ export function useOpticalSender({
     if (walletCompat && !isPrivate) {
       if (selectedFiles.length > 1) {
         isVerifyingHandshakeRef.current = false;
-        setIsVerifyingHandshake(false);
+        dispatch({ type: 'handshakeFailed' });
         setHandshakeError(WALLET_ONE_FILE);
         return;
       }
@@ -899,6 +908,10 @@ export function useOpticalSender({
     });
   }, [selectedFiles, density, isPrivate, outerCode, multiCode, steer, walletCompat, stopTransfer, handleWorkerMessage, startWalletTransfer]);
 
+  /** Under reduced motion, asks once more before the stream flashes; the confirmed start is `startTransfer`. */
+  const askToStart = useCallback(() => dispatch({ type: 'start', reducedMotion: true }), []);
+  const cancelMotion = useCallback(() => dispatch({ type: 'cancelMotion' }), []);
+
   /** Shows the key QR for as long as the person holds the button; it never plays with the stream. */
   const showKeyQr = useCallback(() => workerRef.current?.postMessage({ type: 'KEY_QR' }), []);
   const hideKeyQr = useCallback(() => setKeyFrame(null), []);
@@ -907,7 +920,7 @@ export function useOpticalSender({
   const pauseTransfer = useCallback(() => {
     if (!isTransferringRef.current || isPausedRef.current) return;
     isPausedRef.current = true;
-    setIsPaused(true);
+    dispatch({ type: 'pause' });
     if (animationIdRef.current) {
       cancelAnimationFrame(animationIdRef.current);
       animationIdRef.current = null;
@@ -921,7 +934,7 @@ export function useOpticalSender({
   const resumeTransfer = useCallback(() => {
     if (!isTransferringRef.current || !isPausedRef.current) return;
     isPausedRef.current = false;
-    setIsPaused(false);
+    dispatch({ type: 'resume' });
     lastFrameTimeRef.current = performance.now();
     lastRenderSuccessTimeRef.current = performance.now();
     if (walletRef.current) runWalletLoop();
@@ -965,6 +978,7 @@ export function useOpticalSender({
     keyCanvasRef,
     showKeyQr,
     hideKeyQr,
+    phase,
     isTransferring,
     isPaused,
     isVerifyingHandshake,
@@ -997,6 +1011,8 @@ export function useOpticalSender({
     transferStats,
     canvasRef,
     startTransfer,
+    askToStart,
+    cancelMotion,
     stopTransfer,
     pauseTransfer,
     resumeTransfer,
