@@ -34,6 +34,7 @@ import { Badge } from '../ui/Badge';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { AccordionItem } from '../ui/Accordion';
 import { useToast } from '../ui/Toast';
+import { isCanvasScannable } from '@/packages/scannability/scan';
 
 /**
  * Suggests a card title from the content: the network name of a WiFi code, the site of a link,
@@ -71,16 +72,6 @@ const WALLET_DEVELOPER_SECTION = 'Have your own Apple or Google developer keys?'
 
 /** Message shown when the card's own code fails the scan check. */
 export const WALLET_SCAN_FAILED = 'The wallet card did not pass the scan check, so it was not saved. Try shorter content.';
-
-/** Loads our QR reader and the export check on demand, as the other exports do. */
-const loadScanCheck = () =>
-  Promise.all([import('@/packages/scannability/checker'), import('@/packages/qr-decode').then(({ loadQrReader }) => loadQrReader())]).then(
-    ([{ performScannabilityCheck }, reader]) => (canvas: HTMLCanvasElement) => {
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return false;
-      return performScannabilityCheck(reader, ctx.getImageData(0, 0, canvas.width, canvas.height), canvas.width, canvas.height).success;
-    }
-  );
 
 function toPng(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -134,8 +125,7 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
   const makeCard = async (): Promise<Blob | null> => {
     try {
       const canvas = await renderWalletCard(config, { title, subtitle });
-      const scans = await loadScanCheck();
-      if (!scans(canvas)) {
+      if (!(await isCanvasScannable(canvas))) {
         addToast({ type: 'error', message: WALLET_SCAN_FAILED, duration: 6000 });
         return null;
       }

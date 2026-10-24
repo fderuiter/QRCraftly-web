@@ -21,6 +21,7 @@ import { assertWorkerRequest, isWorkerResponse } from './sharedContract';
 import type { PixelFrame, ScannabilityResult } from './checker';
 import { calculateScannabilityHealth, type HealthScore } from './scoring';
 import { getExportRiskPolicy, type ExportRisk, type ScannabilityStatus } from './exportRiskPolicy';
+import { loadPixelCheck } from './scanCheck';
 import { releaseImageHandle } from './imageHandle';
 import {
   connectScannabilityWorker,
@@ -207,28 +208,12 @@ const defaultFrameReader: ScannabilityFrameReader = {
   bitmapToPixels: drawBitmap,
 };
 
-type RunCheck = (frame: PixelFrame, moduleCount?: number, quietZoneModules?: number) => ScannabilityResult;
-
-let defaultRunCheck: Promise<RunCheck> | null = null;
-
 /**
  * The main-thread check, loaded on first use with the QR reader (#1178), so pages only download
- * the reader's WebAssembly module when a check has to run on the main thread. A failed load is
- * not kept, so a later check retries.
+ * the reader's WebAssembly module when a check has to run on the main thread. The loader is
+ * shared with the one-shot checks in `scanCheck.ts`; a failed load is not kept.
  */
-function loadDefaultRunCheck(): Promise<RunCheck> {
-  defaultRunCheck ??= Promise.all([import('./checker'), import('@/packages/qr-decode')])
-    .then(([{ performScannabilityCheck }, { loadQrReader }]) => loadQrReader().then((reader) => ({ performScannabilityCheck, reader })))
-    .then(
-      ({ performScannabilityCheck, reader }): RunCheck =>
-        (frame, moduleCount, quietZoneModules) => performScannabilityCheck(reader, frame, frame.width, frame.height, moduleCount, quietZoneModules)
-    )
-    .catch((error: unknown) => {
-      defaultRunCheck = null;
-      throw error;
-    });
-  return defaultRunCheck;
-}
+const loadDefaultRunCheck = loadPixelCheck;
 
 const positive = (value: number | undefined) => (value && value > 0 ? value : undefined);
 

@@ -28,6 +28,7 @@ import { sanitizeSvg } from '@/packages/core/security';
 import { validateConfig } from '@/packages/qr-payload';
 import { buildMatrix, loadQrEncoder, type ModuleRenderOptions } from '@/packages/qr-matrix';
 import { loadMosaicSource } from '@/packages/qr-matrix/mosaic';
+import { isCanvasScannable } from '@/packages/scannability/scan';
 
 /**
  * Converts an image URL to a base64 data-URL so it can be embedded inline in
@@ -456,15 +457,6 @@ export async function validateSvgScannability(
 
   const dimensions = SOCIAL_DIMENSIONS[config.socialFormat] || { width: 1000, height: 1000 };
   const canvas = await rasterizeSvgToCanvas(svgString, dimensions.width, dimensions.height);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return false;
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const [{ performScannabilityCheck }, { loadQrReader }] = await Promise.all([
-    import('@/packages/scannability/checker'),
-    import('@/packages/qr-decode'),
-  ]);
-  const result = performScannabilityCheck(await loadQrReader(), imageData, canvas.width, canvas.height);
-  return result.success;
+  return isCanvasScannable(canvas);
 }
 

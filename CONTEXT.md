@@ -71,7 +71,7 @@ An empirical classification of code readability derived from automated contrast 
 _Avoid_: Readability rate, success score, scan rating, reliability index
 
 **Scannability Health Evaluator**:
-The headless deep module that answers "how scannable is this QR frame?" with one assessment (verification status, health score, export risk, worker recovery state). It privately owns canvas capture, buffer transfer, request sequencing, the Scannability Worker lifecycle, the 1500ms watchdog and the main-thread fallback. React code reaches it only through the `useScannability` adapter hook.
+The headless deep module that answers "how scannable is this QR frame?" with one assessment (verification status, health score, export risk, worker recovery state). It privately owns canvas capture, buffer transfer, request sequencing, the Scannability Worker lifecycle, the 1500ms watchdog and the main-thread fallback. React code reaches it only through the `useScannability` adapter hook. Finished images (PNG, JPEG, WebP and SVG exports, the wallet card and the transfer handshake's main-thread fallback) go through its one-shot checks, `isCanvasScannable` and `isFrameScannable` from `@/packages/scannability/scan`, which load the pixel check and the QR reader on demand; whether to check at all stays with the caller.
 _Avoid_: Scannability runner, worker runner, scannability hook internals
 
 **Scannability Worker**:

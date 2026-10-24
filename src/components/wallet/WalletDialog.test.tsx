@@ -44,8 +44,7 @@ vi.mock('@/packages/qr-export', async (original) => {
     }),
   };
 });
-vi.mock('@/packages/scannability/checker', () => ({ performScannabilityCheck: () => ({ success: scan.success }) }));
-vi.mock('@/packages/qr-decode', () => ({ loadQrReader: async () => ({}) }));
+vi.mock('@/packages/scannability/scan', () => ({ isCanvasScannable: async () => scan.success }));
 vi.mock('@/utils/downloadManager', () => ({ triggerFileDownload: download }));
 
 const DEVELOPER_SECTION = 'Have your own Apple or Google developer keys?';

@@ -25,14 +25,13 @@ export type { ModuleContrastAuditResult, LowContrastCell } from './lib/contrastA
 export { calculateScannabilityHealth } from './lib/scoring';
 export { LOW_RELIABILITY_PATTERNS, SYSTEM_LIMITS } from './lib/constants';
 export { getExportRiskPolicy } from './lib/exportRiskPolicy';
-export { getScanVerdict, getScanAdvice, getScanChecks, RELIABLE_SCORE } from './lib/verdict';
+export { getScanVerdict, getScanAdvice, getScanChecks } from './lib/verdict';
 export type { ScanVerdict, ScanFix, ScanAdvice } from './lib/verdict';
 export { auditModuleContrast } from './lib/contrastAudit';
 export {
   simulatePrint,
   PRINT_PX_PER_MODULE,
   PRINT_QUIET_ZONE_MODULES,
-  PRINT_BLUR_MODULES,
   type GreyFrame,
   type PrintPlacement,
 } from './lib/opticalSimulation';
@@ -44,7 +43,6 @@ export {
   type WorkerRequest,
   type WorkerResponse,
 } from './lib/sharedContract';
-export { releaseImageHandle } from './lib/imageHandle';
 export {
   createScannabilityWorker,
   type ScannabilityWorkerFactory,
@@ -54,7 +52,6 @@ export {
 export type { PixelFrame } from './lib/checker';
 export {
   createScannabilityEvaluator,
-  assessScannability,
   type ScannabilityEvaluator,
   type ScannabilityEvaluatorConfig,
   type ScannabilityAssessment,
