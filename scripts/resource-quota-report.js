@@ -1,63 +1,80 @@
+/**
+ * Resource quota report (#1618): how close the built site is to the Workers Static Assets
+ * limits, posted on every PR by the Build job (main.yml, "Generate Resource Quota Report").
+ *
+ * Production is Workers Static Assets with no Worker script (ADR 0012). The limits checked are
+ * the per-version file count on the Workers Free plan and the size of one asset; see
+ * https://developers.cloudflare.com/workers/static-assets/#limits (checked 2026-10-24).
+ */
+
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { walkFiles } from './utils/sourceFiles.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(__dirname, '..');
+const DIST_DIR = path.join(ROOT, 'dist/client');
+const REPORT_FILE = path.join(ROOT, 'quota-report.md');
 
-const DIST_DIR = path.join(__dirname, '../dist/client');
-const MAX_FILES = 20000;
-const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
-// KV limit is also mentioned in the scenario: "KV store or asset limits"
-// Cloudflare KV free tier limits: 100k reads/day, 1000 writes/day, 1GB total data.
-// It's hard to track dynamic KV limits in a PR since they are runtime limits.
-// The scenario specifically says "warning the developer if the change brings the project within 10% of a hard ceiling (e.g., Cloudflare Pages quotas)"
+/** Static assets per version on the Workers Free plan (Paid allows 100,000). */
+export const MAX_FILES = 20000;
+/** Largest single static asset. */
+export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+/** A resource at or above this share of its ceiling is flagged. */
+export const WARNING_PCT = 90;
 
-let fileCount = 0;
-let maxFileSize = 0;
-let maxFileName = '';
-let totalSize = 0;
+const mb = (bytes) => (bytes / 1024 / 1024).toFixed(2);
+const status = (pct) => (pct >= WARNING_PCT ? '⚠️ WARNING' : '✅ OK');
 
-function walkDir(dir) {
-    if (!fs.existsSync(dir)) return;
-    const files = fs.readdirSync(dir);
-    for (const file of files) {
-        const fullPath = path.join(dir, file);
-        const stat = fs.statSync(fullPath);
-        if (stat.isDirectory()) {
-            walkDir(fullPath);
-        } else {
-            fileCount++;
-            totalSize += stat.size;
-            if (stat.size > maxFileSize) {
-                maxFileSize = stat.size;
-                maxFileName = fullPath;
-            }
-        }
+/**
+ * Builds the report for a list of built files.
+ * @param {Array<{ path: string, size: number }>} files paths as they should appear in the report
+ * @returns {{ fileCount: number, totalSize: number, maxFileSize: number, maxFileName: string, fileCountPct: number, maxFilePct: number, warning: boolean, markdown: string }}
+ */
+export function buildQuotaReport(files) {
+  let maxFileSize = 0;
+  let maxFileName = '';
+  let totalSize = 0;
+  for (const file of files) {
+    totalSize += file.size;
+    if (file.size > maxFileSize) {
+      maxFileSize = file.size;
+      maxFileName = file.path;
     }
-}
+  }
+  const fileCount = files.length;
+  const fileCountPct = (fileCount / MAX_FILES) * 100;
+  const maxFilePct = (maxFileSize / MAX_FILE_SIZE_BYTES) * 100;
+  const warning = fileCountPct >= WARNING_PCT || maxFilePct >= WARNING_PCT;
 
-walkDir(DIST_DIR);
-
-const fileCountPct = (fileCount / MAX_FILES) * 100;
-const maxFilePct = (maxFileSize / MAX_FILE_SIZE_BYTES) * 100;
-
-console.log(`Resource Quota Report:`);
-console.log(`Files: ${fileCount} / ${MAX_FILES} (${fileCountPct.toFixed(2)}%)`);
-console.log(`Largest File: ${maxFileName} - ${(maxFileSize/1024/1024).toFixed(2)}MB / 25MB (${maxFilePct.toFixed(2)}%)`);
-console.log(`Total Size: ${(totalSize/1024/1024).toFixed(2)}MB`);
-
-const markdown = `## 📊 Resource Impact Report
+  const markdown = `## 📊 Resource Impact Report
 
 | Resource | Current Usage | Hard Ceiling | % Used | Status |
 |---|---|---|---|---|
-| **File Count** | ${fileCount} | ${MAX_FILES} | ${fileCountPct.toFixed(2)}% | ${fileCountPct >= 90 ? '⚠️ WARNING' : '✅ OK'} |
-| **Max File Size** | ${(maxFileSize/1024/1024).toFixed(2)} MB | 25 MB | ${maxFilePct.toFixed(2)}% | ${maxFilePct >= 90 ? '⚠️ WARNING' : '✅ OK'} |
-| **Total Size** | ${(totalSize/1024/1024).toFixed(2)} MB | N/A | N/A | ℹ️ INFO |
+| **File Count** | ${fileCount} | ${MAX_FILES} | ${fileCountPct.toFixed(2)}% | ${status(fileCountPct)} |
+| **Max File Size** | ${mb(maxFileSize)} MB | 25 MB | ${maxFilePct.toFixed(2)}% | ${status(maxFilePct)} |
+| **Total Size** | ${mb(totalSize)} MB | N/A | N/A | ℹ️ INFO |
 
-*(Largest file: \`${maxFileName ? maxFileName.replace(path.join(__dirname, '../'), '') : 'N/A'}\`)*
+*(Largest file: \`${maxFileName || 'N/A'}\`)*
 
-${fileCountPct >= 90 || maxFilePct >= 90 ? '> **⚠️ WARNING:** Your changes bring the project within 10% of a Cloudflare Pages hard ceiling.' : '> ✅ Resource usage is well within limits.'}
+${warning ? `> **⚠️ WARNING:** Your changes bring the project within ${100 - WARNING_PCT}% of a Workers Static Assets hard ceiling.` : '> ✅ Resource usage is well within limits.'}
 `;
 
-fs.writeFileSync(path.join(__dirname, '../quota-report.md'), markdown);
+  return { fileCount, totalSize, maxFileSize, maxFileName, fileCountPct, maxFilePct, warning, markdown };
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(process.argv[1])) {
+  const files = walkFiles(DIST_DIR).map((file) => ({
+    path: path.relative(ROOT, file),
+    size: fs.statSync(file).size,
+  }));
+  const report = buildQuotaReport(files);
+
+  console.log(`Resource Quota Report:`);
+  console.log(`Files: ${report.fileCount} / ${MAX_FILES} (${report.fileCountPct.toFixed(2)}%)`);
+  console.log(`Largest File: ${report.maxFileName} - ${mb(report.maxFileSize)}MB / 25MB (${report.maxFilePct.toFixed(2)}%)`);
+  console.log(`Total Size: ${mb(report.totalSize)}MB`);
+
+  fs.writeFileSync(REPORT_FILE, report.markdown);
+}

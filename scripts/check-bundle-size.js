@@ -3,6 +3,7 @@ import path from 'path';
 import zlib from 'zlib';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
+import { walkFiles } from './utils/sourceFiles.js';
 
 const require = createRequire(import.meta.url);
 // The service worker generator already knows how to follow a page's startup assets.
@@ -231,21 +232,7 @@ export function checkVendorChunk(distDir) {
  * @param {string} dir 
  * @returns {string[]}
  */
-export function getFiles(dir) {
-  let results = [];
-  if (!fs.existsSync(dir)) return results;
-  const list = fs.readdirSync(dir);
-  for (const file of list) {
-    const fullPath = path.join(dir, file);
-    const stat = fs.statSync(fullPath);
-    if (stat.isDirectory()) {
-      results = results.concat(getFiles(fullPath));
-    } else if (stat.isFile()) {
-      results.push(fullPath);
-    }
-  }
-  return results;
-}
+export const getFiles = (dir) => walkFiles(dir);
 
 /**
  * Calculates raw and gzipped sizes of all files in a directory.
