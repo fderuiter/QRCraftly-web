@@ -33,6 +33,8 @@ import { createSpeedController, switchableProfile, type ControllerDecision, type
 import { createFeedbackLink, type CameraPermission, type FeedbackLink, type FeedbackLinkState } from '../feedback/link';
 import { decodeFrame } from '../prism/frame';
 import { spawnTileWorker } from '../receiver/media';
+import { permissionOf } from '../camera';
+import { transferProgress } from '../progress';
 import { createTileReader, type TileReader } from '../receiver/tileReader';
 import { clearTile, paintBeacon, paintTile, prepareTileCanvas, tileScreenOf } from './tiles';
 import { formatMegabytes, spawnSliceWorker } from './workers';
@@ -61,15 +63,6 @@ export interface UseOpticalSenderOptions {
    * turned on "Let the receiver steer" and started a transfer. Without it, steering is unavailable.
    */
   requestWebcam?: () => Promise<MediaStream>;
-}
-
-/** What asking for the webcam came back with: a refusal and a missing camera are told apart. */
-function permissionOf(error: unknown): CameraPermission {
-  // A DOMException is not an Error everywhere, so read its name as a plain property.
-  const name = typeof error === 'object' && error !== null && 'name' in error ? String(error.name) : '';
-  if (name === 'NotAllowedError' || name === 'SecurityError') return 'denied';
-  if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'NotReadableError') return 'unavailable';
-  throw error;
 }
 
 /** Session details reported by the slice worker. */
@@ -390,8 +383,8 @@ export function useOpticalSender({
 
           // Rateless: frames play once in order and their pool slot is recycled.
           pool.delete(playIdx);
-          setProgress(Math.min(100, Math.round(((playIdx + 1) / total) * 100)));
-          const passNumber = Math.floor(playIdx / total) + 1;
+          const { percent, loop: passNumber } = transferProgress(playIdx + 1, total);
+          setProgress(percent);
           if (passNumber !== passCountRef.current) {
             passCountRef.current = passNumber;
             setCurrentPass(passNumber);
@@ -421,8 +414,8 @@ export function useOpticalSender({
         paint(wallet.nextFrame());
         const shown = wallet.shown;
         setCurrentFrameIndex(shown);
-        setProgress(Math.min(100, Math.round((shown / wallet.fragmentCount) * 100)));
-        const passNumber = Math.floor((shown - 1) / wallet.fragmentCount) + 1;
+        const { percent, loop: passNumber } = transferProgress(shown, wallet.fragmentCount);
+        setProgress(percent);
         if (passNumber !== passCountRef.current) {
           passCountRef.current = passNumber;
           setCurrentPass(passNumber);
@@ -577,8 +570,8 @@ export function useOpticalSender({
           worker?.postMessage({ type: 'ACK', payload: { index: newest } });
           const total = totalFramesRef.current || 1;
           setCurrentFrameIndex(newest + 1);
-          setProgress(Math.min(100, Math.round(((newest + 1) / total) * 100)));
-          const passNumber = Math.floor(newest / total) + 1;
+          const { percent, loop: passNumber } = transferProgress(newest + 1, total);
+          setProgress(percent);
           if (passNumber !== passCountRef.current) {
             passCountRef.current = passNumber;
             setCurrentPass(passNumber);
