@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { LOW_RELIABILITY_PATTERNS, PRESET_COLORS } from '../constants';
+import { PRESET_COLORS } from '../constants';
+import { LOW_RELIABILITY_PATTERNS } from '@/packages/scannability';
 import { QRStyle } from '@/packages/core/types';
 import { styleScanTone, surpriseStyle, type StyleChoice } from './styleGallery';
 

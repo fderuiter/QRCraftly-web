@@ -75,7 +75,6 @@ const CORE = `${PACKAGES_ROOT}/core/`;
  */
 export const LEGACY_APP_ROOT_IMPORTERS = new Set([
   'src/packages/link-safety/lib/analyse.ts',
-  'src/packages/scannability/lib/scoring.ts',
 ]);
 
 /**

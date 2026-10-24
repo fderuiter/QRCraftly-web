@@ -7,7 +7,7 @@ import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
 import { useImageUpload } from '../../hooks/useImageUpload';
 import { IMAGE_UPLOAD_LIMITS } from '@/packages/core/security';
-import { SYSTEM_LIMITS } from '../../constants';
+import { SYSTEM_LIMITS } from '@/packages/scannability';
 import { MIN_LOGO_BACKING_PADDING } from '@/packages/qr-matrix';
 import { PRESET_LOGOS, PRESET_LOGO_CATEGORIES, type PresetCategory } from '../../constants/presetLogos';
 import { SegmentedControl } from '../ui/SegmentedControl';

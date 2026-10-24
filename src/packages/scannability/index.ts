@@ -23,6 +23,7 @@ export type { ScannabilityResult } from './lib/checker';
 export type { ModuleContrastAuditResult, LowContrastCell } from './lib/contrastAudit';
 
 export { calculateScannabilityHealth } from './lib/scoring';
+export { LOW_RELIABILITY_PATTERNS, SYSTEM_LIMITS } from './lib/constants';
 export { getExportRiskPolicy } from './lib/exportRiskPolicy';
 export { getScanVerdict, getScanAdvice, getScanChecks, RELIABLE_SCORE } from './lib/verdict';
 export type { ScanVerdict, ScanFix, ScanAdvice } from './lib/verdict';

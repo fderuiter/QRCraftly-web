@@ -1,5 +1,6 @@
 import type { QRConfig } from '@/packages/core/types';
-import { LOW_RELIABILITY_PATTERNS, MIN_CONTRAST_THRESHOLD, PATTERNS, PRESET_COLORS } from '../constants';
+import { MIN_CONTRAST_THRESHOLD, PATTERNS, PRESET_COLORS } from '../constants';
+import { LOW_RELIABILITY_PATTERNS } from '@/packages/scannability';
 import { getContrastRatio } from '@/packages/core/encoding';
 
 /** The settings a gallery tile or "Surprise me" changes. */
