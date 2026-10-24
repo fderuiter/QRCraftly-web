@@ -52,6 +52,29 @@ const redirectsFileMiddleware = (): Connect.NextHandleFunction => {
   };
 };
 
+/** Modules that go in the long-cached vendor chunk; see `manualChunks` below. */
+const VENDOR_MODULE = /[\\/]node_modules[\\/](react|react-dom|scheduler|vike-react)[\\/]/;
+
+/**
+ * Names the client vendor chunk `assets/chunks/vendor.<hash>.js`, so the bundle report and the
+ * size check can find it. Vike names every other chunk `chunk-<hash>.js` and is left alone.
+ * @returns Plugin wrapping the chunk file names Vike sets.
+ */
+const vendorChunkName = (): Plugin => ({
+  name: 'qrcraftly:vendor-chunk-name',
+  apply: 'build',
+  enforce: 'post',
+  configResolved(config) {
+    if (config.build.ssr) return;
+    const outputs = config.build.rollupOptions.output;
+    for (const output of Array.isArray(outputs) ? outputs : outputs ? [outputs] : []) {
+      const vikeNames = output.chunkFileNames;
+      if (typeof vikeNames !== 'function') continue;
+      output.chunkFileNames = (chunk) => (chunk.name === 'vendor' ? `${config.build.assetsDir}/chunks/vendor.[hash].js` : vikeNames(chunk));
+    }
+  },
+});
+
 const redirectsFile = (): Plugin => ({
   name: 'qrcraftly:redirects-file',
   configureServer(server) {
@@ -86,6 +109,7 @@ export default defineConfig(({ command }) => {
       },
       plugins: [
         vike(),
+        vendorChunkName(),
         redirectsFile(),
         docsManifest(),
         licenses.plugin,
@@ -112,8 +136,12 @@ export default defineConfig(({ command }) => {
         target: "es2022",
         rollupOptions: {
           output: {
+            // React, react-dom, scheduler and vike-react go in one vendor chunk, so their hash stays
+            // the same across app-only releases and returning visitors keep them cached (#1594).
+            // Vike's own client runtime stays in the entry: its entry module imports the page list,
+            // and putting the entry module in a manual chunk turns that chunk into the entry.
             manualChunks(id: string) {
-              if (/[\\/]node_modules[\\/].*[\\/]node_modules[\\/](react|react-dom|scheduler|vike|vike-react)[\\/]/.test(id)) return 'vendor';
+              if (VENDOR_MODULE.test(id)) return 'vendor';
               return undefined;
             },
           },

@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'node:crypto';
-import { OPTICAL_PROBE_MARKER, WASM_MODULE_BUDGETS_KB, MAX_LINK_SAFETY_GZIPPED_SIZE_KB, checkWasmModuleBudgets, getFiles, isOwnWasmModule, measurePageLoads, verifyBundleSize, verifyLinkSafetyBundleSize } from '../scripts/check-bundle-size.js';
+import { ON_DEMAND_WASM_PAGES, OPTICAL_PROBE_MARKER, WASM_MODULE_BUDGETS_KB, checkVendorChunk, readStartupWasm, wasmModuleName, MAX_LINK_SAFETY_GZIPPED_SIZE_KB, checkWasmModuleBudgets, getFiles, isOwnWasmModule, measurePageLoads, verifyBundleSize, verifyLinkSafetyBundleSize } from '../scripts/check-bundle-size.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -149,6 +149,70 @@ describe('Bundle Size Verification Script Tests', () => {
     expect(loads[0].files).toBe(4);
     expect(loads[1].files).toBe(2);
     expect(loads[0].gzipSize).toBeGreaterThan(loads[1].gzipSize);
+  });
+
+  it('adds the Rust modules a page fetches on open to its first load, each once (#1594)', () => {
+    const assets = path.join(TEMP_TEST_DIR, 'assets');
+    fs.mkdirSync(path.join(assets, 'static'), { recursive: true });
+    fs.mkdirSync(path.join(assets, 'entries'), { recursive: true });
+    fs.mkdirSync(path.join(TEMP_TEST_DIR, 'about'), { recursive: true });
+    fs.writeFileSync(path.join(TEMP_TEST_DIR, 'index.html'), '<script src="/assets/entries/home.js"></script>');
+    fs.writeFileSync(path.join(TEMP_TEST_DIR, 'about', 'index.html'), '<script src="/assets/entries/about.js"></script>');
+    // The page loads the encoder itself and starts a worker that loads a second copy and the decoder.
+    fs.writeFileSync(
+      path.join(assets, 'entries', 'home.js'),
+      'new URL("/assets/static/qr-encode.Ab12Cd34.wasm",import.meta.url);new Worker(new URL("/assets/worker-matrix-Ef56Gh78.js",import.meta.url));'
+    );
+    fs.writeFileSync(
+      path.join(assets, 'worker-matrix-Ef56Gh78.js'),
+      'new URL("/assets/qr-encode-Ab12Cd34.wasm",self.location.href);new URL("/assets/qr-decode-Ij90Kl12.wasm",self.location.href);'
+    );
+    fs.writeFileSync(path.join(assets, 'entries', 'about.js'), 'console.log("about");');
+    for (const file of ['static/qr-encode.Ab12Cd34.wasm', 'qr-encode-Ab12Cd34.wasm', 'qr-decode-Ij90Kl12.wasm']) {
+      fs.writeFileSync(path.join(assets, file), randomBytes(2000));
+    }
+
+    expect([...readStartupWasm(TEMP_TEST_DIR, 'index.html').keys()].sort()).toEqual(['qr-decode', 'qr-encode']);
+    const [home, about] = measurePageLoads(TEMP_TEST_DIR);
+    expect(home.page).toBe('index.html');
+    expect(home.wasm).toEqual(['qr-decode', 'qr-encode']);
+    // Two 2000-byte random modules, counted once each; random bytes barely compress.
+    expect(home.wasmGzipSize).toBeGreaterThan(4000);
+    expect(home.wasmGzipSize).toBeLessThan(4200);
+    expect(home.totalGzipSize).toBe(home.gzipSize + home.wasmGzipSize);
+    expect(about.wasm).toEqual([]);
+    expect(about.totalGzipSize).toBe(about.gzipSize);
+  });
+
+  it('leaves out the modules of tools that start their workers only on request', () => {
+    const page = ON_DEMAND_WASM_PAGES[0];
+    fs.mkdirSync(path.join(TEMP_TEST_DIR, path.dirname(page)), { recursive: true });
+    fs.mkdirSync(path.join(TEMP_TEST_DIR, 'assets'), { recursive: true });
+    fs.writeFileSync(path.join(TEMP_TEST_DIR, page), '<script src="/assets/tool.js"></script>');
+    fs.writeFileSync(path.join(TEMP_TEST_DIR, 'assets', 'tool.js'), 'new URL("/assets/modem.Ab12Cd34.wasm",import.meta.url);');
+    fs.writeFileSync(path.join(TEMP_TEST_DIR, 'assets', 'modem.Ab12Cd34.wasm'), randomBytes(100));
+
+    expect(readStartupWasm(TEMP_TEST_DIR, page).size).toBe(0);
+  });
+
+  it('names a built module whatever hash it carries', () => {
+    expect(wasmModuleName('assets/static/qr-decode.onI_tZ34.wasm')).toBe('qr-decode');
+    expect(wasmModuleName('assets/qr-encode-CCYQ4vhX.wasm')).toBe('qr-encode');
+    expect(wasmModuleName('assets/other.wasm')).toBeUndefined();
+  });
+
+  it('finds the vendor chunk and notices React back in the client entry (#1594)', () => {
+    const assets = path.join(TEMP_TEST_DIR, 'assets');
+    fs.mkdirSync(path.join(assets, 'chunks'), { recursive: true });
+    fs.mkdirSync(path.join(assets, 'entries'), { recursive: true });
+    fs.writeFileSync(path.join(assets, 'entries', 'entry-client-routing.Ab12Cd34.js'), 'import"../chunks/vendor.Ef56Gh78.js";');
+    fs.writeFileSync(path.join(assets, 'chunks', 'vendor.Ef56Gh78.js'), 'function hydrateRoot(){}');
+    expect(checkVendorChunk(TEMP_TEST_DIR)).toEqual({ vendor: 'assets/chunks/vendor.Ef56Gh78.js', entryHasReact: false });
+
+    fs.writeFileSync(path.join(assets, 'entries', 'entry-client-routing.Ab12Cd34.js'), 'function hydrateRoot(){}');
+    expect(checkVendorChunk(TEMP_TEST_DIR).entryHasReact).toBe(true);
+    fs.rmSync(path.join(assets, 'chunks', 'vendor.Ef56Gh78.js'));
+    expect(checkVendorChunk(TEMP_TEST_DIR).vendor).toBeNull();
   });
 
   it('keeps @/packages/link-safety strictly under the 6 KB gzipped budget', async () => {

@@ -6,17 +6,33 @@ import { fileURLToPath } from 'url';
 
 const require = createRequire(import.meta.url);
 // The service worker generator already knows how to follow a page's startup assets.
-const { readAssetReferences } = require('./generate_sw.cjs');
+const { readAssetReferences, readWorkerReferences } = require('./generate_sw.cjs');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DIST_DIR = path.resolve(__dirname, '../dist/client');
 const WASM_DIR = path.resolve(__dirname, '../src/wasm');
-// What one visitor downloads to open one page (#1106): its HTML, the CSS and the scripts it loads
-// at startup (static imports, not lazy chunks, workers or WebAssembly modules). The worst page is the
-// number that matters for load time, so this is the budget that catches JavaScript bloat.
+// The code one visitor downloads to open one page (#1106): its HTML, the CSS and the scripts it
+// loads at startup (static imports, not lazy chunks or workers). The worst page is the number that
+// matters for load time, so this is the budget that catches JavaScript bloat.
 export const MAX_PAGE_FIRST_LOAD_KB = 260;
+// The same first load plus the Rust modules the page fetches as soon as it opens (#1594). Generator
+// pages fetch the QR encoder (11.2 KB) and the decoder behind the scannability check (29.3 KB),
+// which took them from 255 KB of code to 296 KB on 2026-10-24. WebAssembly compiles off the main
+// thread while streaming, so it does not hold up the first paint the way scripts do; it gets this
+// separate line, set about 4% above the measured worst page like the code budget, instead of a
+// higher code budget that would let scripts grow into the room.
+export const MAX_PAGE_FIRST_LOAD_WITH_WASM_KB = 308;
+// Tools that start their workers only when the visitor starts a scan or a transfer, so none of
+// the modules their startup scripts can reach is fetched on open. e2e/startup-wasm.spec.ts checks
+// this list and the rule in {@link readStartupWasm} against what a browser really fetches.
+export const ON_DEMAND_WASM_PAGES = [
+  'file-transfer/index.html',
+  'file-transfer/receive/index.html',
+  'qr-code-checker/index.html',
+  'qr-code-scanner/index.html',
+];
 // A loose backstop on the JavaScript and CSS in dist/client, so shipped code cannot grow unseen.
 // Pre-rendered HTML is left out: every new page adds some, and the per-page budget already
 // bounds each page's own HTML. Measured at 563 KB on 2026-10-03.
@@ -115,10 +131,68 @@ export function isGeneratedMedia(relativePath) {
 }
 
 /**
- * Measures the first load of every page: the gzipped size of its HTML plus every stylesheet and
- * script it loads at startup, found by following static imports.
+ * Names the Rust module a built `.wasm` file is, whatever hash the bundler gave it.
+ * @param {string} relativePath
+ * @returns {string | undefined}
+ */
+export function wasmModuleName(relativePath) {
+  return Object.keys(WASM_MODULE_BUDGETS_KB).find((name) => isOwnWasmModule(relativePath, [name]));
+}
+
+/**
+ * Follows a page's static imports from its HTML.
  * @param {string} distDir
- * @returns {Array<{page: string, files: number, gzipSize: number}>} Pages, largest first.
+ * @param {string} page POSIX path of the page's HTML, relative to `distDir`.
+ * @returns {Set<string>} The HTML, stylesheets and startup scripts, relative to `distDir`.
+ */
+export function readStartupFiles(distDir, page) {
+  const loaded = new Set();
+  const queue = [page];
+  while (queue.length > 0) {
+    const next = queue.pop();
+    if (loaded.has(next) || !fs.existsSync(path.join(distDir, next))) continue;
+    loaded.add(next);
+    if (next.endsWith('.css')) continue;
+    for (const ref of readAssetReferences(next, fs.readFileSync(path.join(distDir, next), 'utf8'))) queue.push(ref);
+  }
+  return loaded;
+}
+
+/**
+ * The Rust modules a page fetches as soon as it opens (#1594): those its startup scripts load
+ * themselves and those the workers they start load, unless the page is in
+ * {@link ON_DEMAND_WASM_PAGES}. A module is counted once even when two copies are reachable.
+ * @param {string} distDir
+ * @param {string} page POSIX path of the page's HTML, relative to `distDir`.
+ * @param {Set<string>} [startupFiles] The page's startup files, if already read.
+ * @returns {Map<string, string>} Module name to the built file measured for it.
+ */
+export function readStartupWasm(distDir, page, startupFiles = readStartupFiles(distDir, page)) {
+  const modules = new Map();
+  if (ON_DEMAND_WASM_PAGES.includes(page)) return modules;
+  const read = (relativePath) => fs.readFileSync(path.join(distDir, relativePath), 'utf8');
+  const add = (relativePath) => {
+    const name = wasmModuleName(relativePath);
+    if (name && !modules.has(name) && fs.existsSync(path.join(distDir, relativePath))) modules.set(name, relativePath);
+  };
+  for (const file of [...startupFiles].sort()) {
+    if (!file.endsWith('.js')) continue;
+    for (const ref of readWorkerReferences(file, read(file))) {
+      if (ref.endsWith('.wasm')) add(ref);
+      else if (fs.existsSync(path.join(distDir, ref))) {
+        for (const workerRef of readWorkerReferences(ref, read(ref))) if (workerRef.endsWith('.wasm')) add(workerRef);
+      }
+    }
+  }
+  return modules;
+}
+
+/**
+ * Measures the first load of every page: the gzipped size of its HTML plus every stylesheet and
+ * script it loads at startup, found by following static imports, and separately the Rust modules
+ * it fetches on open ({@link readStartupWasm}).
+ * @param {string} distDir
+ * @returns {Array<{page: string, files: number, gzipSize: number, wasm: string[], wasmGzipSize: number, totalGzipSize: number}>} Pages, largest total first.
  */
 export function measurePageLoads(distDir) {
   const gzipOf = (relativePath) => zlib.gzipSync(fs.readFileSync(path.join(distDir, relativePath))).length;
@@ -126,20 +200,30 @@ export function measurePageLoads(distDir) {
   const pages = getFiles(distDir).map(posix).filter((file) => file.endsWith('.html'));
   return pages
     .map((page) => {
-      const loaded = new Set();
-      const queue = [page];
-      while (queue.length > 0) {
-        const next = queue.pop();
-        if (loaded.has(next) || !fs.existsSync(path.join(distDir, next))) continue;
-        loaded.add(next);
-        if (next.endsWith('.css')) continue;
-        for (const ref of readAssetReferences(next, fs.readFileSync(path.join(distDir, next), 'utf8'))) queue.push(ref);
-      }
+      const loaded = readStartupFiles(distDir, page);
       let gzipSize = 0;
       for (const file of loaded) gzipSize += gzipOf(file);
-      return { page, files: loaded.size, gzipSize };
+      const wasm = readStartupWasm(distDir, page, loaded);
+      let wasmGzipSize = 0;
+      for (const file of wasm.values()) wasmGzipSize += gzipOf(file);
+      return { page, files: loaded.size, gzipSize, wasm: [...wasm.keys()].sort(), wasmGzipSize, totalGzipSize: gzipSize + wasmGzipSize };
     })
-    .sort((a, b) => b.gzipSize - a.gzipSize);
+    .sort((a, b) => b.totalGzipSize - a.totalGzipSize);
+}
+
+/**
+ * Finds the vendor chunk that `manualChunks` in vite.config.ts splits React into (#1594), and
+ * whether React's renderer leaked back into Vike's client entry, which changes on every release.
+ * @param {string} distDir
+ * @returns {{ vendor: string | null, entryHasReact: boolean }} POSIX paths relative to `distDir`.
+ */
+export function checkVendorChunk(distDir) {
+  const posix = (file) => path.relative(distDir, file).split(path.sep).join('/');
+  const files = getFiles(path.join(distDir, 'assets')).map(posix);
+  const vendor = files.find((file) => /^assets\/chunks\/vendor\.[\w-]+\.js$/.test(file)) ?? null;
+  const hasRenderer = (file) => fs.readFileSync(path.join(distDir, file), 'utf8').includes('hydrateRoot');
+  const entryHasReact = files.filter((file) => /^assets\/entries\/entry-client-routing\.[\w-]+\.js$/.test(file)).some(hasRenderer);
+  return { vendor: vendor && hasRenderer(vendor) ? vendor : null, entryHasReact };
 }
 
 /**
@@ -262,20 +346,38 @@ export async function runCheck() {
 
     console.log('-'.repeat(91));
 
+    const vendorChunk = checkVendorChunk(DIST_DIR);
+    if (!vendorChunk.vendor || vendorChunk.entryHasReact) {
+      console.error(
+        `\n❌ ERROR: React is not in its own vendor chunk (vendor: ${vendorChunk.vendor ?? 'none'}, React in the client entry: ${vendorChunk.entryHasReact}). Fix: check that manualChunks and the vendor chunk name plugin in vite.config.ts still match the module ids Vite passes.`
+      );
+      process.exit(1);
+    }
+    console.log(`\nVendor chunk: ${vendorChunk.vendor}`);
+
     const pageLoads = measurePageLoads(DIST_DIR);
-    console.log('\nFirst load per page (HTML + startup scripts + CSS, gzipped):\n');
+    const kb = (bytes) => (bytes / 1024).toFixed(2).padStart(7);
+    console.log('\nFirst load per page (gzipped): code is HTML + startup scripts + CSS; WebAssembly is the Rust modules fetched on open\n');
+    console.log(`${'Page'.padEnd(40)} | ${'files'.padStart(5)} | ${'code'.padStart(10)} | ${'wasm'.padStart(10)} | ${'total'.padStart(10)} | modules`);
     for (const load of pageLoads) {
       console.log(
-        `${('/' + load.page.replace(/index\.html$/, '').replace(/\.html$/, '')).padEnd(40)} | ${String(load.files).padStart(3)} files | ${(load.gzipSize / 1024).toFixed(2).padStart(7)} KB`
+        `${('/' + load.page.replace(/index\.html$/, '').replace(/\.html$/, '')).padEnd(40)} | ${String(load.files).padStart(5)} | ${kb(load.gzipSize)} KB | ${kb(load.wasmGzipSize)} KB | ${kb(load.totalGzipSize)} KB | ${load.wasm.join(', ') || '-'}`
       );
     }
-    const worstPage = pageLoads[0];
+    const worstCode = [...pageLoads].sort((a, b) => b.gzipSize - a.gzipSize)[0];
+    const worstTotal = pageLoads[0];
     console.log(
-      `\nWorst page first load: ${worstPage ? (worstPage.gzipSize / 1024).toFixed(2) : '0'} KB (budget ${MAX_PAGE_FIRST_LOAD_KB}.00 KB)`
+      `\nWorst page first load: ${worstCode ? kb(worstCode.gzipSize).trim() : '0'} KB of code (budget ${MAX_PAGE_FIRST_LOAD_KB}.00 KB), ${worstTotal ? kb(worstTotal.totalGzipSize).trim() : '0'} KB with WebAssembly (budget ${MAX_PAGE_FIRST_LOAD_WITH_WASM_KB}.00 KB)`
     );
-    if (worstPage && worstPage.gzipSize > MAX_PAGE_FIRST_LOAD_KB * 1024) {
+    if (worstCode && worstCode.gzipSize > MAX_PAGE_FIRST_LOAD_KB * 1024) {
       console.error(
-        `\n❌ ERROR: The first load of /${worstPage.page} (${(worstPage.gzipSize / 1024).toFixed(2)} KB gzipped) exceeds the ${MAX_PAGE_FIRST_LOAD_KB} KB per-page budget!`
+        `\n❌ ERROR: The first load of /${worstCode.page} (${kb(worstCode.gzipSize).trim()} KB gzipped) exceeds the ${MAX_PAGE_FIRST_LOAD_KB} KB per-page budget! Fix: lazy-load what the page does not need to draw, or move it out of the shared chunks.`
+      );
+      process.exit(1);
+    }
+    if (worstTotal && worstTotal.totalGzipSize > MAX_PAGE_FIRST_LOAD_WITH_WASM_KB * 1024) {
+      console.error(
+        `\n❌ ERROR: The first load of /${worstTotal.page} with WebAssembly (${kb(worstTotal.totalGzipSize).trim()} KB gzipped: ${worstTotal.wasm.join(', ')}) exceeds the ${MAX_PAGE_FIRST_LOAD_WITH_WASM_KB} KB budget! Fix: fetch the module when the feature first runs, or cut the page's code.`
       );
       process.exit(1);
     }
