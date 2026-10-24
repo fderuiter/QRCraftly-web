@@ -150,6 +150,8 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   // The running batch checks this after every row, so Cancel or leaving the page stops it.
   const runRef = useRef<{ cancelled: boolean; unmounted: boolean } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Each pick takes the next id; a load that finishes after a newer pick is dropped (#1587).
+  const loadIdRef = useRef(0);
   const chooseFile = () => fileInputRef.current?.click();
 
   const outcome = useMemo(() => parseContent(data.csvContent), [data.csvContent]);
@@ -249,6 +251,8 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
+    const loadId = ++loadIdRef.current;
+    const isCurrentLoad = () => loadId === loadIdRef.current;
 
     if (file.size > MAX_BULK_CSV_CHARS) {
       addToast({
@@ -276,19 +280,25 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       let content: string;
       if (isExcel) {
         const arrayBuffer = await file.arrayBuffer();
+        if (!isCurrentLoad()) return;
         const { parseExcelToCsv } = await import('@/packages/bulk-csv');
+        if (!isCurrentLoad()) return;
         content = await parseExcelToCsv(new Uint8Array(arrayBuffer));
+        if (!isCurrentLoad()) return;
         if (!content || content.trim() === '') {
           addToast({ type: 'error', message: `Could not read ${file.name}. Choose the file again.`, duration: 5000 });
           return;
         }
       } else {
-        content = decodeCsvBytes(new Uint8Array(await file.arrayBuffer()));
+        const arrayBuffer = await file.arrayBuffer();
+        if (!isCurrentLoad()) return;
+        content = decodeCsvBytes(new Uint8Array(arrayBuffer));
       }
 
       onChange({ csvContent: content, fileName: file.name });
       addToast({ type: 'success', message: `Loaded ${file.name}.`, duration: 3000 });
     } catch {
+      if (!isCurrentLoad()) return;
       addToast({ type: 'error', message: `Could not read ${file.name}. Choose the file again.`, duration: 5000 });
     }
   };

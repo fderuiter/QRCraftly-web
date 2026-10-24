@@ -192,6 +192,93 @@ describe('useImageUpload', () => {
     expect(result.current.error).toBeNull();
   });
 
+  describe('a newer upload wins (#1587)', () => {
+    /** A promise the test settles by hand. */
+    function deferred<T>() {
+      let resolve: (value: T) => void = () => {};
+      let reject: (error: Error) => void = () => {};
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    }
+
+    function pick(name: string) {
+      const file = new File(['dummy content'], name, { type: 'image/png' });
+      return { target: { files: [file], value: name } } as unknown as React.ChangeEvent<HTMLInputElement>;
+    }
+
+    beforeEach(() => {
+      vi.spyOn(imageResizeHelper, 'isLowTierDevice').mockReturnValue(false);
+      vi.spyOn(imageResizeHelper, 'isOffThreadSupported').mockReturnValue(true);
+    });
+
+    it('applies only the second file when the first decode finishes last', async () => {
+      const first = deferred<string>();
+      const second = deferred<string>();
+      vi.spyOn(imageResizeHelper, 'processImageOffThread').mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+      const { result } = renderHook(() => useImageUpload());
+      const onSuccess = vi.fn();
+
+      act(() => {
+        result.current.handleUpload(pick('a.png'), onSuccess);
+        result.current.handleUpload(pick('b.png'), onSuccess);
+      });
+      await act(async () => {
+        second.resolve('data:image/webp;base64,second');
+        await second.promise;
+      });
+      await act(async () => {
+        first.resolve('data:image/webp;base64,first');
+        await first.promise;
+      });
+
+      expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(onSuccess).toHaveBeenCalledWith('data:image/webp;base64,second');
+    });
+
+    it('drops an error from a superseded upload', async () => {
+      const first = deferred<string>();
+      const second = deferred<string>();
+      vi.spyOn(imageResizeHelper, 'processImageOffThread').mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+      const spyMainThread = vi.spyOn(imageResizeHelper, 'processImageOnMainThread').mockRejectedValue(new Error('Decode failed'));
+      const { result } = renderHook(() => useImageUpload());
+      const onSuccess = vi.fn();
+
+      act(() => {
+        result.current.handleUpload(pick('a.png'), onSuccess);
+        result.current.handleUpload(pick('b.png'), onSuccess);
+      });
+      await act(async () => {
+        second.resolve('data:image/webp;base64,second');
+        first.reject(new Error('Worker failed'));
+        await Promise.allSettled([first.promise, second.promise]);
+      });
+
+      expect(onSuccess).toHaveBeenCalledWith('data:image/webp;base64,second');
+      // The older upload neither falls back nor reports its failure.
+      expect(spyMainThread).not.toHaveBeenCalled();
+      expect(result.current.error).toBeNull();
+    });
+
+    it('ignores a decode that finishes after unmount', async () => {
+      const only = deferred<string>();
+      vi.spyOn(imageResizeHelper, 'processImageOffThread').mockReturnValueOnce(only.promise);
+      const { result, unmount } = renderHook(() => useImageUpload());
+      const onSuccess = vi.fn();
+
+      act(() => {
+        result.current.handleUpload(pick('a.png'), onSuccess);
+      });
+      unmount();
+      only.resolve('data:image/webp;base64,late');
+      await only.promise;
+
+      expect(onSuccess).not.toHaveBeenCalled();
+    });
+  });
+
   describe('isLowTierDevice capabilities utility', () => {
     it('detects low tier based on hardwareConcurrency', () => {
       const originalNavigator = global.navigator;

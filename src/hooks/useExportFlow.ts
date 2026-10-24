@@ -94,16 +94,22 @@ export function useExportFlow({ config, effectiveConfig, isEmpty, refused, previ
   const [gateOpen, setGateOpen] = useState(false);
   const [gateAction, setGateAction] = useState<(() => void | Promise<void>) | null>(null);
 
-  // Which export is encoding right now; its button shows a loading state until it finishes.
-  const [busy, setBusy] = useState<ExportFormat | null>(null);
+  // Which exports are encoding right now; each button shows a loading state until its own export
+  // finishes, so an overlapping export cannot clear another one's state (#1587).
+  const [inFlight, setInFlight] = useState<ReadonlySet<ExportFormat>>(() => new Set());
   const exportAsset = useCallback(async (format: ExportFormat, options?: AssetOptions) => {
-    setBusy(format);
+    setInFlight((current) => new Set(current).add(format));
     try {
       return await runExport(format, options);
     } finally {
-      setBusy(null);
+      setInFlight((current) => {
+        const next = new Set(current);
+        next.delete(format);
+        return next;
+      });
     }
   }, [runExport]);
+  const isBusy = useCallback((format: ExportFormat) => inFlight.has(format), [inFlight]);
   // The export that just finished: its button shows a check and the status region says so.
   const [done, setDone] = useState<{ format: ExportFormat; message: string } | null>(null);
   useEffect(() => {
@@ -239,7 +245,7 @@ export function useExportFlow({ config, effectiveConfig, isEmpty, refused, previ
       },
       cancel: () => setGateOpen(false),
     },
-    status: { busy, done },
+    status: { isBusy, done },
     options: {
       format,
       setFormat,
