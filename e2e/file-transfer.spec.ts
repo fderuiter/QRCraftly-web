@@ -391,16 +391,45 @@ test.describe('Optical file transfer', () => {
       await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 20_000 });
       await expect(page.getByTestId('photosensitivity-notice')).toHaveCount(0);
 
-      // Pause freezes the canvas: two reads a moment apart are the same picture.
-      const picture = () => page.getByRole('img', { name: 'Transfer QR code' }).evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
+      // Pause freezes the canvas. First measure how long the playing stream takes to show three
+      // new pictures, then watch the paused canvas, every animation frame, for that long again:
+      // a stream that kept drawing would have changed it three times (#1613).
+      const canvas = page.getByRole('img', { name: 'Transfer QR code' });
+      const playingMs = await canvas.evaluate(
+        (el: HTMLCanvasElement) =>
+          new Promise<number>((resolve) => {
+            const start = performance.now();
+            let last = el.toDataURL();
+            let changes = 0;
+            const tick = () => {
+              const now = el.toDataURL();
+              if (now !== last) {
+                last = now;
+                changes += 1;
+              }
+              if (changes >= 3) resolve(performance.now() - start);
+              else requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          })
+      );
       await page.getByRole('button', { name: 'Pause' }).click();
       await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
-      const frozen = await picture();
-      // Negative check: nothing may change while paused. The Resume button above is the positive
-      // signal that the pause is applied. The window below is the one deliberate timed wait, kept
-      // bounded so a frame that was already in flight has time to land before the comparison.
-      await page.waitForTimeout(600);
-      expect(await picture()).toBe(frozen);
+      const changedWhilePaused = await canvas.evaluate(
+        (el: HTMLCanvasElement, watchMs: number) =>
+          new Promise<boolean>((resolve) => {
+            const frozen = el.toDataURL();
+            const start = performance.now();
+            const tick = () => {
+              if (el.toDataURL() !== frozen) resolve(true);
+              else if (performance.now() - start >= watchMs) resolve(false);
+              else requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          }),
+        playingMs
+      );
+      expect(changedWhilePaused).toBe(false);
 
       // Escape does the same from wherever focus is.
       await page.getByRole('button', { name: 'Resume' }).click();

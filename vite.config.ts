@@ -210,9 +210,10 @@ export default defineConfig(({ command }) => {
           // Floors set just under the measured totals; raise them as coverage improves,
           // never lower them to make a PR pass. Besides the global floors, each layer has
           // its own (a glob key), so well-covered logic cannot hide an untested component.
-          // Measured on main 2026-10-19 when the UI joined the gate (lines / branches):
-          // logic 93.8 / 84.5, components 89.7 / 82.3 (88.9 / 82.9 without the arcade, which
-          // is being removed), hooks 92.6 / 76.8, pages 64.2 / 60.6. The floors live in a
+          // Measured by CI on main 2026-10-24 (nightly run 40072735509, commit d18c77e), as
+          // lines / branches: all of src 92.1 / 82.8, logic 93.7 / 84.2, components 90.0 / 82.7,
+          // hooks 92.8 / 77.0, pages 64.7 / 62.1. Each floor is about one point under its
+          // measurement, rounded down to a half point (#1613). The floors live in a
           // JSON file so the CI coverage summary (scripts/ci/coverage_summary.js)
           // shows the same numbers, layer by layer, without parsing this config.
           // A CI shard (VITEST_SHARD_RUN) measures only its share of the tests, so the

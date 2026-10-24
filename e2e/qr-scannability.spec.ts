@@ -26,9 +26,6 @@ test.describe('QR Code Scannability via Headless Browser', () => {
             if (!canvas) return null;
             const ctx = canvas.getContext('2d');
             if (!ctx) return null;
-            
-            // Wait a small moment for drawing
-            await new Promise(r => setTimeout(r, 100));
 
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             return {

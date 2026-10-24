@@ -17,6 +17,10 @@ import {
 
 const SCRIPT = path.resolve(__dirname, '../../scripts/ci/coverage_summary.js');
 const THRESHOLDS = { statements: 80, branches: 72, functions: 85, lines: 80 };
+// The floors the script reads when run on its own, so the expected row follows a ratchet.
+const REAL_FLOORS = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, '../../scripts/ci/coverage_thresholds.json'), 'utf8'),
+);
 
 function metric(covered: number, total: number) {
   return { covered, total, skipped: 0, pct: total === 0 ? 100 : Math.round((covered / total) * 10000) / 100 };
@@ -205,7 +209,7 @@ describe('scripts/ci/coverage_summary.js', () => {
     });
     const written = fs.readFileSync(summaryFile, 'utf8');
     expect(written.startsWith('earlier step\n## Coverage')).toBe(true);
-    expect(written).toContain('| Functions | 90.00% | 90 / 100 | 88% | ✅ |');
+    expect(written).toContain(`| Functions | 90.00% | 90 / 100 | ${REAL_FLOORS.functions}% | ✅ |`);
     // The real thresholds file has per-layer floors, so the layer table is written too.
     expect(written).toContain('### Layers');
   });
