@@ -189,7 +189,10 @@ describe('Modular Accessibility Test Helpers & Full Panel Sweep', () => {
   // Requirement 5 / AC 5: Programmatic Style Sections Expansion Helper
   it('utilizes custom helper to programmatically expand all style sections and checks interactive sequence compliance', async () => {
     const mockOnChange = vi.fn();
-    
+    // Layout & Border is lazy-loaded. Load its module first, so findBy below waits for React and not
+    // for a cold transform on a busy CI shard, which ran past findBy's 1 s (#1608).
+    await import('@/components/style-controls/LayoutControls');
+
     // Initial configuration with Border disabled and Template Style as NONE
     const collapsedConfig: QRConfig = {
       ...DEFAULT_CONFIG,
