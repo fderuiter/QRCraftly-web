@@ -21,9 +21,9 @@ import { SvgContext } from './svgContext';
 import { drawWithTemplate, SOCIAL_DIMENSIONS } from './templateRenderer';
 import { getQrTypeLabel, getQrTypeDescription } from '@/utils/a11y';
 
-import { SafeUrlPipeline, normalizeUrl } from '@/utils/url';
+import { SafeUrlPipeline, normalizeUrl } from '@/packages/core/url';
 import { getCachedAsset, setCachedAsset } from '@/utils/assetCache';
-import { sanitizeSvg } from '@/utils/security';
+import { sanitizeSvg } from '@/packages/core/security';
 
 import { validateConfig } from '@/packages/qr-payload';
 import { buildMatrix, loadQrEncoder, type ModuleRenderOptions } from '@/packages/qr-matrix';

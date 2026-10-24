@@ -19,7 +19,7 @@
 import { SectionHeading } from './ui/SectionHeading';
 import type { ReactNode } from 'react';
 import { QrCode } from 'lucide-react';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 import { PrimaryNav } from './ui/PrimaryNav';
 import { InstallAppButton } from './InstallAppButton';
 import { ThemeToggle } from './ui/ThemeToggle';

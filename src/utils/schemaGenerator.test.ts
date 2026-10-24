@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { generateSchema } from './schemaGenerator';
 import type { ToolCopy } from '../data/copy/types';
 import { type ToolContent, SchemaType, SchemaCategory, TargetPersona, StrategicValueCategory } from '../data/contentRegistry';
-import { safeJsonLdStringify } from './security';
+import { safeJsonLdStringify } from '@/packages/core/security';
 
 describe('schemaGenerator', () => {
   const dummyContent: ToolContent & ToolCopy = {

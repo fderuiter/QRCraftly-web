@@ -19,7 +19,7 @@
 import { type QRConfig, type QRModules, QRType } from '@/types';
 import { validateConfig } from '@/packages/qr-payload';
 import { buildMatrix, loadQrEncoder } from '@/packages/qr-matrix';
-import { REGEX_BIDI_CONTROL_CHARS, REGEX_STRICT_CONTROL_CHARS } from '@/utils/security';
+import { REGEX_BIDI_CONTROL_CHARS, REGEX_STRICT_CONTROL_CHARS } from '@/packages/core/security';
 import { PayloadRejectedError } from './svgExport';
 
 /**

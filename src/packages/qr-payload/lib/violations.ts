@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { UNSUPPORTED_SCHEME_PREFIX } from '@/utils/security';
+import { UNSUPPORTED_SCHEME_PREFIX } from '@/packages/core/security';
 
 const VIOLATION_MESSAGES: Record<string, string> = {
   URI_INJECTION_VIOLATION: 'Unsafe URL scheme or malicious protocol detected.',

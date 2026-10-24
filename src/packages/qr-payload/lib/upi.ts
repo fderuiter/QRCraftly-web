@@ -17,7 +17,7 @@
 */
 
 import { CryptoNetwork, type PaymentData } from '@/types';
-import { REGEX_STRICT_CONTROL_CHARS } from '@/utils/security';
+import { REGEX_STRICT_CONTROL_CHARS } from '@/packages/core/security';
 import { paymentAmountError } from './paymentAmount';
 
 /**

@@ -1,5 +1,5 @@
 import { usePageContent } from '@/data/PageContentContext';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 
 /**
  * Links the page's guides in the page body (#1309), so each guide is reachable from the tools it

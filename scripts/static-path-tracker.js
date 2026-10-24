@@ -129,7 +129,7 @@ function main() {
     });
     console.error('💡 How to resolve:');
     console.error('   Ensure all custom SVG assets loaded via FileReader or fetch are');
-    console.error('   sanitized using sanitizeSvg() from src/utils/security.ts prior to');
+    console.error('   sanitized using sanitizeSvg() from src/packages/core/security.ts prior to');
     console.error('   storage, state update, or output generation.\n');
     process.exit(1);
   }

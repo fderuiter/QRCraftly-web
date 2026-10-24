@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { normalizeUrl, shouldNormalizeUrl } from './url';
+import { normalizeUrl, shouldNormalizeUrl } from '@/packages/core/url';
 
 /**
  * Parsed meeting information extracted from a meeting URL.

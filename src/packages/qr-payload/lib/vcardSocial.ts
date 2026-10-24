@@ -17,7 +17,7 @@
 */
 
 import type { VCardData } from '@/types';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 
 /** A social network a contact card can link to. */
 interface SocialNetwork {

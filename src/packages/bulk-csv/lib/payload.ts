@@ -17,7 +17,7 @@
 */
 
 import { QRType } from '@/types';
-import { normalizeUrl } from '@/utils/url';
+import { normalizeUrl } from '@/packages/core/url';
 
 /**
  * How a batch reads its payload cells. `link` treats every cell as a web address and normalises

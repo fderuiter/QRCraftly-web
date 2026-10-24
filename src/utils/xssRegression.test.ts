@@ -27,7 +27,7 @@ if (typeof globalThis.DOMParser === 'undefined') {
   globalThis.Node = dom.window.Node;
 }
 
-import { escapeHtml, isDangerousUrl, safeJsonLdStringify, sanitizeSvg } from './security';
+import { escapeHtml, isDangerousUrl, safeJsonLdStringify, sanitizeSvg } from '@/packages/core/security';
 
 /**
  * Adversarial corpus for the browser trust boundaries in docs/SECURITY.md (#1350). Each SVG

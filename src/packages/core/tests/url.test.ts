@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { looksLikeWebAddress, normalizeUrl, SafeUrlPipeline } from './url';
+import { looksLikeWebAddress, normalizeUrl, SafeUrlPipeline } from '../url';
 
 describe('SafeUrlPipeline', () => {
   describe('decodeHtmlEntities', () => {

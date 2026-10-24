@@ -21,7 +21,7 @@ import { Download, Keyboard, QrCode } from 'lucide-react';
 import { PLEDGE_COMMITMENT, PLEDGE_HEADLINE } from '@/data/pledge';
 import { CONTACT_ADDRESS } from '@/data/contact';
 import { GENERATOR_FOOTER_LINKS, TOOL_LINKS } from '@/data/navigation';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 import { ButtonLink } from '@/components/ui/Button';
 import { PageFaq } from '@/components/PageFaq';
 import { copy } from '@/data/copy/about';

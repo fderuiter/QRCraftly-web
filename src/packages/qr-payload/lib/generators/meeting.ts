@@ -17,8 +17,8 @@
 */
 
 import { type MeetingData, QRType, type QRGeneratorContract } from '@/types';
-import { validateUrlAndInject } from '@/utils/security';
-import { normalizeUrl, shouldNormalizeUrl } from '@/utils/url';
+import { validateUrlAndInject } from '@/packages/core/security';
+import { normalizeUrl, shouldNormalizeUrl } from '@/packages/core/url';
 import { identifyProtocol, CONTAINMENT_PROFILES } from '../protocol';
 
 /**

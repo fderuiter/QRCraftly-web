@@ -20,7 +20,7 @@ import type { ReactNode } from 'react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { ArticleHeading, ArticleLayout } from '@/components/ArticleLayout';
 import { GUIDE_AUTHOR, getGuide, readingMinutes, type Guide, type GuideBlock } from '@/data/guides';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 
 const LINK_PATTERN = /\[([^\]]+)\]\(([^)\s]+)\)/g;
 const LINK_CLASSES = 'font-medium text-accent underline underline-offset-2';

@@ -22,7 +22,7 @@ import { usePageContext } from 'vike-react/usePageContext';
 import { Button } from './Button';
 import { Modal } from './Modal';
 import { Badge } from './Badge';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 import {
   GENERATOR_FOOTER_LINKS,
   HELP_LINKS,

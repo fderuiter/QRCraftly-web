@@ -1,7 +1,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useImageUpload, UNDRAWABLE_SVG_MESSAGE } from './useImageUpload';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as security from '../utils/security';
+import * as security from '@/packages/core/security';
 import * as imageResizeHelper from '../utils/imageResizeHelper';
 
 describe('useImageUpload', () => {

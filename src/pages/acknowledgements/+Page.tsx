@@ -19,7 +19,7 @@
 import type { ReactNode } from 'react';
 import shippedPackages, { licensesFile } from 'virtual:shipped-packages';
 import { ArticleHeading, ArticleLayout, type ArticleSection } from '@/components/ArticleLayout';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 
 const SECTIONS: readonly ArticleSection[] = [
   { id: 'packages', label: 'What ships to your browser' },

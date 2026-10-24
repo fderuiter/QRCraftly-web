@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { getSanitizedPath, resolveDomainForPath, resolvePublicUrl, getMetadataCacheSizes, METADATA_CACHE_LIMIT } from '../src/utils/metadataEngine';
-import { safeJsonLdStringify } from '../src/utils/security';
+import { safeJsonLdStringify } from '@/packages/core/security';
 
 describe('Global Pure-JS Utility Caching', () => {
   describe('Metadata and Path Sanitization Cache', () => {

@@ -145,7 +145,7 @@ describe('Local Git-Diff Lineage Auditor', () => {
     it('should maintain the correct new mappings', () => {
       expect(MAPPING).toHaveProperty('src/packages/scannability/worker.ts', 'docs/public/SCALING.md');
       expect(MAPPING).not.toHaveProperty('src/hooks/useTelemetry.ts');
-      expect(MAPPING).toHaveProperty('src/utils/security.ts', 'docs/SECURITY.md');
+      expect(MAPPING).toHaveProperty('src/packages/core/security.ts', 'docs/SECURITY.md');
       expect(MAPPING).toHaveProperty('.github/rulesets/main.json', '.github/rulesets/README.md');
     });
 
@@ -188,18 +188,18 @@ describe('Local Git-Diff Lineage Auditor', () => {
     });
 
     it('should fail validation when security utilities are modified without security doc', () => {
-      const modifiedFiles = new Set(['src/utils/security.ts']);
+      const modifiedFiles = new Set(['src/packages/core/security.ts']);
       const missing = checkLineage(modifiedFiles);
       expect(missing).toContainEqual({
-        codeFile: 'src/utils/security.ts',
+        codeFile: 'src/packages/core/security.ts',
         docFile: 'docs/SECURITY.md'
       });
     });
 
     it('should pass validation when security utilities are modified with security doc', () => {
-      const modifiedFiles = new Set(['src/utils/security.ts', 'docs/SECURITY.md']);
+      const modifiedFiles = new Set(['src/packages/core/security.ts', 'docs/SECURITY.md']);
       const missing = checkLineage(modifiedFiles);
-      const hasSecurityMissing = missing.some(m => m.codeFile === 'src/utils/security.ts');
+      const hasSecurityMissing = missing.some(m => m.codeFile === 'src/packages/core/security.ts');
       expect(hasSecurityMissing).toBe(false);
     });
   });

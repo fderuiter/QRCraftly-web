@@ -19,7 +19,7 @@
 /* eslint-disable react/no-danger */
 
 import React from 'react';
-import { safeJsonLdStringify } from '@/utils/security';
+import { safeJsonLdStringify } from '@/packages/core/security';
 
 /**
  * Props for the JsonLdScript component.

@@ -20,7 +20,7 @@ import { describe, it, expect } from 'vitest';
 import { QRType } from '@/types';
 import { validatePayload, validateConfig, sanitizeConfig, describeViolation } from '../index';
 import { DEFAULT_CONFIG } from '@/constants';
-import { UNSUPPORTED_SCHEME_PREFIX } from '@/utils/security';
+import { UNSUPPORTED_SCHEME_PREFIX } from '@/packages/core/security';
 
 describe('dangerous schemes are refused in every QR type (#1153)', () => {
   it.each([QRType.TEXT, QRType.PHONE, QRType.WIFI, QRType.SOCIAL, QRType.URL, QRType.MEETING])(

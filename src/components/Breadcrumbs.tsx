@@ -1,4 +1,4 @@
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 import { formatPathName } from '@/utils/metadataEngine';
 
 interface BreadcrumbsProps {

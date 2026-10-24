@@ -1,6 +1,6 @@
 import { QRType, type UrlData, type MeetingData, type TextData } from "../../types";
 import { QR_GENERATORS, validatePayload } from "@/packages/qr-payload";
-import { UNSUPPORTED_SCHEME_PREFIX } from "../../utils/security";
+import { UNSUPPORTED_SCHEME_PREFIX } from "@/packages/core/security";
 
 /**
  * The first violation that should stop a link or text field from reaching the preview: a script or

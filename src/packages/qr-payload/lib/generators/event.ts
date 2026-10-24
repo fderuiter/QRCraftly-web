@@ -17,8 +17,8 @@
 */
 
 import { type EventData, QRType, type QRGeneratorContract, CalendarProvider } from '@/types';
-import { isDangerousUrl } from '@/utils/security';
-import { SafeUrlPipeline } from '@/utils/url';
+import { isDangerousUrl } from '@/packages/core/security';
+import { SafeUrlPipeline } from '@/packages/core/url';
 import { calendarLinkProvider, identifyProtocol, parseProtocol } from '../protocol';
 import {
   type FormattedDateTime,

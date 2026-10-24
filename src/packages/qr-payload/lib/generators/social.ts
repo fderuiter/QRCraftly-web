@@ -18,7 +18,7 @@
 
 import { type SocialData, SocialPlatform, QRType, type QRGeneratorContract } from '@/types';
 import { parseProtocol, parseSocialProfile, identifyProtocol } from '../protocol';
-import { sanitizeSocialHandle } from '@/utils/security';
+import { sanitizeSocialHandle } from '@/packages/core/security';
 
 const SOCIAL_PLATFORM_URLS: Record<SocialPlatform, (handle: string) => string> = {
   [SocialPlatform.INSTAGRAM]: (handle) => `https://instagram.com/${handle}`,

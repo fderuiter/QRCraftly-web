@@ -1,5 +1,5 @@
 import { type AnchorHTMLAttributes, type ButtonHTMLAttributes, forwardRef, type MouseEvent } from 'react';
-import { isDangerousUrl } from '@/utils/security';
+import { isDangerousUrl } from '@/packages/core/security';
 
 type ButtonVariant =
   | 'primary'

@@ -17,8 +17,8 @@
 */
 
 import { type VCardData, QRType, type QRGeneratorContract } from '@/types';
-import { normalizeUrl } from '@/utils/url';
-import { isDangerousUrl } from '@/utils/security';
+import { normalizeUrl } from '@/packages/core/url';
+import { isDangerousUrl } from '@/packages/core/security';
 import { identifyProtocol, CONTAINMENT_PROFILES } from '../protocol';
 import {
   escapeVCardEvent,
