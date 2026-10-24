@@ -69,16 +69,35 @@ export const isOffThreadSupported = (): boolean => {
     'createImageBitmap' in window;
 };
 
+/** How long a resize worker may take before the caller falls back to the main thread (#1612). */
+export const OFF_THREAD_TIMEOUT_MS = 15_000;
+
 /**
- * Resizes a raster image on a background worker thread.
+ * Resizes a raster image on a background worker thread. Rejects if the worker fails, answers
+ * with something unusable, or has not answered within `timeoutMs`; the worker is then stopped,
+ * so the caller can fall back to the main thread instead of waiting forever.
  */
-export const processImageOffThread = (file: File | Blob, maxDim: number): Promise<string> => {
+export const processImageOffThread = (file: File | Blob, maxDim: number, timeoutMs = OFF_THREAD_TIMEOUT_MS): Promise<string> => {
   return new Promise((resolve, reject) => {
     let worker: Worker | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const stop = () => {
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      try {
+        worker?.terminate();
+      } catch {}
+    };
+    const fail = (err: unknown) => {
+      stop();
+      reject(err);
+    };
     try {
       worker = new Worker(new URL('./imageResizeWorker.ts', import.meta.url), { type: 'module' });
+      timer = setTimeout(() => fail(new Error(`Worker resize timed out after ${timeoutMs} ms`)), timeoutMs);
 
       worker.onmessage = (e) => {
+        stop();
         if (e.data.success) {
           if (e.data.dataUrl) {
             resolve(e.data.dataUrl);
@@ -97,22 +116,13 @@ export const processImageOffThread = (file: File | Blob, maxDim: number): Promis
         } else {
           reject(new Error(e.data.error || 'Worker resize failed'));
         }
-        worker?.terminate();
       };
 
-      worker.onerror = (err) => {
-        reject(err);
-        worker?.terminate();
-      };
+      worker.onerror = fail;
 
       worker.postMessage({ file, maxDim });
     } catch (err) {
-      if (worker) {
-        try {
-          worker.terminate();
-        } catch {}
-      }
-      reject(err);
+      fail(err);
     }
   });
 };
