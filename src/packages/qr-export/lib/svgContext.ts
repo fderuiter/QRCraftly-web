@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { clampCornerRadius } from '@/packages/qr-matrix/canvas';
 import { parseCanvasFont } from './canvasFont';
 
 /**
@@ -331,26 +330,6 @@ export class SvgContext {
     this._pathData += `L ${this._pt(x + w, y)} `;
     this._pathData += `L ${this._pt(x + w, y + h)} `;
     this._pathData += `L ${this._pt(x, y + h)} Z `;
-  }
-
-  /**
-   * Adds a rounded rectangle sub-path using quadratic Bézier curves.
-   * Applies the current transform to all corner and control points.
-   * Note: The `radii` parameter is treated as a uniform radius (single number).
-   */
-  roundRect(x: number, y: number, w: number, h: number, r: number): void {
-    // Clamp radius so it doesn't exceed half the shorter side and is not negative
-    const safeR = clampCornerRadius(r, w, h);
-
-    this._pathData += `M ${this._pt(x + safeR, y)} `;
-    this._pathData += `L ${this._pt(x + w - safeR, y)} `;
-    this._pathData += `Q ${this._pt(x + w, y)} ${this._pt(x + w, y + safeR)} `;
-    this._pathData += `L ${this._pt(x + w, y + h - safeR)} `;
-    this._pathData += `Q ${this._pt(x + w, y + h)} ${this._pt(x + w - safeR, y + h)} `;
-    this._pathData += `L ${this._pt(x + safeR, y + h)} `;
-    this._pathData += `Q ${this._pt(x, y + h)} ${this._pt(x, y + h - safeR)} `;
-    this._pathData += `L ${this._pt(x, y + safeR)} `;
-    this._pathData += `Q ${this._pt(x, y)} ${this._pt(x + safeR, y)} Z `;
   }
 
   /**

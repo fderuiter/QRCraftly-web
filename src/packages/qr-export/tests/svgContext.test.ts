@@ -18,6 +18,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { SvgContext } from '../index';
+import { drawRoundRect } from '@/packages/qr-matrix/canvas';
+
+/** Draws a rounded rect the way production does: the shared helper, on the SVG context. */
+const roundRect = (ctx: SvgContext, x: number, y: number, w: number, h: number, r: number) =>
+  drawRoundRect(ctx as unknown as CanvasRenderingContext2D, x, y, w, h, r);
 
 describe('SvgContext', () => {
   describe('serialize', () => {
@@ -112,15 +117,14 @@ describe('SvgContext', () => {
       expect(cCount).toBe(4);
     });
 
-    it('roundRect produces a closed path with Q curve commands', () => {
+    it('drawRoundRect produces a closed path with Q curve commands', () => {
       const ctx = new SvgContext(200, 200);
       ctx.beginPath();
-      // @ts-ignore - roundRect is conditionally available on CanvasRenderingContext2D
-      ctx.roundRect(10, 10, 80, 80, 10);
+      roundRect(ctx, 10, 10, 80, 80, 10);
       ctx.fill();
       const svg = ctx.serialize();
-      // Q = quadratic Bezier (used for corner curves)
-      expect(svg).toContain('Q');
+      // Q = quadratic Bezier (used for corner curves), Z closes the path
+      expect(svg).toMatch(/d="M [^"]* Q [^"]* Z"/);
     });
 
     it('quadraticCurveTo emits Q path command', () => {
@@ -467,7 +471,7 @@ describe('SvgContext', () => {
       const ctx = new SvgContext(200, 200);
       ctx.beginPath();
       // Shortest side is 50, so max safeR should be 25. Let's pass radius 40.
-      ctx.roundRect(0, 0, 100, 50, 40);
+      roundRect(ctx, 0, 0, 100, 50, 40);
       ctx.fill();
 
       const svg = ctx.serialize();
@@ -480,7 +484,7 @@ describe('SvgContext', () => {
       const ctxPos = new SvgContext(200, 200);
       ctxPos.scale(2, 2);
       ctxPos.beginPath();
-      ctxPos.roundRect(0, 0, 50, 25, 10);
+      roundRect(ctxPos, 0, 0, 50, 25, 10);
       ctxPos.fill();
       const svgPos = ctxPos.serialize();
 
@@ -489,7 +493,7 @@ describe('SvgContext', () => {
       ctxNeg.scale(-2, -2);
       ctxNeg.beginPath();
       // Draw standard clockwise sequence with scaled dimensions
-      ctxNeg.roundRect(0, 0, 50, 25, 10);
+      roundRect(ctxNeg, 0, 0, 50, 25, 10);
       ctxNeg.fill();
       const svgNeg = ctxNeg.serialize();
 

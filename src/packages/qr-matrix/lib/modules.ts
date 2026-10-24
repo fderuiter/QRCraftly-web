@@ -17,7 +17,9 @@
 */
 
 import { type QRConfig, QRStyle, type QRModules } from '@/packages/core/types';
-import { drawRoundRect, drawRoughRect, drawPoly, drawStar, drawCircularModule, drawCircuitModule, drawStandardModule } from './canvasHelpers';
+import { drawRoundRect, drawRoughRect, drawPoly, drawStar } from './canvasHelpers';
+import { drawCircularModule, drawCircuitModule, drawStandardModule } from './modulePainters';
+import { SHAPE_SIZES } from './shapeSizes';
 import { getIsCoveredByLogo, type LogoMetrics, iterateMatrix } from './utils';
 import { getLuminance } from '@/packages/core/encoding';
 import { renderFluidModules, isFinderPattern } from './fluid';
@@ -112,10 +114,10 @@ const getModuleDrawer = (
       return (_r, _c, x, y, _cx, _cy) => drawRoundRect(ctx, x, y, cellSize, cellSize, rModern);
     }
     case QRStyle.SWISS: {
-      return (_r, _c, _x, _y, cx, cy) => drawCircularModule(ctx, cx, cy, cellSize, 1.05);
+      return (_r, _c, _x, _y, cx, cy) => drawCircularModule(ctx, cx, cy, cellSize, SHAPE_SIZES.swiss.module);
     }
     case QRStyle.FLUID: {
-      return (_r, _c, _x, _y, cx, cy) => drawCircularModule(ctx, cx, cy, cellSize, 1.1);
+      return (_r, _c, _x, _y, cx, cy) => drawCircularModule(ctx, cx, cy, cellSize, SHAPE_SIZES.fluid.module);
     }
     case QRStyle.CIRCUIT: {
       const validGrid = new Uint8Array(moduleCount * moduleCount);
@@ -137,14 +139,14 @@ const getModuleDrawer = (
       };
     }
     case QRStyle.HIVE: {
-      const rHive = cellSize / 1.55;
+      const rHive = cellSize / SHAPE_SIZES.hive.module;
       return (_r, _c, _x, _y, cx, cy) => drawPoly(ctx, cx, cy, rHive, 6, 0, false, true);
     }
     case QRStyle.GRUNGE:
       return (_r, _c, x, y, _cx, _cy) => drawRoughRect(ctx, x, y, cellSize, cellSize, true);
     case QRStyle.STARBURST: {
-      const outerR = cellSize / 1.5;
-      const innerR = cellSize / 2.2;
+      const outerR = cellSize / SHAPE_SIZES.starburst.module.outer;
+      const innerR = cellSize / SHAPE_SIZES.starburst.module.inner;
       return (_r, _c, _x, _y, cx, cy) => drawStar(ctx, cx, cy, outerR, innerR, 5, false, true);
     }
     case QRStyle.STANDARD:
