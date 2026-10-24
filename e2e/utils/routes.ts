@@ -38,6 +38,7 @@ export const ROUTES = [
   '/privacy',
   '/support',
   '/guides',
+  '/videos',
   '/guides/why-qr-codes-stop-working',
   '/guides/static-vs-dynamic-qr-codes',
   '/guides/how-to-print-a-qr-code-that-scans',

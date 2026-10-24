@@ -95,6 +95,7 @@ export const TOOL_LINKS: readonly (readonly [label: string, href: string])[] = [
 /** Help pages, listed in the mobile site menu and in the footer's Company column. */
 export const HELP_LINKS: readonly (readonly [label: string, href: string])[] = [
   ['Guides', '/guides'],
+  ['Videos', '/videos'],
   ['No-Ads Pledge', '/free-forever'],
 ];
 

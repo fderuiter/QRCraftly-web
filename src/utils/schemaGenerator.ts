@@ -1,5 +1,6 @@
 import type { Guide } from '../data/guides';
 import type { ToolCopy } from '../data/copy/types';
+import { type SiteVideo, videoSrc } from '../data/videos';
 import { type ToolContent, type AuxiliaryContent, getContentForPath, getContentById } from '../data/contentRegistry';
 import { resolveDomainForPath, resolvePublicUrl, type JsonLdObject } from './metadataEngine';
 
@@ -228,6 +229,41 @@ export function generateGuideIndexSchema(description: string, domain: string): J
         "description": description,
         "url": resolvePublicUrl('/guides'),
         "publisher": { "@id": `${domain}/#organization` }
+      }
+    ]
+  };
+}
+
+/**
+ * Schema for the `/videos` page: a collection page that lists each video as a VideoObject, so
+ * search engines can show the clips in video results.
+ * @param description - The page description.
+ * @param videos - The videos on the page, in order.
+ * @param domain - The site origin, for the publisher reference.
+ * @returns The JSON-LD graph.
+ */
+export function generateVideoPageSchema(description: string, videos: readonly SiteVideo[], domain: string): JsonLdObject {
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "CollectionPage",
+        "name": "QRCraftly videos",
+        "description": description,
+        "url": resolvePublicUrl('/videos'),
+        "publisher": { "@id": `${domain}/#organization` },
+        "hasPart": videos.map((video) => ({
+          "@type": "VideoObject",
+          "name": video.title,
+          "description": video.description,
+          "thumbnailUrl": resolvePublicUrl(videoSrc(video, 'jpg')),
+          "contentUrl": resolvePublicUrl(videoSrc(video, 'mp4')),
+          "uploadDate": video.uploadDate,
+          "duration": `PT${video.seconds}S`,
+          "width": video.width,
+          "height": video.height,
+          "publisher": { "@id": `${domain}/#organization` }
+        }))
       }
     ]
   };
