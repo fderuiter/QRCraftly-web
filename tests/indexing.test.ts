@@ -46,23 +46,8 @@ describe('Search Engine Indexing Prevention & Hybrid Sitemap Generation', () => 
     expect(arcadeConfig.prerender).not.toBe(false);
   });
 
-  it('should verify generated static HTML files contain valid canonical tags and DOM content if build output exists', () => {
-    const distDir = join(__dirname, '../dist/client');
-    if (existsSync(distDir)) {
-      const publicRoutes = ['index.html', 'about/index.html', 'arcade/index.html', 'wifi-qr-code/index.html'];
-      for (const routeFile of publicRoutes) {
-        const filePath = join(distDir, routeFile);
-        if (existsSync(filePath)) {
-          const html = readFileSync(filePath, 'utf8');
-          if (html.includes('<!DOCTYPE html>')) {
-            expect(html).toContain('<link rel="canonical"');
-            expect(html).toContain('https://qrcraftly.com');
-            expect(html).toContain('<main');
-          }
-        }
-      }
-    }
-  });
+  // The canonical and <main> checks on the built HTML run after the build, in
+  // tests/build-output/built_output.test.ts (#1609).
 
   it('should discover client-rendered tool routes from central application registries', () => {
     const registryRoutes = getRegistryRoutes();
