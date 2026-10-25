@@ -26,7 +26,7 @@
 //! when every block has been freed the heap rewinds to its base, as before.
 
 use core::alloc::Layout;
-use core::ptr;
+use core::ptr::{self, NonNull};
 
 /// Smallest block, as a power of two: room for the free-list link on any target.
 const MIN_SHIFT: u32 = 4;
@@ -87,40 +87,40 @@ impl Heap {
         self.live
     }
 
-    /// Returns a block for `layout`, or null when memory cannot grow.
+    /// Returns a block for `layout`, or None when memory cannot grow.
     ///
     /// # Safety
     /// `region` must be the same region on every call, and the memory it reserves
     /// must be used by nothing but this heap.
-    pub unsafe fn alloc(&mut self, layout: Layout, region: &mut impl Region) -> *mut u8 {
-        let Some((class, block)) = class_of(layout) else {
-            return ptr::null_mut();
-        };
+    pub unsafe fn alloc(
+        &mut self,
+        layout: Layout,
+        region: &mut impl Region,
+    ) -> Option<NonNull<u8>> {
+        let (class, block) = class_of(layout)?;
         if self.live == 0 {
             // Nothing is in use: start again from the base and forget the free lists.
             self.next = region.base();
             self.free = [0; CLASSES];
         }
-        let head = self.free[class];
-        if head != 0 && head.is_multiple_of(layout.align()) {
+        let head = NonNull::new(self.free[class] as *mut u8)
+            .filter(|head| (head.as_ptr() as usize).is_multiple_of(layout.align()));
+        if let Some(head) = head {
             // SAFETY: `head` is a freed block of this class, which holds the next link.
-            self.free[class] = unsafe { ptr::read_unaligned(head as *const usize) };
+            self.free[class] = unsafe { ptr::read_unaligned(head.as_ptr().cast::<usize>()) };
             self.live += 1;
-            return head as *mut u8;
+            return Some(head);
         }
-        let Some(start) = self.next.checked_next_multiple_of(layout.align()) else {
-            return ptr::null_mut();
-        };
-        let Some(end) = start.checked_add(block) else {
-            return ptr::null_mut();
-        };
+        let start = self.next.checked_next_multiple_of(layout.align())?;
+        let end = start.checked_add(block)?;
         if !region.reserve(end) {
-            return ptr::null_mut();
+            return None;
         }
+        let block = NonNull::new(start as *mut u8)?;
         self.next = end;
         self.high_water = self.high_water.max(end);
         self.live += 1;
-        start as *mut u8
+        Some(block)
     }
 
     /// Takes back a block.
@@ -128,13 +128,13 @@ impl Heap {
     /// # Safety
     /// `block` must come from [`Heap::alloc`] (or [`Heap::realloc`]) on this heap
     /// with this `layout`, and must not be used again.
-    pub unsafe fn dealloc(&mut self, block: *mut u8, layout: Layout) {
+    pub unsafe fn dealloc(&mut self, block: NonNull<u8>, layout: Layout) {
         let Some((class, _)) = class_of(layout) else {
             return;
         };
         // SAFETY: the block is at least 16 bytes and no longer in use.
-        unsafe { ptr::write_unaligned(block as *mut usize, self.free[class]) };
-        self.free[class] = block as usize;
+        unsafe { ptr::write_unaligned(block.as_ptr().cast::<usize>(), self.free[class]) };
+        self.free[class] = block.as_ptr() as usize;
         self.live = self.live.saturating_sub(1);
     }
 
@@ -144,43 +144,36 @@ impl Heap {
     /// As for [`Heap::dealloc`]; `new_size` rounded up to `layout.align()` must not overflow.
     pub unsafe fn realloc(
         &mut self,
-        block: *mut u8,
+        block: NonNull<u8>,
         layout: Layout,
         new_size: usize,
         region: &mut impl Region,
-    ) -> *mut u8 {
-        let Ok(new_layout) = Layout::from_size_align(new_size, layout.align()) else {
-            return ptr::null_mut();
-        };
-        let (Some((old_class, old_block)), Some((new_class, new_block))) =
-            (class_of(layout), class_of(new_layout))
-        else {
-            return ptr::null_mut();
-        };
+    ) -> Option<NonNull<u8>> {
+        let new_layout = Layout::from_size_align(new_size, layout.align()).ok()?;
+        let (old_class, old_block) = class_of(layout)?;
+        let (new_class, new_block) = class_of(new_layout)?;
         if new_class == old_class {
-            return block;
+            return Some(block);
         }
-        let start = block as usize;
+        let start = block.as_ptr() as usize;
         if start + old_block == self.next {
             // The top block grows or shrinks where it is.
-            let Some(end) = start.checked_add(new_block) else {
-                return ptr::null_mut();
-            };
+            let end = start.checked_add(new_block)?;
             if !region.reserve(end) {
-                return ptr::null_mut();
+                return None;
             }
             self.next = end;
             self.high_water = self.high_water.max(end);
-            return block;
+            return Some(block);
         }
         // SAFETY: as documented for `alloc`.
-        let moved = unsafe { self.alloc(new_layout, region) };
-        if !moved.is_null() {
-            // SAFETY: both blocks are live and distinct, and each holds at least this much.
-            unsafe { ptr::copy_nonoverlapping(block, moved, layout.size().min(new_size)) };
-            // SAFETY: the caller hands the old block over.
-            unsafe { self.dealloc(block, layout) };
-        }
-        moved
+        let moved = unsafe { self.alloc(new_layout, region) }?;
+        // SAFETY: both blocks are live and distinct, and each holds at least this much.
+        unsafe {
+            ptr::copy_nonoverlapping(block.as_ptr(), moved.as_ptr(), layout.size().min(new_size))
+        };
+        // SAFETY: the caller hands the old block over.
+        unsafe { self.dealloc(block, layout) };
+        Some(moved)
     }
 }

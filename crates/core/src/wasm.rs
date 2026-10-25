@@ -28,6 +28,7 @@ use crate::heap::{Heap, Region};
 use core::alloc::{GlobalAlloc, Layout};
 use core::arch::wasm32;
 use core::cell::UnsafeCell;
+use core::ptr::{self, NonNull};
 
 const PAGE: usize = 65_536;
 
@@ -78,16 +79,24 @@ unsafe impl GlobalAlloc for ModuleAllocator {
         // SAFETY: single threaded, no reference to the heap outlives this call, and
         // linear memory above `__heap_base` belongs to this allocator alone.
         unsafe { (*self.heap.get()).alloc(layout, &mut LinearMemory) }
+            .map_or(ptr::null_mut(), NonNull::as_ptr)
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        let Some(block) = NonNull::new(ptr) else {
+            return;
+        };
         // SAFETY: as in `alloc`; the caller passes back a block from it.
-        unsafe { (*self.heap.get()).dealloc(ptr, layout) }
+        unsafe { (*self.heap.get()).dealloc(block, layout) }
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        let Some(block) = NonNull::new(ptr) else {
+            return ptr::null_mut();
+        };
         // SAFETY: as in `dealloc`; GlobalAlloc's contract bounds `new_size`.
-        unsafe { (*self.heap.get()).realloc(ptr, layout, new_size, &mut LinearMemory) }
+        unsafe { (*self.heap.get()).realloc(block, layout, new_size, &mut LinearMemory) }
+            .map_or(ptr::null_mut(), NonNull::as_ptr)
     }
 }
 

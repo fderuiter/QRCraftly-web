@@ -20,6 +20,7 @@
 //! block stays live is reused, blocks never overlap, and alignment holds.
 
 use core::alloc::Layout;
+use core::ptr::NonNull;
 use qrcraftly_core::heap::{Heap, Region};
 
 /// A fixed buffer standing in for linear memory; `reserved` plays memory.grow.
@@ -65,7 +66,7 @@ impl Rng {
 
 /// A live block filled with its own tag, so an overlap shows up as a wrong byte.
 struct Block {
-    ptr: *mut u8,
+    ptr: NonNull<u8>,
     layout: Layout,
     tag: u8,
 }
@@ -73,17 +74,17 @@ struct Block {
 fn take(heap: &mut Heap, region: &mut Buffer, size: usize, align: usize, tag: u8) -> Block {
     let layout = Layout::from_size_align(size, align).unwrap();
     // SAFETY: the buffer is used by this heap only.
-    let ptr = unsafe { heap.alloc(layout, region) };
-    assert!(!ptr.is_null(), "out of memory at {size} bytes");
-    assert_eq!(ptr as usize % align, 0, "misaligned");
+    let ptr = unsafe { heap.alloc(layout, region) }
+        .unwrap_or_else(|| panic!("out of memory at {size} bytes"));
+    assert_eq!(ptr.as_ptr() as usize % align, 0, "misaligned");
     // SAFETY: the block is live and `size` bytes long.
-    unsafe { ptr.write_bytes(tag, size) };
+    unsafe { ptr.as_ptr().write_bytes(tag, size) };
     Block { ptr, layout, tag }
 }
 
 fn give(heap: &mut Heap, block: Block) {
     // SAFETY: the block is live and `layout.size()` bytes long.
-    let bytes = unsafe { core::slice::from_raw_parts(block.ptr, block.layout.size()) };
+    let bytes = unsafe { core::slice::from_raw_parts(block.ptr.as_ptr(), block.layout.size()) };
     assert!(
         bytes.iter().all(|&b| b == block.tag),
         "block {} was overwritten",
@@ -153,14 +154,14 @@ fn random_alloc_free_and_realloc_never_overlap() {
                 let old = block.layout.size();
                 let new_size = 1 + rng.below(3_000) as usize;
                 // SAFETY: the block is live and came from this heap with this layout.
-                let ptr = unsafe { heap.realloc(block.ptr, block.layout, new_size, &mut region) };
-                assert!(!ptr.is_null());
-                assert_eq!(ptr as usize % block.layout.align(), 0);
+                let ptr = unsafe { heap.realloc(block.ptr, block.layout, new_size, &mut region) }
+                    .expect("realloc ran out of memory");
+                assert_eq!(ptr.as_ptr() as usize % block.layout.align(), 0);
                 // SAFETY: the resized block holds `new_size` bytes; the kept prefix is checked.
-                let kept = unsafe { core::slice::from_raw_parts(ptr, old.min(new_size)) };
+                let kept = unsafe { core::slice::from_raw_parts(ptr.as_ptr(), old.min(new_size)) };
                 assert!(kept.iter().all(|&b| b == block.tag), "realloc lost data");
                 // SAFETY: as above.
-                unsafe { ptr.write_bytes(block.tag, new_size) };
+                unsafe { ptr.as_ptr().write_bytes(block.tag, new_size) };
                 block.ptr = ptr;
                 block.layout = Layout::from_size_align(new_size, block.layout.align()).unwrap();
             }
@@ -188,14 +189,14 @@ fn freeing_everything_rewinds_to_the_base() {
 }
 
 #[test]
-fn out_of_memory_returns_null() {
+fn out_of_memory_returns_none() {
     let mut region = Buffer::new(1 << 16);
     let mut heap = Heap::new();
     let layout = Layout::from_size_align(1 << 17, 8).unwrap();
     // SAFETY: the buffer is used by this heap only.
-    assert!(unsafe { heap.alloc(layout, &mut region) }.is_null());
+    assert!(unsafe { heap.alloc(layout, &mut region) }.is_none());
     let huge = Layout::from_size_align(isize::MAX as usize, 1).unwrap();
     // SAFETY: as above.
-    assert!(unsafe { heap.alloc(huge, &mut region) }.is_null());
+    assert!(unsafe { heap.alloc(huge, &mut region) }.is_none());
     assert_eq!(heap.live(), 0);
 }
