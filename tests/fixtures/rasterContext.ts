@@ -153,6 +153,14 @@ export class RasterContext {
     this.subpaths = saved;
   }
 
+  /** Draws any image as an opaque mid-grey square: the worst case for the modules under a logo. */
+  drawImage(_image: unknown, x: number, y: number, w: number, h: number): void {
+    const style = this.fillStyle;
+    this.fillStyle = '#808080';
+    this.fillRect(x, y, w, h);
+    this.fillStyle = style;
+  }
+
   fill(rule?: unknown): void {
     // A transparent fill paints nothing.
     const rgb = parseColor(this.fillStyle);
