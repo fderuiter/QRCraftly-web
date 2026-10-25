@@ -70,7 +70,8 @@ test.describe('Throttled Interactive Performance Testing', () => {
 
         // Enable CPU throttling specifically for interactive style switching
         await client.send('Emulation.setCPUThrottlingRate', { rate });
-        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 50))));
+        // Two animation frames: the throttled page has painted at least once since the change.
+        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
         // Clear any long tasks registered during the initial page load/hydration phase.
         // We are specifically testing interactive transitions between complex styling states.
