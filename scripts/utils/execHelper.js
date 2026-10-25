@@ -1,4 +1,4 @@
-import { execFileSync, execSync, spawnSync } from 'child_process';
+import { execFileSync, execSync, spawn, spawnSync } from 'child_process';
 import fs from 'fs';
 
 const WINDOWS_CMD_EXECUTABLES = new Set(['npx', 'npm', 'pnpm', 'yarn', 'tsc', 'wrangler']);
@@ -52,6 +52,28 @@ export function execBinary(file, args = [], options = {}) {
  */
 export function spawnBinary(file, args = [], options = {}) {
   return spawnSync(resolveCommand(file), args, options);
+}
+
+/**
+ * Runs a binary without blocking and collects its stdout and stderr, interleaved as they
+ * arrive, so several commands can run at once and each prints as one block afterwards.
+ *
+ * @param {string} file - Binary/command name or path
+ * @param {string[]} [args=[]] - Arguments array
+ * @param {import('child_process').SpawnOptions} [options={}] - Node child_process options
+ * @returns {Promise<{ status: number, output: string }>} Exit status (1 when it could not start) and output
+ */
+export function runBinary(file, args = [], options = {}) {
+  return new Promise((resolve) => {
+    let output = '';
+    const child = spawn(resolveCommand(file), args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+    child.stdout.on('data', (chunk) => (output += chunk));
+    child.stderr.on('data', (chunk) => (output += chunk));
+    child.on('error', (err) => {
+      output += `${err.message}\n`;
+    });
+    child.on('close', (code) => resolve({ status: code ?? 1, output: output.replace(/\r\n/g, '\n') }));
+  });
 }
 
 /**
