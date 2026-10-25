@@ -170,6 +170,36 @@ describe('useImageUpload', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('falls back to the main thread when the resize worker never answers (#1612)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      vi.spyOn(imageResizeHelper, 'isLowTierDevice').mockReturnValue(false);
+      vi.spyOn(imageResizeHelper, 'isOffThreadSupported').mockReturnValue(true);
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      // The real processImageOffThread runs against a worker that swallows the request.
+      globalThis.mockWorkerControl.setInterceptor(() => {});
+      const spyProcessMainThread = vi.spyOn(imageResizeHelper, 'processImageOnMainThread').mockResolvedValue('data:image/webp;base64,fallbackOptimized');
+
+      const { result } = renderHook(() => useImageUpload());
+      const onSuccess = vi.fn();
+      const file = new File(['dummy content'], 'test.png', { type: 'image/png' });
+      const event = { target: { files: [file], value: 'test.png' } } as unknown as React.ChangeEvent<HTMLInputElement>;
+
+      act(() => {
+        result.current.handleUpload(event, onSuccess);
+      });
+      expect(spyProcessMainThread).not.toHaveBeenCalled();
+
+      await act(() => vi.advanceTimersByTimeAsync(imageResizeHelper.OFF_THREAD_TIMEOUT_MS));
+
+      expect(spyProcessMainThread).toHaveBeenCalledWith(file, 1200);
+      expect(onSuccess).toHaveBeenCalledWith('data:image/webp;base64,fallbackOptimized');
+      expect(globalThis.mockWorkerControl.getInstances().every((worker) => worker.terminated)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('falls back to main thread when off-thread is not supported', async () => {
     vi.spyOn(imageResizeHelper, 'isLowTierDevice').mockReturnValue(false);
     vi.spyOn(imageResizeHelper, 'isOffThreadSupported').mockReturnValue(false);
