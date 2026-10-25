@@ -31,9 +31,7 @@ const ARBITRARY_VALUE_CLASS = new RegExp(
  * tokens, then take it off. New files never join it.
  */
 export const LEGACY_PALETTE_FILES = new Set([
-  // Draws over the live camera picture, which is never themed.
-  'src/components/QRScanner.tsx',
-  // Camera viewport and its dark drop zone, like QRScanner, stay fixed-dark.
+  // Camera viewport and its dark drop zone stay fixed-dark.
   'src/components/transfer/receive/ReceiveViewport.tsx',
 ]);
 
