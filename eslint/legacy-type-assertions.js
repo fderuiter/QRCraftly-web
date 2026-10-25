@@ -1,6 +1,7 @@
 /**
  * Source files that still use TypeScript type assertions (`value as Type`, `<Type>value`).
- * AGENTS.md forbids loose assertions; `@typescript-eslint/consistent-type-assertions` enforces
+ * AGENTS.md forbids loose assertions; `qrcraftly/no-type-assertions` (the typescript-eslint rule
+ * `consistent-type-assertions` with a message that names the fix) enforces
  * that everywhere in `src/` except these files, which held 183 assertions when the rule arrived
  * (2026-10-19). The list may only shrink: remove a file once its assertions are gone (a test
  * fails while a listed file has none left), and never add one. `as const` is always allowed.
@@ -40,8 +41,6 @@ export const LEGACY_TYPE_ASSERTION_FILES = Object.freeze([
   "src/packages/core/security.ts",
   "src/packages/optical-modem/lib/ladder.ts",
   "src/packages/optical-modem/lib/render.ts",
-  "src/packages/optical-scanner/lib/contracts.ts",
-  "src/packages/optical-scanner/lib/worker.ts",
   "src/packages/optical-transfer/lib/bcur/decoder.ts",
   "src/packages/optical-transfer/lib/bcur/schedule.ts",
   "src/packages/optical-transfer/lib/multicode/stagger.ts",

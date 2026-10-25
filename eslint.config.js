@@ -134,8 +134,9 @@ export default tseslint.config(
     // are listed in eslint/legacy-type-assertions.js until they are cleaned up.
     files: ["src/**/*.{ts,tsx}"],
     ignores: [...TEST_FILES, ...LEGACY_TYPE_ASSERTION_FILES],
+    plugins: { qrcraftly },
     rules: {
-      "@typescript-eslint/consistent-type-assertions": ["error", { assertionStyle: "never" }]
+      "qrcraftly/no-type-assertions": ["error", { assertionStyle: "never" }]
     }
   },
   {
