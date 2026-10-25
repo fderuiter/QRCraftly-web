@@ -16,11 +16,13 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { execBinary } from '../utils/execHelper.js';
+import { findOpenAlert as findAlert, runGh, syncAlertIssue } from './alert_issue.js';
+
+export { runGh };
 
 export const MARKER = '<!-- dependency-audit -->';
 export const TITLE = 'Dependency audit failing';
 const LABELS = ['bug', 'area:ci', 'priority:P1'];
-const ASSIGNEE = 'fderuiter';
 const MAX_ROWS = 50;
 const SEVERITY_ORDER = ['critical', 'high', 'moderate', 'low', 'info'];
 
@@ -100,26 +102,13 @@ function readAuditReport() {
 }
 
 /**
- * Runs the gh CLI and returns stdout.
- * @param {string[]} args
- * @returns {string}
- */
-export function runGh(args) {
-  return execBinary('gh', args, { stdio: ['ignore', 'pipe', 'inherit'] });
-}
-
-/**
- * Finds the open alert issue's number, or null.
+ * Finds the open audit alert's number, or null.
  * @param {(args: string[]) => string} gh
  * @param {string} [marker] Hidden marker that identifies the alert issue.
  * @returns {number | null}
  */
 export function findOpenAlert(gh, marker = MARKER) {
-  const issues = JSON.parse(gh(['issue', 'list', '--state', 'open', '--limit', '500', '--json', 'number,body']));
-  /** @type {{ number: number, body?: string }[]} */
-  const list = Array.isArray(issues) ? issues : [];
-  const match = list.find(issue => typeof issue.body === 'string' && issue.body.includes(marker));
-  return match ? match.number : null;
+  return findAlert(gh, marker);
 }
 
 /**
@@ -129,47 +118,33 @@ export function findOpenAlert(gh, marker = MARKER) {
  * @returns {'opened' | 'commented' | 'closed' | 'none'}
  */
 export function syncAuditIssue({ outcome, runUrl, gh = runGh, readReport = readAuditReport, log = console.log }) {
-  if (outcome !== 'success' && outcome !== 'failure') {
-    log(`Audit outcome "${outcome}": nothing to do.`);
-    return 'none';
-  }
-
-  const existing = findOpenAlert(gh);
-  const runLine = runUrl ? `Run: ${runUrl}` : 'Run link unavailable.';
-
-  if (outcome === 'success') {
-    if (existing === null) {
-      log('Audit passed and no alert is open.');
-      return 'none';
-    }
-    gh(['issue', 'close', String(existing), '--reason', 'completed', '--comment', `Audit passing again.\n\n${runLine}`]);
-    log(`Audit passed: closed #${existing}.`);
-    return 'closed';
-  }
-
-  const summary = summarizeAudit(readReport());
-
-  if (existing !== null) {
-    gh(['issue', 'comment', String(existing), '--body', `The nightly dependency audit is still failing.\n\n${summary}\n\n${runLine}`]);
-    log(`Audit failed: commented on #${existing}.`);
-    return 'commented';
-  }
-
-  const body = [
-    MARKER,
-    'The nightly `pnpm audit --audit-level=moderate` found at least one moderate or higher vulnerability.',
-    '',
-    summary,
-    '',
-    runLine,
-    '',
-    'Update or override the affected packages. The next passing run closes this issue.',
-  ].join('\n');
-  const args = ['issue', 'create', '--title', TITLE, '--body', body, '--assignee', ASSIGNEE];
-  for (const label of LABELS) args.push('--label', label);
-  gh(args);
-  log('Audit failed: opened a new alert issue.');
-  return 'opened';
+  // Read the report only for a failure, and only once.
+  let summary = null;
+  const failureSummary = () => (summary ??= summarizeAudit(readReport()));
+  return syncAlertIssue({
+    outcome,
+    runUrl,
+    gh,
+    log,
+    copy: {
+      name: 'Audit',
+      marker: MARKER,
+      title: TITLE,
+      labels: LABELS,
+      closeBody: runLine => `Audit passing again.\n\n${runLine}`,
+      commentBody: runLine => `The nightly dependency audit is still failing.\n\n${failureSummary()}\n\n${runLine}`,
+      openBody: runLine =>
+        [
+          'The nightly `pnpm audit --audit-level=moderate` found at least one moderate or higher vulnerability.',
+          '',
+          failureSummary(),
+          '',
+          runLine,
+          '',
+          'Update or override the affected packages. The next passing run closes this issue.',
+        ].join('\n'),
+    },
+  });
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(process.argv[1])) {
