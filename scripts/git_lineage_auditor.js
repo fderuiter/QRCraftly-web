@@ -187,6 +187,18 @@ export function parseGitDiff(stdout) {
   return modifiedFiles;
 }
 
+/** The next step when there is no usable .git folder. */
+const FIX_NO_GIT =
+  'Fix: run the check from a git clone of the repository. SKIP_GIT_VALIDATION=1 skips it, for local use only; CI must run it.';
+
+/** The next step when the base branch could not be compared. */
+function fixFetch(targetBranch) {
+  const slash = targetBranch.indexOf('/');
+  const remote = targetBranch.slice(0, slash);
+  const branch = targetBranch.slice(slash + 1);
+  return `Fix: run \`git fetch ${remote} ${branch}\` (or \`git fetch --unshallow\` in a shallow clone) and retry; reproduce with \`git diff --name-only ${targetBranch}...HEAD\`.`;
+}
+
 export function runAuditor(options = {}) {
   const env = options.env || process.env;
   const argv = options.argv || process.argv;
@@ -213,6 +225,7 @@ export function runAuditor(options = {}) {
       const gitDir = path.join(repoRoot, '.git');
       if (!customExistsSync(gitDir)) {
         console.error('❌ [Lineage Auditor] Missing Git directory! Failed closed in CI environment.');
+        console.error(FIX_NO_GIT);
         exit(1);
         return;
       }
@@ -254,12 +267,14 @@ export function runAuditor(options = {}) {
           } catch (retryErr) {
             console.error(`❌ [Lineage Auditor] Retry comparison failed: ${retryErr.message}`);
             console.error('❌ [Lineage Auditor] Failed closed in CI environment due to git comparison failure.');
+            console.error(fixFetch(targetBranch));
             exit(1);
             return;
           }
         } else {
           console.error(`❌ [Lineage Auditor] Target branch comparison failed and could not parse remote: ${err.message}`);
           console.error('❌ [Lineage Auditor] Failed closed in CI environment due to git comparison failure.');
+          console.error(`Fix: GITHUB_BASE_REF must name a branch on a remote (origin/<branch>); got '${targetBranch}'.`);
           exit(1);
           return;
         }
@@ -279,6 +294,7 @@ export function runAuditor(options = {}) {
         console.log('[Lineage Auditor] No explicit file list provided. Falling back to local git status check...');
         if (!customExistsSync(path.join(repoRoot, '.git'))) {
           console.error('❌ [Lineage Auditor] Not a git repository or .git folder missing. Failed closed.');
+          console.error(FIX_NO_GIT);
           exit(1);
           return;
         }
@@ -288,6 +304,7 @@ export function runAuditor(options = {}) {
           stdout = customExecSync('git', ['status', '--porcelain'], { encoding: 'utf8', cwd: repoRoot });
         } catch (err) {
           console.error('❌ [Lineage Auditor] Failed to query git status. Failed closed.', err.message);
+          console.error('Fix: run `git status` in the repository root and fix what it reports, or pass the changed files as arguments: node scripts/git_lineage_auditor.js <file>...');
           exit(1);
           return;
         }
@@ -310,6 +327,7 @@ export function runAuditor(options = {}) {
         console.error(`The core contract file '${codeFile}' was modified, but its mapped documentation guide '${docFile}' was not.`);
         console.error(`To resolve this block, please update: ${docFile}`);
       }
+      console.error('Fix: change each listed doc in the same pull request. The pairs are in MAPPING in scripts/git_lineage_auditor.js.');
       console.error('');
       exit(1);
       return;
@@ -318,6 +336,7 @@ export function runAuditor(options = {}) {
     }
   } catch (error) {
     console.error('❌ [Lineage Auditor] Unexpected error during lineage check:', error.message || error);
+    console.error(FIX_NO_GIT);
     exit(1);
     return;
   }

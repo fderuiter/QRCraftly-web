@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { checkLineage, parseGitStatus, MAPPING, parseArgs, runAuditor, parseGitDiff } from '../scripts/git_lineage_auditor.js';
@@ -544,6 +544,59 @@ describe('Local Git-Diff Lineage Auditor', () => {
       expect(fetched).toBe(true);
       expect(doubleDotTried).toBe(true);
       expect(exitCode).toBeNull();
+    });
+  });
+
+  describe('every failure names its fix (#1615)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    /** Runs the auditor and returns its exit code and every error line it printed. */
+    const run = (options) => {
+      const lines = [];
+      vi.spyOn(console, 'error').mockImplementation((...args) => lines.push(args.join(' ')));
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      let exitCode = null;
+      runAuditor({ argv: ['node', 'scripts/git_lineage_auditor.js'], exit: (code) => { exitCode = code; }, ...options });
+      return { exitCode, fixes: lines.filter((line) => line.startsWith('Fix:')) };
+    };
+    const ci = { CI: 'true', GITHUB_ACTIONS: 'true' };
+
+    it('names the doc mapping when a paired doc is missing', () => {
+      const [codeFile] = Object.keys(MAPPING);
+      const { exitCode, fixes } = run({ env: {}, argv: ['node', 'scripts/git_lineage_auditor.js', codeFile], existsSync: () => false });
+      expect(exitCode).toBe(1);
+      expect(fixes).toEqual([expect.stringContaining('MAPPING in scripts/git_lineage_auditor.js')]);
+    });
+
+    it('says to fetch the base branch when the comparison fails in CI', () => {
+      const { exitCode, fixes } = run({
+        env: { ...ci, GITHUB_BASE_REF: 'main' },
+        execSync: () => { throw new Error('shallow clone'); },
+        existsSync: () => true,
+      });
+      expect(exitCode).toBe(1);
+      expect(fixes).toEqual([expect.stringContaining('git fetch origin main')]);
+      expect(fixes[0]).toContain('git fetch --unshallow');
+    });
+
+    it('says to run from a clone when .git is missing, in CI and locally', () => {
+      for (const env of [ci, {}]) {
+        const { exitCode, fixes } = run({ env, execSync: () => '', existsSync: (p) => !p.endsWith('.git') });
+        expect(exitCode).toBe(1);
+        expect(fixes).toEqual([expect.stringContaining('SKIP_GIT_VALIDATION=1 skips it, for local use only')]);
+      }
+    });
+
+    it('prints a fix for a failed git status and an unexpected error', () => {
+      const status = run({ env: {}, execSync: () => { throw new Error('git status failed'); }, existsSync: () => true });
+      expect(status.exitCode).toBe(1);
+      expect(status.fixes).toHaveLength(1);
+      const unexpected = run({ env: ci, existsSync: () => { throw new Error('disk gone'); } });
+      expect(unexpected.exitCode).toBe(1);
+      expect(unexpected.fixes).toHaveLength(1);
     });
   });
 });
