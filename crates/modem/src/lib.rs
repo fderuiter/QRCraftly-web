@@ -34,7 +34,7 @@
 //! Every call goes through a receiver, `Rx`, made once with `modem_rx_new`.
 //! It owns every buffer the kernels use and keeps them from frame to frame,
 //! so nothing is allocated per frame once the largest frame has been seen
-//! (the module's allocator only reclaims memory when everything is freed).
+//! (freed blocks only come back for blocks of the same size class).
 //! The caller writes into and reads from these buffers:
 //!
 //! - the image (`modem_rx_image`): RGBA pixels, row by row;

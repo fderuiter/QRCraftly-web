@@ -29,6 +29,7 @@
 pub mod abi;
 pub mod crc32;
 pub mod gf256;
+pub mod heap;
 pub mod qr;
 pub mod reed_solomon;
 

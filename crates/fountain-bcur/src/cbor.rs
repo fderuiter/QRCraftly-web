@@ -113,14 +113,18 @@ impl<'a> CborReader<'a> {
         Some(val)
     }
 
-    fn take(&mut self, len: usize) -> Option<&'a [u8]> {
-        if self.offset + len > self.bytes.len() {
-            None
-        } else {
-            let slice = &self.bytes[self.offset..self.offset + len];
-            self.offset += len;
-            Some(slice)
-        }
+    fn remaining(&self) -> usize {
+        self.bytes.len().saturating_sub(self.offset)
+    }
+
+    fn take(&mut self, len: u64) -> Option<&'a [u8]> {
+        // A length from the wire can be anything up to u64::MAX: compare before adding.
+        let len = usize::try_from(len)
+            .ok()
+            .filter(|&len| len <= self.remaining())?;
+        let slice = &self.bytes[self.offset..self.offset + len];
+        self.offset += len;
+        Some(slice)
     }
 
     pub fn read(&mut self, depth: usize) -> Option<CborValue> {
@@ -133,15 +137,19 @@ impl<'a> CborReader<'a> {
         match major {
             0 => Some(CborValue::Uint(arg)),
             2 => {
-                let slice = self.take(arg as usize)?;
+                let slice = self.take(arg)?;
                 Some(CborValue::Bytes(slice.to_vec()))
             }
             3 => {
-                let slice = self.take(arg as usize)?;
+                let slice = self.take(arg)?;
                 Some(CborValue::Text(slice.to_vec()))
             }
             4 => {
-                let count = arg as usize;
+                // Every item takes at least one byte, so a count beyond the bytes left is
+                // malformed; checking first also keeps a huge count from sizing the Vec.
+                let count = usize::try_from(arg)
+                    .ok()
+                    .filter(|&n| n <= self.remaining())?;
                 let mut items = Vec::with_capacity(count);
                 for _ in 0..count {
                     items.push(self.read(depth + 1)?);
