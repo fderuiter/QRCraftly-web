@@ -2,8 +2,9 @@ import { readFileSync, existsSync, mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { describe, it, expect } from 'vitest';
-import { shouldExcludePath, getRegistryRoutes, generateSitemap } from '../scripts/generate_sitemap';
+import { describe, it, expect, vi } from 'vitest';
+import { execBinary } from './utils/execHelper';
+import { shouldExcludePath, getRegistryRoutes, generateSitemap, getPageSourcePaths, getLastModified } from '../scripts/generate_sitemap';
 import { legacyRouteRegistry } from '../src/data/contentRegistry';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +40,56 @@ describe('Search Engine Indexing Prevention & Hybrid Sitemap Generation', () => 
     // Retired routes only redirect to /arcade, so they are not indexed.
     expect(shouldExcludePath('/game')).toBe(true);
     expect(shouldExcludePath('/destroy-the-qr')).toBe(true);
+  });
+
+  it('matches excluded names as whole path segments, not substrings (#1619)', () => {
+    for (const route of ['/testimonials', '/contest-qr', '/internal-tools-qr', '/drafting-qr', 'dist/client/latest/index.html']) {
+      expect(shouldExcludePath(route), route).toBe(false);
+    }
+    for (const route of ['/dev-sandbox/optical-probe', '/_error', '/404.html', '/404', 'dist/client/_error.html', '/guides/draft']) {
+      expect(shouldExcludePath(route), route).toBe(true);
+    }
+  });
+
+  it('dates a page by the shared data modules that hold its copy (#1619)', () => {
+    // qr-code-checker has no copy file: its title and description live in landingPageMeta.ts.
+    expect(getPageSourcePaths('/qr-code-checker')).toEqual([
+      'src/pages/qr-code-checker',
+      'src/data/contentRegistry.ts',
+      'src/data/landingPageMeta.ts',
+      'src/data/landingPageContent.ts',
+    ]);
+    expect(getPageSourcePaths('/wifi-qr-code')).toEqual(
+      expect.arrayContaining(['src/pages/wifi-qr-code', 'src/data/copy/wifi-qr-code.ts', 'src/data/contentRegistry.ts', 'src/data/typeGuides.ts']),
+    );
+    expect(getPageSourcePaths('/wifi-qr-code')).not.toContain('src/data/landingPageMeta.ts');
+    // A route with no page source of its own gets no sources, so it gets no guessed lastmod.
+    expect(getPageSourcePaths('/no-such-page')).toEqual([]);
+    expect(getLastModified('/no-such-page')).toBeNull();
+  });
+
+  const shallow = execBinary('git', ['rev-parse', '--is-shallow-repository']).trim() !== 'false';
+  it.skipIf(shallow)('moves a page lastmod when only a shared data module changes (#1619)', () => {
+    const lastCommit = (source: string) =>
+      execBinary('git', ['log', '-1', '--format=%cI', '--', source]).trim().slice(0, 10);
+    const lastmod = getLastModified('/qr-code-checker');
+    expect(lastmod).not.toBeNull();
+    // An edit to landingPageMeta.ts alone (a new seoTitle) is at least as new as the page's lastmod.
+    expect(lastmod! >= lastCommit('src/data/landingPageMeta.ts')).toBe(true);
+    expect(lastmod! >= lastCommit('src/pages/qr-code-checker')).toBe(true);
+  });
+
+  it('prerenders the optical probe only when the build turns its flag on (#1619)', async () => {
+    try {
+      vi.resetModules();
+      vi.stubEnv('VITE_OPTICAL_MODEM', '');
+      expect((await import('../src/pages/dev-sandbox/optical-probe/+config')).default.prerender).toBe(false);
+      vi.resetModules();
+      vi.stubEnv('VITE_OPTICAL_MODEM', 'true');
+      expect((await import('../src/pages/dev-sandbox/optical-probe/+config')).default.prerender).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('should verify arcade page config enables static pre-rendering', async () => {

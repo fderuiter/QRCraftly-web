@@ -1,5 +1,13 @@
+import { render } from 'vike/abort';
+import { isOpticalModemEnabled } from '@/packages/optical-modem/flag';
+
 /**
- * Replaces the sandbox guard, which answers 404 in production builds. The probe decides for itself
- * with the `VITE_OPTICAL_MODEM` flag and renders a notice when it is off.
+ * Replaces the sandbox guard, which answers 404 in every production build. The probe is served by
+ * a production build only when that build turns on `VITE_OPTICAL_MODEM` (#1619); otherwise it
+ * answers 404 like the rest of the sandbox, including on a client-side navigation.
  */
-export const guard = (): void => undefined;
+export const guard = (): void => {
+  if (import.meta.env.PROD && !isOpticalModemEnabled()) {
+    throw render(404, 'The optical probe is switched off in this build.');
+  }
+};

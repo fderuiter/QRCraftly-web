@@ -2,8 +2,10 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "qrcraftly",
   "compatibility_date": "2026-10-01",
-  // Production is served at qrcraftly.fpderuiter.workers.dev (and qrcraftly.com), and every
-  // non-production branch built by Workers Builds gets a <branch>-qrcraftly preview URL.
+  // Production is qrcraftly.com, the only host search engines index. The same build is also served
+  // at qrcraftly.fpderuiter.workers.dev, and every non-production branch built by Workers Builds
+  // gets a <branch>-qrcraftly preview URL; public/_headers sends X-Robots-Tag: noindex on every
+  // workers.dev host, and each page's canonical link names qrcraftly.com (#1619).
   "workers_dev": true,
   "preview_urls": true,
   "assets": {
