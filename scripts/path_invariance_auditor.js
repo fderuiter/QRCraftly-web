@@ -1,20 +1,27 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import ts from 'typescript';
+import { DEFAULT_EXCLUDE_DIRS, walkFiles } from './utils/sourceFiles.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.join(__dirname, '..');
 
-export const EXCLUDE_DIRS = ['node_modules', '.git', 'dist', 'build', 'coverage', '.gemini', '.claude', '.agents'];
+/** Directories the audit skips: the shared list (#1617). */
+export const EXCLUDE_DIRS = [...DEFAULT_EXCLUDE_DIRS];
 
-export const ALLOWLISTED_PLATFORM_BRANCHING_FILES = new Set([
-  'scripts/utils/execHelper.js',
-  'tests/utils/execHelper.ts',
-  'tests/ci_scripts.test.ts',
-  'scripts/path_invariance_auditor.js',
-  'tests/path_invariance_auditor.test.ts',
-]);
+/** The extensions the audit reads. Code files are parsed; .json and .md are scanned by line. */
+const SCANNED_EXTS = ['.js', '.ts', '.tsx', '.cjs', '.mjs', '.json', '.md'];
+
+/**
+ * The marker that allows one platform check or path string. Put it in a comment just before the
+ * statement or expression that needs it (#1617).
+ */
+export const ALLOW_MARKER = 'path-invariance: allow';
+
+/** This auditor's own test, whose fixtures are the paths and splits the audit looks for. */
+const AUDITOR_TEST = 'tests/path_invariance_auditor.test.ts';
 
 // Browser HTML5 file input values standardly return "C:\fakepath\filename"
 export const ALLOWLISTED_FAKEMOCK_PATHS = [
@@ -32,11 +39,140 @@ const WINDOWS_DRIVE_REGEX = /(?:^|[\s"'`(=,[])(?:file:\/\/\/)?([a-zA-Z]:(?:\\+|\
 // Regex for detecting hardcoded Unix/macOS user directories (e.g., /home/user, /Users/user)
 const UNIX_USER_HOME_REGEX = /(?:^|[\s"'`(=,[])(?:\/(?:Users|home)\/[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+)/;
 
-// Regex for detecting raw split on \n without handling \r
+// Regex for detecting raw split on \n without handling \r (.json and .md lines)
 const RAW_NEWLINE_SPLIT_REGEX = /\.split\(\s*['"]\\n['"]\s*\)/;
 
-// Regex for detecting ad-hoc process.platform branching
+// Regex for detecting ad-hoc process.platform branching (.json and .md lines)
 const PLATFORM_CHECK_REGEX = /process\.platform\s*===?\s*['"][^'"]+['"]/;
+
+const CODE_EXTS = { '.ts': ts.ScriptKind.TS, '.tsx': ts.ScriptKind.TSX, '.js': ts.ScriptKind.JS, '.cjs': ts.ScriptKind.JS, '.mjs': ts.ScriptKind.JS };
+
+const MESSAGES = {
+  split: `Detected fragile '.split(\\'\\\\n\\')'. Use '.split(/\\\\r?\\\\n/)' for cross-platform CRLF/LF resilience.`,
+  platform: `Detected ad-hoc process.platform branching. Use centralized helpers in 'scripts/utils/execHelper.js' or 'tests/utils/execHelper.ts', or mark a check that must stay with a '// ${ALLOW_MARKER}' comment.`,
+};
+
+/**
+ * Finds hardcoded host paths in one piece of text.
+ * @param {string} text Line or string value.
+ * @returns {string[]} Messages.
+ */
+function hostPathMessages(text) {
+  if (ALLOWLISTED_FAKEMOCK_PATHS.some(mock => text.includes(mock))) return [];
+  const messages = [];
+  // Ignore common protocol matches (e.g. https://, http://, mailto:, ws://, wss://, git+https://)
+  const clean = text.replace(/https?:\/\/[^\s"'`)]+/g, '').replace(/wss?:\/\/[^\s"'`)]+/g, '');
+  const winMatch = clean.match(WINDOWS_DRIVE_REGEX);
+  if (winMatch && !winMatch[1].includes('fakepath')) {
+    messages.push(`Detected hardcoded Windows drive path '${winMatch[1]}'. Use relative paths with path.join or import.meta.url.`);
+  }
+  const unixMatch = text.match(UNIX_USER_HOME_REGEX);
+  if (unixMatch) {
+    messages.push(`Detected hardcoded user directory '${unixMatch[0].trim()}'. Use relative paths or dynamic environment configuration.`);
+  }
+  return messages;
+}
+
+/**
+ * Whether the `.split('\n')` check applies to a file.
+ * @param {string} file POSIX relative path.
+ * @returns {boolean}
+ */
+const checksSplits = file =>
+  file.startsWith('scripts/') || file.startsWith('tests/') || file.endsWith('.test.ts') || file.endsWith('.test.tsx');
+
+/**
+ * Whether a node, or a node it sits in up to its statement, carries the allow marker in a
+ * comment just before it.
+ * @param {import('typescript').Node} node
+ * @param {string} text Source text.
+ * @returns {boolean}
+ */
+function isAllowed(node, text) {
+  for (let current = node; current && !ts.isSourceFile(current); current = current.parent) {
+    const comments = ts.getLeadingCommentRanges(text, current.getFullStart()) ?? [];
+    if (comments.some(range => text.slice(range.pos, range.end).includes(ALLOW_MARKER))) return true;
+    if (ts.isStatement(current)) break;
+  }
+  return false;
+}
+
+/**
+ * Whether an expression is `process.platform`.
+ * @param {import('typescript').Expression} node
+ * @returns {boolean}
+ */
+const isProcessPlatform = node =>
+  ts.isPropertyAccessExpression(node) && node.name.text === 'platform' && ts.isIdentifier(node.expression) && node.expression.text === 'process';
+
+const EQUALITY = new Set([ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.EqualsEqualsToken]);
+
+/**
+ * Scans a code file on its syntax tree: host paths in string values only (comments and URLs in
+ * comments are never read), `.split('\n')` calls, and `process.platform` comparisons (#1617).
+ * @param {string} content File contents.
+ * @param {string} file POSIX relative path.
+ * @param {import('typescript').ScriptKind} kind Script kind.
+ * @returns {Array<{file: string, line: number, type: string, message: string}>}
+ */
+function scanCode(content, file, kind) {
+  const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true, kind);
+  const findings = [];
+  const isAuditorTest = file === AUDITOR_TEST;
+  const lineOf = node => source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+  const add = (node, type, message) => findings.push({ file, line: lineOf(node), type, message });
+
+  const visit = node => {
+    if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && !isAuditorTest && !isAllowed(node, content)) {
+      for (const message of hostPathMessages(node.text)) add(node, 'Hardcoded Absolute Host Path', message);
+    } else if (ts.isCallExpression(node) && checksSplits(file) && !isAuditorTest) {
+      const callee = node.expression;
+      const [arg] = node.arguments;
+      if (
+        ts.isPropertyAccessExpression(callee) &&
+        callee.name.text === 'split' &&
+        node.arguments.length === 1 &&
+        (ts.isStringLiteral(arg) || ts.isNoSubstitutionTemplateLiteral(arg)) &&
+        arg.text === '\n'
+      ) {
+        add(node, 'Unhandled CRLF Line Splitting', MESSAGES.split);
+      }
+    } else if (
+      ts.isBinaryExpression(node) &&
+      EQUALITY.has(node.operatorToken.kind) &&
+      (isProcessPlatform(node.left) || isProcessPlatform(node.right)) &&
+      !isAllowed(node, content)
+    ) {
+      add(node, 'Ad-Hoc Platform Branching', MESSAGES.platform);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return findings;
+}
+
+/**
+ * Scans a .json or .md file line by line, as before #1617.
+ * @param {string} content File contents.
+ * @param {string} file POSIX relative path.
+ * @returns {Array<{file: string, line: number, type: string, message: string}>}
+ */
+function scanLines(content, file) {
+  const findings = [];
+  content.split(/\r?\n/).forEach((line, index) => {
+    const lineNumber = index + 1;
+    if (!file.endsWith('.md')) {
+      for (const message of hostPathMessages(line)) findings.push({ file, line: lineNumber, type: 'Hardcoded Absolute Host Path', message });
+    }
+    if (checksSplits(file) && RAW_NEWLINE_SPLIT_REGEX.test(line)) {
+      findings.push({ file, line: lineNumber, type: 'Unhandled CRLF Line Splitting', message: MESSAGES.split });
+    }
+    if (PLATFORM_CHECK_REGEX.test(line)) {
+      findings.push({ file, line: lineNumber, type: 'Ad-Hoc Platform Branching', message: MESSAGES.platform });
+    }
+  });
+  return findings;
+}
 
 /**
  * Scans string content of a file for path invariance issues.
@@ -47,65 +183,8 @@ const PLATFORM_CHECK_REGEX = /process\.platform\s*===?\s*['"][^'"]+['"]/;
  */
 export function scanContentForPathInvariants(content, relativePath) {
   const normalizedPath = relativePath.replace(/\\/g, '/');
-  const lines = content.split(/\r?\n/);
-  const findings = [];
-
-  const isPlatformBranchingAllowed = ALLOWLISTED_PLATFORM_BRANCHING_FILES.has(normalizedPath);
-  const isAuditorSelfOrTest = normalizedPath === 'scripts/path_invariance_auditor.js' || normalizedPath === 'tests/path_invariance_auditor.test.ts';
-
-  lines.forEach((line, index) => {
-    const lineNumber = index + 1;
-
-    // 1. Check for hardcoded host paths
-    const isMockPath = ALLOWLISTED_FAKEMOCK_PATHS.some(mock => line.includes(mock));
-    if (!isMockPath && !isAuditorSelfOrTest && !normalizedPath.endsWith('.md')) {
-      // Ignore common protocol matches (e.g. https://, http://, mailto:, ws://, wss://, git+https://)
-      const cleanLine = line.replace(/https?:\/\/[^\s"'`)]+/g, '').replace(/wss?:\/\/[^\s"'`)]+/g, '');
-      const winMatch = cleanLine.match(WINDOWS_DRIVE_REGEX);
-      if (winMatch && !winMatch[1].includes('fakepath')) {
-        findings.push({
-          file: normalizedPath,
-          line: lineNumber,
-          type: 'Hardcoded Absolute Host Path',
-          message: `Detected hardcoded Windows drive path '${winMatch[1]}'. Use relative paths with path.join or import.meta.url.`,
-        });
-      }
-
-      const unixMatch = line.match(UNIX_USER_HOME_REGEX);
-      if (unixMatch) {
-        findings.push({
-          file: normalizedPath,
-          line: lineNumber,
-          type: 'Hardcoded Absolute Host Path',
-          message: `Detected hardcoded user directory '${unixMatch[0].trim()}'. Use relative paths or dynamic environment configuration.`,
-        });
-      }
-    }
-
-    // 2. Check for fragile newline splitting in scripts or test files
-    if (normalizedPath.startsWith('scripts/') || normalizedPath.startsWith('tests/') || normalizedPath.endsWith('.test.ts') || normalizedPath.endsWith('.test.tsx')) {
-      if (!isAuditorSelfOrTest && RAW_NEWLINE_SPLIT_REGEX.test(line)) {
-        findings.push({
-          file: normalizedPath,
-          line: lineNumber,
-          type: 'Unhandled CRLF Line Splitting',
-          message: `Detected fragile '.split(\\'\\\\n\\')'. Use '.split(/\\\\r?\\\\n/)' for cross-platform CRLF/LF resilience.`,
-        });
-      }
-    }
-
-    // 3. Check for ad-hoc platform checks
-    if (!isPlatformBranchingAllowed && PLATFORM_CHECK_REGEX.test(line)) {
-      findings.push({
-        file: normalizedPath,
-        line: lineNumber,
-        type: 'Ad-Hoc Platform Branching',
-        message: `Detected ad-hoc process.platform branching. Use centralized helpers in 'scripts/utils/execHelper.js' or 'tests/utils/execHelper.ts'.`,
-      });
-    }
-  });
-
-  return findings;
+  const kind = CODE_EXTS[path.extname(normalizedPath).toLowerCase()];
+  return kind === undefined ? scanLines(content, normalizedPath) : scanCode(content, normalizedPath, kind);
 }
 
 /**
@@ -138,29 +217,6 @@ export function scanFileForPathInvariants(filePath) {
 }
 
 /**
- * Walks directory recursively to collect candidate source files.
- */
-function walk(dir) {
-  let results = [];
-  if (!fs.existsSync(dir)) return results;
-  const list = fs.readdirSync(dir);
-  for (const item of list) {
-    if (EXCLUDE_DIRS.includes(item)) continue;
-    const fullPath = path.join(dir, item);
-    const stat = fs.statSync(fullPath);
-    if (stat.isDirectory()) {
-      results = results.concat(walk(fullPath));
-    } else {
-      const ext = path.extname(item).toLowerCase();
-      if (['.js', '.ts', '.tsx', '.cjs', '.mjs', '.json', '.md'].includes(ext)) {
-        results.push(fullPath);
-      }
-    }
-  }
-  return results;
-}
-
-/**
  * Main path invariance audit runner.
  */
 export function runPathInvarianceAudit() {
@@ -172,7 +228,7 @@ export function runPathInvarianceAudit() {
 
   for (const d of candidateDirs) {
     const dirPath = path.join(repoRoot, d);
-    filesToScan = filesToScan.concat(walk(dirPath));
+    filesToScan = filesToScan.concat(walkFiles(dirPath, { exts: SCANNED_EXTS, excludeDirs: EXCLUDE_DIRS }));
   }
 
   // Root files

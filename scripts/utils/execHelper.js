@@ -12,6 +12,7 @@ let cachedBash = null;
  * @returns {string} Platform-resolved command name
  */
 export function resolveCommand(command) {
+  // path-invariance: allow -- this helper is where platform differences live
   if (process.platform === 'win32') {
     if (WINDOWS_CMD_EXECUTABLES.has(command)) {
       return `${command}.cmd`;
@@ -30,6 +31,7 @@ export function resolveCommand(command) {
  */
 export function execBinary(file, args = [], options = {}) {
   const resolved = resolveCommand(file);
+  // path-invariance: allow -- this helper is where platform differences live
   const isWin = process.platform === 'win32';
   const opts = {
     encoding: 'utf8',
@@ -112,6 +114,7 @@ export function resolveBash() {
     // bash is not on PATH; fall through to platform-specific locations below.
   }
 
+  // path-invariance: allow -- this helper is where platform differences live
   if (process.platform === 'win32') {
     const sysDrive = process.env.SystemDrive || '';
     const progFiles = process.env.ProgramFiles || (sysDrive ? `${sysDrive}\\Program Files` : '');

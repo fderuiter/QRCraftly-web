@@ -317,7 +317,8 @@ describe('visual baseline refresh (#1426)', () => {
 
 describe('lint runs its checks in parallel groups (#1616)', () => {
   const workflow = read('.github/workflows/main.yml');
-  // The serial `&&` chain `pnpm run lint` ran before #1616, step for step.
+  // The serial `&&` chain `pnpm run lint` ran before #1616, step for step, less the design token
+  // audit, which became the qrcraftly/design-tokens ESLint rule (#1617).
   const SERIAL_CHAIN = [
     'node scripts/dependency_compliance.js',
     'node scripts/rust_no_deps_check.js',
@@ -332,7 +333,6 @@ describe('lint runs its checks in parallel groups (#1616)', () => {
     'knip',
     'knip --production --include files',
     'node scripts/contrast_check.js',
-    'node scripts/design_token_audit.js',
     'prettier --check .',
     'node scripts/check-duplication.js',
   ];

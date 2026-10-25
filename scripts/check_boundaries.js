@@ -19,6 +19,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import ts from 'typescript';
 import { rules as defaultRules } from './boundaries.config.js';
+import { walkFiles } from './utils/sourceFiles.js';
 
 /** @typedef {import('./boundaries.config.js').Edge} Edge */
 /** @typedef {import('./boundaries.config.js').Rule} Rule */
@@ -74,18 +75,7 @@ function readCompilerOptions(rootDir, tsconfigPath) {
  * @returns {string[]} Absolute paths.
  */
 function listSourceFiles(absDir) {
-  /** @type {string[]} */
-  const out = [];
-  const walk = (/** @type {string} */ dir) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name === 'node_modules') continue;
-      const child = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(child);
-      else if (SOURCE_FILE.test(entry.name)) out.push(child);
-    }
-  };
-  walk(absDir);
-  return out;
+  return walkFiles(absDir, { excludeDirs: ['node_modules'] }).filter((file) => SOURCE_FILE.test(file));
 }
 
 /**

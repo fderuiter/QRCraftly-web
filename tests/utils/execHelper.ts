@@ -8,6 +8,7 @@ const WINDOWS_CMD_EXECUTABLES = new Set(['npx', 'npm', 'pnpm', 'yarn', 'tsc', 'w
  * On Windows, npm/pnpm/npx binaries require .cmd extension.
  */
 export function resolveCommand(command: string): string {
+  // path-invariance: allow -- this helper is where platform differences live
   if (process.platform === 'win32') {
     if (WINDOWS_CMD_EXECUTABLES.has(command)) {
       return `${command}.cmd`;
@@ -25,6 +26,7 @@ export function execBinary(
   options: ExecFileSyncOptions = {}
 ): string {
   const resolved = resolveCommand(file);
+  // path-invariance: allow -- this helper is where platform differences live
   const isWin = process.platform === 'win32';
   const opts: ExecFileSyncOptions = {
     encoding: 'utf8',
@@ -63,6 +65,7 @@ export function resolveBash(): string {
     return 'bash';
   } catch (_e) {}
 
+  // path-invariance: allow -- this helper is where platform differences live
   if (process.platform === 'win32') {
     const sysDrive = process.env.SystemDrive || '';
     const progFiles = process.env.ProgramFiles || (sysDrive ? `${sysDrive}\\Program Files` : '');

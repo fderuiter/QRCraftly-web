@@ -29,7 +29,6 @@ export const LINT_GROUPS = [
     ['knip'],
     ['knip', '--production', '--include', 'files'],
     ['node', 'scripts/contrast_check.js'],
-    ['node', 'scripts/design_token_audit.js'],
     ['prettier', '--check', '.'],
     ['node', 'scripts/check-duplication.js'],
   ],

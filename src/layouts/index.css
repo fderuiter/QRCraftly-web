@@ -7,7 +7,7 @@
  * `border-line`, `bg-action`, `ring-focus` ...) instead of raw palette steps. Colour roles
  * are CSS variables: the `.dark` block below swaps their values, so a component needs no
  * `dark:` variant for them. Contrast pairs are checked by scripts/contrast_check.js, and
- * scripts/design_token_audit.js keeps raw palette colours out of src/components/ui/.
+ * The qrcraftly/design-tokens ESLint rule keeps raw palette colours out of src/.
  */
 @theme {
   /* Brand scale (teal). */

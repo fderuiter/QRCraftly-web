@@ -28,7 +28,7 @@ import {
 } from '../../scripts/tailwind/design_system.js';
 
 export const DEFAULT_CALLEES = ['classnames', 'clsx', 'ctl', 'mergeClasses'];
-const CLASS_ATTRIBUTES = new Set(['className', 'class']);
+export const CLASS_ATTRIBUTES = new Set(['className', 'class']);
 
 /**
  * Longhand-to-shorthand families (from eslint-plugin-tailwindcss `enforces-shorthand`). Each strategy
@@ -314,7 +314,7 @@ function findContradictions(tokens, snapshot) {
  * @param {import('estree').Node} node Expression.
  * @param {Array<import('estree').Node>} out Collected `Literal` and `TemplateElement` nodes.
  */
-function collect(node, out) {
+export function collect(node, out) {
   if (!node) return;
   switch (node.type) {
     case 'Literal':
@@ -354,7 +354,7 @@ function collect(node, out) {
  * @param {import('estree').Node} callee Callee or tag.
  * @returns {string} Name, or `''`.
  */
-function calleeName(callee) {
+export function calleeName(callee) {
   if (callee.type === 'Identifier') return callee.name;
   if (callee.type === 'MemberExpression' && callee.property.type === 'Identifier') return callee.property.name;
   return '';

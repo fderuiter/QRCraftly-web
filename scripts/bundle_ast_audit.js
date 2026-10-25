@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
+import { walkFiles } from './utils/sourceFiles.js';
 
 const require = createRequire(import.meta.url);
 // typescript ships as CJS without an `exports` field; use createRequire so the
@@ -38,22 +39,10 @@ export const AUTHORIZED_FETCH_FILES = [
 ];
 
 /**
- * Recursively list all .js and .mjs files under a directory.
+ * List all .js and .mjs files under a directory, recursively.
  */
 function findJsFiles(dir) {
-  let results = [];
-  if (!fs.existsSync(dir)) return results;
-  const list = fs.readdirSync(dir);
-  list.forEach(file => {
-    const fullPath = path.join(dir, file);
-    const stat = fs.statSync(fullPath);
-    if (stat && stat.isDirectory()) {
-      results = results.concat(findJsFiles(fullPath));
-    } else if (file.endsWith('.js') || file.endsWith('.mjs')) {
-      results.push(fullPath);
-    }
-  });
-  return results;
+  return walkFiles(dir, { exts: ['.js', '.mjs'], excludeDirs: [] });
 }
 
 /**

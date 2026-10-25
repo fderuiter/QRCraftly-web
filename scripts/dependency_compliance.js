@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
+import { walkFiles } from './utils/sourceFiles.js';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -278,21 +279,16 @@ export function scanFileForCompliance(filePath) {
  * Recursively find JS/TS files to audit under repoRoot.
  */
 function findSourceFiles(dir = repoRoot) {
-  let results = [];
-  const list = fs.readdirSync(dir);
-  list.forEach(file => {
-    const fullPath = path.join(dir, file);
-    const relPath = path.relative(repoRoot, fullPath).replace(/\\/g, '/');
-    const stat = fs.statSync(fullPath);
-    if (stat && stat.isDirectory()) {
-      if (!isExcludedFile(relPath + '/') && !isExcludedFile(relPath)) {
-        results = results.concat(findSourceFiles(fullPath));
-      }
-    } else if (/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(file) && !isExcludedFile(relPath)) {
-      results.push(fullPath);
-    }
-  });
-  return results;
+  // Directories named here are always excluded by isExcludedFile too, so pruning them is only a shortcut.
+  return walkFiles(dir, { exts: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'], excludeDirs: ['node_modules', '.git', 'dist', 'coverage'] })
+    .filter((fullPath) => {
+      // A directory is skipped when its own path matches a rule, so every ancestor is checked.
+      const segments = path.relative(repoRoot, fullPath).replace(/\\/g, '/').split('/');
+      return segments.every((_, i) => {
+        const relPath = segments.slice(0, i + 1).join('/');
+        return !isExcludedFile(relPath) && (i === segments.length - 1 || !isExcludedFile(relPath + '/'));
+      });
+    });
 }
 
 export function runComplianceAudit() {
