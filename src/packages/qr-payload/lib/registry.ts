@@ -90,49 +90,6 @@ export function formatPayload(type: QRType, data: unknown): string {
 }
 
 /**
- * Parses and hydrates a raw QR payload string into its structured data representation.
- */
-// The overloads return loosely typed data: callers (the package tests) read type-specific fields
-// without narrowing. Use `QR_GENERATORS[type].hydrate` for a typed result.
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export function parsePayload(type: QRType, raw: string): any;
-export function parsePayload(raw: string): { type: QRType; data: any };
-/* eslint-enable @typescript-eslint/no-explicit-any */
-export function parsePayload(typeOrRaw: QRType | string, maybeRaw?: string): unknown {
-  if (arguments.length >= 2) {
-    const type = typeOrRaw as QRType;
-    const raw = typeof maybeRaw === 'string' ? maybeRaw : (maybeRaw == null ? '' : String(maybeRaw));
-    const generator = getGenerator(type);
-    if (!generator) return null;
-    try {
-      return generator.hydrate(raw);
-    } catch (_e) {
-      return null;
-    }
-  }
-
-  const raw = typeof typeOrRaw === 'string' ? typeOrRaw : (typeOrRaw == null ? '' : String(typeOrRaw));
-  const type = identifyProtocol(raw) || QRType.TEXT;
-  const generator = getGenerator(type);
-
-  let data: unknown;
-  if (generator) {
-    try {
-      data = generator.hydrate(raw);
-    } catch (_e) {
-      data = { text: raw };
-    }
-  } else {
-    data = { text: raw };
-  }
-
-  return {
-    type,
-    data,
-  };
-}
-
-/**
  * Validates a raw QR payload string, returning an array of security or structural violation codes.
  *
  * @param raw - The raw payload string to validate.

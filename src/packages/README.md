@@ -87,7 +87,7 @@ The rule has no exceptions. The move into `core` and the packages finished in #1
 
 - **Purpose**: Consolidated QR payload generation, hydration parsing, RFC 5545/6350 escaping, protocol identification, and security containment validation behind a stateless format/parse/validate seam.
 - **Entry Points**:
-  - `index.ts`: Polymorphic `formatPayload`, `parsePayload`, `validatePayload`, config validators `validateConfig` and `sanitizeConfig`, protocol parser `identifyProtocol`, `canHydrate`, RFC escaping helpers, and typed generator contracts (`WifiContract`, `EmailContract`, `VCardContract`, etc.).
+  - `index.ts`: Polymorphic `formatPayload` and `validatePayload` (hydrate through `QR_GENERATORS[type].hydrate`), config validators `validateConfig` and `sanitizeConfig`, protocol parser `identifyProtocol`, `canHydrate`, RFC escaping helpers, and typed generator contracts (`WifiContract`, `EmailContract`, `VCardContract`, etc.).
   - Bulk CSV payload rules (#1599): the RFC 4180 CSV parser (`parseCsv`, `CsvParseError`, row and size limits), `encodeBulkCell` and the live preview row (`previewRow`, `pickColumn`, `hasPayload`). The `bulk-csv` package builds the batch on top of them.
 
 ### `optical-transfer` (`@/packages/optical-transfer`)

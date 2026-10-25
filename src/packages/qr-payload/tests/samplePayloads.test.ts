@@ -18,7 +18,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { QRType } from '@/packages/core/types';
-import { getSamplePayload, SAMPLE_PAYLOADS, validatePayload, parsePayload } from '../index';
+import { getSamplePayload, SAMPLE_PAYLOADS, validatePayload, QR_GENERATORS } from '../index';
 
 describe('Type-Aware Fallback Sample Payloads', () => {
   const allTypes = Object.values(QRType) as QRType[];
@@ -44,7 +44,7 @@ describe('Type-Aware Fallback Sample Payloads', () => {
   it('can parse/hydrate every sample payload back into structured data or valid type', () => {
     for (const type of allTypes) {
       const sample = getSamplePayload(type);
-      const parsed = parsePayload(type, sample);
+      const parsed: unknown = QR_GENERATORS[type].hydrate(sample);
       expect(parsed).not.toBeNull();
       expect(parsed).toBeDefined();
     }

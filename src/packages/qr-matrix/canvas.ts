@@ -27,7 +27,5 @@ export {
   drawStar,
   drawRoughRect,
   drawScribble,
-  drawCircularModule,
-  drawCircuitModule,
-  drawStandardModule,
 } from './lib/canvasHelpers';
+export { drawCircularModule, drawCircuitModule, drawStandardModule } from './lib/modulePainters';

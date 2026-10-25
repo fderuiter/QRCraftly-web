@@ -7,9 +7,9 @@ import {
   drawRoughRect,
   drawPoly,
   drawStar,
-  drawCircularModule,
-  drawCircuitModule,
 } from './canvasHelpers';
+import { drawCircularModule, drawCircuitModule } from './modulePainters';
+import { SHAPE_SIZES } from './shapeSizes';
 
 interface MazeNode {
   r: number;
@@ -452,22 +452,22 @@ function drawModuleHaloPath(
 
   switch (style) {
     case QRStyle.SWISS:
-      drawCircularModule(ctx, cx, cy, cellSize, 1.15);
+      drawCircularModule(ctx, cx, cy, cellSize, SHAPE_SIZES.swiss.halo);
       break;
 
     case QRStyle.FLUID:
-      drawCircularModule(ctx, cx, cy, cellSize, 1.22);
+      drawCircularModule(ctx, cx, cy, cellSize, SHAPE_SIZES.fluid.halo);
       break;
 
     case QRStyle.HIVE: {
-      const rHiveHalo = cellSize / 1.40;
+      const rHiveHalo = cellSize / SHAPE_SIZES.hive.halo;
       drawPoly(ctx, cx, cy, rHiveHalo, 6, 0, false, true);
       break;
     }
 
     case QRStyle.STARBURST: {
-      const outerRHalo = cellSize / 1.35;
-      const innerRHalo = cellSize / 2.0;
+      const outerRHalo = cellSize / SHAPE_SIZES.starburst.halo.outer;
+      const innerRHalo = cellSize / SHAPE_SIZES.starburst.halo.inner;
       drawStar(ctx, cx, cy, outerRHalo, innerRHalo, 5, false, true);
       break;
     }

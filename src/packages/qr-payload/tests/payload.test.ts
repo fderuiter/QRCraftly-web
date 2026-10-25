@@ -19,7 +19,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatPayload,
-  parsePayload,
   validatePayload,
   validateConfig,
   sanitizeConfig,
@@ -152,56 +151,43 @@ describe('qr-payload Package Seam', () => {
     });
   });
 
-  describe('parsePayload', () => {
-    it('parses with explicit QRType', () => {
-      const wifi = parsePayload(
-        QRType.WIFI,
-        'WIFI:T:WPA;S:MyNetwork;P:myPassword;;'
-      );
+  describe('hydrating through the registry', () => {
+    it('hydrates with an explicit QRType', () => {
+      const wifi = QR_GENERATORS[QRType.WIFI].hydrate('WIFI:T:WPA;S:MyNetwork;P:myPassword;;');
       expect(wifi.ssid).toBe('MyNetwork');
       expect(wifi.password).toBe('myPassword');
       expect(wifi.encryption).toBe(WifiEncryption.WPA);
     });
 
-    it('disambiguates 2-argument overload when second arg is undefined or empty', () => {
-      const wifi = parsePayload(QRType.WIFI, undefined as any);
-      expect(wifi).toBeDefined();
-      expect(wifi.ssid).toBe('');
-
-      const nullWifi = parsePayload(QRType.WIFI, null as any);
-      expect(nullWifi).toBeDefined();
-      expect(nullWifi.ssid).toBe('');
+    it('hydrates an empty payload to empty fields', () => {
+      expect(QR_GENERATORS[QRType.WIFI].hydrate('').ssid).toBe('');
     });
 
-    it('recovers gracefully if hydration throws an error in polymorphic mode', () => {
+    it('refuses a payload with control characters', () => {
       const controlWifi = 'WIFI:S:Test\x00;P:pass;;';
-      const parsed = parsePayload(controlWifi);
-      expect(parsed.type).toBe(QRType.WIFI);
-      expect(parsed.data).toEqual({ text: controlWifi });
+      expect(identifyProtocol(controlWifi)).toBe(QRType.WIFI);
+      expect(() => QR_GENERATORS[QRType.WIFI].hydrate(controlWifi)).toThrow();
     });
 
-    it('parses polymorphically by detecting protocol from raw string', () => {
-      const parsed = parsePayload('WIFI:T:WPA;S:MyNetwork;P:myPassword;;');
-      expect(parsed.type).toBe(QRType.WIFI);
-      expect(parsed.data.ssid).toBe('MyNetwork');
+    it('hydrates the detected protocol of a raw string', () => {
+      const wifi = 'WIFI:T:WPA;S:MyNetwork;P:myPassword;;';
+      expect(identifyProtocol(wifi)).toBe(QRType.WIFI);
+      expect(QR_GENERATORS[QRType.WIFI].hydrate(wifi).ssid).toBe('MyNetwork');
 
-      const parsedGeo = parsePayload('geo:37.7749,-122.4194');
-      expect(parsedGeo.type).toBe(QRType.LOCATION);
-      expect(parsedGeo.data.latitude).toBe('37.7749');
-      expect(parsedGeo.data.longitude).toBe('-122.4194');
+      const geo = 'geo:37.7749,-122.4194';
+      expect(identifyProtocol(geo)).toBe(QRType.LOCATION);
+      expect(QR_GENERATORS[QRType.LOCATION].hydrate(geo)).toMatchObject({ latitude: '37.7749', longitude: '-122.4194' });
 
-      const parsedUrl = parsePayload('https://qrcraftly.com');
-      expect(parsedUrl.type).toBe(QRType.URL);
-      expect(parsedUrl.data.url).toBe('https://qrcraftly.com');
+      const url = 'https://qrcraftly.com';
+      expect(identifyProtocol(url)).toBe(QRType.URL);
+      expect(QR_GENERATORS[QRType.URL].hydrate(url).url).toBe('https://qrcraftly.com');
 
-      const parsedText = parsePayload('Just some plain text');
-      expect(parsedText.type).toBe(QRType.TEXT);
-      expect(parsedText.data.text).toBe('Just some plain text');
+      expect(identifyProtocol('Just some plain text') || QRType.TEXT).toBe(QRType.TEXT);
+      expect(QR_GENERATORS[QRType.TEXT].hydrate('Just some plain text').text).toBe('Just some plain text');
     });
 
-    it('returns null when explicit type generator is missing', () => {
-      const result = parsePayload('INVALID_TYPE' as any, 'some text');
-      expect(result).toBeNull();
+    it('has no contract for an unknown type', () => {
+      expect(Object.prototype.hasOwnProperty.call(QR_GENERATORS, 'INVALID_TYPE')).toBe(false);
     });
   });
 

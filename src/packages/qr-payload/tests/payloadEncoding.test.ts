@@ -43,7 +43,8 @@ import {
   hydratePaymentData,
   constructWifiString,
   hydrateWifiData,
-  parsePayload,
+  identifyProtocol,
+  QR_GENERATORS,
 } from '../index';
 import { CryptoNetwork, type EventData, type VCardData } from '../index';
 import { QRType, type WifiData, WifiEapMethod, WifiEapPhase2, WifiEncryption } from '@/packages/core/types';
@@ -338,18 +339,22 @@ describe('#974 case 7: WPA2-EAP emits E: and PH2:', () => {
   });
 
   it('parses scanned enterprise payloads through the registry', () => {
-    const parsed = parsePayload('WIFI:T:WPA2-EAP;S:X;E:ttls;PH2:gtc;I:u;P:p;;');
-    expect(parsed.type).toBe(QRType.WIFI);
-    expect(parsed.data).toMatchObject({
+    const raw = 'WIFI:T:WPA2-EAP;S:X;E:ttls;PH2:gtc;I:u;P:p;;';
+    expect(identifyProtocol(raw)).toBe(QRType.WIFI);
+    expect(QR_GENERATORS[QRType.WIFI].hydrate(raw)).toMatchObject({
       eapMethod: WifiEapMethod.TTLS,
       eapPhase2: WifiEapPhase2.GTC,
       eapIdentity: 'u',
     });
   });
 
-  it('round-trips tel:, mailto: and ethereum: through parsePayload', () => {
-    expect(parsePayload(QRType.PHONE, constructPhoneString({ number: '*#06#' }))).toEqual({ number: '*#06#' });
-    expect(parsePayload('mailto:a@b.com%3Fx?subject=&body=').data.email).toBe('a@b.com?x');
-    expect(parsePayload('ethereum:0xabc?value=250000000000000000').data.amount).toBe('0.25');
+  it('round-trips tel:, mailto: and ethereum: through the registry', () => {
+    expect(QR_GENERATORS[QRType.PHONE].hydrate(constructPhoneString({ number: '*#06#' }))).toEqual({ number: '*#06#' });
+    const mailto = 'mailto:a@b.com%3Fx?subject=&body=';
+    expect(identifyProtocol(mailto)).toBe(QRType.EMAIL);
+    expect(QR_GENERATORS[QRType.EMAIL].hydrate(mailto).email).toBe('a@b.com?x');
+    const ethereum = 'ethereum:0xabc?value=250000000000000000';
+    expect(identifyProtocol(ethereum)).toBe(QRType.PAYMENT);
+    expect(QR_GENERATORS[QRType.PAYMENT].hydrate(ethereum).amount).toBe('0.25');
   });
 });

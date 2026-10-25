@@ -19,7 +19,6 @@
 // High-level polymorphic API seam
 export {
   formatPayload,
-  parsePayload,
   validatePayload,
   QR_GENERATORS,
   type QRPayloadDataMap,

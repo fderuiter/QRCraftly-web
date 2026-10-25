@@ -18,7 +18,6 @@
 
 import type { QRConfig } from '@/packages/core/types';
 import type { LogoMetrics } from './utils';
-import { drawLogoBackground } from './canvasHelpers';
 
 export const renderLogo = (
   ctx: CanvasRenderingContext2D,
@@ -48,3 +47,32 @@ export const renderLogo = (
   }
 };
 
+/**
+ * Draws a circular or rectangular logo background padding mask.
+ * @param ctx The canvas context.
+ * @param displaySize The full display size of the canvas.
+ * @param logoSizePx The width/height of the logo.
+ * @param logoPaddingPx The size of the padding around the logo.
+ * @param paddingStyle The style of padding ('circle' or 'square').
+ * @param backgroundColor The fill color.
+ */
+export const drawLogoBackground = (
+  ctx: CanvasRenderingContext2D,
+  displaySize: number,
+  logoSizePx: number,
+  logoPaddingPx: number,
+  paddingStyle: 'circle' | 'square' | string,
+  backgroundColor: string
+) => {
+  ctx.fillStyle = backgroundColor;
+  if (paddingStyle === 'circle') {
+    ctx.beginPath();
+    const radius = (logoSizePx / 2) + logoPaddingPx;
+    ctx.arc(displaySize / 2, displaySize / 2, radius, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    const lx = (displaySize - logoSizePx) / 2;
+    const ly = (displaySize - logoSizePx) / 2;
+    ctx.fillRect(lx - logoPaddingPx, ly - logoPaddingPx, logoSizePx + (logoPaddingPx * 2), logoSizePx + (logoPaddingPx * 2));
+  }
+};
