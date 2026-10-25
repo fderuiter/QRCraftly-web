@@ -20,9 +20,10 @@ import type { QRConfig } from '@/packages/core/types';
 import { drawEyeFrame, drawEyeball, EYE_POSITIONS, type EyePosition } from './eyeShapes';
 import { type ModuleRenderOptions, sampleCellLuminances } from './modules';
 import { getLuminance } from '@/packages/core/encoding';
+import type { RenderSurface } from './surface';
 
 export const renderEyes = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   config: QRConfig,
   drawX: number,
   drawY: number,

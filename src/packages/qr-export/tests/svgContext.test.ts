@@ -22,7 +22,7 @@ import { drawRoundRect } from '@/packages/qr-matrix/canvas';
 
 /** Draws a rounded rect the way production does: the shared helper, on the SVG context. */
 const roundRect = (ctx: SvgContext, x: number, y: number, w: number, h: number, r: number) =>
-  drawRoundRect(ctx as unknown as CanvasRenderingContext2D, x, y, w, h, r);
+  drawRoundRect(ctx, x, y, w, h, r);
 
 describe('SvgContext', () => {
   describe('serialize', () => {

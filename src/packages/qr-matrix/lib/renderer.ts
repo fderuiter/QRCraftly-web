@@ -26,6 +26,7 @@ import { renderMaze, type MazeData } from './maze';
 import { planMosaic, renderMosaic, DEFAULT_MOSAIC_OPTIONS } from './mosaic';
 import { getMosaicSource } from './mosaicSource';
 import { renderFrame } from './frame';
+import type { RenderSurface } from './surface';
 
 /**
  * Renders the QR code onto the canvas.
@@ -61,7 +62,7 @@ export const drawQR = (
     ctx.scale(pixelRatio, pixelRatio);
 
     drawQRInternal(
-      ctx as unknown as CanvasRenderingContext2D,
+      ctx,
       modules,
       config,
       logoImg,
@@ -94,7 +95,7 @@ export const drawQR = (
  * @param options Optional module rendering options.
  */
 export const drawQRInternal = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   modules: QRModules,
   config: QRConfig,
   logoImg: HTMLImageElement | null,

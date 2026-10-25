@@ -137,8 +137,8 @@ interface ContextState {
   strokeStyle: string | SvgRadialGradient | SvgLinearGradient;
   lineWidth: number;
   font: string;
-  textAlign: string;
-  textBaseline: string;
+  textAlign: CanvasTextAlign;
+  textBaseline: CanvasTextBaseline;
   dashArray: number[];
 }
 
@@ -166,6 +166,15 @@ function getMeasuringContext(): CanvasRenderingContext2D | OffscreenCanvasRender
   return null;
 }
 
+/** An image the SVG context can embed: anything with a `src` URL, such as a loaded logo. */
+export interface SvgImageRef {
+  src: string;
+  width?: number;
+  height?: number;
+  naturalWidth?: number;
+  naturalHeight?: number;
+}
+
 /**
  * A virtual 2D drawing context that captures canvas draw calls and produces
  * equivalent SVG XML. It implements the subset of CanvasRenderingContext2D
@@ -173,7 +182,7 @@ function getMeasuringContext(): CanvasRenderingContext2D | OffscreenCanvasRender
  *
  * Usage:
  *   const ctx = new SvgContext(1024, 1024);
- *   drawQRInternal(ctx as unknown as CanvasRenderingContext2D, ...);
+ *   drawQRInternal(ctx, ...);
  *   const svgString = ctx.serialize();
  */
 export class SvgContext {
@@ -182,8 +191,8 @@ export class SvgContext {
   strokeStyle: string | SvgRadialGradient | SvgLinearGradient = '#000000';
   lineWidth: number = 1;
   font: string = '10px sans-serif';
-  textAlign: string = 'start';
-  textBaseline: string = 'alphabetic';
+  textAlign: CanvasTextAlign = 'start';
+  textBaseline: CanvasTextBaseline = 'alphabetic';
 
   public title?: string;
   public description?: string;
@@ -496,12 +505,11 @@ export class SvgContext {
    * Supports standard 3-parameter, 5-parameter, and 9-parameter image drawing operations
    * and applies matrix transformations directly to preserve rotation, skew, and scaling.
    */
-  drawImage(
-    image: HTMLImageElement | { src: string; width?: number; height?: number; naturalWidth?: number; naturalHeight?: number },
-    ...args: number[]
-  ): void {
-    const href = image.src ?? '';
-    if (!href) return;
+  drawImage(image: CanvasImageSource | SvgImageRef, ...args: number[]): void {
+    // Only images with a URL can be embedded; a canvas or bitmap source draws nothing here.
+    const ref: SvgImageRef | null = 'src' in image && typeof image.src === 'string' ? image : null;
+    const href = ref?.src ?? '';
+    if (!ref || !href) return;
 
     let dx = 0;
     let dy = 0;
@@ -518,8 +526,8 @@ export class SvgContext {
       // 3-parameter: drawImage(image, dx, dy)
       dx = args[0];
       dy = args[1];
-      dw = image.naturalWidth || image.width || 0;
-      dh = image.naturalHeight || image.height || 0;
+      dw = ref.naturalWidth || ref.width || 0;
+      dh = ref.naturalHeight || ref.height || 0;
     } else if (args.length === 4) {
       // 5-parameter: drawImage(image, dx, dy, dw, dh)
       dx = args[0];
@@ -544,8 +552,8 @@ export class SvgContext {
     const tAttr = this._getTransformAttr();
 
     if (isSubImage) {
-      const imgWidth = image.naturalWidth || image.width || sw;
-      const imgHeight = image.naturalHeight || image.height || sh;
+      const imgWidth = ref.naturalWidth || ref.width || sw;
+      const imgHeight = ref.naturalHeight || ref.height || sh;
 
       if (tAttr) {
         this._elements.push(

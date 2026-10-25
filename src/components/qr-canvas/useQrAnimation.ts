@@ -147,18 +147,7 @@ export function useQrAnimation({
           if (currentDims.useTemplate) {
             ctx.save();
             ctx.scale(dims.pixelRatio, dims.pixelRatio);
-            drawWithTemplate(
-              ctx,
-              frame.modules,
-              currentConfig,
-              logoImgRef.current,
-              borderLogoImgRef.current,
-              dims.displayWidth,
-              dims.displayHeight,
-              frame.modules.size,
-              false,
-              mazeDataRef.current
-            );
+            drawWithTemplate(ctx, frame.modules, currentConfig, { logoImg: logoImgRef.current, borderLogoImg: borderLogoImgRef.current, width: dims.displayWidth, height: dims.displayHeight, moduleCount: frame.modules.size, mazeData: mazeDataRef.current });
             ctx.restore();
           } else {
             drawQR(ctx, frame.modules, currentConfig, logoImgRef.current, borderLogoImgRef.current, size, mazeDataRef.current);

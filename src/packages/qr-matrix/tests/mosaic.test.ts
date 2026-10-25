@@ -346,7 +346,7 @@ describe('drawQRInternal with a mosaic', () => {
   it('renders the mosaic instead of the pattern and eyes once the image is decoded', () => {
     storeMosaicSource(url, makeImage('stripes'));
     const svg = new SvgContext(300, 300);
-    drawQRInternal(svg as unknown as CanvasRenderingContext2D, modules, config, null, null, 300, modules.size, true);
+    drawQRInternal(svg, modules, config, null, null, 300, modules.size, true);
     const out = svg.serialize();
     const fills = new Set(Array.from(out.matchAll(/fill="(#[0-9a-f]{6})"/g), (m) => m[1]));
     // Stripes produce several tinted colours rather than the plain two-colour pattern.
@@ -355,7 +355,7 @@ describe('drawQRInternal with a mosaic', () => {
 
   it('falls back to the normal pattern while the image is not decoded', () => {
     const svg = new SvgContext(300, 300);
-    drawQRInternal(svg as unknown as CanvasRenderingContext2D, modules, config, null, null, 300, modules.size, true);
+    drawQRInternal(svg, modules, config, null, null, 300, modules.size, true);
     const fills = new Set(Array.from(svg.serialize().matchAll(/fill="(#[0-9a-f]{6})"/g), (m) => m[1]));
     expect(fills.size).toBeLessThanOrEqual(3);
   });

@@ -321,19 +321,7 @@ export async function generateQRSvg(
   const ctx = new SvgContext(svgWidth, svgHeight, title, description);
 
   try {
-    drawWithTemplate(
-      ctx as unknown as CanvasRenderingContext2D,
-      modules,
-      config,
-      logoImg,
-      borderLogoImg,
-      svgWidth,
-      svgHeight,
-      moduleCount,
-      true,
-      null,
-      options?.renderOptions
-    );
+    drawWithTemplate(ctx, modules, config, { logoImg, borderLogoImg, width: svgWidth, height: svgHeight, moduleCount, isVirtual: true, mazeData: null, renderOptions: options?.renderOptions });
   } catch (err) {
     console.warn('SVG QR generation failed:', err);
     throw err;

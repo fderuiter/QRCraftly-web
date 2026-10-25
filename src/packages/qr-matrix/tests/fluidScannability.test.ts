@@ -125,7 +125,7 @@ describe('Fluid Style Scannability & Optical Readability Suite', () => {
         expect(ctx.closePath).toHaveBeenCalled();
 
         const svgCtx = new SvgContext(displaySize, displaySize);
-        drawQRInternal(svgCtx as unknown as CanvasRenderingContext2D, modules, config, null, null, displaySize, moduleCount);
+        drawQRInternal(svgCtx, modules, config, null, null, displaySize, moduleCount);
         const svgOutput = svgCtx.serialize();
 
         expect(svgOutput).toContain('<path');

@@ -28,4 +28,5 @@ export {
   drawRoughRect,
   drawScribble,
 } from './lib/canvasHelpers';
+export type { RenderSurface } from './lib/surface';
 export { drawCircularModule, drawCircuitModule, drawStandardModule } from './lib/modulePainters';

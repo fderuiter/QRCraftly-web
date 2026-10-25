@@ -1436,8 +1436,8 @@ describe('QRCanvas Animation Loop', () => {
 
     expect(drawSpy).toHaveBeenCalled();
     const firstCallArgs = drawSpy.mock.calls[drawSpy.mock.calls.length - 1];
-    expect(firstCallArgs[5]).toBe(1024);
-    expect(firstCallArgs[6]).toBe(1024);
+    expect(firstCallArgs[3].width).toBe(1024);
+    expect(firstCallArgs[3].height).toBe(1024);
 
     // Mid-animation change socialFormat to PORTRAIT_4_5 (which normally computes height 1280 for size 1024)
     const updatedConfig: QRConfig = {
@@ -1458,8 +1458,8 @@ describe('QRCanvas Animation Loop', () => {
 
     const secondCallArgs = drawSpy.mock.calls[drawSpy.mock.calls.length - 1];
     // drawWithTemplate height should stay the start-time height (1024), not 1280
-    expect(secondCallArgs[5]).toBe(1024);
-    expect(secondCallArgs[6]).toBe(1024);
+    expect(secondCallArgs[3].width).toBe(1024);
+    expect(secondCallArgs[3].height).toBe(1024);
   });
 
   it('stops loop cleanly on component unmount and cancels next requestAnimationFrame', async () => {

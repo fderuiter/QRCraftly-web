@@ -23,6 +23,7 @@ import { SHAPE_SIZES } from './shapeSizes';
 import { getIsCoveredByLogo, type LogoMetrics, iterateMatrix } from './utils';
 import { getLuminance } from '@/packages/core/encoding';
 import { renderFluidModules, isFinderPattern } from './fluid';
+import type { RenderSurface } from './surface';
 
 export interface ModuleRenderOptions {
   /** Optional pre-sampled cell background relative luminance array (length = moduleCount * moduleCount). */
@@ -101,7 +102,7 @@ export function sampleCellLuminances(
 
 const getModuleDrawer = (
   style: QRStyle,
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   cellSize: number,
   modules: QRModules,
   moduleCount: number,
@@ -171,7 +172,7 @@ function getSharedFluidGrid(total: number): Uint8Array {
  * when config.gradientType is active ('linear' or 'radial').
  */
 export function createModuleGradient(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   config: QRConfig,
   drawX: number,
   drawY: number,
@@ -221,7 +222,7 @@ export function createModuleGradient(
 }
 
 export const renderModules = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   modules: QRModules,
   config: QRConfig,
   drawX: number,

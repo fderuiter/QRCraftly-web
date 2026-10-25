@@ -18,9 +18,10 @@
 
 import type { QRConfig } from '@/packages/core/types';
 import type { LogoMetrics } from './utils';
+import type { RenderSurface } from './surface';
 
 export const renderLogo = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   config: QRConfig,
   logoImg: HTMLImageElement | null,
   displaySize: number,
@@ -57,7 +58,7 @@ export const renderLogo = (
  * @param backgroundColor The fill color.
  */
 export const drawLogoBackground = (
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   displaySize: number,
   logoSizePx: number,
   logoPaddingPx: number,

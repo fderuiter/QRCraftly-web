@@ -19,6 +19,7 @@
 import type { QRConfig, FramePosition, FrameIcon, FrameFontFamily } from '@/packages/core/types';
 import type { LayoutMetrics } from './utils';
 import { drawRoundRect } from './canvasHelpers';
+import type { RenderSurface } from './surface';
 
 /**
  * CSS system font stacks for frame typography choices.
@@ -47,7 +48,7 @@ const ICON_PATHS: Record<Exclude<FrameIcon, 'none'>, string> = {
  * Parses and draws vector path command string onto canvas context.
  * Compatible with standard CanvasRenderingContext2D and SvgContext.
  */
-function drawPathData(ctx: CanvasRenderingContext2D, pathData: string): void {
+function drawPathData(ctx: RenderSurface, pathData: string): void {
   const tokens = pathData.trim().split(/[\s,]+/);
   ctx.beginPath();
   let i = 0;
@@ -92,7 +93,7 @@ function drawPathData(ctx: CanvasRenderingContext2D, pathData: string): void {
  * Draws an icon inside the frame CTA badge.
  */
 function drawIcon(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   icon: FrameIcon,
   x: number,
   y: number,
@@ -128,7 +129,7 @@ function drawIcon(
  * Keeps the matrix safe area and quiet zone intact.
  */
 export function renderFrame(
-  ctx: CanvasRenderingContext2D,
+  ctx: RenderSurface,
   config: QRConfig,
   displaySize: number,
   layout: LayoutMetrics
