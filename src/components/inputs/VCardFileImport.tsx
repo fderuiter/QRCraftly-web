@@ -18,12 +18,7 @@
 
 import React, { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { Upload } from 'lucide-react';
-import {
-  MAX_VCARD_FILE_BYTES,
-  VCARD_FILE_ERROR_MESSAGES,
-  readVCardFile,
-  type VCardData,
-} from '@/packages/qr-payload';
+import type { VCardData } from '@/packages/qr-payload';
 import { Button } from '../ui/Button';
 import { Alert } from '../ui/Alert';
 import { mergeClasses } from '../ui/styles';
@@ -48,6 +43,15 @@ export function VCardFileImport({ onImport }: VCardFileImportProps) {
 
   const readFile = async (file: File) => {
     setImportedName(null);
+    // The reader loads on the first file, so no page carries it in its first load.
+    let reader: typeof import('@/packages/qr-payload/vcardFile');
+    try {
+      reader = await import('@/packages/qr-payload/vcardFile');
+    } catch {
+      setError("The contact file reader didn't load. Check your connection and try again.");
+      return;
+    }
+    const { MAX_VCARD_FILE_BYTES, VCARD_FILE_ERROR_MESSAGES, readVCardFile } = reader;
     if (file.size > MAX_VCARD_FILE_BYTES) {
       setError(VCARD_FILE_ERROR_MESSAGES['too-large']);
       return;

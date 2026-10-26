@@ -17,7 +17,8 @@
 */
 
 import { describe, expect, it } from 'vitest';
-import { constructVCardString, readVCardFile, type VCardData, type VCardFileResult } from '../index';
+import { constructVCardString, type VCardData } from '../index';
+import { readVCardFile, type VCardFileResult } from '../vcardFile';
 
 const fieldsOf = (result: VCardFileResult) => {
   if (!result.ok) throw new Error(`expected fields, got ${result.error}`);
