@@ -634,3 +634,78 @@ describe('QRStore appearance history', () => {
     expect(next.result.current.getState().config.fgColor).toBe(DEFAULT_CONFIG.fgColor);
   });
 });
+
+describe('type preset logos in the store (#1554)', () => {
+  const LOGO = 'data:image/svg+xml;charset=utf-8,%3Csvg%3E%3C%2Fsvg%3E';
+  const OTHER = 'data:image/svg+xml;charset=utf-8,%3Csvg%20id%3D%22b%22%3E%3C%2Fsvg%3E';
+
+  afterEach(() => clearRetainedAppearance());
+
+  it('places a logo while none has been chosen, and leaves the error correction level alone', () => {
+    const { result } = renderHook(() => useQRStore(), { wrapper: wrapperWithConfig({ errorCorrectionLevel: QRErrorCorrectionLevel.L }) });
+    act(() => {
+      expect(result.current.placeTypeLogo(LOGO)).toBe(true);
+    });
+    expect(result.current.getState().config.logoUrl).toBe(LOGO);
+    expect(result.current.getState().config.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.L);
+    expect(result.current.getState().logoChosen).toBe(false);
+    act(() => {
+      expect(result.current.placeTypeLogo(OTHER)).toBe(true);
+      expect(result.current.placeTypeLogo(OTHER)).toBe(false);
+      expect(result.current.placeTypeLogo(null)).toBe(true);
+    });
+    expect(result.current.getState().config.logoUrl).toBeNull();
+  });
+
+  it('never replaces a logo the person picked or removed', () => {
+    const { result } = renderHook(() => useQRStore(), { wrapper });
+    act(() => result.current.updateConfig({ logoUrl: LOGO, errorCorrectionLevel: QRErrorCorrectionLevel.H }));
+    expect(result.current.getState().logoChosen).toBe(true);
+    act(() => {
+      expect(result.current.placeTypeLogo(OTHER)).toBe(false);
+      result.current.updateConfig({ logoUrl: null });
+      expect(result.current.placeTypeLogo(OTHER)).toBe(false);
+    });
+    expect(result.current.getState().config.logoUrl).toBeNull();
+  });
+
+  it('treats a logo the route starts with as chosen', () => {
+    const { result } = renderHook(() => useQRStore(), { wrapper: wrapperWithConfig({ logoUrl: LOGO }) });
+    expect(result.current.getState().logoChosen).toBe(true);
+    act(() => {
+      expect(result.current.placeTypeLogo(OTHER)).toBe(false);
+    });
+  });
+
+  it('makes a placed logo an undo step, and undoing it stops further logos', () => {
+    const { result } = renderHook(() => useQRStore(), { wrapper });
+    act(() => {
+      result.current.placeTypeLogo(LOGO);
+    });
+    expect(result.current.getState().canUndo).toBe(true);
+    act(() => {
+      result.current.undo();
+    });
+    expect(result.current.getState().config.logoUrl).toBeNull();
+    expect(result.current.getState().logoChosen).toBe(true);
+    act(() => {
+      expect(result.current.placeTypeLogo(OTHER)).toBe(false);
+    });
+  });
+
+  it('carries whether the logo was chosen to the next generator route, with the retained appearance', () => {
+    const retained = ({ children }: { children: React.ReactNode }) => <QRProvider retainAppearance>{children}</QRProvider>;
+    const first = renderHook(() => useQRStore(), { wrapper: retained });
+    act(() => {
+      first.result.current.placeTypeLogo(LOGO);
+    });
+    first.unmount();
+    const second = renderHook(() => useQRStore(), { wrapper: retained });
+    expect(second.result.current.getState().config.logoUrl).toBe(LOGO);
+    expect(second.result.current.getState().logoChosen).toBe(false);
+    act(() => second.result.current.updateConfig({ logoUrl: OTHER }));
+    second.unmount();
+    const third = renderHook(() => useQRStore(), { wrapper: retained });
+    expect(third.result.current.getState().logoChosen).toBe(true);
+  });
+});

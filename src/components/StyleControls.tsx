@@ -23,7 +23,6 @@ import type { LandingPrimaryAction } from '../data/landingPages';
 import {
   PatternControls,
   ColorControls,
-  LogoControls,
   MosaicControls,
   AdvancedControls
 } from './style-controls';
@@ -41,6 +40,8 @@ const StyleGallery = lazy(() => import('./style-controls/StyleGallery'));
 const LayoutControls = lazy(() => import('./style-controls/LayoutControls').then((module) => ({ default: module.LayoutControls })));
 const BorderControls = lazy(() => import('./style-controls/BorderControls').then((module) => ({ default: module.BorderControls })));
 const FrameControls = lazy(() => import('./style-controls/FrameControls').then((module) => ({ default: module.FrameControls })));
+// The preset logo gallery and its SVG marks load when the Logo section first opens (#1554).
+const LogoControls = lazy(() => import('./style-controls/LogoControls').then((module) => ({ default: module.LogoControls })));
 
 // Templates starts closed on every page, so its gallery loads when the section is first opened.
 const BrandTemplateGallery = lazy(() => import('./style-controls/BrandTemplateGallery').then((module) => ({ default: module.BrandTemplateGallery })));
@@ -102,6 +103,8 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
   const [templatesOpened, setTemplatesOpened] = useState(sectionOpenState.get('Templates') ?? false);
   const layoutOpenAtStart = sectionOpenState.get('Layout & Border') ?? presetOpen.includes('Layout & Border');
   const [layoutOpened, setLayoutOpened] = useState(layoutOpenAtStart);
+  const logoOpenAtStart = sectionOpenState.get('Logo') ?? presetOpen.includes('Logo');
+  const [logoOpened, setLogoOpened] = useState(logoOpenAtStart);
   // Each press of the call to action counts up, so the section reopens even after the person closed it.
   const [openRequest, setOpenRequest] = useState<{ section: string; count: number } | null>(null);
   const requestFor = (title: string) => (openRequest?.section === title ? openRequest.count : undefined);
@@ -199,9 +202,22 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
         )}
       </AccordionItem>
 
-      <AccordionItem title="Logo" headingLevel={3} defaultOpen={sectionOpenState.get('Logo') ?? presetOpen.includes('Logo')} onOpenChange={rememberSection('Logo')} openRequest={requestFor('Logo')}>
+      <AccordionItem
+        title="Logo"
+        headingLevel={3}
+        defaultOpen={logoOpenAtStart}
+        onOpenChange={(open) => {
+          rememberSection('Logo')(open);
+          if (open) setLogoOpened(true);
+        }}
+        openRequest={requestFor('Logo')}
+      >
         <div className="pt-1">
-          <LogoControls config={config} onChange={onChange} />
+          {logoOpened && (
+            <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+              <LogoControls config={config} onChange={onChange} />
+            </Suspense>
+          )}
           <div className="border-t border-line pt-5">
             <MosaicControls config={config} onChange={onChange} />
           </div>

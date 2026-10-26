@@ -45,6 +45,11 @@ export type QRState = {
    * accepted content, so the preview and exports must not use it until the field is fixed (#1279).
    */
   contentRefused: boolean;
+  /**
+   * Whether the person has picked, uploaded or removed a logo themselves, or the route started
+   * with one (#1554). Until then, switching the QR type places that type's preset logo.
+   */
+  logoChosen: boolean;
   /** Whether an appearance change can be undone. */
   canUndo: boolean;
   /** Whether an undone appearance change can be redone. */
@@ -58,6 +63,11 @@ export interface UpdateConfigOptions {
    * step, for example a hover preview.
    */
   history?: 'push' | 'skip';
+  /**
+   * The generator made this change on its own (a type's preset logo, #1554), so it does not count
+   * as the person choosing a logo. Undoing it does, and stops further automatic logos.
+   */
+  automatic?: boolean;
 }
 
 /**
@@ -82,6 +92,12 @@ export interface QRStore {
    * Pass null to restore what was showing before the preview.
    */
   preview: (updates: Partial<QRConfig> | null) => void;
+  /**
+   * Shows a QR type's preset logo, or removes the one shown for the previous type, unless the
+   * person has chosen a logo (#1554). The error correction level is left as it is.
+   * Returns whether the logo changed.
+   */
+  placeTypeLogo: (logoUrl: string | null) => boolean;
   /** Records the rendered matrix module count. */
   setModuleCount: (count: number) => void;
   /** Sets the scannability fallback flag. */
@@ -127,6 +143,8 @@ const NON_RETAINED_FIELDS: ReadonlySet<keyof QRConfig> = new Set<keyof QRConfig>
  * navigation between generator routes. Never persisted: a reload or new tab starts fresh.
  */
 let retainedAppearance: Partial<QRConfig> | null = null;
+/** Whether the retained logo was the person's choice rather than a type's preset (#1554). */
+let retainedLogoChosen = false;
 
 function pickAppearance(config: QRConfig): Partial<QRConfig> {
   const appearance: Partial<QRConfig> = {};
@@ -143,6 +161,7 @@ function pickAppearance(config: QRConfig): Partial<QRConfig> {
  */
 export function clearRetainedAppearance(): void {
   retainedAppearance = null;
+  retainedLogoChosen = false;
 }
 
 /**
@@ -174,7 +193,17 @@ function sameAppearance(a: Partial<QRConfig>, b: Partial<QRConfig>): boolean {
   return keys.every(key => Object.is(a[key], b[key]));
 }
 
+/** One undo or redo step: the appearance to restore, and whether the change it undoes was automatic. */
+interface HistoryStep {
+  appearance: Partial<QRConfig>;
+  automatic: boolean;
+}
+
 function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = false, presetConfig?: Partial<QRConfig>): QRStore {
+  const retained = retainAppearance ? retainedAppearance : null;
+  // A logo the route or a landing page starts with is a choice; one retained from an earlier route
+  // is a choice only if the person made it there.
+  const logoChosen = Boolean(initialConfig?.logoUrl || presetConfig?.logoUrl || (retained?.logoUrl && retainedLogoChosen));
   let state: QRState = {
     config: {
       ...DEFAULT_CONFIG,
@@ -186,13 +215,14 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
     moduleCount: 0,
     isScannabilityFallbackActive: false,
     contentRefused: false,
+    logoChosen,
     canUndo: false,
     canRedo: false,
   };
 
   // Undo history holds appearance snapshots in memory only (never persisted).
-  let past: Partial<QRConfig>[] = [];
-  let future: Partial<QRConfig>[] = [];
+  let past: HistoryStep[] = [];
+  let future: HistoryStep[] = [];
   let lastPush: { keys: string; at: number } | null = null;
   let previewBase: Partial<QRConfig> | null = null;
 
@@ -216,7 +246,9 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
     },
     updateConfig: (updates, options) => {
       const sanitized = sanitizeConfig({ ...state.config, ...updates });
-      if (shallowEqualConfig(sanitized, state.config)) return;
+      const automatic = options?.automatic === true;
+      const nextLogoChosen = state.logoChosen || (!automatic && 'logoUrl' in updates);
+      if (shallowEqualConfig(sanitized, state.config) && nextLogoChosen === state.logoChosen) return;
       const before = pickAppearance(state.config);
       const after = pickAppearance(sanitized);
       const appearanceChanged = !sameAppearance(before, after);
@@ -226,16 +258,20 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
         const now = Date.now();
         const coalesce = lastPush !== null && lastPush.keys === keys && now - lastPush.at < COALESCE_MS && past.length > 0;
         if (!coalesce) {
-          past = [...past.slice(-(MAX_HISTORY_STEPS - 1)), before];
+          past = [...past.slice(-(MAX_HISTORY_STEPS - 1)), { appearance: before, automatic }];
         }
         lastPush = { keys, at: now };
         future = [];
       }
-      if (retainAppearance && previewBase === null) retainedAppearance = after;
+      if (retainAppearance && previewBase === null) {
+        retainedAppearance = after;
+        retainedLogoChosen = nextLogoChosen;
+      }
       const resetsFallback = FALLBACK_RESET_FIELDS.some(key => !Object.is(sanitized[key], state.config[key]));
       setState({
         ...state,
         config: sanitized,
+        logoChosen: nextLogoChosen,
         isScannabilityFallbackActive: resetsFallback ? false : state.isScannabilityFallbackActive,
         canUndo: past.length > 0,
         canRedo: future.length > 0,
@@ -245,23 +281,33 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
       const target = past[past.length - 1];
       if (!target) return false;
       past = past.slice(0, -1);
-      future = [...future, pickAppearance(state.config)];
+      future = [...future, { appearance: pickAppearance(state.config), automatic: target.automatic }];
       lastPush = null;
-      const sanitized = sanitizeConfig({ ...state.config, ...target });
-      if (retainAppearance) retainedAppearance = pickAppearance(sanitized);
-      setState({ ...state, config: sanitized, canUndo: past.length > 0, canRedo: true });
+      const sanitized = sanitizeConfig({ ...state.config, ...target.appearance });
+      // Undoing an automatic logo is the person saying no to it, so no further logo is placed.
+      const nextLogoChosen = state.logoChosen || target.automatic;
+      if (retainAppearance) {
+        retainedAppearance = pickAppearance(sanitized);
+        retainedLogoChosen = nextLogoChosen;
+      }
+      setState({ ...state, config: sanitized, logoChosen: nextLogoChosen, canUndo: past.length > 0, canRedo: true });
       return true;
     },
     redo: () => {
       const target = future[future.length - 1];
       if (!target) return false;
       future = future.slice(0, -1);
-      past = [...past, pickAppearance(state.config)];
+      past = [...past, { appearance: pickAppearance(state.config), automatic: target.automatic }];
       lastPush = null;
-      const sanitized = sanitizeConfig({ ...state.config, ...target });
+      const sanitized = sanitizeConfig({ ...state.config, ...target.appearance });
       if (retainAppearance) retainedAppearance = pickAppearance(sanitized);
       setState({ ...state, config: sanitized, canUndo: true, canRedo: future.length > 0 });
       return true;
+    },
+    placeTypeLogo: (logoUrl) => {
+      if (state.logoChosen || previewBase !== null || state.config.logoUrl === logoUrl) return false;
+      store.updateConfig({ logoUrl }, { automatic: true });
+      return state.config.logoUrl === logoUrl;
     },
     preview: (updates) => {
       if (updates === null) {

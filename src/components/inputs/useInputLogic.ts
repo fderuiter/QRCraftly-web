@@ -19,6 +19,7 @@
 import { useState, useRef, useEffect, type ElementType } from "react";
 import { type QRConfig, QRType } from "@/packages/core/types";
 import { INPUT_REGISTRY, constructInput, hydrateInput, validateInput, type InputDataMap, type InputProps } from "./InputRegistry";
+import { useTypePresetLogo } from "./useTypePresetLogo";
 
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
 const COMMIT_DELAY_MS = 100;
@@ -94,6 +95,8 @@ export function useInputLogic(
   const prevTypeRef = useRef<QRType | null>(null);
   // When the last edit was written, so an edit after a quiet spell is written at once.
   const lastEditAtRef = useRef(Number.NEGATIVE_INFINITY);
+
+  useTypePresetLogo(config.type);
 
   // Synchronize input states reactively when config changes externally (e.g., undo/redo or preset loaded)
   useEffect(() => {

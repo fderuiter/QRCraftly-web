@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { QRType } from '@/packages/core/types';
+
 export interface PresetLogo {
   id: string;
   label: string;
@@ -178,3 +180,29 @@ export const PRESET_LOGOS: PresetLogo[] = [
     `),
   },
 ];
+
+/**
+ * The preset logo each QR type shows when the person switches to it, by preset id (#1554).
+ * Types without an entry show none: links and plain text stay unbranded, there is no Wi-Fi, event
+ * or batch mark, and a link logo on the default type would change every first visit.
+ */
+export const TYPE_TO_PRESET_LOGO: Partial<Record<QRType, PresetLogo['id']>> = {
+  [QRType.EMAIL]: 'email',
+  [QRType.PHONE]: 'phone',
+  [QRType.SMS]: 'chat',
+  [QRType.LOCATION]: 'location',
+  [QRType.VCARD]: 'profile',
+  [QRType.PAYMENT]: 'card',
+  [QRType.SOCIAL]: 'network',
+  [QRType.MEETING]: 'video',
+};
+
+/**
+ * The preset logo for a QR type.
+ * @param type - The QR type.
+ * @returns Its preset, or undefined when the type has none.
+ */
+export function presetLogoForType(type: QRType): PresetLogo | undefined {
+  const id = TYPE_TO_PRESET_LOGO[type];
+  return id === undefined ? undefined : PRESET_LOGOS.find((preset) => preset.id === id);
+}
