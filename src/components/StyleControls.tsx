@@ -23,7 +23,6 @@ import type { LandingPrimaryAction } from '../data/landingPages';
 import {
   PatternControls,
   ColorControls,
-  LogoControls,
   MosaicControls,
   AdvancedControls
 } from './style-controls';
@@ -41,6 +40,10 @@ const StyleGallery = lazy(() => import('./style-controls/StyleGallery'));
 const LayoutControls = lazy(() => import('./style-controls/LayoutControls').then((module) => ({ default: module.LayoutControls })));
 const BorderControls = lazy(() => import('./style-controls/BorderControls').then((module) => ({ default: module.BorderControls })));
 const FrameControls = lazy(() => import('./style-controls/FrameControls').then((module) => ({ default: module.FrameControls })));
+
+// The logo panel carries the preset marks' markup, so it loads with the Logo section rather than
+// with every page (#1554).
+const LogoControls = lazy(() => import('./style-controls/LogoControls').then((module) => ({ default: module.LogoControls })));
 
 // Templates starts closed on every page, so its gallery loads when the section is first opened.
 const BrandTemplateGallery = lazy(() => import('./style-controls/BrandTemplateGallery').then((module) => ({ default: module.BrandTemplateGallery })));
@@ -201,7 +204,9 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
 
       <AccordionItem title="Logo" headingLevel={3} defaultOpen={sectionOpenState.get('Logo') ?? presetOpen.includes('Logo')} onOpenChange={rememberSection('Logo')} openRequest={requestFor('Logo')}>
         <div className="pt-1">
-          <LogoControls config={config} onChange={onChange} />
+          <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+            <LogoControls config={config} onChange={onChange} />
+          </Suspense>
           <div className="border-t border-line pt-5">
             <MosaicControls config={config} onChange={onChange} />
           </div>

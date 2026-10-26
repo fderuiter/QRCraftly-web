@@ -75,4 +75,3 @@ export function buildPresetColorPatch(
  */
 export const MIN_CONTRAST_THRESHOLD = 4.5;
 
-export * from './constants/presetLogos';
