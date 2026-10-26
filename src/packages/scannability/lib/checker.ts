@@ -18,7 +18,8 @@
 
 import type { QrRead, QrReadOptions, QrReader } from '@/packages/qr-decode';
 import { isDangerousUrl } from '@/packages/core/security';
-import { simulatePrint, type OpticalScratchBuffers, type PixelFrame } from './opticalSimulation';
+import type { OpticalScratchBuffers, PixelFrame } from './opticalSimulation';
+import { runPrintSimulation } from './printKernel';
 import { auditModuleContrast } from './contrastAudit';
 
 export type { OpticalScratchBuffers, PixelFrame } from './opticalSimulation';
@@ -132,7 +133,7 @@ export function* scannabilitySteps(
   yield;
 
   // 2. Optical print simulation, in module units around the code the digital check found (#1248)
-  const printed = simulatePrint(page, digital, scratch);
+  const printed = runPrintSimulation(page, digital, scratch);
 
   yield;
 

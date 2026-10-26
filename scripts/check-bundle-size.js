@@ -55,6 +55,8 @@ export const WASM_MODULE_BUDGETS_KB = {
   // 52 KB since slanted tear cuts (ADR 0049) took it to about 49.2 KB. It loads only for file transfer.
   modem: 52,
   'excel-parse': 30,
+  // About 4.3 KB under #1556. Only the Scannability Worker and the on-demand pixel check fetch it.
+  'optical-sim': 6,
 };
 
 /**

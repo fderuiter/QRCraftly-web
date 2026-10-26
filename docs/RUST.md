@@ -30,6 +30,7 @@ crates/
   rust-toolchain.toml   the pinned Rust version
   core/                 qrcraftly-core: GF(256), Reed-Solomon, CRC-32, the QR tables, the ABI and the module allocator
   modem/                QRCraftly Optical's kernels (#1198), loaded by src/packages/optical-modem/lib/kernels.ts
+  optical-sim/          the print simulation of the scannability check (#1556), loaded by src/packages/scannability/lib/opticalSimKernel.ts
   prism-fec/            Prism's outer code (#1176), loaded by src/packages/optical-transfer/lib/fec
   qr-decode/            the QR decoder (#1178), loaded by src/packages/qr-decode
   qr-encode/            the QR encoder (#1177), loaded by src/packages/qr-matrix
