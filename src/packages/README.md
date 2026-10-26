@@ -89,6 +89,7 @@ The rule has no exceptions. The move into `core` and the packages finished in #1
 - **Entry Points**:
   - `index.ts`: Polymorphic `formatPayload` and `validatePayload` (hydrate through `QR_GENERATORS[type].hydrate`), config validators `validateConfig` and `sanitizeConfig`, protocol parser `identifyProtocol`, `canHydrate`, RFC escaping helpers, and typed generator contracts (`WifiContract`, `EmailContract`, `VCardContract`, etc.).
   - Bulk CSV payload rules (#1599): the RFC 4180 CSV parser (`parseCsv`, `CsvParseError`, row and size limits), `encodeBulkCell` and the live preview row (`previewRow`, `pickColumn`, `hasPayload`). The `bulk-csv` package builds the batch on top of them.
+  - `vcardFile.ts`: the contact file reader (#1558): `readVCardFile` turns a `.vcf` file's first card (vCard 2.1, 3.0 or 4.0) into the vCard form's fields, with `MAX_VCARD_FILE_BYTES` and `VCARD_FILE_ERROR_MESSAGES`. The form loads this entry with `import()` when a file is dropped or chosen, so it stays out of every page's first load.
 
 ### `optical-transfer` (`@/packages/optical-transfer`)
 

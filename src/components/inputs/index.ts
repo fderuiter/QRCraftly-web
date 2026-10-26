@@ -15,5 +15,4 @@ export * from './TypeSelector';
 export * from './UrlInput';
 export * from './useInputLogic';
 export * from './VCardInput';
-export * from './LazyVCardInput';
 export * from './WifiInput';
