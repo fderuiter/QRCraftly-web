@@ -31,7 +31,7 @@ Anyone who scans a code can read what is in it. Keeping a code private is up to 
 QRCraftly has no analytics, telemetry, diagnostics or logs of its own. The site is static files served by Cloudflare (Workers Static Assets, with no server code of ours).
 
 - Cloudflare handles every request for a page or file. Like any web host it processes the IP address, browser user agent, page address (such as `/` or `/about`) and time, to deliver the site and protect it from attacks, under [Cloudflare's privacy policy](https://www.cloudflare.com/privacypolicy/). The project owner sees only totals such as request counts in the Cloudflare dashboard.
-- If Cloudflare's bot protection is switched on, it may set a short-lived security cookie. It is not used for tracking.
+- If Cloudflare ever challenges your browser, for example during an attack, it may set a short-lived security cookie. It is not used for tracking.
 
 What is never part of a request:
 

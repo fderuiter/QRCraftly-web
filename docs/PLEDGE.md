@@ -22,7 +22,7 @@ The same text is published at [qrcraftly.com/free-forever](https://qrcraftly.com
 What is seen or stored:
 
 - Cloudflare, which hosts the site, handles each request for a page or file. Like any web host it sees your IP address, browser user agent, the page address and the time, uses them to deliver the site and block attacks, and shows us only aggregate totals such as request counts.
-- If Cloudflare's bot protection is switched on, it may set a short-lived security cookie. It is not used for tracking.
+- If Cloudflare ever challenges your browser, for example during an attack, it may set a short-lived security cookie. It is not used for tracking.
 - Your light or dark theme choice is saved in your own browser (`qrcraftly:theme`) so the site remembers it. It never leaves your device.
 - Brand templates you choose to save are kept in your own browser too (`qrcraftly:brand-templates`, at most 50). They hold only style settings such as colors, patterns and borders, never your content or uploaded images, and never leave your device.
 - If you use your own Google Wallet keys to save a pass, the pass, including the code's content, goes to Google only when you choose Continue to Google Wallet, and Google keeps it in your Google account. QRCraftly never sees it.
