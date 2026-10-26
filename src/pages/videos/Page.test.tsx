@@ -17,7 +17,7 @@
 */
 
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { SITE_VIDEOS } from '@/data/videos';
 import Page from './+Page';
@@ -39,7 +39,8 @@ describe('Videos page', () => {
     }
   });
 
-  it('swaps in the native player with captions when play is pressed, and focuses it', () => {
+  it('swaps in the native player with captions when play is pressed, focuses it and starts it once', () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
     const { container } = render(<Page />);
     const [first, second] = SITE_VIDEOS;
     fireEvent.click(screen.getByRole('button', { name: `Play ${second.title}` }));
@@ -47,12 +48,16 @@ describe('Videos page', () => {
     expect(players).toHaveLength(1);
     const player = players[0];
     expect(player).toHaveAttribute('controls');
+    expect(player).toHaveAttribute('preload', 'none');
+    expect(player).not.toHaveAttribute('autoplay');
+    expect(play).toHaveBeenCalledTimes(1);
     expect(player).toHaveAttribute('aria-labelledby', `${second.id}-title`);
     expect(player.querySelector('source')).toHaveAttribute('src', `/media/${second.id}.mp4`);
     expect(player.querySelector('track[kind="captions"]')).toHaveAttribute('src', `/media/${second.id}.vtt`);
     expect(player).toHaveFocus();
     expect(screen.queryByRole('button', { name: `Play ${second.title}` })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: `Play ${first.title}` })).toBeInTheDocument();
+    play.mockRestore();
   });
 
   it('names each player by its title', () => {

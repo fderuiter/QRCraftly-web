@@ -21,6 +21,8 @@ export const SAMPLE_ROUTES = [
   '/file-transfer',
   '/security',
   '/arcade',
+  // The media grid: 12 more videos took it under the performance floor unseen (#1666).
+  '/videos',
 ];
 
 /**

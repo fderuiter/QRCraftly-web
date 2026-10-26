@@ -27,22 +27,26 @@ import { isDangerousUrl } from '@/packages/core/security';
  * One video. Until someone presses play it is a poster image in a button: a page of native
  * players costs a second of main-thread work for their controls and fetches every captions
  * file, so the player is only built for the video being watched (#1662). Pressing play swaps
- * in the browser's own player, which starts at once and takes the keyboard focus.
+ * in the browser's own player, which starts playing and takes the keyboard focus.
  * @param props The video, the id of its title and whether its poster is above the fold.
  * @returns The poster button, or the player once started.
  */
 function VideoPlayer({ video, titleId, eager }: { video: SiteVideo; titleId: string; eager: boolean }) {
   const [started, setStarted] = useState(false);
   const player = useRef<HTMLVideoElement>(null);
-  // The button that was pressed is gone, so keyboard focus moves to the player that replaced it.
+  // The button that was pressed is gone, so keyboard focus moves to the player that replaced it,
+  // and the press that asked for the video starts it (no autoplay attribute anywhere).
   useEffect(() => {
-    if (started) player.current?.focus();
+    if (!started) return;
+    player.current?.focus();
+    // A browser that refuses to play (power saving, for one) leaves the player's own controls.
+    player.current?.play()?.catch(() => undefined);
   }, [started]);
   const wide = video.width > video.height;
   const box = `w-full rounded-lg bg-surface-sunken ${wide ? 'aspect-video' : 'aspect-[9/16]'}`;
   if (started) {
     return (
-      <video ref={player} tabIndex={0} className={box} controls playsInline autoPlay preload="auto" poster={videoSrc(video, 'jpg')} aria-labelledby={titleId}>
+      <video ref={player} tabIndex={0} className={box} controls playsInline preload="none" poster={videoSrc(video, 'jpg')} aria-labelledby={titleId}>
         <source src={videoSrc(video, 'mp4')} type="video/mp4" />
         <track kind="captions" src={videoSrc(video, 'vtt')} srcLang="en" label="English" default />
       </video>
