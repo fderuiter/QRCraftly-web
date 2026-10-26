@@ -116,7 +116,9 @@ export function assertStructuredCloneable(value: unknown, seen: Set<unknown> = n
 export function resolveWorkerModulePath(url: string | URL): string | null {
   let parsed: URL;
   try {
-    parsed = new URL(url instanceof URL ? url.href : String(url));
+    // A bundled `?worker&url` import is a root-relative path such as
+    // `/src/x/worker.ts?worker_file&type=module`, so it resolves against a placeholder origin.
+    parsed = new URL(url instanceof URL ? url.href : String(url), 'http://localhost/');
   } catch {
     return null;
   }

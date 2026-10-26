@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { startModuleWorker } from '@/packages/core/trustedTypes';
+import scannabilityWorkerUrl from '../worker.ts?worker&url';
 /**
  * Spawns a dedicated Scannability Worker. This is the only place the worker script is
  * referenced by path, so other packages and pages never reach into this package's files.
@@ -25,7 +27,7 @@
 export function createScannabilityWorker(): Worker | null {
   if (typeof Worker === 'undefined') return null;
   try {
-    return new Worker(new URL('../worker.ts', import.meta.url), { type: 'module' });
+    return startModuleWorker(scannabilityWorkerUrl);
   } catch (err) {
     console.error('Failed to spawn the Scannability Worker:', err);
     return null;

@@ -17,6 +17,7 @@ The shared bottom layer of the packages ([ADR 0052](../../../docs/adr/0052-share
 - `files`: file-name cleaning, invisible-character checks and received-file analysis.
 - `security`: dangerous-URL, text and SVG sanitising checks, and the image upload limits.
 - `site`: the configured public domain (`getPublicDomain`).
+- `trustedTypes`: the Trusted Types policies (#1172): `startModuleWorker` and `registerServiceWorker` for same-origin script URLs, and `parseInertDocument` for `DOMParser`. Start workers and parse markup only through these.
 - `types`: the shared QR types: `QRConfig`, `QRType`, `QRStyle` and the frame, border, mosaic, gradient and Wi-Fi types `QRConfig` uses. Payload data types (`EmailData`, `VCardData` and so on) and brand templates stay in `src/types.ts`.
 - `url`: URL normalisation.
 - `zip`: `createZip`, a minimal ZIP writer (stored entries, CRC-32, UTF-8 names) for Bulk CSV, wallet passes and received bundles.

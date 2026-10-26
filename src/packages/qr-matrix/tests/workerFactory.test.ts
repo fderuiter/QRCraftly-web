@@ -47,8 +47,8 @@ describe('qr-matrix worker factories', () => {
     const matrix = createMatrixWorker() as unknown as RecordingWorker;
     const maze = createMazeWorker() as unknown as RecordingWorker;
 
-    expect(String(matrix.url)).toMatch(/\/packages\/qr-matrix\/worker-matrix\.ts$/);
-    expect(String(maze.url)).toMatch(/\/packages\/qr-matrix\/worker-maze\.ts$/);
+    expect(String(matrix.url)).toMatch(/\/packages\/qr-matrix\/worker-matrix\.ts(\?|$)/);
+    expect(String(maze.url)).toMatch(/\/packages\/qr-matrix\/worker-maze\.ts(\?|$)/);
     expect(matrix.options).toEqual({ type: 'module' });
     expect(maze.options).toEqual({ type: 'module' });
   });

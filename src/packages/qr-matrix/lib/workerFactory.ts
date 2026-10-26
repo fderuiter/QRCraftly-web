@@ -16,6 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { startModuleWorker } from '@/packages/core/trustedTypes';
+import workerMatrixUrl from '../worker-matrix.ts?worker&url';
+import workerMazeUrl from '../worker-maze.ts?worker&url';
 const hasWorker = (): boolean => typeof window !== 'undefined' && typeof Worker !== 'undefined';
 
 /**
@@ -24,7 +27,7 @@ const hasWorker = (): boolean => typeof window !== 'undefined' && typeof Worker 
  * @returns The worker, or null where Web Workers are unavailable (SSR, jsdom, old browsers).
  */
 export function createMatrixWorker(): Worker | null {
-  return hasWorker() ? new Worker(new URL('../worker-matrix.ts', import.meta.url), { type: 'module' }) : null;
+  return hasWorker() ? startModuleWorker(workerMatrixUrl) : null;
 }
 
 /**
@@ -33,5 +36,5 @@ export function createMatrixWorker(): Worker | null {
  * @returns The worker, or null where Web Workers are unavailable (SSR, jsdom, old browsers).
  */
 export function createMazeWorker(): Worker | null {
-  return hasWorker() ? new Worker(new URL('../worker-maze.ts', import.meta.url), { type: 'module' }) : null;
+  return hasWorker() ? startModuleWorker(workerMazeUrl) : null;
 }

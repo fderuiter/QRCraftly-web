@@ -6,6 +6,9 @@
  * relative specifier that does not name an existing file, this hook tries `.ts`, `.tsx`, `.js`,
  * `/index.ts` and `/index.js`, in that order. It also maps the `@/` alias from `tsconfig.json` to
  * `src/`. Bare package specifiers, `node:` builtins and absolute URLs go straight to Node.
+ *
+ * A Vite `?worker&url` import (a bundled worker's URL, #1172) becomes a module whose default export is
+ * the worker file's `file:` URL: scripts never start the worker, they only load modules that name it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,6 +16,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const CANDIDATE_SUFFIXES = ['.ts', '.tsx', '.js', `${path.sep}index.ts`, `${path.sep}index.js`];
 const SRC_ALIAS = '@/';
+const WORKER_URL_QUERY = '?worker&url';
 const SRC_DIR = fileURLToPath(new URL('../../src/', import.meta.url));
 
 /**
@@ -48,6 +52,10 @@ function targetPath(specifier, parentURL) {
  * @returns {{ url: string, shortCircuit?: boolean }} The resolved module.
  */
 export function resolve(specifier, context, nextResolve) {
+  if (specifier.endsWith(WORKER_URL_QUERY)) {
+    const worker = resolve(specifier.slice(0, -WORKER_URL_QUERY.length), context, nextResolve);
+    return { url: `data:text/javascript,export default ${encodeURIComponent(JSON.stringify(worker.url))};`, shortCircuit: true };
+  }
   const base = targetPath(specifier, context.parentURL);
   if (base === null) return nextResolve(specifier, context);
   const file = isFile(base) ? base : CANDIDATE_SUFFIXES.map((suffix) => base + suffix).find(isFile);

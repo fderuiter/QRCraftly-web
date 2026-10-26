@@ -16,14 +16,15 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-
+import { startModuleWorker } from '@/packages/core/trustedTypes';
+import workerSliceUrl from '../../worker-slice.ts?worker&url';
 /**
  * Spawns the slice worker that cuts the selected file into QR frames off the main thread.
  * This is the only place the slice worker script is referenced by path.
  * @returns The slice worker.
  */
 export function spawnSliceWorker(): Worker {
-  return new Worker(new URL('../../worker-slice.ts', import.meta.url), { type: 'module' });
+  return startModuleWorker(workerSliceUrl);
 }
 
 /**

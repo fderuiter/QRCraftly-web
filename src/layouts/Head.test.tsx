@@ -21,6 +21,8 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import HeadDefault from './Head';
 import { THEME_INIT_SCRIPT } from '@/utils/theme';
 import { getPageSchema } from '@/data/pageContent';
+import { INERT_MARKUP_POLICY, SCRIPT_URL_POLICY } from '@/packages/core/trustedTypes';
+import { LOADER_POLICY } from '../../scripts/defer_page_scripts.js';
 
 // Hoist the mock functions so they can be used inside vi.mock
 const { mockUsePageContext, mockGetPublicDomain } = vi.hoisted(() => {
@@ -94,6 +96,12 @@ describe('HeadDefault', () => {
       }
       return directives;
     };
+
+    it('requires Trusted Types and allows only the three named policies (#1172)', () => {
+      const directives = renderCspDirectives();
+      expect(directives.get('require-trusted-types-for')).toEqual(["'script'"]);
+      expect(directives.get('trusted-types')).toEqual([SCRIPT_URL_POLICY, INERT_MARKUP_POLICY, LOADER_POLICY]);
+    });
 
     it('allows blob: images so SVG export can rasterize its object URL (#969)', () => {
       expect(renderCspDirectives().get('img-src')).toEqual(["'self'", 'data:', 'blob:']);

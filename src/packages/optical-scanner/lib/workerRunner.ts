@@ -1,3 +1,5 @@
+import { startModuleWorker } from '@/packages/core/trustedTypes';
+import scannerWorkerUrl from '../worker.ts?worker&url';
 import {
   isValidScannerResponse,
   type DecodedCode,
@@ -19,7 +21,7 @@ export function getScannerWorker(): Worker {
   if (typeof window === 'undefined') {
     throw new Error('Web Worker can only be instantiated in browser environment');
   }
-  sharedWorker ??= new Worker(new URL('../worker.ts', import.meta.url), { type: 'module' });
+  sharedWorker ??= startModuleWorker(scannerWorkerUrl);
   return sharedWorker;
 }
 

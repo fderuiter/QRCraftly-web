@@ -4,7 +4,7 @@ import { createRequire } from 'module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DEFERRED_SCRIPTS_ID, DEFERRED_SCRIPTS_LOADER, deferPageScripts, run } from '../scripts/defer_page_scripts.js';
+import { DEFERRED_SCRIPTS_ID, DEFERRED_SCRIPTS_LOADER, LOADER_POLICY, deferPageScripts, run } from '../scripts/defer_page_scripts.js';
 import { extractInlineScripts } from '../scripts/csp_hash_injector.js';
 
 const require = createRequire(import.meta.url);
@@ -95,6 +95,36 @@ describe('DEFERRED_SCRIPTS_LOADER', () => {
     mount();
     new Function(DEFERRED_SCRIPTS_LOADER)();
     expect(document.head.querySelectorAll('script[src]')).toHaveLength(1);
+  });
+
+  it('sets the entry module URL through its own Trusted Types policy (#1172)', () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    const policies: string[] = [];
+    const wrapped: string[] = [];
+    vi.stubGlobal('trustedTypes', {
+      createPolicy: (name: string, rules: { createScriptURL: (url: string) => string }) => {
+        policies.push(name);
+        return { createScriptURL: (url: string) => (wrapped.push(url), rules.createScriptURL(url)) };
+      },
+    });
+    mount();
+    new Function(DEFERRED_SCRIPTS_LOADER)();
+    expect(policies).toEqual([LOADER_POLICY]);
+    expect(wrapped).toEqual(['/assets/entries/entry-client-routing.abc.js']);
+    expect(document.head.querySelector('script[src]')?.getAttribute('src')).toBe('/assets/entries/entry-client-routing.abc.js');
+  });
+
+  it("refuses an entry module from another origin under the loader's policy (#1172)", () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    vi.stubGlobal('trustedTypes', {
+      createPolicy: (_name: string, rules: { createScriptURL: (url: string) => string }) => ({ createScriptURL: rules.createScriptURL }),
+    });
+    const template = document.createElement('template');
+    template.id = DEFERRED_SCRIPTS_ID;
+    template.innerHTML = '<script src="https://evil.example/x.js" type="module"></script>';
+    document.body.appendChild(template);
+    expect(() => new Function(DEFERRED_SCRIPTS_LOADER)()).toThrow(/another origin/);
+    expect(document.head.querySelector('script[src]')).toBeNull();
   });
 });
 

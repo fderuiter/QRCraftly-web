@@ -87,6 +87,12 @@ describe('scripts/utils/ts-resolve.js (ADR 0045)', () => {
     expect(resolve('node:fs', { parentURL }, next).url).toBe('next:node:fs');
   });
 
+  it("turns a Vite `?worker&url` import into the worker file's URL (#1172)", () => {
+    put('worker.ts', 'self.onmessage = () => {};\n');
+    put('spawn.ts', "import workerUrl from './worker.ts?worker&url';\nconsole.log(workerUrl);\n");
+    expect(runNode('spawn.ts').trim()).toBe(pathToFileURL(path.join(dir, 'worker.ts')).href);
+  }, 30000);
+
   it('maps the @/ alias to src/', () => {
     const next = (specifier: string) => ({ url: `next:${specifier}` });
     expect(resolve('@/types', {}, next).url).toBe(pathToFileURL(path.join(repoRoot, 'src', 'types.ts')).href);

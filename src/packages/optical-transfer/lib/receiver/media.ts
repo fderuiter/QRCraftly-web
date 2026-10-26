@@ -16,14 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-
+import { startModuleWorker } from '@/packages/core/trustedTypes';
+import workerReassemblyUrl from '../../worker-reassembly.ts?worker&url';
+import workerTilesUrl from '../../worker-tiles.ts?worker&url';
 /**
  * Spawns the reassembly worker that rebuilds received files off the main thread.
  * This is the only place the reassembly worker script is referenced by path.
  * @returns The reassembly worker.
  */
 export function spawnReassemblyWorker(): Worker {
-  return new Worker(new URL('../../worker-reassembly.ts', import.meta.url), { type: 'module' });
+  return startModuleWorker(workerReassemblyUrl);
 }
 
 /**
@@ -31,7 +33,7 @@ export function spawnReassemblyWorker(): Worker {
  * @returns The worker.
  */
 export function spawnTileWorker(): Worker {
-  return new Worker(new URL('../../worker-tiles.ts', import.meta.url), { type: 'module' });
+  return startModuleWorker(workerTilesUrl);
 }
 
 /**

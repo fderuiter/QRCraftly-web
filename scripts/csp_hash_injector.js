@@ -19,8 +19,12 @@ const DIST_CLIENT_DIR = path.join(__dirname, '../dist/client');
  * - `media-src 'self' blob:` lets the optical scanner play uploaded video files
  *   through `blob:` object URLs (#969).
  * - No web-font CDN is used, so no third-party style/font origins are allowed (#970).
+ * - `require-trusted-types-for 'script'` with three named policies: the two in
+ *   `src/packages/core/trustedTypes.ts` (same-origin worker and service worker script URLs, and
+ *   markup for an inert `DOMParser` document) and the deferred script loader's own in
+ *   `scripts/defer_page_scripts.js` (same-origin entry module URLs) (#1172).
  */
-export const BASE_CSP_PATTERN = "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';";
+export const BASE_CSP_PATTERN = "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; require-trusted-types-for 'script'; trusted-types qrcraftly-script-url qrcraftly-inert-markup qrcraftly-page-loader;";
 
 /**
  * Search a directory recursively for HTML files.

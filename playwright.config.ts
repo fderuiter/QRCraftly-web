@@ -17,6 +17,9 @@
 */
 
 import { defineConfig, devices } from '@playwright/test';
+// Specs import app packages, whose worker factories use Vite `?worker&url` imports (#1172): the
+// resolve hook from ADR 0045 maps those to the worker file's URL under plain Node.
+import './scripts/utils/register-ts.js';
 
 /** Specs that must run with the Content Security Policy enforced (bypassCSP: false). */
 const CSP_ENFORCED_SPECS = 'csp-enforcement.spec.ts';
