@@ -43,6 +43,7 @@
     "docs:sync": "node scripts/sync_docs.js",
     "docs:lint": "node scripts/audit_markdown.js && node scripts/validate_adrs.js && node scripts/validate_ui_catalog.js",
     "licenses:sync": "node scripts/sync_shipped_packages.js",
+    "icons:generate": "node --import ./scripts/utils/register-ts.js scripts/generate_icons.ts",
     "format:classes": "node scripts/sort_tailwind_classes.js",
     "format": "prettier --write .",
     "check-bundle-size": "node scripts/check-bundle-size.js",

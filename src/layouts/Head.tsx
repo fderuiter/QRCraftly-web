@@ -187,10 +187,15 @@ export default function HeadDefault() {
       <meta name="twitter:image:alt" content={imageAlt} />
 
       {/* Mobile & PWA */}
+      {/* Browsers use the first theme-color whose media matches, so the dark one comes first. It
+          follows the operating system, not the in-app theme choice (#1667). */}
+      <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
       <meta name="theme-color" content="#0f766e" />
+      <meta name="color-scheme" content="light dark" />
       <link rel="manifest" href="/manifest.json" />
-      <link rel="icon" type="image/png" href="/favicon.png" />
-      <link rel="apple-touch-icon" href="/icon-192x192.png" />
+      <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+      <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+      <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     </>
   );
 }
