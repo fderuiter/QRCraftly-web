@@ -15,6 +15,9 @@ async function gotoSettledGenerator(page: Page) {
 }
 
 test.describe('Visual Regression Layout Checks', () => {
+  // A service worker can raise the "new version" toast mid-test, over the content (#1662).
+  test.use({ serviceWorkers: 'block' });
+
   test('Standard Desktop Viewport (1280x720)', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     // toHaveScreenshot then waits for two identical frames.
@@ -42,11 +45,8 @@ test.describe('Visual Regression Layout Checks', () => {
     await page.setViewportSize({ width: 480, height: 270 });
     // toHaveScreenshot then waits for two identical frames.
     await gotoSettledGenerator(page);
-    // The update toast's edges render differently from run to run (about 2% of the pixels on
-    // WebKit), so it is masked and the tolerance is the 2% the other views use (#1613).
     await expect(page).toHaveScreenshot('desktop-high-zoom.png', {
       fullPage: false,
-      mask: [page.getByRole('status').filter({ hasText: 'A new version of QRCraftly is available.' })],
       maxDiffPixelRatio: 0.02,
       threshold: 0.25
     });
