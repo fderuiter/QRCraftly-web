@@ -82,20 +82,23 @@ function readAssetReferences(relativePath, source) {
 
 /**
  * Reads the workers and WebAssembly modules a built module starts, written by Vite as
- * `new URL("/assets/...", import.meta.url)` (or `self.location.href` inside a worker). They load
- * after startup, so the first-load budget leaves them out, but a page that starts them cannot
- * work offline without them.
+ * `new URL("/assets/...", import.meta.url)` (or `self.location.href` inside a worker), or, for a
+ * worker imported with `?worker&url` so it can start through a Trusted Types policy (#1172), as
+ * a plain `"/assets/<name>-<hash>.js"` string: Vite emits workers at the top of `assets/`, and
+ * page chunks under `assets/chunks/` and `assets/entries/`. They load after startup, so the
+ * first-load budget leaves them out, but a page that starts them cannot work offline without them.
  * @param {string} relativePath POSIX path relative to dist/client.
  * @param {string} source File contents.
  * @returns {string[]} POSIX paths relative to dist/client.
  */
 function readWorkerReferences(relativePath, source) {
   if (!relativePath.endsWith('.js')) return [];
-  const found = [];
+  const found = new Set();
   for (const match of source.matchAll(/new URL\(\s*["']\/(assets\/[^"'?#]+\.(?:js|wasm))["']\s*,\s*(?:import\.meta\.url|self\.location\.href)/g)) {
-    found.push(match[1]);
+    found.add(match[1]);
   }
-  return found;
+  for (const match of source.matchAll(/["']\/(assets\/[\w.-]+\.js)["']/g)) found.add(match[1]);
+  return [...found];
 }
 
 /**

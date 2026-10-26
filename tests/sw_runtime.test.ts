@@ -443,6 +443,16 @@ describe('service worker precache manifest', () => {
     expect(readWorkerReferences('index.html', 'new URL("/assets/w.js",import.meta.url)')).toEqual([]);
   });
 
+  it('reads a worker imported with ?worker&url, which the bundle writes as a plain URL string (#1172)', () => {
+    expect(
+      readWorkerReferences(
+        'assets/chunks/a.js',
+        'import{t}from"./chunk-b.js";const c="/assets/worker-matrix-x.js",z=\'/assets/worker-maze-y.js\';t(c);t(c);' +
+          'const l=()=>import("/assets/chunks/lazy.js");const s="/assets/static/logo.svg"'
+      )
+    ).toEqual(['assets/worker-matrix-x.js', 'assets/worker-maze-y.js']);
+  });
+
   it('precaches the workers and wasm the homepage generator starts, so it draws offline after one visit (#1262)', () => {
     const files: Record<string, string> = {
       'index.html': '<script src="/assets/entries/e.js"></script>',
