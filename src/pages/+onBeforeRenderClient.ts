@@ -17,6 +17,7 @@
 */
 
 import type { PageContextClient } from 'vike/types';
+import { installTrustedTypesPolicies } from '@/packages/core/trustedTypes';
 
 /** Longest wait for a frame; a hidden tab draws none, so hydration then goes ahead anyway. */
 const FIRST_PAINT_WAIT_MS = 100;
@@ -28,6 +29,8 @@ const FIRST_PAINT_WAIT_MS = 100;
  * @param pageContext - The page being rendered.
  */
 export default async function onBeforeRenderClient(pageContext: PageContextClient): Promise<void> {
+  // Before React renders anything, so every worker and raw HTML sink finds the policies (#1172).
+  installTrustedTypesPolicies();
   if (!pageContext.isHydration) return;
   await new Promise<void>((resolve) => {
     const fallback = setTimeout(resolve, FIRST_PAINT_WAIT_MS);

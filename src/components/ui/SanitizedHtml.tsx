@@ -19,6 +19,7 @@
  
 
 import React from 'react';
+import { reviewedHtml } from '@/packages/core/trustedTypes';
 
 /**
  * Props for the SanitizedHtml component.
@@ -55,7 +56,7 @@ export const SanitizedHtml: React.FC<SanitizedHtmlProps> = ({
     <Component
       id={id}
       className={className}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: reviewedHtml(html) }}
     />
   );
 };

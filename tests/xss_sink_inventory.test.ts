@@ -10,7 +10,8 @@ import path from 'path';
 
 const SINKS: Record<string, RegExp> = {
   'raw HTML': /dangerouslySetInnerHTML|\.innerHTML\b|outerHTML|insertAdjacentHTML|document\.write|srcdoc/,
-  'markup parser': /new DOMParser\b/,
+  'markup parser': /new DOMParser\b|parseInertDocument\(/,
+  'trusted HTML': /reviewedHtml\(/,
   'object URL': /URL\.createObjectURL\(/,
   'new window or navigation': /window\.open\(|location\.(assign|replace)\(|location\.href\s*=/,
   'string as code': /\beval\(|new Function\(|set(Timeout|Interval)\(\s*['"`]/,
@@ -28,6 +29,13 @@ const INVENTORY: Record<string, string[]> = {
     'src/hooks/useImageUpload.ts', // inert SVG document, then sanitizeSvg
     'src/packages/qr-export/lib/sceneReader.ts', // our own SVG export, read for EPS and PDF
     'src/packages/core/security.ts', // sanitizeSvg itself
+    'src/packages/core/trustedTypes.ts', // parseInertDocument, the one DOMParser call (#1172)
+  ],
+  // Markup marked trusted for a Trusted Types HTML sink (#1172): each caller is a raw HTML sink above.
+  'trusted HTML': [
+    'src/components/ui/JsonLdScript.tsx', // build-time data through safeJsonLdStringify
+    'src/components/ui/SanitizedHtml.tsx', // build-time docs only (the /security page)
+    'src/packages/core/trustedTypes.ts', // parseInertDocument
   ],
   'object URL': [
     'src/components/transfer/TransferComplete.tsx', // received file: safe types only open in a tab

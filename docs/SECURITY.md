@@ -170,7 +170,13 @@ There is no `eval`, `new Function` or string timer anywhere in `src/`.
 
 **Tests.** `src/utils/xssRegression.test.ts` runs a corpus of known SVG and URL attacks (script and foreign elements, mixed-case handlers, `<animate>` and `<set>` rewriting a link, XLink under another prefix, remote images, `@import`, `image-set()`, `expression()`, entity- and whitespace-obfuscated `javascript:` links) and checks that nothing active survives. `e2e/xss-regression.spec.ts` types markup into the generator, uploads a hostile SVG logo and scans a code that holds markup, then checks that no script ran, no dialog opened, no request left for the attacker's host and the SVG export holds no active content. Those Playwright projects bypass the CSP on purpose: the app must stay safe on its own, and the CSP is a second layer.
 
-**Trusted Types.** `require-trusted-types-for 'script'` stays off for now (the owner's call). Turning it on needs a policy for the worker and service worker script URLs and for the three `DOMParser` calls above, which also count as sinks under Trusted Types. The inventory test is the list a policy would have to cover.
+**Trusted Types.** The CSP sets `require-trusted-types-for 'script'; trusted-types default qrcraftly qrcraftly-loader` (#1172), so the browser refuses a plain string at every script URL, HTML and script sink unless a policy made it trusted. The three policies live in `src/packages/core/trustedTypes.ts` and `scripts/defer_page_scripts.js`:
+
+- `default` accepts a script URL only when it is same-origin (`checkScriptUrl`), and has no HTML or script rule. The browser calls it for every `new Worker(...)` (matrix, maze, scanner, scannability, image resize and the three file transfer workers) and for the service worker registration. It is the default policy rather than a wrapper at each call site because Vite only bundles a worker written exactly as `new Worker(new URL('./worker.ts', import.meta.url))`. A string that reaches `innerHTML`, `eval` or any other HTML or script sink still throws.
+- `qrcraftly` marks HTML as trusted. Only two helpers hold it: `parseInertDocument`, the one `DOMParser` call, which the three markup parsers above go through, and `reviewedHtml`, which `SanitizedHtml` and `JsonLdScript` use for their build-time markup. The inventory test pins both lists.
+- `qrcraftly-loader` belongs to the inline script that starts each page's scripts after the first paint. It runs before the app's code loads and accepts only the build's own `/assets/*.js` paths.
+
+`installTrustedTypesPolicies` runs in `+onBeforeRenderClient.ts`, before React renders anything. Browsers without Trusted Types ignore the directive, and the helpers hand strings back unchanged there.
 
 ## URL Sanitization & DOM-XSS Protection
 

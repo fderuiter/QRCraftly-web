@@ -4,8 +4,9 @@ import { createRequire } from 'module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DEFERRED_SCRIPTS_ID, DEFERRED_SCRIPTS_LOADER, deferPageScripts, run } from '../scripts/defer_page_scripts.js';
-import { extractInlineScripts } from '../scripts/csp_hash_injector.js';
+import { DEFERRED_SCRIPTS_ID, DEFERRED_SCRIPTS_LOADER, DEFERRED_SCRIPTS_POLICY, deferPageScripts, run } from '../scripts/defer_page_scripts.js';
+import { BASE_CSP_PATTERN, extractInlineScripts } from '../scripts/csp_hash_injector.js';
+import { TRUSTED_TYPES_POLICY_NAMES } from '../src/packages/core/trustedTypes';
 
 const require = createRequire(import.meta.url);
 const { readAssetReferences } = require('../scripts/generate_sw.cjs') as {
@@ -95,6 +96,41 @@ describe('DEFERRED_SCRIPTS_LOADER', () => {
     mount();
     new Function(DEFERRED_SCRIPTS_LOADER)();
     expect(document.head.querySelectorAll('script[src]')).toHaveLength(1);
+  });
+
+  describe('under Trusted Types (#1172)', () => {
+    let policy: ((input: string) => string) | undefined;
+    const stubTrustedTypes = () => {
+      policy = undefined;
+      vi.stubGlobal('trustedTypes', {
+        createPolicy: (name: string, options: { createScriptURL: (input: string) => string }) => {
+          expect(name).toBe(DEFERRED_SCRIPTS_POLICY);
+          policy = options.createScriptURL;
+          return { createScriptURL: (input: string) => options.createScriptURL(input) };
+        },
+      });
+    };
+
+    it('passes the entry script URL through its own policy, which the CSP allows', () => {
+      stubTrustedTypes();
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+      mount();
+      new Function(DEFERRED_SCRIPTS_LOADER)();
+      expect(document.head.querySelector('script[src]')?.getAttribute('src')).toBe('/assets/entries/entry-client-routing.abc.js');
+      expect(TRUSTED_TYPES_POLICY_NAMES).toContain(DEFERRED_SCRIPTS_POLICY);
+      expect(BASE_CSP_PATTERN).toContain(`trusted-types ${TRUSTED_TYPES_POLICY_NAMES.join(' ')};`);
+    });
+
+    it.each(['https://evil.example/assets/x.js', '/elsewhere/x.js', '/assets/x.css', 'javascript:alert(1)'])(
+      'refuses %s, which is not one of the build\'s own scripts',
+      (input) => {
+        stubTrustedTypes();
+        vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+        vi.stubGlobal('requestAnimationFrame', () => 0);
+        new Function(DEFERRED_SCRIPTS_LOADER)();
+        expect(() => policy?.(input)).toThrow(TypeError);
+      }
+    );
   });
 });
 

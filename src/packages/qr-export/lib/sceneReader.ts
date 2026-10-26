@@ -22,6 +22,7 @@
  * an image. It knows nothing about PostScript or PDF.
  */
 
+import { parseInertDocument } from '@/packages/core/trustedTypes';
 import type { GradientStop, Matrix, RgbColor, SceneClip, SceneElement, SceneGradient, ScenePaint, SceneText, SvgScene } from './sceneTypes';
 import { apply, BLACK, compose, num, numbers, parseColor, parseTransform } from './svgValues';
 import { toLatin1Codes } from './winAnsi';
@@ -195,7 +196,7 @@ function walk(el: Element, state: WalkState, gradients: Map<string, SceneGradien
  */
 export function readSvgScene(svg: string): SvgScene {
   if (typeof DOMParser === 'undefined') throw new Error('Vector export needs a browser DOMParser.');
-  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  const doc = parseInertDocument(svg, 'image/svg+xml');
   const root = doc.querySelector('svg');
   if (!root) throw new Error('The vector export could not read the SVG.');
 

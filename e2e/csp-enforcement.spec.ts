@@ -29,6 +29,7 @@ import fs from 'fs';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { codeScene, installFakeCamera, showOnCamera } from '../tests/utils/fakeCamera';
+import { installSyntheticCamera, relayFrames } from './utils/opticalLink';
 
 interface RecordedViolation {
   directive: string;
@@ -38,6 +39,7 @@ interface RecordedViolation {
 declare global {
   interface Window {
     __cspViolations?: RecordedViolation[];
+    __startedWorkers?: string[];
   }
 }
 
@@ -124,6 +126,95 @@ test.describe('Content Security Policy enforced', { tag: '@prod' }, () => {
     await expect(page.locator('#url-input')).toHaveValue('https://qrcraftly.com/csp');
 
     expect(warnings).toEqual([]);
+    expect(await readViolations(page)).toEqual([]);
+  });
+
+  test('starts every worker and the service worker under Trusted Types (#1172)', async ({ page, context, browser, baseURL }) => {
+    test.setTimeout(120_000);
+    const typeErrors: string[] = [];
+    const record = (text: string) => {
+      if (/Trusted ?(Types|HTML|Script)|trusted-types/i.test(text)) typeErrors.push(text);
+    };
+    // Records each worker the page manages to start: a refused script URL throws before the push.
+    const recordWorkers = () => {
+      const NativeWorker = window.Worker;
+      window.__startedWorkers = [];
+      window.Worker = class extends NativeWorker {
+        constructor(url: string | URL, options?: WorkerOptions) {
+          super(url, options);
+          window.__startedWorkers?.push(new URL(String(url), location.href).pathname);
+        }
+      };
+    };
+    const started = (target: Page) => target.evaluate(() => window.__startedWorkers ?? []);
+    const watch = (target: Page) => {
+      target.on('console', (message) => record(message.text()));
+      target.on('pageerror', (error) => record(String(error)));
+    };
+
+    await context.addInitScript(recordWorkers);
+    watch(page);
+    await installFakeCamera(context);
+    await page.reload();
+    await page.waitForSelector('main[data-hydrated="true"]');
+    await expect.poll(() => page.evaluate(() => navigator.serviceWorker.ready.then((registration) => registration.active?.scriptURL ?? ''))).toMatch(/\/sw\.js$/);
+
+    // Generator: matrix, maze and scannability workers.
+    await page.locator('#url-input').fill('https://qrcraftly.com/trusted-types');
+    await expect(page.getByTestId('scannability-verdict')).toHaveText('Scans reliably', { timeout: 20_000 });
+    // Logo upload: the image resize worker.
+    await page.getByRole('button', { name: 'Logo', exact: true }).click();
+    await page.getByRole('region', { name: 'Logo' }).getByLabel('Upload logo image').setInputFiles({
+      name: 'logo.png',
+      mimeType: 'image/png',
+      buffer: fs.readFileSync('public/icon-192x192.png'),
+    });
+    await expect(page.getByText('Custom Logo')).toBeVisible();
+    // Scanner: the optical scanner worker.
+    await showOnCamera(page, codeScene('https://qrcraftly.com/trusted-types'));
+    await page.getByRole('button', { name: 'Scan QR Code' }).click();
+    await page.getByRole('button', { name: 'Edit in generator' }).click();
+    const generatorWorkers = (await started(page)).join(' ');
+    for (const name of ['worker-matrix', 'worker-maze', 'imageResizeWorker']) expect(generatorWorkers).toContain(name);
+    expect(generatorWorkers.match(/\/worker-[\w-]+\.js/g)?.filter((url) => !/matrix|maze/.test(url)).length ?? 0).toBeGreaterThanOrEqual(2);
+
+    // File transfer: the slice worker on the sender, the tile and reassembly workers on the receiver.
+    const receiverContext = await browser.newContext({ baseURL, bypassCSP: false });
+    await receiverContext.addInitScript(recordWorkers);
+    await receiverContext.addInitScript(() => {
+      window.__cspViolations = [];
+      document.addEventListener('securitypolicyviolation', (event) => {
+        window.__cspViolations?.push({ directive: event.effectiveDirective, blockedURI: event.blockedURI });
+      });
+    });
+    await installSyntheticCamera(receiverContext);
+    const receiver = await receiverContext.newPage();
+    watch(receiver);
+    try {
+      await page.goto('/file-transfer');
+      await page.waitForSelector('main[data-hydrated="true"]');
+      await page.getByLabel('Choose a file to send').setInputFiles({ name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('Trusted Types') });
+      await page.getByRole('button', { name: 'Advanced', exact: true }).click();
+      await page.getByText('Several codes per frame (preview)', { exact: true }).click();
+      await page.getByRole('button', { name: 'Start file transfer' }).click();
+      await expect(page.getByRole('button', { name: 'Stop file transfer' })).toBeVisible({ timeout: 20_000 });
+
+      await receiver.goto('/file-transfer/receive');
+      await receiver.waitForSelector('main[data-hydrated="true"]');
+      await receiver.getByText('Read several codes per frame (preview)', { exact: true }).click();
+      await receiver.getByRole('button', { name: 'Activate camera scanner' }).click();
+      await relayFrames(page, receiver, { until: () => receiver.getByTestId('inline-complete-panel').isVisible(), timeoutMs: 60_000 });
+
+      expect((await started(page)).join(' ')).toContain('worker-slice');
+      const receiverWorkers = (await started(receiver)).join(' ');
+      expect(receiverWorkers).toContain('worker-tiles');
+      expect(receiverWorkers).toContain('worker-reassembly');
+      expect(await readViolations(receiver)).toEqual([]);
+    } finally {
+      await receiverContext.close();
+    }
+
+    expect(typeErrors).toEqual([]);
     expect(await readViolations(page)).toEqual([]);
   });
 });

@@ -12,16 +12,26 @@ const DIST_CLIENT_DIR = path.join(__dirname, '../dist/client');
 export const DEFERRED_SCRIPTS_ID = 'deferred-scripts';
 
 /**
+ * The Trusted Types policy the loader creates for itself (#1172). It runs before the app's own
+ * policies exist, and it only accepts the build's own script paths under /assets/. The CSP lists
+ * it in `trusted-types` (`TRUSTED_TYPES_POLICY_NAMES` in `src/packages/core/trustedTypes.ts`).
+ */
+export const DEFERRED_SCRIPTS_POLICY = 'qrcraftly-loader';
+
+/**
  * Starts the page's scripts once the pre-rendered HTML has painted (#1058). It copies each tag
  * out of the inert template, in the order Vike wrote them.
  * A hidden tab paints nothing, so it loads at once there. The text is the same on every page,
  * so `csp_hash_injector.js` adds a single hash for it.
  */
 export const DEFERRED_SCRIPTS_LOADER =
-  '(function(){var d=document;function load(){var t=d.getElementById("' +
+  '(function(){var d=document,f=window.trustedTypes,p=f&&f.createPolicy("' +
+  DEFERRED_SCRIPTS_POLICY +
+  '",{createScriptURL:function(u){if(!/^\\/assets\\/[\\w.\\/-]+\\.js$/.test(u))throw new TypeError("Refused script "+u);return u}});' +
+  'function load(){var t=d.getElementById("' +
   DEFERRED_SCRIPTS_ID +
-  '");if(!t)return;t.remove();Array.prototype.forEach.call(t.content.children,function(e){var n;' +
-  'if(e.tagName==="SCRIPT"){n=d.createElement("script");n.type="module";n.src=e.getAttribute("src")}' +
+  '");if(!t)return;t.remove();Array.prototype.forEach.call(t.content.children,function(e){var n,s=e.getAttribute("src");' +
+  'if(e.tagName==="SCRIPT"){n=d.createElement("script");n.type="module";n.src=p?p.createScriptURL(s):s}' +
   'else{n=d.createElement("link");n.rel="modulepreload";n.href=e.getAttribute("href")}d.head.appendChild(n)})}' +
   'if(d.visibilityState==="hidden"){load()}else{requestAnimationFrame(function(){setTimeout(load,0)})}})();';
 

@@ -20,6 +20,7 @@
 
 import React from 'react';
 import { safeJsonLdStringify } from '@/packages/core/security';
+import { reviewedHtml } from '@/packages/core/trustedTypes';
 
 /**
  * Props for the JsonLdScript component.
@@ -40,7 +41,7 @@ export const JsonLdScript: React.FC<JsonLdScriptProps> = ({ data }) => {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(data) }}
+      dangerouslySetInnerHTML={{ __html: reviewedHtml(safeJsonLdStringify(data)) }}
     />
   );
 };

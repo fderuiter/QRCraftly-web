@@ -123,7 +123,7 @@ Camera results need two agreeing reads. Images are decoded off the main thread, 
 - The receiver checks integrity, not who sent the file: any stream in front of the camera can be offered as a replacement after 8 consecutive frames, and it replaces the current one only if the person accepts. A private transfer opened with its key is never offered one.
 - Link analysis is text only. It cannot expand a shortener, check a site's reputation or know a brand that is not on its list, and it never says a link is safe.
 - The Semgrep phone rule matches only simple `tel:${x}` and `sms:${x}` shapes, not a longer template with a query string.
-- Trusted Types (`require-trusted-types-for 'script'`) was evaluated and is **not** enabled. With it on, every `new Worker(url)` (matrix, maze, scanner, scannability, image-resize and file-transfer workers) and the service worker registration throw, because their script URLs are plain strings. Enabling it needs a reviewed policy that wraps same-origin script URLs, plus a Playwright run for each worker. The app has no other known sink, so this is a defence in depth item, tracked as a follow-up.
+- Trusted Types (`require-trusted-types-for 'script'`) is enabled (#1172). The `default` policy in `src/packages/core/trustedTypes.ts` lets every `new Worker(url)` (matrix, maze, scanner, scannability, image-resize and file-transfer workers) and the service worker registration through only when the script URL is same-origin. HTML sinks need the `qrcraftly` policy, which only the reviewed helpers hold. See `docs/SECURITY.md` ("Browser Trust Boundaries") for the three policies.
 - HSTS `preload` is a separate decision that affects the whole domain and is left to the site owner.
 
 ## What QRCraftly will never do to fix these

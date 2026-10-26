@@ -20,6 +20,8 @@ import { render, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import HeadDefault from './Head';
 import { THEME_INIT_SCRIPT } from '@/utils/theme';
+import { TRUSTED_TYPES_POLICY_NAMES } from '@/packages/core/trustedTypes';
+import { BASE_CSP_PATTERN } from '../../scripts/csp_hash_injector.js';
 import { getPageSchema } from '@/data/pageContent';
 
 // Hoist the mock functions so they can be used inside vi.mock
@@ -94,6 +96,17 @@ describe('HeadDefault', () => {
       }
       return directives;
     };
+
+    it('requires Trusted Types and allows only the app\'s own policies (#1172)', () => {
+      const directives = renderCspDirectives();
+      expect(directives.get('require-trusted-types-for')).toEqual(["'script'"]);
+      expect(directives.get('trusted-types')).toEqual([...TRUSTED_TYPES_POLICY_NAMES]);
+    });
+
+    it('matches the header policy the build writes into _headers', () => {
+      const { container } = render(<HeadDefault />, { container: document.head });
+      expect(container.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content')).toBe(BASE_CSP_PATTERN);
+    });
 
     it('allows blob: images so SVG export can rasterize its object URL (#969)', () => {
       expect(renderCspDirectives().get('img-src')).toEqual(["'self'", 'data:', 'blob:']);

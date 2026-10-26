@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { parseInertDocument } from './trustedTypes';
 import { SafeUrlPipeline } from './url';
 
 const jsonLdCache = new Map<string, string>();
@@ -323,8 +324,7 @@ export const sanitizeSvg = (svgText: string): string => {
   if (!svgText) return '';
 
   try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgText, 'image/svg+xml');
+    const doc = parseInertDocument(svgText, 'image/svg+xml');
 
     // Traverse the document and sanitize
     const cleanNode = (node: Node) => {
