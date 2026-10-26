@@ -3,6 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { BASE_CSP_PATTERN, extractInlineScripts, computeCspHash, replaceMetaCSP, updateCsp, validateHeaders, pathToRoute, generateHeadersContent, allHashes } from '../scripts/csp_hash_injector.js';
+import { DEFERRED_SCRIPTS_POLICY } from '../scripts/defer_page_scripts.js';
+import { TRUSTED_TYPES_POLICY } from '../src/packages/core/security';
 
 describe('CSP Hash Injector Unit Tests', () => {
   describe('pathToRoute', () => {
@@ -168,6 +170,11 @@ describe('CSP Hash Injector Unit Tests', () => {
       expect(BASE_CSP_PATTERN).not.toMatch(/https?:/);
       expect(directiveSources(BASE_CSP_PATTERN, 'font-src')).toEqual(["'self'"]);
       expect(directiveSources(BASE_CSP_PATTERN, 'style-src')).toEqual(["'self'", "'unsafe-inline'"]);
+    });
+
+    it('enforces Trusted Types with only the app policy and the script loader policy (#1172)', () => {
+      expect(directiveSources(BASE_CSP_PATTERN, 'require-trusted-types-for')).toEqual(["'script'"]);
+      expect(directiveSources(BASE_CSP_PATTERN, 'trusted-types')).toEqual([TRUSTED_TYPES_POLICY, DEFERRED_SCRIPTS_POLICY]);
     });
 
     it('matches the meta CSP rendered by src/layouts/Head.tsx byte for byte', () => {

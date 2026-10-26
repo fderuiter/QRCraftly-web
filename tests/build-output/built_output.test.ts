@@ -45,6 +45,25 @@ describe('Built WebAssembly modules (#1595)', () => {
   });
 });
 
+describe('Built workers (#1172)', () => {
+  const assets = (): string[] => (fs.readdirSync(path.join(DIST_DIR, 'assets'), { recursive: true }) as string[]).map((file) => file.replace(/\\/g, '/'));
+
+  it.each(['worker-matrix-', 'worker-maze-', 'worker-slice-', 'worker-reassembly-', 'worker-tiles-', 'imageResizeWorker-'])('bundles %s as its own script', (prefix) => {
+    expect(assets().some((file) => path.basename(file).startsWith(prefix) && file.endsWith('.js'))).toBe(true);
+  });
+
+  it('bundles the scanner and scannability workers, which share the file name worker.ts', () => {
+    expect(assets().filter((file) => /^worker-[\w-]{8}\.js$/.test(path.basename(file)))).toHaveLength(2);
+  });
+
+  it('never ships a worker as its TypeScript source in a data URL', () => {
+    // Vite treats `new URL('./x.ts', import.meta.url)` as a plain asset when it does not see the
+    // constructor call around it, and inlines the source (see sameOriginWorker in core/security).
+    const scripts = assets().filter((file) => file.endsWith('.js'));
+    expect(scripts.filter((file) => readBuilt(`assets/${file}`).includes('data:video/mp2t'))).toEqual([]);
+  });
+});
+
 describe('Built service worker', () => {
   it('precaches every icon the manifest declares', () => {
     const sw = readBuilt('sw.js');

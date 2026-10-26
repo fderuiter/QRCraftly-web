@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { sameOriginWorker } from '@/packages/core/security';
+
 /**
  * Spawns a dedicated Scannability Worker. This is the only place the worker script is
  * referenced by path, so other packages and pages never reach into this package's files.
@@ -23,8 +25,9 @@
  * @returns The worker, or null where Web Workers are unavailable (SSR, old browsers).
  */
 export function createScannabilityWorker(): Worker | null {
-  if (typeof Worker === 'undefined') return null;
+  if (typeof globalThis.Worker === 'undefined') return null;
   try {
+    const Worker = sameOriginWorker();
     return new Worker(new URL('../worker.ts', import.meta.url), { type: 'module' });
   } catch (err) {
     console.error('Failed to spawn the Scannability Worker:', err);

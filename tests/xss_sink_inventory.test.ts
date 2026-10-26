@@ -10,7 +10,8 @@ import path from 'path';
 
 const SINKS: Record<string, RegExp> = {
   'raw HTML': /dangerouslySetInnerHTML|\.innerHTML\b|outerHTML|insertAdjacentHTML|document\.write|srcdoc/,
-  'markup parser': /new DOMParser\b/,
+  'markup parser': /new DOMParser\b|parseInertMarkup\(/,
+  'script URL': /new (?:Shared)?Worker\(|\.register\(/,
   'object URL': /URL\.createObjectURL\(/,
   'new window or navigation': /window\.open\(|location\.(assign|replace)\(|location\.href\s*=/,
   'string as code': /\beval\(|new Function\(|set(Timeout|Interval)\(\s*['"`]/,
@@ -27,7 +28,16 @@ const INVENTORY: Record<string, string[]> = {
   'markup parser': [
     'src/hooks/useImageUpload.ts', // inert SVG document, then sanitizeSvg
     'src/packages/qr-export/lib/sceneReader.ts', // our own SVG export, read for EPS and PDF
-    'src/packages/core/security.ts', // sanitizeSvg itself
+    'src/packages/core/security.ts', // parseInertMarkup, the one DOMParser, and sanitizeSvg
+  ],
+  'script URL': [
+    'src/hooks/useServiceWorkerUpdate.ts', // /sw.js, through trustedScriptUrl (the rest through sameOriginWorker)
+    'src/packages/optical-scanner/lib/workerRunner.ts', // scanner worker
+    'src/packages/optical-transfer/lib/receiver/media.ts', // reassembly and tiles workers
+    'src/packages/optical-transfer/lib/sender/workers.ts', // slice worker
+    'src/packages/qr-matrix/lib/workerFactory.ts', // matrix and maze workers
+    'src/packages/scannability/lib/workerFactory.ts', // scannability worker
+    'src/utils/imageResizeHelper.ts', // image resize worker
   ],
   'object URL': [
     'src/components/transfer/TransferComplete.tsx', // received file: safe types only open in a tab
@@ -65,6 +75,21 @@ describe('browser sink inventory (#1350)', () => {
       expect(found).toEqual([...INVENTORY[sink]].sort());
     });
   }
+
+  it('passes every worker and service worker script URL through the Trusted Types policy (#1172)', () => {
+    // Each `new Worker(new URL(...))` keeps the text Vite looks for, with `Worker` bound to sameOriginWorker() in the same block.
+    const workers = files.flatMap(({ file, text }) =>
+      [...text.matchAll(/new (?:Shared)?Worker\(/g)].map((match) => ({ file, before: text.slice(Math.max(0, text.lastIndexOf('{', match.index)), match.index) }))
+    );
+    expect(workers).toHaveLength(8);
+    expect(workers.filter(({ before }) => !/const Worker = sameOriginWorker\(\);/.test(before)).map(({ file }) => file)).toEqual([]);
+    const registrations = files.flatMap(({ file, text }) => (text.match(/\.register\([^)\n]*\)?/g) ?? []).map((call) => ({ file, call })));
+    expect(registrations).toEqual([{ file: 'src/hooks/useServiceWorkerUpdate.ts', call: ".register(trustedScriptUrl('/sw.js')" }]);
+  });
+
+  it('keeps DOMParser behind parseInertMarkup, the one place that holds the Trusted Types HTML rule (#1172)', () => {
+    expect(files.filter(({ text }) => /new DOMParser\b/.test(text)).map(({ file }) => file)).toEqual(['src/packages/core/security.ts']);
+  });
 
   it('keeps SanitizedHtml for build-time content on the security page only', () => {
     const users = files.filter(({ file, text }) => file !== 'src/components/ui/SanitizedHtml.tsx' && /<SanitizedHtml\b/.test(text)).map(({ file }) => file);

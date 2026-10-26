@@ -17,7 +17,7 @@
 */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { validateImageUpload, sanitizeSvg } from '@/packages/core/security';
+import { validateImageUpload, sanitizeSvg, parseInertMarkup } from '@/packages/core/security';
 import {
   isLowTierDevice,
   isOffThreadSupported,
@@ -54,7 +54,7 @@ export const UNDRAWABLE_SVG_MESSAGE = "This SVG can't be drawn. Check that it is
  */
 const isDrawableSvg = (svg: string): boolean => {
   if (!svg.trim()) return false;
-  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  const doc = parseInertMarkup(svg, 'image/svg+xml');
   const root = doc.documentElement;
   return (
     doc.getElementsByTagName('parsererror').length === 0 &&

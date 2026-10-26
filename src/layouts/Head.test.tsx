@@ -72,6 +72,7 @@ describe('HeadDefault', () => {
 
     const content = metaCSP?.getAttribute('content') || '';
     expect(content).toContain("default-src 'self'");
+    expect(content).toContain("require-trusted-types-for 'script'; trusted-types qrcraftly qrcraftly-loader;");
   });
 
   it('renders the pre-hydration theme script after the CSP meta tag', () => {
