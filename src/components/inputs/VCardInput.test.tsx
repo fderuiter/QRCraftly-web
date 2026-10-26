@@ -17,7 +17,7 @@
 */
 
 import { useState } from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { VCardInput } from './VCardInput';
@@ -139,5 +139,65 @@ describe('VCardInput social profile fields (#1470)', () => {
   it('passes the axe check in MECard mode', async () => {
     const { container } = render(<VCardInput data={blankCard({ version: 'mecard' })} onChange={vi.fn()} />);
     expect((await axe(container)).violations).toEqual([]);
+  });
+});
+
+const CARD = ['BEGIN:VCARD', 'VERSION:3.0', 'N:Doe;Jane;;;', 'EMAIL:jane@example.com', 'TEL:+1 555 0100', 'END:VCARD', ''].join('\r\n');
+const vcf = (text: string, name = 'jane.vcf') => new File([text], name, { type: 'text/vcard' });
+
+describe('VCardInput contact file import (#1558)', () => {
+  it('fills the form from a chosen .vcf file, keeps the card format and clears social profiles the file lacks', async () => {
+    const onChange = vi.fn();
+    render(<VCardInput data={blankCard({ version: '4.0', github: 'old-handle' })} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText('Contact card file (.vcf)'), { target: { files: [vcf(CARD)] } });
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+    const update = onChange.mock.calls[0][0];
+    expect(update).toMatchObject({ firstName: 'Jane', lastName: 'Doe', email: 'jane@example.com', phone: '+1 555 0100', github: '' });
+    expect(update).not.toHaveProperty('version');
+    expect(screen.getByRole('status')).toHaveTextContent('Filled in from jane.vcf.');
+  });
+
+  it('fills the form from a dropped file', async () => {
+    render(<StatefulVCardInput initial={blankCard()} />);
+    fireEvent.drop(screen.getByTestId('vcard-drop-zone'), { dataTransfer: { files: [vcf(CARD)], types: ['Files'] } });
+    await waitFor(() => expect(screen.getByRole('textbox', { name: /First Name/ })).toHaveValue('Jane'));
+    expect(screen.getByRole('textbox', { name: /Email/ })).toHaveValue('jane@example.com');
+  });
+
+  it('opens the file picker from a real button', () => {
+    render(<VCardInput data={blankCard()} onChange={vi.fn()} />);
+    const input = screen.getByLabelText<HTMLInputElement>('Contact card file (.vcf)');
+    const click = vi.spyOn(input, 'click');
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a .vcf file' }));
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(input).toHaveAttribute('tabindex', '-1');
+  });
+
+  it.each([
+    ['a file that is not a contact card', vcf('just some notes', 'notes.txt'), /not a contact card/],
+    ['a card with no details', vcf('BEGIN:VCARD\nVERSION:3.0\nEND:VCARD'), /no name, phone, email or address/],
+    ['a file over 1 MB', vcf('x'.repeat(1024 * 1024 + 1), 'huge.vcf'), /larger than 1 MB/],
+  ])('shows an alert and changes nothing for %s', async (_name, file, message) => {
+    const onChange = vi.fn();
+    render(<VCardInput data={blankCard()} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText('Contact card file (.vcf)'), { target: { files: [file] } });
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('clears the alert after a good file', async () => {
+    render(<StatefulVCardInput initial={blankCard()} />);
+    const input = screen.getByLabelText('Contact card file (.vcf)');
+    fireEvent.change(input, { target: { files: [vcf('nope', 'nope.vcf')] } });
+    await screen.findByRole('alert');
+    fireEvent.change(input, { target: { files: [vcf(CARD)] } });
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+
+  it('passes the axe check with an import error showing', async () => {
+    const { container } = render(<VCardInput data={blankCard()} onChange={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Contact card file (.vcf)'), { target: { files: [vcf('nope', 'nope.vcf')] } });
+    await screen.findByRole('alert');
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

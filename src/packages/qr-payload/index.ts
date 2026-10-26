@@ -63,6 +63,7 @@ export { WifiContract, constructWifiString, hydrateWifiData, wifiPassphraseProbl
 export { EmailContract, constructEmailString, hydrateEmailData, emailListError, type EmailListErrorOptions } from './lib/generators/email';
 export { VCardContract, constructVCardString, hydrateVCardData, CARD_FIELDS, cardFieldsFor, vCardFieldError } from './lib/generators/vcard';
 export { VCARD_SOCIAL_FIELDS, VCARD_SOCIAL_NETWORKS, socialProfileUrl, type VCardSocialField } from './lib/vcardSocial';
+export { readVCardFile, MAX_VCARD_FILE_BYTES, VCARD_FILE_ERROR_MESSAGES, type VCardFileResult, type VCardFileError } from './lib/vcardFile';
 export { constructPhoneString, hydratePhoneData, droppedPhoneCharacters } from './lib/generators/phone';
 export { SmsContract, constructSmsString, hydrateSmsData } from './lib/generators/sms';
 export { PaymentContract, constructPaymentString, hydratePaymentData, paymentRefusal } from './lib/generators/payment';
