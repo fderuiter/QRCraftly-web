@@ -2,7 +2,9 @@
   "name": "QRCraftly",
   "short_name": "QRCraftly",
   "description": "Free, secure, and client-side QR code generator",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#0f766e",
@@ -30,6 +32,72 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Create a QR code",
+      "short_name": "Create QR",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Send a file",
+      "short_name": "Send file",
+      "url": "/file-transfer",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Receive a file",
+      "short_name": "Receive file",
+      "url": "/file-transfer/receive",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Scan a QR code",
+      "short_name": "Scan",
+      "url": "/qr-code-scanner",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/generator-narrow.png",
+      "sizes": "780x1688",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "The QR code generator on a phone"
+    },
+    {
+      "src": "/screenshots/generator-wide.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "The QR code generator with style controls and a live preview"
     }
   ]
 }
