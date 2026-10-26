@@ -10,8 +10,8 @@
   "preview_urls": true,
   "assets": {
     "directory": "dist/client",
-    // Serve /about/index.html at /about and 308 /about/ to /about, so every URL
-    // matches its canonical link (resolvePublicUrl drops trailing slashes).
+    // Serve /about/index.html at /about and redirect /about/ to /about (Cloudflare answers 307),
+    // so every URL matches its canonical link (resolvePublicUrl drops trailing slashes).
     "html_handling": "drop-trailing-slash",
     // Unknown paths get a real 404 status with the prerendered 404.html page.
     "not_found_handling": "404-page",

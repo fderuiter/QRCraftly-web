@@ -58,6 +58,12 @@ The headers in `public/_headers` only matter if the host sends them, so the Veri
 
 **Drift.** A failure in that job means production is not serving what `main` built: a header missing or changed by a dashboard rule (Transform Rules, Page Rules, a custom domain setting), a file changed after the build, or a deployment that did not come from Workers Builds. The failure lists every header or file that differs. To check by hand, compare `curl -sI https://qrcraftly.com/` with `public/_headers` and the `commit` in `https://qrcraftly.com/version.json` with `main`.
 
+**Zone features on `qrcraftly.com`.** Some Cloudflare settings act only on the custom domain, never on `*.workers.dev`, so the Verify Production Deployment job (which checks the workers.dev host) does not see them; the Release workflow's check of `qrcraftly.com` does. Checked on 2026-10-26:
+
+- **Speed Brain** (Speed, Optimization) adds a `Speculation-Rules: "/cdn-cgi/speculation"` header. The browser fetches that same-origin rule file and may prefetch a same-origin page the visitor is about to open (`eagerness: conservative`). It sends nothing to another origin and is allowed by `connect-src 'self'`.
+- **Bot Fight Mode** (Security, Settings, Bot traffic) always turns on Cloudflare's JavaScript Detections, which injects an inline loader for `/cdn-cgi/challenge-platform/scripts/jsd/main.js` into every HTML page. Our hash-based CSP blocks that inline script, so it never runs, but each page logs two `script-src-elem` violations, and `e2e/csp-enforcement.spec.ts` fails against `qrcraftly.com`. Cloudflare only adds nonces to a CSP that already uses them, which a static build cannot do.
+- **Web Analytics** is off (#1480): no `cloudflareinsights` beacon is injected.
+
 **Recovery.** First stop the cause: remove the dashboard rule, or find who deployed and with which token. Then put production back on a known build: roll back to the previous version in the Cloudflare dashboard (Workers & Pages, `qrcraftly`, Deployments) or with `wrangler rollback`, or merge a revert PR so Workers Builds redeploys `main`. Re-run the Verify Production Deployment job to confirm. These steps need Cloudflare access, so they are the owner's to take.
 
 ## Reporting a Vulnerability
