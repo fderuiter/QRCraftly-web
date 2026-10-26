@@ -72,6 +72,16 @@ _Status:_ Cloudflare absorbs this bandwidth cost completely on the CDN layer.
 
 Cloudflare Workers Builds builds every push: pushes to `main` deploy production and pushes to any other branch deploy a preview. Workers Builds meters **build minutes per month**, with plan limits on CPU, memory and build timeout; see Cloudflare's [Workers Builds limits and pricing](https://developers.cloudflare.com/workers/ci-cd/builds/limits-and-pricing/) for the current numbers. (The "500 builds per month" figure often quoted is the Cloudflare Pages limit and does not apply to Workers Builds.)
 
+The account's plan is not recorded in this repository, so both plans are listed. Checked 2026-10-26 against Cloudflare's [Workers Builds limits page](https://developers.cloudflare.com/workers/ci-cd/builds/limits-and-pricing/) (last updated 2026-05-29):
+
+| Metric            | Free plan       | Paid plans                               |
+| :---------------- | :-------------- | :--------------------------------------- |
+| Build minutes     | 3,000 per month | 6,000 per month (then $0.005 per minute) |
+| Concurrent builds | 1               | 6                                        |
+| Build timeout     | 20 minutes      | 20 minutes                               |
+
+Builds per month = monthly build minutes ÷ average minutes per build. A QRCraftly build takes about 1.5 minutes: on the single-push PRs #1656, #1657, #1659, #1660 and #1661 (2026-10-25), the Cloudflare bot's "In progress" comment turned into "Deployment successful" after 1.3 to 1.75 minutes. That is roughly **2,000 builds a month on the Free plan** and **4,000 on a Paid plan** before overage. The figure is read from those comment timestamps, not from the Workers Builds dashboard, and it rises if the build gets slower.
+
 _Mitigation:_ This affects developer deploy frequency, not end-user capacity. If the monthly allowance runs out, new builds stop until the next billing cycle, while the deployed static assets keep serving.
 
 ## Conclusion
