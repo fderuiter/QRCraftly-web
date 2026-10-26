@@ -4,6 +4,7 @@ import { TextField, SelectField } from "../ui/FormFields";
 import { LinkHints, hintsId } from "./FieldHints";
 import { vCardFieldError, VCARD_SOCIAL_FIELDS, VCARD_SOCIAL_NETWORKS } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
+import { VCardFileImport } from "./VCardFileImport";
 import {
   GRID_TWO_COLUMNS_CLASSES,
   SUB_CONTAINER_SPACING_CLASSES,
@@ -31,8 +32,18 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
   const [blurredSocials, setBlurredSocials] = useState<ReadonlySet<string>>(() => new Set());
   const isMeCard = data.version === "mecard";
 
+  // A file replaces the whole contact, so a social profile the file does not have is cleared too.
+  const importFields = (fields: Omit<VCardData, "version">) => {
+    const cleared: Partial<VCardData> = {};
+    for (const field of VCARD_SOCIAL_FIELDS) cleared[field] = "";
+    setBlurredSocials(new Set());
+    onChange({ ...cleared, ...fields });
+  };
+
   return (
     <FormBlock legend="Contact Details (vCard)">
+      <VCardFileImport onImport={importFields} />
+
       <SelectField
         id="vcard-version"
         label="Contact Format"
