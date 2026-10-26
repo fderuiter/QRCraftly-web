@@ -23,6 +23,10 @@
  * resampled to PRINT_PX_PER_MODULE pixels a module, levels are squeezed between paper and ink,
  * a Gaussian blur stands in for ink spread and a slightly soft camera, and seeded sensor noise is
  * added. The same pixels always give the same picture, so the verdict never flickers.
+ *
+ * The checks run the Rust port (`crates/optical-sim`, #1556) once it has loaded (`printKernel.ts`).
+ * This TypeScript stays as the reference the differential test compares the module against, and
+ * runs whenever the module has not loaded (or failed to). Both give the same bytes.
  */
 
 /** Raw RGBA pixels with their dimensions (an `ImageData` satisfies it). */
@@ -168,7 +172,27 @@ function reuse<T extends Float32Array | Uint8ClampedArray>(buffer: T | undefined
 }
 
 /**
- * Simulates a phone camera looking at a print of the code.
+ * How many samples a simulated pixel averages along each axis: more when the code is drawn
+ * larger than the simulated frame, so shrinking it does not alias. The Rust port takes it as an
+ * argument, because it comes from `Math.hypot`.
+ * @param placement - Where a decode found the code.
+ * @returns 1 to 3.
+ */
+export function printTaps(placement: PrintPlacement): number {
+  const modules = 17 + 4 * placement.version;
+  const [tl, tr, , bl] = placement.corners;
+  const edge = Math.max(Math.hypot(tr.x - tl.x, tr.y - tl.y), Math.hypot(bl.x - tl.x, bl.y - tl.y));
+  return Math.min(MAX_TAPS, Math.max(MIN_TAPS, Math.ceil(edge / modules / PRINT_PX_PER_MODULE)));
+}
+
+/** Reuses the scratch grey frame when it has the right size. */
+export function scratchGrey(scratch: OpticalScratchBuffers, count: number): Uint8ClampedArray {
+  return (scratch.grey = reuse(scratch.grey, count, (n) => new Uint8ClampedArray(n)));
+}
+
+/**
+ * Simulates a phone camera looking at a print of the code, in TypeScript: the reference for the
+ * Rust port, and what runs until it loads.
  * @param frame - The rendered design (RGBA).
  * @param placement - Where a decode of `frame` found the code.
  * @param scratch - Optional reusable buffers; filled in on first use.
@@ -180,14 +204,13 @@ export function simulatePrint(frame: PixelFrame, placement: PrintPlacement, scra
   const count = side * side;
   const luma = (scratch.luma = reuse(scratch.luma, count, (n) => new Float32Array(n)));
   const temp = (scratch.temp = reuse(scratch.temp, count, (n) => new Float32Array(n)));
-  const grey = (scratch.grey = reuse(scratch.grey, count, (n) => new Uint8ClampedArray(n)));
+  const grey = scratchGrey(scratch, count);
   const source = paperPlane(frame, (scratch.source = reuse(scratch.source, frame.width * frame.height, (n) => new Float32Array(n))));
 
   // Resample: each simulated pixel averages the source over its footprint (a bilinear map of the
   // corners, which also follows a slightly tilted code in a photo).
   const [tl, tr, br, bl] = placement.corners;
-  const edge = Math.max(Math.hypot(tr.x - tl.x, tr.y - tl.y), Math.hypot(bl.x - tl.x, bl.y - tl.y));
-  const taps = Math.min(MAX_TAPS, Math.max(MIN_TAPS, Math.ceil(edge / modules / PRINT_PX_PER_MODULE)));
+  const taps = printTaps(placement);
   const scale = PRINT_PX_PER_MODULE * taps;
   const range = (PRINT_PAPER_LEVEL - PRINT_INK_LEVEL) / 255;
   for (let oy = 0; oy < side; oy++) {
@@ -220,3 +243,6 @@ export function simulatePrint(frame: PixelFrame, placement: PrintPlacement, scra
   }
   return { data: grey, width: side, height: side };
 }
+
+/** A simulation with the same contract as {@link simulatePrint}. */
+export type PrintKernel = (frame: PixelFrame, placement: PrintPlacement, scratch?: OpticalScratchBuffers) => GreyFrame;

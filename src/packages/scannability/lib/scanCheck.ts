@@ -30,12 +30,17 @@ export type PixelCheck = (frame: PixelFrame, moduleCount?: number, quietZoneModu
 let loading: Promise<PixelCheck> | null = null;
 
 /**
- * Loads the full pixel check and our QR reader (#1178) once, for these checks and the evaluator's
- * main-thread fallback alike. A failed load is forgotten, so the next check retries.
+ * Loads the full pixel check, our QR reader (#1178) and the print simulation's Rust port (#1556)
+ * once, for these checks and the evaluator's main-thread fallback alike. A failed load is
+ * forgotten, so the next check retries; if only the Rust port fails, the TypeScript simulation runs.
  * @returns The loaded check.
  */
 export function loadPixelCheck(): Promise<PixelCheck> {
-  loading ??= Promise.all([import('../checker'), import('@/packages/qr-decode').then(({ loadQrReader }) => loadQrReader())])
+  loading ??= Promise.all([
+    import('../checker'),
+    import('@/packages/qr-decode').then(({ loadQrReader }) => loadQrReader()),
+    import('./opticalSimKernel').then(({ enablePrintKernel }) => enablePrintKernel()),
+  ])
     .then(
       ([{ performScannabilityCheck }, reader]): PixelCheck =>
         (frame, moduleCount, quietZoneModules) =>

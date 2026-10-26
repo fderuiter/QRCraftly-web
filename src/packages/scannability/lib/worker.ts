@@ -19,6 +19,7 @@
 import { assertWorkerRequest, assertWorkerResponse } from './sharedContract';
 import { loadQrReader } from '@/packages/qr-decode';
 import { scannabilitySteps, type OpticalScratchBuffers, type PixelFrame } from './checker';
+import { enablePrintKernel } from './opticalSimKernel';
 import { releaseImageHandle } from './imageHandle';
 
 let latestConfigId: string | undefined;
@@ -144,6 +145,9 @@ self.onmessage = async (e: MessageEvent<unknown>) => {
       throw new Error('Neither imageData nor imageBitmap provided');
     }
 
+    // Not awaited: the first checks run the TypeScript simulation while the Rust port loads, so it
+    // never delays a verdict. Both give the same bytes, so the verdict cannot change when it lands.
+    void enablePrintKernel();
     const steps = scannabilitySteps(await loadQrReader(), frame, moduleCount, scratch, quietZoneModules);
     let step = configId !== undefined && isStale() ? null : steps.next();
     while (step && !step.done) {

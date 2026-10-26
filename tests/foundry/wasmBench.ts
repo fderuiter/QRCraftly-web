@@ -116,6 +116,20 @@ export const BENCH_CALLS: Record<string, WasmBenchCall[]> = {
       prepare: (instance) => prepareDecode(instance, decodeRequest(renderGrid(qrEncoder.create('https://qrcraftly.com/menu?table=12').modules, 6, 640, 480), 640, 480, 1)),
     },
   ],
+  'optical-sim': [
+    {
+      name: 'print a version 5 code drawn 512 px (3 taps)',
+      prepare(instance) {
+        const print = instance.fn('optical_sim_print');
+        const side = instance.fn('optical_sim_side')(5);
+        const rgba = new Uint8Array(512 * 512 * 4).map((_, i) => ((i & 3) === 3 ? 255 : (Math.imul(i >> 2, 2654435761) >>> 31) * 255));
+        const input = instance.alloc(rgba.length);
+        const output = instance.alloc(side * side);
+        instance.write(input, rgba);
+        return () => print(input, rgba.length, 512, 512, 5, 3, 55, 55, 457, 55, 457, 457, 55, 457, output, side * side);
+      },
+    },
+  ],
   modem: [
     {
       name: 'sample P4 grid (160 x 72 cells, 640x360)',
