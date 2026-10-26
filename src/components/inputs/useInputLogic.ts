@@ -19,6 +19,7 @@
 import { useState, useRef, useEffect, type ElementType } from "react";
 import { type QRConfig, QRType } from "@/packages/core/types";
 import { INPUT_REGISTRY, constructInput, hydrateInput, validateInput, type InputDataMap, type InputProps } from "./InputRegistry";
+import { usePresetLogoPlacement } from "./usePresetLogoPlacement";
 
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
 const COMMIT_DELAY_MS = 100;
@@ -59,6 +60,7 @@ export function useInputLogic(
   onChange: (updates: Partial<QRConfig>) => void,
   onRefusedChange?: (refused: boolean) => void,
 ): { InputComponent: ElementType; inputProps: InputProps<QRType>; flush: () => void } {
+  usePresetLogoPlacement(config.type);
   // Initialize state for all types from registry or volatile retained cache
   const [inputStates, setInputStates] = useState<InputStates>(() => {
     let states: InputStates = {};
