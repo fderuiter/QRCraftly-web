@@ -181,7 +181,6 @@ HIPAA Technical Safeguard alignment is documented in [`docs/public/COMPLIANCE.md
 
 ### Later — Medium-Term
 
-- **Commercial self-hosting licence (undecided)**: A possible licence for organizations that want to self-host or white-label QRCraftly with commercial support. It would never gate a feature on `qrcraftly.com` ([the Pledge](docs/PLEDGE.md): no paid upgrades, every feature for everyone).
 - **Expand QR data types**: Additional social platforms, structured data types, and AR marker support as demand warrants.
 - **v1.0 stable release**: Graduate from `v0.x` pre-release when Air-Gapped Optical Transfer is out of Beta and the core studio feature set is considered complete.
 
@@ -246,11 +245,9 @@ QRCraftly has no analytics ([the Pledge](docs/PLEDGE.md)), so it cannot count us
 
 ## 11. Monetization Model
 
-QRCraftly is **open-source under AGPL-3.0**. The base product is free forever for individuals and non-commercial use.
+QRCraftly is **open-source under AGPL-3.0**. It is entirely free, for everyone and for any use.
 
-Every feature on `qrcraftly.com` is free for everyone, with no account, no ads and no paid upgrades, now and later ([the Pledge](docs/PLEDGE.md)). That includes the full studio, every data type, every visual option and Air-Gapped Transfer.
-
-> A commercial licence for organizations that want to self-host or white-label QRCraftly with support is undecided. If it ever exists, it covers only self-hosting, white-labelling and support, never a feature of the public site. No SaaS subscription or per-code pricing is planned.
+Every feature on `qrcraftly.com` is free for everyone, with no account, no ads and no paid upgrades, now and later ([the Pledge](docs/PLEDGE.md)). That includes the full studio, every data type, every visual option and Air-Gapped Transfer. No SaaS subscription, per-code pricing or paid tier is planned.
 
 ---
 
