@@ -99,7 +99,7 @@ describe('public/_headers caching', () => {
     expect(content).toMatch(/^\/assets\/\*\r?\n\s+Cache-Control: public, max-age=31536000, immutable$/m);
   });
 
-  it.each(['/media/*', '/og/*', '/examples/*', '/og-image.png', '/icon-*', '/favicon.png', '/manifest.json'])(
+  it.each(['/media/*', '/og/*', '/examples/*', '/og-image.png', '/icon-*', '/favicon.png', '/favicon.svg', '/favicon-32x32.png', '/apple-touch-icon.png', '/screenshots/*', '/manifest.json'])(
     'lets browsers keep %s, which has a fixed name, for a day (#1596)',
     (route) => {
       const content = fs.readFileSync(HEADERS_PATH, 'utf8');

@@ -28,6 +28,14 @@
   Cache-Control: public, max-age=86400
 /favicon.png
   Cache-Control: public, max-age=86400
+/favicon.svg
+  Cache-Control: public, max-age=86400
+/favicon-32x32.png
+  Cache-Control: public, max-age=86400
+/apple-touch-icon.png
+  Cache-Control: public, max-age=86400
+/screenshots/*
+  Cache-Control: public, max-age=86400
 /manifest.json
   Cache-Control: public, max-age=86400
 
