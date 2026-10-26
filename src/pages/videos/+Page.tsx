@@ -16,14 +16,61 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { useEffect, useRef, useState } from 'react';
+import { Play } from 'lucide-react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
-import { SITE_VIDEOS, videoSrc } from '@/data/videos';
+import { Button } from '@/components/ui/Button';
+import { SITE_VIDEOS, videoSrc, type SiteVideo } from '@/data/videos';
 import { isDangerousUrl } from '@/packages/core/security';
 
 /**
+ * One video. Until someone presses play it is a poster image in a button: a page of native
+ * players costs a second of main-thread work for their controls and fetches every captions
+ * file, so the player is only built for the video being watched (#1662). Pressing play swaps
+ * in the browser's own player, which starts at once and takes the keyboard focus.
+ * @param props The video, the id of its title and whether its poster is above the fold.
+ * @returns The poster button, or the player once started.
+ */
+function VideoPlayer({ video, titleId, eager }: { video: SiteVideo; titleId: string; eager: boolean }) {
+  const [started, setStarted] = useState(false);
+  const player = useRef<HTMLVideoElement>(null);
+  // The button that was pressed is gone, so keyboard focus moves to the player that replaced it.
+  useEffect(() => {
+    if (started) player.current?.focus();
+  }, [started]);
+  const wide = video.width > video.height;
+  const box = `w-full rounded-lg bg-surface-sunken ${wide ? 'aspect-video' : 'aspect-[9/16]'}`;
+  if (started) {
+    return (
+      <video ref={player} tabIndex={0} className={box} controls playsInline autoPlay preload="auto" poster={videoSrc(video, 'jpg')} aria-labelledby={titleId}>
+        <source src={videoSrc(video, 'mp4')} type="video/mp4" />
+        <track kind="captions" src={videoSrc(video, 'vtt')} srcLang="en" label="English" default />
+      </video>
+    );
+  }
+  return (
+    <Button variant="ghost" size="none" className={`group relative overflow-hidden p-0 ${box}`} aria-label={`Play ${video.title}`} onClick={() => setStarted(true)}>
+      <img
+        src={videoSrc(video, 'jpg')}
+        alt=""
+        width={video.width}
+        height={video.height}
+        loading={eager ? 'eager' : 'lazy'}
+        fetchPriority={eager ? 'high' : 'auto'}
+        decoding="async"
+        className="size-full object-cover"
+      />
+      <span className="absolute inset-0 m-auto flex size-16 items-center justify-center rounded-full bg-action text-on-action shadow-lg transition-transform group-hover:scale-105">
+        <Play aria-hidden="true" className="size-8 translate-x-0.5" fill="currentColor" />
+      </span>
+    </Button>
+  );
+}
+
+/**
  * The `/videos` page: short screen recordings of the tools. The files are served from this site
- * and play in the browser's own player. `preload="none"` means nothing downloads until someone
- * presses play, and there is no autoplay and no third-party player.
+ * and play in the browser's own player. Only the posters load with the page: no video or
+ * captions file downloads until someone presses play, and there is no third-party player.
  * @returns The page.
  */
 export default function Page() {
@@ -37,22 +84,12 @@ export default function Page() {
           nothing downloads until you press play.
         </p>
         <ul className="grid list-none gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {SITE_VIDEOS.map((video) => {
+          {SITE_VIDEOS.map((video, index) => {
             const wide = video.width > video.height;
             const titleId = `${video.id}-title`;
             return (
               <li key={video.id} className={`flex min-w-0 flex-col gap-3 rounded-xl border border-line bg-surface p-4 ${wide ? 'sm:col-span-2 lg:col-span-3' : ''}`}>
-                <video
-                  className={`w-full rounded-lg bg-surface-sunken ${wide ? 'aspect-video' : 'aspect-[9/16]'}`}
-                  controls
-                  playsInline
-                  preload="none"
-                  poster={videoSrc(video, 'jpg')}
-                  aria-labelledby={titleId}
-                >
-                  <source src={videoSrc(video, 'mp4')} type="video/mp4" />
-                  <track kind="captions" src={videoSrc(video, 'vtt')} srcLang="en" label="English" default />
-                </video>
+                <VideoPlayer video={video} titleId={titleId} eager={index === 0} />
                 <h2 id={titleId} className="text-xl font-bold text-fg">{video.title}</h2>
                 <p className="text-sm text-fg-soft">{video.description}</p>
                 <details className="text-sm text-fg-muted">

@@ -6,6 +6,7 @@ function TestForm({ initialFields, showConditional }: { initialFields: string[],
   const containerRef = useDynamicFocus<HTMLDivElement>([showConditional]);
   return (
     <div ref={containerRef}>
+      <button type="button">Security type</button>
       {initialFields.includes('ssid') && (
         <div>
           <label htmlFor="wifi-ssid">SSID</label>
@@ -70,6 +71,11 @@ describe('useDynamicFocus hook', () => {
       vi.advanceTimersByTime(200);
     });
 
+    // The user changes a control in the form, which brings in the conditional field.
+    act(() => {
+      document.querySelector<HTMLButtonElement>('button')?.focus();
+    });
+
     // Mount conditional field
     rerender(<TestForm initialFields={['ssid', 'password']} showConditional={true} />);
 
@@ -88,6 +94,39 @@ describe('useDynamicFocus hook', () => {
     const lr = document.getElementById('dynamic-focus-live-region');
     expect(lr).not.toBeNull();
     expect(lr?.textContent).toContain('Identity / Username field is now available');
+  });
+
+  it.each([
+    ['a control outside the panel has focus', true],
+    ['nothing has been focused yet', false],
+  ])('does not take focus for a field that arrives late when %s (#1662)', async (_case, focusOutside) => {
+    const outside = document.createElement('button');
+    outside.textContent = 'Site menu';
+    document.body.appendChild(outside);
+    try {
+      const { rerender } = render(<TestForm initialFields={['ssid']} showConditional={false} />);
+      await act(async () => {
+        await Promise.resolve();
+      });
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+      if (focusOutside) act(() => outside.focus());
+
+      // A lazily loaded form lands well after the page mounted.
+      rerender(<TestForm initialFields={['ssid']} showConditional={true} />);
+      await act(async () => {
+        await Promise.resolve();
+      });
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      expect(document.activeElement).toBe(focusOutside ? outside : document.body);
+      expect(document.getElementById('dynamic-focus-live-region')?.textContent).toContain('Identity / Username field is now available');
+    } finally {
+      outside.remove();
+    }
   });
 
   it('should shift focus to the nearest remaining field when a focused field is unmounted', async () => {

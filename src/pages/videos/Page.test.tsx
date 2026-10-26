@@ -16,24 +16,43 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { SITE_VIDEOS } from '@/data/videos';
 import Page from './+Page';
 
 describe('Videos page', () => {
-  it('lists every video with a player that loads nothing until played', () => {
+  it('shows a poster button per video and builds no player until one is pressed', () => {
     const { container } = render(<Page />);
     expect(screen.getByRole('heading', { level: 1, name: 'QRCraftly videos' })).toBeInTheDocument();
-    const players = container.querySelectorAll('video');
-    expect(players).toHaveLength(SITE_VIDEOS.length);
-    for (const player of players) {
-      expect(player).toHaveAttribute('preload', 'none');
-      expect(player).not.toHaveAttribute('autoplay');
-      expect(player.querySelector('source')?.getAttribute('src')).toMatch(/^\/media\/[a-z-]+\.mp4$/);
-      expect(player.querySelector('track[kind="captions"]')?.getAttribute('src')).toMatch(/^\/media\/[a-z-]+\.vtt$/);
+    expect(container.querySelectorAll('video')).toHaveLength(0);
+    expect(container.querySelectorAll('track')).toHaveLength(0);
+    const posters = container.querySelectorAll('img');
+    expect(posters).toHaveLength(SITE_VIDEOS.length);
+    posters.forEach((poster, index) => {
+      expect(poster.getAttribute('src')).toMatch(/^\/media\/[a-z-]+\.jpg$/);
+      expect(poster).toHaveAttribute('loading', index === 0 ? 'eager' : 'lazy');
+    });
+    for (const video of SITE_VIDEOS) {
+      expect(screen.getByRole('button', { name: `Play ${video.title}` })).toBeInTheDocument();
     }
+  });
+
+  it('swaps in the native player with captions when play is pressed, and focuses it', () => {
+    const { container } = render(<Page />);
+    const [first, second] = SITE_VIDEOS;
+    fireEvent.click(screen.getByRole('button', { name: `Play ${second.title}` }));
+    const players = container.querySelectorAll('video');
+    expect(players).toHaveLength(1);
+    const player = players[0];
+    expect(player).toHaveAttribute('controls');
+    expect(player).toHaveAttribute('aria-labelledby', `${second.id}-title`);
+    expect(player.querySelector('source')).toHaveAttribute('src', `/media/${second.id}.mp4`);
+    expect(player.querySelector('track[kind="captions"]')).toHaveAttribute('src', `/media/${second.id}.vtt`);
+    expect(player).toHaveFocus();
+    expect(screen.queryByRole('button', { name: `Play ${second.title}` })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `Play ${first.title}` })).toBeInTheDocument();
   });
 
   it('names each player by its title', () => {
