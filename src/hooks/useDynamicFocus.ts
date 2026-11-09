@@ -229,7 +229,15 @@ export function useDynamicFocus<T extends HTMLElement = HTMLDivElement>(_depende
           activeElement.closest('[role="tablist"]') !== null
         );
 
-        if (!isUserTypingInTextInput && !isUserFocusingTab) {
+        // Only follow the user's own action inside the panel. A field that arrives on its own,
+        // such as a lazily loaded form on a slow connection, must not pull focus from the site
+        // menu or anywhere else the user has moved to (#1662).
+        const lastFocused = lastFocusedRef.current;
+        const isUserInPanel = activeElement && activeElement !== document.body
+          ? container.contains(activeElement)
+          : lastFocused !== null && (!lastFocused.isConnected || container.contains(lastFocused));
+
+        if (isUserInPanel && !isUserTypingInTextInput && !isUserFocusingTab) {
           const firstNewElement = addedElements[0];
           firstNewElement.focus();
           if (rafId) cancelAnimationFrame(rafId);
