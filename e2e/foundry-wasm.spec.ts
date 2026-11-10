@@ -24,6 +24,7 @@
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { runModemBattery, MODEM_BATTERY_SHA256 } from '../tests/foundry/modemBattery';
 import { runOpticalSimBattery, OPTICAL_SIM_BATTERY_SHA256 } from '../tests/foundry/opticalSimBattery';
@@ -31,6 +32,16 @@ import { decodePrismFecJob, makePrismFecJob, runPrismFecBattery, PRISM_FEC_BATTE
 import { runQrDecodeBattery, QR_DECODE_BATTERY_SHA256 } from '../tests/foundry/qrDecodeBattery';
 import { runQrEncodeBattery, QR_ENCODE_BATTERY_SHA256 } from '../tests/foundry/qrEncodeBattery';
 import { runSelftestBattery, SELFTEST_BATTERY_SHA256 } from '../tests/foundry/selftestBattery';
+
+/**
+ * Opens an empty page on the site's origin with no Content Security Policy. The site's own pages
+ * require Trusted Types (#1172), which WebKit enforces even when Playwright bypasses the CSP, so a
+ * plain `new Worker(url)` from test code would be refused there.
+ */
+async function openPolicyFreePage(page: Page): Promise<void> {
+  await page.context().route('**/__foundry/blank', (route) => route.fulfill({ body: '<!doctype html><title>foundry</title>', contentType: 'text/html' }));
+  await page.goto('/__foundry/blank');
+}
 
 const BATTERIES = [
   { module: 'selftest', battery: runSelftestBattery, sha256: SELFTEST_BATTERY_SHA256 },
@@ -63,7 +74,7 @@ onmessage = async (event) => {
     // worker would not do: WebKit does not load one through Playwright's request interception.
     await page.context().route(`**${modulePath}`, (route) => route.fulfill({ body: moduleBytes, contentType: 'application/wasm' }));
     await page.context().route(`**${workerPath}`, (route) => route.fulfill({ body: workerSource, contentType: 'text/javascript' }));
-    await page.goto('/about');
+    await openPolicyFreePage(page);
 
     const result = await page.evaluate(
       async ({ modulePath, workerPath }) => {
@@ -118,7 +129,7 @@ onmessage = async (event) => {
 };`;
   await page.context().route(`**${modulePath}`, (route) => route.fulfill({ body: moduleBytes, contentType: 'application/wasm' }));
   await page.context().route(`**${workerPath}`, (route) => route.fulfill({ body: workerSource, contentType: 'text/javascript' }));
-  await page.goto('/about');
+  await openPolicyFreePage(page);
 
   const blocks = job.blocks.map((block) => ({ ...block, symbols: Buffer.from(block.symbols).toString('hex') }));
   const result = await page.evaluate(

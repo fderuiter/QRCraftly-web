@@ -218,7 +218,7 @@ test.describe('Trusted Types enforced (#1172)', { tag: '@prod' }, () => {
       const reloaded = route === '/security' ? page.waitForEvent('load') : null;
       await page.evaluate((href) => {
         const link = document.createElement('a');
-        link.href = href;
+        link.setAttribute('href', href);
         document.body.appendChild(link);
         link.click();
         link.remove();

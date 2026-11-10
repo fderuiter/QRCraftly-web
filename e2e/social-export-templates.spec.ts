@@ -445,7 +445,10 @@ test.describe('SVG download', () => {
 
     // The PNG draws the headline at round(width * 0.055)px; the SVG must ask for the same size,
     // and the browser must actually lay the glyphs out at that size (a `font=` attribute is ignored).
-    const { fontSize, glyphHeight, viewBoxWidth } = await page.evaluate((svgText) => {
+    // The SVG is laid out on a blank page, which has no Content Security Policy: the site's pages
+    // require Trusted Types (#1172), which WebKit enforces even when Playwright bypasses the CSP.
+    const scratch = await page.context().newPage();
+    const { fontSize, glyphHeight, viewBoxWidth } = await scratch.evaluate((svgText) => {
       const host = document.createElement('div');
       host.innerHTML = svgText;
       document.body.appendChild(host);
@@ -460,6 +463,7 @@ test.describe('SVG download', () => {
       host.remove();
       return result;
     }, content);
+    await scratch.close();
 
     expect(fontSize).toBe(Math.round(viewBoxWidth * 0.055));
     expect(glyphHeight).toBeGreaterThan(fontSize * 0.8);
