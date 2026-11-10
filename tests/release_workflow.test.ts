@@ -107,6 +107,7 @@ describe('GitHub Releases follow the Cloudflare deploy', () => {
 
   it('gives the Latest badge only to the newest version', () => {
     expect(publishJob).toContain("sort -uV | tail -n 1");
+    expect(publishJob).toContain("grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$'");
     expect(publishJob).toContain('latest=false');
   });
 });
