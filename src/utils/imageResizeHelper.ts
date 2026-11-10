@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { sameOriginWorker } from '@/packages/core/security';
+
 // Persistent module-level cached canvas and context for main thread fallback to prevent GC/memory allocation churn
 let mainThreadCachedCanvas: HTMLCanvasElement | null = null;
 let mainThreadCachedCtx: CanvasRenderingContext2D | null = null;
@@ -93,6 +95,7 @@ export const processImageOffThread = (file: File | Blob, maxDim: number, timeout
       reject(err);
     };
     try {
+      const Worker = sameOriginWorker();
       worker = new Worker(new URL('./imageResizeWorker.ts', import.meta.url), { type: 'module' });
       timer = setTimeout(() => fail(new Error(`Worker resize timed out after ${timeoutMs} ms`)), timeoutMs);
 

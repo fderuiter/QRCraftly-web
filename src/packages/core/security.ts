@@ -323,8 +323,7 @@ export const sanitizeSvg = (svgText: string): string => {
   if (!svgText) return '';
 
   try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgText, 'image/svg+xml');
+    const doc = parseInertMarkup(svgText, 'image/svg+xml');
 
     // Traverse the document and sanitize
     const cleanNode = (node: Node) => {
@@ -419,4 +418,110 @@ export const sanitizeSvg = (svgText: string): string => {
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"></svg>';
   }
 };
+
+
+/** The one Trusted Types policy the app creates, named in the CSP's `trusted-types` directive (#1172). */
+export const TRUSTED_TYPES_POLICY = 'qrcraftly';
+
+/**
+ * The parts of the Trusted Types API this module uses. TypeScript's DOM library does not
+ * declare it, and the `Worker` and `register` signatures there do not know `TrustedScriptURL`,
+ * so the policy's results are typed as the strings they stand for. Only the sinks read them.
+ */
+interface QrcraftlyPolicy {
+  createScriptURL(input: string): string;
+  createHTML(input: string): string;
+}
+
+interface TrustedTypePolicyFactory {
+  createPolicy(name: string, rules: { createScriptURL(input: string): string; createHTML(input: string): string }): QrcraftlyPolicy;
+}
+
+declare global {
+  var trustedTypes: TrustedTypePolicyFactory | undefined;
+}
+
+/**
+ * Accepts a script URL only when it is on this page's origin.
+ * @param input - The URL text, absolute or relative to the page.
+ * @returns The input, unchanged.
+ * @throws TypeError when the URL is on another origin or cannot be parsed.
+ */
+export function assertSameOriginScriptUrl(input: string): string {
+  const { origin } = globalThis.location;
+  let parsed: URL;
+  try {
+    parsed = new URL(input, origin);
+  } catch {
+    throw new TypeError(`Refused script URL that does not parse: ${input}`);
+  }
+  if (parsed.origin !== origin) throw new TypeError(`Refused script URL from another origin: ${parsed.origin}`);
+  return input;
+}
+
+let policy: QrcraftlyPolicy | null | undefined;
+
+/**
+ * The app's policy, created on first use. Null where the browser has no Trusted Types, which
+ * also means it ignores the CSP directive. The policy object never leaves this module, so its
+ * HTML rule is reachable only through {@link parseInertMarkup}.
+ * @returns The policy, or null.
+ */
+function getPolicy(): QrcraftlyPolicy | null {
+  if (policy === undefined) {
+    policy =
+      globalThis.trustedTypes?.createPolicy(TRUSTED_TYPES_POLICY, {
+        createScriptURL: assertSameOriginScriptUrl,
+        // Only parseInertMarkup reaches this rule: a DOMParser document runs no script and loads nothing.
+        createHTML: (input) => input,
+      }) ?? null;
+  }
+  return policy;
+}
+
+/**
+ * Wraps a worker or service worker script URL for a Trusted Types sink (#1172).
+ * @param url - The script URL.
+ * @returns A `TrustedScriptURL` where Trusted Types exists, otherwise the URL unchanged.
+ * @throws TypeError when the URL is on another origin.
+ */
+export function trustedScriptUrl(url: string): string;
+export function trustedScriptUrl(url: string | URL): string | URL;
+export function trustedScriptUrl(url: string | URL): string | URL {
+  const trusted = getPolicy();
+  return trusted ? trusted.createScriptURL(String(url)) : url;
+}
+
+/**
+ * The browser's `Worker`, with every script URL passed through {@link trustedScriptUrl} (#1172).
+ * Each call site binds it to a local `Worker` and keeps Vite's literal worker pattern (the
+ * constructor called on `new URL('./x.ts', import.meta.url)`), because that text is how Vite finds a
+ * worker to bundle; wrapping the URL argument instead would hide the worker from the build. A file
+ * that binds the local `Worker` must not also read the global one by that name (write
+ * `globalThis.Worker`): esbuild then renames the local, Vite no longer sees the pattern and ships
+ * the worker's TypeScript source as a data URL. `tests/build-output` checks every worker is
+ * bundled. The class is made on each call, from whatever `Worker` the page has then, so tests can
+ * stub the global.
+ * @returns A `Worker` subclass.
+ */
+export function sameOriginWorker(): typeof Worker {
+  return class SameOriginWorker extends globalThis.Worker {
+    constructor(scriptURL: string | URL, options?: WorkerOptions) {
+      super(trustedScriptUrl(scriptURL), options);
+    }
+  };
+}
+
+/**
+ * Parses markup into an inert document, the one `DOMParser` path in the app. Under Trusted Types
+ * `parseFromString` is an HTML sink. The document runs no script and loads nothing, and every
+ * caller reads it or sanitizes it before anything reaches the page.
+ * @param text - The markup.
+ * @param type - The parser's MIME type.
+ * @returns The parsed document.
+ */
+export function parseInertMarkup(text: string, type: DOMParserSupportedType): Document {
+  const trusted = getPolicy();
+  return new DOMParser().parseFromString(trusted ? trusted.createHTML(text) : text, type);
+}
 

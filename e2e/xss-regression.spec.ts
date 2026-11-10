@@ -58,8 +58,12 @@ async function open(page: Page, path: string): Promise<void> {
 }
 
 /** Parses an exported SVG and lists any element or attribute that could run script. */
-function activeContentIn(page: Page, svg: string): Promise<string[]> {
-  return page.evaluate((text) => {
+async function activeContentIn(page: Page, svg: string): Promise<string[]> {
+  // A blank page has no Content Security Policy. The site's pages require Trusted Types (#1172),
+  // which WebKit enforces even when Playwright bypasses the CSP, so DOMParser is refused there.
+  const scratch = await page.context().newPage();
+  try {
+    return await scratch.evaluate((text) => {
     const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
     const found: string[] = [];
     for (const element of Array.from(doc.getElementsByTagName('*'))) {
@@ -70,7 +74,10 @@ function activeContentIn(page: Page, svg: string): Promise<string[]> {
       }
     }
     return found;
-  }, svg);
+    }, svg);
+  } finally {
+    await scratch.close();
+  }
 }
 
 async function downloadSvg(page: Page): Promise<string> {

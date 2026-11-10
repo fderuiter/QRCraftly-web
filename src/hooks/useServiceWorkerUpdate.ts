@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { trustedScriptUrl } from '@/packages/core/security';
 
 /**
  * Minimal slice of the ServiceWorkerContainer API used for registration,
@@ -81,7 +82,7 @@ export function useServiceWorkerUpdate(options: ServiceWorkerUpdateOptions): voi
       });
     };
 
-    sw.register('/sw.js')
+    sw.register(trustedScriptUrl('/sw.js'))
       .then((registration) => {
         if (cancelled) return;
         // A worker already waiting from an earlier visit.

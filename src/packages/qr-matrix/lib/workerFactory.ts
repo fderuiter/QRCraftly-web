@@ -16,7 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-const hasWorker = (): boolean => typeof window !== 'undefined' && typeof Worker !== 'undefined';
+import { sameOriginWorker } from '@/packages/core/security';
+
+const hasWorker = (): boolean => typeof window !== 'undefined' && typeof globalThis.Worker !== 'undefined';
 
 /**
  * Spawns the Matrix Worker, which validates a configuration and encodes its module matrix
@@ -24,7 +26,9 @@ const hasWorker = (): boolean => typeof window !== 'undefined' && typeof Worker 
  * @returns The worker, or null where Web Workers are unavailable (SSR, jsdom, old browsers).
  */
 export function createMatrixWorker(): Worker | null {
-  return hasWorker() ? new Worker(new URL('../worker-matrix.ts', import.meta.url), { type: 'module' }) : null;
+  if (!hasWorker()) return null;
+  const Worker = sameOriginWorker();
+  return new Worker(new URL('../worker-matrix.ts', import.meta.url), { type: 'module' });
 }
 
 /**
@@ -33,5 +37,7 @@ export function createMatrixWorker(): Worker | null {
  * @returns The worker, or null where Web Workers are unavailable (SSR, jsdom, old browsers).
  */
 export function createMazeWorker(): Worker | null {
-  return hasWorker() ? new Worker(new URL('../worker-maze.ts', import.meta.url), { type: 'module' }) : null;
+  if (!hasWorker()) return null;
+  const Worker = sameOriginWorker();
+  return new Worker(new URL('../worker-maze.ts', import.meta.url), { type: 'module' });
 }
