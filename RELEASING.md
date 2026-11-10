@@ -116,12 +116,16 @@ A release names what is already running in production: it bumps the version, wri
    - extracts release notes from `CHANGELOG.md` before creating or pushing tags, preventing orphaned tags if note extraction fails
    - creates the annotated tag `vX.Y.Z` idempotently and pushes it to origin
    - creates the GitHub Release as a **draft** with the extracted release notes
-   - waits until both production URLs serve the new `/version.json` (15 minutes for workers.dev, 30 for `qrcraftly.com`), then runs the smoke tests against each. Both legs are required and neither is retried automatically, so a stale production fails the release.
-   - publishes the draft and marks it **Latest** (only when it is the newest version) once both legs pass.
+   - waits until both production URLs serve the new `/version.json` (15 minutes for workers.dev, 30 for `qrcraftly.com`). Neither wait is retried automatically, so a stale production fails the release.
+   - runs the smoke tests against workers.dev. They must pass.
+   - publishes the draft and marks it **Latest** (only when it is the newest version) once both URLs serve it and workers.dev passes.
+   - runs the same smoke tests against `qrcraftly.com` as an advisory job. A failure there adds a warning to the run but does not hold the release back (see below).
 
 ### GitHub Releases follow Cloudflare
 
-Cloudflare Workers Builds deploys every merge to `main` on its own, and nothing in this flow changes how Cloudflare is set up. The Release workflow only watches it: a GitHub Release becomes public, and takes the **Latest** badge, only after `qrcraftly.com` and `qrcraftly.fpderuiter.workers.dev` both report that version in `/version.json` and pass the smoke tests. So the newest published release is always what production serves. If the Cloudflare build fails or production stays on the old version, the release stays a draft (visible to maintainers only) and the previous release stays **Latest**.
+Cloudflare Workers Builds deploys every merge to `main` on its own, and nothing in this flow changes how Cloudflare is set up. The Release workflow only watches it: a GitHub Release becomes public, and takes the **Latest** badge, only after `qrcraftly.com` and `qrcraftly.fpderuiter.workers.dev` both report that version in `/version.json` and workers.dev passes the smoke tests. So the newest published release is always what production serves. If the Cloudflare build fails or production stays on the old version, the release stays a draft (visible to maintainers only) and the previous release stays **Latest**.
+
+The strict smoke suite gates on workers.dev because that host serves exactly what Workers Builds deployed. `qrcraftly.com` sits behind the zone's dashboard features, which can change pages without changing the build: JavaScript Detections (from Bot Fight Mode) injects a `/cdn-cgi/challenge-platform` script that the suite flags as a CSP violation, an outbound request and a changed page. Those are Cloudflare settings, not release blockers, so the custom-domain suite only warns. A warning there is worth reading: it lists what the zone changed (see [Zone features](docs/SECURITY.md) in `docs/SECURITY.md`).
 
 If the workflow failed for an external reason (for example, a slow or failed Cloudflare build, or a network error), fix the cause and rerun it from **Actions → Release → Run workflow** (or re-run the failed workflow run). The workflow sees the existing tag and the draft release, refreshes the notes, waits for production again, and publishes the draft when production serves it, without manual tag deletion or Git intervention. Rerunning is safe.
 

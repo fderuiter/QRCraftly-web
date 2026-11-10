@@ -6,9 +6,11 @@ name: Release
 # CHANGELOG.md section. When that PR is squash-merged, this workflow sees a
 # package.json version on main with no published release, creates the annotated tag
 # vX.Y.Z on that commit and a DRAFT GitHub Release, waits for Cloudflare Workers
-# Builds to serve the version on both production URLs, smoke tests it, and only then
-# publishes the release. A published GitHub Release therefore always names what
-# Cloudflare is serving; a failed or stale deploy leaves the release as a draft.
+# Builds to serve the version on both production URLs, smoke tests workers.dev, and only
+# then publishes the release. A published GitHub Release therefore always names what
+# Cloudflare is serving; a failed or stale deploy leaves the release as a draft. The full
+# smoke suite also runs on qrcraftly.com, but only as a warning: Cloudflare zone features
+# there (such as JavaScript Detections) change pages without changing the build.
 # Cloudflare is not touched: Workers Builds still deploys every push to main itself.
 #
 # Every other push to main finds the release already published and does nothing. The
@@ -134,19 +136,17 @@ jobs:
             gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release_notes.md"
           fi
 
+  # The release gate. workers.dev serves exactly what Workers Builds deployed, with no zone
+  # features in front of it, so the full smoke suite (CSP, Trusted Types, no outbound data,
+  # build integrity) runs there and must pass.
   smoke-tests:
-    name: Production Smoke Tests
+    name: Production Smoke Tests (workers.dev)
     needs: publish
     if: needs.publish.outputs.published == 'true'
     runs-on: ubuntu-latest
-    # Covers the 30-minute wait on qrcraftly.com plus the smoke tests.
-    timeout-minutes: 50
-    strategy:
-      fail-fast: false
-      matrix:
-        base_url:
-          - https://qrcraftly.fpderuiter.workers.dev
-          - https://qrcraftly.com
+    timeout-minutes: 30
+    env:
+      BASE_URL: https://qrcraftly.fpderuiter.workers.dev
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -158,28 +158,83 @@ jobs:
         with:
           cache-playwright: 'true'
 
-      # Both legs are required. qrcraftly.com gets 30 minutes instead of 15 (#1217, #1394), and on a
-      # timeout the script prints the last response's status, headers and body start, so a failure
-      # says whether the custom domain served a cached copy, an error or a challenge page. There is
-      # no blind retry: a stale production must fail the release.
-      - name: Wait for production to serve this release
+      # On a timeout the script prints the last response's status, headers and body start.
+      # There is no blind retry: a stale production must fail the release.
+      - name: Wait for workers.dev to serve this release
         env:
-          BASE_URL: ${{ matrix.base_url }}
           EXPECTED_VERSION: ${{ needs.publish.outputs.version }}
-          TIMEOUT_SECONDS: ${{ matrix.base_url == 'https://qrcraftly.com' && '1800' || '900' }}
+          TIMEOUT_SECONDS: '900'
         run: bash scripts/ci/wait_for_deploy.sh
 
       - name: Run Smoke Tests
         env:
-          PLAYWRIGHT_TEST_BASE_URL: ${{ matrix.base_url }}
+          PLAYWRIGHT_TEST_BASE_URL: ${{ env.BASE_URL }}
           EXPECTED_VERSION: ${{ needs.publish.outputs.version }}
         run: bash scripts/ci/run_smoke_tests.sh
 
-  # Runs only when both production URLs serve this version and pass the smoke tests,
-  # so the public GitHub Release matches what Cloudflare Workers Builds deployed.
+  # Also part of the gate: the custom domain must serve this version too, so the release
+  # never goes public while qrcraftly.com still serves the old one. It gets 30 minutes
+  # (#1217, #1394) and no blind retry.
+  custom-domain-version:
+    name: Wait for qrcraftly.com
+    needs: publish
+    if: needs.publish.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          sparse-checkout: scripts/ci
+          persist-credentials: false
+
+      - name: Wait for qrcraftly.com to serve this release
+        env:
+          BASE_URL: https://qrcraftly.com
+          EXPECTED_VERSION: ${{ needs.publish.outputs.version }}
+          TIMEOUT_SECONDS: '1800'
+        run: bash scripts/ci/wait_for_deploy.sh
+
+  # Advisory, not part of the gate. Cloudflare zone features on the custom domain (such as
+  # JavaScript Detections from Bot Fight Mode) inject scripts that the strict suite rightly
+  # flags, and those are dashboard settings, not the build. This job still runs the full suite
+  # there and turns a failure into a warning on the run, so the drift stays visible without
+  # holding the release back.
+  custom-domain-smoke:
+    name: qrcraftly.com Smoke Tests (advisory)
+    needs: [publish, custom-domain-version]
+    if: needs.publish.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          cache-playwright: 'true'
+
+      - name: Run Smoke Tests against qrcraftly.com
+        env:
+          PLAYWRIGHT_TEST_BASE_URL: https://qrcraftly.com
+          EXPECTED_VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          if bash scripts/ci/run_smoke_tests.sh; then
+            echo "qrcraftly.com passed the full smoke suite." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning title=qrcraftly.com differs from the build::The smoke suite failed on https://qrcraftly.com but passed on workers.dev. A Cloudflare zone feature (for example JavaScript Detections) is changing pages on the custom domain. See docs/SECURITY.md, Zone features."
+            echo "qrcraftly.com failed the smoke suite (advisory). See the log for the failing checks." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # Runs only when workers.dev passes the smoke suite and both production URLs serve this
+  # version, so the public GitHub Release matches what Cloudflare Workers Builds deployed.
   publish-release:
     name: Publish GitHub Release
-    needs: [publish, smoke-tests]
+    needs: [publish, smoke-tests, custom-domain-version]
     if: needs.publish.outputs.published == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5

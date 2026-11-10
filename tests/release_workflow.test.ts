@@ -46,21 +46,41 @@ describe('Release Workflow Structural Invariants Audit', () => {
   });
 });
 
-describe('Release smoke test legs (#1217, #1394)', () => {
+describe('Release production checks (#1217, #1394)', () => {
   const content = fs.readFileSync(path.resolve(process.cwd(), '.github/workflows/release.yml'), 'utf8');
-  const smoke = content.slice(content.indexOf('  smoke-tests:'));
+  const job = (name: string) => {
+    const start = content.indexOf(`\n  ${name}:`);
+    const next = content.slice(start + 1).search(/\n {2}[a-z-]+:\n/);
+    return next === -1 ? content.slice(start) : content.slice(start, start + 1 + next);
+  };
+  const strict = job('smoke-tests');
+  const customDomain = job('custom-domain-version');
+  const advisory = job('custom-domain-smoke');
+  const gate = job('publish-release');
 
-  it('keeps both production URLs as required legs, without a blind retry', () => {
-    expect(smoke).toContain('- https://qrcraftly.fpderuiter.workers.dev');
-    expect(smoke).toContain('- https://qrcraftly.com');
-    expect(smoke).not.toContain('continue-on-error');
-    expect(smoke).toContain('fail-fast: false');
+  it('runs the strict smoke suite on workers.dev, without a blind retry', () => {
+    expect(strict).toContain('BASE_URL: https://qrcraftly.fpderuiter.workers.dev');
+    expect(strict).toContain('bash scripts/ci/run_smoke_tests.sh');
+    expect(strict).not.toContain('continue-on-error');
+    expect(strict).not.toContain('if bash');
   });
 
-  it('gives qrcraftly.com a 30-minute wait and the job room for it', () => {
-    expect(smoke).toContain("TIMEOUT_SECONDS: ${{ matrix.base_url == 'https://qrcraftly.com' && '1800' || '900' }}");
-    const jobMinutes = Number(/timeout-minutes:\s*(\d+)/.exec(smoke)?.[1]);
+  it('gives qrcraftly.com a 30-minute wait for the version and the job room for it', () => {
+    expect(customDomain).toContain('BASE_URL: https://qrcraftly.com');
+    expect(customDomain).toContain("TIMEOUT_SECONDS: '1800'");
+    expect(customDomain).toContain('bash scripts/ci/wait_for_deploy.sh');
+    const jobMinutes = Number(/timeout-minutes:\s*(\d+)/.exec(customDomain)?.[1]);
     expect(jobMinutes).toBeGreaterThan(30);
+  });
+
+  it('publishes only when workers.dev passes and both URLs serve the version', () => {
+    expect(gate).toContain('needs: [publish, smoke-tests, custom-domain-version]');
+    expect(gate).not.toContain('custom-domain-smoke');
+  });
+
+  it('runs the full suite on qrcraftly.com as a warning, not a gate', () => {
+    expect(advisory).toContain('PLAYWRIGHT_TEST_BASE_URL: https://qrcraftly.com');
+    expect(advisory).toContain('::warning title=qrcraftly.com differs from the build::');
   });
 });
 
@@ -80,7 +100,7 @@ describe('GitHub Releases follow the Cloudflare deploy', () => {
   });
 
   it('publishes only after both production legs and their smoke tests pass', () => {
-    expect(releaseJob).toContain('needs: [publish, smoke-tests]');
+    expect(releaseJob).toContain('needs: [publish, smoke-tests, custom-domain-version]');
     expect(releaseJob).not.toMatch(/if:.*always\(\)/);
     expect(releaseJob).toContain('gh release edit "$RELEASE_TAG" --draft=false --latest="$MAKE_LATEST"');
   });
