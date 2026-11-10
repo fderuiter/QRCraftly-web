@@ -251,6 +251,22 @@ describe('CI builds the app once', () => {
     expect(jobBlock('e2e')).toContain('run: pnpm run test:e2e:dev');
   });
 
+  it('runs the full tier as one e2e job per browser, each keeping its own traces (#1662)', () => {
+    const e2e = jobBlock('e2e');
+    expect(e2e).toContain(`'["chromium", "firefox", "webkit"]'`);
+    expect(e2e).toContain(`|| '["chromium"]'`);
+    expect(e2e).toContain('fail-fast: false');
+    expect(e2e).toContain('pnpm run test:e2e --project=chromium --project=chromium-csp');
+    expect(e2e).toContain('pnpm run test:e2e --project="$BROWSER"');
+    expect(e2e).toContain('bash scripts/ci/install_playwright.sh "$BROWSER"');
+    expect(e2e).toMatch(/if: matrix\.browser == 'chromium'\n\s*run: pnpm run test:e2e:dev/);
+    expect(e2e).toContain('name: playwright-test-results-${{ matrix.browser }}');
+    const stepLimit = Number(/name: Run Playwright tests\n\s*timeout-minutes: (\d+)/.exec(e2e)?.[1]);
+    const jobLimit = Number(/\n {4}timeout-minutes: (\d+)/.exec(e2e)?.[1]);
+    expect(stepLimit).toBeGreaterThan(0);
+    expect(stepLimit).toBeLessThan(jobLimit - 10);
+  });
+
   it('skips the build in the Playwright web server only when a build is supplied', async () => {
     vi.stubEnv('PLAYWRIGHT_TEST_BASE_URL', '');
     vi.stubEnv('PLAYWRIGHT_USE_EXISTING_BUILD', 'true');
