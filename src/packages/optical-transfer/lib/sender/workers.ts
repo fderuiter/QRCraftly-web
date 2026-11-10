@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { sameOriginWorker } from '@/packages/core/security';
+
 
 /**
  * Spawns the slice worker that cuts the selected file into QR frames off the main thread.
@@ -23,6 +25,7 @@
  * @returns The slice worker.
  */
 export function spawnSliceWorker(): Worker {
+  const Worker = sameOriginWorker();
   return new Worker(new URL('../../worker-slice.ts', import.meta.url), { type: 'module' });
 }
 

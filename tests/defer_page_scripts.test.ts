@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { createRequire } from 'module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DEFERRED_SCRIPTS_ID, DEFERRED_SCRIPTS_LOADER, deferPageScripts, run } from '../scripts/defer_page_scripts.js';
+import { DEFERRED_SCRIPTS_ID, DEFERRED_SCRIPTS_LOADER, DEFERRED_SCRIPTS_POLICY, deferPageScripts, run } from '../scripts/defer_page_scripts.js';
 import { extractInlineScripts } from '../scripts/csp_hash_injector.js';
 
 const require = createRequire(import.meta.url);
@@ -95,6 +95,49 @@ describe('DEFERRED_SCRIPTS_LOADER', () => {
     mount();
     new Function(DEFERRED_SCRIPTS_LOADER)();
     expect(document.head.querySelectorAll('script[src]')).toHaveLength(1);
+  });
+});
+
+describe('DEFERRED_SCRIPTS_LOADER under Trusted Types (#1172)', () => {
+  type Rules = { createScriptURL(input: string): string };
+  const policies: Array<{ name: string; rules: Rules }> = [];
+
+  beforeEach(() => {
+    policies.length = 0;
+    vi.stubGlobal('trustedTypes', {
+      createPolicy: (name: string, rules: Rules) => {
+        policies.push({ name, rules });
+        return { createScriptURL: (input: string) => rules.createScriptURL(input) };
+      },
+    });
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+    document.head.querySelectorAll('script[src], link[rel="modulepreload"]').forEach((node) => node.remove());
+  });
+
+  const mountScript = (src: string) => {
+    const template = document.createElement('template');
+    template.id = DEFERRED_SCRIPTS_ID;
+    template.innerHTML = `<script src="${src}" type="module" async></script>`;
+    document.body.appendChild(template);
+  };
+
+  it('creates its own named policy and passes the entry module through it', () => {
+    mountScript('/assets/entries/entry-client-routing.abc.js');
+    new Function(DEFERRED_SCRIPTS_LOADER)();
+    expect(policies.map((policy) => policy.name)).toEqual([DEFERRED_SCRIPTS_POLICY]);
+    expect(document.head.querySelector('script[src]')?.getAttribute('src')).toBe('/assets/entries/entry-client-routing.abc.js');
+  });
+
+  it.each(['https://evil.example/assets/x.js', '//evil.example/assets/x.js', '/elsewhere/x.js', '/assets/x.js?x=1'])('refuses %s', (src) => {
+    mountScript(src);
+    expect(() => new Function(DEFERRED_SCRIPTS_LOADER)()).toThrow(TypeError);
+    expect(document.head.querySelector('script[src]')).toBeNull();
   });
 });
 

@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { sameOriginWorker } from '@/packages/core/security';
+
 
 /**
  * Spawns the reassembly worker that rebuilds received files off the main thread.
@@ -23,6 +25,7 @@
  * @returns The reassembly worker.
  */
 export function spawnReassemblyWorker(): Worker {
+  const Worker = sameOriginWorker();
   return new Worker(new URL('../../worker-reassembly.ts', import.meta.url), { type: 'module' });
 }
 
@@ -31,6 +34,7 @@ export function spawnReassemblyWorker(): Worker {
  * @returns The worker.
  */
 export function spawnTileWorker(): Worker {
+  const Worker = sameOriginWorker();
   return new Worker(new URL('../../worker-tiles.ts', import.meta.url), { type: 'module' });
 }
 
