@@ -118,7 +118,7 @@ Once `CI`, `PR Title` and `Workers Builds: qrcraftly` pass and reviews are compl
 Releases, versioning, tags, environments and rollback are documented in one place: [RELEASING.md](../RELEASING.md). In short:
 
 1. `pnpm run release:prepare` opens a `release/vX.Y.Z` branch with the version bump and changelog. Open it as a PR into `main`.
-2. Merging that PR makes the `Release` workflow tag `vX.Y.Z`, publish the GitHub Release, and smoke test production.
+2. Merging that PR makes the `Release` workflow tag `vX.Y.Z`, smoke test production, and publish the GitHub Release.
 3. To roll back, roll back the Cloudflare deployment, then fix forward with a PR.
 
 Every Monday at 08:00 UTC the `Release Preview` workflow (`.github/workflows/release-preview.yml`, also runnable from **Actions → Release Preview → Run workflow**) runs `pnpm run release:dry-run` and writes the next version, whether a release is due and the changelog it would add to the run summary. It only has `contents: read`: it opens no PR and creates no tag.
