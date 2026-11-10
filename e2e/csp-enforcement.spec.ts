@@ -31,6 +31,7 @@ import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { codeScene, installFakeCamera, showOnCamera } from '../tests/utils/fakeCamera';
 import { installSyntheticCamera, relayFrames } from './utils/opticalLink';
+import { ROUTES } from './utils/routes';
 
 interface RecordedViolation {
   directive: string;
@@ -62,14 +63,6 @@ function recordWorkers(page: Page): string[] {
   const names: string[] = [];
   page.on('worker', (worker) => names.push(new URL(worker.url()).pathname.split('/').pop() ?? ''));
   return names;
-}
-
-/** The path of every page the build pre-rendered, such as `/wifi-qr-code`. */
-function prerenderedRoutes(dir = 'dist/client', prefix = ''): string[] {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    if (entry.isDirectory()) return prerenderedRoutes(`${dir}/${entry.name}`, `${prefix}/${entry.name}`);
-    return entry.name === 'index.html' ? [prefix || '/'] : [];
-  });
 }
 
 /** Page errors that name Trusted Types, which a refused sink throws. */
@@ -211,7 +204,7 @@ test.describe('Trusted Types enforced (#1172)', { tag: '@prod' }, () => {
     const errors = recordTrustedTypesErrors(page);
     // A client-side navigation renders the page in the browser, so a sink that only the
     // server-rendered HTML avoided (such as the /security docs' HTML) is reached here.
-    const routes = prerenderedRoutes();
+    const routes = ROUTES.filter((route) => route !== '/this-page-does-not-exist');
     expect(routes.length).toBeGreaterThan(20);
     for (const route of [...routes, '/']) {
       // /security reloads once after a client-side navigation to read its pre-rendered docs.
