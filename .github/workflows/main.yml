@@ -295,7 +295,10 @@ jobs:
     name: E2E Tests (${{ matrix.browser }})
     needs: [plan, build]
     if: needs.plan.outputs.e2e != 'none'
-    runs-on: ubuntu-latest
+    # Pinned (#1662): on the ubuntu-26.04 image that `ubuntu-latest` became in November 2026,
+    # Playwright's WebKit build reads none of the generated codes, so every download test
+    # times out. update-snapshots.yml uses the same image so the visual baselines match.
+    runs-on: ubuntu-24.04
     # About 1,100 tests on one worker took about 41 minutes in one job (2026-11-03); one
     # browser takes a third to a half of that. The Playwright step stops itself first, so a
     # run that hangs still fails as a failure and uploads its traces.

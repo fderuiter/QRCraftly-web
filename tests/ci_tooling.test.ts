@@ -251,6 +251,12 @@ describe('CI builds the app once', () => {
     expect(jobBlock('e2e')).toContain('run: pnpm run test:e2e:dev');
   });
 
+  it('takes the visual baselines on the same pinned runner image the e2e job compares them on (#1662)', () => {
+    const image = /\n {4}runs-on: (\S+)/.exec(jobBlock('e2e'))?.[1];
+    expect(image).toBe('ubuntu-24.04');
+    expect(read('.github/workflows/update-snapshots.yml')).toContain(`runs-on: ${image}`);
+  });
+
   it('runs the full tier as one e2e job per browser, each keeping its own traces (#1662)', () => {
     const e2e = jobBlock('e2e');
     expect(e2e).toContain(`'["chromium", "firefox", "webkit"]'`);
