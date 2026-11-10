@@ -289,13 +289,21 @@ jobs:
 
   # JOB E2E: Playwright Cross-Browser Tests
   # Runs against the exact `dist` the Build job produced, so CI builds the app once.
+  # The full tier runs one job per browser (#1662): the four projects in one job reached
+  # the time limit, and a job cancelled at the limit keeps no error summary or traces.
   e2e:
-    name: E2E Tests
+    name: E2E Tests (${{ matrix.browser }})
     needs: [plan, build]
     if: needs.plan.outputs.e2e != 'none'
     runs-on: ubuntu-latest
-    # About 1,100 tests on one worker take about 28 minutes (2026-10-04); the cap leaves room for retries.
-    timeout-minutes: 45
+    # About 1,100 tests on one worker took about 41 minutes in one job (2026-11-03); one
+    # browser takes a third to a half of that. The Playwright step stops itself first, so a
+    # run that hangs still fails as a failure and uploads its traces.
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: ${{ fromJSON(needs.plan.outputs.e2e == 'full' && '["chromium", "firefox", "webkit"]' || '["chromium"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -314,41 +322,39 @@ jobs:
 
       # Each attempt is time-limited and retried (scripts/ci/install_playwright.sh), so a stalled
       # apt mirror costs minutes, not the whole job.
-      # The PR tier needs only Chromium; the full tier installs every browser.
+      # Each job installs only its own browser.
       - name: Install Playwright Browsers
         timeout-minutes: 13
         env:
-          E2E_TIER: ${{ needs.plan.outputs.e2e }}
-        run: |
-          if [ "$E2E_TIER" = "full" ]; then
-            bash scripts/ci/install_playwright.sh
-          else
-            bash scripts/ci/install_playwright.sh chromium
-          fi
+          BROWSER: ${{ matrix.browser }}
+        run: bash scripts/ci/install_playwright.sh "$BROWSER"
 
-      # PR tier: the chromium and chromium-csp projects. Full tier (nightly, release PRs,
-      # the `full-e2e` label): Firefox and WebKit as well.
+      # The chromium job runs the chromium and chromium-csp projects (all the PR tier runs).
+      # The full tier (nightly, release PRs, the `full-e2e` label) adds a firefox and a webkit job.
       - name: Run Playwright tests
+        timeout-minutes: 40
         env:
           # Serve the downloaded build with `vite preview` instead of rebuilding.
           PLAYWRIGHT_USE_EXISTING_BUILD: "true"
-          E2E_TIER: ${{ needs.plan.outputs.e2e }}
+          BROWSER: ${{ matrix.browser }}
         run: |
-          if [ "$E2E_TIER" = "full" ]; then
-            pnpm run test:e2e
-          else
+          if [ "$BROWSER" = "chromium" ]; then
             pnpm run test:e2e --project=chromium --project=chromium-csp
+          else
+            pnpm run test:e2e --project="$BROWSER"
           fi
 
       - name: Run Development Hydration Tests
+        if: matrix.browser == 'chromium'
         run: pnpm run test:e2e:dev
 
       # The list reporter writes no HTML report; keep the failing tests' screenshots,
       # diffs and traces instead so visual baselines can be reviewed and refreshed.
+      # A step that ran out of time counts as a failure here, so its traces are kept too.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
-          name: playwright-test-results
+          name: playwright-test-results-${{ matrix.browser }}
           path: test-results/
           retention-days: 14
 
