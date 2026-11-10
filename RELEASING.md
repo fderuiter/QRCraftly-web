@@ -10,8 +10,9 @@ feat/*, fix/*, …  ──PR (squash, required checks green)──►  main ─�
                                                                      qrcraftly.fpderuiter.workers.dev
 
 release/vX.Y.Z    ──release PR (chore(release): vX.Y.Z)──►  main ──► Release workflow:
-                                                                     tag vX.Y.Z → GitHub Release
+                                                                     tag vX.Y.Z → draft GitHub Release
                                                                      → wait for deploy → smoke tests
+                                                                     → publish the GitHub Release
 ```
 
 | Piece                                    | Owner                     | What it does                                                                                                                      |
@@ -22,7 +23,7 @@ release/vX.Y.Z    ──release PR (chore(release): vX.Y.Z)──►  main ─�
 | `vX.Y.Z` tags                            | Release workflow          | Created on the release commit when the release PR merges. Protected from being moved or deleted.                                  |
 | `.github/workflows/main.yml`             | GitHub Actions            | Quality gate on PRs, plus the nightly full tier on `main` (see [CI tiers](#ci-tiers)). The `CI` job aggregates every quality job. |
 | `.github/workflows/deploy-verify.yml`    | GitHub Actions            | After each push to `main`, waits for the deploy and smoke tests production.                                                       |
-| `.github/workflows/release.yml`          | GitHub Actions            | Tags a new `package.json` version, publishes the GitHub Release, and smoke tests production for that version.                     |
+| `.github/workflows/release.yml`          | GitHub Actions            | Tags a new `package.json` version, smoke tests production for it, and publishes the GitHub Release once Cloudflare serves it.     |
 | `.github/workflows/release-preview.yml`  | GitHub Actions            | Weekly read-only preview of the next version and changelog. Opens no PR and creates no tag.                                       |
 
 ## Environments
@@ -114,10 +115,15 @@ A release names what is already running in production: it bumps the version, wri
    - verifies whether a GitHub Release already exists for the `package.json` version using `gh release view`
    - extracts release notes from `CHANGELOG.md` before creating or pushing tags, preventing orphaned tags if note extraction fails
    - creates the annotated tag `vX.Y.Z` idempotently and pushes it to origin
-   - publishes or updates the GitHub Release with the extracted release notes
+   - creates the GitHub Release as a **draft** with the extracted release notes
    - waits until both production URLs serve the new `/version.json` (15 minutes for workers.dev, 30 for `qrcraftly.com`), then runs the smoke tests against each. Both legs are required and neither is retried automatically, so a stale production fails the release.
+   - publishes the draft and marks it **Latest** (only when it is the newest version) once both legs pass.
 
-If the workflow failed for an external reason (for example, network issues during release publishing or production deployment timeouts), rerun it from **Actions → Release → Run workflow** (or re-run the failed workflow run). When retried, the workflow detects if the Git tag was already pushed while the GitHub Release remains unpublished, extracts notes, updates tags idempotently, and publishes the GitHub Release automatically without requiring manual tag deletion or Git intervention. Rerunning is safe.
+### GitHub Releases follow Cloudflare
+
+Cloudflare Workers Builds deploys every merge to `main` on its own, and nothing in this flow changes how Cloudflare is set up. The Release workflow only watches it: a GitHub Release becomes public, and takes the **Latest** badge, only after `qrcraftly.com` and `qrcraftly.fpderuiter.workers.dev` both report that version in `/version.json` and pass the smoke tests. So the newest published release is always what production serves. If the Cloudflare build fails or production stays on the old version, the release stays a draft (visible to maintainers only) and the previous release stays **Latest**.
+
+If the workflow failed for an external reason (for example, a slow or failed Cloudflare build, or a network error), fix the cause and rerun it from **Actions → Release → Run workflow** (or re-run the failed workflow run). The workflow sees the existing tag and the draft release, refreshes the notes, waits for production again, and publishes the draft when production serves it, without manual tag deletion or Git intervention. Rerunning is safe.
 
 ## Rolling back
 

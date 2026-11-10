@@ -27,3 +27,7 @@ ADR 0018 kept two long-lived branches: `dev` for integration and staging, and `m
 ## Amendment (2026-10-19)
 
 Point 5 no longer lets a Claude thread turn on auto-merge by itself. The maintainer merges every PR, by hand or with auto-merge. A Claude thread marks its PR ready for review once it is complete and green, and merges it or turns on auto-merge only when the maintainer says so in words for that PR. Auto-merge cannot tell whether the previous merge has finished deploying, and every merge goes to production.
+
+## Amendment (2026-11-10)
+
+Point 3 now publishes the GitHub Release only after production serves it. `release.yml` tags the release commit and creates the GitHub Release as a draft, waits for both production URLs to report the version in `/version.json`, runs the smoke tests, and then publishes the draft. The **Latest** badge goes only to the newest version. A failed or stale Cloudflare deploy leaves the release as a draft and the previous one as Latest, so the newest public release always names what Cloudflare Workers Builds is serving. Cloudflare's setup is unchanged: Workers Builds still deploys every push to `main`, and GitHub Actions still holds no Cloudflare credentials.
