@@ -34,6 +34,7 @@ export const ROUTES = [
   '/social-qr-code',
   '/bulk-csv-qr-code',
   '/about',
+  '/free-forever',
   '/acknowledgements',
   '/privacy',
   '/support',
