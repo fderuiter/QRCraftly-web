@@ -4,12 +4,15 @@ name: Release
 #
 # `pnpm run release:prepare` opens a release PR that bumps package.json and adds a
 # CHANGELOG.md section. When that PR is squash-merged, this workflow sees a
-# package.json version on main with no matching tag, creates the annotated tag
-# vX.Y.Z on that commit, publishes the GitHub Release, waits for Cloudflare Workers
-# Builds to serve the version in production, and smoke tests it.
+# package.json version on main with no published release, creates the annotated tag
+# vX.Y.Z on that commit and a DRAFT GitHub Release, waits for Cloudflare Workers
+# Builds to serve the version on both production URLs, smoke tests it, and only then
+# publishes the release. A published GitHub Release therefore always names what
+# Cloudflare is serving; a failed or stale deploy leaves the release as a draft.
+# Cloudflare is not touched: Workers Builds still deploys every push to main itself.
 #
-# Every other push to main finds the tag already exists and does nothing. The only
-# thing this workflow pushes is the tag; it never pushes a branch.
+# Every other push to main finds the release already published and does nothing. The
+# only thing this workflow pushes is the tag; it never pushes a branch.
 
 on:
   push:
@@ -39,6 +42,8 @@ jobs:
     outputs:
       version: ${{ steps.resolve.outputs.version }}
       published: ${{ steps.resolve.outputs.published }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      latest: ${{ steps.resolve.outputs.latest }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -63,15 +68,29 @@ jobs:
             exit 1
           fi
 
+          # A published release means this version is already live; a draft means an
+          # earlier run stopped before production served it, so this run finishes it.
           if [ -z "$INPUT_TAG" ]; then
-            if VIEW_OUTPUT=$(gh release view "$TAG" 2>&1); then
-              echo "$TAG already has a published GitHub release; this push is not a new release."
-              echo "published=false" >> "$GITHUB_OUTPUT"
-              exit 0
+            if VIEW_OUTPUT=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>&1); then
+              if [ "$VIEW_OUTPUT" != "true" ]; then
+                echo "$TAG already has a published GitHub release; this push is not a new release."
+                echo "published=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "$TAG has a draft release from an earlier run; finishing it."
             elif ! grep -qi "release not found" <<<"$VIEW_OUTPUT"; then
               echo "::error::Could not check for an existing $TAG release: $VIEW_OUTPUT"
               exit 1
             fi
+          fi
+
+          # Only the newest version becomes "Latest", so republishing an old tag by hand
+          # never takes the badge from the release production is serving.
+          NEWEST=$( { git tag -l 'v*'; echo "$TAG"; } | sort -uV | tail -n 1)
+          if [ "$NEWEST" = "$TAG" ]; then
+            echo "latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "latest=false" >> "$GITHUB_OUTPUT"
           fi
 
           if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
@@ -99,7 +118,10 @@ jobs:
           fi
           git push origin "refs/tags/$RELEASE_TAG"
 
-      - name: Publish GitHub Release
+      # The release stays a draft until production serves it (see the publish-release job).
+      # A release that is already public (a manual republish) keeps its state and gets
+      # fresh notes.
+      - name: Draft GitHub Release
         if: steps.resolve.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -107,9 +129,9 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release_notes.md" --latest
+            gh release edit "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release_notes.md"
           else
-            gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release_notes.md" --latest
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release_notes.md"
           fi
 
   smoke-tests:
@@ -152,3 +174,25 @@ jobs:
           PLAYWRIGHT_TEST_BASE_URL: ${{ matrix.base_url }}
           EXPECTED_VERSION: ${{ needs.publish.outputs.version }}
         run: bash scripts/ci/run_smoke_tests.sh
+
+  # Runs only when both production URLs serve this version and pass the smoke tests,
+  # so the public GitHub Release matches what Cloudflare Workers Builds deployed.
+  publish-release:
+    name: Publish GitHub Release
+    needs: [publish, smoke-tests]
+    if: needs.publish.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the release production is serving
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.publish.outputs.tag }}
+          MAKE_LATEST: ${{ needs.publish.outputs.latest }}
+        run: |
+          set -euo pipefail
+          gh release edit "$RELEASE_TAG" --draft=false --latest="$MAKE_LATEST"
+          echo "Published $RELEASE_TAG (latest: $MAKE_LATEST) after https://qrcraftly.com and https://qrcraftly.fpderuiter.workers.dev served it." >> "$GITHUB_STEP_SUMMARY"

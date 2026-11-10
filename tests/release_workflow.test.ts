@@ -63,3 +63,30 @@ describe('Release smoke test legs (#1217, #1394)', () => {
     expect(jobMinutes).toBeGreaterThan(30);
   });
 });
+
+describe('GitHub Releases follow the Cloudflare deploy', () => {
+  const content = fs.readFileSync(path.resolve(process.cwd(), '.github/workflows/release.yml'), 'utf8');
+  const publishJob = content.slice(content.indexOf('  publish:'), content.indexOf('  smoke-tests:'));
+  const releaseJob = content.slice(content.indexOf('  publish-release:'));
+
+  it('creates the release as a draft before production is checked', () => {
+    expect(publishJob).toContain('gh release create "$RELEASE_TAG" --verify-tag --draft');
+    expect(publishJob).not.toContain('--latest');
+    expect(publishJob).not.toContain('--draft=false');
+  });
+
+  it('finishes a draft left by an earlier run instead of treating it as published', () => {
+    expect(publishJob).toContain('gh release view "$TAG" --json isDraft --jq .isDraft');
+  });
+
+  it('publishes only after both production legs and their smoke tests pass', () => {
+    expect(releaseJob).toContain('needs: [publish, smoke-tests]');
+    expect(releaseJob).not.toMatch(/if:.*always\(\)/);
+    expect(releaseJob).toContain('gh release edit "$RELEASE_TAG" --draft=false --latest="$MAKE_LATEST"');
+  });
+
+  it('gives the Latest badge only to the newest version', () => {
+    expect(publishJob).toContain("sort -uV | tail -n 1");
+    expect(publishJob).toContain('latest=false');
+  });
+});
