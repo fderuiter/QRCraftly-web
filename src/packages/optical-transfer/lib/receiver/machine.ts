@@ -85,7 +85,11 @@ export type ReceiverEvent =
   | { type: 'verify' }
   | { type: 'complete'; result: ReceiverResult }
   | { type: 'fail'; error: ReceiverFailure }
-  | { type: 'clear' };
+  /**
+   * Clear forgets the transfer. `scanning` says whether the camera still runs afterwards: Clear
+   * keeps a live camera scanning for the next transfer, and stops a video (#1703).
+   */
+  | { type: 'clear'; scanning: boolean };
 
 /** Where a receiver with nothing in view starts in a mode. */
 const restingPhase = (mode: ReceiverMode) => (mode === 'camera' ? 'idle' : 'awaitingVideo');
@@ -142,7 +146,8 @@ export function receiverReducer(state: ReceiverState, event: ReceiverEvent): Rec
     case 'fail':
       return { mode: state.mode, phase: 'failed', error: event.error };
     case 'clear':
-      return moveTo(state, restingPhase(state.mode));
+      // A camera that is still on keeps scanning: the phase says so instead of claiming it is off (#1703).
+      return moveTo(state, event.scanning && state.mode === 'camera' ? 'scanning' : restingPhase(state.mode));
     default: {
       const unknown: never = event;
       return unknown;

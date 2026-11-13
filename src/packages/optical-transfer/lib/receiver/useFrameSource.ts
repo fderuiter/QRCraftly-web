@@ -148,12 +148,21 @@ export function useFrameSource(options: FrameSourceOptions) {
     return true;
   }, [addToast, dispatch, revokeVideoUrl]);
 
-  /** Drops the uploaded video and its error, as Clear does. */
-  const clearVideo = useCallback(() => {
+  /**
+   * Drops the uploaded video and its error, as Clear does. In video mode the video stops too, and
+   * the receiver waits for a new file; a live camera is left running (#1703).
+   * @returns Whether frames still come in: a camera that is on.
+   */
+  const clearVideo = useCallback((): boolean => {
     setFileValidationError(null);
     revokeVideoUrl();
     setVideoFile(null);
-  }, [revokeVideoUrl]);
+    if (receiverMode === 'file') {
+      setIsScanning(false);
+      return false;
+    }
+    return isScanning;
+  }, [revokeVideoUrl, receiverMode, isScanning]);
 
   useEffect(() => {
     // Camera mode is started by startCameraSession: the session attaches the stream and runs the
@@ -179,7 +188,8 @@ export function useFrameSource(options: FrameSourceOptions) {
   useEffect(() => {
     if (cameraStatus === 'streaming') {
       optionsRef.current.addToast?.({ type: 'success', message: 'Camera scanner activated.', duration: 3000 });
-    } else if (cameraStatus === 'denied' || cameraStatus === 'unavailable' || cameraStatus === 'busy' || cameraStatus === 'unsupported' || cameraStatus === 'error') {
+    } else if (cameraStatus === 'denied' || cameraStatus === 'unavailable' || cameraStatus === 'busy' || cameraStatus === 'unsupported' || cameraStatus === 'stopped' || cameraStatus === 'error') {
+      // A camera that ended by itself (unplugged, taken by another app) no longer scans either (#1703).
       setIsScanning(false);
     }
   }, [cameraStatus]);
