@@ -82,6 +82,8 @@ export { planMultiCode, type MultiCodeOptions, type MultiCodePlan } from './lib/
 export {
   createTileReader,
   layoutForCodes,
+  MAX_TILE_SLOT_FAILURES,
+  TILE_JOB_DEADLINE_MS,
   TileReadSession,
   type TilePlan,
   type TileReader,

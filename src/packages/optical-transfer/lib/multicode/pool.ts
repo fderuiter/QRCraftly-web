@@ -55,6 +55,8 @@ export interface DecoderPoolOptions<Job, Result> {
    */
   onResult: (result: Result, frameId: number, superseded: boolean) => void;
   onError?: (error: unknown, frameId: number) => void;
+  /** Receives each job dropped from the queue unrun, so the caller can free what it holds (a frame). */
+  onDrop?: (job: Job) => void;
 }
 
 export interface DecoderPoolStats {
@@ -138,7 +140,11 @@ export function createDecoderPool<Job, Result>(options: DecoderPoolOptions<Job, 
         return;
       }
       newestFrame = frameId;
-      const kept = queue.filter((entry) => entry.frameId >= frameId);
+      const kept: Queued<Job>[] = [];
+      for (const entry of queue) {
+        if (entry.frameId >= frameId) kept.push(entry);
+        else options.onDrop?.(entry.job);
+      }
       counters.dropped += queue.length - kept.length;
       queue = kept;
       for (const job of jobs) queue.push({ frameId, job });
