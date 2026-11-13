@@ -23,8 +23,17 @@ import { isDangerousUrl } from '@/packages/core/security';
 /** Side of the square frame handed to the scanners. */
 export const SCAN_FRAME_SIZE = 256;
 
-/** A worker is considered stalled after this long without a reply. */
+/**
+ * Deadline for one scan, from capture to verdict. It covers the native detector and the worker,
+ * so neither can hold the pipeline busy for longer (#1706).
+ */
 export const SCAN_WATCHDOG_MS = 1500;
+
+/**
+ * Worker failures (timeouts, crashes, failed posts) in a row before the pipeline stops replacing
+ * the worker and reports `unavailable` instead of retrying forever.
+ */
+export const MAX_WORKER_FAILURES = 3;
 
 /** Minimal `BarcodeDetector` surface. */
 export interface DetectorLike {
@@ -71,6 +80,17 @@ export interface EmpiricalScanOptions {
   detector?: DetectorLike | null;
   /** Spawns the fallback Scannability Worker (lazily, on first use). */
   createWorker?: () => WorkerLike | null;
+  /** Scan deadline in milliseconds; defaults to {@link SCAN_WATCHDOG_MS}. */
+  deadlineMs?: number;
+}
+
+/** The one scan in flight: its token, the payload captured with its frame, and its decoder. */
+interface Attempt {
+  token: number;
+  payload: string;
+  engine: 'native' | 'worker';
+  /** A newer board was requested while this scan ran, so its verdict is no longer current. */
+  stale: boolean;
 }
 
 /**
@@ -80,18 +100,28 @@ export interface EmpiricalScanOptions {
  * pool that recycles the returned buffers.
  *
  * Only one scan is in flight. Requests made while busy are coalesced into a single
- * "blocked" flag; when the in-flight scan finishes and input has stopped, one catch-up scan
- * runs so the verdict always reflects the final board. Replies for superseded scans are
- * discarded by sequence token, and a watchdog frees a stalled worker.
+ * "blocked" flag and mark the scan in flight stale, so its verdict (which describes an older
+ * board) is never published; when it finishes and input has stopped, one catch-up scan runs
+ * so the verdict always reflects the final board. Replies for superseded scans are discarded
+ * by sequence token. The expected payload is read with the frame, so a worker success always
+ * names the board it scanned.
+ *
+ * One deadline, started before any decoder call, bounds each scan (#1706). A native detector
+ * that hangs is dropped for the worker; a worker that stalls, crashes or cannot be posted to is
+ * replaced, up to {@link MAX_WORKER_FAILURES} times in a row, after which the verdict is
+ * `unavailable`.
  */
 export class EmpiricalScanPipeline {
   private readonly options: EmpiricalScanOptions;
   private readonly pool = new DoubleBufferPool(SCAN_FRAME_SIZE, SCAN_FRAME_SIZE);
   private worker: WorkerLike | null = null;
   private workerUnavailable = false;
+  private workerFailures = 0;
+  private nativeFailed = false;
   private busy = false;
   private blocked = false;
   private sequence = 0;
+  private attempt: Attempt | null = null;
   private watchdog: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
 
@@ -118,6 +148,7 @@ export class EmpiricalScanPipeline {
     if (this.disposed) return;
     if (this.busy) {
       this.blocked = true;
+      if (this.attempt) this.attempt.stale = true;
       return;
     }
     void this.run();
@@ -132,11 +163,9 @@ export class EmpiricalScanPipeline {
   dispose(): void {
     this.disposed = true;
     this.clearWatchdog();
-    if (this.worker) {
-      this.worker.removeEventListener('message', this.handleMessage);
-      this.worker.terminate();
-      this.worker = null;
-    }
+    this.attempt = null;
+    this.blocked = false;
+    this.dropWorker();
     this.pool.clear();
   }
 
@@ -149,19 +178,26 @@ export class EmpiricalScanPipeline {
       this.busy = false;
       return;
     }
+    const attempt: Attempt = { token, payload: this.options.expectedPayload(), engine: 'native', stale: false };
+    this.attempt = attempt;
+    // The deadline starts before any decoder call, so a hung detector is bounded too.
+    this.startWatchdog(attempt);
 
-    if (this.options.detector) {
+    const detector = this.nativeFailed ? null : this.options.detector;
+    if (detector) {
       try {
-        const codes = await this.options.detector.detect(frame);
+        const codes = await detector.detect(frame);
         const decoded = codes[0]?.rawValue ?? '';
         const ok = decoded.length > 0 && !isDangerousUrl(decoded);
         this.finish(token, { status: ok ? 'scannable' : 'corrupted', decoded: ok ? decoded : null, engine: 'native' });
         return;
       } catch (err) {
+        if (!this.isCurrent(token)) return;
         console.warn('Native BarcodeDetector failed, using the Scannability Worker:', err);
       }
     }
 
+    attempt.engine = 'worker';
     const worker = this.getWorker();
     if (!worker) {
       this.finish(token, { status: 'unavailable', decoded: null, engine: 'none' });
@@ -180,13 +216,27 @@ export class EmpiricalScanPipeline {
       configId: String(token),
     };
     assertWorkerRequest(request);
-    this.startWatchdog(token);
-    worker.postMessage(request, [buffer]);
+    try {
+      worker.postMessage(request, [buffer]);
+    } catch (err) {
+      console.warn('The Scannability Worker could not take the frame:', err);
+      this.failWorker(token);
+    }
+  }
+
+  private isCurrent(token: number): boolean {
+    return !this.disposed && this.attempt?.token === token;
   }
 
   private getWorker(): WorkerLike | null {
     if (this.worker || this.workerUnavailable) return this.worker;
-    const worker = this.options.createWorker?.() ?? null;
+    let worker: WorkerLike | null = null;
+    try {
+      worker = this.options.createWorker?.() ?? null;
+    } catch (err) {
+      console.warn('The Scannability Worker could not start:', err);
+      worker = null;
+    }
     if (!worker) {
       this.workerUnavailable = true;
       return null;
@@ -196,46 +246,86 @@ export class EmpiricalScanPipeline {
     return worker;
   }
 
+  /** Detaches and stops the worker, if any. */
+  private dropWorker(): void {
+    if (!this.worker) return;
+    this.worker.removeEventListener('message', this.handleMessage);
+    this.worker.terminate();
+    this.worker = null;
+  }
+
+  /**
+   * Retires the current scan after its worker stalled, crashed or refused the frame. The worker
+   * is replaced for the next scan, up to {@link MAX_WORKER_FAILURES} in a row; after that the
+   * pipeline reports `unavailable` instead of retrying.
+   */
+  private failWorker(token: number): void {
+    if (!this.isCurrent(token)) return;
+    this.dropWorker();
+    this.workerFailures += 1;
+    if (this.workerFailures >= MAX_WORKER_FAILURES) {
+      this.workerUnavailable = true;
+      this.finish(token, { status: 'unavailable', decoded: null, engine: 'none' });
+      return;
+    }
+    this.retry();
+  }
+
+  /** Ends the current scan without a verdict and schedules one fresh scan. */
+  private retry(): void {
+    this.clearWatchdog();
+    this.attempt = null;
+    this.busy = false;
+    this.blocked = true;
+    this.settle();
+  }
+
   private readonly handleMessage = (event: MessageEvent<unknown>): void => {
     const response = event.data;
     if (!isWorkerResponse(response)) return;
     if ('buffer' in response && response.buffer instanceof ArrayBuffer) this.pool.release(response.buffer);
-    if (response.configId !== String(this.sequence)) {
+    const attempt = this.attempt;
+    if (this.disposed || !attempt || response.configId !== String(attempt.token)) {
       // A superseded scan answered late: its verdict describes an old board.
       return;
     }
     if ('dropped' in response || 'retryWithImageData' in response) {
-      this.clearWatchdog();
-      this.busy = false;
-      this.blocked = true;
-      this.settle();
+      this.retry();
       return;
     }
-    this.finish(this.sequence, {
+    this.workerFailures = 0;
+    this.finish(attempt.token, {
       status: response.success ? 'scannable' : 'corrupted',
-      decoded: response.success ? this.options.expectedPayload() : null,
+      decoded: response.success ? attempt.payload : null,
       engine: 'worker',
     });
   };
 
   private finish(token: number, outcome: ScanOutcome): void {
-    if (this.disposed || token !== this.sequence) return;
+    if (!this.isCurrent(token)) return;
+    const stale = this.attempt?.stale ?? false;
     this.clearWatchdog();
+    this.attempt = null;
     this.busy = false;
-    this.options.onResult(outcome);
+    // A newer board is owed a scan: this verdict describes an older one.
+    if (!stale) this.options.onResult(outcome);
     this.settle();
   }
 
-  private startWatchdog(token: number): void {
+  private startWatchdog(attempt: Attempt): void {
     this.clearWatchdog();
     this.watchdog = setTimeout(() => {
       this.watchdog = null;
-      if (token !== this.sequence || !this.busy) return;
-      // Stalled worker: release the lock and schedule a fresh scan.
-      this.busy = false;
-      this.blocked = true;
-      this.settle();
-    }, SCAN_WATCHDOG_MS);
+      if (!this.isCurrent(attempt.token)) return;
+      if (attempt.engine === 'native') {
+        // A detector that never answers is not asked again; the worker takes over.
+        console.warn('Native BarcodeDetector did not answer, using the Scannability Worker.');
+        this.nativeFailed = true;
+        this.retry();
+        return;
+      }
+      this.failWorker(attempt.token);
+    }, this.options.deadlineMs ?? SCAN_WATCHDOG_MS);
   }
 
   private clearWatchdog(): void {

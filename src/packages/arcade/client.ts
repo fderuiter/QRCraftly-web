@@ -123,7 +123,11 @@ export function useEmpiricalScan(options: UseEmpiricalScanOptions): UseEmpirical
       captureFrame: () => optionsRef.current.captureFrame(),
       expectedPayload: () => optionsRef.current.expectedPayload(),
       isInputActive: () => optionsRef.current.isInputActive(),
-      onResult: setState,
+      onResult: (outcome) => {
+        setState(outcome);
+        // The pipeline drops a native detector that stops answering, so name the decoder that answered.
+        if (outcome.engine !== 'none') setIsNative(outcome.engine === 'native');
+      },
       detector,
       createWorker: createScannabilityWorker,
     });

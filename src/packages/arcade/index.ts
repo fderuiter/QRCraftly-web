@@ -89,6 +89,7 @@ export {
   paintScanFrame,
   SCAN_FRAME_SIZE,
   SCAN_WATCHDOG_MS,
+  MAX_WORKER_FAILURES,
   type DetectorLike,
   type ScanOutcome,
   type WorkerLike,
