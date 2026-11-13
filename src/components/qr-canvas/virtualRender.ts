@@ -37,7 +37,7 @@ export interface VirtualRenderInput {
   onRendered: (info: RenderedInfo) => void;
 }
 
-/** A scheduled render that has not run yet. */
+/** A scheduled render. Cancelling it stops it before it runs or, once it runs, before it reports. */
 export interface ScheduledRender {
   cancel: () => void;
 }
@@ -46,8 +46,17 @@ export interface ScheduledRender {
  * Draws the code without its template into an off-screen square canvas and hands it to
  * `onRendered` as an `ImageBitmap` (or `ImageData` where bitmaps are unavailable). Any failure
  * still reports the module count, so the caller always hears back.
+ *
+ * `isCancelled` is asked again once the bitmap is ready (#1708): a copy whose design was replaced
+ * while it was captured reports nothing and its bitmap is closed, so old pixels never reach the
+ * scan check as the new design's.
+ * @param input - What to draw and where to report it.
+ * @param isCancelled - Whether the caller has moved on to another design.
  */
-export function renderVirtualCopy({ modules, config, logoImg, borderLogoImg, mazeData, onRendered }: VirtualRenderInput): void {
+export function renderVirtualCopy(
+  { modules, config, logoImg, borderLogoImg, mazeData, onRendered }: VirtualRenderInput,
+  isCancelled: () => boolean = () => false
+): void {
   try {
     const virtualSize = Math.max(512, Math.min(1024, (modules.size + 8) * 10));
     let vCanvas: HTMLCanvasElement | OffscreenCanvas;
@@ -71,8 +80,13 @@ export function renderVirtualCopy({ modules, config, logoImg, borderLogoImg, maz
 
     if (typeof globalThis.createImageBitmap === 'function') {
       createImageBitmap(vCanvas).then((imageBitmap) => {
+        if (isCancelled()) {
+          imageBitmap.close();
+          return;
+        }
         onRendered({ moduleCount: modules.size, virtualImageBitmap: imageBitmap });
-      }).catch((err) => {
+      }, (err: unknown) => {
+        if (isCancelled()) return;
         console.error("createImageBitmap failed in virtual render:", err);
         const imageData = vCtx.getImageData(0, 0, virtualSize, virtualSize);
         onRendered({ moduleCount: modules.size, virtualImageData: imageData });
@@ -94,11 +108,16 @@ export function renderVirtualCopy({ modules, config, logoImg, borderLogoImg, maz
  * where `requestIdleCallback` is missing, so the visible preview paints first.
  */
 export function scheduleVirtualRender(input: VirtualRenderInput): ScheduledRender {
-  const run = () => renderVirtualCopy(input);
+  let cancelled = false;
+  const isCancelled = () => cancelled;
+  const run = () => {
+    if (!cancelled) renderVirtualCopy(input, isCancelled);
+  };
   if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
     const handle = window.requestIdleCallback(run, { timeout: 100 });
     return {
       cancel: () => {
+        cancelled = true;
         if (typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
           window.cancelIdleCallback(handle);
         }
@@ -106,5 +125,10 @@ export function scheduleVirtualRender(input: VirtualRenderInput): ScheduledRende
     };
   }
   const handle = setTimeout(run, 50);
-  return { cancel: () => clearTimeout(handle) };
+  return {
+    cancel: () => {
+      cancelled = true;
+      clearTimeout(handle);
+    },
+  };
 }

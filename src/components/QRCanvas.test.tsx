@@ -1835,6 +1835,130 @@ describe('QRCanvas encoder load failure (#1586)', () => {
   });
 });
 
+describe('QRCanvas scan copy after a newer design (#1708)', () => {
+  type FakeBitmap = { close: Mock };
+  interface PendingCapture {
+    bitmap: FakeBitmap;
+    resolve: () => void;
+  }
+
+  let pendingCaptures: PendingCapture[];
+  let requestIdle: unknown;
+
+  /** Holds every createImageBitmap call until the test resolves it, so each capture can finish late. */
+  function stubPendingCaptures(): void {
+    vi.stubGlobal('createImageBitmap', vi.fn(() => new Promise<FakeBitmap>((resolve) => {
+      const bitmap: FakeBitmap = { close: vi.fn() };
+      pendingCaptures.push({ bitmap, resolve: () => resolve(bitmap) });
+    })));
+  }
+
+  /** Finishes one held capture and lets its callbacks run. */
+  async function finishCapture(capture: PendingCapture): Promise<void> {
+    await act(async () => {
+      capture.resolve();
+      for (let i = 0; i < 5; i++) {
+        await Promise.resolve();
+      }
+    });
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    pendingCaptures = [];
+    stubPendingCaptures();
+    // Without requestIdleCallback the scan copy is scheduled on a 50 ms timeout, which fake timers drive.
+    requestIdle = Reflect.get(window, 'requestIdleCallback');
+    Reflect.deleteProperty(window, 'requestIdleCallback');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    if (requestIdle !== undefined) Reflect.set(window, 'requestIdleCallback', requestIdle);
+  });
+
+  it('drops the pending copy of the old design when the value is cleared', async () => {
+    const encoder = createFakeQrEncoder();
+    const restoreRuntime = setQrCanvasRuntime({ loadEncoder: () => encoder, createMatrixWorker: () => null });
+    const onRendered = vi.fn();
+    const onRenderFailed = vi.fn();
+    try {
+      const { rerender } = render(<QRCanvas config={{ ...DEFAULT_CONFIG, value: 'A' }} size={100} onRendered={onRendered} onRenderFailed={onRenderFailed} />);
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      expect(pendingCaptures).toHaveLength(1);
+
+      rerender(<QRCanvas config={{ ...DEFAULT_CONFIG, value: '' }} size={100} onRendered={onRendered} onRenderFailed={onRenderFailed} />);
+      await finishCapture(pendingCaptures[0]);
+
+      expect(onRendered).not.toHaveBeenCalled();
+      expect(pendingCaptures[0].bitmap.close).toHaveBeenCalledTimes(1);
+    } finally {
+      restoreRuntime();
+    }
+  });
+
+  it('drops the pending copy of the old design when the new value fails to encode', async () => {
+    const encoder = createFakeQrEncoder();
+    const restoreRuntime = setQrCanvasRuntime({ loadEncoder: () => encoder, createMatrixWorker: () => null });
+    const onRendered = vi.fn();
+    const onRenderFailed = vi.fn();
+    try {
+      const { rerender } = render(<QRCanvas config={{ ...DEFAULT_CONFIG, value: 'A' }} size={100} onRendered={onRendered} onRenderFailed={onRenderFailed} />);
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      expect(pendingCaptures).toHaveLength(1);
+
+      encoder.create.mockImplementationOnce(() => {
+        throw new Error('Generation failed');
+      });
+      rerender(<QRCanvas config={{ ...DEFAULT_CONFIG, value: 'B' }} size={100} onRendered={onRendered} onRenderFailed={onRenderFailed} />);
+      expect(onRenderFailed).toHaveBeenCalledWith('failed');
+
+      await finishCapture(pendingCaptures[0]);
+
+      expect(onRendered).not.toHaveBeenCalled();
+      expect(pendingCaptures[0].bitmap.close).toHaveBeenCalledTimes(1);
+    } finally {
+      restoreRuntime();
+    }
+  });
+
+  it('reports only the newer design when the older copy finishes after it was painted', async () => {
+    const encoder = createFakeQrEncoder();
+    const restoreRuntime = setQrCanvasRuntime({ loadEncoder: () => encoder, createMatrixWorker: () => null });
+    const onRendered = vi.fn();
+    try {
+      const { rerender } = render(<QRCanvas config={{ ...DEFAULT_CONFIG, value: 'A' }} size={100} onRendered={onRendered} />);
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      expect(pendingCaptures).toHaveLength(1);
+
+      rerender(<QRCanvas config={{ ...DEFAULT_CONFIG, value: 'B' }} size={100} onRendered={onRendered} />);
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      expect(pendingCaptures).toHaveLength(2);
+
+      await finishCapture(pendingCaptures[0]);
+      expect(onRendered).not.toHaveBeenCalled();
+      expect(pendingCaptures[0].bitmap.close).toHaveBeenCalledTimes(1);
+
+      await finishCapture(pendingCaptures[1]);
+      expect(onRendered).toHaveBeenCalledTimes(1);
+      expect(onRendered).toHaveBeenCalledWith(expect.objectContaining({ virtualImageBitmap: pendingCaptures[1].bitmap }));
+      expect(pendingCaptures[1].bitmap.close).not.toHaveBeenCalled();
+    } finally {
+      restoreRuntime();
+    }
+  });
+});
+
 describe('calculateCanvasDimensions', () => {
   it('calculates correct dimensions for default square formats with default ratio of 1', () => {
     const config = {
