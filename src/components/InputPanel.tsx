@@ -19,6 +19,7 @@
 import React, { Suspense, useState, useEffect } from 'react';
 import type { QRConfig } from '@/packages/core/types';
 import { TypeSelector, useInputLogic } from './inputs';
+import { acceptIncomingContent } from './inputs/retainedDrafts';
 import { useDynamicFocus } from '../hooks/useDynamicFocus';
 import { Button } from './ui/Button';
 import { Camera } from 'lucide-react';
@@ -96,6 +97,8 @@ const InputPanel: React.FC<InputPanelProps> = ({ config, onChange, onRefusedChan
     setScannerActive(false);
     const previous = { type: config.type, value: config.value };
     const replacing = previous.value.trim() !== '' && previous.value !== scan.text;
+    // The scan replaces the draft kept for its type, so the form shows and encodes the scan (#1700).
+    acceptIncomingContent(scan.type);
     onChange({ type: scan.type, value: scan.text });
     addToast({
       type: 'success',

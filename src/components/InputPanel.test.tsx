@@ -29,6 +29,7 @@ import { WifiInput, EmailInput } from './inputs';
 import { ToastProvider } from './ui/Toast';
 import type { QRScannerProps } from './QRScanner';
 import { describeScan } from './scanner/describeScan';
+import { QRProvider, useQRStore, useQRStoreSelector } from '@/context/QRContext';
 
 /**
  * The scan-toast tests swap the camera scanner for a button that reports a fixed
@@ -783,5 +784,40 @@ describe('InputPanel scanner dialog (#978, #1101, #1102)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Simulate scan' }));
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect(onChange).toHaveBeenLastCalledWith({ type: QRType.TEXT, value: 'My draft' });
+  });
+
+  it('opens a scan into a type with an earlier draft: the form and the stored content both hold the scan (#1700)', async () => {
+    /** The generator's wiring: the panel shows the store's config and writes to it. */
+    function StoreBackedPanel() {
+      const store = useQRStore();
+      const config = useQRStoreSelector((state) => state.config);
+      return <InputPanel config={config} onChange={store.updateConfig} />;
+    }
+    const probe: { store: ReturnType<typeof useQRStore> | null } = { store: null };
+    function Probe() {
+      probe.store = useQRStore();
+      return null;
+    }
+    render(
+      <ToastProvider>
+        <QRProvider initialConfig={{ type: QRType.VCARD, value: '' }}>
+          <StoreBackedPanel />
+          <Probe />
+        </QRProvider>
+      </ToastProvider>
+    );
+    // An earlier vCard draft, then a switch to another type.
+    fireEvent.change(screen.getByLabelText('First Name'), { target: { value: 'Old' } });
+    await waitFor(() => expect(probe.store?.getState().config.value).toContain('Old'));
+    act(() => probe.store?.updateConfig({ type: QRType.TEXT, value: 'Some note' }));
+    await waitFor(() => expect(screen.queryByLabelText('First Name')).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /scan qr code/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Simulate scan' }));
+
+    await waitFor(() => expect(screen.getByLabelText('First Name')).toHaveValue('Ada'));
+    expect(probe.store?.getState().config.type).toBe(QRType.VCARD);
+    expect(probe.store?.getState().config.value).toContain('Ada Lovelace');
+    expect(probe.store?.getState().config.value).not.toContain('Old');
   });
 });

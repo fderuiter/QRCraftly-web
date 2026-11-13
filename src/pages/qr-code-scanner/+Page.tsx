@@ -27,6 +27,7 @@ import { usePageContent } from '@/data/PageContentContext';
 import { copy } from '@/data/copy/qr-code-scanner';
 import { QR_TYPE_ROUTES } from '@/data/navigation';
 import { stageGeneratorContent } from '@/context/QRContext';
+import { acceptIncomingContent } from '@/components/inputs/retainedDrafts';
 
 /** The plain promises under the scanner, each backed by how the scanner works. */
 const PROMISES = [
@@ -44,6 +45,7 @@ const RELATED_LINK_CLASSES = 'font-medium text-accent underline-offset-2 hover:u
  */
 function openInGenerator(scan: ScanDescription) {
   stageGeneratorContent({ type: scan.type, value: scan.text });
+  acceptIncomingContent(scan.type);
   // nosemgrep: require-isdangerousurl -- an internal route from a fixed table, not scanned text
   void navigate(QR_TYPE_ROUTES[scan.type]);
 }

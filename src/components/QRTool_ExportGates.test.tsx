@@ -23,7 +23,7 @@ import QRTool from './QRTool';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { QRType, type QRConfig } from '@/packages/core/types';
 import { getSamplePayload } from '@/packages/qr-payload';
-import { clearRetainedInputStates } from './inputs/useInputLogic';
+import { clearRetainedInputStates } from './inputs/retainedDrafts';
 
 // The preview canvas reports the config it was given and has a painted size, so the mockup
 // scene can copy it.

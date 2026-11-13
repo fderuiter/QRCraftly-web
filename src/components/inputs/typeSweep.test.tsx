@@ -30,7 +30,8 @@ import { SAMPLE_PAYLOADS } from '@/packages/qr-payload';
 import { QRProvider } from '@/context/QRContext';
 import { ToastProvider } from '../ui/Toast';
 import { INPUT_REGISTRY, constructInput, type InputDataMap } from './InputRegistry';
-import { clearRetainedInputStates, useInputLogic } from './useInputLogic';
+import { useInputLogic } from './useInputLogic';
+import { clearRetainedInputStates } from './retainedDrafts';
 
 /** How to set one form field: the control's label, or a file input that receives the value. */
 type Fill = string | RegExp | { upload: string; fileName: string };

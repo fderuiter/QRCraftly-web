@@ -20,31 +20,16 @@ import { useState, useRef, useEffect, type ElementType } from "react";
 import { type QRConfig, QRType } from "@/packages/core/types";
 import { INPUT_REGISTRY, constructInput, hydrateInput, validateInput, type InputDataMap, type InputProps } from "./InputRegistry";
 import { usePresetLogoPlacement } from "./usePresetLogoPlacement";
+import { getRetainedInputStates, setRetainedInputStates, type InputStates } from "./retainedDrafts";
 
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
 const COMMIT_DELAY_MS = 100;
-
-/** Form data per QR type; a type with no entry has not been touched. */
-type InputStates = { [K in QRType]?: InputDataMap[K] };
 
 /** Stores one type's form data, keeping the key and the data's type tied together. */
 const withState = <K extends QRType>(states: InputStates, type: K, data: InputDataMap[K]): InputStates => ({ ...states, [type]: data });
 
 /** A type's form data, or its starting state when the form has not been touched. */
 const stateFor = <K extends QRType>(states: InputStates, type: K): InputDataMap[K] => states[type] ?? INPUT_REGISTRY[type].initialState;
-
-/**
- * Module-scoped cache for uncommitted form field values in volatile memory.
- * Preserves user text across generator route switches without persisting to storage.
- */
-let retainedInputStates: InputStates = {};
-
-/**
- * Forgets input states retained from earlier generator routes.
- */
-export function clearRetainedInputStates(): void {
-  retainedInputStates = {};
-}
 
 /**
  * Hook to encapsulate the state management and component selection logic for the InputPanel.
@@ -65,7 +50,7 @@ export function useInputLogic(
   const [inputStates, setInputStates] = useState<InputStates>(() => {
     let states: InputStates = {};
     for (const key of Object.values(QRType)) {
-      const retained = retainedInputStates[key];
+      const retained = getRetainedInputStates()[key];
       if (retained !== undefined) {
         states = withState(states, key, { ...retained });
       } else if (key === config.type && config.value) {
@@ -118,7 +103,7 @@ export function useInputLogic(
 
       // If we switched types, or on initial mount where retained state exists for this type:
       // Preserve local retained state and push its constructed value to global state.
-      if (retainedInputStates[config.type] !== undefined && (prevType !== config.type || prevType === null)) {
+      if (getRetainedInputStates()[config.type] !== undefined && (prevType !== config.type || prevType === null)) {
         onChange({ value: currentConstructed });
         return;
       }
@@ -146,7 +131,7 @@ export function useInputLogic(
         const hydrated = hydrateInput(config.type, config.value);
         if (hydrated) {
           updateStateForType(config.type, hydrated);
-          retainedInputStates = withState(retainedInputStates, config.type, hydrated);
+          setRetainedInputStates(withState(getRetainedInputStates(), config.type, hydrated));
         } else {
           updateStateForType(config.type, INPUT_REGISTRY[config.type].initialState);
         }
@@ -175,7 +160,7 @@ export function useInputLogic(
     const newData: InputDataMap[K] = { ...stateFor(inputStates, type), ...updates };
 
     setInputStates((prev) => withState(prev, type, newData));
-    retainedInputStates = withState(retainedInputStates, type, newData);
+    setRetainedInputStates(withState(getRetainedInputStates(), type, newData));
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
