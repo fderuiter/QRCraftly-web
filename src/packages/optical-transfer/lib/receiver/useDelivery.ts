@@ -53,6 +53,12 @@ export function useDelivery(options: DeliveryOptions) {
   const [bundle, setBundle] = useState<ReceivedBundleFile[] | null>(null);
   const handshakeRef = useRef<HandshakeInfo | null>(null);
   const reassembledDataRef = useRef<Uint8Array | null>(null);
+  /**
+   * The manual save in progress (#1702): every Save takes the next number, and Clear, a new
+   * result and unmount move it on too, so a save that finishes its check after any of them
+   * neither saves nor touches what the receiver shows now.
+   */
+  const saveOpRef = useRef(0);
   const optionsRef = useRef(options);
   useEffect(() => {
     optionsRef.current = options;
@@ -60,14 +66,15 @@ export function useDelivery(options: DeliveryOptions) {
 
   /** Saves a verified file under its announced name and tells the user. */
   const deliverFile = useCallback((data: Uint8Array, hs: HandshakeInfo | null) => {
-    setDownloadTriggered(true);
     // The name and type are chosen by whoever is showing the stream: save the sanitised name and a
     // MIME type that agrees with it.
     const analysis = analyseReceivedFile(
       hs?.fileName || `received_file_${Date.now()}.bin`,
       hs?.mimeType || 'application/octet-stream'
     );
+    // Marked saved only once the saver has taken the file: a saver that throws is an error, not a save.
     optionsRef.current.saveFile(data, analysis.safeName, analysis.mimeType);
+    setDownloadTriggered(true);
     optionsRef.current.addToast?.({ type: 'success', message: FILE_RECEIVED_MESSAGE, duration: 5000 });
   }, []);
 
@@ -106,6 +113,8 @@ export function useDelivery(options: DeliveryOptions) {
     const { buffer, handshake: workerHandshake, files } = message;
     const { dispatch, setReceiverError, currentRun, onStreamDone } = optionsRef.current;
     const run = currentRun();
+    // A new result retires any manual save of the previous one.
+    saveOpRef.current += 1;
     if (files) {
       // Several files: each was verified against its own hash in the worker. They are saved one by
       // one or as an archive, never automatically.
@@ -157,25 +166,35 @@ export function useDelivery(options: DeliveryOptions) {
 
   /** Saves the received file, after checking it once more against the announced SHA-256. */
   const saveReceivedFile = useCallback(async () => {
+    const data = reassembledDataRef.current;
+    const hs = handshakeRef.current;
+    if (!data || !hs) return;
+    // This save belongs to this run, this result and this press of Save; a later press, a Clear, a
+    // new result or an unmount retires it (#1702).
+    const run = optionsRef.current.currentRun();
+    saveOpRef.current += 1;
+    const op = saveOpRef.current;
+    const current = () => op === saveOpRef.current && run === optionsRef.current.currentRun() && reassembledDataRef.current === data;
     try {
       setIsVerifying(true);
       optionsRef.current.setReceiverError(null);
-      const data = reassembledDataRef.current;
-      const hs = handshakeRef.current;
-      if (!data || !hs) return;
       await assertIntegrity(data, hs.sha256);
-      setReceiverSuccess(true);
+      if (!current()) return;
       deliverFile(data, hs);
+      setReceiverSuccess(true);
     } catch (err) {
-      failReassembly(err);
+      if (current()) failReassembly(err);
     } finally {
-      setIsVerifying(false);
-      setCompilationStatus(null);
+      if (current()) {
+        setIsVerifying(false);
+        setCompilationStatus(null);
+      }
     }
   }, [assertIntegrity, deliverFile, failReassembly]);
 
   /** Forgets the received file, as Clear does. */
   const reset = useCallback(() => {
+    saveOpRef.current += 1;
     setBundle(null);
     setHandshake(null);
     handshakeRef.current = null;
@@ -185,6 +204,11 @@ export function useDelivery(options: DeliveryOptions) {
     setReassembledData(null);
     reassembledDataRef.current = null;
     setCompilationStatus(null);
+  }, []);
+
+  // An unmount retires a save still checking its file.
+  useEffect(() => () => {
+    saveOpRef.current += 1;
   }, []);
 
   return {

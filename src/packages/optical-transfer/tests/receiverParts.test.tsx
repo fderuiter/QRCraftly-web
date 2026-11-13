@@ -24,6 +24,12 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { sha256Hex } from '@/packages/core/encoding';
 import { useReassemblyWorker, useReceiverTelemetry, useFrameSource, useDelivery, type ReassemblyWorkerEvents, type FrameSourceOptions, type DeliveryOptions } from '../client';
 
+// The hash is real, but a test can hold one check open to act while it waits (#1702).
+vi.mock('@/packages/core/encoding', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/packages/core/encoding')>();
+  return { ...actual, sha256Hex: vi.fn(actual.sha256Hex) };
+});
+
 vi.mock('@/packages/qr-matrix/encoder', () => ({
   loadQrEncoder: async () => ({ create: () => ({ version: 2, modules: { size: 25, data: new Uint8Array(625) } }) }),
 }));
@@ -308,6 +314,106 @@ describe('useDelivery', () => {
       await result.current.saveReceivedFile();
     });
     expect(options.saveFile).toHaveBeenCalledTimes(1);
+  });
+
+  describe('a manual save whose check finishes late (#1702)', () => {
+    /** Holds the next SHA-256 check open; `release` lets it finish with the real hash. */
+    function holdNextHash() {
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      vi.mocked(sha256Hex).mockImplementationOnce(async (data) => {
+        await gate;
+        const { sha256Hex: real } = await vi.importActual<typeof import('@/packages/core/encoding')>('@/packages/core/encoding');
+        return real(data);
+      });
+      return { release: () => release() };
+    }
+
+    /** A received file waiting for the person to press Save. */
+    async function waitingForSave(overrides: Partial<DeliveryOptions> = {}) {
+      const options = deliveryOptions({ autoDownload: false, ...overrides });
+      const hook = renderHook(() => useDelivery(options));
+      const handshake = await handshakeFor();
+      await act(async () => {
+        await hook.result.current.handleWorkerComplete({ type: 'COMPLETE', buffer: bytes.slice().buffer, handshake });
+      });
+      expect(hook.result.current.receiverSuccess).toBe(true);
+      return { ...hook, options };
+    }
+
+    it('saves nothing and shows nothing old when Clear lands during the check', async () => {
+      let run = 0;
+      const { result, options } = await waitingForSave({ currentRun: () => run });
+      const hash = holdNextHash();
+      let saving: Promise<void> = Promise.resolve();
+      act(() => {
+        saving = result.current.saveReceivedFile();
+      });
+      expect(result.current.isVerifying).toBe(true);
+      act(() => {
+        run += 1;
+        result.current.reset();
+      });
+      await act(async () => {
+        hash.release();
+        await saving;
+      });
+      expect(options.saveFile).not.toHaveBeenCalled();
+      expect(result.current).toMatchObject({ receiverSuccess: false, isVerifying: false, downloadTriggered: false, reassembledData: null });
+    });
+
+    it('saves nothing after unmount', async () => {
+      const { result, options, unmount } = await waitingForSave();
+      const hash = holdNextHash();
+      let saving: Promise<void> = Promise.resolve();
+      act(() => {
+        saving = result.current.saveReceivedFile();
+      });
+      unmount();
+      hash.release();
+      await saving;
+      expect(options.saveFile).not.toHaveBeenCalled();
+    });
+
+    it('lets a second press of Save own the busy state and save once', async () => {
+      const { result, options } = await waitingForSave();
+      const first = holdNextHash();
+      const second = holdNextHash();
+      let a: Promise<void> = Promise.resolve();
+      let b: Promise<void> = Promise.resolve();
+      act(() => {
+        a = result.current.saveReceivedFile();
+        b = result.current.saveReceivedFile();
+      });
+      await act(async () => {
+        first.release();
+        await a;
+      });
+      // The first press was retired by the second: it neither saved nor ended the busy state.
+      expect(options.saveFile).not.toHaveBeenCalled();
+      expect(result.current.isVerifying).toBe(true);
+      await act(async () => {
+        second.release();
+        await b;
+      });
+      expect(options.saveFile).toHaveBeenCalledTimes(1);
+      expect(result.current).toMatchObject({ isVerifying: false, downloadTriggered: true, receiverSuccess: true });
+    });
+
+    it('reports a saver that throws as an error, not as saved', async () => {
+      const saveFile = vi.fn(() => {
+        throw new Error('The browser refused the download.');
+      });
+      const { result, options } = await waitingForSave({ saveFile });
+      await act(async () => {
+        await result.current.saveReceivedFile();
+      });
+      expect(saveFile).toHaveBeenCalledTimes(1);
+      expect(result.current.downloadTriggered).toBe(false);
+      expect(options.setReceiverError).toHaveBeenLastCalledWith('The browser refused the download.');
+    });
   });
 
   it('keeps a bundle for saving by hand, and Clear forgets it', async () => {
