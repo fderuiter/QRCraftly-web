@@ -16,9 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { FileKey2 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { Alert } from '../ui/Alert';
+import { useLatestSelection } from '@/hooks/useLatestSelection';
 
 /** A file read into memory: its name and bytes. */
 export interface PickedFile {
@@ -35,9 +37,27 @@ interface FilePickerProps {
   onPick: (files: PickedFile[]) => void;
 }
 
-/** A labelled "Choose file" button over a hidden file input, listing what was chosen. */
+/** Reads every chosen file into memory, all or nothing. */
+const readAll = (chosen: File[]): Promise<PickedFile[]> =>
+  Promise.all(chosen.map(async (file) => ({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) })));
+
+/**
+ * A labelled "Choose file" button over a hidden file input, listing what was chosen. Only the
+ * newest pick is handed on, and only once every file in it has been read, so names and bytes
+ * always belong to the same pick (#1705). A pick that cannot be read keeps the files chosen before.
+ * @param props - Component properties.
+ * @param props.label - Visible label, also the input's accessible name.
+ * @param props.hint - Help text under the label.
+ * @param props.accept - File types the picker offers.
+ * @param props.multiple - Whether several files can be chosen at once.
+ * @param props.files - The files chosen so far.
+ * @param props.onPick - Receives a complete, current pick.
+ * @returns The picker.
+ */
 export function FilePicker({ label, hint, accept, multiple, files, onPick }: FilePickerProps) {
   const input = useRef<HTMLInputElement>(null);
+  const selection = useLatestSelection();
+  const [error, setError] = useState<string | null>(null);
   return (
     <div className="space-y-1">
       <p className="text-sm font-medium text-fg-soft">{label}</p>
@@ -60,9 +80,20 @@ export function FilePicker({ label, hint, accept, multiple, files, onPick }: Fil
         onChange={async (event) => {
           const chosen = Array.from(event.target.files ?? []);
           event.target.value = '';
-          onPick(await Promise.all(chosen.map(async (file) => ({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }))));
+          const isCurrent = selection.begin();
+          let picked: PickedFile[];
+          try {
+            picked = await readAll(chosen);
+          } catch {
+            if (isCurrent()) setError(`That file could not be read. Choose the ${multiple ? 'files' : 'file'} again.`);
+            return;
+          }
+          if (!isCurrent()) return;
+          setError(null);
+          onPick(picked);
         }}
       />
+      {error && <Alert variant="error">{error}</Alert>}
     </div>
   );
 }

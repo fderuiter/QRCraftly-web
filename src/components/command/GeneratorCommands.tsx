@@ -2,8 +2,10 @@ import React, { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, 
 import { useQRStore } from '@/context/QRContext';
 import { useToast } from '@/components/ui/Toast';
 import { useUndoToast } from '@/hooks/useUndoToast';
+import { useLatestSelection } from '@/hooks/useLatestSelection';
 import { usesCommandKey, useGeneratorShortcuts } from './useGeneratorShortcuts';
 import type { buildCommands, Command, GeneratorActions } from './commands';
+import type { StyleFileResult } from '@/utils/styleFile';
 
 // The palette, its command list and the style file code load on first use, so they cost
 // nothing on a page that never opens them.
@@ -37,20 +39,32 @@ export function GeneratorCommands({ actions, onDownload }: GeneratorCommandsProp
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modLabel = usesCommandKey() ? '⌘' : 'Ctrl';
 
+  // Only the newest style file is applied: an older one that finishes reading later, or one still
+  // reading when the generator unmounts, changes nothing and shows no toast (#1705).
+  const styleSelection = useLatestSelection();
   const applyStyleFile = useCallback(
     async (file: File) => {
-      const { parseStyleFile, MAX_STYLE_FILE_BYTES } = await import('@/utils/styleFile');
-      const result = file.size > MAX_STYLE_FILE_BYTES
-        ? ({ ok: false, reason: 'That file is too large to be a QRCraftly style file.' } as const)
-        : parseStyleFile(await file.text());
+      const isCurrent = styleSelection.begin();
+      const showError = (message: string) => addToast({ type: 'error', message, duration: 6000 });
+      let result: StyleFileResult;
+      try {
+        const { parseStyleFile, MAX_STYLE_FILE_BYTES } = await import('@/utils/styleFile');
+        result = file.size > MAX_STYLE_FILE_BYTES
+          ? ({ ok: false, reason: 'That file is too large to be a QRCraftly style file.' } as const)
+          : parseStyleFile(await file.text());
+      } catch {
+        if (isCurrent()) showError('That style file could not be read. Try again.');
+        return;
+      }
+      if (!isCurrent()) return;
       if (!result.ok) {
-        addToast({ type: 'error', message: result.reason, duration: 6000 });
+        showError(result.reason);
         return;
       }
       store.updateConfig(result.style);
       notifyUndo(result.skipped > 0 ? `Style loaded; ${result.skipped} setting${result.skipped === 1 ? '' : 's'} could not be used.` : 'Style loaded');
     },
-    [store, addToast, notifyUndo]
+    [store, addToast, notifyUndo, styleSelection]
   );
 
   const exportStyleFile = useCallback(async () => {

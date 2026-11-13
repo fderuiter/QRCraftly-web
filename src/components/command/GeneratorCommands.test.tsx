@@ -37,6 +37,28 @@ function setup() {
 const styleFile = (style: Record<string, unknown>) =>
   new File([JSON.stringify({ format: STYLE_FILE_FORMAT, version: 1, style })], 'brand.qrcraftly.json', { type: 'application/json' });
 
+/** A style file whose text() the test settles by hand, so reads can finish out of order (#1705). */
+const pendingStyleFile = (style: Record<string, unknown>) => {
+  const text = JSON.stringify({ format: STYLE_FILE_FORMAT, version: 1, style });
+  let settle!: (value: string) => void;
+  let fail!: (reason: unknown) => void;
+  const pending = new Promise<string>((resolve, reject) => {
+    settle = resolve;
+    fail = reject;
+  });
+  const file = styleFile(style);
+  const read = vi.fn(() => pending);
+  file.text = read;
+  return { file, read, settle: () => settle(text), fail: () => fail(new Error('read failed')) };
+};
+
+/** Lets pending dynamic imports and file reads settle without any timers. */
+const flush = async () => {
+  for (let i = 0; i < 5; i++) {
+    await act(async () => {});
+  }
+};
+
 describe('GeneratorCommands', () => {
   it('opens the command palette with Ctrl+K and runs a command', async () => {
     const { actions } = setup();
@@ -124,5 +146,38 @@ describe('GeneratorCommands', () => {
     expect(await blob[0].text()).not.toContain('private.example');
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+  it('applies only the newest style file when an older read finishes last (#1705)', async () => {
+    const { store } = setup();
+    const older = pendingStyleFile({ fgColor: '#aa0000' });
+    const newer = styleFile({ fgColor: '#00bb00' });
+    const input = screen.getByLabelText('Load style file');
+    fireEvent.change(input, { target: { files: [older.file] } });
+    await waitFor(() => expect(older.read).toHaveBeenCalled());
+    fireEvent.change(input, { target: { files: [newer] } });
+    await waitFor(() => expect(store().getState().config.fgColor).toBe('#00bb00'));
+
+    older.settle();
+    await flush();
+
+    expect(store().getState().config.fgColor).toBe('#00bb00');
+    expect(screen.getAllByText('Style loaded')).toHaveLength(1);
+  });
+
+  it('shows no error toast when an older style file fails after a newer one loaded (#1705)', async () => {
+    const { store } = setup();
+    const older = pendingStyleFile({ fgColor: '#aa0000' });
+    const newer = styleFile({ fgColor: '#00bb00' });
+    const input = screen.getByLabelText('Load style file');
+    fireEvent.change(input, { target: { files: [older.file] } });
+    await waitFor(() => expect(older.read).toHaveBeenCalled());
+    fireEvent.change(input, { target: { files: [newer] } });
+    await waitFor(() => expect(store().getState().config.fgColor).toBe('#00bb00'));
+
+    older.fail();
+    await flush();
+
+    expect(screen.queryByText(/could not be read/i)).not.toBeInTheDocument();
+    expect(store().getState().config.fgColor).toBe('#00bb00');
   });
 });

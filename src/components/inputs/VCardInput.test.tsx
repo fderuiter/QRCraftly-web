@@ -17,7 +17,7 @@
 */
 
 import { useState } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { VCardInput } from './VCardInput';
@@ -145,6 +145,18 @@ describe('VCardInput social profile fields (#1470)', () => {
 const CARD = ['BEGIN:VCARD', 'VERSION:3.0', 'N:Doe;Jane;;;', 'EMAIL:jane@example.com', 'TEL:+1 555 0100', 'END:VCARD', ''].join('\r\n');
 const vcf = (text: string, name = 'jane.vcf') => new File([text], name, { type: 'text/vcard' });
 
+/** A .vcf file whose text() waits until the test settles it (#1705). */
+const pendingVcf = (text: string, name: string) => {
+  let settle!: (value: string) => void;
+  const pending = new Promise<string>((resolve) => {
+    settle = resolve;
+  });
+  const file = vcf(text, name);
+  const read = vi.fn(() => pending);
+  file.text = read;
+  return { file, read, settle: () => settle(text) };
+};
+
 describe('VCardInput contact file import (#1558)', () => {
   it('fills the form from a chosen .vcf file, keeps the card format and clears social profiles the file lacks', async () => {
     const onChange = vi.fn();
@@ -199,5 +211,23 @@ describe('VCardInput contact file import (#1558)', () => {
     fireEvent.change(screen.getByLabelText('Contact card file (.vcf)'), { target: { files: [vcf('nope', 'nope.vcf')] } });
     await screen.findByRole('alert');
     expect(await axe(container)).toHaveNoViolations();
+  });
+  it('drops a pending contact file when the person types in the form first (#1705)', async () => {
+    const onChange = vi.fn();
+    render(<VCardInput data={blankCard()} onChange={onChange} />);
+    const pending = pendingVcf(CARD, 'jane.vcf');
+
+    fireEvent.change(screen.getByLabelText('Contact card file (.vcf)'), { target: { files: [pending.file] } });
+    await waitFor(() => expect(pending.read).toHaveBeenCalled());
+    fireEvent.change(screen.getByRole('textbox', { name: /First Name/i }), { target: { value: 'Typed' } });
+
+    pending.settle();
+    for (let i = 0; i < 5; i++) {
+      await act(async () => {});
+    }
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith({ firstName: 'Typed' });
+    expect(onChange.mock.calls.some(([updates]) => updates.firstName === 'Jane')).toBe(false);
   });
 });
