@@ -268,6 +268,20 @@ export class AdaptiveFrameScheduler<TDetail = unknown> {
   }
 
   /**
+   * Forgets a frame whose answer will never count (#1699): its source changed or its worker was
+   * replaced while it was captured. Nothing is reported and no latency is recorded; backpressure is
+   * released only when it is still the newest frame in flight, so a later frame keeps its slot.
+   */
+  public retireFrame(sequenceId: number) {
+    this.startTimeMap.delete(sequenceId);
+    if (sequenceId === this.sequenceId && sequenceId > this.completedSequenceId) {
+      this.completedSequenceId = sequenceId;
+      this.inFlight = false;
+      this.inFlightStart = null;
+    }
+  }
+
+  /**
    * Updates the adaptive sampling bounds without resetting in-flight state.
    */
   public setSamplingBounds(minSamplingDelay: number, maxSamplingDelay: number) {

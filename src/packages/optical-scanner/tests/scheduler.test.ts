@@ -309,3 +309,40 @@ describe('AdaptiveFrameScheduler', () => {
     scheduler.stop();
   });
 });
+
+describe('AdaptiveFrameScheduler.retireFrame (#1699)', () => {
+  it('frees the newest frame silently: no result, no latency, no status', () => {
+    const onScanFail = vi.fn();
+    const onStatusChange = vi.fn();
+    const onLatencyHistoryChange = vi.fn();
+    const scheduler = new AdaptiveFrameScheduler({ onScanFail, onStatusChange, onLatencyHistoryChange });
+    scheduler.start();
+    const seq = scheduler.beginFrame();
+    onStatusChange.mockClear();
+    expect(seq).not.toBeNull();
+    scheduler.retireFrame(seq ?? -1);
+
+    expect(scheduler.getInFlight()).toBe(false);
+    expect(scheduler.getStartTimeMap().size).toBe(0);
+    expect(onScanFail).not.toHaveBeenCalled();
+    expect(onStatusChange).not.toHaveBeenCalled();
+    expect(onLatencyHistoryChange).not.toHaveBeenCalled();
+    // A late answer for the retired frame counts for nothing either.
+    scheduler.endFrame(seq ?? -1, 'pass', 'LATE');
+    expect(scheduler.getLatencyHistory()).toEqual([]);
+    scheduler.stop();
+  });
+
+  it('keeps backpressure for a newer frame in flight', () => {
+    const scheduler = new AdaptiveFrameScheduler();
+    scheduler.start();
+    const older = scheduler.beginFrame();
+    scheduler.triggerRecovery(0, false);
+    const newer = scheduler.beginFrame();
+    expect(newer).not.toBeNull();
+    scheduler.retireFrame(older ?? -1);
+    expect(scheduler.getInFlight()).toBe(true);
+    expect(scheduler.beginFrame()).toBeNull();
+    scheduler.stop();
+  });
+});
