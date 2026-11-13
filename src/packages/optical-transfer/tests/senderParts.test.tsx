@@ -243,6 +243,71 @@ describe('useSliceWorker', () => {
     emit(refs, { type: 'ERROR', message: 'Too big' });
     expect(spies.onError).toHaveBeenCalledWith('Too big');
   });
+
+  describe('key QR hold (#1698)', () => {
+    const keyFrame = (revealId: number) => ({ type: 'KEY_FRAME', revealId, size: 21, data: new Uint8Array(21 * 21) });
+    /** The reveal IDs the worker was asked for, in order. */
+    const asked = (sent: unknown[]): number[] =>
+      sent.flatMap((m) =>
+        typeof m === 'object' && m !== null && 'type' in m && m.type === 'KEY_QR' && 'revealId' in m && typeof m.revealId === 'number'
+          ? [m.revealId]
+          : []);
+
+    it('shows the key QR answered for the hold still held', async () => {
+      const { result, sent } = renderWorker();
+      act(() => result.current.worker.ensureWorker());
+      act(() => result.current.worker.showKeyQr());
+      await waitFor(() => expect(asked(sent)).toHaveLength(1));
+      emit(result.current.refs, keyFrame(asked(sent)[0] ?? -1));
+      expect(result.current.worker.keyFrame).toMatchObject({ size: 21 });
+    });
+
+    it('keeps the key hidden when the answer lands after the release', async () => {
+      const { result, sent } = renderWorker();
+      act(() => result.current.worker.ensureWorker());
+      act(() => result.current.worker.showKeyQr());
+      act(() => result.current.worker.hideKeyQr());
+      await waitFor(() => expect(asked(sent)).toHaveLength(1));
+      emit(result.current.refs, keyFrame(asked(sent)[0] ?? -1));
+      expect(result.current.worker.keyFrame).toBeNull();
+    });
+
+    it('ignores the first hold\'s late answer during a second hold, and takes the second\'s', async () => {
+      const { result, sent } = renderWorker();
+      act(() => result.current.worker.ensureWorker());
+      act(() => result.current.worker.showKeyQr());
+      act(() => result.current.worker.hideKeyQr());
+      act(() => result.current.worker.showKeyQr());
+      await waitFor(() => expect(asked(sent)).toHaveLength(2));
+      const [first, second] = asked(sent);
+      expect(second).not.toBe(first);
+      emit(result.current.refs, keyFrame(first ?? -1));
+      expect(result.current.worker.keyFrame).toBeNull();
+      emit(result.current.refs, keyFrame(second ?? -1));
+      expect(result.current.worker.keyFrame).not.toBeNull();
+    });
+
+    it('hides a shown key at once on release, and a repeated answer cannot bring it back', async () => {
+      const { result, sent } = renderWorker();
+      act(() => result.current.worker.ensureWorker());
+      act(() => result.current.worker.showKeyQr());
+      await waitFor(() => expect(asked(sent)).toHaveLength(1));
+      const [id] = asked(sent);
+      emit(result.current.refs, keyFrame(id ?? -1));
+      act(() => result.current.worker.hideKeyQr());
+      expect(result.current.worker.keyFrame).toBeNull();
+      emit(result.current.refs, keyFrame(id ?? -1));
+      expect(result.current.worker.keyFrame).toBeNull();
+    });
+
+    it('drops an answer with no hold at all', () => {
+      const { result } = renderWorker();
+      act(() => result.current.worker.ensureWorker());
+      emit(result.current.refs, keyFrame(0));
+      emit(result.current.refs, keyFrame(1));
+      expect(result.current.worker.keyFrame).toBeNull();
+    });
+  });
 });
 
 describe('useSteering', () => {

@@ -123,15 +123,15 @@ describe('private and multi-file transfer workers', () => {
     const init = await start({ file: new File([randomBytes(400, 1)], 'x.bin'), private: true });
     expect(parseKeyCode(init.fountain.keyCode ?? '')).not.toBeNull();
 
-    await sliceHandler({ data: { type: 'KEY_QR' } });
+    await sliceHandler({ data: { type: 'KEY_QR', revealId: 7 } });
     const keyFrame = posted.find((m) => m.type === 'KEY_FRAME');
-    expect(keyFrame).toMatchObject({ size: expect.any(Number) });
+    expect(keyFrame).toMatchObject({ revealId: 7, size: expect.any(Number) });
     expect((keyFrame?.data as Uint8Array).length).toBe((keyFrame?.size as number) ** 2);
 
     posted = [];
     await sliceHandler({ data: { type: 'STOP' } });
     await start({ file: new File([randomBytes(400, 2)], 'y.bin') });
-    await sliceHandler({ data: { type: 'KEY_QR' } });
+    await sliceHandler({ data: { type: 'KEY_QR', revealId: 7 } });
     expect(posted.find((m) => m.type === 'KEY_FRAME')).toBeUndefined();
   });
 
@@ -178,7 +178,7 @@ describe('private and multi-file transfer workers', () => {
 
   it('opens a private transfer from the key QR a camera read', async () => {
     const init = await start({ file: new File([randomBytes(500, 10)], 'qr.bin'), private: true });
-    await sliceHandler({ data: { type: 'KEY_QR' } });
+    await sliceHandler({ data: { type: 'KEY_QR', revealId: 7 } });
     const keyText = frameTexts.find((text) => text.startsWith('QRKEY:'));
     expect(keyText).toBeDefined();
     await feed((await collectFrames(init.fountain.k * 4 + 20)).filter((text) => !text.startsWith('QRKEY:')));

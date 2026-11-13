@@ -760,6 +760,46 @@ describe('useOpticalSender', () => {
     globalThis.mockWorkerControl.setInterceptor(null);
   });
 
+  it('never shows a key QR answered for a hold that a Stop ended, even after a restart (#1698)', async () => {
+    const options = senderOptions();
+    const { result } = await startWithFrames(options);
+    await waitFor(() => expect(result.current.isTransferring).toBe(true));
+    const holds: Array<{ revealId: number; worker: { dispatchMessage: (data: unknown) => void } }> = [];
+    globalThis.mockWorkerControl.setInterceptor((message: any, worker: any) => {
+      if (message.type === 'KEY_QR') holds.push({ revealId: message.revealId, worker });
+      if (message.type === 'START') {
+        worker.dispatchMessage({ type: 'PROGRESS', index: 0, total: 1 });
+        worker.dispatchMessage({ type: 'FRAME', index: 0, total: 1, size: 21, data: new Uint8Array(441) });
+      }
+    });
+    const answer = async (hold: (typeof holds)[number] | undefined) => {
+      await act(async () => {
+        hold?.worker.dispatchMessage({ type: 'KEY_FRAME', revealId: hold.revealId, size: 21, data: new Uint8Array(441) });
+      });
+    };
+
+    act(() => result.current.showKeyQr());
+    await waitFor(() => expect(holds).toHaveLength(1));
+    act(() => result.current.stopTransfer());
+    await answer(holds[0]);
+    expect(result.current.keyFrame).toBeNull();
+
+    await act(async () => {
+      result.current.startTransfer();
+    });
+    await waitFor(() => expect(result.current.isTransferring).toBe(true));
+    act(() => result.current.showKeyQr());
+    await waitFor(() => expect(holds).toHaveLength(2));
+    await answer(holds[0]);
+    expect(result.current.keyFrame).toBeNull();
+    await answer(holds[1]);
+    expect(result.current.keyFrame).toMatchObject({ size: 21 });
+
+    act(() => result.current.stopTransfer());
+    expect(result.current.keyFrame).toBeNull();
+    globalThis.mockWorkerControl.setInterceptor(null);
+  });
+
   it('reports the frame pool buffer size as frame memory while transferring', async () => {
     const options = senderOptions();
     const { result } = await startWithFrames(options);

@@ -52,6 +52,12 @@ export function useSliceWorker(refs: SenderRefs, events: SliceWorkerEvents) {
   const [fountainInfo, setFountainInfo] = useState<SenderFountainInfo | null>(null);
   /** The key QR, while the person holds the button that shows it. */
   const [keyFrame, setKeyFrame] = useState<TransferFrame | null>(null);
+  /**
+   * The key QR hold (#1698): `current` is the reveal now held, or null when none is. Every hold
+   * takes a fresh ID from `next`, and only a KEY_FRAME naming the held ID may show the key, so an
+   * answer that lands after a release, a later hold, a stop or an unmount stays hidden.
+   */
+  const revealRef = useRef<{ next: number; current: number | null }>({ next: 0, current: null });
   const [frameBufferBytes, setFrameBufferBytes] = useState(0);
   /** Canvas of the key QR; painted whenever `keyFrame` is set. */
   const keyCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -110,6 +116,8 @@ export function useSliceWorker(refs: SenderRefs, events: SliceWorkerEvents) {
       }
 
       case 'KEY_FRAME': {
+        // The worker's answer carries the key but never grants showing it: only the hold does.
+        if (message.revealId !== revealRef.current.current) break;
         setKeyFrame({ size: message.size, data: message.data });
         break;
       }
@@ -150,6 +158,19 @@ export function useSliceWorker(refs: SenderRefs, events: SliceWorkerEvents) {
     workerRef.current?.postMessage(message);
   }, [workerRef]);
 
+  /** Starts a hold of the key QR: retires any earlier one and asks the worker for the key. */
+  const showKeyQr = useCallback(() => {
+    const revealId = revealRef.current.next + 1;
+    revealRef.current = { next: revealId, current: revealId };
+    post({ type: 'KEY_QR', revealId });
+  }, [post]);
+
+  /** Ends the hold: retires its reveal before the key QR is cleared, so no late answer brings it back. */
+  const hideKeyQr = useCallback(() => {
+    revealRef.current = { ...revealRef.current, current: null };
+    setKeyFrame(null);
+  }, []);
+
   /** Stops the stream and keeps the worker for the next start. */
   const stop = useCallback(() => post({ type: 'STOP' }), [post]);
 
@@ -164,6 +185,7 @@ export function useSliceWorker(refs: SenderRefs, events: SliceWorkerEvents) {
 
   // Terminate background worker on unmount
   useEffect(() => () => {
+    revealRef.current = { ...revealRef.current, current: null };
     if (workerRef.current) {
       workerRef.current.terminate();
       workerRef.current = null;
@@ -171,7 +193,7 @@ export function useSliceWorker(refs: SenderRefs, events: SliceWorkerEvents) {
   }, [workerRef]);
 
   return {
-    totalFrames, setTotalFrames, fountainInfo, setFountainInfo, keyFrame, setKeyFrame, keyCanvasRef,
+    totalFrames, setTotalFrames, fountainInfo, setFountainInfo, keyFrame, showKeyQr, hideKeyQr, keyCanvasRef,
     frameBufferBytes, ensureWorker, post, stop, terminate,
   };
 }

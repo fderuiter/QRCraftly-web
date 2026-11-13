@@ -52,11 +52,42 @@ export interface SenderKeyPanelProps {
 
 /**
  * A private transfer's key (#1144): the words and the key QR show only while their button is
- * held, never beside the stream by default.
+ * held, never beside the stream by default. Both follow the same hold: it ends on release, pointer
+ * leave or cancel, focus loss, and also when the window loses focus or the page is hidden, which
+ * Safari's buttons do not report as blur because a click does not focus them (#1698).
  * @returns The key panel.
  */
 export function SenderKeyPanel({ keyCode, showingKeyQr, keyCanvasRef, onShowKeyQr, onHideKeyQr }: SenderKeyPanelProps) {
   const [showingKeyCode, setShowingKeyCode] = React.useState(false);
+  /** Whether the key QR button is held, from the press, before the worker has drawn the code. */
+  const [holdingKeyQr, setHoldingKeyQr] = React.useState(false);
+  const showKeyQr = React.useCallback(() => {
+    setHoldingKeyQr(true);
+    onShowKeyQr();
+  }, [onShowKeyQr]);
+  const hideKeyQr = React.useCallback(() => {
+    setHoldingKeyQr(false);
+    onHideKeyQr();
+  }, [onHideKeyQr]);
+  const holding = showingKeyCode || holdingKeyQr;
+
+  React.useEffect(() => {
+    if (!holding) return undefined;
+    const hideAll = () => {
+      setShowingKeyCode(false);
+      hideKeyQr();
+    };
+    const hideWhenHidden = () => {
+      if (document.visibilityState === 'hidden') hideAll();
+    };
+    window.addEventListener('blur', hideAll);
+    document.addEventListener('visibilitychange', hideWhenHidden);
+    return () => {
+      window.removeEventListener('blur', hideAll);
+      document.removeEventListener('visibilitychange', hideWhenHidden);
+    };
+  }, [holding, hideKeyQr]);
+
   return (
     <div className="space-y-2 rounded-lg border border-line bg-surface p-3" data-testid="sender-key-panel">
       <p className="font-semibold text-fg">Key code</p>
@@ -76,7 +107,7 @@ export function SenderKeyPanel({ keyCode, showingKeyQr, keyCanvasRef, onShowKeyQ
         <Button variant="outline" {...holdToShow(() => setShowingKeyCode(true), () => setShowingKeyCode(false))}>
           Hold to show key code
         </Button>
-        <Button variant="outline" {...holdToShow(onShowKeyQr, onHideKeyQr)}>
+        <Button variant="outline" {...holdToShow(showKeyQr, hideKeyQr)}>
           Hold to show key QR
         </Button>
       </div>
