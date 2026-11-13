@@ -294,13 +294,16 @@ async function handleStart(payload: SliceStartPayload | undefined): Promise<void
   await processPipeline(sessionId);
 }
 
-/** Posts the module matrix of the key QR, a code with room to spare so a phone reads it from across a desk. */
-function postKeyQr(): void {
+/**
+ * Posts the module matrix of the key QR, a code with room to spare so a phone reads it from across a desk.
+ * @param revealId - The hold that asked for it, echoed so the sender can tell a late answer (#1698).
+ */
+function postKeyQr(revealId: number): void {
   if (!keyQr || !encoder) return;
   try {
     const { size, data } = encoder.create(keyQr, { errorCorrectionLevel: 'M' }).modules;
     const matrix = new Uint8Array(data);
-    post({ type: 'KEY_FRAME', size, data: matrix }, [matrix.buffer]);
+    post({ type: 'KEY_FRAME', revealId, size, data: matrix }, [matrix.buffer]);
   } catch (err: unknown) {
     post({ type: 'ERROR', message: `Failed to generate the key code: ${errorMessage(err)}` });
   }
@@ -388,7 +391,7 @@ self.onmessage = async (e: MessageEvent<SliceWorkerIncomingMessage | null>) => {
       break;
     }
     case 'KEY_QR':
-      postKeyQr();
+      postKeyQr(message.revealId);
       break;
     case 'SWITCH':
       await handleSwitch(message.payload);

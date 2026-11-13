@@ -78,8 +78,11 @@ export type SliceWorkerIncomingMessage =
   | { type: 'START'; payload?: SliceStartPayload }
   | { type: 'ACK'; payload?: { index?: number } }
   | { type: 'HEAL'; payload?: { lastAckedIndex?: unknown } }
-  /** Asks for the key QR of a private transfer; answered with KEY_FRAME. */
-  | { type: 'KEY_QR' }
+  /**
+   * Asks for the key QR of a private transfer; answered with KEY_FRAME carrying the same
+   * `revealId`, so the sender can drop an answer that arrives after the person let go (#1698).
+   */
+  | { type: 'KEY_QR'; revealId: number }
   /** A steered transfer changes layout (#1146): answered with SWITCHED, then frames of the new layout from index 0. */
   | { type: 'SWITCH'; payload?: { tiles?: TileLayoutId; beacon?: BeaconPlan } }
   | { type: 'STOP' };
@@ -115,7 +118,8 @@ export type SliceWorkerOutgoingMessage =
   | { type: 'FRAME'; index: number; total: number; size: number; data: Uint8Array }
   | { type: 'PROGRESS'; index: number; total: number; fileName?: string; fileSize?: number }
   | { type: 'INITIALIZED'; totalFrames: number; sha256: string; fountain: FountainInitInfo }
-  | { type: 'KEY_FRAME'; size: number; data: Uint8Array }
+  /** The key QR asked for by the KEY_QR with this `revealId`. */
+  | { type: 'KEY_FRAME'; revealId: number; size: number; data: Uint8Array }
   /** Beacon `index` of a multi-rate stream: it follows dense display frame `(index + 1) * (every - 1) - 1`. */
   | { type: 'BEACON'; index: number; size: number; data: Uint8Array }
   /** The layout changed: frames and beacons posted before this belong to the old one. */

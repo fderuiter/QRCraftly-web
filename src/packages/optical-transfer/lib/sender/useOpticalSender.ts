@@ -122,7 +122,7 @@ export function useOpticalSender({
       dispatch({ type: 'error' });
     },
   });
-  const { setKeyFrame, setTotalFrames, setFountainInfo, ensureWorker, post, stop: stopWorker } = worker;
+  const { showKeyQr, hideKeyQr, setTotalFrames, setFountainInfo, ensureWorker, post, stop: stopWorker } = worker;
 
   /** Ends whatever plays or starts and resets the stream; the caller says why with its own event. */
   const teardown = useCallback(() => {
@@ -132,13 +132,13 @@ export function useOpticalSender({
     settingsLockedRef.current = false;
     setHandshakeError(null);
     setHandshakeVerified(false);
-    setKeyFrame(null);
+    hideKeyQr();
     refs.walletRef.current = null;
     refs.walletRunRef.current += 1;
     resetSteering();
     stopWorker();
     resetPlayback();
-  }, [refs, isTransferringRef, isPausedRef, isVerifyingHandshakeRef, settingsLockedRef, setKeyFrame, resetSteering, stopWorker, resetPlayback]);
+  }, [refs, isTransferringRef, isPausedRef, isVerifyingHandshakeRef, settingsLockedRef, hideKeyQr, resetSteering, stopWorker, resetPlayback]);
   useEffect(() => {
     teardownBox.current = teardown;
   }, [teardownBox, teardown]);
@@ -253,10 +253,6 @@ export function useOpticalSender({
   /** Under reduced motion, asks once more before the stream flashes; the confirmed start is `startTransfer`. */
   const askToStart = useCallback(() => dispatch({ type: 'start', reducedMotion: true }), []);
   const cancelMotion = useCallback(() => dispatch({ type: 'cancelMotion' }), []);
-
-  /** Shows the key QR for as long as the person holds the button; it never plays with the stream. */
-  const showKeyQr = useCallback(() => post({ type: 'KEY_QR' }), [post]);
-  const hideKeyQr = useCallback(() => setKeyFrame(null), [setKeyFrame]);
 
   /** Freezes the stream on its current frame at once. Escape and the Pause button call this. */
   const pauseTransfer = useCallback(() => {
