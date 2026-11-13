@@ -5,6 +5,7 @@ import { LinkHints, hintsId } from "./FieldHints";
 import { vCardFieldError, VCARD_SOCIAL_FIELDS, VCARD_SOCIAL_NETWORKS } from "@/packages/qr-payload";
 import { FormBlock } from "../ui/FormBlock";
 import { VCardFileImport } from "./VCardFileImport";
+import { useLatestSelection } from "@/hooks/useLatestSelection";
 import {
   GRID_TWO_COLUMNS_CLASSES,
   SUB_CONTAINER_SPACING_CLASSES,
@@ -31,6 +32,12 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
   // A half-typed profile link is not yet on its network's host, so its error waits for blur (#1435).
   const [blurredSocials, setBlurredSocials] = useState<ReadonlySet<string>>(() => new Set());
   const isMeCard = data.version === "mecard";
+  // A field typed while a contact file is still being read wins: that file is dropped (#1705).
+  const fileImport = useLatestSelection();
+  const edit = (updates: Partial<VCardData>) => {
+    fileImport.retire();
+    onChange(updates);
+  };
 
   // A file replaces the whole contact, so a social profile the file does not have is cleared too.
   const importFields = (fields: Omit<VCardData, "version">) => {
@@ -42,7 +49,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
 
   return (
     <FormBlock legend="Contact Details (vCard)">
-      <VCardFileImport onImport={importFields} />
+      <VCardFileImport onImport={importFields} selection={fileImport} />
 
       <SelectField
         id="vcard-version"
@@ -67,7 +74,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           maxLength={100}
           placeholder="e.g. Jane"
           value={data.firstName}
-          onChange={(e) => onChange({ firstName: e.target.value })}
+          onChange={(e) => edit({ firstName: e.target.value })}
           error={firstNameError}
         />
         <TextField
@@ -78,7 +85,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           maxLength={100}
           placeholder="e.g. Doe"
           value={data.lastName}
-          onChange={(e) => onChange({ lastName: e.target.value })}
+          onChange={(e) => edit({ lastName: e.target.value })}
           error={lastNameError}
         />
       </div>
@@ -93,7 +100,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           maxLength={20}
           placeholder="+1 555 000 0000"
           value={data.phone}
-          onChange={(e) => onChange({ phone: e.target.value })}
+          onChange={(e) => edit({ phone: e.target.value })}
           error={phoneError}
         />
         <TextField
@@ -105,7 +112,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
           maxLength={254}
           placeholder="name@example.com"
           value={data.email}
-          onChange={(e) => onChange({ email: e.target.value })}
+          onChange={(e) => edit({ email: e.target.value })}
           error={emailError}
         />
       </div>
@@ -118,7 +125,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         maxLength={100}
         placeholder="e.g. Acme Corp"
         value={data.organization}
-        onChange={(e) => onChange({ organization: e.target.value })}
+        onChange={(e) => edit({ organization: e.target.value })}
         error={orgError}
       />
 
@@ -130,7 +137,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         maxLength={100}
         placeholder="e.g. Software Engineer"
         value={data.title}
-        onChange={(e) => onChange({ title: e.target.value })}
+        onChange={(e) => edit({ title: e.target.value })}
         error={titleError}
       />
 
@@ -143,7 +150,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
         maxLength={2048}
         placeholder="https://example.com"
         value={data.website}
-        onChange={(e) => onChange({ website: e.target.value })}
+        onChange={(e) => edit({ website: e.target.value })}
         error={websiteError}
         aria-describedby={hintsId("vcard-website")}
       />
@@ -160,7 +167,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
             maxLength={2048}
             placeholder="https://example.com/avatar.jpg"
             value={data.photo || ""}
-            onChange={(e) => onChange({ photo: e.target.value })}
+            onChange={(e) => edit({ photo: e.target.value })}
             error={photoError}
             aria-describedby={hintsId("vcard-photo")}
           />
@@ -187,7 +194,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
                   maxLength={2048}
                   placeholder={`@user or ${network.hosts[0]}/…`}
                   value={data[field] || ""}
-                  onChange={(e) => onChange({ [field]: e.target.value })}
+                  onChange={(e) => edit({ [field]: e.target.value })}
                   onBlur={() => setBlurredSocials((prev) => new Set(prev).add(field))}
                   error={blurredSocials.has(field) ? vCardFieldError(field, data[field]) : undefined}
                 />
@@ -207,7 +214,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
             maxLength={100}
             placeholder="Street"
             value={data.street}
-            onChange={(e) => onChange({ street: e.target.value })}
+            onChange={(e) => edit({ street: e.target.value })}
             error={streetError}
           />
           <div className={GRID_TWO_COLUMNS_CLASSES}>
@@ -219,7 +226,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               maxLength={100}
               placeholder="City"
               value={data.city}
-              onChange={(e) => onChange({ city: e.target.value })}
+              onChange={(e) => edit({ city: e.target.value })}
               error={cityError}
             />
             <TextField
@@ -230,7 +237,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               maxLength={20}
               placeholder="ZIP"
               value={data.zip}
-              onChange={(e) => onChange({ zip: e.target.value })}
+              onChange={(e) => edit({ zip: e.target.value })}
               error={zipError}
             />
             <TextField
@@ -241,7 +248,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               maxLength={100}
               placeholder="Country"
               value={data.country}
-              onChange={(e) => onChange({ country: e.target.value })}
+              onChange={(e) => edit({ country: e.target.value })}
               error={countryError}
             />
           </div>

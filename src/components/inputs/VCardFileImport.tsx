@@ -22,10 +22,16 @@ import type { VCardData } from '@/packages/qr-payload';
 import { Button } from '../ui/Button';
 import { Alert } from '../ui/Alert';
 import { mergeClasses } from '../ui/styles';
+import { useLatestSelection, type LatestSelection } from '@/hooks/useLatestSelection';
 
 interface VCardFileImportProps {
   /** Receives every contact field read from the file; the card format stays as the form has it. */
   onImport: (fields: Omit<VCardData, 'version'>) => void;
+  /**
+   * Owner of the file being read, when the form also needs to retire it (a manual edit while a
+   * file is still being read wins over that file). Defaults to one of this component's own.
+   */
+  selection?: LatestSelection;
 }
 
 /**
@@ -33,24 +39,32 @@ interface VCardFileImportProps {
  * is read on this device and never sent anywhere.
  * @param root0 - Component properties.
  * @param root0.onImport - Called with the fields of the file's first contact card.
+ * @param root0.selection - Owner of the file being read; only the newest file is applied (#1705).
  * @returns The drop zone, its file picker and the result message.
  */
-export function VCardFileImport({ onImport }: VCardFileImportProps) {
+export function VCardFileImport({ onImport, selection }: VCardFileImportProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importedName, setImportedName] = useState<string | null>(null);
 
+  const ownSelection = useLatestSelection();
+  const latest = selection ?? ownSelection;
+
+  // Only the newest file publishes its fields, name or error: an older file that finishes
+  // reading later, or one still reading when the form unmounts, changes nothing (#1705).
   const readFile = async (file: File) => {
+    const isCurrent = latest.begin();
     setImportedName(null);
     // The reader loads on the first file, so no page carries it in its first load.
     let reader: typeof import('@/packages/qr-payload/vcardFile');
     try {
       reader = await import('@/packages/qr-payload/vcardFile');
     } catch {
-      setError("The contact file reader didn't load. Check your connection and try again.");
+      if (isCurrent()) setError("The contact file reader didn't load. Check your connection and try again.");
       return;
     }
+    if (!isCurrent()) return;
     const { MAX_VCARD_FILE_BYTES, VCARD_FILE_ERROR_MESSAGES, readVCardFile } = reader;
     if (file.size > MAX_VCARD_FILE_BYTES) {
       setError(VCARD_FILE_ERROR_MESSAGES['too-large']);
@@ -60,9 +74,10 @@ export function VCardFileImport({ onImport }: VCardFileImportProps) {
     try {
       text = await file.text();
     } catch {
-      setError(VCARD_FILE_ERROR_MESSAGES['not-a-vcard']);
+      if (isCurrent()) setError(VCARD_FILE_ERROR_MESSAGES['not-a-vcard']);
       return;
     }
+    if (!isCurrent()) return;
     const result = readVCardFile(text);
     if (!result.ok) {
       setError(VCARD_FILE_ERROR_MESSAGES[result.error]);
