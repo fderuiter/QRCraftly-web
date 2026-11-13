@@ -1104,6 +1104,29 @@ describe('QRScanner Component', () => {
       expect(mockOnScanSuccess).not.toHaveBeenCalled();
     });
 
+    it('drops a clipboard image that arrives after switching to the camera (#1704)', async () => {
+      decodeImagesAs('LATE CLIPBOARD');
+      let finishRead: (items: unknown[]) => void = () => undefined;
+      const read = vi.fn(() => new Promise<unknown[]>((resolve) => { finishRead = resolve; }));
+      Object.defineProperty(navigator, 'clipboard', { value: { read }, configurable: true });
+      render(<QRScanner onScanSuccess={mockOnScanSuccess} />);
+      fireEvent.click(screen.getByRole('radio', { name: 'Image' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Paste image' }));
+      });
+      expect(read).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole('radio', { name: 'Camera' }));
+
+      await act(async () => {
+        finishRead([{ types: ['image/png'], getType: vi.fn().mockResolvedValue(new Blob(['png'], { type: 'image/png' })) }]);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      expect(mockOnScanSuccess).not.toHaveBeenCalled();
+      expect(screen.getByRole('radio', { name: 'Camera' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.queryByRole('heading', { name: 'QR code found' })).not.toBeInTheDocument();
+    });
+
     it('starts each scan in the history with a fresh Copy button (#1588)', async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });

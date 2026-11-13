@@ -30,25 +30,35 @@ export function useImageScan({ scanFile, onFound, onStart, onShowImageMode, onRe
   const [fileError, setFileError] = useState<string | null>(null);
   const [fileProcessing, setFileProcessing] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
+  // Each image input (file pick, drop, paste, clipboard button) is one operation. It owns the
+  // clipboard read, the item lookup and the decode. Starting another input, reset or unmount
+  // retires it (#1704): clipboard promises cannot be cancelled, so every later step checks it.
+  const operationRef = useRef(0);
 
-  const cancel = () => {
+  /**
+   * Retires the current input operation and aborts its decode.
+   * @returns The new operation's id.
+   */
+  const retire = () => {
+    operationRef.current += 1;
     controllerRef.current?.abort();
     controllerRef.current = null;
+    return operationRef.current;
   };
+  const isCurrent = (operation: number) => operationRef.current === operation;
 
-  // Cancel a file scan when the scanner closes.
+  // Retire the image operation when the scanner closes.
   useEffect(
     () => () => {
+      operationRef.current += 1;
       controllerRef.current?.abort();
       controllerRef.current = null;
     },
     []
   );
 
-  // Client-side QR decoding using the unified deep module scanFile method.
-  const processFile = async (file: File) => {
-    onStart();
-    cancel();
+  /** Decodes an image for an operation that is still current. */
+  const decode = async (file: File, operation: number) => {
     const controller = new AbortController();
     controllerRef.current = controller;
 
@@ -58,7 +68,7 @@ export function useImageScan({ scanFile, onFound, onStart, onShowImageMode, onRe
 
     try {
       const scanned = await scanFile(file, { signal: controller.signal });
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || !isCurrent(operation)) return;
       if (scanned.status === 'pass' && scanned.data) {
         onFound(scanned.data);
       } else if (scanned.error) {
@@ -66,7 +76,7 @@ export function useImageScan({ scanFile, onFound, onStart, onShowImageMode, onRe
       }
     } catch (err) {
       const isAbort = isErrorLike(err) && err.name === 'AbortError';
-      if (!controller.signal.aborted && !isAbort) {
+      if (!controller.signal.aborted && !isAbort && isCurrent(operation)) {
         setFileError((isErrorLike(err) && err.message) || 'Failed to parse file.');
       }
     } finally {
@@ -77,22 +87,29 @@ export function useImageScan({ scanFile, onFound, onStart, onShowImageMode, onRe
     }
   };
 
+  // Client-side QR decoding using the unified deep module scanFile method.
+  const processFile = async (file: File) => {
+    onStart();
+    await decode(file, retire());
+  };
+
   /** Retires any running scan and shows image mode for an image that arrived by paste or drop. */
   const beginIncoming = () => {
     onStart();
-    cancel();
+    const operation = retire();
     setFileProcessing(false);
     onShowImageMode();
+    return operation;
   };
 
   /** Scans an image that arrived by paste or drop. */
   const scanImage = (file: File | undefined) => {
-    beginIncoming();
+    const operation = beginIncoming();
     if (!file || !file.type.startsWith('image/')) {
       setFileError('Please drop an image file.');
       return;
     }
-    void processFile(file);
+    void decode(file, operation);
   };
   const scanImageRef = useRef(scanImage);
   useEffect(() => {
@@ -112,26 +129,31 @@ export function useImageScan({ scanFile, onFound, onStart, onShowImageMode, onRe
   }, []);
 
   const pasteFromClipboard = async () => {
-    beginIncoming();
+    const operation = beginIncoming();
     setFileError(null);
     try {
-      for (const item of await navigator.clipboard.read()) {
+      const items = await navigator.clipboard.read();
+      if (!isCurrent(operation)) return;
+      for (const item of items) {
         const type = item.types.find((candidate) => candidate.startsWith('image/'));
         if (type) {
           const blob = await item.getType(type);
-          void processFile(new File([blob], 'pasted-image', { type }));
+          if (!isCurrent(operation)) return;
+          onStart();
+          void decode(new File([blob], 'pasted-image', { type }), operation);
           return;
         }
       }
       setFileError('The clipboard has no image. Copy a screenshot of a QR code, then try again.');
     } catch {
+      if (!isCurrent(operation)) return;
       setFileError('The browser did not allow reading the clipboard. Press Ctrl+V or ⌘V to paste instead.');
     }
   };
 
   /** Stops any image scan and clears its message (switching input, scanning another). */
   const reset = () => {
-    cancel();
+    retire();
     setFileError(null);
     setFileProcessing(false);
   };
