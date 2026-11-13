@@ -94,8 +94,19 @@ export function useOpticalSender({
   /** Runs the scannability gate on the first frame, then starts or refuses playback. */
   const gateFirstFrame = async (frame: TransferFrame) => {
     isVerifyingHandshakeRef.current = false;
+    // The run and the worker being checked, noted before the wait: a check that settles after a
+    // stop, an error, a restart or an unmount changes nothing (#1701).
+    const run = refs.runRef.current;
+    const checkedWorker = refs.workerRef.current;
     // The first frame is checked as it will be shown. Tiles are painted by the sender itself, so they skip the check.
-    const isScannable = refs.tilePlanRef.current ? true : await refs.verifyFrameRef.current(frame);
+    let isScannable: boolean;
+    try {
+      isScannable = refs.tilePlanRef.current ? true : await refs.verifyFrameRef.current(frame);
+    } catch {
+      // A check that broke cannot vouch for the frame.
+      isScannable = false;
+    }
+    if (run !== refs.runRef.current) return;
 
     if (isScannable) {
       setHandshakeVerified(true);
@@ -109,7 +120,8 @@ export function useOpticalSender({
     setHandshakeError(`Transfer QR frame ${HANDSHAKE_FAILURE_SUFFIX}`);
     dispatch({ type: 'handshakeFailed' });
     isTransferringRef.current = false;
-    worker.terminate();
+    // Only the worker that made the refused frame is ended.
+    if (refs.workerRef.current === checkedWorker) worker.terminate();
   };
 
   const worker = useSliceWorker(refs, {
@@ -134,7 +146,7 @@ export function useOpticalSender({
     setHandshakeVerified(false);
     hideKeyQr();
     refs.walletRef.current = null;
-    refs.walletRunRef.current += 1;
+    refs.runRef.current += 1;
     resetSteering();
     stopWorker();
     resetPlayback();
@@ -142,6 +154,13 @@ export function useOpticalSender({
   useEffect(() => {
     teardownBox.current = teardown;
   }, [teardownBox, teardown]);
+  // An unmount ends the run, so a check or a wallet stream still opening does nothing afterwards.
+  useEffect(() => () => {
+    refs.runRef.current += 1;
+    isTransferringRef.current = false;
+    isVerifyingHandshakeRef.current = false;
+    refs.walletRef.current = null;
+  }, [refs, isTransferringRef, isVerifyingHandshakeRef]);
 
   const stopTransfer = useCallback(() => {
     teardown();
@@ -154,9 +173,9 @@ export function useOpticalSender({
    * @param file The file to send.
    */
   const startWalletTransfer = useCallback((file: File) => {
-    const run = refs.walletRunRef.current;
+    const run = refs.runRef.current;
     const fail = (message: string) => {
-      if (run !== refs.walletRunRef.current) return;
+      if (run !== refs.runRef.current) return;
       isVerifyingHandshakeRef.current = false;
       dispatch({ type: 'handshakeFailed' });
       setHandshakeError(message);
@@ -165,10 +184,10 @@ export function useOpticalSender({
       .arrayBuffer()
       .then((buffer) => openWalletStream(new Uint8Array(buffer), density))
       .then(async (wallet) => {
-        if (run !== refs.walletRunRef.current) return;
+        if (run !== refs.runRef.current) return;
         const first = wallet.nextFrame();
         const isScannable = await refs.verifyFrameRef.current(first);
-        if (run !== refs.walletRunRef.current) return;
+        if (run !== refs.runRef.current) return;
         if (!isScannable) {
           fail(`Transfer QR frame ${HANDSHAKE_FAILURE_SUFFIX}`);
           return;

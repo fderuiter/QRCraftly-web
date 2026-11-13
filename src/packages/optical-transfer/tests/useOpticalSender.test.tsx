@@ -800,6 +800,112 @@ describe('useOpticalSender', () => {
     globalThis.mockWorkerControl.setInterceptor(null);
   });
 
+  describe('a first-frame check that settles after its run ended (#1701)', () => {
+    /** A verifier whose every check waits for the test. */
+    function heldVerifier() {
+      const checks: Array<{ resolve: (ok: boolean) => void; reject: (reason: unknown) => void }> = [];
+      const verifyFrame = vi.fn(
+        () =>
+          new Promise<boolean>((resolve, reject) => {
+            checks.push({ resolve, reject });
+          })
+      );
+      return { verifyFrame, checks };
+    }
+    const settle = async (run: () => void) => {
+      await act(async () => {
+        run();
+        await Promise.resolve();
+      });
+    };
+
+    it('stays stopped when the check passes after Stop', async () => {
+      const held = heldVerifier();
+      const options = senderOptions({ verifyFrame: held.verifyFrame });
+      const { result } = await startWithFrames(options);
+      await waitFor(() => expect(held.checks).toHaveLength(1));
+      act(() => result.current.stopTransfer());
+
+      await settle(() => held.checks[0]?.resolve(true));
+      expect(result.current).toMatchObject({ isTransferring: false, isVerifyingHandshake: false, handshakeVerified: false, phase: 'ready' });
+      expect(options.renderFrame).not.toHaveBeenCalled();
+      globalThis.mockWorkerControl.setInterceptor(null);
+    });
+
+    it('does not let run A\'s failed check end or refuse run B, which then starts once', async () => {
+      const held = heldVerifier();
+      const options = senderOptions({ verifyFrame: held.verifyFrame });
+      const { result } = await startWithFrames(options);
+      await waitFor(() => expect(held.checks).toHaveLength(1));
+      const worker = globalThis.mockWorkerControl.getInstances()[0];
+
+      await act(async () => {
+        result.current.startTransfer();
+      });
+      await waitFor(() => expect(held.checks).toHaveLength(2));
+      await settle(() => held.checks[0]?.resolve(false));
+      expect(worker.terminate).not.toHaveBeenCalled();
+      expect(result.current.handshakeError).toBeNull();
+      // B is still being checked.
+      expect(result.current.isVerifyingHandshake).toBe(true);
+      expect(result.current.isTransferring).toBe(false);
+
+      await settle(() => held.checks[1]?.resolve(true));
+      await waitFor(() => expect(result.current.isTransferring).toBe(true));
+      expect(result.current.handshakeVerified).toBe(true);
+      act(() => result.current.stopTransfer());
+      globalThis.mockWorkerControl.setInterceptor(null);
+    });
+
+    it('does not start run B when run A\'s check passes late', async () => {
+      const held = heldVerifier();
+      const options = senderOptions({ verifyFrame: held.verifyFrame });
+      const { result } = await startWithFrames(options);
+      await waitFor(() => expect(held.checks).toHaveLength(1));
+      await act(async () => {
+        result.current.startTransfer();
+      });
+      await waitFor(() => expect(held.checks).toHaveLength(2));
+
+      await settle(() => held.checks[0]?.resolve(true));
+      expect(result.current.isTransferring).toBe(false);
+      expect(result.current.handshakeVerified).toBe(false);
+      expect(options.renderFrame).not.toHaveBeenCalled();
+      act(() => result.current.stopTransfer());
+      globalThis.mockWorkerControl.setInterceptor(null);
+    });
+
+    it('requests no frame when the check settles after unmount', async () => {
+      const held = heldVerifier();
+      const options = senderOptions({ verifyFrame: held.verifyFrame });
+      const hook = await startWithFrames(options);
+      await waitFor(() => expect(held.checks).toHaveLength(1));
+      const raf = vi.spyOn(globalThis, 'requestAnimationFrame');
+      hook.unmount();
+      raf.mockClear();
+
+      await settle(() => held.checks[0]?.resolve(true));
+      expect(raf).not.toHaveBeenCalled();
+      expect(options.renderFrame).not.toHaveBeenCalled();
+      raf.mockRestore();
+      globalThis.mockWorkerControl.setInterceptor(null);
+    });
+
+    it('refuses the stream when the current check throws', async () => {
+      const held = heldVerifier();
+      const options = senderOptions({ verifyFrame: held.verifyFrame });
+      const { result } = await startWithFrames(options);
+      await waitFor(() => expect(held.checks).toHaveLength(1));
+      const worker = globalThis.mockWorkerControl.getInstances()[0];
+
+      await settle(() => held.checks[0]?.reject(new Error('decoder broke')));
+      expect(result.current.handshakeError).toMatch(/Transfer QR frame/);
+      expect(result.current.isTransferring).toBe(false);
+      expect(worker.terminate).toHaveBeenCalledTimes(1);
+      globalThis.mockWorkerControl.setInterceptor(null);
+    });
+  });
+
   it('reports the frame pool buffer size as frame memory while transferring', async () => {
     const options = senderOptions();
     const { result } = await startWithFrames(options);
