@@ -72,8 +72,12 @@ export interface SenderRefs {
   lastRefreshRef: RefObject<number>;
   /** The running wallet-compatible stream, or null. */
   walletRef: RefObject<WalletStream | null>;
-  /** Bumped on every start and stop, so a wallet stream that opens late is dropped. */
-  walletRunRef: RefObject<number>;
+  /**
+   * The sender run: bumped on every start, stop, error and unmount. Work that waits (opening a
+   * wallet stream, the first-frame check) notes it first, and does nothing once it has changed,
+   * so a run that ended cannot start, fail or stop the one after it (#1701).
+   */
+  runRef: RefObject<number>;
 }
 
 /**
@@ -113,7 +117,7 @@ export function useSenderRefs(renderFrame: TransferFrameRenderer, verifyFrame: H
     refreshBaseRef: { current: 0 },
     lastRefreshRef: { current: -1 },
     walletRef: { current: null },
-    walletRunRef: { current: 0 },
+    runRef: { current: 0 },
   }));
   return refs;
 }
