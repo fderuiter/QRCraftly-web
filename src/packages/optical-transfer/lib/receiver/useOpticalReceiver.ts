@@ -140,7 +140,8 @@ export function useOpticalReceiver({
 
   const handleClear = useCallback(() => {
     terminateWorker();
-    dispatch({ type: 'clear' });
+    const stillScanning = clearVideo();
+    dispatch({ type: 'clear', scanning: stillScanning });
     resetTelemetry();
     setFountainStats(null);
     setManifest(null);
@@ -153,7 +154,6 @@ export function useOpticalReceiver({
     reportedBcurTooLargeRef.current = false;
     setReceiverError(null);
     resetDelivery();
-    clearVideo();
     addToast?.({ type: 'info', message: 'Receiver state has been reset.', duration: 3000 });
   }, [addToast, terminateWorker, resetTelemetry, resetDelivery, clearVideo]);
 

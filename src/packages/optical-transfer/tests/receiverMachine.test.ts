@@ -37,7 +37,8 @@ const EVENTS = {
   verify: { type: 'verify' },
   complete: { type: 'complete', result: FILE_RESULT },
   fail: { type: 'fail', error: FAILURE },
-  clear: { type: 'clear' },
+  clear: { type: 'clear', scanning: false },
+  clearWhileScanning: { type: 'clear', scanning: true },
 } satisfies Record<string, ReceiverEvent>;
 type EventName = keyof typeof EVENTS;
 
@@ -54,14 +55,14 @@ function stateIn(phase: ReceiverPhase): ReceiverState {
 
 /** The phase after each event in camera mode (awaitingVideo is file mode); a missing entry means the same state comes back. */
 const NEXT: Record<ReceiverPhase, Partial<Record<EventName, ReceiverPhase>>> = {
-  idle: { toFile: 'awaitingVideo', startCamera: 'scanning', manifest: 'receiving', privateManifest: 'needsKey', progress: 'receiving', verify: 'verifying', complete: 'complete', fail: 'failed' },
+  idle: { toFile: 'awaitingVideo', startCamera: 'scanning', manifest: 'receiving', privateManifest: 'needsKey', progress: 'receiving', verify: 'verifying', complete: 'complete', fail: 'failed', clearWhileScanning: 'scanning' },
   awaitingVideo: { toCamera: 'idle', loadVideo: 'scanning', manifest: 'receiving', privateManifest: 'needsKey', progress: 'receiving', verify: 'verifying', complete: 'complete', fail: 'failed' },
   scanning: { toFile: 'awaitingVideo', stop: 'idle', manifest: 'receiving', privateManifest: 'needsKey', progress: 'receiving', verify: 'verifying', complete: 'complete', fail: 'failed', clear: 'idle' },
-  needsKey: { toFile: 'needsKey', manifest: 'receiving', keyAccepted: 'receiving', verify: 'verifying', complete: 'complete', fail: 'failed', clear: 'idle' },
-  receiving: { toFile: 'receiving', privateManifest: 'needsKey', verify: 'verifying', complete: 'complete', fail: 'failed', clear: 'idle' },
-  verifying: { toFile: 'verifying', complete: 'complete', fail: 'failed', clear: 'idle' },
-  complete: { toFile: 'complete', complete: 'complete', fail: 'failed', clear: 'idle' },
-  failed: { toFile: 'awaitingVideo', startCamera: 'scanning', manifest: 'receiving', privateManifest: 'needsKey', progress: 'receiving', verify: 'verifying', complete: 'complete', fail: 'failed', clear: 'idle' },
+  needsKey: { toFile: 'needsKey', manifest: 'receiving', keyAccepted: 'receiving', verify: 'verifying', complete: 'complete', fail: 'failed', clear: 'idle', clearWhileScanning: 'scanning' },
+  receiving: { toFile: 'receiving', privateManifest: 'needsKey', verify: 'verifying', complete: 'complete', fail: 'failed', clear: 'idle', clearWhileScanning: 'scanning' },
+  verifying: { toFile: 'verifying', complete: 'complete', fail: 'failed', clear: 'idle', clearWhileScanning: 'scanning' },
+  complete: { toFile: 'complete', complete: 'complete', fail: 'failed', clear: 'idle', clearWhileScanning: 'scanning' },
+  failed: { toFile: 'awaitingVideo', startCamera: 'scanning', manifest: 'receiving', privateManifest: 'needsKey', progress: 'receiving', verify: 'verifying', complete: 'complete', fail: 'failed', clear: 'idle', clearWhileScanning: 'scanning' },
 };
 
 const CASES = PHASES.flatMap((phase) => EVENT_NAMES.map((event) => [phase, event, NEXT[phase][event] ?? null] as const));
@@ -94,6 +95,14 @@ describe('receiverReducer', () => {
     const moved = receiverReducer(stateIn('receiving'), EVENTS.toFile);
     expect(moved).toEqual({ mode: 'file', phase: 'receiving' });
     expect(receiverReducer(moved, EVENTS.clear)).toEqual({ mode: 'file', phase: 'awaitingVideo' });
+    // A video is stopped by Clear, so file mode waits for a new one even if it was playing (#1703).
+    expect(receiverReducer(moved, EVENTS.clearWhileScanning)).toEqual({ mode: 'file', phase: 'awaitingVideo' });
+  });
+
+  it('keeps a live camera scanning after Clear instead of calling it off (#1703)', () => {
+    const receiving = stateIn('receiving');
+    expect(receiverReducer(receiving, EVENTS.clearWhileScanning)).toEqual({ mode: 'camera', phase: 'scanning' });
+    expect(receiverReducer(receiving, EVENTS.clear)).toEqual({ mode: 'camera', phase: 'idle' });
   });
 
   it('ignores a camera start in file mode and a video in camera mode', () => {

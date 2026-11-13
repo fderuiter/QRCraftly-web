@@ -161,6 +161,18 @@ describe('useOpticalReceiver phase', () => {
       act(() => result.current.setReceiverMode('camera'));
       expect(result.current.phase).toBe('idle');
     });
+
+    it('stops the video on Clear, releases it, and waits for a new one (#1703)', () => {
+      const { result } = renderReceiver({ initialMode: 'file' });
+      act(() => {
+        result.current.handleFileUpload(new File(['video'], 'stream.mp4', { type: 'video/mp4' }));
+      });
+      expect(result.current).toMatchObject({ phase: 'scanning', isScanning: true });
+
+      act(() => result.current.handleClear());
+      expect(result.current).toMatchObject({ phase: 'awaitingVideo', isScanning: false, videoFile: null, videoObjectUrl: null });
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('mock-url');
+    });
   });
 
   describe('camera mode', () => {
@@ -193,6 +205,48 @@ describe('useOpticalReceiver phase', () => {
       expect(result.current.phase).toBe('scanning');
       act(() => result.current.stopCameraSession());
       expect(phases).toEqual(['idle', 'scanning', 'idle']);
+    });
+
+    it('keeps scanning with the camera still on after Clear, without opening it again (#1703)', async () => {
+      const { result } = renderReceiver();
+      withVideo(result);
+      await act(async () => {
+        await result.current.startCameraSession();
+      });
+      act(() => result.current.handleClear());
+      expect(result.current).toMatchObject({ phase: 'scanning', isScanning: true });
+      expect(getUserMedia).toHaveBeenCalledTimes(1);
+    });
+
+    it('says the camera is off after Clear when it was never started', () => {
+      const { result } = renderReceiver();
+      act(() => result.current.handleClear());
+      expect(result.current).toMatchObject({ phase: 'idle', isScanning: false });
+      expect(getUserMedia).not.toHaveBeenCalled();
+    });
+
+    it('stops scanning and fails as the camera when the camera ends by itself (#1703)', async () => {
+      const listeners: Array<() => void> = [];
+      const track = {
+        stop: vi.fn(),
+        addEventListener: (type: string, listener: () => void) => {
+          if (type === 'ended') listeners.push(listener);
+        },
+        removeEventListener: vi.fn(),
+      };
+      getUserMedia.mockResolvedValueOnce({ getTracks: () => [track], getVideoTracks: () => [track] });
+      const { result } = renderReceiver();
+      withVideo(result);
+      await act(async () => {
+        await result.current.startCameraSession();
+      });
+      expect(listeners.length).toBeGreaterThan(0);
+      act(() => {
+        for (const listener of listeners) listener();
+      });
+      await waitFor(() => expect(result.current.phase).toBe('failed'));
+      expect(result.current.isScanning).toBe(false);
+      expect(result.current.failure).toMatchObject({ source: 'camera' });
     });
 
     it('fails as the camera when access is refused, with the same words the page shows', async () => {
