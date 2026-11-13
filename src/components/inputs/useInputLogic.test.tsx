@@ -1,6 +1,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { useInputLogic, clearRetainedInputStates } from "./useInputLogic";
+import { useInputLogic } from "./useInputLogic";
+import { acceptIncomingContent, clearRetainedInputStates } from "./retainedDrafts";
 import { CryptoNetwork, type EmailData } from "@/packages/qr-payload";
 import { type QRConfig, QRType, QRStyle, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from "@/packages/core/types";
 
@@ -349,6 +350,86 @@ describe("useInputLogic", () => {
     // Retained cache should preserve the explicitly cleared state ("")
     expect(returnUrlHook.current.inputProps.data).toEqual({ url: "" });
     expect(onChange2).toHaveBeenCalledWith({ value: "" });
+  });
+
+  describe("content opened in the generator wins over a retained draft (#1700)", () => {
+    /** Leaves a TEXT draft behind, as a visit to the text generator would. */
+    const leaveTextDraft = (text: string) => {
+      const onChange = vi.fn();
+      const { result, unmount } = renderHook(() => useInputLogic(createMockConfig(QRType.TEXT, "default"), onChange));
+      act(() => {
+        result.current.inputProps.onChange({ text });
+      });
+      unmount();
+    };
+
+    it("shows the incoming content on a remount of the same type and writes nothing back", () => {
+      leaveTextDraft("old retained");
+      acceptIncomingContent(QRType.TEXT);
+      const onChange = vi.fn();
+      const onRefusedChange = vi.fn();
+      const { result } = renderHook(() => useInputLogic(createMockConfig(QRType.TEXT, "new scan"), onChange, onRefusedChange));
+
+      expect(result.current.inputProps.data).toEqual({ text: "new scan" });
+      expect(onChange).not.toHaveBeenCalled();
+      expect(onRefusedChange).toHaveBeenLastCalledWith(false);
+    });
+
+    it("still restores the draft on an ordinary visit with no incoming content", () => {
+      leaveTextDraft("kept draft");
+      const onChange = vi.fn();
+      const { result } = renderHook(() => useInputLogic(createMockConfig(QRType.TEXT, "default"), onChange));
+      expect(result.current.inputProps.data).toEqual({ text: "kept draft" });
+      expect(onChange).toHaveBeenCalledWith({ value: "kept draft" });
+    });
+
+    it("switches to a type visited before and keeps the incoming content, in the form and the store", () => {
+      const onChange = vi.fn();
+      const { result, rerender } = renderHook(({ cfg }) => useInputLogic(cfg, onChange), {
+        initialProps: { cfg: createMockConfig(QRType.TEXT, "default") },
+      });
+      act(() => {
+        result.current.inputProps.onChange({ text: "old retained" });
+      });
+      rerender({ cfg: createMockConfig(QRType.URL, "https://qrcraftly.com") });
+      onChange.mockClear();
+
+      acceptIncomingContent(QRType.TEXT);
+      rerender({ cfg: createMockConfig(QRType.TEXT, "new scan") });
+
+      expect(result.current.inputProps.data).toEqual({ text: "new scan" });
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("does not let a refused draft mark the incoming content refused", () => {
+      const firstChange = vi.fn();
+      const first = renderHook(() => useInputLogic(createMockConfig(QRType.URL, "https://qrcraftly.com"), firstChange));
+      act(() => {
+        first.result.current.inputProps.onChange({ url: "javascript:alert(1)" });
+        vi.runAllTimers();
+      });
+      first.unmount();
+
+      acceptIncomingContent(QRType.URL);
+      const onRefusedChange = vi.fn();
+      const onChange = vi.fn();
+      const { result } = renderHook(() => useInputLogic(createMockConfig(QRType.URL, "https://scanned.example"), onChange, onRefusedChange));
+      expect(result.current.inputProps.data).toEqual({ url: "https://scanned.example" });
+      expect(onRefusedChange).not.toHaveBeenCalledWith(true);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("leaves other types' drafts alone", () => {
+      const onChange = vi.fn();
+      const { result, unmount } = renderHook(() => useInputLogic(createMockConfig(QRType.URL, "https://qrcraftly.com"), onChange));
+      act(() => {
+        result.current.inputProps.onChange({ url: "https://kept.example" });
+      });
+      unmount();
+      acceptIncomingContent(QRType.TEXT);
+      const again = renderHook(() => useInputLogic(createMockConfig(QRType.URL, "https://qrcraftly.com"), onChange));
+      expect(again.result.current.inputProps.data).toEqual({ url: "https://kept.example" });
+    });
   });
 
   it("should clear retained input states when clearRetainedInputStates is called", () => {

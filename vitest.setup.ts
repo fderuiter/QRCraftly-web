@@ -819,7 +819,7 @@ afterEach(async () => {
   // (#1608). After the first test these resolve from the module cache.
   const [{ clearRetainedAppearance }, { clearRetainedInputStates }] = await Promise.all([
     import('./src/context/QRContext'),
-    import('./src/components/inputs/useInputLogic'),
+    import('./src/components/inputs/retainedDrafts'),
   ]);
   clearRetainedAppearance();
   clearRetainedInputStates();

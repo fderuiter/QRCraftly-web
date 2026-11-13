@@ -27,6 +27,7 @@ import { usePageContent } from '@/data/PageContentContext';
 import type { ToolCopy } from '@/data/copy/types';
 import { QR_TYPE_ROUTES } from '@/data/navigation';
 import { stageGeneratorContent } from '@/context/QRContext';
+import { acceptIncomingContent } from '@/components/inputs/retainedDrafts';
 
 /** The plain promises under the checker, each backed by how it works. */
 const PROMISES = [
@@ -44,6 +45,7 @@ const LINK_CLASSES = 'font-medium text-accent underline-offset-2 hover:underline
  */
 function openInGenerator(scan: ScanDescription) {
   stageGeneratorContent({ type: scan.type, value: scan.text });
+  acceptIncomingContent(scan.type);
   // nosemgrep: require-isdangerousurl -- an internal route from a fixed table, not scanned text
   void navigate(QR_TYPE_ROUTES[scan.type]);
 }

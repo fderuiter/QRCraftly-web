@@ -17,7 +17,7 @@
 */
 
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, renderHook, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { navigate } from 'vike/client/router';
@@ -28,6 +28,9 @@ import { getMetadataForPath } from '@/data/contentRegistry';
 import { useQrScanner, type UseQrScannerOptions } from '@/packages/optical-scanner/client';
 import { getPageSchema } from '@/data/pageContent';
 import { withPageContent } from '../../../tests/utils/pageContent';
+import { useInputLogic } from '@/components/inputs/useInputLogic';
+import { QRProvider, useQRStore, useQRStoreSelector } from '@/context/QRContext';
+import { QRType } from '@/packages/core/types';
 
 vi.mock('vike/client/router', () => ({ navigate: vi.fn(() => Promise.resolve()) }));
 vi.mock('@/packages/optical-scanner/client', async (importOriginal) => {
@@ -71,6 +74,35 @@ describe('/qr-code-scanner page (#1034)', () => {
     });
     expect(navigate).toHaveBeenCalledWith('/wifi-qr-code');
     expect(vi.mocked(navigate).mock.lastCall?.[0]).not.toContain('Home');
+  });
+
+  it('opens the scan over a draft kept from an earlier visit to that generator (#1700)', async () => {
+    const draftChange = vi.fn();
+    const draft = renderHook(() => useInputLogic({ type: QRType.WIFI, value: '' }, draftChange));
+    act(() => draft.result.current.inputProps.onChange({ ssid: 'Old network' }));
+    draft.unmount();
+
+    const page = render(withPageContent('/qr-code-scanner', <Page />));
+    const options: UseQrScannerOptions | undefined = vi.mocked(useQrScanner).mock.lastCall?.[0];
+    await act(async () => {
+      options?.onScanSuccess?.('WIFI:T:WPA;S:Home;P:secret;;', { text: 'x', bytes: null, corners: null, source: 'qr-decode', durationMs: 0 });
+    });
+    act(() => {
+      screen.getByRole('button', { name: 'Open in generator' }).click();
+    });
+    page.unmount();
+
+    // The WiFi generator the navigation opens: its store and its form.
+    const generator = renderHook(
+      () => {
+        const store = useQRStore();
+        const config = useQRStoreSelector((state) => state.config);
+        return { store, form: useInputLogic(config, store.updateConfig) };
+      },
+      { wrapper: ({ children }: { children: React.ReactNode }) => <QRProvider initialConfig={{ type: QRType.WIFI }} retainAppearance>{children}</QRProvider> },
+    );
+    expect(generator.result.current.form.inputProps.data).toMatchObject({ ssid: 'Home' });
+    expect(generator.result.current.store.getState().config.value).toBe('WIFI:T:WPA;S:Home;P:secret;;');
   });
 
   it('is prerendered with an accurate title and description', () => {
