@@ -752,7 +752,9 @@ describe('Camera Scanner Engine (headless)', () => {
 
     it('waits for a source to appear', async () => {
       let available = false;
-      const h = createHarness({ getSource: () => (available ? new FakeSource() : null) });
+      // One element once it appears, as a page's video element is: a frame whose source changed is retired (#1699).
+      const appeared = new FakeSource();
+      const h = createHarness({ getSource: () => (available ? appeared : null) });
       h.engine.start();
       await h.step(200);
       expect(h.currentWorker()?.frames).toHaveLength(0);
@@ -760,6 +762,253 @@ describe('Camera Scanner Engine (headless)', () => {
       available = true;
       await h.step(100);
       expect(h.currentWorker()?.frames).toHaveLength(1);
+    });
+  });
+
+  describe('work from an earlier run (#1699)', () => {
+    /** A promise the test settles by hand. */
+    function deferred<T>() {
+      let resolve: (value: T) => void = () => undefined;
+      let reject: (reason: unknown) => void = () => undefined;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    }
+
+    /** A detector whose every call waits for the test. */
+    function heldDetector() {
+      const calls: Array<ReturnType<typeof deferred<{ text: string; bytes: null; corners: null } | null>>> = [];
+      const detect = vi.fn(() => {
+        const call = deferred<{ text: string; bytes: null; corners: null } | null>();
+        calls.push(call);
+        return call.promise;
+      });
+      return { detector: { detect }, calls };
+    }
+
+    /** A bitmap that counts how often it is closed. */
+    function countedBitmap(width: number, height: number) {
+      const bitmap = { width, height, closed: 0, close: () => undefined };
+      bitmap.close = () => {
+        bitmap.closed += 1;
+      };
+      return bitmap;
+    }
+
+    /** A grabber whose every capture waits for the test. */
+    function heldGrabber() {
+      const captures: Array<{ bitmap: ReturnType<typeof countedBitmap> } & ReturnType<typeof deferred<ImageBitmap>>> = [];
+      const grabber: CameraFrameGrabber = {
+        grabBitmap: (_source, width, height) => {
+          const call = deferred<ImageBitmap>();
+          captures.push({ ...call, bitmap: countedBitmap(width, height) });
+          return call.promise;
+        },
+        grabPixels: (_source, width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
+      };
+      /** Settles capture `index` with its bitmap. */
+      const finish = (index: number) => {
+        const capture = captures[index];
+        if (!capture) throw new Error(`No capture ${index}`);
+        capture.resolve(capture.bitmap);
+        return capture.bitmap;
+      };
+      return { grabber, captures, finish };
+    }
+
+    /** Lets settled promises run their callbacks. */
+    const flush = async () => {
+      for (let i = 0; i < 4; i++) await Promise.resolve();
+    };
+
+    it('drops a native result from before a restart, and reads the new run\'s frame', async () => {
+      const held = heldDetector();
+      const h = createHarness({ detector: held.detector });
+      h.engine.start();
+      await h.step(16);
+      expect(held.calls).toHaveLength(1);
+
+      h.engine.stop();
+      h.engine.start();
+      await h.step(16);
+      expect(held.calls).toHaveLength(2);
+
+      held.calls[0]?.resolve({ text: 'OLD CAMERA', bytes: null, corners: null });
+      await flush();
+      expect(h.events.onScanSuccess).not.toHaveBeenCalled();
+
+      held.calls[1]?.resolve({ text: 'NEW CAMERA', bytes: null, corners: null });
+      await flush();
+      expect(h.events.onScanSuccess).toHaveBeenCalledTimes(1);
+      expect(h.events.onScanSuccess).toHaveBeenCalledWith('NEW CAMERA', expect.objectContaining({ source: 'native' }));
+    });
+
+    it('keeps the native detector when only a frame from before a restart fails', async () => {
+      const held = heldDetector();
+      const h = createHarness({ detector: held.detector });
+      h.engine.start();
+      await h.step(16);
+      h.engine.stop();
+      h.engine.start();
+      await h.step(16);
+
+      held.calls[0]?.reject(new DOMException('Source not supported', 'NotSupportedError'));
+      await flush();
+      expect(h.workers).toHaveLength(0);
+      expect(h.events.onScanFail).not.toHaveBeenCalled();
+
+      // The new run's frame still holds its slot, then reads natively.
+      await h.step(100);
+      expect(held.calls).toHaveLength(2);
+      held.calls[1]?.resolve({ text: 'STILL NATIVE', bytes: null, corners: null });
+      await flush();
+      expect(h.events.onScanSuccess).toHaveBeenCalledWith('STILL NATIVE', expect.objectContaining({ source: 'native' }));
+    });
+
+    it('closes a bitmap captured before a restart instead of posting it under the new run', async () => {
+      const held = heldGrabber();
+      const h = createHarness({ grabber: held.grabber });
+      h.engine.start();
+      await h.step(16);
+      h.engine.stop();
+      h.engine.start();
+      await h.step(16);
+      expect(held.captures).toHaveLength(2);
+
+      const old = held.finish(0);
+      await flush();
+      expect(h.currentWorker()?.frames).toHaveLength(0);
+      expect(old.closed).toBe(1);
+
+      const fresh = held.finish(1);
+      await flush();
+      expect(h.currentWorker()?.frames).toHaveLength(1);
+      expect(fresh.closed).toBe(0);
+      h.currentWorker()?.replyLatest({ status: 'pass', decodedData: 'NEW BITMAP' });
+      expect(h.events.onScanSuccess).toHaveBeenCalledTimes(1);
+      expect(h.events.onScanSuccess).toHaveBeenCalledWith('NEW BITMAP', expect.objectContaining({ text: 'NEW BITMAP' }));
+    });
+
+    it('ignores a failed capture from before a restart', async () => {
+      const held = heldGrabber();
+      const h = createHarness({ grabber: held.grabber });
+      h.engine.start();
+      await h.step(16);
+      h.engine.stop();
+      h.engine.start();
+      await h.step(16);
+
+      held.captures[0]?.reject(new Error('capture failed'));
+      await flush();
+      expect(h.events.onScanFail).not.toHaveBeenCalled();
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it('closes a bitmap that resolves after destroy, once', async () => {
+      const held = heldGrabber();
+      const h = createHarness({ grabber: held.grabber });
+      h.engine.start();
+      await h.step(16);
+      const worker = h.currentWorker();
+      h.engine.destroy();
+
+      const late = held.finish(0);
+      await flush();
+      expect(late.closed).toBe(1);
+      expect(worker?.frames).toHaveLength(0);
+    });
+
+    it('retires a frame captured from the camera before a device switch and samples the new one at once', async () => {
+      const held = heldGrabber();
+      const h = createHarness({ grabber: held.grabber });
+      h.engine.start();
+      await h.step(16);
+      h.source.srcObject = { id: 'other-camera' };
+
+      const old = held.finish(0);
+      await flush();
+      expect(old.closed).toBe(1);
+      expect(h.currentWorker()?.frames).toHaveLength(0);
+      expect(h.events.onScanFail).not.toHaveBeenCalled();
+
+      // The retired frame freed its slot: the next tick captures without waiting for the watchdog.
+      await h.step(100);
+      expect(held.captures).toHaveLength(2);
+    });
+
+    it('closes a bitmap the worker could not take, once', async () => {
+      const held = heldGrabber();
+      const workers: Array<{ posted: number }> = [];
+      const h = createHarness({
+        grabber: held.grabber,
+        createWorker: () => {
+          const record = { posted: 0 };
+          workers.push(record);
+          return {
+            postFrame: () => {
+              record.posted += 1;
+              throw new DOMException('could not clone', 'DataCloneError');
+            },
+            release: () => undefined,
+            terminate: () => undefined,
+          };
+        },
+      });
+      h.engine.start();
+      await h.step(16);
+      const bitmap = held.finish(0);
+      await flush();
+      expect(workers[0]?.posted).toBe(1);
+      expect(bitmap.closed).toBe(1);
+      expect(h.events.onScanFail).toHaveBeenCalledWith('DISPATCH_ERROR');
+    });
+
+    it('posts a frame under the epoch it was captured for, and drops it when the worker was replaced meanwhile', async () => {
+      const held = heldGrabber();
+      const h = createHarness({ grabber: held.grabber });
+      h.engine.start();
+      await h.step(16);
+      const first = h.currentWorker();
+      first?.crash();
+      expect(h.workers).toHaveLength(2);
+
+      const old = held.finish(0);
+      await flush();
+      expect(old.closed).toBe(1);
+      expect(first?.frames).toHaveLength(0);
+      expect(h.currentWorker()?.frames).toHaveLength(0);
+    });
+
+    it('drops a main-thread decode that was waiting when the scanner restarted', async () => {
+      // The restart lands between the pixel read and the decode it schedules.
+      let duringRead: (() => void) | null = null;
+      const h = createHarness({
+        grabber: {
+          grabBitmap: () => Promise.reject(new Error('unused')),
+          grabPixels: (_source, width, height) => {
+            const restart = duringRead;
+            duringRead = null;
+            restart?.();
+            return { data: new Uint8ClampedArray(width * height * 4) };
+          },
+        },
+      });
+      h.blockWorkerSpawns();
+      h.decodeSync.mockReturnValue('FRAME');
+      duringRead = () => {
+        h.engine.stop();
+        h.engine.start();
+      };
+      h.engine.start();
+      await h.step(16);
+      expect(h.decodeSync).not.toHaveBeenCalled();
+      expect(h.events.onScanSuccess).not.toHaveBeenCalled();
+
+      await h.step(100);
+      expect(h.decodeSync).toHaveBeenCalled();
+      expect(h.events.onScanSuccess).toHaveBeenCalledWith('FRAME', expect.objectContaining({ text: 'FRAME' }));
     });
   });
 

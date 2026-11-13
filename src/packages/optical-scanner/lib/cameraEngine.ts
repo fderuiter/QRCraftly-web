@@ -292,6 +292,11 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
   let timerId: number | null = null;
   let frameId: number | null = null;
   let boundSource: { source: CameraFrameSource; handlers: Array<[SourceEvent, () => void]> } | null = null;
+  /**
+   * The scan run: bumped by every start, stop and destroy (#1699). The scheduler numbers frames
+   * from 1 again in each run, so an answer from an earlier run could pass for one of this run's.
+   */
+  let run = 0;
 
   const scheduler = new AdaptiveFrameScheduler<CameraScanResult>({
     minSamplingDelay: config.minSamplingDelay,
@@ -413,7 +418,46 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
     spawnWorker();
   }
 
+  /** What a frame belongs to, noted before its capture or decode is awaited (#1699). */
+  interface FrameOwner {
+    run: number;
+    source: CameraFrameSource;
+    stream: unknown;
+    src: string;
+  }
+
+  function ownFrame(source: CameraFrameSource): FrameOwner {
+    return { run, source, stream: source.srcObject, src: source.src };
+  }
+
+  /**
+   * Where a settled frame stands: `current` when it may report, `retired` when its run is still on
+   * but its source changed (so it must free its slot without reporting), `gone` when it belongs to
+   * an earlier run, whose scheduler state no longer exists.
+   */
+  function frameStanding(owner: FrameOwner): 'current' | 'retired' | 'gone' {
+    if (destroyed || !running || owner.run !== run) return 'gone';
+    const source = getSource();
+    if (source !== owner.source || source.srcObject !== owner.stream || source.src !== owner.src) return 'retired';
+    return 'current';
+  }
+
+  /**
+   * Runs `report` only for a frame that is still current; frees a retired frame's slot.
+   * @returns Whether `report` ran.
+   */
+  function settle(owner: FrameOwner, seqId: number, report: () => void): boolean {
+    const standing = frameStanding(owner);
+    if (standing === 'current') {
+      report();
+      return true;
+    }
+    if (standing === 'retired') scheduler.retireFrame(seqId);
+    return false;
+  }
+
   function decodeOnMainThread(source: CameraFrameSource, seqId: number, width: number, height: number) {
+    const owner = ownFrame(source);
     const dims = getDownscaledDimensions(width, height, MAIN_THREAD_MAX_DIMENSION);
     let pixels: CameraFramePixels | null;
     try {
@@ -429,6 +473,10 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
     }
     const frame = pixels;
     clock.setTimeout(() => {
+      if (frameStanding(owner) !== 'current') {
+        settle(owner, seqId, () => undefined);
+        return;
+      }
       try {
         const found = decodeSync(frame, dims.width, dims.height, seqId);
         if (found) {
@@ -451,26 +499,32 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
   }
 
   function decodeNatively(active: CameraCodeDetector, source: CameraFrameSource, seqId: number) {
-    active
-      .detect(source)
-      .then((code) => {
-        if (code) {
-          scheduler.endFrame(seqId, 'pass', code.text, null, undefined, {
-            ...code,
-            source: 'native',
-            durationMs: frameDuration(seqId),
-          });
-        } else {
-          scheduler.endFrame(seqId, 'fail', null, null);
-        }
-      })
-      .catch((err: unknown) => {
-        // A detector that cannot read this source (or broke) hands over to the worker for good.
-        console.warn('Native QR detector failed, switching to the scanner worker:', err);
-        detector = null;
-        if (!worker && !useMainThread) spawnWorker();
-        scheduler.endFrame(seqId, 'fail', null, 'NATIVE_DETECTOR_ERROR');
-      });
+    const owner = ownFrame(source);
+    active.detect(source).then(
+      (code) => {
+        settle(owner, seqId, () => {
+          if (code) {
+            scheduler.endFrame(seqId, 'pass', code.text, null, undefined, {
+              ...code,
+              source: 'native',
+              durationMs: frameDuration(seqId),
+            });
+          } else {
+            scheduler.endFrame(seqId, 'fail', null, null);
+          }
+        });
+      },
+      (err: unknown) => {
+        // A failure from an earlier run or source says nothing about the decoder in use now.
+        settle(owner, seqId, () => {
+          // A detector that cannot read this source (or broke) hands over to the worker for good.
+          console.warn('Native QR detector failed, switching to the scanner worker:', err);
+          if (detector === active) detector = null;
+          if (!detector && !worker && !useMainThread) spawnWorker();
+          scheduler.endFrame(seqId, 'fail', null, 'NATIVE_DETECTOR_ERROR');
+        });
+      }
+    );
   }
 
   function decodeOnWorker(source: CameraFrameSource, seqId: number, width: number, height: number) {
@@ -480,29 +534,47 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
       region.height,
       region.width === width && region.height === height ? WORKER_MAX_DIMENSION : REGION_MAX_DIMENSION
     );
-    grabber
-      .grabBitmap(source, dims.width, dims.height, region)
-      .then((image) => {
-        const target = worker;
-        if (!target) {
-          image.close();
-          scheduler.endFrame(seqId, 'fail', null, 'WORKER_UNAVAILABLE');
-          return;
-        }
-        try {
-          target.postFrame(
-            { image, width: dims.width, height: dims.height, sequenceId: seqId, epochId: epoch, region },
-            [image]
-          );
-        } catch (err) {
-          console.error('Failed to post camera frame to scanner worker:', err);
-          scheduler.endFrame(seqId, 'fail', null, 'DISPATCH_ERROR');
-        }
-      })
-      .catch((err: unknown) => {
-        console.error('Failed to capture camera frame:', err);
-        scheduler.endFrame(seqId, 'fail', null, 'CAPTURE_ERROR');
-      });
+    // The frame is posted under the epoch and to the worker it was captured for, never relabelled
+    // with whatever is current when the capture resolves (#1699).
+    const owner = ownFrame(source);
+    const frameEpoch = epoch;
+    const frameWorker = worker;
+    grabber.grabBitmap(source, dims.width, dims.height, region).then(
+      (image) => {
+        const posted = settle(owner, seqId, () => {
+          if (epoch !== frameEpoch || worker !== frameWorker) {
+            // The worker was replaced while the frame was captured; recovery already freed its slot.
+            scheduler.retireFrame(seqId);
+            image.close();
+            return;
+          }
+          const target = worker;
+          if (!target) {
+            image.close();
+            scheduler.endFrame(seqId, 'fail', null, 'WORKER_UNAVAILABLE');
+            return;
+          }
+          try {
+            target.postFrame(
+              { image, width: dims.width, height: dims.height, sequenceId: seqId, epochId: frameEpoch, region },
+              [image]
+            );
+          } catch (err) {
+            console.error('Failed to post camera frame to scanner worker:', err);
+            // A frame that could not be posted was not transferred, so it is still ours to close.
+            image.close();
+            scheduler.endFrame(seqId, 'fail', null, 'DISPATCH_ERROR');
+          }
+        });
+        if (!posted) image.close();
+      },
+      (err: unknown) => {
+        settle(owner, seqId, () => {
+          console.error('Failed to capture camera frame:', err);
+          scheduler.endFrame(seqId, 'fail', null, 'CAPTURE_ERROR');
+        });
+      }
+    );
   }
 
   /** Captures one frame. `force` bypasses backpressure (used for paused or seeked video files). */
@@ -647,6 +719,7 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
 
   function start() {
     if (destroyed) return;
+    run += 1;
     restartAttempts = 0;
     epoch = nextEpoch();
     gate.reset();
@@ -663,6 +736,7 @@ export function createCameraScannerEngine(config: CameraScannerEngineConfig): Ca
 
   function stop() {
     const wasRunning = running;
+    run += 1;
     running = false;
     loopSuspended = false;
     clearLoopTimers();
