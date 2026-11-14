@@ -150,8 +150,18 @@ export class TileReadSession {
 export interface TileWorker {
   postMessage(message: TileReadRequest, transfer: Transferable[]): void;
   onmessage: ((event: MessageEvent<TileReadResponse>) => void) | null;
+  /** Set when the worker can report a crash (a real `Worker` can). */
+  onerror?: ((event: ErrorEvent) => void) | null;
+  /** Set when the worker can report a message it could not deserialize. */
+  onmessageerror?: ((event: MessageEvent) => void) | null;
   terminate(): void;
 }
+
+/** How long one decode may take before its worker is treated as stuck (#1707). */
+export const TILE_JOB_DEADLINE_MS = 3000;
+
+/** Failures in a row (timeouts, crashes, failed starts or posts) before a slot is given up. */
+export const MAX_TILE_SLOT_FAILURES = 3;
 
 /** The parts of a video element the reader uses. */
 export interface TileVideoSource {
@@ -177,6 +187,10 @@ export interface TileReaderOptions {
   spawnWorker: () => TileWorker;
   /** Grabs the current camera frame. Defaults to `createImageBitmap`. */
   grab?: (video: TileVideoSource) => Promise<ImageBitmap>;
+  /** Decode deadline per job in milliseconds; defaults to {@link TILE_JOB_DEADLINE_MS}. */
+  jobDeadlineMs?: number;
+  /** Called once a run when every worker slot has failed too often and no frame can be read. */
+  onUnavailable?: () => void;
 }
 
 /** A started reader is the camera session's frame loop. */
@@ -192,64 +206,170 @@ interface Result {
   response: TileReadResponse;
 }
 
+/** One worker slot of a run: its worker (started on first use) and its failures in a row. */
+interface Slot {
+  worker: TileWorker | null;
+  failures: number;
+}
+
+/** A job posted to a worker. It settles exactly once: by reply, deadline, worker error or stop. */
+interface PendingJob {
+  worker: TileWorker;
+  timer: ReturnType<typeof setTimeout>;
+  resolve: (response: TileReadResponse) => void;
+  reject: (reason: Error) => void;
+}
+
 /** `HTMLVideoElement.HAVE_CURRENT_DATA`. */
 const HAVE_CURRENT_DATA = 2;
 
 /**
  * Creates the reader. Nothing runs and no worker starts until `start`.
+ *
+ * Each `start` begins a new generation (#1707). A decode job holds its slot's worker, a deadline
+ * and the generation it was dispatched in, and settles exactly once. A reply, the deadline, a
+ * worker error or `stop` settles it, so a silent or crashed worker never holds a slot forever. A
+ * stuck worker is terminated and replaced on the slot's next job, up to
+ * {@link MAX_TILE_SLOT_FAILURES} failures in a row; when every slot has given up, the reader stops
+ * grabbing frames and calls `onUnavailable`. A frame grabbed for an older generation is closed,
+ * never posted, and late replies from replaced workers are ignored.
  * @param options - Video source, pool size, callbacks and worker factory.
  * @returns The frame loop to hand to the camera session.
  */
 export function createTileReader(options: TileReaderOptions): TileReader {
   const size = Math.max(1, Math.floor(options.poolSize));
+  const deadlineMs = options.jobDeadlineMs ?? TILE_JOB_DEADLINE_MS;
   const grab =
     options.grab ??
     ((video: TileVideoSource) =>
       typeof HTMLVideoElement !== 'undefined' && video instanceof HTMLVideoElement
         ? createImageBitmap(video)
         : Promise.reject(new Error('No camera frame to grab.')));
-  let workers: TileWorker[] = [];
+  let slots: Slot[] = [];
   let pool: DecoderPool<Job> | null = null;
   let session = new TileReadSession();
   let dedup = createSymbolDedup();
   let running = false;
+  let generation = 0;
+  let unavailableReported = false;
   let handle: { video: TileVideoSource; id: number } | { video: null; id: number } | null = null;
   let frameId = 0;
   let requestId = 0;
   let grabbing = false;
-  const pending = new Map<number, (response: TileReadResponse) => void>();
+  const pending = new Map<number, PendingJob>();
 
-  const run = (job: Job, slot: number): Promise<Result> =>
-    new Promise((resolve) => {
-      const id = ++requestId;
-      pending.set(id, (response) => resolve({ plan: job.plan, response }));
-      workers[slot].postMessage({ ...job.request, id }, [job.request.image]);
-    });
-
-  const onResult = ({ plan, response }: Result): void => {
-    if (!running) return;
-    const codes = session.report(plan, response.codes);
-    if (codes.length > 0) {
-      const [first] = codes;
-      options.onCorners?.([first.corners[0], first.corners[1], first.corners[2], first.corners[3]]);
-    }
-    options.onFrameRead?.(codes);
-    for (const code of codes) {
-      if (dedup.accept(code.text)) options.onText(code.text);
-    }
+  const release = (worker: TileWorker): void => {
+    worker.onmessage = null;
+    worker.onerror = null;
+    worker.onmessageerror = null;
+    worker.terminate();
   };
+
+  /** Settles every job on this worker as failed, then retires the worker from its slot. */
+  const failWorker = (worker: TileWorker, reason: string): void => {
+    for (const [id, job] of pending) {
+      if (job.worker !== worker) continue;
+      pending.delete(id);
+      clearTimeout(job.timer);
+      job.reject(new Error(reason));
+    }
+    const slot = slots.find((candidate) => candidate.worker === worker);
+    if (slot) {
+      slot.worker = null;
+      slot.failures += 1;
+    }
+    release(worker);
+  };
+
+  const spawn = (slot: Slot): TileWorker | null => {
+    let worker: TileWorker;
+    try {
+      worker = options.spawnWorker();
+    } catch {
+      slot.failures += 1;
+      return null;
+    }
+    worker.onmessage = (event) => {
+      const job = pending.get(event.data.id);
+      // A reply from a worker that no longer owns the job (replaced, or a stale id) is ignored.
+      if (!job || job.worker !== worker) return;
+      pending.delete(event.data.id);
+      clearTimeout(job.timer);
+      slot.failures = 0;
+      job.resolve(event.data);
+    };
+    worker.onerror = () => failWorker(worker, 'The decoder worker crashed.');
+    worker.onmessageerror = () => failWorker(worker, 'The decoder worker sent an unreadable reply.');
+    slot.worker = worker;
+    return worker;
+  };
+
+  const allSlotsFailed = (): boolean => slots.length > 0 && slots.every((slot) => slot.failures >= MAX_TILE_SLOT_FAILURES);
+
+  /** The pool's runner for one generation: it never posts an older generation's frame. */
+  const runFor =
+    (owner: number) =>
+    (job: Job, index: number): Promise<Result> =>
+      new Promise<Result>((resolve, reject) => {
+        const slot = slots[index];
+        if (owner !== generation || !slot || slot.failures >= MAX_TILE_SLOT_FAILURES) {
+          job.request.image.close();
+          reject(new Error(owner !== generation ? 'The reader stopped.' : 'No decoder worker is available.'));
+          return;
+        }
+        const worker = slot.worker ?? spawn(slot);
+        if (!worker) {
+          job.request.image.close();
+          reject(new Error('The decoder worker did not start.'));
+          return;
+        }
+        const id = ++requestId;
+        const timer = setTimeout(() => failWorker(worker, 'The decoder worker did not answer.'), deadlineMs);
+        pending.set(id, { worker, timer, resolve: (response) => resolve({ plan: job.plan, response }), reject });
+        try {
+          worker.postMessage({ ...job.request, id }, [job.request.image]);
+        } catch {
+          // The frame was not transferred, so it is still ours to close.
+          job.request.image.close();
+          failWorker(worker, 'The decoder worker did not take the frame.');
+        }
+      });
+
+  const resultFor =
+    (owner: number) =>
+    ({ plan, response }: Result): void => {
+      if (!running || owner !== generation) return;
+      const codes = session.report(plan, response.codes);
+      if (codes.length > 0) {
+        const [first] = codes;
+        options.onCorners?.([first.corners[0], first.corners[1], first.corners[2], first.corners[3]]);
+      }
+      options.onFrameRead?.(codes);
+      for (const code of codes) {
+        if (dedup.accept(code.text)) options.onText(code.text);
+      }
+    };
 
   const onFrame = async (): Promise<void> => {
     const video = options.getVideo();
     const active = pool;
     if (!video || !active || grabbing || video.readyState < HAVE_CURRENT_DATA || video.videoWidth === 0) return;
+    if (allSlotsFailed()) {
+      if (!unavailableReported) {
+        unavailableReported = true;
+        options.onUnavailable?.();
+      }
+      return;
+    }
     // Every worker busy: skip this camera frame rather than queue a stale one.
     if (active.stats().inFlight >= size) return;
+    const owner = generation;
     grabbing = true;
     try {
       const frame = { width: video.videoWidth, height: video.videoHeight };
       const image = await grab(video);
-      if (!running) {
+      // Stopped, or stopped and started again, while grabbing: this frame belongs to no run.
+      if (!running || owner !== generation || active !== pool) {
         image.close();
         return;
       }
@@ -258,7 +378,7 @@ export function createTileReader(options: TileReaderOptions): TileReader {
     } catch {
       // A frame that cannot be grabbed (the stream just stopped) is skipped.
     } finally {
-      grabbing = false;
+      if (owner === generation) grabbing = false;
     }
   };
 
@@ -280,29 +400,37 @@ export function createTileReader(options: TileReaderOptions): TileReader {
     start() {
       if (running) return;
       running = true;
+      generation += 1;
+      grabbing = false;
+      unavailableReported = false;
       session = new TileReadSession();
       dedup = createSymbolDedup();
-      workers = Array.from({ length: size }, () => {
-        const worker = options.spawnWorker();
-        worker.onmessage = (event) => {
-          const resolve = pending.get(event.data.id);
-          pending.delete(event.data.id);
-          resolve?.(event.data);
-        };
-        return worker;
+      // Workers start lazily, one per slot, so a failed start is retried on that slot's next job.
+      slots = Array.from({ length: size }, () => ({ worker: null, failures: 0 }));
+      for (const slot of slots) spawn(slot);
+      pool = createDecoderPool<Job, Result>({
+        size,
+        run: runFor(generation),
+        onResult: resultFor(generation),
+        onDrop: (job) => job.request.image.close(),
       });
-      pool = createDecoderPool<Job, Result>({ size, run, onResult });
       schedule();
     },
     stop() {
       running = false;
+      generation += 1;
       if (handle?.video) handle.video.cancelVideoFrameCallback?.(handle.id);
       else if (handle) cancelAnimationFrame(handle.id);
       handle = null;
-      for (const worker of workers) worker.terminate();
-      workers = [];
-      pool = null;
+      // Settle every job still waiting, so the pool frees its slots and nothing waits forever.
+      for (const job of pending.values()) {
+        clearTimeout(job.timer);
+        job.reject(new Error('The reader stopped.'));
+      }
       pending.clear();
+      for (const slot of slots) if (slot.worker) release(slot.worker);
+      slots = [];
+      pool = null;
     },
   };
 }
