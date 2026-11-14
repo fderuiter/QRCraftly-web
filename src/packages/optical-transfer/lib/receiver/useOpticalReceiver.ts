@@ -32,8 +32,12 @@ import { useFrameSource } from './useFrameSource';
 import { useReassemblyWorker } from './useReassemblyWorker';
 import { useReceiverTelemetry } from './useReceiverTelemetry';
 
+type BcUrModule = typeof import('../../bcur');
+
 /** Shown once when a wallet-style stream claims more than this receiver takes. */
 const BCUR_TOO_LARGE = 'A wallet-style stream is in view, but it is too large for this receiver, so it is ignored.';
+/** Shown when the wallet-style reader could not be loaded. The next wallet code loads it again (#1710). */
+const BCUR_LOAD_FAILED = 'The wallet-style (BC-UR) reader could not load. Keep the code in view to try again.';
 
 /**
  * Headless React hook to handle camera streams, video file uploads, adaptive scanning,
@@ -55,8 +59,20 @@ export function useOpticalReceiver({
   // A stream in the real BC-UR format (what wallets show), read next to our own (#1149).
   const [bcur, setBcur] = useState<BcUrResult | null>(null);
   const [bcurProgress, setBcurProgress] = useState<{ received: number; total: number } | null>(null);
-  const bcurDecoderRef = useRef<BcUrDecoder | null>(null);
-  const bcurLoadingRef = useRef<Promise<BcUrDecoder> | null>(null);
+  /**
+   * The BC-UR codec, loaded on the first UR code and kept for later receives. Only the code is
+   * shared: a load that failed is dropped so the next code tries again (#1710).
+   */
+  const bcurModuleRef = useRef<Promise<BcUrModule> | null>(null);
+  /** Bumped by Clear, unmount and a finished stream, so BC-UR work queued before it is dropped (#1710). */
+  const bcurRunRef = useRef(0);
+  /** The decoder of the current BC-UR receive. It never outlives the run it was made for. */
+  const bcurDecoderRef = useRef<{ run: number; decoder: BcUrDecoder } | null>(null);
+  /**
+   * True from the moment a wallet-style stream finishes until Clear. Set at once, so a frame read
+   * before React re-renders with `bcur` cannot start the same stream again.
+   */
+  const bcurDoneRef = useRef(false);
   /** True while a private transfer is in view and no key code has opened it. */
   const [needsKey, setNeedsKey] = useState(false);
   /** Whether the last key code was readable: null before one was entered. */
@@ -138,7 +154,17 @@ export function useOpticalReceiver({
     recordFrameReadBox.current = recordFrameRead;
   }, [terminateWorker, recordFrameRead]);
 
+  /** Ends the current BC-UR receive: work still queued for it is dropped, and its decoder is let go. */
+  const retireBcur = useCallback(() => {
+    bcurRunRef.current += 1;
+    bcurDecoderRef.current?.decoder.reset();
+    bcurDecoderRef.current = null;
+  }, []);
+  useEffect(() => retireBcur, [retireBcur]);
+
   const handleClear = useCallback(() => {
+    retireBcur();
+    bcurDoneRef.current = false;
     terminateWorker();
     const stillScanning = clearVideo();
     dispatch({ type: 'clear', scanning: stillScanning });
@@ -150,31 +176,41 @@ export function useOpticalReceiver({
     setSwitchOffer(null);
     setBcur(null);
     setBcurProgress(null);
-    bcurDecoderRef.current?.reset();
     reportedBcurTooLargeRef.current = false;
     setReceiverError(null);
     resetDelivery();
     addToast?.({ type: 'info', message: 'Receiver state has been reset.', duration: 3000 });
-  }, [addToast, terminateWorker, resetTelemetry, resetDelivery, clearVideo]);
+  }, [addToast, retireBcur, terminateWorker, resetTelemetry, resetDelivery, clearVideo]);
 
   const handleFrame = useCallback((decodedText: string) => {
     if (!decodedText || receiverSuccess || isVerifying || bcur) return;
     // A BC-UR stream (a wallet's animated QR, or our sender's wallet-compatible mode) is read by its
     // own decoder, loaded on the first such code so the page does not carry it.
     if (/^ur:/i.test(decodedText)) {
-      void (bcurLoadingRef.current ??= import('../../bcur').then(({ BcUrDecoder: Decoder }) => new Decoder())).then((decoder) => {
-        bcurDecoderRef.current = decoder;
+      if (bcurDoneRef.current) return;
+      // The run this code belongs to: a Clear or unmount while the codec loads retires it (#1710).
+      const run = bcurRunRef.current;
+      const loading = (bcurModuleRef.current ??= import('../../bcur'));
+      loading.then(({ BcUrDecoder: Decoder }) => {
+        if (run !== bcurRunRef.current || bcurDoneRef.current) return;
         // A Prism transfer in progress is not ended by a wallet code that happens to be in view (#1300).
         if (prismActive()) return;
-        const outcome = decoder.ingest(decodedText);
+        const owned = bcurDecoderRef.current?.run === run ? bcurDecoderRef.current : { run, decoder: new Decoder() };
+        bcurDecoderRef.current = owned;
+        const outcome = owned.decoder.ingest(decodedText);
         if (outcome.status === 'progress') {
+          setReceiverError(null);
           setBcurProgress({ received: outcome.received, total: outcome.total });
+          dispatch({ type: 'progress' });
         } else if (outcome.status === 'rejected' && outcome.reason === 'too-large') {
           if (reportedBcurTooLargeRef.current) return;
           reportedBcurTooLargeRef.current = true;
           dispatch({ type: 'fail', error: { source: 'receiver', message: BCUR_TOO_LARGE } });
           setReceiverError(BCUR_TOO_LARGE);
         } else if (outcome.status === 'complete') {
+          // The stream is done: parts still queued behind this one must not report it again.
+          bcurDoneRef.current = true;
+          retireBcur();
           // Stop any Prism decode an earlier frame started, and drop its error.
           terminateWorker();
           setReceiverError(null);
@@ -187,6 +223,12 @@ export function useOpticalReceiver({
           dispatch({ type: 'fail', error: { source: 'receiver', message: outcome.reason } });
           setReceiverError(outcome.reason);
         }
+      }, () => {
+        // A failed load is not kept, so the next wallet code loads the reader again.
+        if (bcurModuleRef.current === loading) bcurModuleRef.current = null;
+        if (run !== bcurRunRef.current || prismActive()) return;
+        dispatch({ type: 'fail', error: { source: 'receiver', message: BCUR_LOAD_FAILED } });
+        setReceiverError(BCUR_LOAD_FAILED);
       });
       return;
     }
@@ -196,7 +238,7 @@ export function useOpticalReceiver({
     // failed transfer recovers by simply scanning on.
     recordDroplet();
     initWorker().postMessage({ type: 'FOUNTAIN_DROPLET', droplet: decodedText });
-  }, [receiverSuccess, isVerifying, bcur, initWorker, stopStream, terminateWorker, setIsScanning, prismActive, recordDroplet]);
+  }, [receiverSuccess, isVerifying, bcur, initWorker, stopStream, terminateWorker, retireBcur, setIsScanning, prismActive, recordDroplet]);
 
   useEffect(() => {
     handleFrameRef.current = handleFrame;

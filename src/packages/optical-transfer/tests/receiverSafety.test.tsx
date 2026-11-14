@@ -109,6 +109,45 @@ describe('the receiver keeps a transfer in progress', () => {
     expect(await sha256Hex(saved)).toBe(await sha256Hex(file));
   }, 30_000);
 
+  it('is not ended by a wallet code that arrived while the BC-UR reader was still loading (#1710)', async () => {
+    const actual = await vi.importActual<typeof import('../bcur')>('../bcur');
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.resetModules();
+    vi.doMock('../bcur', async () => {
+      await gate;
+      return actual;
+    });
+    try {
+      const file = randomBytes(3000, 5);
+      const { stream } = await session(file, false);
+      const options = receiverOptions({ autoDownload: true });
+      const { result } = renderHook(() => useOpticalReceiver(options));
+
+      await show(result, WALLET_CODE);
+      await feed(result, stream, 0, Math.ceil(stream.k / 3));
+      await waitFor(() => expect(result.current.manifest).not.toBeNull());
+      release();
+      await act(async () => {
+        await import('../bcur');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(result.current.bcur).toBeNull();
+      expect(result.current.phase).not.toBe('complete');
+
+      await feed(result, stream, Math.ceil(stream.k / 3));
+      await waitFor(() => expect(result.current.receiverSuccess).toBe(true));
+      expect(result.current.bcur).toBeNull();
+      const [saved] = vi.mocked(options.saveFile).mock.calls[0];
+      expect(await sha256Hex(saved)).toBe(await sha256Hex(file));
+    } finally {
+      vi.doUnmock('../bcur');
+      vi.resetModules();
+    }
+  }, 30_000);
+
   it('says once why it ignores a wallet stream over its limits (#1302)', async () => {
     const part = walletPart(1, 65_537, 655_370, new Uint8Array(10));
     const addToast = vi.fn();
