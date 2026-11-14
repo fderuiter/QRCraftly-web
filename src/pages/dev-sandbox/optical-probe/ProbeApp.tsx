@@ -152,95 +152,181 @@ interface ReceiverProps {
   meta: Omit<ProbeMeta, 'camera'>;
 }
 
+/** Stops every track of a stream. Stopping a track twice is harmless. */
+function stopTracks(stream: MediaStream): void {
+  stream.getTracks().forEach((track) => track.stop());
+}
+
+/**
+ * The receiver. Camera ownership (#1712): each acquisition belongs to one generation, and Stop,
+ * unmount, a hidden tab or a newer acquisition retire it. Whatever a retired acquisition still
+ * receives (a late grant, a finished `play`) is released at once, and every exit path stops the
+ * owned tracks, detaches the video and stops the frame watcher.
+ */
 function Receiver({ meta }: ReceiverProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  /** The stream the current generation owns, once granted. */
   const streamRef = useRef<MediaStream | null>(null);
   const runRef = useRef<ProbeRun | null>(null);
   const cameraRef = useRef<ProbeCamera | null>(null);
   const stopLoopRef = useRef<() => void>(() => undefined);
-  const [state, setState] = useState<'idle' | 'running' | 'error'>('idle');
+  /** Bumped whenever an acquisition is retired, so its late results are released, not used. */
+  const generationRef = useRef(0);
+  /** True from Start until Stop, an error or unmount: a tab that comes back asks for the camera again. */
+  const wantedRef = useRef(false);
+  const [state, setState] = useState<'idle' | 'starting' | 'running' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [progress, setProgress] = useState('');
   const [report, setReport] = useState('');
   const [want4k, setWant4k] = useState(false);
 
-  const stop = useCallback(() => {
+  /** Retires the current acquisition and lets go of everything it owns. */
+  const release = useCallback(() => {
+    generationRef.current += 1;
     stopLoopRef.current();
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    stopLoopRef.current = () => undefined;
+    if (streamRef.current) stopTracks(streamRef.current);
     streamRef.current = null;
+    const video = videoRef.current;
+    if (video) video.srcObject = null;
+  }, []);
+
+  /** Opens the camera for a new generation. `fresh` starts a new run; a tab that came back keeps it. */
+  const acquire = useCallback(
+    async (fresh: boolean) => {
+      release();
+      const generation = generationRef.current;
+      const current = () => generation === generationRef.current;
+      let stream: MediaStream | null = null;
+      try {
+        // The analysis runs in the modem module.
+        await loadOpticalModem();
+        if (!current()) return;
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: 'environment', width: { ideal: want4k ? 3840 : 1920 }, height: { ideal: want4k ? 2160 : 1080 }, frameRate: { ideal: 60 } },
+        });
+        // A grant that arrives after Stop, unmount or a hidden tab is given straight back.
+        if (!current()) {
+          stopTracks(stream);
+          return;
+        }
+        streamRef.current = stream;
+        // The report uses what the camera granted, not what was asked for.
+        cameraRef.current = { ...grantedSettings(stream.getVideoTracks()[0]) };
+        if (fresh || !runRef.current) runRef.current = new ProbeRun({ ...meta, camera: cameraRef.current });
+        const video = videoRef.current;
+        if (!video) throw new Error('No video element');
+        video.srcObject = stream;
+        await video.play();
+        // Retired while it started to play: whoever retired it released the stream.
+        if (!current()) return;
+        setState('running');
+        let cancelled = false;
+        let busy = false;
+        let lastAnalysis = 0;
+        let lastRateUpdate = 0;
+        const meter = new FrameRateMeter(2000);
+        const onFrame = (tick: FrameTick): void => {
+          const { now } = tick;
+          meter.record(tick);
+          if (now - lastRateUpdate >= 2000 && cameraRef.current) {
+            cameraRef.current.deliveredFps = meter.fps;
+            lastRateUpdate = now;
+          }
+          const canvas = canvasRef.current;
+          const context = canvas?.getContext('2d', { willReadFrequently: true });
+          if (!busy && canvas && context && now - lastAnalysis > ANALYSIS_GAP_MS && video.videoWidth > 0) {
+            busy = true;
+            lastAnalysis = now;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+            const image = context.getImageData(0, 0, canvas.width, canvas.height);
+            // Analysis runs after this callback returns, so the next camera frame is never held up.
+            setTimeout(() => {
+              const run = runRef.current;
+              if (run && !cancelled) {
+                const pattern = run.ingest(image, now);
+                const summary = run.report();
+                setProgress(`${summary.framesAnalysed} frames analyzed, last pattern: ${pattern === null ? 'not readable' : probeSequence()[pattern].label}`);
+              }
+              busy = false;
+            }, 0);
+          }
+        };
+        const watcher = watchFrames(video, onFrame);
+        stopLoopRef.current = () => {
+          cancelled = true;
+          watcher.stop();
+        };
+      } catch (error) {
+        if (!current()) {
+          if (stream) stopTracks(stream);
+          return;
+        }
+        // A failed request, a missing video element or a failed play: the camera is given back.
+        wantedRef.current = false;
+        release();
+        setState('error');
+        setMessage(error instanceof Error ? error.message : 'The camera could not be opened.');
+      }
+    },
+    [meta, want4k, release]
+  );
+  const acquireRef = useRef(acquire);
+  useEffect(() => {
+    acquireRef.current = acquire;
+  }, [acquire]);
+
+  const stop = useCallback(() => {
+    wantedRef.current = false;
+    release();
     const run = runRef.current;
     if (run) {
       run.meta = { ...run.meta, camera: cameraRef.current ?? undefined };
       setReport(formatProbeReport(run.report()));
     }
     setState('idle');
-  }, []);
+  }, [release]);
 
-  useEffect(() => () => stopLoopRef.current(), []);
-
-  const start = useCallback(async () => {
+  const start = useCallback(() => {
+    // A second press while the camera is being opened starts nothing.
+    if (wantedRef.current) return;
+    wantedRef.current = true;
+    runRef.current = null;
     setReport('');
     setMessage('');
-    try {
-      // The analysis runs in the modem module.
-      await loadOpticalModem();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: 'environment', width: { ideal: want4k ? 3840 : 1920 }, height: { ideal: want4k ? 2160 : 1080 }, frameRate: { ideal: 60 } },
-      });
-      streamRef.current = stream;
-      const granted = grantedSettings(stream.getVideoTracks()[0]);
-      cameraRef.current = { ...granted };
-      runRef.current = new ProbeRun({ ...meta, camera: cameraRef.current });
-      const video = videoRef.current;
-      if (!video) throw new Error('No video element');
-      video.srcObject = stream;
-      await video.play();
-      setState('running');
-      let cancelled = false;
-      let busy = false;
-      let lastAnalysis = 0;
-      let lastRateUpdate = 0;
-      const meter = new FrameRateMeter(2000);
-      const onFrame = (tick: FrameTick): void => {
-        const { now } = tick;
-        meter.record(tick);
-        if (now - lastRateUpdate >= 2000 && cameraRef.current) {
-          cameraRef.current.deliveredFps = meter.fps;
-          lastRateUpdate = now;
-        }
-        const canvas = canvasRef.current;
-        const context = canvas?.getContext('2d', { willReadFrequently: true });
-        if (!busy && canvas && context && now - lastAnalysis > ANALYSIS_GAP_MS && video.videoWidth > 0) {
-          busy = true;
-          lastAnalysis = now;
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          context.drawImage(video, 0, 0);
-          const image = context.getImageData(0, 0, canvas.width, canvas.height);
-          // Analysis runs after this callback returns, so the next camera frame is never held up.
-          setTimeout(() => {
-            const run = runRef.current;
-            if (run && !cancelled) {
-              const pattern = run.ingest(image, now);
-              const summary = run.report();
-              setProgress(`${summary.framesAnalysed} frames analyzed, last pattern: ${pattern === null ? 'not readable' : probeSequence()[pattern].label}`);
-            }
-            busy = false;
-          }, 0);
-        }
-      };
-      const watcher = watchFrames(video, onFrame);
-      stopLoopRef.current = () => {
-        cancelled = true;
-        watcher.stop();
-      };
-    } catch (error) {
-      setState('error');
-      setMessage(error instanceof Error ? error.message : 'The camera could not be opened.');
-    }
-  }, [meta, want4k]);
+    setState('starting');
+    // A tab that is already hidden asks once it is shown (the visibility handler below).
+    if (typeof document !== 'undefined' && document.hidden) return;
+    void acquire(true);
+  }, [acquire]);
+
+  // A hidden tab gives the camera back; it is asked for again on return only while still wanted.
+  useEffect(() => {
+    const onVisibility = (): void => {
+      if (!wantedRef.current) return;
+      if (document.hidden) {
+        release();
+        setState('starting');
+      } else {
+        // A start made while hidden has no run yet, so it begins one.
+        void acquireRef.current(runRef.current === null);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [release]);
+
+  useEffect(
+    () => () => {
+      wantedRef.current = false;
+      release();
+    },
+    [release]
+  );
 
   return (
     <section className="space-y-4" aria-labelledby="probe-receiver">
@@ -250,12 +336,12 @@ function Receiver({ meta }: ReceiverProps) {
       <p className="text-fg-muted">
         Opens the camera and reads the sender&apos;s patterns on this device. Nothing is sent anywhere: the report below is plain text for you to copy.
       </p>
-      <CheckboxField label="Ask for 4K capture (only where the device grants it)" checked={want4k} onChange={(event) => setWant4k(event.target.checked)} disabled={state === 'running'} />
+      <CheckboxField label="Ask for 4K capture (only where the device grants it)" checked={want4k} onChange={(event) => setWant4k(event.target.checked)} disabled={state === 'starting' || state === 'running'} />
       <div className="flex flex-wrap gap-3">
-        <Button onClick={() => void start()} disabled={state === 'running'}>
+        <Button onClick={start} disabled={state === 'starting' || state === 'running'}>
           Start the camera
         </Button>
-        <Button variant="outline" onClick={stop} disabled={state !== 'running'}>
+        <Button variant="outline" onClick={stop} disabled={state !== 'starting' && state !== 'running'}>
           Stop and make the report
         </Button>
       </div>
