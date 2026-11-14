@@ -22,6 +22,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QRProvider } from '@/context/QRContext';
 import { QRErrorCorrectionLevel, QRType } from '@/packages/core/types';
 import { clearStagedArcadeTarget, stageArcadeTarget } from '@/packages/arcade/handoff';
+import { getQrCanvasRuntime, setQrCanvasRuntime } from '@/utils/qrCanvasRuntime';
+import { axe } from '../../../tests/utils/axe';
 import { ArcadeApp } from './ArcadeApp';
 
 vi.mock('vike/client/router', () => ({ navigate: vi.fn(() => Promise.resolve()) }));
@@ -440,5 +442,59 @@ describe('Responsive ergonomics (#926)', () => {
     expect(screen.getByTestId('arcade-blaster-canvas').style.touchAction).toBe('none');
     fireEvent.click(screen.getByRole('tab', { name: 'Damage Simulator' }));
     expect(screen.getByTestId('arcade-simulator-canvas').style.touchAction).toBe('none');
+  });
+});
+
+describe('Encoder that fails to load (#1711)', () => {
+  it('shows an accessible error with Try again instead of a board that stays busy, and recovers on retry', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const realEncoder = getQrCanvasRuntime().loadEncoder();
+    let attempts = 0;
+    let fail = true;
+    const restore = setQrCanvasRuntime({
+      loadEncoder: () => {
+        attempts += 1;
+        return fail ? Promise.reject(new Error('wasm failed')) : Promise.resolve(realEncoder);
+      },
+    });
+    try {
+      const { container } = render(<ArcadeApp />);
+      fireEvent.change(payloadField(), { target: { value: 'Chosen target' } });
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('The QR encoder did not load');
+      const board = screen.getByTestId('arcade-loading');
+      expect(board).toHaveAttribute('aria-busy', 'false');
+      expect(board).toHaveAttribute('inert');
+      expect(await axe(container)).toHaveNoViolations();
+
+      // Nothing asks again on its own.
+      const failedAttempts = attempts;
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+      expect(attempts).toBe(failedAttempts);
+
+      fail = false;
+      fireEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
+      await waitFor(() => expect(screen.queryByTestId('arcade-loading')).not.toBeInTheDocument());
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(attempts).toBe(failedAttempts + 1);
+      // The target chosen before the retry is kept.
+      expect(payloadField().value).toBe('Chosen target');
+    } finally {
+      restore();
+    }
+  });
+
+  it('marks the board busy while the encoder is still loading', () => {
+    const restore = setQrCanvasRuntime({ loadEncoder: () => new Promise(() => undefined) });
+    try {
+      render(<ArcadeApp />);
+      expect(screen.getByTestId('arcade-loading')).toHaveAttribute('aria-busy', 'true');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    } finally {
+      restore();
+    }
   });
 });
