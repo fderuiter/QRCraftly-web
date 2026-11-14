@@ -138,14 +138,16 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
   const sizeRef = useRef(size);
   const virtualRenderTimerRef = useRef<ScheduledRender | null>(null);
 
-  useEffect(() => {
-    return () => {
-      if (virtualRenderTimerRef.current) {
-        virtualRenderTimerRef.current.cancel();
-        virtualRenderTimerRef.current = null;
-      }
-    };
+  /**
+   * Drops the scan copy of the design shown until now, even mid-capture, so a newer design's
+   * failure or verdict cannot be replaced by the older design's pixels (#1708).
+   */
+  const cancelVirtualRender = useCallback(() => {
+    virtualRenderTimerRef.current?.cancel();
+    virtualRenderTimerRef.current = null;
   }, []);
+
+  useEffect(() => cancelVirtualRender, [cancelVirtualRender]);
 
   // The refs, the matrix worker and the paint effects below are layout effects so a change is
   // drawn before the browser paints, not one frame later; the refs update first.
@@ -182,6 +184,8 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
   });
 
   const clearCanvasAndResize = useCallback(() => {
+    // No code is shown, so no older one may still report a scan.
+    cancelVirtualRender();
     const canvas = localCanvasRef.current;
     if (!canvas) return;
 
@@ -193,7 +197,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     canvas.height = dims.pixelHeight;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }, []);
+  }, [cancelVirtualRender]);
 
   const repaintCanvasOnly = useCallback((modules: QRModules) => {
     const canvas = localCanvasRef.current;
@@ -228,8 +232,8 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     }
     settleCrossfade();
 
+    cancelVirtualRender();
     if (currentOnRendered) {
-      virtualRenderTimerRef.current?.cancel();
       virtualRenderTimerRef.current = scheduleVirtualRender({
         modules,
         config: currentConfig,
@@ -239,7 +243,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
         onRendered: currentOnRendered,
       });
     }
-  }, [computedMazeDataRef]);
+  }, [computedMazeDataRef, cancelVirtualRender]);
 
   const paintMatrix = useCallback((modules: QRModules) => {
     requestMazeCalculation(modules);
@@ -248,8 +252,10 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
 
   const requestMatrixCalculation = useCallback(() => {
     const currentConfig = configRef.current;
-    // Every request, the empty one included, supersedes answers still on their way for older values.
+    // Every request, the empty one included, supersedes answers still on their way for older values,
+    // and the older value's scan copy with them.
     sequenceIdRef.current += 1;
+    cancelVirtualRender();
     const currentSeqId = sequenceIdRef.current;
     if (!currentConfig.value) {
       lastModulesRef.current = null;
@@ -302,7 +308,7 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
         encodeOnMainThread(encoder);
       }
     }
-  }, [paintMatrix, clearCanvasAndResize]);
+  }, [paintMatrix, clearCanvasAndResize, cancelVirtualRender]);
 
   // Web Worker lifecycle management
   useLayoutEffect(() => {
