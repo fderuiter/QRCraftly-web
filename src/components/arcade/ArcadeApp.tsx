@@ -20,6 +20,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Gamepad2 } from 'lucide-react';
 import { ARCADE_MODES, type ArcadeMode, arcadeModeHref, blankTargetMatrix, buildTargetMatrix, parseArcadeMode } from '@/packages/arcade';
 import { BlasterMode } from './BlasterMode';
+import { Alert } from '@/components/ui/Alert';
+import { Button } from '@/components/ui/Button';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { SimulatorMode } from './SimulatorMode';
 import { TargetSettings } from './TargetSettings';
@@ -64,7 +66,8 @@ const ignore = () => {};
 export function ArcadeApp() {
   const [mode, setMode] = useModeParam();
   const { target, updateTarget, resetToGenerator, hasGeneratorDesign } = useArcadeTarget();
-  const encoder = useQrEncoder();
+  const encoderLoad = useQrEncoder();
+  const encoder = encoderLoad.status === 'ready' ? encoderLoad.encoder : null;
   const [announcement, setAnnouncement] = useState('');
   const announce = useCallback((message: string) => setAnnouncement(message), []);
 
@@ -122,9 +125,18 @@ export function ArcadeApp() {
 
       <div id={PANEL_ID} role="tabpanel" aria-labelledby={tabId(mode)}>
         <p className="sr-only">{activeMode.description}</p>
+        {encoderLoad.status === 'failed' && (
+          <Alert variant="error" className="mb-4">
+            <p>The QR encoder did not load, so the arcade cannot build its target. Check your connection and try again.</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={encoderLoad.retry}>
+              Try again
+            </Button>
+          </Alert>
+        )}
         {/* Until the encoder loads, the mode shows a blank board so the page keeps its layout; it is
-            inert and silent until the real target is built, which re-scans it. */}
-        <div inert={!encoder} aria-busy={!encoder} data-testid={encoder ? undefined : 'arcade-loading'}>
+            inert and silent until the real target is built, which re-scans it. It is busy only while
+            the encoder loads: after a failed load the alert above says why it waits. */}
+        <div inert={!encoder} aria-busy={encoderLoad.status === 'loading'} data-testid={encoder ? undefined : 'arcade-loading'}>
           {mode === 'blaster' ? (
             <BlasterMode target={target} encoder={encoder} settings={settings} announce={encoder ? announce : ignore} />
           ) : (
