@@ -195,4 +195,9 @@ describe('CI wiring', () => {
     expect(workflow).toContain('run: rustup toolchain install');
     expect(workflow).not.toMatch(/uses: [^\n]*(rust-toolchain|actions-rs|setup-rust)/);
   });
+
+  it('caches Cargo dependencies and build artifacts with Swatinem/rust-cache', () => {
+    expect(workflow).toMatch(/uses: Swatinem\/rust-cache@[0-9a-f]{40}/);
+    expect(workflow).toContain('workspaces: crates');
+  });
 });
