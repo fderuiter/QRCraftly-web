@@ -1,5 +1,6 @@
 ---
 publish-approved: true
+audience: developers # internal developer documentation, not published on /security
 ---
 
 # Public Developer Integration Guide and Architecture Manual
