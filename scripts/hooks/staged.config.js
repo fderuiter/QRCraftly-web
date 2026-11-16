@@ -55,8 +55,10 @@ export default [
         run: ['node', 'scripts/storage_privacy_ast_auditor.js'],
       },
       {
+        // Runs once on the git status: component changes and UI_CATALOG.md can land in different chunks of a large commit.
         label: 'UI catalog validator',
         run: ['node', 'scripts/validate_ui_catalog.js'],
+        files: false,
       },
       {
         label: 'static path tracker',

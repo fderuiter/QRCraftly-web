@@ -335,6 +335,10 @@ describe('scripts/hooks/staged.config.js', () => {
       ['node scripts/audit_markdown.js', false],
       ['node scripts/validate_adrs.js', false],
     ]);
+
+    const everyStaged = stagedRules.find((rule) => rule.name === 'every staged file');
+    const uiCatalog = everyStaged?.commands.find((command) => command.label === 'UI catalog validator');
+    expect(uiCatalog?.files).toBe(false);
   });
 
   it('gives every fixer a read-only check form for partly staged files', () => {
