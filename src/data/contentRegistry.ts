@@ -603,6 +603,16 @@ export const auxiliaryRegistry: Record<string, AuxiliaryContent> = {
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty
   },
+  "guides/qr-code-customization-parameters": {
+    "id": "guides/qr-code-customization-parameters",
+    "name": "QR code customization guide",
+    "seoTitle": "QR Code Customization Guide: Styles, Contrast & Formats | QRCraftly",
+    "description": "Complete reference for QR code visual styling: 8 pattern styles, locator eye shapes, 4.5:1 contrast rules, logo sizing caps, and export formats.",
+    "image": "/og/guides-qr-code-customization-parameters.png",
+    "imageAlt": "QR code customization guide",
+    "personas": [TargetPersona.SecurityConsciousEnterprise],
+    "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty
+  },
   "file-transfer/receive": {
     "id": "file-transfer/receive",
     "name": "Offline Animated QR File Receiver",

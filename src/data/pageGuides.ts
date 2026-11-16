@@ -31,8 +31,8 @@ export const PAGE_GUIDES: Readonly<Record<string, readonly string[]>> = {
   'pdf-qr-code': ['why-qr-codes-stop-working', 'static-vs-dynamic-qr-codes'],
   'menu-qr-code': ['qr-code-without-subscription', 'how-to-print-a-qr-code-that-scans', 'why-qr-codes-stop-working'],
   'google-review-qr-code': ['static-vs-dynamic-qr-codes', 'how-to-print-a-qr-code-that-scans'],
-  'qr-code-with-logo': ['qr-code-error-correction-explained', 'how-to-print-a-qr-code-that-scans'],
-  'mosaic-qr-code': ['qr-code-error-correction-explained', 'how-to-print-a-qr-code-that-scans'],
+  'qr-code-with-logo': ['qr-code-error-correction-explained', 'how-to-print-a-qr-code-that-scans', 'qr-code-customization-parameters'],
+  'mosaic-qr-code': ['qr-code-error-correction-explained', 'how-to-print-a-qr-code-that-scans', 'qr-code-customization-parameters'],
   'bulk-csv-qr-code': ['how-to-print-a-qr-code-that-scans'],
   'payment-qr-code': ['qr-code-scams-quishing'],
   'qr-code-scanner': ['qr-code-scams-quishing', 'why-qr-codes-stop-working'],
@@ -50,7 +50,7 @@ export const PAGE_GUIDES: Readonly<Record<string, readonly string[]>> = {
   'meeting-qr-code': ['why-qr-codes-stop-working', 'static-vs-dynamic-qr-codes'],
   'social-qr-code': ['static-vs-dynamic-qr-codes', 'how-to-print-a-qr-code-that-scans'],
   'static-qr-code-generator': ['qr-code-without-subscription', 'static-vs-dynamic-qr-codes', 'why-qr-codes-stop-working'],
-  'svg-qr-code': ['how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained'],
+  'svg-qr-code': ['how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained', 'qr-code-customization-parameters'],
 };
 
 /**
