@@ -1,5 +1,12 @@
 import { type BrandTemplate } from '../types';
-import { QRStyle, type BorderStyle, QRErrorCorrectionLevel } from '@/packages/core/types';
+import {
+  QRStyle,
+  type BorderStyle,
+  type FrameStyle,
+  type FrameIcon,
+  type FramePosition,
+  QRErrorCorrectionLevel,
+} from '@/packages/core/types';
 
 /**
  * Curated pre-built brand templates.
@@ -22,7 +29,7 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
   {
     id: 'preset-modern-soft',
     name: 'Modern Teal',
-    description: 'Rounded squares in teal on white, with a teal border.',
+    description: 'Rounded squares in teal on white, with a teal border and pill frame.',
     isPrebuilt: true,
     config: {
       fgColor: '#0f766e',
@@ -34,6 +41,12 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
       borderColor: '#0d9488',
       borderSize: 0.05,
       borderTextColor: '#ffffff',
+      frameStyle: 'pill' as FrameStyle,
+      frameText: 'SCAN ME',
+      frameIcon: 'scan' as FrameIcon,
+      framePosition: 'bottom' as FramePosition,
+      frameBgColor: '#0f766e',
+      frameTextColor: '#ffffff',
       errorCorrectionLevel: QRErrorCorrectionLevel.H,
     },
   },
@@ -58,7 +71,7 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
   {
     id: 'preset-swiss-crimson',
     name: 'Swiss Crimson',
-    description: 'Round dots in crimson on white, with a dashed border.',
+    description: 'Round dots in crimson on white, with a dashed border and card frame.',
     isPrebuilt: true,
     config: {
       fgColor: '#be123c',
@@ -70,13 +83,19 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
       borderColor: '#e11d48',
       borderSize: 0.05,
       borderTextColor: '#ffffff',
+      frameStyle: 'card' as FrameStyle,
+      frameText: 'DOWNLOAD APP',
+      frameIcon: 'phone' as FrameIcon,
+      framePosition: 'bottom' as FramePosition,
+      frameBgColor: '#be123c',
+      frameTextColor: '#ffffff',
       errorCorrectionLevel: QRErrorCorrectionLevel.H,
     },
   },
   {
     id: 'preset-corporate-emerald',
     name: 'Corporate Emerald',
-    description: 'Square modules in dark green on pale green, with a green border.',
+    description: 'Square modules in dark green on pale green, with a green border and banner frame.',
     isPrebuilt: true,
     config: {
       fgColor: '#047857',
@@ -88,13 +107,19 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
       borderColor: '#059669',
       borderSize: 0.05,
       borderTextColor: '#ffffff',
+      frameStyle: 'banner' as FrameStyle,
+      frameText: 'VISIT US',
+      frameIcon: 'info' as FrameIcon,
+      framePosition: 'bottom' as FramePosition,
+      frameBgColor: '#047857',
+      frameTextColor: '#ffffff',
       errorCorrectionLevel: QRErrorCorrectionLevel.H,
     },
   },
   {
     id: 'preset-fluid-lavender',
     name: 'Fluid Lavender',
-    description: 'Joined, flowing shapes in purple on pale lilac, with a double border.',
+    description: 'Joined, flowing shapes in purple on pale lilac, with a speech bubble frame.',
     isPrebuilt: true,
     config: {
       fgColor: '#6b21a8',
@@ -106,6 +131,12 @@ export const PREBUILT_TEMPLATES: BrandTemplate[] = [
       borderColor: '#7e22ce',
       borderSize: 0.05,
       borderTextColor: '#ffffff',
+      frameStyle: 'speech-bubble' as FrameStyle,
+      frameText: 'VIEW MENU',
+      frameIcon: 'star' as FrameIcon,
+      framePosition: 'bottom' as FramePosition,
+      frameBgColor: '#6b21a8',
+      frameTextColor: '#ffffff',
       errorCorrectionLevel: QRErrorCorrectionLevel.H,
     },
   },

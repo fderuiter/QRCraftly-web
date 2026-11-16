@@ -68,6 +68,9 @@ export function applyTemplateToConfig(
       (updates as Record<string, unknown>)[key] = templateConfig[key];
     }
   }
+  if (templateConfig.frameText && !currentConfig.frameText?.trim()) {
+    updates.frameText = templateConfig.frameText;
+  }
   return updates;
 }
 
