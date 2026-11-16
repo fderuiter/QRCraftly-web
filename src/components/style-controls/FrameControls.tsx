@@ -20,9 +20,22 @@ import React, { useMemo } from 'react';
 import { type QRConfig, type FrameStyle, type FramePosition, type FrameIcon, type FrameFontFamily, FRAME_FONT_FAMILIES } from '@/packages/core/types';
 import { SelectField, TextField } from '../ui/FormFields';
 import { ColorInput } from '../ui/ColorInput';
+import { Button } from '../ui/Button';
 import { getContrastRatio } from '@/packages/core/encoding';
 import { MIN_CONTRAST_THRESHOLD } from '../../constants';
 import { ContrastBadge } from './ContrastWarning';
+
+export interface CtaPreset {
+  text: string;
+  icon: FrameIcon;
+}
+
+export const CTA_PRESETS: ReadonlyArray<CtaPreset> = [
+  { text: 'SCAN ME', icon: 'scan' },
+  { text: 'VISIT US', icon: 'info' },
+  { text: 'DOWNLOAD APP', icon: 'phone' },
+  { text: 'VIEW MENU', icon: 'star' },
+] as const;
 
 const FRAME_FONT_OPTIONS: ReadonlyArray<{ value: FrameFontFamily; label: string }> = [
   { value: 'sans-serif', label: 'Sans Serif' },
@@ -63,7 +76,14 @@ export const FrameControls: React.FC<FrameControlsProps> = ({ config, onChange }
           id="frame-style"
           label="Frame Shape"
           value={frameStyle}
-          onChange={(e) => onChange({ frameStyle: e.target.value as FrameStyle })}
+          onChange={(e) => {
+            const nextStyle = e.target.value as FrameStyle;
+            if (nextStyle !== 'none' && !config.frameText?.trim()) {
+              onChange({ frameStyle: nextStyle, frameText: 'SCAN ME' });
+            } else {
+              onChange({ frameStyle: nextStyle });
+            }
+          }}
         >
           <option value="none">None</option>
           <option value="pill">Pill Badge</option>
@@ -105,13 +125,34 @@ export const FrameControls: React.FC<FrameControlsProps> = ({ config, onChange }
             </div>
 
             {/* CTA Text Input */}
-            <TextField
-              id="frame-text"
-              label="Call to Action Text"
-              placeholder="SCAN ME"
-              value={config.frameText || ''}
-              onChange={(e) => onChange({ frameText: e.target.value })}
-            />
+            <div>
+              <TextField
+                id="frame-text"
+                label="Call to Action Text"
+                placeholder="SCAN ME"
+                value={config.frameText || ''}
+                onChange={(e) => onChange({ frameText: e.target.value })}
+              />
+              <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Call to action presets">
+                {CTA_PRESETS.map((preset) => {
+                  const isSelected =
+                    config.frameText === preset.text && (config.frameIcon || 'none') === preset.icon;
+                  return (
+                    <Button
+                      key={preset.text}
+                      type="button"
+                      variant={isSelected ? 'secondary' : 'outline'}
+                      size="xs"
+                      shape="round"
+                      pressed={isSelected}
+                      onClick={() => onChange({ frameText: preset.text, frameIcon: preset.icon })}
+                    >
+                      {preset.text}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Typography Selector */}
             <div>

@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { PREBUILT_TEMPLATES } from '../src/data/brandTemplates';
 import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel } from '@/packages/core/types';
+import { getContrastRatio } from '@/packages/core/encoding';
 import {
   BRAND_TEMPLATES_STORAGE_KEY,
   MAX_CUSTOM_TEMPLATES,
@@ -40,6 +41,43 @@ describe('Brand Template Gallery & Persistence System', () => {
         expect(tpl.config.fgColor).toMatch(/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
         expect(tpl.config.bgColor).toMatch(/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
       });
+    });
+
+    it('configures active frame shapes, badges, and positions on at least four starter templates', () => {
+      const framedTemplates = PREBUILT_TEMPLATES.filter(
+        (tpl) => tpl.config.frameStyle && tpl.config.frameStyle !== 'none'
+      );
+      expect(framedTemplates.length).toBeGreaterThanOrEqual(4);
+
+      framedTemplates.forEach((tpl) => {
+        expect(tpl.config.frameStyle).toBeDefined();
+        expect(tpl.config.frameText).toBeDefined();
+        expect(tpl.config.frameBgColor).toBeDefined();
+        expect(tpl.config.frameTextColor).toBeDefined();
+        expect(tpl.config.frameIcon).toBeDefined();
+        expect(tpl.config.framePosition).toBeDefined();
+
+        // Constraint: All prebuilt template frame colors must maintain contrast ratio of at least 4.5:1
+        const ratio = getContrastRatio(tpl.config.frameTextColor!, tpl.config.frameBgColor!);
+        expect(ratio).toBeGreaterThanOrEqual(4.5);
+      });
+    });
+
+    it('applies frameText from template when current frameText is blank and preserves custom text when set', () => {
+      const tealTemplate = PREBUILT_TEMPLATES.find((tpl) => tpl.name === 'Modern Teal')!;
+      expect(tealTemplate).toBeDefined();
+
+      // Blank active frame text -> template frameText is applied
+      const blankConfig: QRConfig = { ...DEFAULT_CONFIG, frameText: '' };
+      const updatesForBlank = applyTemplateToConfig(blankConfig, tealTemplate.config);
+      expect(updatesForBlank.frameStyle).toBe('pill');
+      expect(updatesForBlank.frameText).toBe('SCAN ME');
+
+      // User already typed custom text -> preserved
+      const customConfig: QRConfig = { ...DEFAULT_CONFIG, frameText: 'VISIT MY CAFE' };
+      const updatesForCustom = applyTemplateToConfig(customConfig, tealTemplate.config);
+      expect(updatesForCustom.frameStyle).toBe('pill');
+      expect(updatesForCustom.frameText).toBeUndefined();
     });
   });
 

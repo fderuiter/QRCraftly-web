@@ -34,14 +34,67 @@ describe('FrameControls Component', () => {
     expect((select as HTMLSelectElement).value).toBe('none');
   });
 
-  it('triggers onChange when frame shape changes', () => {
+  it('triggers onChange and defaults frameText to SCAN ME when enabling frame shape if text is blank', () => {
     const onChange = vi.fn();
     render(<FrameControls config={DEFAULT_CONFIG as QRConfig} onChange={onChange} />);
 
     const select = screen.getByLabelText('Frame Shape');
     fireEvent.change(select, { target: { value: 'pill' } });
 
-    expect(onChange).toHaveBeenCalledWith({ frameStyle: 'pill' });
+    expect(onChange).toHaveBeenCalledWith({ frameStyle: 'pill', frameText: 'SCAN ME' });
+  });
+
+  it('preserves existing custom frame text when frame shape changes', () => {
+    const onChange = vi.fn();
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      frameStyle: 'none',
+      frameText: 'SPECIAL OFFER',
+    };
+    render(<FrameControls config={config} onChange={onChange} />);
+
+    const select = screen.getByLabelText('Frame Shape');
+    fireEvent.change(select, { target: { value: 'banner' } });
+
+    expect(onChange).toHaveBeenCalledWith({ frameStyle: 'banner' });
+  });
+
+  it('renders quick-select prompt chips when frame is enabled', () => {
+    const onChange = vi.fn();
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      frameStyle: 'pill',
+      frameText: 'SCAN ME',
+    };
+    render(<FrameControls config={config} onChange={onChange} />);
+
+    expect(screen.getByRole('button', { name: 'SCAN ME' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'VISIT US' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'DOWNLOAD APP' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'VIEW MENU' })).toBeInTheDocument();
+  });
+
+  it('updates text and selects matching badge icon when a prompt chip is clicked', () => {
+    const onChange = vi.fn();
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      frameStyle: 'pill',
+      frameText: 'SCAN ME',
+      frameIcon: 'none',
+    };
+    render(<FrameControls config={config} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'DOWNLOAD APP' }));
+    expect(onChange).toHaveBeenCalledWith({ frameText: 'DOWNLOAD APP', frameIcon: 'phone' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'VISIT US' }));
+    expect(onChange).toHaveBeenCalledWith({ frameText: 'VISIT US', frameIcon: 'info' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'VIEW MENU' }));
+    expect(onChange).toHaveBeenCalledWith({ frameText: 'VIEW MENU', frameIcon: 'star' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'SCAN ME' }));
+    expect(onChange).toHaveBeenCalledWith({ frameText: 'SCAN ME', frameIcon: 'scan' });
   });
 
   it('renders text, icon, font, and position fields when frame is enabled', () => {
