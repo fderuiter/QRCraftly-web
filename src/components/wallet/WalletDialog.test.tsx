@@ -24,7 +24,10 @@ import { type QRConfig, QRType } from '@/packages/core/types';
 import { ToastProvider } from '../ui/Toast';
 import WalletDialog, { suggestWalletTitle, WALLET_SCAN_FAILED } from './WalletDialog';
 
-const scan = vi.hoisted(() => ({ success: true }));
+const scan = vi.hoisted(() => ({
+  success: true,
+  check: null as null | ((canvas: unknown) => Promise<boolean>),
+}));
 const download = vi.hoisted(() => vi.fn());
 
 vi.mock('@/packages/qr-export', async (original) => {
@@ -44,7 +47,9 @@ vi.mock('@/packages/qr-export', async (original) => {
     }),
   };
 });
-vi.mock('@/packages/scannability/scan', () => ({ isCanvasScannable: async () => scan.success }));
+vi.mock('@/packages/scannability/scan', () => ({
+  isCanvasScannable: async (canvas: unknown) => (scan.check ? scan.check(canvas) : scan.success),
+}));
 vi.mock('@/utils/downloadManager', () => ({ triggerFileDownload: download }));
 
 const DEVELOPER_SECTION = 'Have your own Apple or Google developer keys?';
@@ -60,6 +65,7 @@ function open(config: Partial<QRConfig>) {
 describe('WalletDialog (ADR 0048)', () => {
   beforeEach(() => {
     scan.success = true;
+    scan.check = null;
     download.mockClear();
   });
 
@@ -67,19 +73,88 @@ describe('WalletDialog (ADR 0048)', () => {
     const { baseElement } = open({ type: QRType.WIFI, value: 'WIFI:T:WPA;S:Home;P:secret;;' });
     expect(screen.getByLabelText('Title')).toHaveValue('WiFi: Home');
     expect(await screen.findByTestId('wallet-card-preview')).toBeInTheDocument();
+    expect(screen.getByTestId('wallet-scannability-badge')).toHaveTextContent('Scans reliably');
+    expect(screen.getByTestId('wallet-scannability-live-region')).toHaveTextContent('Card scannability: Scans reliably.');
+    const downloadButton = screen.getByRole('button', { name: 'Download card' });
+    expect(downloadButton).toBeEnabled();
     expect(await axe(baseElement)).toHaveNoViolations();
-    fireEvent.click(screen.getByRole('button', { name: 'Download card' }));
+    fireEvent.click(downloadButton);
     await waitFor(() => expect(download).toHaveBeenCalled());
     expect(download.mock.calls[0][1]).toBe('wifi-Home-wallet-card.png');
     expect(download.mock.calls[0][2]).toBe('image/png');
   });
 
-  it('does not save a card that fails the scan check', async () => {
+  it('does not save a card that fails the scan check and disables export', async () => {
     scan.success = false;
+    const { baseElement } = open({ type: QRType.URL, value: 'https://example.com' });
+    const warning = await screen.findByTestId('wallet-scannability-warning');
+    expect(warning).toBeInTheDocument();
+    expect(warning).toHaveTextContent(/shorter content/i);
+    expect(screen.getByRole('button', { name: 'Download card' })).toBeDisabled();
+    expect(screen.getByTestId('wallet-scannability-badge')).toHaveTextContent("Won't scan reliably");
+    expect(screen.getByTestId('wallet-scannability-live-region')).toHaveTextContent(/Optical verification failed/i);
+    expect(download).not.toHaveBeenCalled();
+    expect(await axe(baseElement)).toHaveNoViolations();
+  });
+
+  it('retains the final scannability verification in makeCard as a defense-in-depth safety guard', async () => {
+    scan.success = true;
     open({ type: QRType.URL, value: 'https://example.com' });
-    fireEvent.click(screen.getByRole('button', { name: 'Download card' }));
+    expect(await screen.findByTestId('wallet-card-preview')).toBeInTheDocument();
+    const downloadButton = screen.getByRole('button', { name: 'Download card' });
+    expect(downloadButton).toBeEnabled();
+
+    scan.success = false;
+    fireEvent.click(downloadButton);
     expect(await screen.findByText(WALLET_SCAN_FAILED)).toBeInTheDocument();
     expect(download).not.toHaveBeenCalled();
+  });
+
+  it('disables download while optical validation is checking and transitions to passed', async () => {
+    let resolveCheck: ((scannable: boolean) => void) | undefined;
+    scan.check = () => new Promise<boolean>((resolve) => { resolveCheck = resolve; });
+
+    open({ type: QRType.URL, value: 'https://example.com' });
+    expect(screen.getByTestId('wallet-scannability-badge')).toHaveTextContent('Checking…');
+    expect(screen.getByRole('button', { name: 'Download card' })).toBeDisabled();
+    expect(screen.getByTestId('wallet-scannability-live-region')).toHaveTextContent('Checking card scannability…');
+
+    await waitFor(() => expect(resolveCheck).toBeDefined());
+    resolveCheck!(true);
+    expect(await screen.findByText('Scans reliably')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download card' })).toBeEnabled();
+    expect(screen.getByTestId('wallet-scannability-live-region')).toHaveTextContent('Card scannability: Scans reliably.');
+  });
+
+  it('disables the share button when scannability check fails', async () => {
+    const originalCanShare = navigator.canShare;
+    const originalShare = navigator.share;
+    Object.defineProperty(navigator, 'canShare', { value: () => true, configurable: true, writable: true });
+    Object.defineProperty(navigator, 'share', { value: vi.fn(), configurable: true, writable: true });
+
+    try {
+      scan.success = false;
+      open({ type: QRType.URL, value: 'https://example.com' });
+      expect(await screen.findByTestId('wallet-scannability-warning')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Download card' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Share card' })).toBeDisabled();
+    } finally {
+      Object.defineProperty(navigator, 'canShare', { value: originalCanShare, configurable: true, writable: true });
+      Object.defineProperty(navigator, 'share', { value: originalShare, configurable: true, writable: true });
+    }
+  });
+
+  it('updates scannability verdict and alert when user edits text', async () => {
+    scan.success = true;
+    open({ type: QRType.URL, value: 'https://example.com' });
+    expect(await screen.findByText('Scans reliably')).toBeInTheDocument();
+    expect(screen.queryByTestId('wallet-scannability-warning')).not.toBeInTheDocument();
+
+    scan.success = false;
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Very long title that forces high density' } });
+    expect(await screen.findByText("Won't scan reliably")).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download card' })).toBeDisabled();
+    expect(screen.getByTestId('wallet-scannability-warning')).toBeInTheDocument();
   });
 
   it('keeps the signed passes in a closed developer section until it is opened', async () => {
