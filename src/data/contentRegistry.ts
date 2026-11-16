@@ -603,6 +603,16 @@ export const auxiliaryRegistry: Record<string, AuxiliaryContent> = {
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty
   },
+  "guides/developer-integration-guide": {
+    "id": "guides/developer-integration-guide",
+    "name": "Developer integration guide",
+    "seoTitle": "Developer Integration Guide & Architecture Manual | QRCraftly",
+    "description": "Programmatic integration recipes and Web Worker message contracts for embedding QRCraftly QR matrix generation, contrast audits and vector export.",
+    "image": "/og/guides-developer-integration-guide.png",
+    "imageAlt": "Developer integration guide",
+    "personas": [TargetPersona.SecurityConsciousEnterprise],
+    "valueProposition": StrategicValueCategory.AsynchronousWebWorkerDiagnostics
+  },
   "file-transfer/receive": {
     "id": "file-transfer/receive",
     "name": "Offline Animated QR File Receiver",

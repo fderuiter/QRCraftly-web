@@ -16,7 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { Check, Copy } from 'lucide-react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { ArticleHeading, ArticleLayout } from '@/components/ArticleLayout';
 import type { GuideArticleContent, GuideBlock } from '@/data/guides';
@@ -54,10 +55,66 @@ export function renderInline(text: string): ReactNode[] {
   return nodes;
 }
 
+function CopyButton({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => void handleCopy()}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-medium text-fg-soft transition-colors hover:bg-surface-raised hover:text-fg"
+      aria-label={copied ? 'Code copied to clipboard' : 'Copy code to clipboard'}
+    >
+      {copied ? (
+        <>
+          <Check className="size-3.5 text-success" aria-hidden="true" />
+          <span>Copied</span>
+        </>
+      ) : (
+        <>
+          <Copy className="size-3.5" aria-hidden="true" />
+          <span>Copy</span>
+        </>
+      )}
+    </button>
+  );
+}
+
+function CodeBlock({ code, language, title }: { code: string; language?: string; title?: string }) {
+  return (
+    <div className="my-4 overflow-hidden rounded-xl border border-line bg-surface-sunken text-sm">
+      <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-2 font-mono text-xs text-fg-muted">
+        <span>{title || language || 'Code'}</span>
+        <CopyButton code={code} />
+      </div>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+      <div tabIndex={0} role="region" aria-label={title || `${language || 'Code'} snippet`} className="w-0 min-w-full overflow-x-auto p-4">
+        <pre className="font-mono text-xs leading-relaxed text-fg sm:text-sm">
+          <code>{code}</code>
+        </pre>
+      </div>
+    </div>
+  );
+}
+
 function Block({ block }: { block: GuideBlock }) {
   switch (block.type) {
     case 'p':
       return <p className="my-3 leading-relaxed">{renderInline(block.text)}</p>;
+    case 'code':
+      return <CodeBlock code={block.code} language={block.language} title={block.title} />;
     case 'ul':
       return (
         <ul className={`${LIST_CLASSES} list-disc`}>
