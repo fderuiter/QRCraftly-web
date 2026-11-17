@@ -1,5 +1,6 @@
 import React from "react";
 import { CharCount } from "../CharCount";
+import { useFieldIds } from "../../hooks/useFieldIds";
 
 export interface BaseFieldProps {
   label?: string;
@@ -16,7 +17,7 @@ const getLabelClass = (customClass?: string) => {
   return "block text-sm font-medium text-fg-soft mb-1";
 };
 
-interface FieldWrapperProps extends BaseFieldProps {
+export interface FieldWrapperProps extends BaseFieldProps {
   showCharCount?: boolean;
   maxLength?: number;
   value?: string | number | readonly string[];
@@ -90,3 +91,80 @@ export const FieldWrapper: React.FC<FieldWrapperProps> = ({
     </div>
   );
 };
+
+export interface FormFieldRenderProps {
+  inputId: string;
+  describedBy?: string;
+  errorId?: string;
+  charCountId?: string;
+}
+
+export interface FormFieldContainerProps extends BaseFieldProps {
+  showCharCount?: boolean;
+  maxLength?: number;
+  value?: string | number | readonly string[];
+  isCheckbox?: boolean;
+  ariaDescribedby?: string;
+  "aria-describedby"?: string;
+  children?: React.ReactNode | ((props: FormFieldRenderProps) => React.ReactNode);
+  render?: (props: FormFieldRenderProps) => React.ReactNode;
+}
+
+export const FormFieldContainer: React.FC<FormFieldContainerProps> = ({
+  id,
+  label,
+  contextualLabel,
+  className,
+  labelClassName,
+  error,
+  showCharCount,
+  maxLength,
+  value,
+  isCheckbox,
+  ariaDescribedby,
+  "aria-describedby": ariaDescribedByHyphen,
+  children,
+  render,
+}) => {
+  const resolvedAriaDescribedby = ariaDescribedby ?? ariaDescribedByHyphen;
+  const { inputId, errorId, charCountId, describedBy } = useFieldIds({
+    id,
+    error,
+    showCharCount,
+    maxLength,
+    ariaDescribedby: resolvedAriaDescribedby,
+  });
+
+  const renderProps: FormFieldRenderProps = {
+    inputId,
+    describedBy,
+    errorId,
+    charCountId,
+  };
+
+  const content = render
+    ? render(renderProps)
+    : typeof children === "function"
+      ? children(renderProps)
+      : children;
+
+  return (
+    <FieldWrapper
+      inputId={inputId}
+      label={label}
+      contextualLabel={contextualLabel}
+      className={className}
+      labelClassName={labelClassName}
+      showCharCount={showCharCount}
+      maxLength={maxLength}
+      value={value}
+      error={error}
+      errorId={errorId}
+      charCountId={charCountId}
+      isCheckbox={isCheckbox}
+    >
+      {content}
+    </FieldWrapper>
+  );
+};
+
