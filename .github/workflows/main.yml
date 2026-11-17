@@ -139,6 +139,11 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'requirements.txt'
 
+      - name: Audit Python Dependencies
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
+
       - name: Install Semgrep
         # requirements.txt is a pip-compile lock with hashes (source: requirements.in).
         run: pip install --require-hashes -r requirements.txt
