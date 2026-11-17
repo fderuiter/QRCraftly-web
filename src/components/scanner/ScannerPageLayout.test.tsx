@@ -94,4 +94,25 @@ describe('ScannerPageLayout', () => {
     expect(screen.getByText('Empty metadata fallback description.')).toBeInTheDocument();
     expect(screen.getByText('Safe Fallback Content')).toBeInTheDocument();
   });
+
+  it('filters out dangerous URLs from related links', () => {
+    const mixedLinks = [
+      { href: '/safe-route', label: 'Safe Link' },
+      { href: 'javascript:alert(1)', label: 'Malicious Link' },
+    ];
+
+    render(
+      <ScannerPageLayout
+        toolId="qr-code-scanner"
+        description="Filter test."
+        promises={MOCK_PROMISES}
+        relatedLinks={mixedLinks}
+      >
+        <div>Content</div>
+      </ScannerPageLayout>,
+    );
+
+    expect(screen.getByRole('link', { name: 'Safe Link' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Malicious Link' })).not.toBeInTheDocument();
+  });
 });

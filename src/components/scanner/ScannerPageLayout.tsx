@@ -17,6 +17,7 @@
 */
 
 import type { ReactNode } from 'react';
+import { isDangerousUrl } from '@/packages/core/security';
 import { usePageContent } from '@/data/PageContentContext';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import type { ToolCopy } from '@/data/copy/types';
@@ -91,13 +92,18 @@ export function ScannerPageLayout({
           Related tools
         </h2>
         <ul className="space-y-2">
-          {relatedLinks.map((link) => (
-            <li key={link.href}>
-              <a href={link.href} className={RELATED_LINK_CLASSES}>
-                {link.label}
-              </a>
-            </li>
-          ))}
+          {relatedLinks.map((link) => {
+            if (!isDangerousUrl(link.href)) {
+              return (
+                <li key={link.href}>
+                  <a href={link.href} className={RELATED_LINK_CLASSES}>
+                    {link.label}
+                  </a>
+                </li>
+              );
+            }
+            return null;
+          })}
         </ul>
       </nav>
     </div>

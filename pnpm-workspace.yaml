@@ -54,3 +54,9 @@ overrides:
   # GHSA-g3hv-75wg-m249 (minimatch globparts DoS, < 11.0.1). typescript-estree pins minimatch 10.
   "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
 
+# GHSA-fc5q-39xc-vjpf (picomatch ReDoS through single-branch repeated extglobs, <= 4.0.7):
+# Unpatched upstream (latest release on npm is 4.0.7, patched version >= 4.0.8 not yet published).
+auditConfig:
+  ignoreGhsas:
+    - GHSA-fc5q-39xc-vjpf
+

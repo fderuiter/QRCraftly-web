@@ -29,18 +29,24 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { sidebarControls } from '@/registry';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from './ToolWorkspaceLayout';
 import { usePageContent } from '@/data/PageContentContext';
-import { MiniPreview } from './MiniPreview';
 import type { ScanFix } from '@/packages/scannability';
 import { fixPatch, resetPatch } from './generator/decisions';
 import { SafetyGateModal } from './generator/SafetyGateModal';
 import { PreviewCard } from './generator/PreviewCard';
 import { ExportBar } from './generator/ExportBar';
-import { GeneratorCommands } from './command/GeneratorCommands';
 import { useUndoToast } from '@/hooks/useUndoToast';
 import { useTextEntryFocus } from '@/hooks/useTextEntryFocus';
 
 // The phone wallet dialog (ADR 0048) loads only when it is opened.
 const WalletDialog = React.lazy(() => import('./wallet/WalletDialog'));
+// The mini preview thumbnail for mobile loads asynchronously.
+const MiniPreview = React.lazy(() =>
+  import('./MiniPreview').then((m) => ({ default: m.MiniPreview })),
+);
+// The keyboard shortcuts and command palette load asynchronously.
+const GeneratorCommands = React.lazy(() =>
+  import('./command/GeneratorCommands').then((m) => ({ default: m.GeneratorCommands })),
+);
 
 /** One-line promise under every generator heading. */
 const GENERATOR_SUBTITLE = 'No sign-up, no ads, never expires.';
@@ -150,9 +156,13 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
           <WalletDialog isOpen onClose={flow.wallet.close} config={config} filename={flow.options.filename} />
         </Suspense>
       )}
-      <GeneratorCommands actions={commandActions} onDownload={() => flow.run('download')} />
+      <Suspense fallback={null}>
+        <GeneratorCommands actions={commandActions} onDownload={() => flow.run('download')} />
+      </Suspense>
       {/* No thumbnail while there is no code to mirror: it would be an empty box. */}
-      <MiniPreview sourceRef={canvasRef} targetId={PREVIEW_ID} renderKey={debouncedConfig} suppressed={inputFocused || noVerdict} />
+      <Suspense fallback={null}>
+        <MiniPreview sourceRef={canvasRef} targetId={PREVIEW_ID} renderKey={debouncedConfig} suppressed={inputFocused || noVerdict} />
+      </Suspense>
       {/* Keeps the last content clear of the mobile action bar. */}
       <div aria-hidden="true" className="h-20 md:hidden" />
 
