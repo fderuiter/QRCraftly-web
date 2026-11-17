@@ -16,18 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { navigate } from 'vike/client/router';
 import { CloudUpload, Gamepad2, ShieldCheck } from 'lucide-react';
 import { QRChecker } from '@/components/QRChecker';
-import { PrivacyPromiseGrid } from '@/components/ui/PrivacyPromiseGrid';
-import type { ScanDescription } from '@/components/scanner/describeScan';
-import { SidebarContent } from '@/components/SidebarContent';
-import { PageCopyContext } from '@/data/copy/PageCopyContext';
-import { usePageContent } from '@/data/PageContentContext';
-import type { ToolCopy } from '@/data/copy/types';
-import { QR_TYPE_ROUTES } from '@/data/navigation';
-import { stageGeneratorContent } from '@/context/QRContext';
-import { acceptIncomingContent } from '@/components/inputs/retainedDrafts';
+import { ScannerPageLayout, type ScannerRelatedLink } from '@/components/scanner/ScannerPageLayout';
+import { openInGenerator } from '@/utils/scanHandover';
 
 /** The plain promises under the checker, each backed by how it works. */
 const PROMISES = [
@@ -36,22 +28,11 @@ const PROMISES = [
   { icon: Gamepad2, title: 'Test durability too', text: 'The Arcade knocks holes in a code to show how much damage it survives.' },
 ] as const;
 
-const LINK_CLASSES = 'font-medium text-accent underline-offset-2 hover:underline';
-
-/**
- * Opens a checked code in the generator for its type. The content is handed over in memory for
- * the client-side navigation, never in the URL.
- * @param scan - The checked code.
- */
-function openInGenerator(scan: ScanDescription) {
-  stageGeneratorContent({ type: scan.type, value: scan.text });
-  acceptIncomingContent(scan.type);
-  // nosemgrep: require-isdangerousurl -- an internal route from a fixed table, not scanned text
-  void navigate(QR_TYPE_ROUTES[scan.type]);
-}
-
-/** Copy used before the page's content is available. */
-const NO_COPY: ToolCopy = {};
+const RELATED_LINKS: readonly ScannerRelatedLink[] = [
+  { href: '/arcade', label: 'Stress-test a code in the Arcade' },
+  { href: '/qr-code-scanner', label: 'Scan a code with your camera' },
+  { href: '/', label: 'Make your own QR code' },
+];
 
 /**
  * Standalone QR code checker (/qr-code-checker, #1036): upload, drop or paste a picture of any
@@ -59,48 +40,14 @@ const NO_COPY: ToolCopy = {};
  * @returns The page.
  */
 export default function Page() {
-  const page = usePageContent();
-  const copy = page?.landing ?? NO_COPY;
-
   return (
-    <>
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="mb-2 text-3xl font-bold text-fg sm:text-4xl">{page?.tool?.heading}</h1>
-        <p className="mb-6 text-fg-soft">
-          Find out what a QR code holds and whether it will scan, even after print blur. No sign-up, and nothing leaves your browser.
-        </p>
-
-        <QRChecker onEdit={openInGenerator} />
-
-        <PrivacyPromiseGrid items={PROMISES} ariaLabel="Privacy" className="mt-6" />
-
-        <PageCopyContext.Provider value={copy}>
-          <SidebarContent toolId="qr-code-checker" />
-        </PageCopyContext.Provider>
-
-        <nav aria-labelledby="related-title" className="mt-10">
-          <h2 id="related-title" className="mb-3 text-2xl font-bold text-fg">
-            Related tools
-          </h2>
-          <ul className="space-y-2">
-            <li>
-              <a href="/arcade" className={LINK_CLASSES}>
-                Stress-test a code in the Arcade
-              </a>
-            </li>
-            <li>
-              <a href="/qr-code-scanner" className={LINK_CLASSES}>
-                Scan a code with your camera
-              </a>
-            </li>
-            <li>
-              <a href="/" className={LINK_CLASSES}>
-                Make your own QR code
-              </a>
-            </li>
-          </ul>
-        </nav>
-      </div>
-    </>
+    <ScannerPageLayout
+      toolId="qr-code-checker"
+      description="Find out what a QR code holds and whether it will scan, even after print blur. No sign-up, and nothing leaves your browser."
+      promises={PROMISES}
+      relatedLinks={RELATED_LINKS}
+    >
+      <QRChecker onEdit={openInGenerator} />
+    </ScannerPageLayout>
   );
 }

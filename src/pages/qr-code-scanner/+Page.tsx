@@ -16,18 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { navigate } from 'vike/client/router';
 import { Camera, CloudUpload, ShieldCheck } from 'lucide-react';
 import { QRScanner } from '@/components/QRScanner';
-import { PrivacyPromiseGrid } from '@/components/ui/PrivacyPromiseGrid';
-import type { ScanDescription } from '@/components/scanner/describeScan';
-import { SidebarContent } from '@/components/SidebarContent';
-import { PageCopyContext } from '@/data/copy/PageCopyContext';
-import { usePageContent } from '@/data/PageContentContext';
 import { copy } from '@/data/copy/qr-code-scanner';
-import { QR_TYPE_ROUTES } from '@/data/navigation';
-import { stageGeneratorContent } from '@/context/QRContext';
-import { acceptIncomingContent } from '@/components/inputs/retainedDrafts';
+import { ScannerPageLayout, type ScannerRelatedLink } from '@/components/scanner/ScannerPageLayout';
+import { openInGenerator } from '@/utils/scanHandover';
 
 /** The plain promises under the scanner, each backed by how the scanner works. */
 const PROMISES = [
@@ -36,19 +29,11 @@ const PROMISES = [
   { icon: ShieldCheck, title: 'Links checked first', text: 'See the real address before opening a link. Script links are blocked.' },
 ] as const;
 
-const RELATED_LINK_CLASSES = 'font-medium text-accent underline-offset-2 hover:underline';
-
-/**
- * Opens a scanned code in the generator for its type. The content is handed over in memory
- * for the client-side navigation, never in the URL.
- * @param scan - The scanned code.
- */
-function openInGenerator(scan: ScanDescription) {
-  stageGeneratorContent({ type: scan.type, value: scan.text });
-  acceptIncomingContent(scan.type);
-  // nosemgrep: require-isdangerousurl -- an internal route from a fixed table, not scanned text
-  void navigate(QR_TYPE_ROUTES[scan.type]);
-}
+const RELATED_LINKS: readonly ScannerRelatedLink[] = [
+  { href: '/', label: 'Make your own QR code' },
+  { href: '/file-transfer/receive', label: 'Receive a file over QR codes' },
+  { href: '/security', label: 'How QRCraftly protects your data' },
+];
 
 /**
  * Standalone QR code scanner (/qr-code-scanner, #1034): camera scanning that starts only on
@@ -57,48 +42,15 @@ function openInGenerator(scan: ScanDescription) {
  * @returns The page.
  */
 export default function Page() {
-  const page = usePageContent();
-
   return (
-    <>
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="mb-2 text-3xl font-bold text-fg sm:text-4xl">{page?.tool?.heading}</h1>
-        <p className="mb-6 text-fg-soft">
-          Scan a QR code with your camera, or from a photo or screenshot. No app and no sign-up, and nothing leaves your
-          browser.
-        </p>
-
-        <QRScanner autoStartCamera={false} onEdit={openInGenerator} editLabel="Open in generator" />
-
-        <PrivacyPromiseGrid items={PROMISES} ariaLabel="Privacy" className="mt-6" />
-
-        <PageCopyContext.Provider value={copy}>
-          <SidebarContent toolId="qr-code-scanner" />
-        </PageCopyContext.Provider>
-
-        <nav aria-labelledby="related-title" className="mt-10">
-          <h2 id="related-title" className="mb-3 text-2xl font-bold text-fg">
-            Related tools
-          </h2>
-          <ul className="space-y-2">
-            <li>
-              <a href="/" className={RELATED_LINK_CLASSES}>
-                Make your own QR code
-              </a>
-            </li>
-            <li>
-              <a href="/file-transfer/receive" className={RELATED_LINK_CLASSES}>
-                Receive a file over QR codes
-              </a>
-            </li>
-            <li>
-              <a href="/security" className={RELATED_LINK_CLASSES}>
-                How QRCraftly protects your data
-              </a>
-            </li>
-          </ul>
-        </nav>
-      </div>
-    </>
+    <ScannerPageLayout
+      toolId="qr-code-scanner"
+      description="Scan a QR code with your camera, or from a photo or screenshot. No app and no sign-up, and nothing leaves your browser."
+      promises={PROMISES}
+      copy={copy}
+      relatedLinks={RELATED_LINKS}
+    >
+      <QRScanner autoStartCamera={false} onEdit={openInGenerator} editLabel="Open in generator" />
+    </ScannerPageLayout>
   );
 }
