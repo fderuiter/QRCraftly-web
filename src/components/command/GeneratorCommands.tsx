@@ -5,7 +5,6 @@ import { useUndoToast } from '@/hooks/useUndoToast';
 import { useLatestSelection } from '@/hooks/useLatestSelection';
 import { usesCommandKey, useGeneratorShortcuts } from './useGeneratorShortcuts';
 import type { buildCommands, Command, GeneratorActions } from './commands';
-import type { StyleFileResult } from '@/utils/styleFile';
 
 // The palette, its command list and the style file code load on first use, so they cost
 // nothing on a page that never opens them.
@@ -45,32 +44,15 @@ export function GeneratorCommands({ actions, onDownload }: GeneratorCommandsProp
   const applyStyleFile = useCallback(
     async (file: File) => {
       const isCurrent = styleSelection.begin();
-      const showError = (message: string) => addToast({ type: 'error', message, duration: 6000 });
-      let result: StyleFileResult;
-      try {
-        const { parseStyleFile, MAX_STYLE_FILE_BYTES } = await import('@/utils/styleFile');
-        result = file.size > MAX_STYLE_FILE_BYTES
-          ? ({ ok: false, reason: 'That file is too large to be a QRCraftly style file.' } as const)
-          : parseStyleFile(await file.text());
-      } catch {
-        if (isCurrent()) showError('That style file could not be read. Try again.');
-        return;
-      }
-      if (!isCurrent()) return;
-      if (!result.ok) {
-        showError(result.reason);
-        return;
-      }
-      store.updateConfig(result.style);
-      notifyUndo(result.skipped > 0 ? `Style loaded; ${result.skipped} setting${result.skipped === 1 ? '' : 's'} could not be used.` : 'Style loaded');
+      const { readAndApplyStyleFile } = await import('./styleFileActions');
+      await readAndApplyStyleFile(file, store, addToast, notifyUndo, isCurrent);
     },
     [store, addToast, notifyUndo, styleSelection]
   );
 
   const exportStyleFile = useCallback(async () => {
-    const [{ serializeStyle }, { triggerFileDownload }] = await Promise.all([import('@/utils/styleFile'), import('@/utils/downloadManager')]);
-    triggerFileDownload(new TextEncoder().encode(serializeStyle(store.getState().config)), 'qrcraftly-style.qrcraftly.json', 'application/json');
-    addToast({ type: 'success', message: 'Style saved. It holds colors and layout only, never your content.', duration: 5000 });
+    const { exportStyleFileAction } = await import('./styleFileActions');
+    await exportStyleFileAction(store, addToast);
   }, [store, addToast]);
 
   useGeneratorShortcuts({
