@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { axe } from '../../tests/utils/axe';
 import { auxiliaryRegistry } from '@/data/contentRegistry';
 import { getGuideArticle, guides, readingMinutes } from '@/data/guides';
@@ -83,6 +83,26 @@ describe('GuideArticle', () => {
     expect(screen.getByRole('link', { name: 'home' })).toHaveAttribute('href', '/guides');
     expect(screen.queryByRole('link', { name: 'bad' })).toBeNull();
     expect(screen.getByText(/bad/)).toBeInTheDocument();
+  });
+
+  it('renders code blocks with copy buttons and triggers clipboard write without axe violations', async () => {
+    const article = getGuideArticle('developer-integration-guide')!;
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      writable: true,
+      configurable: true,
+    });
+
+    const { container } = render(<GuideArticle article={article} />);
+    const copyButtons = screen.getAllByRole('button', { name: /Copy code to clipboard/i });
+    expect(copyButtons.length).toBeGreaterThan(0);
+
+    await act(async () => {
+      copyButtons[0].click();
+    });
+    expect(writeText).toHaveBeenCalled();
+    expect(await axe(container)).toHaveNoViolations();
   });
 });
 

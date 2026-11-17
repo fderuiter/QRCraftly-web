@@ -46,6 +46,7 @@ export const ROUTES = [
   '/guides/qr-code-error-correction-explained',
   '/guides/qr-code-scams-quishing',
   '/guides/qr-code-without-subscription',
+  '/guides/developer-integration-guide',
   '/security',
   '/file-transfer',
   '/file-transfer/receive',

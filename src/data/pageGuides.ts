@@ -33,11 +33,11 @@ export const PAGE_GUIDES: Readonly<Record<string, readonly string[]>> = {
   'google-review-qr-code': ['static-vs-dynamic-qr-codes', 'how-to-print-a-qr-code-that-scans'],
   'qr-code-with-logo': ['qr-code-error-correction-explained', 'how-to-print-a-qr-code-that-scans', 'qr-code-customization-parameters'],
   'mosaic-qr-code': ['qr-code-error-correction-explained', 'how-to-print-a-qr-code-that-scans', 'qr-code-customization-parameters'],
-  'bulk-csv-qr-code': ['how-to-print-a-qr-code-that-scans'],
+  'bulk-csv-qr-code': ['how-to-print-a-qr-code-that-scans', 'developer-integration-guide'],
   'payment-qr-code': ['qr-code-scams-quishing'],
   'qr-code-scanner': ['qr-code-scams-quishing', 'why-qr-codes-stop-working'],
   'qr-code-checker': ['qr-code-scams-quishing', 'how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained'],
-  arcade: ['qr-code-error-correction-explained'],
+  arcade: ['qr-code-error-correction-explained', 'developer-integration-guide'],
   'qr-code-size-calculator': ['how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained'],
   'wifi-qr-code': ['how-to-print-a-qr-code-that-scans', 'qr-code-scams-quishing'],
   'vcard-qr-code': ['how-to-print-a-qr-code-that-scans', 'static-vs-dynamic-qr-codes'],
@@ -50,7 +50,7 @@ export const PAGE_GUIDES: Readonly<Record<string, readonly string[]>> = {
   'meeting-qr-code': ['why-qr-codes-stop-working', 'static-vs-dynamic-qr-codes'],
   'social-qr-code': ['static-vs-dynamic-qr-codes', 'how-to-print-a-qr-code-that-scans'],
   'static-qr-code-generator': ['qr-code-without-subscription', 'static-vs-dynamic-qr-codes', 'why-qr-codes-stop-working'],
-  'svg-qr-code': ['how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained', 'qr-code-customization-parameters'],
+  'svg-qr-code': ['how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained', 'developer-integration-guide', 'qr-code-customization-parameters'],
 };
 
 /**

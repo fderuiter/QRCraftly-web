@@ -478,7 +478,8 @@ export function checkCodeSnippets(filesList) {
           }
         };
 
-        const program = ts.createProgram(fileNames, compilerOptions, customHost);
+        const ambientFiles = parsedConfig.fileNames.filter((f) => f.endsWith('.d.ts'));
+        const program = ts.createProgram([...ambientFiles, ...fileNames], compilerOptions, customHost);
         const emitResult = program.emit();
 
         const allDiagnostics = ts

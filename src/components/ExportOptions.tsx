@@ -17,7 +17,7 @@
 */
 
 import { useState } from 'react';
-import { Code, ShieldCheck, Wallet } from 'lucide-react';
+import { Check, Code, Copy, ShieldCheck, Wallet } from 'lucide-react';
 import { Button } from './ui/Button';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { TextField } from './ui/TextField';
@@ -88,6 +88,10 @@ interface ExportOptionsProps {
   /** File name without extension. */
   filename: string;
   onFilenameChange: (filename: string) => void;
+  /** Copies the code as an image (PNG) to clipboard. */
+  onCopyImage?: () => void;
+  copyImageBusy?: boolean;
+  copiedImage?: boolean;
   /** Copies the code as SVG markup. */
   onCopySvg: () => void;
   copySvgBusy: boolean;
@@ -97,7 +101,7 @@ interface ExportOptionsProps {
 
 /**
  * The Download options panel of the generator: format, raster size with a print helper,
- * color space toggle for vector EPS and PDF formats, the file name, Copy as SVG and Add to phone wallet.
+ * color space toggle for vector EPS and PDF formats, the file name, Copy image, Copy as SVG and Add to phone wallet.
  * The Download button exports with these choices.
  * @param props - Current choices and their change handlers.
  * @returns The options panel.
@@ -112,6 +116,9 @@ export function ExportOptions({
   onSizeChange,
   filename,
   onFilenameChange,
+  onCopyImage,
+  copyImageBusy = false,
+  copiedImage = false,
   onCopySvg,
   copySvgBusy,
   onWallet,
@@ -201,6 +208,15 @@ export function ExportOptions({
       )}
 
       <TextField label="File name" value={filename} onChange={(event) => onFilenameChange(event.target.value)} spellCheck={false} />
+
+      <Button variant="outline" size="sm" fullWidth onClick={onCopyImage} loading={copyImageBusy}>
+        {copiedImage ? (
+          <Check className="size-4 text-success motion-safe:animate-pop-in" aria-hidden="true" />
+        ) : (
+          <Copy className="size-4" aria-hidden="true" />
+        )}
+        {copiedImage ? 'Copied' : 'Copy image'}
+      </Button>
 
       <Button variant="outline" size="sm" fullWidth onClick={onCopySvg} loading={copySvgBusy}>
         <Code className="size-4" aria-hidden="true" />

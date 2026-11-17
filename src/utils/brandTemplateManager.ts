@@ -1,6 +1,6 @@
 import type { BrandTemplate, BrandTemplateExportPayload } from '../types';
 import type { QRConfig } from '@/packages/core/types';
-import { isStyleField, pickStyle } from './styleFields';
+import { isStyleField, pickStyle, STYLE_BASELINE } from './styleFields';
 import { handOffBlob } from './blobHandoff';
 
 /** Approved storage key for user-saved brand templates. */
@@ -53,6 +53,7 @@ export function extractStyleConfig(config: QRConfig): Partial<QRConfig> {
 
 /**
  * Merges a template's style config into an existing QRConfig, strictly preserving active content fields.
+ * Resets unconfigured visual style fields to clean defaults so prior canvas styles do not bleed through.
  * @param currentConfig - Active QRConfig containing user content.
  * @param templateConfig - Visual style properties to apply.
  * @returns Partial QRConfig updates to pass to updateConfig.
@@ -61,10 +62,10 @@ export function applyTemplateToConfig(
   currentConfig: QRConfig,
   templateConfig: Partial<QRConfig>
 ): Partial<QRConfig> {
-  const updates: Partial<QRConfig> = {};
+  const updates: Partial<QRConfig> = { ...STYLE_BASELINE };
   const keys = Object.keys(templateConfig) as (keyof QRConfig)[];
   for (const key of keys) {
-    if (isStyleField(key)) {
+    if (isStyleField(key) && templateConfig[key] !== undefined) {
       (updates as Record<string, unknown>)[key] = templateConfig[key];
     }
   }
