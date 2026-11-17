@@ -5,7 +5,7 @@ import ts from 'typescript';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { PREBUILT_TEMPLATES } from '../src/data/brandTemplates';
-import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel } from '@/packages/core/types';
+import { type QRConfig, QRStyle, QRType, QRErrorCorrectionLevel, EyeShape } from '@/packages/core/types';
 import { getContrastRatio } from '@/packages/core/encoding';
 import {
   BRAND_TEMPLATES_STORAGE_KEY,
@@ -22,7 +22,7 @@ import {
   TEMPLATE_STORAGE_ERROR,
   CONTENT_FIELDS,
 } from '../src/utils/brandTemplateManager';
-import { isStyleField } from '../src/utils/styleFields';
+import { isStyleField, STYLE_BASELINE } from '../src/utils/styleFields';
 
 describe('Brand Template Gallery & Persistence System', () => {
   beforeEach(() => {
@@ -226,7 +226,110 @@ describe('Brand Template Gallery & Persistence System', () => {
       }
 
       const updates = applyTemplateToConfig(DEFAULT_CONFIG, images);
-      expect(updates).toEqual({});
+      for (const key of Object.keys(images)) {
+        expect((updates as Record<string, unknown>)[key]).toBeUndefined();
+      }
+      expect(updates).toEqual(STYLE_BASELINE);
+    });
+
+    it('clears active frames, gradients, and eye shapes while preserving payload text and user-uploaded logos', () => {
+      const activeConfig: QRConfig = {
+        ...DEFAULT_CONFIG,
+        value: 'https://example.com/preserve-this-url',
+        type: QRType.URL,
+        logoUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        frameStyle: 'banner',
+        frameText: 'USER FRAME TEXT',
+        frameIcon: 'heart',
+        frameBgColor: '#e11d48',
+        frameTextColor: '#ffffff',
+        framePosition: 'top',
+        gradientType: 'linear',
+        gradientColorStops: [
+          { offset: 0, color: '#ff0000' },
+          { offset: 1, color: '#0000ff' },
+        ],
+        gradientAngle: 45,
+        eyeFrameShape: EyeShape.CIRCLE,
+        eyeBallShape: EyeShape.ROUNDED,
+        eyeFrameColor: '#ff0000',
+        eyeBallColor: '#0000ff',
+      };
+
+      // Classic Slate preset omits frame, gradient, and eye shapes
+      const classicSlate = PREBUILT_TEMPLATES.find((t) => t.name === 'Classic Slate')!;
+      expect(classicSlate).toBeDefined();
+
+      const updates = applyTemplateToConfig(activeConfig, classicSlate.config);
+      const merged: QRConfig = { ...activeConfig, ...updates };
+
+      // Omitted visual fields must be cleanly reset
+      expect(merged.frameStyle).toBe('none');
+      expect(merged.gradientType).toBe('none');
+      expect(merged.eyeFrameShape).toBeUndefined();
+      expect(merged.eyeBallShape).toBeUndefined();
+      expect(merged.eyeFrameColor).toBeUndefined();
+      expect(merged.eyeBallColor).toBeUndefined();
+
+      // Template's explicitly defined styles must be applied
+      expect(merged.fgColor).toBe('#334155');
+      expect(merged.bgColor).toBe('#f8fafc');
+      expect(merged.eyeColor).toBe('#0f172a');
+      expect(merged.style).toBe(QRStyle.STANDARD);
+
+      // User payload content and user-uploaded logo must be strictly preserved
+      expect(merged.value).toBe('https://example.com/preserve-this-url');
+      expect(merged.type).toBe(QRType.URL);
+      expect(merged.logoUrl).toBe('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+      expect(merged.frameText).toBe('USER FRAME TEXT');
+    });
+
+    it('resets omitted border properties to baseline defaults for templates with partial border configurations', () => {
+      const activeConfig: QRConfig = {
+        ...DEFAULT_CONFIG,
+        isBorderEnabled: true,
+        borderSize: 0.12,
+        borderStyle: 'dotted',
+        borderColor: '#aabbcc',
+        borderTextColor: '#112233',
+        borderText: 'PRESERVED BORDER TEXT',
+      };
+
+      const partialBorderTemplate: Partial<QRConfig> = {
+        fgColor: '#10b981',
+        bgColor: '#f0fdf4',
+        isBorderEnabled: true,
+        borderColor: '#059669',
+      };
+
+      const updates = applyTemplateToConfig(activeConfig, partialBorderTemplate);
+      const merged: QRConfig = { ...activeConfig, ...updates };
+
+      // Configured properties from template applied
+      expect(merged.isBorderEnabled).toBe(true);
+      expect(merged.borderColor).toBe('#059669');
+      expect(merged.fgColor).toBe('#10b981');
+
+      // Omitted border visual properties reset to baseline defaults
+      expect(merged.borderSize).toBe(0.05);
+      expect(merged.borderStyle).toBe('solid');
+      expect(merged.borderTextColor).toBe('#ffffff');
+      expect(merged.borderTextPosition).toBe('bottom-center');
+      expect(merged.borderLogoPosition).toBe('bottom-center');
+
+      // User border text preserved
+      expect(merged.borderText).toBe('PRESERVED BORDER TEXT');
+    });
+
+    it('defines clean baseline defaults for all style fields', () => {
+      expect(STYLE_BASELINE.frameStyle).toBe('none');
+      expect(STYLE_BASELINE.gradientType).toBe('none');
+      expect(STYLE_BASELINE.eyeFrameShape).toBeUndefined();
+      expect(STYLE_BASELINE.eyeBallShape).toBeUndefined();
+      expect(STYLE_BASELINE.isBorderEnabled).toBe(false);
+      expect(STYLE_BASELINE.borderSize).toBe(0.05);
+      expect(STYLE_BASELINE.borderStyle).toBe('solid');
+      expect(STYLE_BASELINE.quietZoneModules).toBe(4);
     });
   });
 

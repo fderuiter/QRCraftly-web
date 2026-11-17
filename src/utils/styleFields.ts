@@ -70,6 +70,61 @@ const STYLE_FIELDS: Partial<Record<keyof QRConfig, FieldRule>> = {
 };
 
 /**
+ * Clean baseline defaults for every visual style setting.
+ * When applying a brand template, omitted visual properties fall back to these defaults
+ * so prior canvas styles do not bleed through.
+ */
+export const STYLE_BASELINE: Readonly<Partial<QRConfig>> = {
+  style: QRStyle.STANDARD,
+  fgColor: '#000000',
+  bgColor: '#ffffff',
+  eyeColor: '#000000',
+  gradientType: 'none',
+  gradientColorStops: undefined,
+  gradientAngle: 0,
+  errorCorrectionLevel: QRErrorCorrectionLevel.H,
+  logoSize: 0.2,
+  logoPaddingStyle: 'square',
+  logoPadding: 1,
+  logoBackgroundColor: '#ffffff',
+  isBorderEnabled: false,
+  borderSize: 0.05,
+  borderColor: '#000000',
+  borderStyle: 'solid',
+  borderTextPosition: 'bottom-center',
+  borderTextColor: '#ffffff',
+  borderLogoPosition: 'bottom-center',
+  socialFormat: SocialFormat.SQUARE_1_1,
+  templateStyle: TemplateStyle.NONE,
+  templateBgColor: undefined,
+  templateTextColor: undefined,
+  templateQrScale: 1.0,
+  isMazeEnabled: false,
+  isMazeBridgesEnabled: true,
+  mazeColor: '#3b82f6',
+  showMazeSolution: false,
+  frameStyle: 'none',
+  frameTextColor: '#ffffff',
+  frameBgColor: '#000000',
+  framePosition: 'bottom',
+  frameIcon: 'none',
+  frameFontFamily: 'sans-serif',
+  eyeFrameColor: undefined,
+  eyeBallColor: undefined,
+  eyeFrameShape: undefined,
+  eyeBallShape: undefined,
+  mazePathWidth: undefined,
+  mosaicMode: undefined,
+  mosaicContrast: undefined,
+  quietZoneModules: 4,
+  animationFps: 30,
+  isLuminanceMaskingEnabled: false,
+  fgColorDark: undefined,
+  fgColorLight: undefined,
+  luminanceThreshold: undefined,
+};
+
+/**
  * Reports whether a config key is a style setting that style files and templates may carry.
  * @param key - Config key.
  * @returns True when the key has a rule.
