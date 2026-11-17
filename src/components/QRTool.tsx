@@ -32,7 +32,6 @@ import { usePageContent } from '@/data/PageContentContext';
 import { MiniPreview } from './MiniPreview';
 import type { ScanFix } from '@/packages/scannability';
 import { fixPatch, resetPatch } from './generator/decisions';
-import { SafetyGateModal } from './generator/SafetyGateModal';
 import { PreviewCard } from './generator/PreviewCard';
 import { ExportBar } from './generator/ExportBar';
 import { GeneratorCommands } from './command/GeneratorCommands';
@@ -41,6 +40,10 @@ import { useTextEntryFocus } from '@/hooks/useTextEntryFocus';
 
 // The phone wallet dialog (ADR 0048) loads only when it is opened.
 const WalletDialog = React.lazy(() => import('./wallet/WalletDialog'));
+// The safety gate warning modal loads only when an export is held for scannability advice.
+const SafetyGateModal = React.lazy(() =>
+  import('./generator/SafetyGateModal').then((m) => ({ default: m.SafetyGateModal }))
+);
 
 /** One-line promise under every generator heading. */
 const GENERATOR_SUBTITLE = 'No sign-up, no ads, never expires.';
@@ -98,7 +101,11 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
 
   return (
     <div className="w-full" id="top">
-      <SafetyGateModal open={gate.open} advice={gate.advice} onFix={handleFix} onCancel={gate.cancel} onConfirm={gate.confirm} />
+      {gate.open && (
+        <Suspense fallback={null}>
+          <SafetyGateModal open={gate.open} advice={gate.advice} onFix={handleFix} onCancel={gate.cancel} onConfirm={gate.confirm} />
+        </Suspense>
+      )}
       <ToolWorkspaceLayout
         controlsLabel="QR Code Settings"
         previewLabel="QR Code Preview"

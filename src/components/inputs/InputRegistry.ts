@@ -13,7 +13,7 @@ import { EmailInput } from "./EmailInput";
 import { VCardInput } from "./VCardInput";
 import { PhoneInput } from "./PhoneInput";
 import { SmsInput } from "./SmsInput";
-import { PaymentInput } from "./PaymentInput";
+import { LazyPaymentInput } from "./LazyPaymentInput";
 import { LazyEventInput } from "./LazyEventInput";
 import { LocationInput } from "./LocationInput";
 import { MeetingInput } from "./MeetingInput";
@@ -200,7 +200,7 @@ export const INPUT_REGISTRY: Registry = {
     canHydrate: QR_GENERATORS[QRType.SMS].matches,
   },
   [QRType.PAYMENT]: {
-    Component: PaymentInput,
+    Component: LazyPaymentInput,
     initialState: {
       network: CryptoNetwork.BITCOIN,
       address: "",
