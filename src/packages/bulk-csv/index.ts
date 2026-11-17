@@ -44,6 +44,9 @@ export {
   type BulkCsvPreview,
   encodeBulkCell,
   type BulkContentType,
+  autoDetectContactMapping,
+  isContactContentType,
+  type BulkContactMapping,
 } from '@/packages/qr-payload';
 export { formatErrorLogCsv, type ErrorLogItem } from './lib/errorLog';
 export { createZip, type ZipEntry, type CreateZipOptions } from '@/packages/core/zip';

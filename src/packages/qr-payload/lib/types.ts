@@ -247,6 +247,26 @@ export interface MeetingData {
 }
 
 /**
+ * Column mapping for synthesizing contact cards (vCard) from CSV rows.
+ */
+export interface BulkContactMapping {
+  /** Column holding the contact's first name (or full name). */
+  firstName?: string;
+  /** Column holding the contact's last name. */
+  lastName?: string;
+  /** Column holding the contact's company or organization. */
+  organization?: string;
+  /** Column holding the contact's job title or role. */
+  title?: string;
+  /** Column holding the contact's phone or mobile number. */
+  phone?: string;
+  /** Column holding the contact's email address. */
+  email?: string;
+  /** Column holding the contact's website URL. */
+  website?: string;
+}
+
+/**
  * Data structure for Bulk CSV Batch QR generation.
  */
 export interface BulkCsvData {
@@ -260,11 +280,14 @@ export interface BulkCsvData {
   exportFormat: 'png' | 'svg' | 'eps' | 'pdf';
   /**
    * How payload cells are read: 'link' normalises each cell like the Link generator, 'text'
-   * encodes it as typed. Defaults to 'link'.
+   * encodes it as typed, 'vcard' / 'contact' synthesizes a contact card from mapped columns.
+   * Defaults to 'link'.
    */
-  contentType?: 'link' | 'text';
+  contentType?: 'link' | 'text' | 'vcard' | 'contact';
   /** PNG export resolution in pixels (e.g. 500, 1000, 2000, 3000). Defaults to 1000. */
   exportResolution?: number;
   /** Original file name. */
   fileName?: string;
+  /** Column mapping for contact card (vCard) mode. */
+  contactMapping?: BulkContactMapping;
 }
