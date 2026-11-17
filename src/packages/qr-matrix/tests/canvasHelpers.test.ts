@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { clampCornerRadius, drawRoundRect, drawPoly, drawStar, drawRoughRect, drawScribble, drawCircularModule, drawCircuitModule, drawStandardModule } from '../canvas';
+import { clampCornerRadius, drawRoundRect, drawCornerRect, drawPoly, drawStar, drawRoughRect, drawScribble, drawCircularModule, drawCircuitModule, drawStandardModule } from '../canvas';
 
 describe('canvasHelpers', () => {
   let ctx: any;
@@ -73,6 +73,64 @@ describe('canvasHelpers', () => {
       // Expected safe radius = min(50, 50, 25) = 25
       // Verify the first moveTo command starts at safeR
       expect(ctx.moveTo).toHaveBeenCalledWith(25, 0);
+    });
+  });
+
+  describe('drawCornerRect', () => {
+    it('should emit path commands with individually clamped radii without array allocations', () => {
+      drawCornerRect(ctx, 10, 20, 100, 50, [5, 10, 15, 20]);
+      expect(ctx.moveTo).toHaveBeenCalledWith(10 + 5, 20);
+      expect(ctx.lineTo).toHaveBeenCalledWith(10 + 100 - 10, 20);
+      expect(ctx.quadraticCurveTo).toHaveBeenNthCalledWith(1, 10 + 100, 20, 10 + 100, 20 + 10);
+      expect(ctx.lineTo).toHaveBeenCalledWith(10 + 100, 20 + 50 - 15);
+      expect(ctx.quadraticCurveTo).toHaveBeenNthCalledWith(2, 10 + 100, 20 + 50, 10 + 100 - 15, 20 + 50);
+      expect(ctx.lineTo).toHaveBeenCalledWith(10 + 20, 20 + 50);
+      expect(ctx.quadraticCurveTo).toHaveBeenNthCalledWith(3, 10, 20 + 50, 10, 20 + 50 - 20);
+      expect(ctx.lineTo).toHaveBeenCalledWith(10, 20 + 5);
+      expect(ctx.quadraticCurveTo).toHaveBeenNthCalledWith(4, 10, 20, 10 + 5, 20);
+      expect(ctx.closePath).toHaveBeenCalled();
+    });
+
+    it('should clamp individual corner radii that exceed half width or height or are negative', () => {
+      // w=100, h=50 -> max radius is min(50, 25) = 25
+      drawCornerRect(ctx, 0, 0, 100, 50, [100, -5, 30, 10]);
+      // tl: clamped to 25
+      // tr: clamped to 0
+      // br: clamped to 25
+      // bl: 10
+      expect(ctx.moveTo).toHaveBeenCalledWith(25, 0);
+      expect(ctx.lineTo).toHaveBeenCalledWith(100 - 0, 0);
+      expect(ctx.quadraticCurveTo).toHaveBeenNthCalledWith(1, 100, 0, 100, 0);
+      expect(ctx.lineTo).toHaveBeenCalledWith(100, 50 - 25);
+      expect(ctx.quadraticCurveTo).toHaveBeenNthCalledWith(2, 100, 50, 100 - 25, 50);
+      expect(ctx.lineTo).toHaveBeenCalledWith(10, 50);
+      expect(ctx.quadraticCurveTo).toHaveBeenNthCalledWith(3, 0, 50, 0, 50 - 10);
+      expect(ctx.lineTo).toHaveBeenCalledWith(0, 25);
+      expect(ctx.quadraticCurveTo).toHaveBeenNthCalledWith(4, 0, 0, 25, 0);
+      expect(ctx.closePath).toHaveBeenCalled();
+    });
+
+    it('matches drawRoundRect path commands exactly when all radii are identical', () => {
+      const callsRoundRect: any[] = [];
+      const mockRoundRectCtx: any = {
+        moveTo: (...args: any[]) => callsRoundRect.push(['moveTo', ...args]),
+        lineTo: (...args: any[]) => callsRoundRect.push(['lineTo', ...args]),
+        quadraticCurveTo: (...args: any[]) => callsRoundRect.push(['quadraticCurveTo', ...args]),
+        closePath: () => callsRoundRect.push(['closePath']),
+      };
+
+      const callsCornerRect: any[] = [];
+      const mockCornerRectCtx: any = {
+        moveTo: (...args: any[]) => callsCornerRect.push(['moveTo', ...args]),
+        lineTo: (...args: any[]) => callsCornerRect.push(['lineTo', ...args]),
+        quadraticCurveTo: (...args: any[]) => callsCornerRect.push(['quadraticCurveTo', ...args]),
+        closePath: () => callsCornerRect.push(['closePath']),
+      };
+
+      drawRoundRect(mockRoundRectCtx, 15, 25, 80, 60, 12);
+      drawCornerRect(mockCornerRectCtx, 15, 25, 80, 60, [12, 12, 12, 12]);
+
+      expect(callsRoundRect).toEqual(callsCornerRect);
     });
   });
 
