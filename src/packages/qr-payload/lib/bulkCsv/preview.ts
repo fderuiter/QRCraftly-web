@@ -18,6 +18,12 @@
 
 import { CsvParseError, MAX_BULK_CSV_ROWS, parseCsv, type CsvRow } from './csv';
 import { encodeBulkCell, type BulkContentType } from './cell';
+import {
+  isContactContentType,
+  autoDetectContactMapping,
+  synthesizeVCardPayload,
+} from './contactMapping';
+import type { BulkContactMapping } from '../types';
 
 /** Header words that usually mark the QR content column. */
 export const PAYLOAD_COLUMN_WORDS: readonly string[] = [
@@ -79,7 +85,7 @@ function headerWords(header: string): string[] {
 
 /** Options for column selection heuristics. */
 export interface PickColumnOptions {
-  exclude?: string;
+  exclude?: string | readonly string[];
   rows?: CsvRow[];
   kind?: 'payload' | 'filename';
 }
@@ -99,7 +105,12 @@ export function pickColumn(
   words: readonly string[],
   options: PickColumnOptions = {}
 ): string {
-  const exclude = options.exclude ?? '';
+  const excludeList = Array.isArray(options.exclude)
+    ? options.exclude
+    : options.exclude
+      ? [options.exclude]
+      : [];
+  const excludeSet = new Set(excludeList);
   const rows = options.rows ?? [];
   const kind =
     options.kind ??
@@ -109,7 +120,7 @@ export function pickColumn(
         ? 'filename'
         : undefined);
 
-  const candidates = columns.filter((col) => col !== exclude);
+  const candidates = columns.filter((col) => !excludeSet.has(col));
   if (candidates.length === 0) return columns[0] ?? '';
 
   let bestCandidate: string | null = null;
@@ -197,16 +208,28 @@ export interface BulkCsvPreview {
   rowCount: number;
 }
 
+/** Options for {@link previewRow}. */
+export interface PreviewRowOptions {
+  /** Column mapping for contact card (vCard) mode. */
+  contactMapping?: BulkContactMapping;
+}
+
 /**
  * Finds what the live preview should encode: the first data row that has a payload, encoded
  * exactly as the ZIP encodes it, not the whole CSV. Uses `payloadColumn`, or the column the
- * input would pick.
+ * input would pick, or synthesizes a vCard if contentType is contact/vCard.
  * @param csvContent Raw CSV text.
  * @param payloadColumn Selected payload column, or `''` for the default.
- * @param contentType Whether cells are links or plain text.
+ * @param contentType Whether cells are links, plain text, or contact cards.
+ * @param options Additional options such as contact mapping.
  * @returns The preview row, or null when the CSV is empty, unreadable or has no payloads.
  */
-export function previewRow(csvContent: string, payloadColumn: string, contentType: BulkContentType = 'link'): BulkCsvPreview | null {
+export function previewRow(
+  csvContent: string,
+  payloadColumn: string,
+  contentType: BulkContentType = 'link',
+  options?: PreviewRowOptions
+): BulkCsvPreview | null {
   if (!csvContent) return null;
   let table;
   try {
@@ -215,6 +238,23 @@ export function previewRow(csvContent: string, payloadColumn: string, contentTyp
     if (err instanceof CsvParseError) return null;
     throw err;
   }
+
+  if (isContactContentType(contentType)) {
+    const mapping = options?.contactMapping ?? autoDetectContactMapping(table.headers, table.rows);
+    for (let i = 0; i < table.rows.length; i++) {
+      const row = table.rows[i];
+      const synthesized = synthesizeVCardPayload(row, mapping);
+      if (synthesized.hasAnyData) {
+        return {
+          payload: synthesized.payload,
+          rowNumber: table.rowNumbers[i],
+          rowCount: table.rows.length,
+        };
+      }
+    }
+    return null;
+  }
+
   const column = table.headers.includes(payloadColumn)
     ? payloadColumn
     : pickColumn(table.headers, PAYLOAD_COLUMN_WORDS, { exclude: '', rows: table.rows, kind: 'payload' });

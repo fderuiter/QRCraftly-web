@@ -97,7 +97,13 @@ export {
   FILENAME_COLUMN_WORDS,
   type BulkCsvPreview,
   type PickColumnOptions,
+  type PreviewRowOptions,
 } from './lib/bulkCsv/preview';
+export {
+  autoDetectContactMapping,
+  synthesizeVCardPayload,
+  isContactContentType,
+} from './lib/bulkCsv/contactMapping';
 
 // Wallet address checksums (Base58Check, bech32/bech32m, EIP-55)
 export { checkCryptoAddress, type AddressCheck } from './lib/cryptoAddress';
@@ -116,6 +122,7 @@ export {
   CalendarProvider,
   CryptoNetwork,
   SocialPlatform,
+  type BulkContactMapping,
   type BulkCsvData,
   type EmailData,
   type EventData,
