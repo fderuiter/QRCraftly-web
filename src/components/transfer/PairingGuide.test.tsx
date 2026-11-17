@@ -20,9 +20,17 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from '../../../tests/utils/axe';
 import { PairingGuide, getReceiverUrl } from './PairingGuide';
-import * as qrMatrix from '@/packages/qr-matrix';
+import { buildMatrix } from '@/packages/qr-matrix';
 import { qrEncoder } from '../../../tests/fixtures/qrEncoder';
 import { loadQrReader } from '@/packages/qr-decode';
+
+vi.mock('@/packages/qr-matrix', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/packages/qr-matrix')>();
+  return {
+    ...actual,
+    buildMatrix: vi.fn(actual.buildMatrix),
+  };
+});
 
 describe('PairingGuide', () => {
   it('renders the pairing guide card with fallback textual link', () => {
@@ -52,7 +60,7 @@ describe('PairingGuide', () => {
   });
 
   it('encodes the receiver URL via buildMatrix and draws to the canvas', async () => {
-    const buildMatrixSpy = vi.spyOn(qrMatrix, 'buildMatrix');
+    const buildMatrixSpy = vi.mocked(buildMatrix);
     render(<PairingGuide receiverUrl="https://qrcraftly.com/file-transfer/receive" />);
 
     await waitFor(() => {
@@ -68,12 +76,12 @@ describe('PairingGuide', () => {
 
     const canvas = screen.getByTestId('pairing-qr-canvas') as HTMLCanvasElement;
     expect(canvas.getAttribute('aria-label')).toBe('Pairing QR code to open receiver page at https://qrcraftly.com/file-transfer/receive');
-    buildMatrixSpy.mockRestore();
+    buildMatrixSpy.mockClear();
   });
 
   it('generates a scannable QR code decodable by standard readers', async () => {
     const targetUrl = 'https://qrcraftly.com/file-transfer/receive';
-    const modules = qrMatrix.buildMatrix(
+    const modules = buildMatrix(
       {
         type: 'URL',
         value: targetUrl,
