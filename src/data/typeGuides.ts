@@ -44,6 +44,56 @@ const landingGuides: Record<string, TypeGuide> = Object.fromEntries(
 
 export const typeGuides: Record<string, TypeGuide> = {
   ...landingGuides,
+  index: {
+    intro:
+      'Turn any web link into a QR code. People point their phone camera at it and tap to open your website or page.',
+    scanned: [
+      'The phone camera detects the link and shows the web address. Tapping it opens the page in the browser.',
+      'The code is static: it holds the link itself, so it opens directly without going through any redirect server.',
+    ],
+    useCases: [
+      'Product packaging, instruction manuals and stickers linking to user guides.',
+      'Posters, flyers and business cards sending visitors to a website or portfolio.',
+      'Signs, storefront windows and table tents linking to online menus or services.',
+    ],
+    printing: [
+      'Print it at least 2 cm (0.8 in) wide, larger if scanned from a distance.',
+      'Keep strong contrast between dark modules and a light background so cameras focus quickly.',
+      'Short links keep the pattern simpler and easier to scan at smaller print sizes.',
+    ],
+    checks: [
+      'Include https:// in the address and open the link on a phone before you print.',
+      'Check that the page loads quickly on a mobile connection and is mobile friendly.',
+      'Make sure the destination link is permanent, because a printed static code cannot be changed.',
+    ],
+    privacy:
+      'The web address is encoded directly into the QR code in your browser. QRCraftly never sees, redirects or logs your destination link.',
+  },
+  'bulk-csv-qr-code': {
+    intro:
+      'Turn each row of a spreadsheet into a QR code in one run. Download hundreds of codes in a single ZIP file.',
+    scanned: [
+      'Each code in the batch scans according to its row data: web links open in the browser, and text shows on screen.',
+      'Every code is independent and static, storing its payload directly without tracking or redirect servers.',
+    ],
+    useCases: [
+      'Asset tags, inventory labels and serial numbers from an equipment spreadsheet.',
+      'Event name badges, admission tickets and wristbands from an attendee roster.',
+      'Product packaging batches and shelf tags from a catalogue export.',
+    ],
+    printing: [
+      'Choose SVG for vector printing that scales to any size, or high-resolution PNG for label printers.',
+      'Base your label size on the longest entry in your file, because longer text creates denser codes.',
+      'Print and scan a few sample labels before running a large batch through a label printer.',
+    ],
+    checks: [
+      'Confirm the column headers match your intended content and file naming columns before generating.',
+      'Keep batches to 500 rows or fewer; split larger spreadsheets into separate CSV files.',
+      'Review any flagged empty or invalid rows shown on screen before downloading the archive.',
+    ],
+    privacy:
+      'All CSV parsing, QR code rendering and ZIP packaging happen entirely in your browser. Your spreadsheet data is never uploaded to any server.',
+  },
   'wifi-qr-code': {
     intro:
       'Put your network name and password in a QR code. Guests point their camera at it and join your Wi-Fi without typing anything.',

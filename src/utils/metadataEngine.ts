@@ -202,6 +202,7 @@ export const formatPathName = (segment: string): string => {
     'qr-code-scams-quishing': 'QR Code Scams (Quishing)',
     'qr-code-without-subscription': 'QR Codes Without a Subscription',
     'developer-integration-guide': 'Developer Integration Guide',
+    'qr-code-customization-parameters': 'QR Code Customization Guide',
     'qr-code-scanner': 'QR Code Scanner',
     'qr-code-checker': 'QR Code Checker',
     'qr-code-size-calculator': 'QR Code Size Calculator',

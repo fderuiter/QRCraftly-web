@@ -205,8 +205,8 @@ describe('BulkCsvInput Component', () => {
 
     renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
 
-    expect(screen.getByText(/Main Thread Processing Warning/)).toBeInTheDocument();
-    expect(screen.getByText(/exceeding 100 rows/)).toBeInTheDocument();
+    expect(screen.getByText(/Large batch processing time/)).toBeInTheDocument();
+    expect(screen.getByText(/This CSV file contains 105 rows/)).toBeInTheDocument();
   });
 
   it('renders preflight summary card and updates button label when CSV contains rows with empty payload values', async () => {

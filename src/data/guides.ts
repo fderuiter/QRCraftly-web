@@ -1275,6 +1275,218 @@ console.log(\`Prism session ready, symbol size: \${session.symbolSize} bytes\`);
     ],
     related: ['how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained', 'static-vs-dynamic-qr-codes'],
   },
+  {
+    slug: 'qr-code-customization-parameters',
+    title: 'QR code customization guide: styling, contrast and export parameters',
+    shortTitle: 'QR code customization guide',
+    seoTitle: 'QR Code Customization Guide: Styles, Contrast & Formats | QRCraftly',
+    description:
+      'Complete reference for QR code visual styling: 8 pattern styles, locator eye shapes, 4.5:1 contrast rules, logo sizing caps, and export formats.',
+    lead: 'A customized QR code helps your brand stand out on marketing materials, packaging, and digital signage. However, aggressive styling can make codes difficult or impossible for camera lenses to read. This reference guide outlines the visual parameters, scannability boundaries, contrast thresholds, and export formats you need to produce beautiful, reliable QR codes.',
+    datePublished: '2026-11-16',
+    dateModified: '2026-11-16',
+    sections: [
+      {
+        id: 'overview',
+        heading: 'Visual customization and scannability limits',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Every QR code is built on an underlying grid of square modules and three corner finder patterns. When you customize styling, colors, or embedded artwork, you alter how camera sensors distinguish dark modules from light background spaces.',
+          },
+          {
+            type: 'p',
+            text: 'Customization gives your codes personality, but scanners require clear optical boundaries. To avoid unreadable prints, adhere to four essential rules:',
+          },
+          {
+            type: 'ol',
+            items: [
+              'Maintain at least 4.5:1 contrast between foreground elements and background surfaces across all lighting conditions.',
+              'Keep embedded center logos under 30 percent of the total code area, paired with error correction level H.',
+              'Use robust module patterns for small prints or long-distance scanning, reserving decorative patterns for high-contrast, large formats.',
+              'Export vector formats (SVG, EPS, PDF) for commercial print and crisp raster formats (PNG, WebP) for screens.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'pattern-styles',
+        heading: 'The eight module pattern styles',
+        blocks: [
+          {
+            type: 'p',
+            text: 'QRCraftly provides eight distinct module pattern styles. Each pattern alters the geometry of the interior data modules while preserving the underlying binary matrix:',
+          },
+          {
+            type: 'table',
+            caption: 'QR code pattern styles and characteristics',
+            head: ['Pattern', 'Visual appearance', 'Best suited for'],
+            rows: [
+              ['Standard', 'Traditional solid square modules with sharp corners', 'Maximum scanner compatibility, industrial labels, small prints'],
+              ['Modern', 'Gently rounded squares with smooth corners', 'Corporate branding, business cards, clean interfaces'],
+              ['Swiss', 'Crisp disconnected circular dots with uniform spacing', 'Editorial layouts, high-end packaging, minimalist print'],
+              ['Fluid', 'Continuous organic contours and connected liquid shapes', 'Creative agencies, modern product labels, vibrant marketing'],
+              ['Circuit', 'Angular electronic traces and microchip interconnects', 'Technology companies, software services, hardware gear'],
+              ['Hive', 'Hexagonal honeycomb geometry inspired by nature', 'Craft beverages, eco-conscious goods, geometric packaging'],
+              ['Grunge', 'Rough, distressed textures with organic imperfections', 'Streetwear, concert posters, artistic branding'],
+              ['Starburst', 'Faceted diamond and star-shaped module geometry', 'Promotional event flyers, entertainment, high-impact campaigns'],
+            ],
+          },
+          {
+            type: 'p',
+            text: 'You can test any pattern in real time with our [static QR code generator](/) or inspect scanned codes with the [QR code scanner](/qr-code-scanner).',
+          },
+        ],
+      },
+      {
+        id: 'scanning-reliability',
+        heading: 'Pattern reliability and scanning recommendations',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Standard, Modern, Swiss, Fluid, and Hive patterns deliver strong optical clarity across virtually all phone cameras and handheld barcode scanners. In contrast, three decorative patterns require extra care:',
+          },
+          {
+            type: 'ul',
+            items: [
+              'Grunge: Distressed outer edges introduce fine optical noise that low-resolution lenses or angled cameras can misread as module damage.',
+              'Circuit: Angular traces create visual bridges between neighboring modules, making grid alignment harder in poor lighting.',
+              'Starburst: Tapered star points reduce the effective ink coverage in module centers, demanding sharper lens focus.',
+            ],
+          },
+          {
+            type: 'note',
+            title: 'Recommendations for low-reliability patterns',
+            text: 'When using Grunge, Circuit, or Starburst styles, set error correction to Level Q (25%) or Level H (30%), avoid subtle color gradients, print at least 35 mm (1.4 inches) wide, and verify physical test proofs using the [QR code checker](/qr-code-checker) before full production.',
+          },
+        ],
+      },
+      {
+        id: 'locator-eyes',
+        heading: 'Locator eye frame and ball geometries',
+        blocks: [
+          {
+            type: 'p',
+            text: 'The three large square targets in the corners of every QR code are locator eyes (also called finder patterns). Camera software searches for their concentric 1:1:3:1:1 black-and-white module ratio to determine the code’s position, orientation, and angle.',
+          },
+          {
+            type: 'p',
+            text: 'Each eye consists of an outer 7x7 module frame and an inner 3x3 module ball. QRCraftly lets you configure frame and ball geometries together or independently across four options:',
+          },
+          {
+            type: 'ul',
+            items: [
+              'Square: Traditional sharp-cornered frame and ball matching standard ISO symbology.',
+              'Rounded: Smooth outer corners that soften the silhouette while preserving the inner module ratio.',
+              'Circle: Concentric circular ring and solid circular center for rounded, modern designs.',
+              'Leaf: Organic teardrop styling with two sharp opposing corners and two rounded corners.',
+            ],
+          },
+          {
+            type: 'p',
+            text: 'When no custom eye shape is selected, the eyes automatically adopt the visual character of the chosen pattern style. When you select the Leaf shape, each corner eye dynamically points its sharp diagonal axis toward the center of the code, maintaining natural geometric harmony.',
+          },
+        ],
+      },
+      {
+        id: 'contrast-rules',
+        heading: 'Color contrast and the 4.5:1 rule',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Camera sensors do not perceive color the way human eyes do; they convert incoming light into relative luminance values to separate dark modules from light modules. If the luminance difference is too small, the scanner cannot differentiate binary data.',
+          },
+          {
+            type: 'p',
+            text: 'To guarantee universal scanning, all color combinations must meet a minimum contrast ratio of 4.5:1. This standard aligns with the W3C Web Content Accessibility Guidelines (WCAG) 2.1 Level AA threshold for readable visual presentations.',
+          },
+          {
+            type: 'ul',
+            items: [
+              'Modules and Background: Foreground modules must maintain at least 4.5:1 contrast against the background surface. Never place pale yellow, light grey, or pastel foregrounds on white.',
+              'Locator Eye Contrast: Custom eye frames and balls must each satisfy 4.5:1 contrast against the background. Mismatched eye contrast causes cameras to miss the entire symbol.',
+              'Gradient Color Stops: Linear gradients transition smoothly between start and end color stops. Every stop along the gradient must independently meet the 4.5:1 threshold against the background.',
+              'Quiet Zone: The four-module clear margin surrounding the code must remain unpatterned and match the light background color to prevent neighboring graphic elements from bleeding into the finder rings.',
+            ],
+          },
+          {
+            type: 'note',
+            title: 'Dark backgrounds and inverted codes',
+            text: 'While inverted QR codes (light modules on dark surfaces) are popular in screen designs, many older or budget smartphone cameras fail to recognize inverted finders. For broad public use in print, always use dark modules on a light background.',
+          },
+        ],
+      },
+      {
+        id: 'logo-limits',
+        heading: 'Embedding logos and upload safeguards',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Adding a company logo or emblem reinforces brand recognition and helps people trust where the code leads. You can create a branded code using our [QR code with logo](/qr-code-with-logo) tool. However, placing an image over modules deliberately obscures underlying data.',
+          },
+          {
+            type: 'p',
+            text: 'QRCraftly enforces client-side safeguards to protect performance, privacy, and code readability:',
+          },
+          {
+            type: 'ul',
+            items: [
+              'File Upload Limit: Image uploads are strictly capped at 2 MB. All processing occurs securely within your browser; nothing is uploaded to external servers.',
+              'Allowed File Types: Logos must be in JPEG, PNG, WebP, or SVG format. Vector SVG logos provide the sharpest results across both small and large exports.',
+              '30 Percent Area Cap: Embedded logos cannot cover more than 30 percent of the total code area. Going beyond this limit destroys too many modules for error correction to reconstruct.',
+              'Error Correction Level H: Because an embedded logo consumes error correction budget, always select Level H (recovers up to 30% of missing data) or Level Q (recovers up to 25%). Learn more in our [error correction explained](/guides/qr-code-error-correction-explained) guide.',
+              'Protective Backing Margin: The generator adds a clear padding border around your logo so surrounding data modules do not visually merge with logo edges.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'export-formats',
+        heading: 'Raster versus vector export formats',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Choosing the right download format ensures your QR code looks razor-sharp whether displayed on a mobile screen, printed on a business card, or scaled across a billboard:',
+          },
+          {
+            type: 'table',
+            caption: 'Export formats and recommended applications',
+            head: ['Format', 'Type', 'Best use cases', 'Key characteristics'],
+            rows: [
+              ['PNG', 'Raster', 'Websites, email signatures, presentation decks', 'Lossless compression with full alpha transparency support.'],
+              ['SVG', 'Vector', 'Web development, UI design, print production', 'Infinitely scalable without pixelation; editable in design software.'],
+              ['EPS', 'Vector', 'Commercial print shops, signage, apparel', 'Standard vector exchange format for professional commercial prepress.'],
+              ['PDF', 'Vector', 'Direct printing, documentation, client proofs', 'Self-contained, vector-accurate document for print and distribution.'],
+              ['JPEG', 'Raster', 'Legacy document systems, simple web images', 'Smallest raster file size; solid background with no transparency.'],
+              ['WebP', 'Raster', 'Modern websites, web applications, mobile apps', 'Modern web standard delivering small file sizes and high image clarity.'],
+            ],
+          },
+          {
+            type: 'p',
+            text: 'For raster downloads (PNG, JPEG, WebP), presets are available for Screen (512 px), Print (2048 px), and Poster (4096 px), or you can specify custom widths from 128 px to 8192 px. For professional print, always favor vector formats (SVG, EPS, PDF) to eliminate raster scaling artifacts, as detailed in our guide on [how to print a QR code that scans](/guides/how-to-print-a-qr-code-that-scans).',
+          },
+        ],
+      },
+    ],
+    sources: [
+      {
+        label: 'ISO/IEC 18004:2015, “Information technology — Automatic identification and data capture techniques — QR Code bar code symbology specification”',
+        url: 'https://www.iso.org/standard/62021.html',
+        supports: 'Symbology structure, locator finder patterns, module grid definitions, and Reed-Solomon error correction capacities.',
+      },
+      {
+        label: 'W3C, “Web Content Accessibility Guidelines (WCAG) 2.1 — Guideline 1.4.3 Contrast (Minimum)”',
+        url: 'https://www.w3.org/TR/WCAG21/#contrast-minimum',
+        supports: 'The 4.5:1 relative luminance contrast ratio requirement for visual readability.',
+      },
+      {
+        label: 'Denso Wave, “QR Code Technology and Finder Pattern Structure”, qrcode.com',
+        url: 'https://www.qrcode.com/en/about/standards.html',
+        supports: 'Finder pattern 1:1:3:1:1 module geometry and scanning synchronization standards.',
+      },
+    ],
+    related: ['how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained', 'static-vs-dynamic-qr-codes'],
+  },
 ];
 
 /**

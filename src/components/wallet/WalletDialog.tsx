@@ -17,7 +17,7 @@
 */
 
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { Download, Share2 } from 'lucide-react';
+import { Download, Loader2, Share2, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { type QRConfig, QRType } from '@/packages/core/types';
 import { renderWalletCard, walletRefusalReason, WALLET_CARD_TEXT_LIMITS, WALLET_CARD_SIZE } from '@/packages/qr-export';
 import { hydrateWifiData } from '@/packages/qr-payload';
@@ -62,6 +62,9 @@ const GooglePassPanel = lazy(() => import('./GooglePassPanel'));
 /** The signed passes in the developer section, made with the person's own keys. */
 type PassMode = 'apple' | 'google';
 
+/** Scannability status of the generated wallet card preview. */
+type ScannabilityCheckStatus = 'checking' | 'passed' | 'failed';
+
 const PASS_MODES: readonly { value: PassMode; label: string }[] = [
   { value: 'apple', label: 'Apple Wallet pass' },
   { value: 'google', label: 'Google Wallet pass' },
@@ -98,6 +101,7 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
   const [title, setTitle] = useState(() => suggestWalletTitle(config));
   const [subtitle, setSubtitle] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
+  const [scannabilityStatus, setScannabilityStatus] = useState<ScannabilityCheckStatus>('checking');
   const [busy, setBusy] = useState<'download' | 'share' | null>(null);
   // Set on first open and kept, so loaded keys survive collapsing the section; they go when the dialog closes.
   const [developerOpened, setDeveloperOpened] = useState(false);
@@ -110,17 +114,34 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
   useEffect(() => {
     if (!isOpen || refusal) return;
     let cancelled = false;
+    setScannabilityStatus('checking');
     renderWalletCard(config, text)
-      .then((canvas) => {
-        if (!cancelled) setPreview(canvas.toDataURL('image/png'));
+      .then(async (canvas) => {
+        if (cancelled) return;
+        setPreview(canvas.toDataURL('image/png'));
+        const scannable = await isCanvasScannable(canvas);
+        if (!cancelled) {
+          setScannabilityStatus(scannable ? 'passed' : 'failed');
+        }
       })
       .catch(() => {
-        if (!cancelled) setPreview(null);
+        if (!cancelled) {
+          setPreview(null);
+          setScannabilityStatus('failed');
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [isOpen, refusal, config, text]);
+
+  const announcement = useMemo(() => {
+    if (scannabilityStatus === 'checking') return 'Checking card scannability…';
+    if (scannabilityStatus === 'passed') return 'Card scannability: Scans reliably.';
+    return 'Card scannability: Optical verification failed. Try shorter content to enable downloading.';
+  }, [scannabilityStatus]);
+
+  const isExportDisabled = scannabilityStatus !== 'passed' || busy !== null;
 
   const makeCard = async (): Promise<Blob | null> => {
     try {
@@ -180,27 +201,65 @@ export default function WalletDialog({ isOpen, onClose, config, filename }: Wall
             <p className="text-sm text-fg-muted">
               This makes a card image with a plain black-and-white code that a wallet app can read. It is made on your device and is not sent anywhere.
             </p>
-            <div className="flex justify-center rounded-lg border border-line bg-surface-sunken p-3">
-              {preview ? (
-                <img
-                  src={preview}
-                  width={WALLET_CARD_SIZE.width}
-                  height={WALLET_CARD_SIZE.height}
-                  alt="Preview of the wallet card"
-                  className="h-64 w-auto rounded-md shadow-raised"
-                  data-testid="wallet-card-preview"
-                />
-              ) : (
-                <Skeleton className="h-64 w-36 rounded-md" />
-              )}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold tracking-wider text-fg-muted uppercase">Card Preview</span>
+                <Badge
+                  tone={scannabilityStatus === 'passed' ? 'success' : scannabilityStatus === 'failed' ? 'danger' : 'neutral'}
+                  data-testid="wallet-scannability-badge"
+                >
+                  {scannabilityStatus === 'checking' && (
+                    <>
+                      <Loader2 className="size-3.5 shrink-0 motion-safe:animate-spin" aria-hidden="true" />
+                      Checking…
+                    </>
+                  )}
+                  {scannabilityStatus === 'passed' && (
+                    <>
+                      <ShieldCheck className="size-3.5 shrink-0" aria-hidden="true" />
+                      Scans reliably
+                    </>
+                  )}
+                  {scannabilityStatus === 'failed' && (
+                    <>
+                      <ShieldAlert className="size-3.5 shrink-0" aria-hidden="true" />
+                      Won&apos;t scan reliably
+                    </>
+                  )}
+                </Badge>
+              </div>
+              <div className="flex justify-center rounded-lg border border-line bg-surface-sunken p-3">
+                {preview ? (
+                  <img
+                    src={preview}
+                    width={WALLET_CARD_SIZE.width}
+                    height={WALLET_CARD_SIZE.height}
+                    alt="Preview of the wallet card"
+                    className="h-64 w-auto rounded-md shadow-raised"
+                    data-testid="wallet-card-preview"
+                  />
+                ) : (
+                  <Skeleton className="h-64 w-36 rounded-md" />
+                )}
+              </div>
+            </div>
+            {scannabilityStatus === 'failed' && (
+              <div data-testid="wallet-scannability-warning">
+                <Alert variant="warning" title="Optical verification failed">
+                  The wallet card does not pass the scan check. Try shorter content to enable downloading.
+                </Alert>
+              </div>
+            )}
+            <div className="sr-only" role="status" aria-live="polite" data-testid="wallet-scannability-live-region">
+              {announcement}
             </div>
             <div className="flex gap-2">
-              <Button variant="primary" fullWidth onClick={onDownload} loading={busy === 'download'}>
+              <Button variant="primary" fullWidth onClick={onDownload} loading={busy === 'download'} disabled={isExportDisabled}>
                 <Download className="size-4" aria-hidden="true" />
                 Download card
               </Button>
               {canShare && (
-                <Button variant="secondary" fullWidth onClick={onShare} loading={busy === 'share'}>
+                <Button variant="secondary" fullWidth onClick={onShare} loading={busy === 'share'} disabled={isExportDisabled}>
                   <Share2 className="size-4" aria-hidden="true" />
                   Share card
                 </Button>

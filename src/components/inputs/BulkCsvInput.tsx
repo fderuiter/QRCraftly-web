@@ -573,9 +573,9 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
           )}
 
           {rowCount > LARGE_BATCH_WARNING_ROWS && (
-            <Alert variant="warning" title="Main Thread Processing Warning">
-              This CSV file contains {rowCount} rows (exceeding {LARGE_BATCH_WARNING_ROWS} rows).
-              Processing large batches directly in the browser may cause brief UI unresponsiveness.
+            <Alert variant="warning" title="Large batch processing time">
+              This CSV file contains {rowCount} rows. Generating large batches in the browser may
+              take a few moments.
             </Alert>
           )}
 
