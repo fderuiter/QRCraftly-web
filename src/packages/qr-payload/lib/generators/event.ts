@@ -60,6 +60,31 @@ const hydrateOutlookDates = (params: Map<string, string>): Pick<EventData, 'star
 };
 
 /**
+ * Extracts recurrence frequency and count from an RFC 5545 RRULE string or parameter.
+ */
+export const parseRecurrenceRule = (
+  recur?: string
+): Pick<EventData, 'recurrenceFreq' | 'recurrenceCount'> => {
+  const result: Pick<EventData, 'recurrenceFreq' | 'recurrenceCount'> = {};
+  if (!recur) return result;
+  const freqMatch = recur.match(/FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)/i);
+  if (freqMatch) {
+    const freq = freqMatch[1].toUpperCase();
+    if (freq === 'DAILY' || freq === 'WEEKLY' || freq === 'MONTHLY' || freq === 'YEARLY') {
+      result.recurrenceFreq = freq;
+    }
+  }
+  const countMatch = recur.match(/COUNT=(\d+)/i);
+  if (countMatch) {
+    const count = parseInt(countMatch[1], 10);
+    if (count > 0) {
+      result.recurrenceCount = Math.min(999, count);
+    }
+  }
+  return result;
+};
+
+/**
  * Hydrates EventData from a raw string.
  */
 export const hydrateEventData = (raw: string): EventData => {
@@ -100,20 +125,7 @@ export const hydrateEventData = (raw: string): EventData => {
       }
       const recur = parsed.params.get('recur');
       if (recur) {
-        const freqMatch = recur.match(/FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)/i);
-        if (freqMatch) {
-          const freq = freqMatch[1].toUpperCase();
-          if (freq === 'DAILY' || freq === 'WEEKLY' || freq === 'MONTHLY' || freq === 'YEARLY') {
-            result.recurrenceFreq = freq;
-          }
-        }
-        const countMatch = recur.match(/COUNT=(\d+)/i);
-        if (countMatch) {
-          const count = parseInt(countMatch[1], 10);
-          if (count > 0) {
-            result.recurrenceCount = Math.min(999, count);
-          }
-        }
+        Object.assign(result, parseRecurrenceRule(recur));
       }
       result.location = parsed.params.get('location') || '';
       result.description = parsed.params.get('details') || '';
@@ -179,20 +191,7 @@ export const hydrateEventData = (raw: string): EventData => {
         result.description = unescapeVCardEvent(value);
         break;
       case 'RRULE': {
-        const freqMatch = value.match(/FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)/i);
-        if (freqMatch) {
-          const freq = freqMatch[1].toUpperCase();
-          if (freq === 'DAILY' || freq === 'WEEKLY' || freq === 'MONTHLY' || freq === 'YEARLY') {
-            result.recurrenceFreq = freq;
-          }
-        }
-        const countMatch = value.match(/COUNT=(\d+)/i);
-        if (countMatch) {
-          const count = parseInt(countMatch[1], 10);
-          if (count > 0) {
-            result.recurrenceCount = Math.min(999, count);
-          }
-        }
+        Object.assign(result, parseRecurrenceRule(value));
         break;
       }
     }
@@ -308,6 +307,88 @@ const resolveStamp = (now: Date | undefined): string => {
   return sessionStamp;
 };
 
+/** A zoned wall-clock time as UTC (`…Z`); floating and UTC times are returned as they are. */
+const toUtcValue = (formatted: FormattedDateTime): string =>
+  formatted.tzid ? (wallClockToUtc(formatted.value, formatted.tzid) ?? formatted.value) : formatted.value;
+
+/** `20261015T100000Z` as `2026-10-15T10:00:00Z`. */
+const toExtendedIso = (value: string): string =>
+  value.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/, '$1-$2-$3T$4:$5:$6');
+
+/** Date configuration for Google Calendar URLs. */
+export interface GoogleDateConfig {
+  dates?: string;
+  ctz?: string;
+}
+
+/** Date configuration for Outlook and Office 365 Calendar URLs. */
+export interface OutlookDateConfig {
+  startdt?: string;
+  enddt?: string;
+  allDay?: boolean;
+  ctz?: string;
+}
+
+/** Date configuration for Yahoo Calendar URLs. */
+export interface YahooDateConfig {
+  st?: string;
+  et?: string;
+  allDay?: boolean;
+}
+
+/**
+ * Builds a Google Calendar web event URL.
+ */
+export const buildGoogleCalendarUrl = (data: EventData, dates?: GoogleDateConfig): string => {
+  const params = new URLSearchParams();
+  params.set('action', 'TEMPLATE');
+  if (data.title) params.set('text', data.title);
+  if (dates?.dates) params.set('dates', dates.dates);
+  const rrule = buildRRule(data.recurrenceFreq, data.recurrenceCount);
+  if (rrule.length > 0) params.set('recur', rrule[0]);
+  if (dates?.ctz) params.set('ctz', dates.ctz);
+  if (data.location) params.set('location', data.location);
+  if (data.description) params.set('details', data.description);
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+};
+
+/**
+ * Builds an Outlook or Office 365 web event compose URL.
+ */
+export const buildOutlookCalendarUrl = (
+  data: EventData,
+  provider: string,
+  dates?: OutlookDateConfig
+): string => {
+  const host = provider === CalendarProvider.OUTLOOK ? 'outlook.live.com' : 'outlook.office.com';
+  const params = new URLSearchParams();
+  params.set('path', '/calendar/action/compose');
+  params.set('rru', 'addevent');
+  if (data.title) params.set('subject', data.title);
+  if (dates?.startdt) params.set('startdt', dates.startdt);
+  if (dates?.enddt) params.set('enddt', dates.enddt);
+  if (dates?.allDay) params.set('allday', 'true');
+  if (dates?.ctz) params.set('ctz', dates.ctz);
+  if (data.location) params.set('location', data.location);
+  if (data.description) params.set('body', data.description);
+  return `https://${host}/calendar/0/deeplink/compose?${params.toString()}`;
+};
+
+/**
+ * Builds a Yahoo Calendar web event URL.
+ */
+export const buildYahooCalendarUrl = (data: EventData, dates?: YahooDateConfig): string => {
+  const params = new URLSearchParams();
+  params.set('v', '60');
+  if (data.title) params.set('TITLE', data.title);
+  if (dates?.st) params.set('ST', dates.st);
+  if (dates?.et) params.set('ET', dates.et);
+  if (dates?.allDay) params.set('DUR', 'allday');
+  if (data.description) params.set('DESC', data.description);
+  if (data.location) params.set('in_loc', data.location);
+  return `https://calendar.yahoo.com/?${params.toString()}`;
+};
+
 /**
  * Constructs an iCalendar VEVENT payload.
  * Includes the RFC 5545 required UID and DTSTAMP properties, and leaves out
@@ -328,50 +409,32 @@ export const constructEventString = (
   const effectiveEnd = endFormatted.value || startFormatted.value;
 
   if (provider === CalendarProvider.GOOGLE) {
-    const params = new URLSearchParams();
-    params.set('action', 'TEMPLATE');
-    if (data.title) params.set('text', data.title);
-    if (startFormatted.value) {
-      params.set('dates', `${startFormatted.value}/${effectiveEnd}`);
-    }
-    const rrule = buildRRule(data.recurrenceFreq, data.recurrenceCount);
-    if (rrule.length > 0) params.set('recur', rrule[0]);
-    if (data.timezone) params.set('ctz', data.timezone);
-    if (data.location) params.set('location', data.location);
-    if (data.description) params.set('details', data.description);
-    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+    return buildGoogleCalendarUrl(data, {
+      dates: startFormatted.value ? `${startFormatted.value}/${effectiveEnd}` : undefined,
+      ctz: data.timezone,
+    });
   }
 
   // Outlook documents extended ISO times; a zoned time is sent as UTC because Outlook has no
   // zone parameter (`ctz` is kept only so editing the scanned code restores the zone).
   if (provider === CalendarProvider.OUTLOOK || provider === CalendarProvider.OFFICE365) {
-    const host = provider === CalendarProvider.OUTLOOK ? 'outlook.live.com' : 'outlook.office.com';
-    const params = new URLSearchParams();
-    params.set('path', '/calendar/action/compose');
-    params.set('rru', 'addevent');
-    if (data.title) params.set('subject', data.title);
     const startIso = toExtendedIso(toUtcValue(startFormatted));
     const endIso = toExtendedIso(toUtcValue(endFormatted)) || startIso;
-    if (startIso) params.set('startdt', startIso);
-    if (endIso) params.set('enddt', endIso);
-    if (data.timezone) params.set('ctz', data.timezone);
-    if (data.location) params.set('location', data.location);
-    if (data.description) params.set('body', data.description);
-    return `https://${host}/calendar/0/deeplink/compose?${params.toString()}`;
+    return buildOutlookCalendarUrl(data, provider, {
+      startdt: startIso || undefined,
+      enddt: endIso || undefined,
+      ctz: data.timezone,
+    });
   }
 
   if (provider === CalendarProvider.YAHOO) {
-    const params = new URLSearchParams();
-    params.set('v', '60');
-    if (data.title) params.set('TITLE', data.title);
     // Yahoo has no zone parameter, so a zoned time is sent as UTC.
     const yahooStart = toUtcValue(startFormatted);
     const yahooEnd = toUtcValue(endFormatted) || yahooStart;
-    if (yahooStart) params.set('ST', yahooStart);
-    if (yahooEnd) params.set('ET', yahooEnd);
-    if (data.description) params.set('DESC', data.description);
-    if (data.location) params.set('in_loc', data.location);
-    return `https://calendar.yahoo.com/?${params.toString()}`;
+    return buildYahooCalendarUrl(data, {
+      st: yahooStart || undefined,
+      et: yahooEnd || undefined,
+    });
   }
 
   // Standard iCalendar VEVENT block for 'ical' or fallback for unrecognized provider. A TZID
@@ -387,14 +450,6 @@ export const constructEventString = (
     ...optional('DTEND', endValue),
   ]);
 };
-
-/** A zoned wall-clock time as UTC (`…Z`); floating and UTC times are returned as they are. */
-const toUtcValue = (formatted: FormattedDateTime): string =>
-  formatted.tzid ? (wallClockToUtc(formatted.value, formatted.tzid) ?? formatted.value) : formatted.value;
-
-/** `20261015T100000Z` as `2026-10-15T10:00:00Z`. */
-const toExtendedIso = (value: string): string =>
-  value.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/, '$1-$2-$3T$4:$5:$6');
 
 const optional = (key: string, value: string): string[] => (value ? [`${key}:${value}`] : []);
 
@@ -437,41 +492,25 @@ const constructAllDayEvent = (data: EventData, provider: string, options: EventC
   const compact = (iso: string): string => iso.replace(/-/g, '');
 
   if (provider === CalendarProvider.GOOGLE) {
-    const params = new URLSearchParams();
-    params.set('action', 'TEMPLATE');
-    if (data.title) params.set('text', data.title);
-    if (startDate) params.set('dates', `${compact(startDate)}/${compact(endDate || shiftDate(startDate, 1))}`);
-    const rrule = buildRRule(data.recurrenceFreq, data.recurrenceCount);
-    if (rrule.length > 0) params.set('recur', rrule[0]);
-    if (data.location) params.set('location', data.location);
-    if (data.description) params.set('details', data.description);
-    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+    return buildGoogleCalendarUrl(data, {
+      dates: startDate ? `${compact(startDate)}/${compact(endDate || shiftDate(startDate, 1))}` : undefined,
+    });
   }
 
   if (provider === CalendarProvider.OUTLOOK || provider === CalendarProvider.OFFICE365) {
-    const host = provider === CalendarProvider.OUTLOOK ? 'outlook.live.com' : 'outlook.office.com';
-    const params = new URLSearchParams();
-    params.set('path', '/calendar/action/compose');
-    params.set('rru', 'addevent');
-    if (data.title) params.set('subject', data.title);
-    if (startDate) params.set('startdt', startDate);
-    if (startDate) params.set('enddt', endDate || shiftDate(startDate, 1));
-    params.set('allday', 'true');
-    if (data.location) params.set('location', data.location);
-    if (data.description) params.set('body', data.description);
-    return `https://${host}/calendar/0/deeplink/compose?${params.toString()}`;
+    return buildOutlookCalendarUrl(data, provider, {
+      startdt: startDate || undefined,
+      enddt: startDate ? endDate || shiftDate(startDate, 1) : undefined,
+      allDay: true,
+    });
   }
 
   if (provider === CalendarProvider.YAHOO) {
-    const params = new URLSearchParams();
-    params.set('v', '60');
-    if (data.title) params.set('TITLE', data.title);
-    if (startDate) params.set('ST', compact(startDate));
-    if (endDate) params.set('ET', compact(endDate));
-    params.set('DUR', 'allday');
-    if (data.description) params.set('DESC', data.description);
-    if (data.location) params.set('in_loc', data.location);
-    return `https://calendar.yahoo.com/?${params.toString()}`;
+    return buildYahooCalendarUrl(data, {
+      st: startDate ? compact(startDate) : undefined,
+      et: endDate ? compact(endDate) : undefined,
+      allDay: true,
+    });
   }
 
   return buildCalendar(data, options, [], [

@@ -17,7 +17,7 @@
 */
 
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from '../../../../tests/utils/axe';
 import { SenderKeyPanel } from './SenderKeyPanel';
@@ -54,29 +54,30 @@ describe('TransferStats', () => {
 });
 
 describe('SenderKeyPanel', () => {
-  it('shows the words only while their button is held', async () => {
+  it('toggles the words on click and hides on blur', async () => {
     const { container } = render(<SenderKeyPanel keyCode="one two three" showingKeyQr={false} keyCanvasRef={{ current: null }} onShowKeyQr={vi.fn()} onHideKeyQr={vi.fn()} />);
-    const hold = screen.getByRole('button', { name: 'Hold to show key code' });
+    const toggle = screen.getByRole('button', { name: 'Show key code' });
     expect(screen.getByTestId('sender-key-code-hidden')).toBeInTheDocument();
-    fireEvent.pointerDown(hold);
+    fireEvent.click(toggle);
     expect(screen.getByTestId('sender-key-code')).toHaveTextContent('one two three');
-    fireEvent.pointerUp(hold);
+    const hide = screen.getByRole('button', { name: 'Hide key code' });
+    fireEvent.click(hide);
     expect(screen.queryByTestId('sender-key-code')).toBeNull();
-    fireEvent.keyDown(hold, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Show key code' }));
     expect(screen.getByTestId('sender-key-code')).toBeInTheDocument();
-    fireEvent.blur(hold);
+    act(() => {
+      window.dispatchEvent(new Event('blur'));
+    });
     expect(screen.queryByTestId('sender-key-code')).toBeNull();
     expect(await axe(container)).toHaveNoViolations();
   });
 
-  it('asks for the key QR while its button is held', () => {
+  it('asks for the key QR when toggled', () => {
     const onShowKeyQr = vi.fn();
     const onHideKeyQr = vi.fn();
     render(<SenderKeyPanel keyCode="w" showingKeyQr keyCanvasRef={{ current: null }} onShowKeyQr={onShowKeyQr} onHideKeyQr={onHideKeyQr} />);
-    const hold = screen.getByRole('button', { name: 'Hold to show key QR' });
-    fireEvent.pointerDown(hold);
-    fireEvent.pointerLeave(hold);
-    expect(onShowKeyQr).toHaveBeenCalledTimes(1);
+    const hideToggle = screen.getByRole('button', { name: 'Hide key QR' });
+    fireEvent.click(hideToggle);
     expect(onHideKeyQr).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('img', { name: 'Key code QR' })).not.toHaveClass('hidden');
   });

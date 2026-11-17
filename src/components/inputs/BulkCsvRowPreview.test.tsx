@@ -106,6 +106,41 @@ describe('BulkCsvRowPreview', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('shows mapped contact columns and file name in contact mode', () => {
+    const contactRows: CsvRow[] = [
+      { FName: 'Alice', LName: 'Smith', Phone: '555-1234', Email: 'alice@example.com', Org: 'Acme', FileId: 'badge-1' },
+    ];
+    const contactMapping = {
+      firstName: 'FName',
+      lastName: 'LName',
+      phone: 'Phone',
+      email: 'Email',
+      organization: 'Org',
+    };
+
+    render(
+      <BulkCsvRowPreview
+        rows={contactRows}
+        rowNumbers={[1]}
+        contentType="vcard"
+        contactMapping={contactMapping}
+        filenameColumn="FileId"
+      />
+    );
+
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers[1]).toHaveTextContent('FNameFirst Name');
+    expect(headers[2]).toHaveTextContent('LNameLast Name');
+    expect(headers[3]).toHaveTextContent('OrgOrganization');
+    expect(headers[4]).toHaveTextContent('PhonePhone');
+    expect(headers[5]).toHaveTextContent('EmailEmail');
+    expect(headers[6]).toHaveTextContent('FileIdFile name');
+
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+    expect(screen.getByText('Smith')).toBeInTheDocument();
+    expect(screen.getByText('badge-1')).toBeInTheDocument();
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(<BulkCsvRowPreview rows={rows} rowNumbers={rowNumbers} payloadColumn="URL" filenameColumn="Name" />);
     expect(await axe(container)).toHaveNoViolations();

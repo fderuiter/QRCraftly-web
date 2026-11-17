@@ -75,7 +75,7 @@ if (typeof globalThis.DOMParser === 'undefined') {
 const { isCanvasScannable } = vi.hoisted(() => ({ isCanvasScannable: vi.fn<(canvas: HTMLCanvasElement) => Promise<boolean>>() }));
 vi.mock('@/packages/scannability/scan', () => ({ isCanvasScannable }));
 
-import { generateQRSvg, PayloadRejectedError, rasterizeSvgToCanvas, validateSvgScannability, preflightLogoCheck } from '../index';
+import { generateQRSvg, PayloadRejectedError, rasterizeSvgToCanvas, validateSvgScannability, preflightLogoCheck, clearAssetCache } from '../index';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { EyeShape, QRStyle, type QRConfig, SocialFormat, TemplateStyle, QRType } from '@/packages/core/types';
 
@@ -472,6 +472,146 @@ describe('generateQRSvg', () => {
       expect(onLogoOmitted).not.toHaveBeenCalled();
     });
 
+    it('downloads multiple remote assets concurrently', async () => {
+      clearAssetCache();
+      const originalFetch = global.fetch;
+      const originalFileReader = global.FileReader;
+
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const requestedUrls: string[] = [];
+
+      global.fetch = vi.fn().mockImplementation(async (url: string) => {
+        requestedUrls.push(url);
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        inFlight--;
+        return {
+          ok: true,
+          blob: () => Promise.resolve(new Blob(['fake image data'], { type: 'image/png' })),
+        } as any;
+      });
+
+      class MockFileReader {
+        onload: () => void = () => {};
+        result = 'data:image/png;base64,ZmFrZSBpbWFnZSBkYXRh';
+        readAsDataURL() {
+          this.onload();
+        }
+      }
+      global.FileReader = MockFileReader as any;
+
+      try {
+        const config: QRConfig = {
+          ...(DEFAULT_CONFIG as QRConfig),
+          logoUrl: 'https://example.com/concurrent-logo.png',
+          isBorderEnabled: true,
+          borderLogoUrl: 'https://example.com/concurrent-border.png',
+        };
+
+        const svg = await generateQRSvg(config);
+        expect(svg).toContain('<svg');
+        expect(requestedUrls).toEqual([
+          'https://example.com/concurrent-logo.png',
+          'https://example.com/concurrent-border.png',
+        ]);
+        expect(maxInFlight).toBe(2);
+      } finally {
+        global.FileReader = originalFileReader;
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('asserts that failed fetches trigger onLogoOmitted without unhandled promise rejections', async () => {
+      clearAssetCache();
+      const originalFetch = global.fetch;
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network offline'));
+
+      try {
+        const config: QRConfig = {
+          ...(DEFAULT_CONFIG as QRConfig),
+          logoUrl: 'https://example.com/failed-logo.png',
+          isBorderEnabled: true,
+          borderLogoUrl: 'https://example.com/failed-border.png',
+        };
+
+        const onLogoOmitted = vi.fn();
+        const svg = await generateQRSvg(config, { onLogoOmitted });
+        expect(svg).toContain('<svg');
+        expect(onLogoOmitted).toHaveBeenCalledTimes(1);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('resolves unconfigured or falsy asset URLs immediately to null without network requests', async () => {
+      clearAssetCache();
+      const originalFetch = global.fetch;
+      const fetchMock = vi.fn();
+      global.fetch = fetchMock;
+
+      try {
+        const config: QRConfig = {
+          ...(DEFAULT_CONFIG as QRConfig),
+          logoUrl: '',
+          isBorderEnabled: false,
+          borderLogoUrl: '',
+          mosaicImageUrl: '',
+        };
+
+        const onLogoOmitted = vi.fn();
+        const svg = await generateQRSvg(config, { onLogoOmitted });
+        expect(svg).toContain('<svg');
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(onLogoOmitted).not.toHaveBeenCalled();
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('triggers onLogoOmitted when one asset fails and another succeeds without rejecting batch', async () => {
+      clearAssetCache();
+      const originalFetch = global.fetch;
+      const originalFileReader = global.FileReader;
+
+      global.fetch = vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('failing')) {
+          throw new Error('Connection reset by peer');
+        }
+        return {
+          ok: true,
+          blob: () => Promise.resolve(new Blob(['fake image data'], { type: 'image/png' })),
+        } as any;
+      });
+
+      class MockFileReader {
+        onload: () => void = () => {};
+        result = 'data:image/png;base64,ZmFrZSBpbWFnZSBkYXRh';
+        readAsDataURL() {
+          this.onload();
+        }
+      }
+      global.FileReader = MockFileReader as any;
+
+      try {
+        const config: QRConfig = {
+          ...(DEFAULT_CONFIG as QRConfig),
+          logoUrl: 'https://example.com/failing-logo.png',
+          isBorderEnabled: true,
+          borderLogoUrl: 'https://example.com/succeeding-border.png',
+        };
+
+        const onLogoOmitted = vi.fn();
+        const svg = await generateQRSvg(config, { onLogoOmitted });
+        expect(svg).toContain('<svg');
+        expect(onLogoOmitted).toHaveBeenCalledTimes(1);
+      } finally {
+        global.FileReader = originalFileReader;
+        global.fetch = originalFetch;
+      }
+    });
+
     it('sanitizes the final generated SVG output of all malicious scripts and external resources', async () => {
       const config: QRConfig = {
         ...(DEFAULT_CONFIG as QRConfig),
@@ -793,5 +933,47 @@ describe('generateQRSvg eye shapes', () => {
     const unset = await generateQRSvg(base);
     const explicit = await generateQRSvg({ ...base, eyeFrameShape: undefined, eyeBallShape: undefined });
     expect(explicit).toBe(unset);
+  });
+});
+
+describe('generateQRSvg precomputed matrix injection', () => {
+  it('uses the provided matrix instead of calling buildMatrix when options supply modules', async () => {
+    const { buildMatrix, loadQrEncoder } = await import('@/packages/qr-matrix');
+    const encoder = await loadQrEncoder();
+    const modules = buildMatrix(DEFAULT_CONFIG as QRConfig, encoder);
+
+    const recordedCalls: [number, number][] = [];
+    const customModules = {
+      size: modules.size,
+      get: (row: number, col: number) => {
+        recordedCalls.push([row, col]);
+        return modules.get(row, col);
+      },
+    };
+
+    const svg = await generateQRSvg(DEFAULT_CONFIG as QRConfig, { modules: customModules });
+    parseAndAssertValidSvg(svg);
+    expect(recordedCalls.length).toBeGreaterThan(0);
+  });
+
+  it('produces identical SVG output whether using precomputed modules or dynamic matrix generation', async () => {
+    const { buildMatrix, loadQrEncoder } = await import('@/packages/qr-matrix');
+    const config = DEFAULT_CONFIG as QRConfig;
+    const encoder = await loadQrEncoder();
+    const modules = buildMatrix(config, encoder);
+
+    const dynamicSvg = await generateQRSvg(config);
+    const precomputedSvg = await generateQRSvg(config, { modules });
+
+    expect(precomputedSvg).toBe(dynamicSvg);
+  });
+
+  it('preserves backward compatibility when callers omit precomputed modules', async () => {
+    const config = DEFAULT_CONFIG as QRConfig;
+    const svgWithoutOptions = await generateQRSvg(config);
+    const svgWithEmptyOptions = await generateQRSvg(config, {});
+
+    expect(svgWithoutOptions).toBe(svgWithEmptyOptions);
+    expect(svgWithoutOptions).toContain('<svg');
   });
 });

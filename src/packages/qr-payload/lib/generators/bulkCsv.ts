@@ -27,7 +27,11 @@ import { QRType } from '@/packages/core/types';
  */
 export const constructBulkCsvString = (data: BulkCsvData): string => {
   if (!data) return '';
-  return previewRow(data.csvContent || '', data.payloadColumn || '', data.contentType ?? 'link')?.payload ?? '';
+  return (
+    previewRow(data.csvContent || '', data.payloadColumn || '', data.contentType ?? 'link', {
+      contactMapping: data.contactMapping,
+    })?.payload ?? ''
+  );
 };
 
 /**
