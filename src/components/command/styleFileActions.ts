@@ -32,6 +32,24 @@ export async function readAndApplyStyleFile(
 }
 
 /**
+ * Handles style file drop events from the window.
+ */
+export async function handleStyleDrop(
+  event: DragEvent,
+  store: QRStore,
+  addToast: (toast: { type: 'error' | 'success' | 'info'; message: string; duration?: number }) => void,
+  notifyUndo: (message: string) => void,
+  isCurrent: () => boolean
+): Promise<void> {
+  const file = Array.from(event.dataTransfer?.files ?? []).find((f) => /\.json$/i.test(f.name));
+  if (file) {
+    await readAndApplyStyleFile(file, store, addToast, notifyUndo, isCurrent);
+  } else {
+    addToast({ type: 'info', message: 'Drop a .qrcraftly.json style file to load a style.', duration: 5000 });
+  }
+}
+
+/**
  * Serializes and triggers the download of the current QR style configuration.
  */
 export async function exportStyleFileAction(

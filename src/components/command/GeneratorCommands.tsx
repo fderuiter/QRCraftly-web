@@ -42,17 +42,19 @@ export function GeneratorCommands({ actions, onDownload }: GeneratorCommandsProp
   // reading when the generator unmounts, changes nothing and shows no toast (#1705).
   const styleSelection = useLatestSelection();
   const applyStyleFile = useCallback(
-    async (file: File) => {
+    (file: File) => {
       const isCurrent = styleSelection.begin();
-      const { readAndApplyStyleFile } = await import('./styleFileActions');
-      await readAndApplyStyleFile(file, store, addToast, notifyUndo, isCurrent);
+      void import('./styleFileActions').then(({ readAndApplyStyleFile }) => {
+        void readAndApplyStyleFile(file, store, addToast, notifyUndo, isCurrent);
+      });
     },
     [store, addToast, notifyUndo, styleSelection]
   );
 
-  const exportStyleFile = useCallback(async () => {
-    const { exportStyleFileAction } = await import('./styleFileActions');
-    await exportStyleFileAction(store, addToast);
+  const exportStyleFile = useCallback(() => {
+    void import('./styleFileActions').then(({ exportStyleFileAction }) => {
+      void exportStyleFileAction(store, addToast);
+    });
   }, [store, addToast]);
 
   useGeneratorShortcuts({
@@ -68,18 +70,19 @@ export function GeneratorCommands({ actions, onDownload }: GeneratorCommandsProp
   // A style file dropped anywhere on the page. Zones that handle their own drops (the logo
   // upload) mark the event as handled first and are left alone.
   useEffect(() => {
-    const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files');
     const onDragOver = (event: DragEvent) => {
-      if (event.defaultPrevented || !hasFiles(event)) return;
-      event.preventDefault();
-      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+      if (!event.defaultPrevented && event.dataTransfer?.types?.includes('Files')) {
+        event.preventDefault();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+      }
     };
     const onDrop = (event: DragEvent) => {
-      if (event.defaultPrevented || !hasFiles(event)) return;
+      if (event.defaultPrevented) return;
       event.preventDefault();
-      const file = Array.from(event.dataTransfer?.files ?? []).find((f) => /\.json$/i.test(f.name));
-      if (file) void applyStyleFile(file);
-      else addToast({ type: 'info', message: 'Drop a .qrcraftly.json style file to load a style.', duration: 5000 });
+      const isCurrent = styleSelection.begin();
+      void import('./styleFileActions').then(({ handleStyleDrop }) => {
+        void handleStyleDrop(event, store, addToast, notifyUndo, isCurrent);
+      });
     };
     window.addEventListener('dragover', onDragOver);
     window.addEventListener('drop', onDrop);
@@ -87,7 +90,7 @@ export function GeneratorCommands({ actions, onDownload }: GeneratorCommandsProp
       window.removeEventListener('dragover', onDragOver);
       window.removeEventListener('drop', onDrop);
     };
-  }, [applyStyleFile, addToast]);
+  }, [store, addToast, notifyUndo, styleSelection]);
 
   const close = useCallback(() => setPanel('closed'), []);
   const [commands, setCommands] = useState<Command[]>([]);
