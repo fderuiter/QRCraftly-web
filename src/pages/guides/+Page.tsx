@@ -34,7 +34,7 @@ export default function Page() {
         <h1 className="mb-3 text-3xl font-bold text-fg sm:text-4xl">QR code guides</h1>
         <p className="mb-8 text-lg text-fg-muted">
           Plain answers to the questions people ask when a QR code lets them down, with sources. No sign-up, no ads, and nothing tracked. Programmatic embedding and Web Worker recipes are documented in the{' '}
-          <a href="/guides/developer-integration-guide" className="text-accent underline-offset-2 hover:underline">
+          <a href="/guides/developer-integration-guide" className="text-accent underline underline-offset-2 hover:underline">
             Developer Integration Guide
           </a>
           .
