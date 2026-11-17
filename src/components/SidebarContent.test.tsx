@@ -47,6 +47,7 @@ describe('SidebarContent FAQs and intro', () => {
   const generatorIds = [
     'index', 'wifi-qr-code', 'vcard-qr-code', 'email-qr-code', 'sms-qr-code', 'phone-qr-code',
     'event-qr-code', 'location-qr-code', 'meeting-qr-code', 'payment-qr-code', 'social-qr-code', 'text-qr-code',
+    'bulk-csv-qr-code',
   ];
 
   it.each(generatorIds)('renders its own FAQ answers as text for %s, even while collapsed', (toolId) => {
@@ -95,13 +96,18 @@ describe('SidebarContent internal linking (#1031)', () => {
 });
 
 describe('Generator page template (#1029)', () => {
+  const allGeneratorTypes = [
+    'index', 'bulk-csv-qr-code', 'wifi-qr-code', 'vcard-qr-code', 'email-qr-code', 'sms-qr-code',
+    'phone-qr-code', 'event-qr-code', 'location-qr-code', 'meeting-qr-code', 'payment-qr-code',
+    'social-qr-code', 'text-qr-code',
+  ];
   const typePages = [
     'wifi-qr-code', 'vcard-qr-code', 'email-qr-code', 'sms-qr-code', 'phone-qr-code', 'event-qr-code',
     'location-qr-code', 'meeting-qr-code', 'payment-qr-code', 'social-qr-code', 'text-qr-code',
   ];
   const words = (text: string) => text.trim().split(/\s+/).length;
 
-  it.each(typePages)('%s keeps its background reading short and inside the FAQ (#1354)', (toolId) => {
+  it.each(allGeneratorTypes)('%s keeps its background reading short and inside the FAQ (#1354)', (toolId) => {
     const { container } = renderSidebar(toolId);
     const total = words(container.textContent ?? '');
     expect(total).toBeGreaterThanOrEqual(250);
@@ -115,6 +121,17 @@ describe('Generator page template (#1029)', () => {
       expect(screen.getByRole('heading', { level: 3, name: faq.question })).toBeInTheDocument();
       for (const text of [...faq.paragraphs, ...(faq.items ?? [])]) expect(container.textContent).toContain(text);
     }
+  });
+
+  it.each(allGeneratorTypes)('%s has an intro between 10 and 40 words and non-empty guide sections', (toolId) => {
+    const guide = typeGuides[toolId];
+    expect(words(guide.intro)).toBeGreaterThanOrEqual(10);
+    expect(words(guide.intro)).toBeLessThanOrEqual(40);
+    expect(guide.scanned.length).toBeGreaterThan(0);
+    expect(guide.useCases.length).toBeGreaterThan(0);
+    expect(guide.printing.length).toBeGreaterThan(0);
+    expect(guide.checks.length).toBeGreaterThan(0);
+    expect(guide.privacy.trim().length).toBeGreaterThan(0);
   });
 
   it.each(typePages)('%s has a short intro, a template title and a description of at most 155 characters', (toolId) => {
