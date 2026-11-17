@@ -124,12 +124,15 @@ export const STYLE_BASELINE: Readonly<Partial<QRConfig>> = {
   luminanceThreshold: undefined,
 };
 
+/** Valid property keys for QR visual style configuration. */
+export type StyleField = Extract<keyof QRConfig, string>;
+
 /**
  * Reports whether a config key is a style setting that style files and templates may carry.
  * @param key - Config key.
  * @returns True when the key has a rule.
  */
-export function isStyleField(key: string): boolean {
+export function isStyleField(key: string): key is StyleField {
   return Object.prototype.hasOwnProperty.call(STYLE_FIELDS, key);
 }
 
