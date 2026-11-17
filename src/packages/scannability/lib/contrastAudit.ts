@@ -109,8 +109,6 @@ export function auditModuleContrast(
               SRGB_TO_LINEAR_LUT[data[idx + 1]],
               SRGB_TO_LINEAR_LUT[data[idx + 2]]
             );
-          } else if (a === 0) {
-            lum = 1.0;
           } else {
             const alpha = a / 255;
             const invAlpha = 1 - alpha;
