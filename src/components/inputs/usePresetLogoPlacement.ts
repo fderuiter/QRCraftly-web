@@ -31,7 +31,11 @@ let lastType: QRType | null = null;
 /** The logo this hook last placed (a preset's data URL), or null when it has placed none. */
 let placedLogo: string | null = null;
 
-/** Forgets the type and logo seen so far. Tests only. */
+/**
+ * Forgets the type and logo seen so far. Tests only.
+ *
+ * @internal
+ */
 export function resetPresetLogoPlacement(): void {
   lastType = null;
   placedLogo = null;

@@ -38,7 +38,9 @@ export const setCachedAsset = (url: string, base64: string): void => {
 };
 
 /**
- * Clears the in-memory asset cache.
+ * Clears the in-memory asset cache. Tests only.
+ *
+ * @internal
  */
 export const clearAssetCache = (): void => {
   cache.clear();
