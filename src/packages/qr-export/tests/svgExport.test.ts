@@ -795,3 +795,45 @@ describe('generateQRSvg eye shapes', () => {
     expect(explicit).toBe(unset);
   });
 });
+
+describe('generateQRSvg precomputed matrix injection', () => {
+  it('uses the provided matrix instead of calling buildMatrix when options supply modules', async () => {
+    const { buildMatrix, loadQrEncoder } = await import('@/packages/qr-matrix');
+    const encoder = await loadQrEncoder();
+    const modules = buildMatrix(DEFAULT_CONFIG as QRConfig, encoder);
+
+    const recordedCalls: [number, number][] = [];
+    const customModules = {
+      size: modules.size,
+      get: (row: number, col: number) => {
+        recordedCalls.push([row, col]);
+        return modules.get(row, col);
+      },
+    };
+
+    const svg = await generateQRSvg(DEFAULT_CONFIG as QRConfig, { modules: customModules });
+    parseAndAssertValidSvg(svg);
+    expect(recordedCalls.length).toBeGreaterThan(0);
+  });
+
+  it('produces identical SVG output whether using precomputed modules or dynamic matrix generation', async () => {
+    const { buildMatrix, loadQrEncoder } = await import('@/packages/qr-matrix');
+    const config = DEFAULT_CONFIG as QRConfig;
+    const encoder = await loadQrEncoder();
+    const modules = buildMatrix(config, encoder);
+
+    const dynamicSvg = await generateQRSvg(config);
+    const precomputedSvg = await generateQRSvg(config, { modules });
+
+    expect(precomputedSvg).toBe(dynamicSvg);
+  });
+
+  it('preserves backward compatibility when callers omit precomputed modules', async () => {
+    const config = DEFAULT_CONFIG as QRConfig;
+    const svgWithoutOptions = await generateQRSvg(config);
+    const svgWithEmptyOptions = await generateQRSvg(config, {});
+
+    expect(svgWithoutOptions).toBe(svgWithEmptyOptions);
+    expect(svgWithoutOptions).toContain('<svg');
+  });
+});

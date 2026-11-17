@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { type QRConfig, TemplateStyle, SocialFormat } from '@/packages/core/types';
+import { type QRConfig, type QRModules, TemplateStyle, SocialFormat } from '@/packages/core/types';
 import { SvgContext } from './svgContext';
 import { drawWithTemplate, SOCIAL_DIMENSIONS } from './templateRenderer';
 import { getQrTypeLabel, getQrTypeDescription } from '@/packages/qr-payload';
@@ -273,7 +273,12 @@ export class PayloadRejectedError extends Error {
  */
 export async function generateQRSvg(
   config: QRConfig,
-  options?: { onLogoOmitted?: () => void; renderOptions?: ModuleRenderOptions; skipPayloadValidation?: boolean }
+  options?: {
+    onLogoOmitted?: () => void;
+    renderOptions?: ModuleRenderOptions;
+    skipPayloadValidation?: boolean;
+    modules?: QRModules;
+  }
 ): Promise<string> {
   // Defence in depth: no caller can render an unvalidated payload unless it opts out explicitly.
   if (!options?.skipPayloadValidation) {
@@ -283,8 +288,8 @@ export async function generateQRSvg(
     }
   }
 
-  // The encoder is loaded lazily so `qrcode` stays out of the main bundle.
-  const modules = buildMatrix(config, await loadQrEncoder());
+  // The encoder is loaded lazily so `qrcode` stays out of the main bundle unless modules are precomputed.
+  const modules = options?.modules ?? buildMatrix(config, await loadQrEncoder());
   const moduleCount = modules.size;
 
   // Pre-resolve logo images to inline data-URLs
