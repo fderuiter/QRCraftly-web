@@ -104,6 +104,21 @@ describe('ToggleSwitch Component', () => {
 
     const toggle = screen.getByRole('switch', { name: /Enable Screen Reader Only Feature/i });
     const label = toggle.closest('label');
-    expect(label).toHaveClass('min-h-6', 'min-w-6');
+    expect(label).toHaveClass('min-h-6', 'min-w-6', 'items-center', 'justify-center');
+  });
+
+  it('anchors the thumb relative to the track element for vertical centering', () => {
+    const { container } = render(
+      <ToggleSwitch
+        id="test-toggle-relative"
+        label="Anchor Feature"
+        checked={false}
+        onChange={() => {}}
+      />
+    );
+
+    // The track div sibling of the input must have 'relative' so after:absolute positions relative to it
+    const track = container.querySelector('.rounded-full');
+    expect(track).toHaveClass('relative');
   });
 });

@@ -23,7 +23,7 @@ export const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
 }) => {
   return (
     <div className="flex items-center">
-      <label htmlFor={id} className="relative inline-flex min-h-6 min-w-6 cursor-pointer items-center">
+      <label htmlFor={id} className="inline-flex min-h-6 min-w-6 cursor-pointer items-center justify-center">
         {srLabel && <span className="sr-only">{label}</span>}
         <input
           id={id}
@@ -34,7 +34,7 @@ export const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
           onChange={(e) => onChange(e.target.checked)}
           {...rest}
         />
-        <div className="peer h-5 w-9 rounded-full bg-line-strong peer-checked:bg-accent after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:border after:border-line after:bg-surface after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-on-action"></div>
+        <div className="peer relative h-5 w-9 rounded-full bg-line-strong peer-checked:bg-accent after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:border after:border-line after:bg-surface after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-on-action"></div>
         {!srLabel && (
           <span className={labelClassName ? `ml-3 ${labelClassName}` : "ml-3 text-sm font-medium text-fg-soft"}>
             {label}
