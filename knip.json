@@ -11,6 +11,8 @@
     "src/**/*.{ts,tsx}!",
     "!src/packages/*/tests/**!",
     "scripts/**/*.{js,cjs,ts}!",
+    "eslint/**/*.{js,cjs}!",
+    "!eslint/*.js!",
     "tests/**/*.{ts,tsx}",
     "e2e/**/*.ts"
   ],
@@ -27,7 +29,7 @@
     "src/packages/*/*.ts": ["types"]
   },
   "ignoreBinaries": ["shellcheck", "semgrep"],
-  "ignoreDependencies": ["wrangler", "@ngraveio/bc-ur", "marked"],
+  "ignoreDependencies": ["wrangler", "@ngraveio/bc-ur", "marked", "estree"],
   "rules": {
     "files": "error",
     "dependencies": "error",

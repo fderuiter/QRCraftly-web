@@ -147,7 +147,7 @@ const execThroughHelper = {
     schema: [],
     messages: {
       direct:
-        'Import child_process only in {{helpers}}. Use execBinary, execShell or spawnBinary from the helper, so commands resolve the same way on Windows, macOS and Linux.',
+        'Import child_process only in {{helpers}}. Use execBinary or spawnBinary from the helper, so commands resolve the same way on Windows, macOS and Linux.',
     },
   },
   create(context) {

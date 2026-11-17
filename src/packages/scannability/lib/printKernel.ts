@@ -48,7 +48,11 @@ export function installPrintKernel(load: () => Promise<PrintKernel>): Promise<bo
   return kernelLoading;
 }
 
-/** Goes back to the TypeScript simulation. Tests only. */
+/**
+ * Goes back to the TypeScript simulation. Tests only.
+ *
+ * @internal
+ */
 export function resetPrintKernelForTests(): void {
   kernel = null;
   kernelLoading = null;

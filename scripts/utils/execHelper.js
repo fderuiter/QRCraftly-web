@@ -79,23 +79,6 @@ export function runBinary(file, args = [], options = {}) {
 }
 
 /**
- * Executes a shell command synchronously with UTF-8 decoding and LF output normalization.
- *
- * @param {string} command - Command string to execute
- * @param {import('child_process').ExecSyncOptions} [options={}] - Node child_process options
- * @returns {string} Normalized standard output with LF line endings
- */
-export function execShell(command, options = {}) {
-  const opts = {
-    encoding: 'utf8',
-    ...options,
-  };
-
-  const output = execSync(command, opts);
-  return typeof output === 'string' ? output.replace(/\r\n/g, '\n') : output;
-}
-
-/**
  * Resolves the bash executable for the current platform with caching.
  *
  * @returns {string} Bash executable command or path
