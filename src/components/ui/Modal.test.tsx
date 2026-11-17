@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { axe } from '../../../tests/utils/axe';
 import { describe, it, expect, vi } from 'vitest';
 import { Modal } from './Modal';
+import { Accordion, AccordionItem } from './Accordion';
 
 describe('Modal Component Accessibility and Behavior', () => {
   it('should have zero accessibility violations when open', async () => {
@@ -102,6 +103,57 @@ describe('Modal Component Accessibility and Behavior', () => {
     expect(document.activeElement).toBe(trigger);
 
     document.body.removeChild(trigger);
+  });
+
+  it('should bypass hidden controls in collapsed accordion sections and include them when expanded', async () => {
+    render(
+      <Modal isOpen={true} onClose={() => {}} title="Disclosure Modal">
+        <Accordion>
+          <AccordionItem title="Advanced Settings">
+            <button data-testid="hidden-opt1">Option 1</button>
+            <button data-testid="hidden-opt2">Option 2</button>
+          </AccordionItem>
+        </Accordion>
+        <button data-testid="submit-action">Submit</button>
+      </Modal>
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    const closeBtn = document.querySelector('[aria-label="Close modal"]') as HTMLElement;
+    const accordionTrigger = document.querySelector('[aria-controls][aria-expanded]') as HTMLElement;
+    const submitBtn = document.querySelector('[data-testid="submit-action"]') as HTMLElement;
+    const opt1 = document.querySelector('[data-testid="hidden-opt1"]') as HTMLElement;
+    const opt2 = document.querySelector('[data-testid="hidden-opt2"]') as HTMLElement;
+
+    expect(document.activeElement).toBe(closeBtn);
+
+    // Tab -> Accordion Trigger
+    await userEvent.tab();
+    expect(document.activeElement).toBe(accordionTrigger);
+
+    // Tab -> skips collapsed Option 1 and Option 2, lands directly on Submit button
+    await userEvent.tab();
+    expect(document.activeElement).toBe(submitBtn);
+
+    // Tab -> wraps back to Close button
+    await userEvent.tab();
+    expect(document.activeElement).toBe(closeBtn);
+
+    // Now click accordion trigger to expand it
+    await userEvent.click(accordionTrigger);
+    expect(accordionTrigger).toHaveAttribute('aria-expanded', 'true');
+
+    // Tab from accordionTrigger enters the newly revealed controls
+    accordionTrigger.focus();
+    await userEvent.tab();
+    expect(document.activeElement).toBe(opt1);
+
+    await userEvent.tab();
+    expect(document.activeElement).toBe(opt2);
+
+    await userEvent.tab();
+    expect(document.activeElement).toBe(submitBtn);
   });
 
   it('should dynamically set aria-hidden="true" on sibling elements when open and restore them on close', () => {

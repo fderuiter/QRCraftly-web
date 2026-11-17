@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CircleCheck, Dices, Redo2, TriangleAlert, Undo2 } from 'lucide-react';
-import { type QRConfig, SocialFormat, TemplateStyle } from '@/packages/core/types';
+import { type QRConfig, type QRModules, SocialFormat, TemplateStyle } from '@/packages/core/types';
 import { PATTERNS, PRESET_COLORS, buildPresetColorPatch } from '../../constants';
 import { getSamplePayload } from '@/packages/qr-payload';
+import { buildMatrix, loadQrEncoder, type MatrixSource } from '@/packages/qr-matrix';
 import { useOptionalQRStore, useOptionalQRStoreSelector } from '../../context/QRContext';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useUndoToast } from '../../hooks/useUndoToast';
@@ -83,14 +84,15 @@ const yieldToMain = (): Promise<void> => {
  * maze are left out so every tile compares just the pattern and colours.
  * @param config - Current configuration.
  * @param choice - Pattern and colours to draw.
+ * @param modules - Optional precomputed QR matrix to bypass re-encoding.
  * @returns A data URL for an `<img>`.
  */
-async function renderThumbnail(config: QRConfig, choice: StyleChoice): Promise<string> {
+async function renderThumbnail(config: QRConfig, choice: StyleChoice, modules?: QRModules): Promise<string> {
   const { thumbConfig, cacheId } = thumbnailFor(config, choice);
   const cached = thumbnailCache.get(cacheId);
   if (cached) return cached;
   const { generateQRSvg } = await import('@/packages/qr-export');
-  const svg = await generateQRSvg(thumbConfig);
+  const svg = await generateQRSvg(thumbConfig, modules ? { modules } : undefined);
   const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   thumbnailCache.set(cacheId, url);
   if (thumbnailCache.size > THUMBNAIL_CACHE_LIMIT) thumbnailCache.delete(thumbnailCache.keys().next().value as string);
@@ -186,7 +188,22 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
 
       if (uncachedTiles.length === 0 || cancelled) return;
 
-      // 2. Process uncached tiles with cooperative frame scheduling (8ms max main-thread slice)
+      // 2. Precompute the QR matrix once per settled batch for all uncached preset tiles
+      let modules: QRModules | undefined;
+      try {
+        const encoder = await loadQrEncoder();
+        if (cancelled) return;
+        const baseSource: MatrixSource = {
+          type: settled.type,
+          value: settled.value.trim() ? settled.value : getSamplePayload(settled.type),
+          errorCorrectionLevel: settled.errorCorrectionLevel,
+        };
+        modules = buildMatrix(baseSource, encoder);
+      } catch {
+        return;
+      }
+
+      // 3. Process uncached tiles with cooperative frame scheduling (8ms max main-thread slice)
       let frameStart = performance.now();
       const MAX_FRAME_SLICE_MS = 8;
 
@@ -202,7 +219,7 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
 
         const tile = uncachedTiles[i];
         try {
-          const url = await renderThumbnail(settled, tile.choice);
+          const url = await renderThumbnail(settled, tile.choice, modules);
           if (cancelled) return;
           batchBuffer[tile.id] = url;
         } catch {
@@ -210,7 +227,7 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
         }
       }
 
-      // 3. Flush accumulated thumbnail updates in a single final dispatch
+      // 4. Flush accumulated thumbnail updates in a single final dispatch
       if (!cancelled) {
         setThumbnails((prev) => ({ ...prev, ...batchBuffer }));
       }

@@ -115,11 +115,33 @@ A release names what is already running in production: it bumps the version, wri
    - verifies whether a GitHub Release already exists for the `package.json` version using `gh release view`
    - extracts release notes from `CHANGELOG.md` before creating or pushing tags, preventing orphaned tags if note extraction fails
    - creates the annotated tag `vX.Y.Z` idempotently and pushes it to origin
-   - creates the GitHub Release as a **draft** with the extracted release notes
+   - compiles the production client (`pnpm run build`), compresses `dist/client/` into `qrcraftly-vX.Y.Z.tar.gz` (excluding source maps and temporary build caches), and calculates `SHA256SUMS`
+   - generates a cryptographic build provenance attestation signed by the GitHub Actions OIDC issuer using `actions/attest-build-provenance`
+   - creates the GitHub Release as a **draft** with the extracted release notes, uploading the archive and `SHA256SUMS`
    - waits until both production URLs serve the new `/version.json` (15 minutes for workers.dev, 30 for `qrcraftly.com`). Neither wait is retried automatically, so a stale production fails the release.
    - runs the smoke tests against workers.dev. They must pass.
    - publishes the draft and marks it **Latest** (only when it is the newest version) once both URLs serve it and workers.dev passes.
    - runs the same smoke tests against `qrcraftly.com` as an advisory job. A failure there adds a warning to the run but does not hold the release back (see below).
+
+### Verifying release archives and build provenance
+
+Every published GitHub Release includes a compressed client archive (`qrcraftly-vX.Y.Z.tar.gz`), a `SHA256SUMS` manifest, and a cryptographic SLSA build provenance attestation signed by GitHub's OIDC issuer.
+
+Consumers and staging deployments can verify artifact integrity and authentic build provenance with the following commands:
+
+1. **Verify checksum integrity:**
+   Download the archive and `SHA256SUMS` manifest from the GitHub Release, then check the SHA-256 digest:
+
+   ```bash
+   sha256sum -c SHA256SUMS
+   ```
+
+2. **Verify build provenance attestation:**
+   Inspect and verify the cryptographic build provenance using the GitHub CLI:
+
+   ```bash
+   gh attestation verify qrcraftly-vX.Y.Z.tar.gz --repo fderuiter/QRCraftly-web
+   ```
 
 ### GitHub Releases follow Cloudflare
 

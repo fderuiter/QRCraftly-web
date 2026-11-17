@@ -340,7 +340,7 @@ describe('File Transfer Page & Pipeline', () => {
     }
   });
 
-  it('keeps a private transfer\'s key words hidden until their button is held', async () => {
+  it('keeps a private transfer\'s key words hidden until their button is toggled', async () => {
     render(<Page />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /simulate 50mb/i }));
@@ -367,15 +367,18 @@ describe('File Transfer Page & Pipeline', () => {
       expect(within(panel).queryByText(keyCode)).not.toBeInTheDocument();
       expect(within(panel).getByTestId('sender-key-code-hidden')).toBeInTheDocument();
 
-      const hold = within(panel).getByRole('button', { name: 'Hold to show key code' });
-      fireEvent.pointerDown(hold);
+      const showBtn = within(panel).getByRole('button', { name: 'Show key code' });
+      fireEvent.click(showBtn);
       expect(within(panel).getByTestId('sender-key-code')).toHaveTextContent(keyCode);
-      fireEvent.pointerUp(hold);
+      const hideBtn = within(panel).getByRole('button', { name: 'Hide key code' });
+      fireEvent.click(hideBtn);
       expect(within(panel).queryByText(keyCode)).not.toBeInTheDocument();
 
-      fireEvent.keyDown(hold, { key: 'Enter' });
+      fireEvent.click(within(panel).getByRole('button', { name: 'Show key code' }));
       expect(within(panel).getByTestId('sender-key-code')).toHaveTextContent(keyCode);
-      fireEvent.blur(hold);
+      act(() => {
+        window.dispatchEvent(new Event('blur'));
+      });
       expect(within(panel).queryByText(keyCode)).not.toBeInTheDocument();
     } finally {
       globalThis.mockWorkerControl.setInterceptor(null);

@@ -19,7 +19,7 @@ export const TEMPLATE_STORAGE_ERROR =
  * Uploaded images stay in volatile memory only (docs/public/COMPLIANCE.md), so a
  * template never persists or imports a logo, border logo, background or mosaic image.
  */
-export const CONTENT_FIELDS: ReadonlySet<keyof QRConfig> = new Set<keyof QRConfig>([
+const CONTENT_KEY_LIST = [
   'value',
   'type',
   'animationValues',
@@ -32,20 +32,33 @@ export const CONTENT_FIELDS: ReadonlySet<keyof QRConfig> = new Set<keyof QRConfi
   'borderLogoUrl',
   'backgroundImageUrl',
   'mosaicImageUrl',
-]);
+] as const satisfies readonly (keyof QRConfig)[];
+
+export const CONTENT_FIELDS: ReadonlySet<string> = new Set<string>(CONTENT_KEY_LIST);
+
+/**
+ * Reports whether an unknown value is a non-null, non-array object record.
+ * @param value - Value to check.
+ * @returns True when value is an object record.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 /**
  * Extracts visual style parameters from a QRConfig. STYLE_FIELDS in styleFields.ts is the one list
  * of what a template keeps, so a saved template holds exactly what an import accepts (#1583).
- * @param config - Full QRConfig.
+ * @param config - Full or partial QRConfig.
  * @returns Partial QRConfig with visual style properties only.
  */
-export function extractStyleConfig(config: QRConfig): Partial<QRConfig> {
+export function extractStyleConfig(config: Partial<QRConfig>): Partial<QRConfig> {
   const styleConfig: Partial<QRConfig> = {};
-  const keys = Object.keys(config) as (keyof QRConfig)[];
-  for (const key of keys) {
+  for (const key of Object.keys(config)) {
     if (isStyleField(key)) {
-      (styleConfig as Record<string, unknown>)[key] = config[key];
+      const value = config[key];
+      if (value !== undefined) {
+        Reflect.set(styleConfig, key, value);
+      }
     }
   }
   return styleConfig;
@@ -63,10 +76,12 @@ export function applyTemplateToConfig(
   templateConfig: Partial<QRConfig>
 ): Partial<QRConfig> {
   const updates: Partial<QRConfig> = { ...STYLE_BASELINE };
-  const keys = Object.keys(templateConfig) as (keyof QRConfig)[];
-  for (const key of keys) {
-    if (isStyleField(key) && templateConfig[key] !== undefined) {
-      (updates as Record<string, unknown>)[key] = templateConfig[key];
+  for (const key of Object.keys(templateConfig)) {
+    if (isStyleField(key)) {
+      const value = templateConfig[key];
+      if (value !== undefined) {
+        Reflect.set(updates, key, value);
+      }
     }
   }
   if (templateConfig.frameText && !currentConfig.frameText?.trim()) {
@@ -206,7 +221,7 @@ export function updateCustomTemplate(
     target.description = updates.description.trim().substring(0, 200);
   }
   if (updates.config) {
-    target.config = { ...target.config, ...extractStyleConfig(updates.config as QRConfig) };
+    target.config = { ...target.config, ...extractStyleConfig(updates.config) };
   }
   target.updatedAt = new Date().toISOString();
 
@@ -261,17 +276,16 @@ export function addImportedTemplate(
 export function validateTemplateJson(
   data: unknown
 ): { valid: boolean; template?: BrandTemplate; error?: string; skipped?: number } {
-  if (!data || typeof data !== 'object') {
+  if (!isRecord(data)) {
     return { valid: false, error: 'Invalid file: JSON root must be an object.' };
   }
 
-  const rawObj = data as Record<string, unknown>;
   let templateObj: Record<string, unknown> | null = null;
 
-  if (rawObj.type === 'qrcraftly-brand-template' && rawObj.template && typeof rawObj.template === 'object') {
-    templateObj = rawObj.template as Record<string, unknown>;
-  } else if (typeof rawObj.name === 'string' && rawObj.config && typeof rawObj.config === 'object') {
-    templateObj = rawObj;
+  if (data.type === 'qrcraftly-brand-template' && isRecord(data.template)) {
+    templateObj = data.template;
+  } else if (typeof data.name === 'string' && isRecord(data.config)) {
+    templateObj = data;
   }
 
   if (!templateObj) {
@@ -284,15 +298,15 @@ export function validateTemplateJson(
   }
 
   const rawConfig = templateObj.config;
-  if (!rawConfig || typeof rawConfig !== 'object') {
+  if (!isRecord(rawConfig)) {
     return { valid: false, error: 'Invalid template: Missing or invalid visual config object.' };
   }
 
   // Content fields are dropped silently; other keys must pass the style rules or are skipped.
-  const configObj = rawConfig as Record<string, unknown>;
+  const configObj = rawConfig;
   const { style: validConfig, skipped: invalid } = pickStyle(configObj);
   const unknown = Object.keys(configObj).filter(
-    key => !CONTENT_FIELDS.has(key as keyof QRConfig) && !isStyleField(key)
+    key => !CONTENT_FIELDS.has(key) && !isStyleField(key)
   ).length;
 
   const now = new Date().toISOString();

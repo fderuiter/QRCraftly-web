@@ -159,17 +159,7 @@ export function decodeCameraCode(
     if (strategy === 'frame' && longest > FRAME_PASS_MAX_DIMENSION) {
       image = downscaleRgba(image.data, image.width, image.height, FRAME_PASS_MAX_DIMENSION / longest);
     }
-    if (strategy === 'inverted') {
-      // Invert the pixels so this pass looks for light-on-dark codes only, at the cost of one pass.
-      const inverted = image.data === data ? new Uint8ClampedArray(image.data) : image.data;
-      for (let i = 0; i < inverted.length; i += 4) {
-        inverted[i] = 255 - inverted[i];
-        inverted[i + 1] = 255 - inverted[i + 1];
-        inverted[i + 2] = 255 - inverted[i + 2];
-      }
-      image = { ...image, data: inverted };
-    }
-    const [code] = reader.read(image.data, image.width, image.height);
+    const [code] = reader.read(image.data, image.width, image.height, strategy === 'inverted' ? { inverted: true } : undefined);
     if (!code) return null;
     return toDecodedCode(code, {
       offsetX: cut.left,

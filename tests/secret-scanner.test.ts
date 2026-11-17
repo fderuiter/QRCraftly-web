@@ -11,6 +11,7 @@ import {
   STRIPE_REGEX,
   GITHUB_REGEX,
   GCP_REGEX,
+  PRIVATE_KEY_REGEX,
 } from '../scripts/secret-scanner.js';
 
 describe('secret-scanner', () => {
@@ -140,6 +141,18 @@ describe('secret-scanner', () => {
       expect(match).not.toBeNull();
       expect(match![1]).toBe('AIzaSyAz1234567890abcdefghijklmnopqrstu');
     });
+
+    it('should match PEM private key headers', () => {
+      const pkcs8Key = '-----BEGIN PRIVATE KEY-----';
+      const rsaKey = '-----BEGIN RSA PRIVATE KEY-----';
+      const ecKey = '-----BEGIN EC PRIVATE KEY-----';
+      const certificate = '-----BEGIN CERTIFICATE-----';
+
+      expect(pkcs8Key.match(PRIVATE_KEY_REGEX)).not.toBeNull();
+      expect(rsaKey.match(PRIVATE_KEY_REGEX)).not.toBeNull();
+      expect(ecKey.match(PRIVATE_KEY_REGEX)).not.toBeNull();
+      expect(certificate.match(PRIVATE_KEY_REGEX)).toBeNull();
+    });
   });
 
   describe('scanFile', () => {
@@ -162,6 +175,7 @@ describe('secret-scanner', () => {
           stripe_key: "${stripeSecret}",
           github_token: "ghp_123456789012345678901234567890123456",
           gcp_key: "AIzaSyAz1234567890abcdefghijklmnopqrstu",
+          private_key: "-----BEGIN RSA PRIVATE KEY-----",
         };
         `,
         'utf8'
@@ -179,6 +193,7 @@ describe('secret-scanner', () => {
           stripe_key: "sk_live_placeholder_key",
           github_token: "ghp_placeholder_token",
           gcp_key: "AIzaSy_placeholder",
+          certificate: "-----BEGIN CERTIFICATE-----",
         };
         `,
         'utf8'
@@ -192,7 +207,7 @@ describe('secret-scanner', () => {
 
     it('should successfully detect all secrets in a file with secrets', () => {
       const findings = scanFile(tempFileWithSecret);
-      expect(findings.length).toBe(11);
+      expect(findings.length).toBe(12);
 
       const types = findings.map(f => f.type);
       expect(types).toContain('Cloudflare API Secret/Token');
@@ -202,6 +217,7 @@ describe('secret-scanner', () => {
       expect(types).toContain('Stripe API Key');
       expect(types).toContain('GitHub Personal Access Token');
       expect(types).toContain('Google Cloud or Firebase API Key');
+      expect(types).toContain('Private Key');
     });
 
     it('should ignore all patterns in a clean file', () => {
