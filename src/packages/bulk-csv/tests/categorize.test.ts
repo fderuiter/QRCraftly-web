@@ -209,3 +209,95 @@ describe('preflightReportFileName', () => {
   });
 });
 
+describe('categorizeCsvRows Contact Card (vCard) Mode', () => {
+  const contactMapping = {
+    firstName: 'First',
+    lastName: 'Last',
+    phone: 'Phone',
+    email: 'Email',
+    organization: 'Company',
+    title: 'Role',
+  };
+
+  it('synthesizes valid RFC vCards from complete and partial contact rows', () => {
+    const rows: CsvRow[] = [
+      { First: 'Jane', Last: 'Doe', Phone: '+1-555-1234', Email: 'jane@example.com', Company: 'Acme', Role: 'Dev' },
+      // Partial row: missing phone and role, but has name -> should synthesize and be valid
+      { First: 'John', Last: 'Smith', Phone: '', Email: 'john@example.com', Company: '', Role: '' },
+      // Partial row: organization only -> has identity, valid
+      { First: '', Last: '', Phone: '+1-555-9876', Email: '', Company: 'Acme Corp', Role: '' },
+    ];
+
+    const report = categorizeCsvRows(rows, '', undefined, undefined, {
+      contentType: 'vcard',
+      contactMapping,
+    });
+
+    expect(report.totalRows).toBe(3);
+    expect(report.validCount).toBe(3);
+    expect(report.emptyCount).toBe(0);
+    expect(report.unsafeCount).toBe(0);
+
+    expect(report.validPayloads[0]).toContain('BEGIN:VCARD');
+    expect(report.validPayloads[0]).toContain('FN:Jane Doe');
+    expect(report.validPayloads[0]).toContain('TEL:+1-555-1234');
+    expect(report.validPayloads[0]).toContain('ORG:Acme');
+
+    expect(report.validPayloads[1]).toContain('FN:John Smith');
+    expect(report.validPayloads[1]).toContain('EMAIL:john@example.com');
+  });
+
+  it('flags rows with missing contact data as empty, and missing identity as unsafe', () => {
+    const rows: CsvRow[] = [
+      // Valid row
+      { First: 'Jane', Last: 'Doe', Phone: '+1-555-1234', Email: 'jane@example.com', Company: 'Acme', Role: 'Dev' },
+      // Completely empty row
+      { First: '', Last: '', Phone: '', Email: '', Company: '', Role: '' },
+      // Incomplete row: has phone & email, but no name and no company (missing identity)
+      { First: '', Last: '', Phone: '+1-555-0000', Email: 'anonymous@example.com', Company: '', Role: '' },
+    ];
+
+    const report = categorizeCsvRows(rows, '', undefined, undefined, {
+      contentType: 'vcard',
+      contactMapping,
+    });
+
+    expect(report.totalRows).toBe(3);
+    expect(report.validCount).toBe(1);
+    expect(report.emptyCount).toBe(1);
+    expect(report.unsafeCount).toBe(1);
+
+    const emptyDetail = report.invalidDetails.find((d) => d.rowNumber === 2);
+    expect(emptyDetail?.category).toBe('empty');
+    expect(emptyDetail?.reason).toContain('Missing value in mapped contact fields');
+
+    const unsafeDetail = report.invalidDetails.find((d) => d.rowNumber === 3);
+    expect(unsafeDetail?.category).toBe('unsafe');
+    expect(unsafeDetail?.reason).toContain('Missing required contact identity');
+  });
+
+  it('flags rows with control characters, dangerous URLs, or invalid emails as unsafe', () => {
+    const rows: CsvRow[] = [
+      // Control character injection
+      { First: 'Jane\x00', Last: 'Doe', Phone: '12345', Email: 'jane@example.com', Company: 'Acme', Role: '' },
+      // Dangerous script URL
+      { First: 'Bob', Last: 'Malicious', Phone: '12345', Email: 'javascript:alert(1)', Company: 'Hacks', Role: '' },
+      // Invalid email format
+      { First: 'Alice', Last: 'Smith', Phone: '12345', Email: 'not-an-email', Company: 'Acme', Role: '' },
+    ];
+
+    const report = categorizeCsvRows(rows, '', undefined, undefined, {
+      contentType: 'vcard',
+      contactMapping,
+    });
+
+    expect(report.totalRows).toBe(3);
+    expect(report.validCount).toBe(0);
+    expect(report.unsafeCount).toBe(3);
+
+    expect(report.invalidDetails[0].reason).toContain('invalid control or zero-width characters');
+    expect(report.invalidDetails[1].reason).toContain('unsafe URL scheme');
+    expect(report.invalidDetails[2].reason).toContain('Invalid email address format');
+  });
+});
+

@@ -19,13 +19,20 @@
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { escapeCsvCell } from './csvEscape';
 import { sanitizeFileStem } from './fileNames';
-import { bulkValidationType, encodeBulkCell, hasPayload, type BulkContentType, type CsvRow } from '@/packages/qr-payload';
+import {
+  bulkValidationType,
+  encodeBulkCell,
+  hasPayload,
+  isContactContentType,
+  synthesizeVCardPayload,
+  type BulkContentType,
+  type BulkContactMapping,
+  type CsvRow,
+} from '@/packages/qr-payload';
 import { analyseLink, type LinkFinding } from '@/packages/link-safety';
-import type { QRConfig } from '@/packages/core/types';
+import { QRType, type QRConfig } from '@/packages/core/types';
 import {
   isDangerousUrl,
-  REGEX_STRICT_CONTROL_CHARS,
-  REGEX_BIDI_CONTROL_CHARS,
 } from '@/packages/core/security';
 
 export type PreflightRowStatus = 'valid' | 'empty' | 'unsafe' | 'caution';
@@ -66,25 +73,35 @@ export interface PreflightReport {
 
 /** Options for {@link categorizeCsvRows}. */
 export interface CategorizeOptions {
-  /** Whether cells are links or plain text. Defaults to links. */
+  /** Whether cells are links, plain text, or contact cards. Defaults to links. */
   contentType?: BulkContentType;
   /** Spreadsheet row number of each row (`CsvTable.rowNumbers`). Defaults to the position + 1. */
   rowNumbers?: readonly number[];
+  /** Column mapping for contact card synthesis. */
+  contactMapping?: BulkContactMapping;
 }
+
+const REGEX_STRICT_NO_G = /[\x00-\x1F\x7F-\x9F]/;
+const REGEX_PRESERVE_NO_G = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/;
+const REGEX_BIDI_NO_G = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/;
 
 function defaultValidateConfig(config: QRConfig): string[] {
   const violations: string[] = [];
-  if (config.borderText && REGEX_STRICT_CONTROL_CHARS.test(config.borderText)) {
+  if (config.borderText && REGEX_STRICT_NO_G.test(config.borderText)) {
     violations.push('Border Text contains invalid control characters');
   }
-  if (config.templateHeadline && REGEX_STRICT_CONTROL_CHARS.test(config.templateHeadline)) {
+  if (config.templateHeadline && REGEX_STRICT_NO_G.test(config.templateHeadline)) {
     violations.push('Template Headline contains invalid control characters');
   }
   if (config.value) {
-    if (REGEX_STRICT_CONTROL_CHARS.test(config.value)) {
+    const isMultiLine = config.type === QRType.VCARD || config.type === QRType.TEXT;
+    const hasControl = isMultiLine
+      ? REGEX_PRESERVE_NO_G.test(config.value)
+      : REGEX_STRICT_NO_G.test(config.value);
+    if (hasControl) {
       violations.push('Value contains invalid control characters');
     }
-    if (REGEX_BIDI_CONTROL_CHARS.test(config.value)) {
+    if (REGEX_BIDI_NO_G.test(config.value)) {
       violations.push('Value contains hidden text-direction characters');
     }
     if (isDangerousUrl(config.value)) {
@@ -99,10 +116,10 @@ function defaultValidateConfig(config: QRConfig): string[] {
  * Operates in browser memory without network calls.
  *
  * @param rows CSV data rows.
- * @param payloadColumn Header name of the column containing QR payloads.
+ * @param payloadColumn Header name of the column containing QR payloads (or empty in contact mode).
  * @param config Active QR configuration.
  * @param customValidator Optional custom validator function for QR configuration.
- * @param options Content type and spreadsheet row numbers.
+ * @param options Content type, contact mapping, and spreadsheet row numbers.
  * @returns PreflightReport with detailed categorization metrics and row issues.
  */
 export function categorizeCsvRows(
@@ -112,8 +129,9 @@ export function categorizeCsvRows(
   customValidator?: (config: QRConfig) => string[],
   options: CategorizeOptions = {}
 ): PreflightReport {
-  const { contentType = 'link', rowNumbers } = options;
+  const { contentType = 'link', rowNumbers, contactMapping } = options;
   const validationType = bulkValidationType(contentType);
+  const isContact = isContactContentType(contentType);
   const validPayloads: string[] = [];
   const details: PreflightRowDetail[] = [];
   const invalidDetails: PreflightRowDetail[] = [];
@@ -125,7 +143,7 @@ export function categorizeCsvRows(
   let unsafeCount = 0;
   let cautionCount = 0;
 
-  if (!rows || rows.length === 0 || !payloadColumn) {
+  if (!rows || rows.length === 0 || (!payloadColumn && !isContact)) {
     return {
       totalRows: rows ? rows.length : 0,
       validCount: 0,
@@ -150,9 +168,139 @@ export function categorizeCsvRows(
   const validateFn = customValidator ?? defaultValidateConfig;
   const validateCache = new Map<string, string[]>();
   const analyseCache = new Map<string, LinkFinding[]>();
+  const mapping: BulkContactMapping = contactMapping ?? (payloadColumn ? { firstName: payloadColumn } : {});
 
   rows.forEach((row, index) => {
     const rowNumber = rowNumbers?.[index] ?? index + 1;
+
+    // Contact card (vCard) multi-column synthesis workflow
+    if (isContact) {
+      const hasAnyFieldMapped = Object.values(mapping).some(Boolean);
+      if (!hasAnyFieldMapped) {
+        emptyCount += 1;
+        const detail: PreflightRowDetail = {
+          rowNumber,
+          category: 'empty',
+          reason: 'Missing column mapping for contact fields',
+          payload: '',
+        };
+        details.push(detail);
+        invalidDetails.push(detail);
+        return;
+      }
+
+      const synthesized = synthesizeVCardPayload(row, mapping);
+      const trimmedValue = synthesized.payload;
+
+      // 1. Missing payload check
+      if (!synthesized.hasAnyData) {
+        emptyCount += 1;
+        const detail: PreflightRowDetail = {
+          rowNumber,
+          category: 'empty',
+          reason: 'Missing value in mapped contact fields',
+          payload: '',
+        };
+        details.push(detail);
+        invalidDetails.push(detail);
+        return;
+      }
+
+      // 2. Identity validation: first name, last name, or organization required
+      if (!synthesized.hasIdentity) {
+        unsafeCount += 1;
+        const detail: PreflightRowDetail = {
+          rowNumber,
+          category: 'unsafe',
+          reason: 'Missing required contact identity (first name, last name, or organization)',
+          payload: trimmedValue,
+        };
+        details.push(detail);
+        invalidDetails.push(detail);
+        return;
+      }
+
+      // 3. Security and format checks (control characters, dangerous URLs, email format)
+      if (synthesized.violations.length > 0) {
+        unsafeCount += 1;
+        const reason = synthesized.violations.join(' ');
+        const detail: PreflightRowDetail = {
+          rowNumber,
+          category: 'unsafe',
+          reason,
+          payload: trimmedValue,
+        };
+        details.push(detail);
+        invalidDetails.push(detail);
+        return;
+      }
+
+      // 4. Config & vCard structural validation
+      let violations = validateCache.get(trimmedValue);
+      if (!violations) {
+        violations = validateFn({ ...baseConfig, value: trimmedValue });
+        validateCache.set(trimmedValue, violations);
+      }
+
+      if (violations.length > 0) {
+        unsafeCount += 1;
+        const reason = violations.join(' ');
+        const detail: PreflightRowDetail = {
+          rowNumber,
+          category: 'unsafe',
+          reason,
+          payload: trimmedValue,
+        };
+        details.push(detail);
+        invalidDetails.push(detail);
+        return;
+      }
+
+      // 5. Caution check on contact website URL if present
+      const websiteUrl = mapping.website ? (row[mapping.website] ?? '').trim() : '';
+      let cautions: LinkFinding[] = [];
+      if (websiteUrl) {
+        let findings = analyseCache.get(websiteUrl);
+        if (!findings) {
+          findings = analyseLink(websiteUrl);
+          analyseCache.set(websiteUrl, findings);
+        }
+        cautions = findings.filter((f) => f.severity === 'caution');
+      }
+
+      if (cautions.length > 0) {
+        cautionCount += 1;
+        validCount += 1;
+        const reason = cautions.map((f) => f.message).join(' ');
+        const detail: PreflightRowDetail = {
+          rowNumber,
+          category: 'caution',
+          reason,
+          payload: trimmedValue,
+        };
+        details.push(detail);
+        invalidDetails.push(detail);
+        validRows.push(row);
+        validRowIndices.push(index);
+        validPayloads.push(trimmedValue);
+        return;
+      }
+
+      // 6. Valid contact row
+      validCount += 1;
+      const detail: PreflightRowDetail = {
+        rowNumber,
+        category: 'valid',
+        payload: trimmedValue,
+      };
+      details.push(detail);
+      validRows.push(row);
+      validRowIndices.push(index);
+      validPayloads.push(trimmedValue);
+      return;
+    }
+
+    // Single-column link / text workflow
     const rawValue = row[payloadColumn] ?? '';
 
     // 1. Missing payload check

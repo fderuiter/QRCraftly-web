@@ -43,7 +43,17 @@ export const clampCornerRadius = (r: number, w: number, h: number): number => {
  * @param r The corner radius.
  */
 export const drawRoundRect = (ctx: RenderSurface, x: number, y: number, w: number, h: number, r: number) => {
-  drawCornerRect(ctx, x, y, w, h, [r, r, r, r]);
+  const clampedR = clampCornerRadius(r, w, h);
+  ctx.moveTo(x + clampedR, y);
+  ctx.lineTo(x + w - clampedR, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + clampedR);
+  ctx.lineTo(x + w, y + h - clampedR);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - clampedR, y + h);
+  ctx.lineTo(x + clampedR, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - clampedR);
+  ctx.lineTo(x, y + clampedR);
+  ctx.quadraticCurveTo(x, y, x + clampedR, y);
+  ctx.closePath();
 };
 
 /**
@@ -63,7 +73,10 @@ export const drawCornerRect = (
   h: number,
   radii: readonly [number, number, number, number]
 ) => {
-  const [tl, tr, br, bl] = radii.map((r) => clampCornerRadius(r, w, h));
+  const tl = clampCornerRadius(radii[0], w, h);
+  const tr = clampCornerRadius(radii[1], w, h);
+  const br = clampCornerRadius(radii[2], w, h);
+  const bl = clampCornerRadius(radii[3], w, h);
   ctx.moveTo(x + tl, y);
   ctx.lineTo(x + w - tr, y);
   ctx.quadraticCurveTo(x + w, y, x + w, y + tr);

@@ -45,25 +45,13 @@ function multiplyMatrix(m1: Matrix, m2: Matrix): Matrix {
   };
 }
 
-class SvgRadialGradient {
+abstract class SvgGradient {
   public id: string;
-  public x0: number;
-  public y0: number;
-  public r0: number;
-  public x1: number;
-  public y1: number;
-  public r1: number;
   public transform: Matrix;
   public stops: Array<{ offset: number; color: string }> = [];
 
-  constructor(id: string, x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, transform: Matrix) {
+  constructor(id: string, transform: Matrix) {
     this.id = id;
-    this.x0 = x0;
-    this.y0 = y0;
-    this.r0 = r0;
-    this.x1 = x1;
-    this.y1 = y1;
-    this.r1 = r1;
     this.transform = transform;
   }
 
@@ -71,16 +59,43 @@ class SvgRadialGradient {
     this.stops.push({ offset, color });
   }
 
-  toSvgString(): string {
-    const stopsXml = this.stops.map(stop => 
+  protected formatStopsXml(): string {
+    return this.stops.map(stop => 
       `      <stop offset="${stop.offset * 100}%" stop-color="${stop.color}" />`
     ).join('\n');
-    
+  }
+
+  protected formatTransformAttr(): string {
     // Only apply gradientTransform if it's not the identity matrix
     const t = this.transform;
     const isIdentity = t.a === 1 && t.b === 0 && t.c === 0 && t.d === 1 && t.e === 0 && t.f === 0;
-    const transformAttr = isIdentity ? '' : ` gradientTransform="matrix(${t.a} ${t.b} ${t.c} ${t.d} ${t.e} ${t.f})"`;
+    return isIdentity ? '' : ` gradientTransform="matrix(${t.a} ${t.b} ${t.c} ${t.d} ${t.e} ${t.f})"`;
+  }
 
+  abstract toSvgString(): string;
+}
+
+class SvgRadialGradient extends SvgGradient {
+  public x0: number;
+  public y0: number;
+  public r0: number;
+  public x1: number;
+  public y1: number;
+  public r1: number;
+
+  constructor(id: string, x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, transform: Matrix) {
+    super(id, transform);
+    this.x0 = x0;
+    this.y0 = y0;
+    this.r0 = r0;
+    this.x1 = x1;
+    this.y1 = y1;
+    this.r1 = r1;
+  }
+
+  toSvgString(): string {
+    const stopsXml = this.formatStopsXml();
+    const transformAttr = this.formatTransformAttr();
     const frAttr = this.r0 > 0 ? ` fr="${this.r0}"` : '';
 
     return [
@@ -91,37 +106,23 @@ class SvgRadialGradient {
   }
 }
 
-class SvgLinearGradient {
-  public id: string;
+class SvgLinearGradient extends SvgGradient {
   public x0: number;
   public y0: number;
   public x1: number;
   public y1: number;
-  public transform: Matrix;
-  public stops: Array<{ offset: number; color: string }> = [];
 
   constructor(id: string, x0: number, y0: number, x1: number, y1: number, transform: Matrix) {
-    this.id = id;
+    super(id, transform);
     this.x0 = x0;
     this.y0 = y0;
     this.x1 = x1;
     this.y1 = y1;
-    this.transform = transform;
-  }
-
-  addColorStop(offset: number, color: string): void {
-    this.stops.push({ offset, color });
   }
 
   toSvgString(): string {
-    const stopsXml = this.stops.map(stop => 
-      `      <stop offset="${stop.offset * 100}%" stop-color="${stop.color}" />`
-    ).join('\n');
-    
-    // Only apply gradientTransform if it's not the identity matrix
-    const t = this.transform;
-    const isIdentity = t.a === 1 && t.b === 0 && t.c === 0 && t.d === 1 && t.e === 0 && t.f === 0;
-    const transformAttr = isIdentity ? '' : ` gradientTransform="matrix(${t.a} ${t.b} ${t.c} ${t.d} ${t.e} ${t.f})"`;
+    const stopsXml = this.formatStopsXml();
+    const transformAttr = this.formatTransformAttr();
 
     return [
       `    <linearGradient id="${this.id}" x1="${this.x0}" y1="${this.y0}" x2="${this.x1}" y2="${this.y1}" gradientUnits="userSpaceOnUse"${transformAttr}>`,
@@ -133,8 +134,8 @@ class SvgLinearGradient {
 
 interface ContextState {
   transform: Matrix;
-  fillStyle: string | SvgRadialGradient | SvgLinearGradient;
-  strokeStyle: string | SvgRadialGradient | SvgLinearGradient;
+  fillStyle: string | SvgGradient;
+  strokeStyle: string | SvgGradient;
   lineWidth: number;
   font: string;
   textAlign: CanvasTextAlign;
@@ -187,8 +188,8 @@ export interface SvgImageRef {
  */
 export class SvgContext {
   // Public style properties (mirrors CanvasRenderingContext2D)
-  fillStyle: string | SvgRadialGradient | SvgLinearGradient = '#000000';
-  strokeStyle: string | SvgRadialGradient | SvgLinearGradient = '#000000';
+  fillStyle: string | SvgGradient = '#000000';
+  strokeStyle: string | SvgGradient = '#000000';
   lineWidth: number = 1;
   font: string = '10px sans-serif';
   textAlign: CanvasTextAlign = 'start';
@@ -207,7 +208,7 @@ export class SvgContext {
   private _transform: Matrix = identityMatrix();
   private _stateStack: ContextState[] = [];
   private _dashArray: number[] = [];
-  private _gradients: Array<SvgRadialGradient | SvgLinearGradient> = [];
+  private _gradients: Array<SvgGradient> = [];
   private _radialGradientCount = 0;
   private _linearGradientCount = 0;
 
@@ -621,8 +622,8 @@ export class SvgContext {
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
-  private _cssColor(color: string | SvgRadialGradient | SvgLinearGradient): string {
-    if (color instanceof SvgRadialGradient || color instanceof SvgLinearGradient) {
+  private _cssColor(color: string | SvgGradient): string {
+    if (color instanceof SvgGradient) {
       return `url(#${color.id})`;
     }
     return color || 'none';

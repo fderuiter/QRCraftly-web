@@ -8,34 +8,45 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.join(__dirname, '..');
 const ciScriptsDir = path.join(repoRoot, 'scripts', 'ci');
+const wizardsDir = path.join(repoRoot, 'scripts', 'wizards');
 
 describe('CI Modular Shell Scripts Validation', () => {
   it('should find the scripts/ci directory and script files', () => {
     expect(fs.existsSync(ciScriptsDir)).toBe(true);
     const files = fs.readdirSync(ciScriptsDir).filter(f => f.endsWith('.sh'));
     expect(files.length).toBeGreaterThan(0);
+
+    expect(fs.existsSync(wizardsDir)).toBe(true);
+    const wizardFiles = fs.readdirSync(wizardsDir).filter(f => f.endsWith('.sh'));
+    expect(wizardFiles.length).toBeGreaterThan(0);
   });
 
   it('should enforce strict execution flags in all extracted shell scripts', () => {
-    const files = fs.readdirSync(ciScriptsDir).filter(f => f.endsWith('.sh'));
-    for (const file of files) {
-      const filePath = path.join(ciScriptsDir, file);
-      const content = fs.readFileSync(filePath, 'utf8');
-      const lines = content.split(/\r?\n/).map(l => l.trim());
+    const scriptDirs = [ciScriptsDir, wizardsDir];
+    for (const dir of scriptDirs) {
+      const files = fs.readdirSync(dir).filter(f => f.endsWith('.sh'));
+      for (const file of files) {
+        const filePath = path.join(dir, file);
+        const content = fs.readFileSync(filePath, 'utf8');
+        const lines = content.split(/\r?\n/).map(l => l.trim());
 
-      expect(lines[0], `${file} shebang`).toMatch(/^#!\/usr\/bin\/(env )?bash$/);
-      const hasStrictFlags = lines.slice(1, 5).some(l => l.includes('set -euo pipefail') || l.includes('set -e'));
-      expect(hasStrictFlags, `${file} strict execution flags`).toBe(true);
+        expect(lines[0], `${file} shebang`).toMatch(/^#!\/usr\/bin\/(env )?bash$/);
+        const hasStrictFlags = lines.slice(1, 15).some(l => l.includes('set -euo pipefail') || l.includes('set -e'));
+        expect(hasStrictFlags, `${file} strict execution flags`).toBe(true);
+      }
     }
   });
 
   it('should pass ShellCheck static analysis on all extracted shell scripts', () => {
+    expect(fs.existsSync(wizardsDir)).toBe(true);
     const files = fs.readdirSync(ciScriptsDir).filter(f => f.endsWith('.sh'));
     expect(files.length).toBeGreaterThan(0);
+    const wizardFiles = fs.readdirSync(wizardsDir).filter(f => f.endsWith('.sh'));
+    expect(wizardFiles.length).toBeGreaterThan(0);
 
     // bash expands the glob, so no file name read by this test reaches a command line.
     try {
-      execFile('bash', ['-c', 'shellcheck scripts/ci/*.sh'], { cwd: repoRoot });
+      execFile('bash', ['-c', 'shellcheck scripts/ci/*.sh scripts/wizards/*.sh'], { cwd: repoRoot });
     } catch (err: any) {
       const stdout = err.stdout ? err.stdout.toString() : '';
       const stderr = err.stderr ? err.stderr.toString() : '';
