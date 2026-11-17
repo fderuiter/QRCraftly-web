@@ -6,9 +6,25 @@ import { ExportOptions, clampSize, printHint, type DownloadFormat } from './Expo
 import { suggestFilename } from '@/hooks/useExportFlow';
 
 function renderOptions(format: DownloadFormat = 'png', size = 2048) {
-  const handlers = { onFormatChange: vi.fn(), onSizeChange: vi.fn(), onFilenameChange: vi.fn(), onCopySvg: vi.fn(), onWallet: vi.fn() };
+  const handlers = {
+    onFormatChange: vi.fn(),
+    onSizeChange: vi.fn(),
+    onFilenameChange: vi.fn(),
+    onCopyImage: vi.fn(),
+    onCopySvg: vi.fn(),
+    onWallet: vi.fn(),
+  };
   const view = render(
-    <ExportOptions id="opts" format={format} size={size} filename="url-example.com" copySvgBusy={false} {...handlers} />
+    <ExportOptions
+      id="opts"
+      format={format}
+      size={size}
+      filename="url-example.com"
+      copySvgBusy={false}
+      copyImageBusy={false}
+      copiedImage={false}
+      {...handlers}
+    />
   );
   return { ...view, ...handlers };
 }
@@ -40,7 +56,7 @@ describe('ExportOptions (#1052)', () => {
   });
 
   it('has no axe violations and reports each choice', async () => {
-    const { container, onFormatChange, onSizeChange, onFilenameChange, onCopySvg, onWallet } = renderOptions();
+    const { container, onFormatChange, onSizeChange, onFilenameChange, onCopyImage, onCopySvg, onWallet } = renderOptions();
     expect(await axe(container)).toHaveNoViolations();
 
     fireEvent.click(screen.getByRole('radio', { name: 'JPEG' }));
@@ -49,10 +65,44 @@ describe('ExportOptions (#1052)', () => {
     expect(onSizeChange).toHaveBeenCalledWith(512);
     fireEvent.change(screen.getByLabelText('File name'), { target: { value: 'menu' } });
     expect(onFilenameChange).toHaveBeenCalledWith('menu');
+    fireEvent.click(screen.getByRole('button', { name: 'Copy image' }));
+    expect(onCopyImage).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Copy as SVG' }));
     expect(onCopySvg).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Add to phone wallet' }));
     expect(onWallet).toHaveBeenCalled();
+  });
+
+  it('handles raster copy click, busy, and feedback states with no axe violations', async () => {
+    const onCopyImage = vi.fn();
+    const props = {
+      id: 'opts',
+      format: 'png' as const,
+      size: 2048,
+      filename: 'file',
+      copySvgBusy: false,
+      onFormatChange: vi.fn(),
+      onSizeChange: vi.fn(),
+      onFilenameChange: vi.fn(),
+      onCopyImage,
+      onCopySvg: vi.fn(),
+      onWallet: vi.fn(),
+    };
+    const { rerender, container } = render(<ExportOptions {...props} copyImageBusy={false} copiedImage={false} />);
+    const copyBtn = screen.getByRole('button', { name: 'Copy image' });
+    expect(copyBtn).toBeInTheDocument();
+    fireEvent.click(copyBtn);
+    expect(onCopyImage).toHaveBeenCalledTimes(1);
+
+    // Busy state
+    rerender(<ExportOptions {...props} copyImageBusy={true} copiedImage={false} />);
+    expect(screen.getByRole('button', { name: 'Copy image' })).toHaveAttribute('aria-busy', 'true');
+
+    // Copied feedback state
+    rerender(<ExportOptions {...props} copyImageBusy={false} copiedImage={true} />);
+    const copiedBtn = screen.getByRole('button', { name: 'Copied' });
+    expect(copiedBtn).toBeInTheDocument();
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('takes a custom width and hides the size for SVG, EPS, and PDF', () => {

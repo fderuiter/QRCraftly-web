@@ -92,6 +92,22 @@ describe('ExportBar', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('copies image from the download options panel and reports status with no axe violations', async () => {
+    const { container } = renderBar();
+    const toggle = screen.getByRole('button', { name: 'Download options' });
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    expect(await axe(container)).toHaveNoViolations();
+
+    const copyImageButton = screen.getByRole('button', { name: 'Copy image' });
+    expect(copyImageButton).toBeInTheDocument();
+
+    await userEvent.click(copyImageButton);
+    expect(exportAsset).toHaveBeenCalledWith('clipboard', expect.objectContaining({ size: 2048 }));
+    expect(await screen.findAllByRole('button', { name: 'Copied' })).not.toHaveLength(0);
+  });
+
   it('has no axe violations, with exports on or off', async () => {
     const { container, unmount } = renderBar();
     expect(await axe(container)).toHaveNoViolations();

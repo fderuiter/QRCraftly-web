@@ -140,6 +140,9 @@ export function ExportBar({ flow, verdict, health, canShare, rowRef, inputFocuse
               onColorSpaceChange={setColorSpace}
               filename={filename}
               onFilenameChange={setCustomFilename}
+              onCopyImage={onCopy}
+              copyImageBusy={isBusy('clipboard')}
+              copiedImage={copied}
               onCopySvg={onCopySvg}
               copySvgBusy={isBusy('svg-copy')}
               onWallet={onWallet}
