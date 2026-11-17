@@ -75,4 +75,35 @@ describe('ToggleSwitch Component', () => {
     await user.keyboard(' ');
     expect(mockOnChange).toHaveBeenCalledWith(true);
   });
+
+  it('applies minimum target sizing classes to the label container', () => {
+    render(
+      <ToggleSwitch
+        id="test-toggle"
+        label="Enable Feature"
+        checked={false}
+        onChange={() => {}}
+      />
+    );
+
+    const toggle = screen.getByRole('switch', { name: /Enable Feature/i });
+    const label = toggle.closest('label');
+    expect(label).toHaveClass('min-h-6', 'min-w-6');
+  });
+
+  it('applies minimum target sizing classes when srLabel is enabled', () => {
+    render(
+      <ToggleSwitch
+        id="test-toggle-sr"
+        label="Enable Screen Reader Only Feature"
+        srLabel={true}
+        checked={false}
+        onChange={() => {}}
+      />
+    );
+
+    const toggle = screen.getByRole('switch', { name: /Enable Screen Reader Only Feature/i });
+    const label = toggle.closest('label');
+    expect(label).toHaveClass('min-h-6', 'min-w-6');
+  });
 });
