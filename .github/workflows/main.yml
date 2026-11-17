@@ -124,7 +124,7 @@ jobs:
         run: pnpm run lint
 
       - name: Run ShellCheck Static Analysis
-        run: shellcheck scripts/ci/*.sh .githooks/pre-commit
+        run: shellcheck scripts/ci/*.sh scripts/wizards/*.sh .githooks/pre-commit
 
       - name: Run Secret Scanning Guardrail
         if: steps.changed-files.outputs.any_changed == 'true'
@@ -138,6 +138,19 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
           cache-dependency-path: 'requirements.txt'
+
+      - name: Audit Python Dependencies
+        # Upstream Semgrep 1.185.0 pins mcp==1.29.0 and opentelemetry-api~=1.37.0 (see .github/dependabot.yml);
+        # ignore known CVEs in those pinned versions until Semgrep upgrades them upstream.
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt \
+            --ignore-vuln CVE-2026-59951 \
+            --ignore-vuln CVE-2026-116685 \
+            --ignore-vuln CVE-2026-116684 \
+            --ignore-vuln CVE-2026-116686 \
+            --ignore-vuln CVE-2026-114603 \
+            --ignore-vuln CVE-2026-126360
 
       - name: Install Semgrep
         # requirements.txt is a pip-compile lock with hashes (source: requirements.in).

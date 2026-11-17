@@ -34,7 +34,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { AWS_REGEX, GCP_REGEX, GITHUB_REGEX, STRIPE_REGEX } from './secret-scanner.js';
+import { AWS_REGEX, GCP_REGEX, GITHUB_REGEX, PRIVATE_KEY_REGEX, STRIPE_REGEX } from './secret-scanner.js';
 import { walkFiles } from './utils/sourceFiles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -110,7 +110,7 @@ const SECRET_PATTERNS = [
   ['Stripe key', STRIPE_REGEX],
   ['GitHub token', GITHUB_REGEX],
   ['Google API key', GCP_REGEX],
-  ['Private key', /-----BEGIN [A-Z ]*PRIVATE KEY-----/],
+  ['Private key', PRIVATE_KEY_REGEX],
 ];
 
 /**

@@ -62,6 +62,8 @@ describe('public/_headers security headers', () => {
     expect(headers.get('x-content-type-options')).toBe('nosniff');
     expect(headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
     expect(headers.get('strict-transport-security')).toMatch(/^max-age=\d+/);
+    expect(headers.get('cross-origin-opener-policy')).toBe('same-origin');
+    expect(headers.get('cross-origin-resource-policy')).toBe('same-origin');
   });
 
   it('sends HSTS for subdomains too, without the preload flag, which is a separate decision (#1160)', () => {

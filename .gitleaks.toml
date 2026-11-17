@@ -42,3 +42,9 @@ title = "gitleaks config"
     description = "Google Cloud or Firebase API Key"
     regex = '''(?i)\b(AIzaSy[a-zA-Z0-9_-]{33})\b'''
     secretGroup = 1
+
+[[rules]]
+    id = "private-key"
+    description = "Private Key"
+    regex = '''(?i)-----BEGIN [A-Z ]*PRIVATE KEY-----'''
+

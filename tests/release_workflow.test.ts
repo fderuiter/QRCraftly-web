@@ -44,6 +44,24 @@ describe('Release Workflow Structural Invariants Audit', () => {
     expect(tagStep).toContain('git tag -a');
     expect(tagStep).toContain('git push origin "refs/tags/$RELEASE_TAG"');
   });
+
+  it('verifies that the publish job has id-token and attestations write permissions', () => {
+    const content = fs.readFileSync(workflowPath, 'utf8');
+    const publishJob = content.slice(content.indexOf('  publish:'), content.indexOf('  smoke-tests:'));
+    expect(publishJob).toContain('id-token: write');
+    expect(publishJob).toContain('attestations: write');
+    expect(publishJob).toContain('contents: write');
+  });
+
+  it('verifies client build, packaging, checksum, attestation, and upload in the publish job', () => {
+    const content = fs.readFileSync(workflowPath, 'utf8');
+    const publishJob = content.slice(content.indexOf('  publish:'), content.indexOf('  smoke-tests:'));
+    expect(publishJob).toContain('pnpm run build');
+    expect(publishJob).toContain('qrcraftly-v${VERSION}.tar.gz');
+    expect(publishJob).toContain('sha256sum "$ARCHIVE_NAME" > SHA256SUMS');
+    expect(publishJob).toContain('actions/attest-build-provenance');
+    expect(publishJob).toContain('gh release upload "$RELEASE_TAG" "$ARCHIVE_NAME" SHA256SUMS --clobber');
+  });
 });
 
 describe('Release production checks (#1217, #1394)', () => {

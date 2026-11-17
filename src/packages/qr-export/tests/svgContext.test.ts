@@ -456,6 +456,31 @@ describe('SvgContext', () => {
       expect(svg).toContain('fill="url(#radial-grad-1)"');
     });
 
+    it('applies gradientTransform attribute when context has active non-identity transform', () => {
+      const ctx = new SvgContext(200, 200);
+      ctx.translate(20, 30);
+      const grad = ctx.createLinearGradient(0, 0, 100, 100);
+      grad.addColorStop(0, '#ff0000');
+      grad.addColorStop(1, '#0000ff');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 100, 100);
+
+      const svg = ctx.serialize();
+      expect(svg).toContain('gradientTransform="matrix(1 0 0 1 20 30)"');
+    });
+
+    it('omits gradientTransform attribute when context transform is identity', () => {
+      const ctx = new SvgContext(200, 200);
+      const grad = ctx.createLinearGradient(0, 0, 100, 100);
+      grad.addColorStop(0, '#ff0000');
+      grad.addColorStop(1, '#0000ff');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 100, 100);
+
+      const svg = ctx.serialize();
+      expect(svg).not.toContain('gradientTransform=');
+    });
+
     it('ensures standard rectangle shapes match canvas coordinate boundaries and transforms precisely using _pt helper', () => {
       const ctx = new SvgContext(200, 200);
       ctx.translate(10, 10);

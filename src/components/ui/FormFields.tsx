@@ -1,7 +1,6 @@
 import React from "react";
 import { TEXT_AREA_CLASSES, SELECT_CLASSES, ERROR_INPUT_CLASSES, mergeClasses } from "./styles";
-import { useFieldIds } from "../../hooks/useFieldIds";
-import { FieldWrapper, type BaseFieldProps } from "./FieldWrapper";
+import { FormFieldContainer, type BaseFieldProps } from "./FieldWrapper";
 export { TextField } from "./TextField";
 
 interface TextAreaFieldProps
@@ -25,17 +24,9 @@ export const TextAreaField: React.FC<TextAreaFieldProps> = ({
   "aria-describedby": ariaDescribedby,
   ...props
 }) => {
-  const { inputId, errorId, charCountId, describedBy } = useFieldIds({
-    id,
-    error,
-    showCharCount,
-    maxLength,
-    ariaDescribedby,
-  });
-
   return (
-    <FieldWrapper
-      inputId={inputId}
+    <FormFieldContainer
+      id={id}
       label={label}
       contextualLabel={contextualLabel}
       className={className}
@@ -44,23 +35,24 @@ export const TextAreaField: React.FC<TextAreaFieldProps> = ({
       maxLength={maxLength}
       value={value}
       error={error}
-      errorId={errorId}
-      charCountId={charCountId}
+      ariaDescribedby={ariaDescribedby}
     >
-      <textarea
-        id={inputId}
-        maxLength={maxLength}
-        className={mergeClasses(
-          TEXT_AREA_CLASSES,
-          error && ERROR_INPUT_CLASSES,
-          inputClassName
-        )}
-        value={value}
-        aria-invalid={!!error}
-        {...props}
-        aria-describedby={describedBy}
-      />
-    </FieldWrapper>
+      {({ inputId, describedBy }) => (
+        <textarea
+          id={inputId}
+          maxLength={maxLength}
+          className={mergeClasses(
+            TEXT_AREA_CLASSES,
+            error && ERROR_INPUT_CLASSES,
+            inputClassName
+          )}
+          value={value}
+          aria-invalid={!!error}
+          {...props}
+          aria-describedby={describedBy}
+        />
+      )}
+    </FormFieldContainer>
   );
 };
 
@@ -82,36 +74,32 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   "aria-describedby": ariaDescribedby,
   ...props
 }) => {
-  const { inputId, errorId, describedBy } = useFieldIds({
-    id,
-    error,
-    ariaDescribedby,
-  });
-
   return (
-    <FieldWrapper
-      inputId={inputId}
+    <FormFieldContainer
+      id={id}
       label={label}
       contextualLabel={contextualLabel}
       className={className}
       labelClassName={labelClassName}
       error={error}
-      errorId={errorId}
+      ariaDescribedby={ariaDescribedby}
     >
-      <select 
-        id={inputId} 
-        className={mergeClasses(
-          SELECT_CLASSES,
-          error && ERROR_INPUT_CLASSES,
-          inputClassName
-        )} 
-        aria-invalid={!!error}
-        {...props}
-        aria-describedby={describedBy}
-      >
-        {children}
-      </select>
-    </FieldWrapper>
+      {({ inputId, describedBy }) => (
+        <select 
+          id={inputId} 
+          className={mergeClasses(
+            SELECT_CLASSES,
+            error && ERROR_INPUT_CLASSES,
+            inputClassName
+          )} 
+          aria-invalid={!!error}
+          {...props}
+          aria-describedby={describedBy}
+        >
+          {children}
+        </select>
+      )}
+    </FormFieldContainer>
   );
 };
 
@@ -130,31 +118,27 @@ export const CheckboxField: React.FC<CheckboxFieldProps> = ({
   "aria-describedby": ariaDescribedby,
   ...props
 }) => {
-  const { inputId, errorId, describedBy } = useFieldIds({
-    id,
-    error,
-    ariaDescribedby,
-  });
-
   return (
-    <FieldWrapper
-      inputId={inputId}
+    <FormFieldContainer
+      id={id}
       label={label}
       contextualLabel={contextualLabel}
       className={className}
       labelClassName={labelClassName}
       error={error}
-      errorId={errorId}
       isCheckbox
+      ariaDescribedby={ariaDescribedby}
     >
-      <input
-        id={inputId}
-        type="checkbox"
-        className="size-5 shrink-0 rounded border-line-strong bg-surface text-action"
-        aria-invalid={!!error}
-        {...props}
-        aria-describedby={describedBy}
-      />
-    </FieldWrapper>
+      {({ inputId, describedBy }) => (
+        <input
+          id={inputId}
+          type="checkbox"
+          className="size-5 shrink-0 rounded border-line-strong bg-surface text-action"
+          aria-invalid={!!error}
+          {...props}
+          aria-describedby={describedBy}
+        />
+      )}
+    </FormFieldContainer>
   );
 };

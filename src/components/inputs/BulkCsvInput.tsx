@@ -40,6 +40,9 @@ import {
   skippedFromReport,
   formatErrorLogCsv,
   errorLogFileName,
+  isContactContentType,
+  autoDetectContactMapping,
+  type BulkContactMapping,
   type BulkContentType,
   type SkippedRow,
 } from '@/packages/bulk-csv';
@@ -101,8 +104,22 @@ function isExportFormat(value: string): value is BulkCsvData['exportFormat'] {
 }
 
 function isContentType(value: string): value is BulkContentType {
-  return value === 'link' || value === 'text';
+  return value === 'link' || value === 'text' || value === 'vcard' || value === 'contact';
 }
+
+const CONTACT_FIELD_CONTROLS: readonly {
+  key: keyof BulkContactMapping;
+  label: string;
+  id: string;
+  testId: string;
+}[] = [
+  { key: 'firstName', label: 'First Name', id: 'bulk-contact-firstname', testId: 'bulk-contact-firstname' },
+  { key: 'lastName', label: 'Last Name', id: 'bulk-contact-lastname', testId: 'bulk-contact-lastname' },
+  { key: 'phone', label: 'Phone', id: 'bulk-contact-phone', testId: 'bulk-contact-phone' },
+  { key: 'email', label: 'Email', id: 'bulk-contact-email', testId: 'bulk-contact-email' },
+  { key: 'organization', label: 'Organization', id: 'bulk-contact-organization', testId: 'bulk-contact-organization' },
+  { key: 'title', label: 'Job Title', id: 'bulk-contact-title', testId: 'bulk-contact-title' },
+];
 
 /** Plain-language reason a row that passed the checks still could not be turned into an image. */
 function describeRowFailure(err: unknown, errorCorrectionLevel: string): string {
@@ -160,30 +177,62 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   const rowNumbers = useMemo(() => outcome.table?.rowNumbers ?? [], [outcome]);
   const delimiterName = DELIMITER_NAMES[outcome.table?.delimiter ?? ','];
 
+  const exportFormat = data.exportFormat || 'png';
+  const contentType: BulkContentType = data.contentType ?? 'link';
+  const isContact = isContactContentType(contentType);
+  const contactMapping = data.contactMapping;
+
+  const autoContactMapping = useMemo(
+    () => (isContact ? autoDetectContactMapping(columns, rows) : {}),
+    [isContact, columns, rows]
+  );
+
   const payloadCol = columns.includes(data.payloadColumn)
     ? data.payloadColumn
     : pickColumn(columns, PAYLOAD_COLUMN_WORDS, { exclude: '', rows, kind: 'payload' });
+
+  const filenameExclude = useMemo(() => {
+    if (!isContact) return payloadCol;
+    const mappedCols = Object.values(autoContactMapping).filter((c): c is string => Boolean(c));
+    return mappedCols.length > 0 ? mappedCols : [payloadCol];
+  }, [isContact, payloadCol, autoContactMapping]);
+
   const filenameCol = columns.includes(data.filenameColumn)
     ? data.filenameColumn
-    : pickColumn(columns, FILENAME_COLUMN_WORDS, { exclude: payloadCol, rows, kind: 'filename' });
+    : pickColumn(columns, FILENAME_COLUMN_WORDS, { exclude: filenameExclude, rows, kind: 'filename' });
 
   const autoPayloadCol = useMemo(
     () => pickColumn(columns, PAYLOAD_COLUMN_WORDS, { exclude: '', rows, kind: 'payload' }),
     [columns, rows]
   );
   const autoFilenameCol = useMemo(
-    () => pickColumn(columns, FILENAME_COLUMN_WORDS, { exclude: payloadCol, rows, kind: 'filename' }),
-    [columns, rows, payloadCol]
+    () => pickColumn(columns, FILENAME_COLUMN_WORDS, { exclude: filenameExclude, rows, kind: 'filename' }),
+    [columns, rows, filenameExclude]
   );
 
   const isPayloadAutoMatched = !data.payloadColumn || data.payloadColumn === autoPayloadCol;
   const isFilenameAutoMatched = !data.filenameColumn || data.filenameColumn === autoFilenameCol;
-  const exportFormat = data.exportFormat || 'png';
-  const contentType: BulkContentType = data.contentType ?? 'link';
+
+  const effectiveContactMapping = useMemo<BulkContactMapping>(() => {
+    if (!isContact) return {};
+    const emailFieldValue =
+      contactMapping?.email !== undefined
+        ? contactMapping.email
+        : (autoContactMapping.email ?? '');
+    return {
+      firstName: contactMapping?.firstName !== undefined ? contactMapping.firstName : (autoContactMapping.firstName ?? ''),
+      lastName: contactMapping?.lastName !== undefined ? contactMapping.lastName : (autoContactMapping.lastName ?? ''),
+      phone: contactMapping?.phone !== undefined ? contactMapping.phone : (autoContactMapping.phone ?? ''),
+      ['email']: emailFieldValue,
+      organization: contactMapping?.organization !== undefined ? contactMapping.organization : (autoContactMapping.organization ?? ''),
+      title: contactMapping?.title !== undefined ? contactMapping.title : (autoContactMapping.title ?? ''),
+    };
+  }, [isContact, contactMapping, autoContactMapping]);
+
   const rowCount = rows.length;
   const preview = useMemo(
-    () => previewRow(data.csvContent, payloadCol, contentType),
-    [data.csvContent, payloadCol, contentType]
+    () => previewRow(data.csvContent, payloadCol, contentType, { contactMapping: effectiveContactMapping }),
+    [data.csvContent, payloadCol, contentType, effectiveContactMapping]
   );
 
   const validateRowConfig = useCallback((cfg: QRConfig) => {
@@ -194,10 +243,15 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   // colour or size changes don't re-check every row.
   const { borderText, templateHeadline, templateSubtext, frameText } = currentConfig;
   const preflightReport = useMemo(() => {
-    if (rows.length === 0 || !payloadCol) return null;
+    if (rows.length === 0) return null;
+    if (!isContact && !payloadCol) return null;
     const designText = { borderText, templateHeadline, templateSubtext, frameText };
-    return categorizeCsvRows(rows, payloadCol, designText, validateRowConfig, { contentType, rowNumbers });
-  }, [rows, payloadCol, borderText, templateHeadline, templateSubtext, frameText, validateRowConfig, contentType, rowNumbers]);
+    return categorizeCsvRows(rows, payloadCol, designText, validateRowConfig, {
+      contentType,
+      rowNumbers,
+      contactMapping: effectiveContactMapping,
+    });
+  }, [rows, payloadCol, isContact, borderText, templateHeadline, templateSubtext, frameText, validateRowConfig, contentType, rowNumbers, effectiveContactMapping]);
 
   // The preview row is left out of the ZIP: say so beside the preview, with the same reason.
   const previewProblem = useMemo(() => {
@@ -227,7 +281,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   // A skipped-rows list belongs to the file and settings it was made from.
   useEffect(() => {
     setSkippedRows([]);
-  }, [data.csvContent, payloadCol, contentType]);
+  }, [data.csvContent, payloadCol, contentType, effectiveContactMapping]);
 
   // Leaving the page stops a running batch, so no ZIP downloads on another page.
   useEffect(
@@ -243,8 +297,11 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     const updates: Partial<BulkCsvData> = {};
     if (payloadCol !== data.payloadColumn) updates.payloadColumn = payloadCol;
     if (filenameCol !== data.filenameColumn) updates.filenameColumn = filenameCol;
+    if (isContact && !data.contactMapping && Object.keys(autoContactMapping).length > 0) {
+      updates.contactMapping = autoContactMapping;
+    }
     if (Object.keys(updates).length > 0) onChange(updates);
-  }, [columns, payloadCol, filenameCol, data.payloadColumn, data.filenameColumn, onChange]);
+  }, [columns, payloadCol, filenameCol, data.payloadColumn, data.filenameColumn, isContact, data.contactMapping, autoContactMapping, onChange]);
 
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const input = e.target;
@@ -316,7 +373,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   };
 
   const startBatchGeneration = async () => {
-    if (!payloadCol) {
+    if (!isContact && !payloadCol) {
       addToast({
         type: 'error',
         message: 'Pick a Content Column first. It holds what goes in each code.',
@@ -325,8 +382,22 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       return;
     }
 
+    if (isContact && !Object.values(effectiveContactMapping).some(Boolean)) {
+      addToast({
+        type: 'error',
+        message: 'Map at least one contact column first.',
+        duration: 4000,
+      });
+      return;
+    }
+
     const report =
-      preflightReport || categorizeCsvRows(rows, payloadCol, currentConfig, validateRowConfig, { contentType, rowNumbers });
+      preflightReport ||
+      categorizeCsvRows(rows, payloadCol, currentConfig, validateRowConfig, {
+        contentType,
+        rowNumbers,
+        contactMapping: effectiveContactMapping,
+      });
     const preflightSkipped = skippedFromReport(report);
     setSkippedRows(preflightSkipped);
 
@@ -583,10 +654,16 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
           <div className="space-y-4 rounded-xl border border-line bg-surface-sunken p-4">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle pb-3">
               <div>
-                <h3 className="text-sm font-semibold text-fg">Column Mapping</h3>
-                <p className="text-xs text-fg-muted">Match your CSV columns to QR code content and file names</p>
+                <h3 className="text-sm font-semibold text-fg">
+                  {isContact ? 'Contact Field Mapping' : 'Column Mapping'}
+                </h3>
+                <p className="text-xs text-fg-muted">
+                  {isContact
+                    ? 'Match your CSV columns to contact card fields and file names'
+                    : 'Match your CSV columns to QR code content and file names'}
+                </p>
               </div>
-              {columns.length > 1 && (
+              {!isContact && columns.length > 1 && (
                 <Button
                   type="button"
                   variant="outline"
@@ -602,110 +679,257 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
               )}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2 rounded-lg border border-line bg-surface p-3.5 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold tracking-wider text-accent-strong uppercase">QR Content</span>
-                  {isPayloadAutoMatched ? (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong"
-                      data-testid="payload-auto-matched-badge"
+            {isContact ? (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {CONTACT_FIELD_CONTROLS.map(({ key, label, id, testId }) => {
+                    const currentVal = effectiveContactMapping[key] ?? '';
+                    const autoVal = autoContactMapping[key] ?? '';
+                    const isFieldAutoMatched = Boolean(
+                      currentVal && (!contactMapping?.[key] || contactMapping[key] === autoVal)
+                    );
+                    const isMapped = Boolean(currentVal && !isFieldAutoMatched);
+
+                    return (
+                      <div
+                        key={key}
+                        className="space-y-2 rounded-lg border border-line bg-surface p-3.5 shadow-2xs"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold tracking-wider text-accent-strong uppercase">
+                            {label}
+                          </span>
+                          {isFieldAutoMatched ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong"
+                              data-testid={`${testId}-auto-matched-badge`}
+                            >
+                              <Sparkles className="size-3" aria-hidden="true" />
+                              Auto-matched
+                            </span>
+                          ) : isMapped ? (
+                            <span
+                              className="inline-flex items-center rounded-full border border-line bg-surface-sunken px-2 py-0.5 text-xs font-medium text-fg-muted"
+                              data-testid={`${testId}-mapped-badge`}
+                            >
+                              Mapped
+                            </span>
+                          ) : (
+                            <span className="text-xs text-fg-muted italic">Optional</span>
+                          )}
+                        </div>
+
+                        <SelectField
+                          id={id}
+                          label={label}
+                          value={currentVal}
+                          data-testid={testId}
+                          onChange={(e) => {
+                            const updated = { ...effectiveContactMapping, [key]: e.target.value };
+                            onChange({ contactMapping: updated });
+                          }}
+                        >
+                          <option value="">(None)</option>
+                          {columns.map((col) => (
+                            <option key={col} value={col}>
+                              {col}
+                            </option>
+                          ))}
+                        </SelectField>
+
+                        {currentVal && rows[0]?.[currentVal] !== undefined && (
+                          <div
+                            className="rounded bg-surface-sunken p-2 text-xs text-fg-muted"
+                            data-testid={`${testId}-sample-preview`}
+                          >
+                            <span className="mb-0.5 block text-xs font-medium tracking-wider text-fg-soft uppercase">
+                              Sample Cell
+                            </span>
+                            <p className="truncate font-mono text-xs text-fg" title={rows[0][currentVal]}>
+                              {rows[0][currentVal] || <span className="text-fg-muted italic">(empty)</span>}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  <div className="space-y-2 rounded-lg border border-line bg-surface p-3.5 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold tracking-wider text-fg-soft uppercase">
+                        File Name
+                      </span>
+                      {isFilenameAutoMatched ? (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong"
+                          data-testid="filename-auto-matched-badge"
+                        >
+                          <Sparkles className="size-3" aria-hidden="true" />
+                          Auto-matched
+                        </span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center rounded-full border border-line bg-surface-sunken px-2 py-0.5 text-xs font-medium text-fg-muted"
+                          data-testid="filename-mapped-badge"
+                        >
+                          Mapped
+                        </span>
+                      )}
+                    </div>
+
+                    <SelectField
+                      id="bulk-filename-column"
+                      label="File Name Column"
+                      value={filenameCol}
+                      aria-describedby="bulk-filename-column-desc"
+                      onChange={(e) => onChange({ filenameColumn: e.target.value })}
                     >
-                      <Sparkles className="size-3" aria-hidden="true" />
-                      Auto-matched
+                      {columns.map((col) => (
+                        <option key={col} value={col}>
+                          {col}
+                        </option>
+                      ))}
+                    </SelectField>
+                    <span id="bulk-filename-column-desc" className="sr-only">
+                      {isFilenameAutoMatched ? 'Auto-matched column choice' : 'Manually mapped column choice'}
                     </span>
-                  ) : (
-                    <span
-                      className="inline-flex items-center rounded-full border border-line bg-surface-sunken px-2 py-0.5 text-xs font-medium text-fg-muted"
-                      data-testid="payload-mapped-badge"
+
+                    {rows[0]?.[filenameCol] !== undefined && (
+                      <div
+                        className="rounded bg-surface-sunken p-2 text-xs text-fg-muted"
+                        data-testid="bulk-filename-sample-preview"
+                      >
+                        <span className="mb-0.5 block text-xs font-medium tracking-wider text-fg-soft uppercase">
+                          Sample Cell
+                        </span>
+                        <p className="truncate font-mono text-xs text-fg" title={rows[0][filenameCol]}>
+                          {rows[0][filenameCol] || <span className="text-fg-muted italic">(empty)</span>}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 rounded-lg border border-line bg-surface p-3.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold tracking-wider text-accent-strong uppercase">
+                      QR Content
+                    </span>
+                    {isPayloadAutoMatched ? (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong"
+                        data-testid="payload-auto-matched-badge"
+                      >
+                        <Sparkles className="size-3" aria-hidden="true" />
+                        Auto-matched
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center rounded-full border border-line bg-surface-sunken px-2 py-0.5 text-xs font-medium text-fg-muted"
+                        data-testid="payload-mapped-badge"
+                      >
+                        Mapped
+                      </span>
+                    )}
+                  </div>
+
+                  <SelectField
+                    id="bulk-payload-column"
+                    label="Content Column"
+                    value={payloadCol}
+                    aria-describedby="bulk-payload-column-desc"
+                    onChange={(e) => onChange({ payloadColumn: e.target.value })}
+                  >
+                    {columns.map((col) => (
+                      <option key={col} value={col}>
+                        {col}
+                      </option>
+                    ))}
+                  </SelectField>
+                  <span id="bulk-payload-column-desc" className="sr-only">
+                    {isPayloadAutoMatched ? 'Auto-matched column choice' : 'Manually mapped column choice'}
+                  </span>
+
+                  {rows[0]?.[payloadCol] !== undefined && (
+                    <div
+                      className="rounded bg-surface-sunken p-2 text-xs text-fg-muted"
+                      data-testid="bulk-payload-sample-preview"
                     >
-                      Mapped
-                    </span>
+                      <span className="mb-0.5 block text-xs font-medium tracking-wider text-fg-soft uppercase">
+                        Sample Cell
+                      </span>
+                      <p className="truncate font-mono text-xs text-fg" title={rows[0][payloadCol]}>
+                        {rows[0][payloadCol] || <span className="text-fg-muted italic">(empty)</span>}
+                      </p>
+                    </div>
                   )}
                 </div>
 
-                <SelectField
-                  id="bulk-payload-column"
-                  label="Content Column"
-                  value={payloadCol}
-                  aria-describedby="bulk-payload-column-desc"
-                  onChange={(e) => onChange({ payloadColumn: e.target.value })}
-                >
-                  {columns.map((col) => (
-                    <option key={col} value={col}>
-                      {col}
-                    </option>
-                  ))}
-                </SelectField>
-                <span id="bulk-payload-column-desc" className="sr-only">
-                  {isPayloadAutoMatched ? 'Auto-matched column choice' : 'Manually mapped column choice'}
-                </span>
-
-                {rows[0]?.[payloadCol] !== undefined && (
-                  <div className="rounded bg-surface-sunken p-2 text-xs text-fg-muted" data-testid="bulk-payload-sample-preview">
-                    <span className="mb-0.5 block text-xs font-medium tracking-wider text-fg-soft uppercase">Sample Cell</span>
-                    <p className="truncate font-mono text-xs text-fg" title={rows[0][payloadCol]}>
-                      {rows[0][payloadCol] || <span className="text-fg-muted italic">(empty)</span>}
-                    </p>
+                <div className="space-y-2 rounded-lg border border-line bg-surface p-3.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold tracking-wider text-fg-soft uppercase">
+                      File Name
+                    </span>
+                    {isFilenameAutoMatched ? (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong"
+                        data-testid="filename-auto-matched-badge"
+                      >
+                        <Sparkles className="size-3" aria-hidden="true" />
+                        Auto-matched
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center rounded-full border border-line bg-surface-sunken px-2 py-0.5 text-xs font-medium text-fg-muted"
+                        data-testid="filename-mapped-badge"
+                      >
+                        Mapped
+                      </span>
+                    )}
                   </div>
-                )}
-              </div>
 
-              <div className="space-y-2 rounded-lg border border-line bg-surface p-3.5 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold tracking-wider text-fg-soft uppercase">File Name</span>
-                  {isFilenameAutoMatched ? (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong"
-                      data-testid="filename-auto-matched-badge"
+                  <SelectField
+                    id="bulk-filename-column"
+                    label="File Name Column"
+                    value={filenameCol}
+                    aria-describedby="bulk-filename-column-desc"
+                    onChange={(e) => onChange({ filenameColumn: e.target.value })}
+                  >
+                    {columns.map((col) => (
+                      <option key={col} value={col}>
+                        {col}
+                      </option>
+                    ))}
+                  </SelectField>
+                  <span id="bulk-filename-column-desc" className="sr-only">
+                    {isFilenameAutoMatched ? 'Auto-matched column choice' : 'Manually mapped column choice'}
+                  </span>
+
+                  {rows[0]?.[filenameCol] !== undefined && (
+                    <div
+                      className="rounded bg-surface-sunken p-2 text-xs text-fg-muted"
+                      data-testid="bulk-filename-sample-preview"
                     >
-                      <Sparkles className="size-3" aria-hidden="true" />
-                      Auto-matched
-                    </span>
-                  ) : (
-                    <span
-                      className="inline-flex items-center rounded-full border border-line bg-surface-sunken px-2 py-0.5 text-xs font-medium text-fg-muted"
-                      data-testid="filename-mapped-badge"
-                    >
-                      Mapped
-                    </span>
+                      <span className="mb-0.5 block text-xs font-medium tracking-wider text-fg-soft uppercase">
+                        Sample Cell
+                      </span>
+                      <p className="truncate font-mono text-xs text-fg" title={rows[0][filenameCol]}>
+                        {rows[0][filenameCol] || <span className="text-fg-muted italic">(empty)</span>}
+                      </p>
+                    </div>
                   )}
                 </div>
-
-                <SelectField
-                  id="bulk-filename-column"
-                  label="File Name Column"
-                  value={filenameCol}
-                  aria-describedby="bulk-filename-column-desc"
-                  onChange={(e) => onChange({ filenameColumn: e.target.value })}
-                >
-                  {columns.map((col) => (
-                    <option key={col} value={col}>
-                      {col}
-                    </option>
-                  ))}
-                </SelectField>
-                <span id="bulk-filename-column-desc" className="sr-only">
-                  {isFilenameAutoMatched ? 'Auto-matched column choice' : 'Manually mapped column choice'}
-                </span>
-
-                {rows[0]?.[filenameCol] !== undefined && (
-                  <div className="rounded bg-surface-sunken p-2 text-xs text-fg-muted" data-testid="bulk-filename-sample-preview">
-                    <span className="mb-0.5 block text-xs font-medium tracking-wider text-fg-soft uppercase">Sample Cell</span>
-                    <p className="truncate font-mono text-xs text-fg" title={rows[0][filenameCol]}>
-                      {rows[0][filenameCol] || <span className="text-fg-muted italic">(empty)</span>}
-                    </p>
-                  </div>
-                )}
               </div>
-            </div>
+            )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <SelectField
               id="bulk-content-type"
               label="Content Type"
-              value={contentType}
+              value={contentType === 'contact' ? 'vcard' : contentType}
               onChange={(e) => {
                 const value = e.target.value;
                 if (isContentType(value)) onChange({ contentType: value });
@@ -713,6 +937,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
             >
               <option value="link">Links (web addresses)</option>
               <option value="text">Plain text (exactly as typed)</option>
+              <option value="vcard">Contact Card</option>
             </SelectField>
 
             <SelectField
@@ -745,14 +970,23 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
             )}
           </div>
 
-          <BulkCsvRowPreview rows={rows} rowNumbers={rowNumbers} payloadColumn={payloadCol} filenameColumn={filenameCol} />
+          <BulkCsvRowPreview
+            rows={rows}
+            rowNumbers={rowNumbers}
+            payloadColumn={payloadCol}
+            filenameColumn={filenameCol}
+            contentType={contentType}
+            contactMapping={effectiveContactMapping}
+          />
 
           {preflightReport && <BulkCsvPreflightSummary report={preflightReport} fileName={data.fileName} />}
 
           <p className="text-xs text-fg-muted" data-testid="bulk-preview-row">
             {preview
               ? `Preview: row ${preview.rowNumber}. Each row becomes its own QR code in the ZIP.`
-              : 'No row has a value in the payload column, so there is nothing to preview.'}
+              : isContact
+                ? 'No row has valid contact information, so there is nothing to preview.'
+                : 'No row has a value in the payload column, so there is nothing to preview.'}
             {previewProblem && ` This row is left out of the ZIP: ${previewProblem.reason}`}
           </p>
 

@@ -17,11 +17,10 @@
 */
 
 // @vitest-environment jsdom
-// The key panel's hold (#1698): the words and the key QR share one rule, shown only while held.
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { axe } from '../../../../tests/utils/axe';
-import { SenderKeyPanel, type SenderKeyPanelProps } from './SenderKeyPanel';
+import { AUTO_HIDE_MS, SenderKeyPanel, type SenderKeyPanelProps } from './SenderKeyPanel';
 
 /** Renders the panel with spy handlers. */
 function renderPanel(overrides: Partial<SenderKeyPanelProps> = {}) {
@@ -36,61 +35,133 @@ function renderPanel(overrides: Partial<SenderKeyPanelProps> = {}) {
   return { ...render(<SenderKeyPanel {...props} />), props };
 }
 
-const qrButton = () => screen.getByRole('button', { name: 'Hold to show key QR' });
-const wordsButton = () => screen.getByRole('button', { name: 'Hold to show key code' });
-
 describe('SenderKeyPanel', () => {
-  it('shows the words only while their button is held', async () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('toggles the words on click and exposes dynamic aria-expanded', async () => {
     const { container } = renderPanel();
     expect(screen.queryByTestId('sender-key-code')).toBeNull();
-    fireEvent.pointerDown(wordsButton());
-    expect(screen.getByTestId('sender-key-code')).toHaveTextContent('baba dede');
-    fireEvent.pointerUp(wordsButton());
-    expect(screen.queryByTestId('sender-key-code')).toBeNull();
+    expect(screen.getByTestId('sender-key-code-hidden')).toBeInTheDocument();
+
+    const codeBtn = screen.getByRole('button', { name: 'Show key code' });
+    expect(codeBtn).toHaveAttribute('aria-expanded', 'false');
     expect(await axe(container)).toHaveNoViolations();
+
+    fireEvent.click(codeBtn);
+    expect(screen.getByTestId('sender-key-code')).toHaveTextContent('baba dede');
+    const hideBtn = screen.getByRole('button', { name: 'Hide key code' });
+    expect(hideBtn).toHaveAttribute('aria-expanded', 'true');
+    expect(await axe(container)).toHaveNoViolations();
+
+    fireEvent.click(hideBtn);
+    expect(screen.queryByTestId('sender-key-code')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Show key code' })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it.each([
-    ['pointer up', (el: HTMLElement) => fireEvent.pointerUp(el)],
-    ['pointer leave', (el: HTMLElement) => fireEvent.pointerLeave(el)],
-    ['pointer cancel', (el: HTMLElement) => fireEvent.pointerCancel(el)],
-    ['blur', (el: HTMLElement) => fireEvent.blur(el)],
-  ])('ends the key QR hold on %s', (_name, release) => {
-    const { props } = renderPanel();
-    fireEvent.pointerDown(qrButton());
+  it('toggles the key QR on click and calls props handlers', async () => {
+    const { container, props } = renderPanel();
+    const qrBtn = screen.getByRole('button', { name: 'Show key QR' });
+    expect(qrBtn).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(qrBtn);
     expect(props.onShowKeyQr).toHaveBeenCalledTimes(1);
-    release(qrButton());
+    const hideQrBtn = screen.getByRole('button', { name: 'Hide key QR' });
+    expect(hideQrBtn).toHaveAttribute('aria-expanded', 'true');
+    expect(await axe(container)).toHaveNoViolations();
+
+    fireEvent.click(hideQrBtn);
+    expect(props.onHideKeyQr).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Show key QR' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('automatically hides the key code after thirty seconds', () => {
+    vi.useFakeTimers();
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Show key code' }));
+    expect(screen.getByTestId('sender-key-code')).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(AUTO_HIDE_MS - 1);
+    });
+    expect(screen.getByTestId('sender-key-code')).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.queryByTestId('sender-key-code')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Show key code' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('automatically hides the key QR after thirty seconds', () => {
+    vi.useFakeTimers();
+    const { props } = renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Show key QR' }));
+    expect(props.onShowKeyQr).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(AUTO_HIDE_MS);
+    });
+    expect(props.onHideKeyQr).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Show key QR' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('clears the auto-hide timer when manually toggled off', () => {
+    vi.useFakeTimers();
+    const { props } = renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show key code' }));
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Hide key code' }));
+    expect(screen.queryByTestId('sender-key-code')).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(AUTO_HIDE_MS);
+    });
+    expect(screen.queryByTestId('sender-key-code')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show key QR' }));
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Hide key QR' }));
+    expect(props.onHideKeyQr).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(AUTO_HIDE_MS);
+    });
     expect(props.onHideKeyQr).toHaveBeenCalledTimes(1);
   });
 
-  it('holds with Space or Enter, ignores key repeat, and ends on key up', () => {
+  it('ends reveals when the window loses focus', () => {
     const { props } = renderPanel();
-    fireEvent.keyDown(qrButton(), { key: 'Enter' });
-    fireEvent.keyDown(qrButton(), { key: 'Enter', repeat: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Show key code' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show key QR' }));
+    expect(screen.getByTestId('sender-key-code')).toBeInTheDocument();
     expect(props.onShowKeyQr).toHaveBeenCalledTimes(1);
-    fireEvent.keyUp(qrButton(), { key: 'Enter' });
-    expect(props.onHideKeyQr).toHaveBeenCalledTimes(1);
-  });
 
-  it('ends both holds when the window loses focus, before the key QR has even arrived', () => {
-    const { props } = renderPanel();
-    fireEvent.pointerDown(wordsButton());
-    fireEvent.pointerDown(qrButton());
     act(() => {
       window.dispatchEvent(new Event('blur'));
     });
     expect(screen.queryByTestId('sender-key-code')).toBeNull();
     expect(props.onHideKeyQr).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Show key code' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'Show key QR' })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('ends the hold when the page is hidden, and not while it stays visible', () => {
+  it('ends the reveal when the page is hidden, and not while it stays visible', () => {
     const { props } = renderPanel();
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
-    fireEvent.pointerDown(qrButton());
+    fireEvent.click(screen.getByRole('button', { name: 'Show key QR' }));
+
     act(() => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
     expect(props.onHideKeyQr).not.toHaveBeenCalled();
+
     visibility.mockReturnValue('hidden');
     act(() => {
       document.dispatchEvent(new Event('visibilitychange'));
@@ -99,10 +170,12 @@ describe('SenderKeyPanel', () => {
     visibility.mockRestore();
   });
 
-  it('stops listening for window blur once nothing is held', () => {
+  it('stops listening for window blur once nothing is revealed', () => {
     const { props } = renderPanel();
-    fireEvent.pointerDown(qrButton());
-    fireEvent.pointerUp(qrButton());
+    fireEvent.click(screen.getByRole('button', { name: 'Show key QR' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hide key QR' }));
+    expect(props.onHideKeyQr).toHaveBeenCalledTimes(1);
+
     act(() => {
       window.dispatchEvent(new Event('blur'));
     });

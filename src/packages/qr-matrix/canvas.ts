@@ -23,6 +23,7 @@
 export {
   clampCornerRadius,
   drawRoundRect,
+  drawCornerRect,
   drawPoly,
   drawStar,
   drawRoughRect,

@@ -47,6 +47,9 @@ export const GITHUB_REGEX = /\b(gh[pousr]_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_
 // 7. Google Cloud or Firebase API Key
 export const GCP_REGEX = /\b(AIzaSy[a-zA-Z0-9_-]{33})\b/i;
 
+// 8. Cryptographic Private Key
+export const PRIVATE_KEY_REGEX = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
+
 // Helper to check if a value is a false positive
 export function isFalsePositive(secret, varName = '') {
   if (!secret) return true;
@@ -392,6 +395,21 @@ export function scanFile(filePath) {
           line: lineNumber,
           type: 'Google Cloud or Firebase API Key',
           match: gcpMatch[0],
+          secret: secret,
+        });
+      }
+    }
+
+    // Check Private Keys
+    const privateKeyMatch = line.match(PRIVATE_KEY_REGEX);
+    if (privateKeyMatch) {
+      const secret = privateKeyMatch[0];
+      if (!isFalsePositive(secret)) {
+        findings.push({
+          file: relativePath,
+          line: lineNumber,
+          type: 'Private Key',
+          match: privateKeyMatch[0],
           secret: secret,
         });
       }
