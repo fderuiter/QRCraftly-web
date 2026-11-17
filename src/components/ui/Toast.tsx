@@ -96,7 +96,8 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
   const addToast = useCallback((toast: Omit<ToastMessage, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { ...toast, id }]);
+    const persistent = Boolean(toast.persistent || toast.action);
+    setToasts((prev) => [...prev, { ...toast, persistent, id }]);
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -110,13 +111,29 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     setTimeout(drop, EXIT_DURATION_MS);
   }, []);
 
+  const politeToasts = toasts.filter((toast) => toast.type === 'info' || toast.type === 'success');
+  const assertiveToasts = toasts.filter((toast) => toast.type === 'warning' || toast.type === 'error');
+
   return (
     <ToastContext.Provider value={{ addToast, removeToast }}>
       {children}
       <div className="pointer-events-none fixed right-28 bottom-24 left-4 z-50 flex flex-col items-center gap-2 md:right-4 md:bottom-4 md:left-auto md:items-end">
-        {toasts.map((toast) => (
-          <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
-        ))}
+        <div
+          aria-live="polite"
+          className="flex w-full flex-col items-center gap-2 md:items-end"
+        >
+          {politeToasts.map((toast) => (
+            <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
+          ))}
+        </div>
+        <div
+          aria-live="assertive"
+          className="flex w-full flex-col items-center gap-2 md:items-end"
+        >
+          {assertiveToasts.map((toast) => (
+            <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
+          ))}
+        </div>
       </div>
     </ToastContext.Provider>
   );
@@ -147,7 +164,7 @@ const ToastItem = (props: { toast: ToastMessage; onRemove: (id: string) => void 
   };
 
   useEffect(() => {
-    if (toast.persistent || toast.closing || isHovered || isFocused) {
+    if (toast.persistent || Boolean(toast.action) || toast.closing || isHovered || isFocused) {
       return;
     }
 
