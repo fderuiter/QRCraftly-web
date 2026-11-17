@@ -31,6 +31,7 @@
  * pictures, real fiducials among random data, and captured frames with their header scrambled,
  * their fiducials painted over or a grid size the receiver does not know.
  */
+import { createMulberry32 } from '@/packages/core/math';
 import { HIGH_RATE_PROFILES, MODEM_PROFILES, capturedPoints, constellationId, encodeModemFrame, frameCapacity, simulateCapture, type ChannelPreset, type ModemProfile, type RgbaImage } from '../index';
 
 /** A point in camera pixels. */
@@ -55,14 +56,8 @@ interface Rng {
 }
 
 function createRng(seed: number): Rng {
-  let state = seed >>> 0;
-  const nextUint32 = (): number => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return (t ^ (t >>> 14)) >>> 0;
-  };
-  return { nextUint32, nextFloat: () => nextUint32() / 4294967296 };
+  const gen = createMulberry32(seed);
+  return { nextUint32: gen.nextUint32, nextFloat: gen };
 }
 
 /** Seeds for the held-out captures: never used to choose a threshold. */

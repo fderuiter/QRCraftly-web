@@ -16,19 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { createMulberry32 } from '@/packages/core/math';
+
 /**
  * Deterministic pseudo-random number generator (Mulberry32).
  * Produces uniform 32-bit floating point numbers in [0, 1).
  */
 export function createPrng(seed: number): () => number {
-  let a = seed >>> 0;
-  return function next(): number {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  return createMulberry32(seed);
 }
 
 /**
