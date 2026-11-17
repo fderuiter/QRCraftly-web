@@ -68,7 +68,18 @@ export { SmsContract, constructSmsString, hydrateSmsData } from './lib/generator
 export { PaymentContract, constructPaymentString, hydratePaymentData, paymentRefusal } from './lib/generators/payment';
 export { paymentAmountError } from './lib/paymentAmount';
 export { upiVpaError, UPI_NAME_MAX_LENGTH } from './lib/upi';
-export { EventContract, constructEventString, hydrateEventData } from './lib/generators/event';
+export {
+  EventContract,
+  constructEventString,
+  hydrateEventData,
+  parseRecurrenceRule,
+  buildGoogleCalendarUrl,
+  buildOutlookCalendarUrl,
+  buildYahooCalendarUrl,
+  type GoogleDateConfig,
+  type OutlookDateConfig,
+  type YahooDateConfig,
+} from './lib/generators/event';
 export { UrlContract, constructUrlString } from './lib/generators/url';
 export { constructTextString, hydrateTextData } from './lib/generators/text';
 export { constructLocationString, hydrateLocationData, coordinateError } from './lib/generators/location';

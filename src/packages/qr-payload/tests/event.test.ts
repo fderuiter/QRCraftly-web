@@ -17,7 +17,16 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { constructEventString, hydrateEventData, EventContract, identifyProtocol } from '../index';
+import {
+  constructEventString,
+  hydrateEventData,
+  EventContract,
+  identifyProtocol,
+  parseRecurrenceRule,
+  buildGoogleCalendarUrl,
+  buildOutlookCalendarUrl,
+  buildYahooCalendarUrl,
+} from '../index';
 import { CalendarProvider } from '../index';
 import { QRType } from '@/packages/core/types';
 
@@ -560,6 +569,141 @@ describe('Event generator', () => {
 
       const dangerousGoogleUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=Party&dates=20261015T100000/20261015T120000&location=javascript:alert(1)';
       expect(EventContract.validate?.(dangerousGoogleUrl)).toEqual(['URI_INJECTION_VIOLATION']);
+    });
+
+    it('constructs and hydrates all-day web calendar URLs', () => {
+      const allDayData = {
+        title: 'Conference Day',
+        startDate: '2026-10-15',
+        endDate: '2026-10-16',
+        location: 'Hall A',
+        description: 'All day conference',
+        allDay: true,
+      };
+
+      const googleUrl = constructEventString({ ...allDayData, provider: CalendarProvider.GOOGLE });
+      expect(googleUrl).toContain('calendar.google.com/calendar/render?');
+      expect(googleUrl).toContain('dates=20261015%2F20261017');
+      expect(hydrateEventData(googleUrl)).toEqual({ ...allDayData, provider: CalendarProvider.GOOGLE });
+
+      const outlookUrl = constructEventString({ ...allDayData, provider: CalendarProvider.OUTLOOK });
+      expect(outlookUrl).toContain('outlook.live.com');
+      expect(outlookUrl).toContain('allday=true');
+      expect(outlookUrl).toContain('startdt=2026-10-15');
+      expect(outlookUrl).toContain('enddt=2026-10-17');
+      expect(hydrateEventData(outlookUrl)).toEqual({ ...allDayData, provider: CalendarProvider.OUTLOOK });
+
+      const yahooUrl = constructEventString({ ...allDayData, provider: CalendarProvider.YAHOO });
+      expect(yahooUrl).toContain('calendar.yahoo.com');
+      expect(yahooUrl).toContain('DUR=allday');
+      expect(yahooUrl).toContain('ST=20261015');
+      expect(yahooUrl).toContain('ET=20261017');
+      expect(hydrateEventData(yahooUrl)).toEqual({ ...allDayData, provider: CalendarProvider.YAHOO });
+    });
+  });
+
+  describe('Shared recurrence rule parser', () => {
+    it('parses valid FREQ and COUNT from RRULE string', () => {
+      expect(parseRecurrenceRule('FREQ=WEEKLY;COUNT=5')).toEqual({
+        recurrenceFreq: 'WEEKLY',
+        recurrenceCount: 5,
+      });
+      expect(parseRecurrenceRule('RRULE:FREQ=DAILY;COUNT=30')).toEqual({
+        recurrenceFreq: 'DAILY',
+        recurrenceCount: 30,
+      });
+      expect(parseRecurrenceRule('FREQ=MONTHLY')).toEqual({
+        recurrenceFreq: 'MONTHLY',
+      });
+      expect(parseRecurrenceRule('FREQ=YEARLY;COUNT=1')).toEqual({
+        recurrenceFreq: 'YEARLY',
+        recurrenceCount: 1,
+      });
+    });
+
+    it('returns empty object for undefined or empty string', () => {
+      expect(parseRecurrenceRule()).toEqual({});
+      expect(parseRecurrenceRule('')).toEqual({});
+      expect(parseRecurrenceRule('UNKNOWN_FORMAT')).toEqual({});
+    });
+
+    it('caps count at 999 and ignores non-positive counts', () => {
+      expect(parseRecurrenceRule('FREQ=DAILY;COUNT=1500')).toEqual({
+        recurrenceFreq: 'DAILY',
+        recurrenceCount: 999,
+      });
+      expect(parseRecurrenceRule('FREQ=DAILY;COUNT=0')).toEqual({
+        recurrenceFreq: 'DAILY',
+      });
+    });
+  });
+
+  describe('Shared calendar URL builders', () => {
+    const baseEvent = {
+      title: 'Sprint Planning',
+      startDate: '2026-10-15T09:00',
+      endDate: '2026-10-15T10:00',
+      location: 'Room 101',
+      description: 'Sprint planning session',
+    };
+
+    it('builds Google Calendar URL with timed or all-day configurations', () => {
+      const timedUrl = buildGoogleCalendarUrl(baseEvent, {
+        dates: '20261015T090000/20261015T100000',
+        ctz: 'UTC',
+      });
+      expect(timedUrl).toContain('https://calendar.google.com/calendar/render?');
+      expect(timedUrl).toContain('action=TEMPLATE');
+      expect(timedUrl).toContain('text=Sprint+Planning');
+      expect(timedUrl).toContain('dates=20261015T090000%2F20261015T100000');
+      expect(timedUrl).toContain('ctz=UTC');
+
+      const allDayUrl = buildGoogleCalendarUrl(baseEvent, {
+        dates: '20261015/20261016',
+      });
+      expect(allDayUrl).toContain('dates=20261015%2F20261016');
+      expect(allDayUrl).not.toContain('ctz=');
+    });
+
+    it('builds Outlook and Office 365 URLs with timed or all-day configurations', () => {
+      const timedOutlook = buildOutlookCalendarUrl(baseEvent, CalendarProvider.OUTLOOK, {
+        startdt: '2026-10-15T09:00:00',
+        enddt: '2026-10-15T10:00:00',
+        ctz: 'America/New_York',
+      });
+      expect(timedOutlook).toContain('outlook.live.com');
+      expect(timedOutlook).toContain('startdt=2026-10-15T09%3A00%3A00');
+      expect(timedOutlook).toContain('ctz=America%2FNew_York');
+
+      const allDayOffice = buildOutlookCalendarUrl(baseEvent, CalendarProvider.OFFICE365, {
+        startdt: '2026-10-15',
+        enddt: '2026-10-16',
+        allDay: true,
+      });
+      expect(allDayOffice).toContain('outlook.office.com');
+      expect(allDayOffice).toContain('allday=true');
+      expect(allDayOffice).toContain('startdt=2026-10-15');
+      expect(allDayOffice).not.toContain('ctz=');
+    });
+
+    it('builds Yahoo Calendar URL with timed or all-day configurations', () => {
+      const timedYahoo = buildYahooCalendarUrl(baseEvent, {
+        st: '20261015T090000Z',
+        et: '20261015T100000Z',
+      });
+      expect(timedYahoo).toContain('calendar.yahoo.com');
+      expect(timedYahoo).toContain('ST=20261015T090000Z');
+      expect(timedYahoo).toContain('ET=20261015T100000Z');
+      expect(timedYahoo).not.toContain('DUR=allday');
+
+      const allDayYahoo = buildYahooCalendarUrl(baseEvent, {
+        st: '20261015',
+        et: '20261016',
+        allDay: true,
+      });
+      expect(allDayYahoo).toContain('ST=20261015');
+      expect(allDayYahoo).toContain('ET=20261016');
+      expect(allDayYahoo).toContain('DUR=allday');
     });
   });
 });
