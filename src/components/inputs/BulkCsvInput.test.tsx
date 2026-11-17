@@ -1230,4 +1230,152 @@ describe('Excel Spreadsheet Parsing (.xlsx)', () => {
     expect(await screen.findByText('Loaded solo.csv.')).toBeInTheDocument();
     expect(onChange).toHaveBeenLastCalledWith({ csvContent, fileName: 'solo.csv' });
   });
+
+  describe('Contact Card (vCard) Multi-Column Mode', () => {
+    const contactCsv = [
+      'First Name,Last Name,Phone,Email,Company,Role,BadgeID',
+      'Jane,Doe,+1-555-1234,jane.doe@example.com,Acme Corp,Engineer,ID001',
+      ',,+1-555-9999,missing-name@example.com,,,ID002', // missing identity
+      'Alice,Smith,555-0100,bad-email,Acme,Designer,ID003', // invalid email
+      ',,,,,,ID004', // empty
+    ].join('\n');
+
+    beforeEach(() => {
+      vi.mocked(downloadManager.triggerFileDownload).mockClear();
+    });
+
+    it('shows Contact Card option in the Content Type selector and switches mode', () => {
+      const onChange = vi.fn();
+      renderWithProvider(<BulkCsvInput data={{ ...initialData, csvContent: contactCsv }} onChange={onChange} />);
+
+      const contentTypeSelect = screen.getByLabelText('Content Type');
+      const contactOption = within(contentTypeSelect).getByRole('option', { name: 'Contact Card' });
+      expect(contactOption).toBeInTheDocument();
+      expect(contactOption).toHaveValue('vcard');
+
+      fireEvent.change(contentTypeSelect, { target: { value: 'vcard' } });
+      expect(onChange).toHaveBeenCalledWith({ contentType: 'vcard' });
+    });
+
+    it('renders contact mapping controls and automatically matches detected columns', () => {
+      const data: BulkCsvData = {
+        ...initialData,
+        csvContent: contactCsv,
+        contentType: 'vcard',
+      };
+      renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+
+      expect(screen.getByText('Contact Field Mapping')).toBeInTheDocument();
+
+      const firstNameSelect = screen.getByLabelText('First Name');
+      const lastNameSelect = screen.getByLabelText('Last Name');
+      const phoneSelect = screen.getByLabelText('Phone');
+      const emailSelect = screen.getByLabelText('Email');
+      const orgSelect = screen.getByLabelText('Organization');
+      const titleSelect = screen.getByLabelText('Job Title');
+      const fileSelect = screen.getByLabelText('File Name Column');
+
+      expect(firstNameSelect).toHaveValue('First Name');
+      expect(lastNameSelect).toHaveValue('Last Name');
+      expect(phoneSelect).toHaveValue('Phone');
+      expect(emailSelect).toHaveValue('Email');
+      expect(orgSelect).toHaveValue('Company');
+      expect(titleSelect).toHaveValue('Role');
+      expect(fileSelect).toHaveValue('BadgeID');
+
+      expect(screen.getByTestId('bulk-contact-firstname-auto-matched-badge')).toBeInTheDocument();
+      expect(screen.getByTestId('bulk-contact-lastname-auto-matched-badge')).toBeInTheDocument();
+      expect(screen.getByTestId('bulk-contact-phone-auto-matched-badge')).toBeInTheDocument();
+      expect(screen.getByTestId('bulk-contact-email-auto-matched-badge')).toBeInTheDocument();
+      expect(screen.getByTestId('bulk-contact-organization-auto-matched-badge')).toBeInTheDocument();
+    });
+
+    it('allows changing contact column mapping and updates mapping', () => {
+      const onChange = vi.fn();
+      const data: BulkCsvData = {
+        ...initialData,
+        csvContent: contactCsv,
+        contentType: 'vcard',
+      };
+      renderWithProvider(<BulkCsvInput data={data} onChange={onChange} />);
+
+      fireEvent.change(screen.getByLabelText('Organization'), { target: { value: 'Role' } });
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contactMapping: expect.objectContaining({ organization: 'Role' }),
+        })
+      );
+    });
+
+    it('flags rows without valid contact information in the preflight summary', () => {
+      const data: BulkCsvData = {
+        ...initialData,
+        csvContent: contactCsv,
+        contentType: 'vcard',
+      };
+      renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+
+      expect(screen.getByTestId('count-total')).toHaveTextContent('4');
+      expect(screen.getByTestId('count-valid')).toHaveTextContent('1');
+      expect(screen.getByTestId('count-empty')).toHaveTextContent('1');
+      expect(screen.getByTestId('count-unsafe')).toHaveTextContent('2');
+
+      // Expand details to see specific reasons
+      fireEvent.click(screen.getByTestId('preflight-expand-toggle'));
+      const detailsList = screen.getByTestId('preflight-details-list');
+      expect(detailsList).toHaveTextContent('Missing required contact identity');
+      expect(detailsList).toHaveTextContent('Invalid email address format');
+    });
+
+    it('generates a batch ZIP containing synthesized RFC vCards for valid rows', async () => {
+      const svgSpy = vi.spyOn(qrExport, 'generateQRSvg');
+      const data: BulkCsvData = {
+        ...initialData,
+        csvContent: contactCsv,
+        contentType: 'vcard',
+        exportFormat: 'svg',
+      };
+      renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+
+      const generateBtn = screen.getByRole('button', { name: /Generate Batch for 1 Valid Row/i });
+      fireEvent.click(generateBtn);
+
+      await waitFor(() => expect(downloadManager.triggerFileDownload).toHaveBeenCalled());
+      expect(zipEntryNames(downloadedZip())).toEqual(['ID001.svg']);
+
+      const encoded = encodedValues(svgSpy);
+      expect(encoded).toHaveLength(1);
+      expect(encoded[0]).toContain('BEGIN:VCARD');
+      expect(encoded[0]).toContain('VERSION:3.0');
+      expect(encoded[0]).toContain('FN:Jane Doe');
+      expect(encoded[0]).toContain('TEL:+1-555-1234');
+      expect(encoded[0]).toContain('EMAIL:jane.doe@example.com');
+      expect(encoded[0]).toContain('ORG:Acme Corp');
+      expect(encoded[0]).toContain('TITLE:Engineer');
+      expect(encoded[0]).toContain('END:VCARD');
+
+      svgSpy.mockRestore();
+    });
+
+    it('exports error log with specific validation failures for skipped contact rows', async () => {
+      const data: BulkCsvData = {
+        ...initialData,
+        fileName: 'badge-attendees.csv',
+        csvContent: contactCsv,
+        contentType: 'vcard',
+      };
+      renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+
+      const exportLogBtn = screen.getByTestId('export-error-log-button');
+      fireEvent.click(exportLogBtn);
+
+      expect(downloadManager.triggerFileDownload).toHaveBeenCalledTimes(1);
+      const [bytes, filename] = vi.mocked(downloadManager.triggerFileDownload).mock.calls[0];
+      expect(filename).toBe('badge-attendees-error-log.csv');
+      const text = new TextDecoder().decode(bytes);
+      expect(text).toContain('Row Number,Category,Reason,Payload');
+      expect(text).toContain('Missing required contact identity');
+      expect(text).toContain('Invalid email address format');
+    });
+  });
 });

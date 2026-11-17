@@ -49,7 +49,7 @@ In the generated `_headers` file, only the global `/*` rule sets `Content-Securi
 
 The headers in `public/_headers` only matter if the host sends them, so the Verify Production Deployment job checks the live site after every merge to `main`, and the Release workflow checks `qrcraftly.com` after every release (`e2e/production-headers.spec.ts`). Over plain HTTP, without a browser that could bypass the CSP, it checks:
 
-- every page, the 404 page, `sw.js`, `manifest.json` and both kinds of redirect (a retired route from `_redirects` and a dropped trailing slash) carry each header in the `/*` block of `public/_headers` with the same value;
+- every page, the 404 page, `sw.js`, `manifest.json` and both kinds of redirect (a retired route from `_redirects` and a dropped trailing slash) carry each header in the `/*` block of `public/_headers` with the same value, including cross-origin isolation headers (`Cross-Origin-Opener-Policy: same-origin` to isolate browsing contexts and sever external window references, and `Cross-Origin-Resource-Policy: same-origin` to restrict resource loading to the same origin);
 - every page sends a Content Security Policy with `default-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, no `'unsafe-inline'` or `'unsafe-eval'` scripts and no third-party origin, matching the page's own `<meta http-equiv>` policy (which omits framing directives);
 - only the `*.fpderuiter.workers.dev` hosts (the production workers.dev host and every preview) send `X-Robots-Tag: noindex`;
 - `/version.json` reports the commit (or release) being verified, and every file the service worker precaches is still served byte for byte: its SHA-256 must match the revision `sw.js` was built with.
@@ -80,7 +80,7 @@ Please email [fpderuiter+qrcraftly@gmail.com](mailto:fpderuiter+qrcraftly@gmail.
   - Data leaks (e.g., data being sent to a server).
   - XSS vulnerabilities.
   - Improper configuration of the client-side generator (including vCard 2.1, 3.0, 4.0, MECard, and iCalendar event RRULE recurrence formats).
-  - Bulk CSV processing (including link/text content types and PNG/SVG/EPS/PDF export formats), custom PNG export resolution settings, & batch ZIP generation privacy boundary violations.
+  - Bulk CSV processing (including link/text/contact content types, multi-column contact mapping with preflight vCard synthesis, and PNG/SVG/EPS/PDF export formats), custom PNG export resolution settings, & batch ZIP generation privacy boundary violations.
 - **Out of Scope:**
   - Physical security of the user's device.
   - Browser-level vulnerabilities.

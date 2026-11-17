@@ -9,6 +9,8 @@ import { ToastProvider } from '../ui/Toast';
 import { PATTERNS, PRESET_COLORS } from '../../constants';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { QRStyle } from '@/packages/core/types';
+import * as qrMatrix from '@/packages/qr-matrix';
+import { generateQRSvg } from '@/packages/qr-export';
 
 vi.mock('@/packages/qr-export', () => ({
   generateQRSvg: vi.fn(async () => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>'),
@@ -199,5 +201,66 @@ describe('StyleGallery', () => {
       { offset: 0, color: '#334155' },
       { offset: 1, color: '#00ff00' },
     ]);
+  });
+
+  it('builds the QRModules instance exactly once per settled configuration update and injects it into thumbnail calls', async () => {
+    const buildMatrixSpy = vi.spyOn(qrMatrix, 'buildMatrix');
+    buildMatrixSpy.mockClear();
+    vi.mocked(generateQRSvg).mockClear();
+
+    let storeHandle!: ReturnType<typeof useQRStore>;
+    function MatrixHarness({ onStore }: { onStore: (store: ReturnType<typeof useQRStore>) => void }) {
+      const store = useQRStore();
+      onStore(store);
+      const config = useQRStoreSelector((s) => s.config);
+      return <StyleGallery config={config} onChange={store.updateConfig} />;
+    }
+
+    const { container } = render(
+      <ToastProvider>
+        <QRProvider>
+          <MatrixHarness onStore={(s) => { storeHandle = s; }} />
+        </QRProvider>
+      </ToastProvider>
+    );
+
+    // Initial render with uncached payload (unique value to avoid cache hits from previous tests)
+    const uniqueValue = `https://example.com/test-${Date.now()}`;
+    act(() => {
+      storeHandle.updateConfig({ value: uniqueValue });
+    });
+
+    await waitFor(() => {
+      expect(buildMatrixSpy).toHaveBeenCalledTimes(1);
+    });
+
+    // Verify that generateQRSvg was called with the precomputed modules matrix for each unique thumbnail
+    await waitFor(() => {
+      expect(vi.mocked(generateQRSvg).mock.calls.length).toBeGreaterThanOrEqual(16);
+    });
+
+    for (const call of vi.mocked(generateQRSvg).mock.calls) {
+      expect(call[1]).toEqual(
+        expect.objectContaining({
+          modules: expect.objectContaining({
+            size: expect.any(Number),
+            get: expect.any(Function),
+          }),
+        })
+      );
+    }
+
+    // Now update configuration with another settled payload and verify exactly one more buildMatrix call
+    buildMatrixSpy.mockClear();
+    const secondUniqueValue = `https://example.com/test-second-${Date.now()}`;
+    act(() => {
+      storeHandle.updateConfig({ value: secondUniqueValue });
+    });
+
+    await waitFor(() => {
+      expect(buildMatrixSpy).toHaveBeenCalledTimes(1);
+    });
+
+    buildMatrixSpy.mockRestore();
   });
 });

@@ -19,26 +19,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/Button';
 
-/**
- * Button handlers that show something only while the button is held, by pointer or with Space or
- * Enter, and hide it when the button is let go or loses focus.
- * @param show - Shows it.
- * @param hide - Hides it.
- * @returns Props for a `Button`.
- */
-function holdToShow(show: () => void, hide: () => void) {
-  return {
-    onPointerDown: show,
-    onPointerUp: hide,
-    onPointerLeave: hide,
-    onPointerCancel: hide,
-    onBlur: hide,
-    onKeyDown: (event: React.KeyboardEvent) => {
-      if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) show();
-    },
-    onKeyUp: hide,
-  };
-}
+export const AUTO_HIDE_MS = 30_000;
 
 export interface SenderKeyPanelProps {
   /** The eight words of the key code. */
@@ -51,32 +32,69 @@ export interface SenderKeyPanelProps {
 }
 
 /**
- * A private transfer's key (#1144): the words and the key QR show only while their button is
- * held, never beside the stream by default. Both follow the same hold: it ends on release, pointer
- * leave or cancel, focus loss, and also when the window loses focus or the page is hidden, which
- * Safari's buttons do not report as blur because a click does not focus them (#1698).
+ * A private transfer's key (#1144): the words and the key QR show upon click with a 30-second
+ * auto-hide window, never beside the stream by default. Secrets can be manually toggled off, and
+ * both close immediately when the window loses focus or the page is hidden (#1698).
  * @returns The key panel.
  */
 export function SenderKeyPanel({ keyCode, showingKeyQr, keyCanvasRef, onShowKeyQr, onHideKeyQr }: SenderKeyPanelProps) {
   const [showingKeyCode, setShowingKeyCode] = React.useState(false);
-  /** Whether the key QR button is held, from the press, before the worker has drawn the code. */
-  const [holdingKeyQr, setHoldingKeyQr] = React.useState(false);
+  /** Whether the key QR reveal was requested, before or while the worker draws the code. */
+  const [revealingKeyQr, setRevealingKeyQr] = React.useState(false);
+
   const showKeyQr = React.useCallback(() => {
-    setHoldingKeyQr(true);
+    setRevealingKeyQr(true);
     onShowKeyQr();
   }, [onShowKeyQr]);
+
   const hideKeyQr = React.useCallback(() => {
-    setHoldingKeyQr(false);
+    setRevealingKeyQr(false);
     onHideKeyQr();
   }, [onHideKeyQr]);
-  const holding = showingKeyCode || holdingKeyQr;
+
+  const hideAll = React.useCallback(() => {
+    setShowingKeyCode(false);
+    hideKeyQr();
+  }, [hideKeyQr]);
+
+  const isKeyQrRevealed = revealingKeyQr || showingKeyQr;
+
+  const toggleKeyCode = React.useCallback(() => {
+    setShowingKeyCode((prev) => !prev);
+  }, []);
+
+  const toggleKeyQr = React.useCallback(() => {
+    if (isKeyQrRevealed) {
+      hideKeyQr();
+    } else {
+      showKeyQr();
+    }
+  }, [isKeyQrRevealed, hideKeyQr, showKeyQr]);
 
   React.useEffect(() => {
-    if (!holding) return undefined;
-    const hideAll = () => {
+    if (!showingKeyCode) return undefined;
+    const timer = setTimeout(() => {
       setShowingKeyCode(false);
-      hideKeyQr();
+    }, AUTO_HIDE_MS);
+    return () => {
+      clearTimeout(timer);
     };
+  }, [showingKeyCode]);
+
+  React.useEffect(() => {
+    if (!isKeyQrRevealed) return undefined;
+    const timer = setTimeout(() => {
+      hideKeyQr();
+    }, AUTO_HIDE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isKeyQrRevealed, hideKeyQr]);
+
+  const isRevealed = showingKeyCode || isKeyQrRevealed;
+
+  React.useEffect(() => {
+    if (!isRevealed) return undefined;
     const hideWhenHidden = () => {
       if (document.visibilityState === 'hidden') hideAll();
     };
@@ -86,7 +104,7 @@ export function SenderKeyPanel({ keyCode, showingKeyQr, keyCanvasRef, onShowKeyQ
       window.removeEventListener('blur', hideAll);
       document.removeEventListener('visibilitychange', hideWhenHidden);
     };
-  }, [holding, hideKeyQr]);
+  }, [isRevealed, hideAll]);
 
   return (
     <div className="space-y-2 rounded-lg border border-line bg-surface p-3" data-testid="sender-key-panel">
@@ -101,14 +119,22 @@ export function SenderKeyPanel({ keyCode, showingKeyQr, keyCanvasRef, onShowKeyQ
         )}
       </p>
       <p className="text-fg-muted">
-        Hold a button to show the eight words to read to the receiver, or a QR code they can scan. Anyone filming this screen while the key shows can read the file, so show it only out of view of other cameras.
+        Toggle a button to show the eight words to read to the receiver, or a QR code they can scan. Anyone filming this screen while the key shows can read the file, so show it only out of view of other cameras.
       </p>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" {...holdToShow(() => setShowingKeyCode(true), () => setShowingKeyCode(false))}>
-          Hold to show key code
+        <Button
+          variant="outline"
+          onClick={toggleKeyCode}
+          aria-expanded={showingKeyCode}
+        >
+          {showingKeyCode ? 'Hide key code' : 'Show key code'}
         </Button>
-        <Button variant="outline" {...holdToShow(showKeyQr, hideKeyQr)}>
-          Hold to show key QR
+        <Button
+          variant="outline"
+          onClick={toggleKeyQr}
+          aria-expanded={isKeyQrRevealed}
+        >
+          {isKeyQrRevealed ? 'Hide key QR' : 'Show key QR'}
         </Button>
       </div>
       <canvas
