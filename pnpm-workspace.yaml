@@ -54,3 +54,12 @@ overrides:
   # GHSA-g3hv-75wg-m249 (minimatch globparts DoS, < 11.0.1). typescript-estree pins minimatch 10.
   "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
 
+
+# Upstream advisories ignored until a patched version is published upstream.
+# GHSA-fc5q-39xc-vjpf / CVE-2026-112366: picomatch <= 4.0.7 ReDoS through single-branch repeated extglobs.
+# Currently picomatch 4.0.7 is the latest version published on npm and no patched release (> 4.0.7) exists yet.
+auditConfig:
+  ignoreCves:
+    - CVE-2026-112366
+  ignoreGhsas:
+    - GHSA-fc5q-39xc-vjpf
