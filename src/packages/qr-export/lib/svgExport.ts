@@ -38,7 +38,7 @@ import { isCanvasScannable } from '@/packages/scannability/scan';
  * If conversion fails (e.g. CORS or network error) or the URL is dangerous,
  * it returns null so the image is safely omitted.
  */
-async function toDataUrl(url: string, signal?: AbortSignal): Promise<string | null> {
+async function toDataUrl(url?: string | null, signal?: AbortSignal): Promise<string | null> {
   if (!url) return null;
 
   // Synchronously retrieve from transparent in-memory cache if available
@@ -47,44 +47,44 @@ async function toDataUrl(url: string, signal?: AbortSignal): Promise<string | nu
     return cached;
   }
 
-  const normalized = normalizeUrl(url).toLowerCase();
-
-  if (normalized.startsWith('data:')) {
-    if (normalized.startsWith('data:image/')) {
-      if (normalized.startsWith('data:image/svg+xml')) {
-        try {
-          const isBase64 = normalized.includes('base64');
-          const commaIndex = url.indexOf(',');
-          if (commaIndex !== -1) {
-            const rawContent = url.substring(commaIndex + 1);
-            let decoded = '';
-            if (isBase64) {
-              decoded = decodeURIComponent(escape(atob(rawContent)));
-            } else {
-              decoded = decodeURIComponent(rawContent);
-            }
-            const sanitized = sanitizeSvg(decoded);
-            const base64 = btoa(unescape(encodeURIComponent(sanitized)));
-            return `data:image/svg+xml;base64,${base64}`;
-          }
-        } catch {
-          return null; // Omit if malformed
-        }
-      }
-      return url;
-    }
-    return null;
-  }
-
-  if (url === 'xmlns="http://www.w3.org/2000/svg"') {
-    return null;
-  }
-
-  if (SafeUrlPipeline.isDangerous(url)) {
-    return null;
-  }
-
   try {
+    const normalized = normalizeUrl(url).toLowerCase();
+
+    if (normalized.startsWith('data:')) {
+      if (normalized.startsWith('data:image/')) {
+        if (normalized.startsWith('data:image/svg+xml')) {
+          try {
+            const isBase64 = normalized.includes('base64');
+            const commaIndex = url.indexOf(',');
+            if (commaIndex !== -1) {
+              const rawContent = url.substring(commaIndex + 1);
+              let decoded = '';
+              if (isBase64) {
+                decoded = decodeURIComponent(escape(atob(rawContent)));
+              } else {
+                decoded = decodeURIComponent(rawContent);
+              }
+              const sanitized = sanitizeSvg(decoded);
+              const base64 = btoa(unescape(encodeURIComponent(sanitized)));
+              return `data:image/svg+xml;base64,${base64}`;
+            }
+          } catch {
+            return null; // Omit if malformed
+          }
+        }
+        return url;
+      }
+      return null;
+    }
+
+    if (url === 'xmlns="http://www.w3.org/2000/svg"') {
+      return null;
+    }
+
+    if (SafeUrlPipeline.isDangerous(url)) {
+      return null;
+    }
+
     // The CSP (connect-src 'self') limits this to same-origin images.
     const response = await fetch(url, { mode: 'cors', signal });
     if (!response.ok) return null;
@@ -297,22 +297,17 @@ export async function generateQRSvg(
   const hasRemoteLogo = isRemoteLogo(config.logoUrl);
   const hasRemoteBorderLogo = config.isBorderEnabled && isRemoteLogo(config.borderLogoUrl);
 
-  const logoDataUrl = config.logoUrl ? await toDataUrl(config.logoUrl) : null;
+  const [logoDataUrl, borderLogoDataUrl] = await Promise.all([
+    toDataUrl(config.logoUrl),
+    toDataUrl(config.isBorderEnabled ? config.borderLogoUrl : null),
+    config.mosaicImageUrl ? loadMosaicSource(config.mosaicImageUrl).catch(() => null) : null,
+  ]);
   const logoImg = logoDataUrl ? makeImgProxy(logoDataUrl) : null;
-
-  const borderLogoDataUrl = config.isBorderEnabled && config.borderLogoUrl
-    ? await toDataUrl(config.borderLogoUrl)
-    : null;
   const borderLogoImg = borderLogoDataUrl ? makeImgProxy(borderLogoDataUrl) : null;
 
   const logoOmitted = (hasRemoteLogo && !logoDataUrl) || (hasRemoteBorderLogo && !borderLogoDataUrl);
   if (logoOmitted && options?.onLogoOmitted) {
     options.onLogoOmitted();
-  }
-
-  // Decode the Mosaic QR image (if any) so the renderer can tile it into the modules
-  if (config.mosaicImageUrl) {
-    await loadMosaicSource(config.mosaicImageUrl);
   }
 
   // Determine output dimensions from the social format (canonical resolution)
