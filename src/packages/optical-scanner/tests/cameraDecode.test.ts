@@ -83,4 +83,20 @@ describe('camera-frame decoding', () => {
     expect(decodeCameraFrame(shifted, frame.width, frame.height, 'centre')).toBeNull();
     expect(decodeCameraFrame(shifted, frame.width, frame.height, 'frame')).toBe(TEXT);
   });
+
+  it('passes inverted option to reader without mutating frame data for inverted strategy', () => {
+    let capturedOptions: unknown;
+    const testReader: QrReader = {
+      read: (_data, _w, _h, options) => {
+        capturedOptions = options;
+        return [];
+      },
+      readTracked: (...args) => qrReader.readTracked(...args),
+    };
+    const frameData = new Uint8ClampedArray([10, 20, 30, 255]);
+    const originalCopy = new Uint8ClampedArray(frameData);
+    decodeWith(testReader, frameData, 1, 1, 'inverted');
+    expect(capturedOptions).toEqual({ inverted: true });
+    expect(frameData).toEqual(originalCopy);
+  });
 });
