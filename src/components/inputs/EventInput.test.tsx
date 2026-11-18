@@ -127,4 +127,96 @@ describe('EventInput', () => {
     fireEvent.change(repeatSelect, { target: { value: 'HOURLY' } });
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it('renders inline error on end date when end time precedes start time in timed events', () => {
+    render(
+      <EventInput
+        data={{
+          ...event,
+          startDate: '2025-12-24T18:00',
+          endDate: '2025-12-24T12:00',
+        }}
+        onChange={vi.fn()}
+      />
+    );
+
+    const endDateInput = screen.getByLabelText('End Date & Time');
+    expect(endDateInput).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Event end date/time cannot be before start date/time.'
+    );
+  });
+
+  it('renders inline error on last day when end date precedes start date in all-day events', () => {
+    render(
+      <EventInput
+        data={{
+          ...event,
+          allDay: true,
+          startDate: '2025-12-26',
+          endDate: '2025-12-24',
+        }}
+        onChange={vi.fn()}
+      />
+    );
+
+    const lastDayInput = screen.getByLabelText('Last Day');
+    expect(lastDayInput).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Event end date/time cannot be before start date/time.'
+    );
+  });
+
+  it('does not render error for valid chronology or equal start and end times', () => {
+    const { rerender } = render(
+      <EventInput
+        data={{
+          ...event,
+          startDate: '2025-12-24T12:00',
+          endDate: '2025-12-24T18:00',
+        }}
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('End Date & Time')).toHaveAttribute('aria-invalid', 'false');
+
+    rerender(
+      <EventInput
+        data={{
+          ...event,
+          startDate: '2025-12-24T12:00',
+          endDate: '2025-12-24T12:00',
+        }}
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('does not render error while typing when only one date field is set', () => {
+    const { rerender } = render(
+      <EventInput
+        data={{
+          ...event,
+          startDate: '2025-12-24T12:00',
+          endDate: '',
+        }}
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    rerender(
+      <EventInput
+        data={{
+          ...event,
+          startDate: '',
+          endDate: '2025-12-24T12:00',
+        }}
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });

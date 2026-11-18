@@ -73,7 +73,7 @@ export const typeGuides: Record<string, TypeGuide> = {
     intro:
       'Turn each row of a spreadsheet into a QR code in one run. Download hundreds of codes in a single ZIP file.',
     scanned: [
-      'Each code in the batch scans according to its row data: web links open in the browser, and text shows on screen.',
+      'Each code in the batch scans according to its content type: web links open in the browser, plain text displays on screen, and contact cards prompt phones to save the contact directly to address books without typing.',
       'Every code is independent and static, storing its payload directly without tracking or redirect servers.',
     ],
     useCases: [
@@ -82,14 +82,16 @@ export const typeGuides: Record<string, TypeGuide> = {
       'Product packaging batches and shelf tags from a catalogue export.',
     ],
     printing: [
-      'Choose SVG for vector printing that scales to any size, or high-resolution PNG for label printers.',
-      'Base your label size on the longest entry in your file, because longer text creates denser codes.',
-      'Print and scan a few sample labels before running a large batch through a label printer.',
+      'Choose SVG or EPS for vector printing on commercial presses, PDF for sharp document collation, or high-resolution PNG for label printers.',
+      'Vector EPS and PDF exports retain sharp geometry at any print dimension without pixelation or raster blur.',
+      'Base your label size on the longest entry in your file, because multi-column contact cards and longer text create denser codes.',
+      'Print and scan a few sample labels before running a large batch through a label printer or commercial press.',
     ],
     checks: [
-      'Confirm the column headers match your intended content and file naming columns before generating.',
+      'Confirm column headers match your intended content or contact card fields (first name, last name, phone, email, organization, title) and file naming column.',
+      'Preflight synthesis checks verify contact identity (first name, last name, or organization) and valid email formatting before generation.',
+      'Review any flagged empty, invalid, or caution rows shown on screen before downloading the archive.',
       'Keep batches to 500 rows or fewer; split larger spreadsheets into separate CSV files.',
-      'Review any flagged empty or invalid rows shown on screen before downloading the archive.',
     ],
     privacy:
       'All CSV parsing, QR code rendering and ZIP packaging happen entirely in your browser. Your spreadsheet data is never uploaded to any server.',

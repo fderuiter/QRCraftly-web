@@ -343,6 +343,7 @@ export function synthesizeVCardPayload(
     website,
     street: '',
     city: '',
+    state: '',
     zip: '',
     country: '',
   };

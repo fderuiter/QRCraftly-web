@@ -390,3 +390,72 @@ describe('lint runs its checks in parallel groups (#1616)', () => {
     expect(workflow).toContain('pnpm run test:semgrep');
   });
 });
+
+describe('Branch cleanup workflow (cleanup.yml)', () => {
+  const cleanupWorkflow = read('.github/workflows/cleanup.yml');
+
+  it('runs on schedule and workflow_dispatch', () => {
+    expect(cleanupWorkflow).toMatch(/schedule:\n\s+- cron: '0 2 \* \* 0'/);
+    expect(cleanupWorkflow).toContain('workflow_dispatch:');
+  });
+
+  it('resolves default branch from payload, REST API fallback, or main fallback', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const scriptMatch = cleanupWorkflow.match(/script:\s*\|\n([\s\S]*?)(?=\n\s*\/\/\s*Get all unprotected branches)/);
+    expect(scriptMatch).not.toBeNull();
+    const scriptCode = scriptMatch![1];
+
+    const runResolution = async (context: any, github: any) => {
+      const fn = new Function(
+        'context',
+        'github',
+        `
+        return (async () => {
+          ${scriptCode}
+          return defaultBranch;
+        })();
+      `
+      );
+      return await fn(context, github);
+    };
+
+    // 1. Scheduled run with empty payload (context.payload = {}) -> queries REST API
+    const getRepoMock1 = vi.fn().mockResolvedValue({ data: { default_branch: 'develop' } });
+    const result1 = await runResolution(
+      { repo: { owner: 'fderuiter', repo: 'QRCraftly-web' }, payload: {} },
+      { rest: { repos: { get: getRepoMock1 } } }
+    );
+    expect(result1).toBe('develop');
+    expect(getRepoMock1).toHaveBeenCalledWith({ owner: 'fderuiter', repo: 'QRCraftly-web' });
+
+    // 2. Event with context.payload.repository present -> avoids REST API call
+    const getRepoMock2 = vi.fn();
+    const result2 = await runResolution(
+      { repo: { owner: 'fderuiter', repo: 'QRCraftly-web' }, payload: { repository: { default_branch: 'custom-main' } } },
+      { rest: { repos: { get: getRepoMock2 } } }
+    );
+    expect(result2).toBe('custom-main');
+    expect(getRepoMock2).not.toHaveBeenCalled();
+
+    // 3. REST API failure during scheduled run -> falls back to 'main'
+    const getRepoMock3 = vi.fn().mockRejectedValue(new Error('API rate limit exceeded'));
+    const result3 = await runResolution(
+      { repo: { owner: 'fderuiter', repo: 'QRCraftly-web' }, payload: {} },
+      { rest: { repos: { get: getRepoMock3 } } }
+    );
+    expect(result3).toBe('main');
+
+    // 4. REST API returns empty/undefined default_branch -> falls back to 'main'
+    const getRepoMock4 = vi.fn().mockResolvedValue({ data: {} });
+    const result4 = await runResolution(
+      { repo: { owner: 'fderuiter', repo: 'QRCraftly-web' }, payload: {} },
+      { rest: { repos: { get: getRepoMock4 } } }
+    );
+    expect(result4).toBe('main');
+  });
+
+  it('ensures downstream trunk protection and compareCommits reference valid default branch', () => {
+    expect(cleanupWorkflow).toContain("const longLived = new Set(['main', defaultBranch]);");
+    expect(cleanupWorkflow).toContain('base: defaultBranch,');
+  });
+});
