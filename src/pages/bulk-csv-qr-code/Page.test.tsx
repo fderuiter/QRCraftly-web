@@ -20,6 +20,8 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Page from './+Page';
 import { getPageSchema } from '@/data/pageContent';
+import { copy } from '@/data/copy/bulk-csv-qr-code';
+import { typeGuides } from '@/data/typeGuides';
 
 interface SchemaNode {
   '@type'?: string | string[];
@@ -72,5 +74,39 @@ describe('Bulk CSV QR Code Page', () => {
     const howTo = json['@graph'].find((item) => item['@type'] === 'HowTo');
     expect(howTo).toBeDefined();
     expect(howTo?.step).toHaveLength(3);
+  });
+
+  it('includes updated copy and type guide details for contact mapping and vector formats', () => {
+    const json: unknown = JSON.parse(JSON.stringify(getPageSchema('/bulk-csv-qr-code')));
+    if (!isSchemaGraph(json)) throw new Error('Expected a JSON-LD @graph');
+    const howTo = json['@graph'].find((item) => item['@type'] === 'HowTo') as {
+      step: { name: string; text: string }[];
+    };
+    expect(howTo).toBeDefined();
+    expect(howTo.step).toHaveLength(3);
+    expect(howTo.step[1].text).toMatch(/Contact Card/);
+    expect(howTo.step[1].text).toMatch(/multi-column/);
+    expect(howTo.step[2].text).toMatch(/PNG, SVG, EPS, or PDF/);
+
+    expect(copy.howTo).toBeDefined();
+    expect(copy.howTo?.steps[1].text.split(/\s+/).length).toBeLessThan(20);
+    expect(copy.howTo?.steps[2].text.split(/\s+/).length).toBeLessThan(20);
+
+    const formatFaq = copy.faqs?.find((f) => f.question.includes('Which formats'));
+    expect(formatFaq?.answer).toMatch(/PNG/);
+    expect(formatFaq?.answer).toMatch(/SVG/);
+    expect(formatFaq?.answer).toMatch(/EPS/);
+    expect(formatFaq?.answer).toMatch(/PDF/);
+
+    const contactFaq = copy.faqs?.find((f) => f.question.includes('Contact Card'));
+    expect(contactFaq).toBeDefined();
+    expect(contactFaq?.answer).toMatch(/first name, last name, phone, email, organization, and job title/);
+    expect(contactFaq?.answer).toMatch(/match automatically/);
+    expect(contactFaq?.answer).toMatch(/first name, last name, or organization/);
+
+    const bulkGuide = typeGuides['bulk-csv-qr-code'];
+    expect(bulkGuide.scanned.some((s) => s.includes('contact cards') || s.includes('address books'))).toBe(true);
+    expect(bulkGuide.printing.some((p) => p.includes('EPS') && p.includes('PDF'))).toBe(true);
+    expect(bulkGuide.checks.some((c) => c.includes('Preflight synthesis checks'))).toBe(true);
   });
 });
