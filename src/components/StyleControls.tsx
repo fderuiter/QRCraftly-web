@@ -20,12 +20,10 @@
 import React, { createContext, lazy, Suspense, useContext, useEffect, useState } from 'react';
 import type { QRConfig } from '@/packages/core/types';
 import type { LandingPrimaryAction } from '../data/landingPages';
-import {
-  PatternControls,
-  ColorControls,
-  MosaicControls,
-  AdvancedControls
-} from './style-controls';
+import { PatternControls } from './style-controls/PatternControls';
+import { ColorControls } from './style-controls/ColorControls';
+import { MosaicControls } from './style-controls/MosaicControls';
+import { AdvancedControls } from './style-controls/AdvancedControls';
 import { Accordion, AccordionItem } from './ui/Accordion';
 import { Button } from './ui/Button';
 import { Skeleton } from './ui/Skeleton';
