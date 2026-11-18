@@ -111,6 +111,163 @@ function defaultValidateConfig(config: QRConfig): string[] {
   return violations;
 }
 
+interface PreflightRowRecorder extends Omit<PreflightReport, 'totalRows'> {
+  recordRow(
+    category: PreflightRowStatus,
+    payload: string,
+    rowNumber: number,
+    row: CsvRow,
+    index: number,
+    reason?: string
+  ): void;
+  toReport(totalRows: number): PreflightReport;
+}
+
+function createPreflightRowRecorder(): PreflightRowRecorder {
+  const details: PreflightRowDetail[] = [];
+  const invalidDetails: PreflightRowDetail[] = [];
+  const validRows: CsvRow[] = [];
+  const validRowIndices: number[] = [];
+  const validPayloads: string[] = [];
+
+  const recorder: PreflightRowRecorder = {
+    validCount: 0,
+    emptyCount: 0,
+    unsafeCount: 0,
+    cautionCount: 0,
+    details,
+    invalidDetails,
+    validRows,
+    validRowIndices,
+    validPayloads,
+    recordRow(category, payload, rowNumber, row, index, reason) {
+      const detail: PreflightRowDetail = {
+        rowNumber,
+        category,
+        payload,
+      };
+      if (reason !== undefined) {
+        detail.reason = reason;
+      }
+      details.push(detail);
+
+      switch (category) {
+        case 'empty':
+          recorder.emptyCount += 1;
+          invalidDetails.push(detail);
+          break;
+        case 'unsafe':
+          recorder.unsafeCount += 1;
+          invalidDetails.push(detail);
+          break;
+        case 'caution':
+          recorder.cautionCount += 1;
+          recorder.validCount += 1;
+          invalidDetails.push(detail);
+          validRows.push(row);
+          validRowIndices.push(index);
+          validPayloads.push(payload);
+          break;
+        case 'valid':
+          recorder.validCount += 1;
+          validRows.push(row);
+          validRowIndices.push(index);
+          validPayloads.push(payload);
+          break;
+      }
+    },
+    toReport(totalRows) {
+      return {
+        totalRows,
+        validCount: recorder.validCount,
+        emptyCount: recorder.emptyCount,
+        unsafeCount: recorder.unsafeCount,
+        cautionCount: recorder.cautionCount,
+        details,
+        invalidDetails,
+        validRows,
+        validRowIndices,
+        validPayloads,
+      };
+    },
+  };
+
+  return recorder;
+}
+
+/**
+ * Executes cached QR configuration validation and cached link caution analysis for a payload.
+ */
+function evaluateValidationAndCaution(
+  payload: string,
+  cautionUrl: string,
+  baseConfig: QRConfig,
+  validateFn: (config: QRConfig) => string[],
+  validateCache: Map<string, string[]>,
+  analyseCache: Map<string, LinkFinding[]>
+): { category: 'unsafe' | 'caution' | 'valid'; reason?: string } {
+  let violations = validateCache.get(payload);
+  if (!violations) {
+    violations = validateFn({ ...baseConfig, value: payload });
+    validateCache.set(payload, violations);
+  }
+
+  if (violations.length > 0) {
+    return { category: 'unsafe', reason: violations.join(' ') };
+  }
+
+  if (cautionUrl) {
+    let findings = analyseCache.get(cautionUrl);
+    if (!findings) {
+      findings = analyseLink(cautionUrl);
+      analyseCache.set(cautionUrl, findings);
+    }
+    const cautions = findings.filter((f) => f.severity === 'caution');
+    if (cautions.length > 0) {
+      return {
+        category: 'caution',
+        reason: cautions.map((f) => f.message).join(' '),
+      };
+    }
+  }
+
+  return { category: 'valid' };
+}
+
+/**
+ * Validates a row payload against config rules and link caution analysis, recording the resulting
+ * row outcome into the preflight recorder.
+ */
+function evaluateAndRecordValidatedRow(
+  recorder: PreflightRowRecorder,
+  payload: string,
+  cautionUrl: string,
+  baseConfig: QRConfig,
+  validateFn: (config: QRConfig) => string[],
+  validateCache: Map<string, string[]>,
+  analyseCache: Map<string, LinkFinding[]>,
+  row: CsvRow,
+  index: number,
+  rowNumber: number
+): void {
+  const result = evaluateValidationAndCaution(
+    payload,
+    cautionUrl,
+    baseConfig,
+    validateFn,
+    validateCache,
+    analyseCache
+  );
+  recorder.recordRow(
+    result.category,
+    payload,
+    rowNumber,
+    row,
+    index,
+    result.reason
+  );
+}
+
 /**
  * Synchronously categorizes parsed CSV rows into Valid, Empty, Unsafe, and Caution buckets.
  * Operates in browser memory without network calls.
@@ -132,16 +289,6 @@ export function categorizeCsvRows(
   const { contentType = 'link', rowNumbers, contactMapping } = options;
   const validationType = bulkValidationType(contentType);
   const isContact = isContactContentType(contentType);
-  const validPayloads: string[] = [];
-  const details: PreflightRowDetail[] = [];
-  const invalidDetails: PreflightRowDetail[] = [];
-  const validRows: CsvRow[] = [];
-  const validRowIndices: number[] = [];
-
-  let validCount = 0;
-  let emptyCount = 0;
-  let unsafeCount = 0;
-  let cautionCount = 0;
 
   if (!rows || rows.length === 0 || (!payloadColumn && !isContact)) {
     return {
@@ -157,6 +304,8 @@ export function categorizeCsvRows(
       validPayloads: [],
     };
   }
+
+  const recorder = createPreflightRowRecorder();
 
   const baseConfig: QRConfig = {
     ...DEFAULT_CONFIG,
@@ -177,15 +326,14 @@ export function categorizeCsvRows(
     if (isContact) {
       const hasAnyFieldMapped = Object.values(mapping).some(Boolean);
       if (!hasAnyFieldMapped) {
-        emptyCount += 1;
-        const detail: PreflightRowDetail = {
+        recorder.recordRow(
+          'empty',
+          '',
           rowNumber,
-          category: 'empty',
-          reason: 'Missing column mapping for contact fields',
-          payload: '',
-        };
-        details.push(detail);
-        invalidDetails.push(detail);
+          row,
+          index,
+          'Missing column mapping for contact fields'
+        );
         return;
       }
 
@@ -194,109 +342,57 @@ export function categorizeCsvRows(
 
       // 1. Missing payload check
       if (!synthesized.hasAnyData) {
-        emptyCount += 1;
-        const detail: PreflightRowDetail = {
+        recorder.recordRow(
+          'empty',
+          '',
           rowNumber,
-          category: 'empty',
-          reason: 'Missing value in mapped contact fields',
-          payload: '',
-        };
-        details.push(detail);
-        invalidDetails.push(detail);
+          row,
+          index,
+          'Missing value in mapped contact fields'
+        );
         return;
       }
 
       // 2. Identity validation: first name, last name, or organization required
       if (!synthesized.hasIdentity) {
-        unsafeCount += 1;
-        const detail: PreflightRowDetail = {
+        recorder.recordRow(
+          'unsafe',
+          trimmedValue,
           rowNumber,
-          category: 'unsafe',
-          reason: 'Missing required contact identity (first name, last name, or organization)',
-          payload: trimmedValue,
-        };
-        details.push(detail);
-        invalidDetails.push(detail);
+          row,
+          index,
+          'Missing required contact identity (first name, last name, or organization)'
+        );
         return;
       }
 
       // 3. Security and format checks (control characters, dangerous URLs, email format)
       if (synthesized.violations.length > 0) {
-        unsafeCount += 1;
-        const reason = synthesized.violations.join(' ');
-        const detail: PreflightRowDetail = {
+        recorder.recordRow(
+          'unsafe',
+          trimmedValue,
           rowNumber,
-          category: 'unsafe',
-          reason,
-          payload: trimmedValue,
-        };
-        details.push(detail);
-        invalidDetails.push(detail);
+          row,
+          index,
+          synthesized.violations.join(' ')
+        );
         return;
       }
 
-      // 4. Config & vCard structural validation
-      let violations = validateCache.get(trimmedValue);
-      if (!violations) {
-        violations = validateFn({ ...baseConfig, value: trimmedValue });
-        validateCache.set(trimmedValue, violations);
-      }
-
-      if (violations.length > 0) {
-        unsafeCount += 1;
-        const reason = violations.join(' ');
-        const detail: PreflightRowDetail = {
-          rowNumber,
-          category: 'unsafe',
-          reason,
-          payload: trimmedValue,
-        };
-        details.push(detail);
-        invalidDetails.push(detail);
-        return;
-      }
-
-      // 5. Caution check on contact website URL if present
+      // 4. Config & vCard structural validation and caution check
       const websiteUrl = mapping.website ? (row[mapping.website] ?? '').trim() : '';
-      let cautions: LinkFinding[] = [];
-      if (websiteUrl) {
-        let findings = analyseCache.get(websiteUrl);
-        if (!findings) {
-          findings = analyseLink(websiteUrl);
-          analyseCache.set(websiteUrl, findings);
-        }
-        cautions = findings.filter((f) => f.severity === 'caution');
-      }
-
-      if (cautions.length > 0) {
-        cautionCount += 1;
-        validCount += 1;
-        const reason = cautions.map((f) => f.message).join(' ');
-        const detail: PreflightRowDetail = {
-          rowNumber,
-          category: 'caution',
-          reason,
-          payload: trimmedValue,
-        };
-        details.push(detail);
-        invalidDetails.push(detail);
-        validRows.push(row);
-        validRowIndices.push(index);
-        validPayloads.push(trimmedValue);
-        return;
-      }
-
-      // 6. Valid contact row
-      validCount += 1;
-      const detail: PreflightRowDetail = {
-        rowNumber,
-        category: 'valid',
-        payload: trimmedValue,
-      };
-      details.push(detail);
-      validRows.push(row);
-      validRowIndices.push(index);
-      validPayloads.push(trimmedValue);
+      evaluateAndRecordValidatedRow(
+        recorder,
+        trimmedValue,
+        websiteUrl,
+        baseConfig,
+        validateFn,
+        validateCache,
+        analyseCache,
+        row,
+        index,
+        rowNumber
+      );
       return;
     }
 
@@ -305,91 +401,34 @@ export function categorizeCsvRows(
 
     // 1. Missing payload check
     if (!hasPayload(row, payloadColumn)) {
-      emptyCount += 1;
-      const detail: PreflightRowDetail = {
+      recorder.recordRow(
+        'empty',
+        rawValue,
         rowNumber,
-        category: 'empty',
-        reason: `Missing value in payload column '${payloadColumn}'`,
-        payload: rawValue,
-      };
-      details.push(detail);
-      invalidDetails.push(detail);
+        row,
+        index,
+        `Missing value in payload column '${payloadColumn}'`
+      );
       return;
     }
 
     // 2. The same payload checks as the single generator, on the string that will be encoded.
     const trimmedValue = encodeBulkCell(rawValue, contentType);
-    let violations = validateCache.get(trimmedValue);
-    if (!violations) {
-      violations = validateFn({ ...baseConfig, value: trimmedValue });
-      validateCache.set(trimmedValue, violations);
-    }
-
-    if (violations.length > 0) {
-      unsafeCount += 1;
-      const reason = violations.join(' ');
-      const detail: PreflightRowDetail = {
-        rowNumber,
-        category: 'unsafe',
-        reason,
-        payload: trimmedValue,
-      };
-      details.push(detail);
-      invalidDetails.push(detail);
-      return;
-    }
-
-    // 3. Link caution check
-    let findings = analyseCache.get(trimmedValue);
-    if (!findings) {
-      findings = analyseLink(trimmedValue);
-      analyseCache.set(trimmedValue, findings);
-    }
-
-    const cautions = findings.filter((f) => f.severity === 'caution');
-    if (cautions.length > 0) {
-      cautionCount += 1;
-      validCount += 1;
-      const reason = cautions.map((f) => f.message).join(' ');
-      const detail: PreflightRowDetail = {
-        rowNumber,
-        category: 'caution',
-        reason,
-        payload: trimmedValue,
-      };
-      details.push(detail);
-      invalidDetails.push(detail);
-      validRows.push(row);
-      validRowIndices.push(index);
-      validPayloads.push(trimmedValue);
-      return;
-    }
-
-    // 4. Valid row
-    validCount += 1;
-    const detail: PreflightRowDetail = {
-      rowNumber,
-      category: 'valid',
-      payload: trimmedValue,
-    };
-    details.push(detail);
-    validRows.push(row);
-    validRowIndices.push(index);
-    validPayloads.push(trimmedValue);
+    evaluateAndRecordValidatedRow(
+      recorder,
+      trimmedValue,
+      trimmedValue,
+      baseConfig,
+      validateFn,
+      validateCache,
+      analyseCache,
+      row,
+      index,
+      rowNumber
+    );
   });
 
-  return {
-    totalRows: rows.length,
-    validCount,
-    emptyCount,
-    unsafeCount,
-    cautionCount,
-    details,
-    invalidDetails,
-    validRows,
-    validRowIndices,
-    validPayloads,
-  };
+  return recorder.toReport(rows.length);
 }
 
 /**

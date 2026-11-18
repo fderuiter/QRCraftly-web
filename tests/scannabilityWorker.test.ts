@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import { loadWorkerModule, type InThreadWorkerScope, type WorkerModuleUnderTest } from './utils/inThreadWorker';
 import { fakeQrRead } from './utils/fakeQrRead';
-import { getLuminanceFromRgb } from '@/packages/core/encoding';
+import { getLuminanceFromRgb, getLuminanceFromLinearRgb } from '@/packages/core/encoding';
 
 const qrRead = vi.hoisted(() => vi.fn());
 vi.mock('@/packages/qr-decode', () => ({ loadQrReader: () => Promise.resolve({ read: qrRead }) }));
@@ -9,7 +9,11 @@ vi.mock('@/packages/qr-decode', () => ({ loadQrReader: () => Promise.resolve({ r
 // Spy on the luminance helper the contrast audit uses, so a test can make processing crash.
 vi.mock('@/packages/core/encoding', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/packages/core/encoding')>();
-  return { ...actual, getLuminanceFromRgb: vi.fn(actual.getLuminanceFromRgb) };
+  return {
+    ...actual,
+    getLuminanceFromRgb: vi.fn(actual.getLuminanceFromRgb),
+    getLuminanceFromLinearRgb: vi.fn(actual.getLuminanceFromLinearRgb),
+  };
 });
 
 /** Gives the worker a minimal OffscreenCanvas (Node has none) so bitmap extraction succeeds. */
@@ -254,7 +258,7 @@ describe('scannabilityWorker', () => {
     const postMessageSpy = vi.fn();
     scope.postMessage = postMessageSpy;
 
-    vi.mocked(getLuminanceFromRgb).mockImplementationOnce(() => {
+    vi.mocked(getLuminanceFromLinearRgb).mockImplementationOnce(() => {
       throw new Error('Contrast audit crash');
     });
 
@@ -388,7 +392,7 @@ describe('scannabilityWorker', () => {
       moduleCount: 5,
     };
 
-    vi.mocked(getLuminanceFromRgb).mockImplementationOnce(() => {
+    vi.mocked(getLuminanceFromLinearRgb).mockImplementationOnce(() => {
       throw new Error('Processing failure');
     });
 

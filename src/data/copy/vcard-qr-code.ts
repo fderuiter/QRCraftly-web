@@ -1,5 +1,4 @@
 import type { ToolCopy } from './types';
-import { NEVER_EXPIRES } from './shared';
 
 /** The how-to steps and FAQs of the vcard-qr-code page. */
 export const copy: ToolCopy = {
@@ -23,6 +22,10 @@ export const copy: ToolCopy = {
       answer:
         'Every field is stored inside the code, so a long address or many fields make it bigger and harder to scan. Leave out what you do not need, and print business-card codes at least 2 cm (0.8 in) wide.',
     },
-    NEVER_EXPIRES,
+    {
+      question: 'Will this QR code ever expire or stop working?',
+      answer:
+        'No. QRCraftly makes static QR codes: the information is stored in the pattern itself, not behind a redirect link on our servers. There is no trial, no subscription and nothing we could switch off, so the code keeps working for as long as the information in it is still correct.',
+    },
   ],
 };

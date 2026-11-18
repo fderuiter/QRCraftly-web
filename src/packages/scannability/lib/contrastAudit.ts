@@ -28,7 +28,7 @@ export interface ModuleContrastAuditResult {
   lowContrastCells: LowContrastCell[];
 }
 
-import { getLuminanceFromRgb } from '@/packages/core/encoding';
+import { getLuminanceFromLinearRgb, SRGB_TO_LINEAR_LUT } from '@/packages/core/encoding';
 
 
 /**
@@ -100,13 +100,28 @@ export function auditModuleContrast(
       for (let y = y0; y < y1; y++) {
         for (let x = x0; x < x1; x++) {
           const idx = (y * width + x) * 4;
-          const alpha = data[idx + 3] / 255;
+          const a = data[idx + 3];
 
-          const rNorm = (data[idx] * alpha + 255 * (1 - alpha)) / 255;
-          const gNorm = (data[idx + 1] * alpha + 255 * (1 - alpha)) / 255;
-          const bNorm = (data[idx + 2] * alpha + 255 * (1 - alpha)) / 255;
+          let lum: number;
+          if (a === 255) {
+            lum = getLuminanceFromLinearRgb(
+              SRGB_TO_LINEAR_LUT[data[idx]],
+              SRGB_TO_LINEAR_LUT[data[idx + 1]],
+              SRGB_TO_LINEAR_LUT[data[idx + 2]]
+            );
+          } else {
+            const alpha = a / 255;
+            const invAlpha = 1 - alpha;
+            const r = Math.round(data[idx] * alpha + 255 * invAlpha);
+            const g = Math.round(data[idx + 1] * alpha + 255 * invAlpha);
+            const b = Math.round(data[idx + 2] * alpha + 255 * invAlpha);
+            lum = getLuminanceFromLinearRgb(
+              SRGB_TO_LINEAR_LUT[r],
+              SRGB_TO_LINEAR_LUT[g],
+              SRGB_TO_LINEAR_LUT[b]
+            );
+          }
 
-          const lum = getLuminanceFromRgb(rNorm, gNorm, bNorm);
           totalLum += lum;
           count++;
 
@@ -129,7 +144,7 @@ export function auditModuleContrast(
   }
 
   // 2. Identify global dark and light reference levels
-  const sorted = Array.from(cellLuminance).sort((a, b) => a - b);
+  const sorted = cellLuminance.slice().sort();
   const p10Idx = Math.floor(sorted.length * 0.1);
   const p90Idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9));
   const refDark = sorted[p10Idx];

@@ -22,6 +22,7 @@ import {
   isContactContentType,
   autoDetectContactMapping,
   synthesizeVCardPayload,
+  headerWords,
 } from './contactMapping';
 import type { BulkContactMapping } from '../types';
 
@@ -60,27 +61,6 @@ function isPayloadCell(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) return false;
   return PAYLOAD_CELL_PATTERN.test(trimmed) || /\.[a-z]{2,}(\/|\?|#|$)/i.test(trimmed);
-}
-
-/** Splits a header into lowercase words and normalized tokens. */
-function headerWords(header: string): string[] {
-  const normalized = header.toLowerCase().trim();
-  const rawClean = normalized.replace(/[^\p{L}\p{N}]+/gu, '');
-  const rawUnderscore = normalized.replace(/[^\p{L}\p{N}]+/gu, '_');
-  const splitWords = header
-    .replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, '$1 $2')
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter(Boolean);
-
-  const set = new Set<string>();
-  if (normalized) set.add(normalized);
-  if (rawClean) set.add(rawClean);
-  if (rawUnderscore) set.add(rawUnderscore);
-  for (const word of splitWords) {
-    set.add(word);
-  }
-  return Array.from(set);
 }
 
 /** Options for column selection heuristics. */

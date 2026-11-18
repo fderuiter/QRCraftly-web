@@ -18,7 +18,6 @@
 
 import { useCallback, useEffect } from 'react';
 import { type QRConfig, TemplateStyle, SocialFormat } from '@/packages/core/types';
-import type { PayloadRejectedError } from '@/packages/qr-export';
 import { QrEncodeError } from '@/packages/qr-matrix';
 import { describeViolation } from '@/packages/qr-payload';
 import { previewFailureMessage, tooLongMessage } from '../utils/previewFailure';
@@ -58,20 +57,23 @@ const scanValidationFailed = (): Error => {
   return error;
 };
 
-/** Checks whether an error is a PayloadRejectedError without statically importing the class or using type assertions. */
-const isPayloadRejectedError = (err: unknown): err is PayloadRejectedError => {
-  if (typeof err !== 'object' || err === null) return false;
-  if (!('name' in err) || err.name !== 'PayloadRejectedError') return false;
-  if (!('violations' in err) || !Array.isArray(err.violations)) return false;
-  return true;
-};
+interface ViolationContainer {
+  violations: readonly string[];
+}
+
+const hasViolations = (err: unknown): err is ViolationContainer =>
+  typeof err === 'object' &&
+  err !== null &&
+  'violations' in err &&
+  Array.isArray(err.violations) &&
+  err.violations.every((violation) => typeof violation === 'string');
 
 /**
  * Turns an export failure into an error whose message can be shown to people: validation
  * codes and encoder errors become plain sentences instead of raw codes (#1255).
  */
-const describeExportError = (err: unknown, config: QRConfig): Error => {
-  if (isPayloadRejectedError(err)) {
+const describeExportError = async (err: unknown, config: QRConfig): Promise<Error> => {
+  if (hasViolations(err)) {
     return new Error(err.violations.map(describeViolation).join(' '));
   }
   if (err instanceof QrEncodeError) {
@@ -226,7 +228,7 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
     try {
       canvas = await renderExportCanvas(config, renderFormat, options?.size);
     } catch (err) {
-      return { status: { success: false, format, error: describeExportError(err, config) } };
+      return { status: { success: false, format, error: await describeExportError(err, config) } };
     }
     if (!options?.allowUnsafe && !(await validateScannability(canvas))) {
       return { status: { success: false, format, error: scanValidationFailed() } };
@@ -440,7 +442,7 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
       return { success: true, format: 'svg', logoOmitted: built.logoOmitted };
     } catch (err) {
       console.warn('SVG export failed:', err instanceof Error ? err.name : typeof err);
-      return { success: false, format: 'svg', error: describeExportError(err, config) };
+      return { success: false, format: 'svg', error: await describeExportError(err, config) };
     }
   }, [buildSvg, getFilename, config]);
 
@@ -462,7 +464,7 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
       return { success: true, format, logoOmitted: built.logoOmitted };
     } catch (err) {
       console.warn(`${format.toUpperCase()} export failed:`, err instanceof Error ? err.name : typeof err);
-      return { success: false, format, error: describeExportError(err, config) };
+      return { success: false, format, error: await describeExportError(err, config) };
     }
   }, [buildSvg, getFilename, config]);
 
@@ -480,7 +482,7 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
       await navigator.clipboard.writeText(built.svg);
       return { success: true, format: 'svg-copy', logoOmitted: built.logoOmitted };
     } catch (err) {
-      return { success: false, format: 'svg-copy', error: describeExportError(err, config) };
+      return { success: false, format: 'svg-copy', error: await describeExportError(err, config) };
     }
   }, [buildSvg, config]);
 

@@ -186,8 +186,20 @@ export function generateHeadersContent(existingHeadersContent, baseCsp) {
     routesMap.set('/*', []);
   }
 
+  let headerCsp = (baseCsp || '').trim();
+  if (!/\bframe-ancestors\b/.test(headerCsp)) {
+    if (headerCsp) {
+      if (!headerCsp.endsWith(';')) {
+        headerCsp += ';';
+      }
+      headerCsp += " frame-ancestors 'none';";
+    } else {
+      headerCsp = "frame-ancestors 'none';";
+    }
+  }
+
   const globalHeaders = routesMap.get('/*');
-  globalHeaders.unshift(`  Content-Security-Policy: ${baseCsp}`);
+  globalHeaders.unshift(`  Content-Security-Policy: ${headerCsp}`);
 
   const sortedRoutes = Array.from(routesMap.keys()).sort((a, b) => {
     if (a === '/*') return -1;
@@ -362,8 +374,19 @@ export function validateHeaders(csp, headersContent) {
     throw new Error(`Content-Security-Policy is set by ${cspRoutes.length} _headers rules (${cspRoutes.join(', ')}); only the global /* rule may set it.`);
   }
 
+  for (const route of cspRoutes) {
+    const cspHeader = routeHeaders[route].find(h => h.name.toLowerCase() === 'content-security-policy');
+    if (cspHeader && !/\bframe-ancestors\s+'none'/.test(cspHeader.value)) {
+      throw new Error(`Content-Security-Policy header in route "${route}" must include "frame-ancestors 'none'".`);
+    }
+  }
+
+  const cspHeader = cspRoutes.length > 0
+    ? routeHeaders[cspRoutes[0]].find(h => h.name.toLowerCase() === 'content-security-policy')
+    : null;
+
   return {
-    cspLength: cspToValidate ? cspToValidate.length : 0,
+    cspLength: cspHeader ? cspHeader.value.length : (cspToValidate ? cspToValidate.length : 0),
     totalHeadersSize,
     routeHeaders
   };

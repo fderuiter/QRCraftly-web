@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { generateHeadersContent, BASE_CSP_PATTERN } from '../scripts/csp_hash_injector.js';
 
 const HEADERS_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public/_headers');
 
@@ -64,6 +65,9 @@ describe('public/_headers security headers', () => {
     expect(headers.get('strict-transport-security')).toMatch(/^max-age=\d+/);
     expect(headers.get('cross-origin-opener-policy')).toBe('same-origin');
     expect(headers.get('cross-origin-resource-policy')).toBe('same-origin');
+
+    const generated = generateHeadersContent(fs.readFileSync(HEADERS_PATH, 'utf8'), BASE_CSP_PATTERN);
+    expect(generated).toContain("frame-ancestors 'none'");
   });
 
   it('sends HSTS for subdomains too, without the preload flag, which is a separate decision (#1160)', () => {

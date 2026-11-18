@@ -289,6 +289,140 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       const res = performScannabilityCheck(qrReader, frame, width, height, moduleCount, margin);
       expect(res.localContrastViolations).toBe(0);
     });
+
+    it('returns identical fallback result for zero or negative dimensions or module counts', () => {
+      const fallback = { violations: 0, minContrast: 21, lowContrastCells: [] };
+
+      expect(auditModuleContrast({ data: new Uint8ClampedArray(0), width: 0, height: 0 }, 21)).toEqual(fallback);
+      expect(auditModuleContrast({ data: new Uint8ClampedArray(100), width: 10, height: 10 }, 0)).toEqual(fallback);
+      expect(auditModuleContrast({ data: new Uint8ClampedArray(100), width: 10, height: 10 }, -1)).toEqual(fallback);
+      expect(auditModuleContrast({ data: new Uint8ClampedArray(100), width: -10, height: 10 }, 21)).toEqual(fallback);
+      expect(auditModuleContrast({ data: new Uint8ClampedArray(100), width: 10, height: -10 }, 21)).toEqual(fallback);
+      expect(auditModuleContrast(null as any, 21)).toEqual(fallback);
+    });
+
+    it('verifies numeric parity across opaque canvas frames', () => {
+      const moduleCount = 21;
+      const cellSize = 4;
+      const width = moduleCount * cellSize;
+      const height = width;
+      const data = new Uint8ClampedArray(width * height * 4);
+
+      // Checkerboard pattern of black (0) and white (255)
+      for (let r = 0; r < moduleCount; r++) {
+        for (let c = 0; c < moduleCount; c++) {
+          const isDark = (r + c) % 2 === 0;
+          const val = isDark ? 0 : 255;
+          for (let y = r * cellSize; y < (r + 1) * cellSize; y++) {
+            for (let x = c * cellSize; x < (c + 1) * cellSize; x++) {
+              const idx = (y * width + x) * 4;
+              data[idx] = val;
+              data[idx + 1] = val;
+              data[idx + 2] = val;
+              data[idx + 3] = 255;
+            }
+          }
+        }
+      }
+
+      const audit = auditModuleContrast({ data, width, height }, moduleCount, 0);
+      expect(audit.violations).toBe(0);
+      expect(audit.minContrast).toBeCloseTo(21, 1);
+      expect(audit.lowContrastCells).toHaveLength(0);
+    });
+
+    it('correctly handles non-opaque and transparent canvas frames', () => {
+      const moduleCount = 21;
+      const cellSize = 4;
+      const width = moduleCount * cellSize;
+      const height = width;
+      const data = new Uint8ClampedArray(width * height * 4);
+
+      // Transparent background (alpha = 0, RGB = 0).
+      // When composited onto white, transparent pixels should evaluate as white (lum = 1.0).
+      // Draw opaque black modules on half the cells.
+      for (let r = 0; r < moduleCount; r++) {
+        for (let c = 0; c < moduleCount; c++) {
+          const isDark = r === 0 && c === 0;
+          for (let y = r * cellSize; y < (r + 1) * cellSize; y++) {
+            for (let x = c * cellSize; x < (c + 1) * cellSize; x++) {
+              const idx = (y * width + x) * 4;
+              if (isDark) {
+                // Opaque black
+                data[idx] = 0;
+                data[idx + 1] = 0;
+                data[idx + 2] = 0;
+                data[idx + 3] = 255;
+              } else {
+                // Fully transparent (stored as clear black)
+                data[idx] = 0;
+                data[idx + 1] = 0;
+                data[idx + 2] = 0;
+                data[idx + 3] = 0;
+              }
+            }
+          }
+        }
+      }
+
+      const audit = auditModuleContrast({ data, width, height }, moduleCount, 0);
+      expect(audit.violations).toBe(0);
+      expect(audit.minContrast).toBeCloseTo(21, 1);
+    });
+
+    it('detects low contrast violations in low-contrast module areas', () => {
+      const moduleCount = 21;
+      const cellSize = 4;
+      const width = moduleCount * cellSize;
+      const height = width;
+      const data = new Uint8ClampedArray(width * height * 4);
+
+      // Background: white (#FFFFFF)
+      data.fill(255);
+
+      // Draw dark modules in 7x7 block so refDark is low (0.0) and refLight is high (1.0)
+      for (let r = 0; r < 7; r++) {
+        for (let c = 0; c < 7; c++) {
+          for (let y = r * cellSize; y < (r + 1) * cellSize; y++) {
+            for (let x = c * cellSize; x < (c + 1) * cellSize; x++) {
+              const idx = (y * width + x) * 4;
+              data[idx] = 0;
+              data[idx + 1] = 0;
+              data[idx + 2] = 0;
+              data[idx + 3] = 255;
+            }
+          }
+        }
+      }
+
+      // Add a module in the dark region that is faded (RGB = 160, lum ~0.35 <= midLum 0.5),
+      // yielding contrast (1.0 + 0.05) / (0.35 + 0.05) ~ 2.62 < 3.0
+      const targetR = 0;
+      const targetC = 0;
+      for (let y = targetR * cellSize; y < (targetR + 1) * cellSize; y++) {
+        for (let x = targetC * cellSize; x < (targetC + 1) * cellSize; x++) {
+          const idx = (y * width + x) * 4;
+          data[idx] = 160;
+          data[idx + 1] = 160;
+          data[idx + 2] = 160;
+          data[idx + 3] = 255;
+        }
+      }
+
+      const audit = auditModuleContrast({ data, width, height }, moduleCount, 0);
+      expect(audit.minContrast).toBeLessThan(3.0);
+      expect(audit.violations).toBeGreaterThan(0);
+      expect(audit.lowContrastCells.some((cell) => cell.row === targetR && cell.col === targetC)).toBe(true);
+    });
+
+    it('verifies Float64Array.prototype.slice().sort() matches numeric sorting parity', () => {
+      const floatBuffer = new Float64Array([0.85, 0.12, 0.05, 1.0, 0.45, 0.23, 0.99, 0.0]);
+      const typedSorted = floatBuffer.slice().sort();
+      const boxedSorted = Array.from(floatBuffer).sort((a, b) => a - b);
+
+      expect(typedSorted).toBeInstanceOf(Float64Array);
+      expect(Array.from(typedSorted)).toEqual(boxedSorted);
+    });
   });
 });
 

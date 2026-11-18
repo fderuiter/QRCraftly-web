@@ -68,6 +68,15 @@ export const srgbToLinear = (c: number): number =>
   c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 
 /**
+ * Precomputed 256-element lookup table mapping 8-bit sRGB channel values (0..255)
+ * to linear light (0..1) using the W3C WCAG 2.0 relative luminance specification.
+ */
+export const SRGB_TO_LINEAR_LUT: Float64Array = new Float64Array(256);
+for (let i = 0; i < 256; i++) {
+  SRGB_TO_LINEAR_LUT[i] = srgbToLinear(i / 255);
+}
+
+/**
  * Converts one linear-light channel (0..1) back to gamma-encoded sRGB (0..1).
  * Inverse of {@link srgbToLinear}.
  *
