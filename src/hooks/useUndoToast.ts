@@ -13,7 +13,12 @@ export function useUndoToast(): (message: string) => void {
   return useCallback(
     (message: string) => {
       if (!store) return;
-      addToast({ type: 'info', message, duration: 8000, action: { label: 'Undo', onClick: () => void store.undo() } });
+      addToast({
+        type: 'info',
+        message,
+        persistent: true,
+        action: { label: 'Undo', onClick: () => void store.undo() },
+      });
     },
     [store, addToast]
   );
