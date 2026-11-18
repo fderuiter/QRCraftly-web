@@ -34,6 +34,7 @@ const blankCard = (overrides: Partial<VCardData> = {}): VCardData => ({
   website: '',
   street: '',
   city: '',
+  state: '',
   zip: '',
   country: '',
   x: '',
@@ -229,5 +230,63 @@ describe('VCardInput contact file import (#1558)', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith({ firstName: 'Typed' });
     expect(onChange.mock.calls.some(([updates]) => updates.firstName === 'Jane')).toBe(false);
+  });
+});
+
+describe('VCardInput address state/province field', () => {
+  it('renders a text input field for state or province with correct attributes', () => {
+    render(<VCardInput data={blankCard()} onChange={vi.fn()} />);
+    const stateInput = screen.getByLabelText(/State or Province/i);
+    expect(stateInput).toBeInTheDocument();
+    expect(stateInput).toHaveAttribute('id', 'vcard-state');
+    expect(stateInput).toHaveAttribute('name', 'state');
+    expect(stateInput).toHaveAttribute('autocomplete', 'address-level1');
+    expect(stateInput).toHaveAttribute('maxlength', '100');
+  });
+
+  it('updates state field when user types into the input', () => {
+    const onChange = vi.fn();
+    render(<VCardInput data={blankCard()} onChange={onChange} />);
+    const stateInput = screen.getByLabelText(/State or Province/i);
+    fireEvent.change(stateInput, { target: { value: 'California' } });
+    expect(onChange).toHaveBeenCalledWith({ state: 'California' });
+  });
+
+  it('shows an error when state contains dangerous control or zero-width characters', () => {
+    render(<VCardInput data={blankCard({ state: 'CA\u0000' })} onChange={vi.fn()} />);
+    const stateInput = screen.getByLabelText(/State or Province/i);
+    expect(stateInput).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Contains invalid control or zero-width characters.')).toBeInTheDocument();
+  });
+
+  it('populates state when importing a contact file containing a region', async () => {
+    const onChange = vi.fn();
+    const vcfWithState = [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      'N:Smith;Jane;;;',
+      'FN:Jane Smith',
+      'ADR:;;100 Market St;San Francisco;CA;94105;USA',
+      'END:VCARD',
+    ].join('\r\n');
+
+    render(<VCardInput data={blankCard()} onChange={onChange} />);
+    const input = screen.getByLabelText('Contact card file (.vcf)');
+    fireEvent.change(input, {
+      target: {
+        files: [new File([vcfWithState], 'jane.vcf', { type: 'text/vcard' })],
+      },
+    });
+
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        street: '100 Market St',
+        city: 'San Francisco',
+        state: 'CA',
+        zip: '94105',
+        country: 'USA',
+      })
+    );
   });
 });

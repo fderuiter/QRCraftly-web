@@ -170,6 +170,7 @@ export const INPUT_REGISTRY: Registry = {
       website: "",
       street: "",
       city: "",
+      state: "",
       zip: "",
       country: "",
     },

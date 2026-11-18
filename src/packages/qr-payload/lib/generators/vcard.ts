@@ -75,6 +75,7 @@ export const hydrateVCardData = (raw: string): VCardData => {
     website: '',
     street: '',
     city: '',
+    state: '',
     zip: '',
     country: '',
     photo: '',
@@ -126,6 +127,7 @@ export const hydrateVCardData = (raw: string): VCardData => {
             // DoCoMo's positional form: PO box, room, street, city, state, zip, country.
             result.street = unescapeMECard(adrParts[2] || '');
             result.city = unescapeMECard(adrParts[3] || '');
+            result.state = unescapeMECard(adrParts[4] || '');
             result.zip = unescapeMECard(adrParts[5] || '');
             result.country = unescapeMECard(adrParts[6] || '');
           } else {
@@ -195,6 +197,7 @@ export const hydrateVCardData = (raw: string): VCardData => {
         const adrParts = splitCompoundField(value, ';');
         result.street = unescapeVCardEvent(adrParts[2] || '');
         result.city = unescapeVCardEvent(adrParts[3] || '');
+        result.state = unescapeVCardEvent(adrParts[4] || '');
         result.zip = unescapeVCardEvent(adrParts[5] || '');
         result.country = unescapeVCardEvent(adrParts[6] || '');
         break;
@@ -227,7 +230,7 @@ export const hydrateVCardData = (raw: string): VCardData => {
 const isPopulated = (str: string | undefined): boolean => Boolean(str && str.trim().length > 0);
 
 /** The fields MECard carries too. */
-const CONTACT_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'zip', 'country', 'photo'] as const satisfies readonly (keyof VCardData)[];
+const CONTACT_FIELDS = ['firstName', 'lastName', 'organization', 'title', 'phone', 'email', 'website', 'street', 'city', 'state', 'zip', 'country', 'photo'] as const satisfies readonly (keyof VCardData)[];
 
 /** The fields a visitor types; a card with none of them filled in is empty. */
 export const CARD_FIELDS = [...CONTACT_FIELDS, ...VCARD_SOCIAL_FIELDS] as const satisfies readonly (keyof VCardData)[];
@@ -326,6 +329,7 @@ export const constructVCardString = (data: VCardData): string => {
 
   const street = escape(data.street);
   const city = escape(data.city);
+  const state = escape(data.state);
   const zip = escape(data.zip);
   const country = escape(data.country);
 
@@ -355,8 +359,8 @@ export const constructVCardString = (data: VCardData): string => {
     if (profile?.url) parts.push(`URL;TYPE=${VCARD_SOCIAL_NETWORKS[field].type}:${profile.url}`);
   }
 
-  if (isPopulated(street) || isPopulated(city) || isPopulated(zip) || isPopulated(country)) {
-    parts.push(prop('ADR', `;;${street};${city};;${zip};${country}`));
+  if (isPopulated(street) || isPopulated(city) || isPopulated(state) || isPopulated(zip) || isPopulated(country)) {
+    parts.push(prop('ADR', `;;${street};${city};${state};${zip};${country}`));
   }
 
   parts.push('END:VCARD');
