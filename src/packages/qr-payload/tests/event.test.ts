@@ -23,6 +23,7 @@ import {
   EventContract,
   identifyProtocol,
   parseRecurrenceRule,
+  hasChronologicalViolation,
   buildGoogleCalendarUrl,
   buildOutlookCalendarUrl,
   buildYahooCalendarUrl,
@@ -704,6 +705,68 @@ describe('Event generator', () => {
       expect(allDayYahoo).toContain('ST=20261015');
       expect(allDayYahoo).toContain('ET=20261016');
       expect(allDayYahoo).toContain('DUR=allday');
+    });
+  });
+
+  describe('hasChronologicalViolation', () => {
+    it('returns false when either or both dates are empty', () => {
+      expect(hasChronologicalViolation()).toBe(false);
+      expect(hasChronologicalViolation('', '')).toBe(false);
+      expect(hasChronologicalViolation('2026-10-15T10:00', '')).toBe(false);
+      expect(hasChronologicalViolation('', '2026-10-15T10:00')).toBe(false);
+      expect(hasChronologicalViolation(undefined, '2026-10-15T10:00')).toBe(false);
+      expect(hasChronologicalViolation('2026-10-15T10:00', undefined)).toBe(false);
+    });
+
+    it('returns false for valid timed event chronology and equal timestamps', () => {
+      expect(hasChronologicalViolation('2026-10-15T09:00', '2026-10-15T10:00')).toBe(false);
+      expect(hasChronologicalViolation('2026-10-15T10:00', '2026-10-15T10:00')).toBe(false);
+    });
+
+    it('returns true when end time precedes start time in timed events', () => {
+      expect(hasChronologicalViolation('2026-10-15T11:00', '2026-10-15T10:00')).toBe(true);
+      expect(hasChronologicalViolation('2026-10-16T09:00', '2026-10-15T18:00')).toBe(true);
+    });
+
+    it('evaluates all-day event chronology correctly', () => {
+      // Multi-day and single-day valid
+      expect(hasChronologicalViolation('2026-10-15', '2026-10-16')).toBe(false);
+      expect(hasChronologicalViolation('2026-10-15', '2026-10-15')).toBe(false);
+      // Inverted all-day
+      expect(hasChronologicalViolation('2026-10-16', '2026-10-15')).toBe(true);
+    });
+
+    it('handles regional timezone parameters (TZID)', () => {
+      expect(
+        hasChronologicalViolation(
+          '2026-10-15T12:00;TZID=America/New_York',
+          '2026-10-15T13:00;TZID=America/New_York'
+        )
+      ).toBe(false);
+      expect(
+        hasChronologicalViolation(
+          '2026-10-15T14:00;TZID=America/New_York',
+          '2026-10-15T13:00;TZID=America/New_York'
+        )
+      ).toBe(true);
+    });
+
+    it('handles compact RFC 5545 date formats', () => {
+      expect(hasChronologicalViolation('20261015T090000', '20261015T100000')).toBe(false);
+      expect(hasChronologicalViolation('20261015T110000', '20261015T100000')).toBe(true);
+      expect(hasChronologicalViolation('20261015', '20261016')).toBe(false);
+      expect(hasChronologicalViolation('20261016', '20261015')).toBe(true);
+    });
+
+    it('returns false when dates do not parse as valid dates', () => {
+      expect(hasChronologicalViolation('invalid', 'invalid')).toBe(false);
+      expect(hasChronologicalViolation('2026-10-15T10:00', 'invalid')).toBe(false);
+      expect(hasChronologicalViolation('invalid', '2026-10-15T10:00')).toBe(false);
+    });
+
+    it('accepts an object parameter with startDate and endDate', () => {
+      expect(hasChronologicalViolation({ startDate: '2026-10-15T09:00', endDate: '2026-10-15T10:00' })).toBe(false);
+      expect(hasChronologicalViolation({ startDate: '2026-10-15T11:00', endDate: '2026-10-15T10:00' })).toBe(true);
     });
   });
 });
