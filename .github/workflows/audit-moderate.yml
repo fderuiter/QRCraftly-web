@@ -41,10 +41,12 @@ jobs:
         run: pnpm audit --audit-level=moderate
 
       - name: Run Python Dependency Audit
+        id: python_audit
+        continue-on-error: true
         # Upstream Semgrep 1.185.0 pins mcp==1.29.0 and opentelemetry-api~=1.37.0 (see .github/dependabot.yml);
         # ignore known CVEs in those pinned versions until Semgrep upgrades them upstream.
         run: |
-          pip install pip-audit
+          pip install --require-hashes -r requirements.txt
           pip-audit -r requirements.txt \
             --ignore-vuln CVE-2026-59951 \
             --ignore-vuln CVE-2026-116685 \
@@ -56,15 +58,16 @@ jobs:
       # One GitHub issue instead of an SMTP email (#1184): opened or commented on
       # when the audit fails, closed when it passes again.
       - name: Sync Dependency Audit Issue
-        if: always() && steps.audit.outcome != 'skipped'
+        if: always() && steps.audit.outcome != 'skipped' && steps.python_audit.outcome != 'skipped'
         env:
           AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+          PYTHON_AUDIT_OUTCOME: ${{ steps.python_audit.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci/audit_issue.js
 
       - name: Fail When The Audit Failed
-        if: steps.audit.outcome == 'failure'
+        if: steps.audit.outcome == 'failure' || steps.python_audit.outcome == 'failure'
         run: |
-          echo "::error::pnpm audit found a moderate or higher vulnerability."
+          echo "::error::Dependency audit found a vulnerability."
           exit 1

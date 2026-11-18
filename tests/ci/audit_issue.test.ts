@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MARKER, TITLE, summarizeAudit, syncAuditIssue } from '../../scripts/ci/audit_issue.js';
+import { MARKER, TITLE, resolveAuditOutcome, summarizeAudit, syncAuditIssue } from '../../scripts/ci/audit_issue.js';
 
 const RUN_URL = 'https://github.com/fderuiter/QRCraftly-web/actions/runs/1';
 
@@ -116,5 +116,114 @@ describe('syncAuditIssue', () => {
     expect(syncAuditIssue({ outcome: 'cancelled', runUrl: RUN_URL, gh, log: quiet })).toBe('none');
     expect(syncAuditIssue({ outcome: '', runUrl: RUN_URL, gh, log: quiet })).toBe('none');
     expect(calls).toHaveLength(0);
+  });
+
+  describe('combined Node and Python audits', () => {
+    it('comments on open alert and keeps it open when Python audit fails and Node audit passes', () => {
+      const { gh, calls } = fakeGh([{ number: 42, body: `${MARKER}\nold` }]);
+      const result = syncAuditIssue({
+        outcome: 'success',
+        pythonOutcome: 'failure',
+        runUrl: RUN_URL,
+        gh,
+        readReport: () => JSON.stringify({ advisories: {}, metadata: { vulnerabilities: {} } }),
+        log: quiet,
+      });
+
+      expect(result).toBe('commented');
+      expect(calls.some(args => args[1] === 'close')).toBe(false);
+      const comment = calls.find(args => args[1] === 'comment') ?? [];
+      expect(comment[2]).toBe('42');
+      expect(comment[comment.indexOf('--body') + 1]).toContain(RUN_URL);
+    });
+
+    it('opens a new alert when Python audit fails and Node audit passes with no existing alert', () => {
+      const { gh, calls } = fakeGh([]);
+      const result = syncAuditIssue({
+        outcome: 'success',
+        pythonOutcome: 'failure',
+        runUrl: RUN_URL,
+        gh,
+        readReport: () => JSON.stringify({ advisories: {}, metadata: { vulnerabilities: {} } }),
+        log: quiet,
+      });
+
+      expect(result).toBe('opened');
+      const create = calls.find(args => args[1] === 'create');
+      expect(create).toBeDefined();
+    });
+
+    it('preserves failure when Node audit fails and Python audit passes', () => {
+      const { gh, calls } = fakeGh([{ number: 42, body: `${MARKER}\nold` }]);
+      const result = syncAuditIssue({
+        outcome: 'failure',
+        pythonOutcome: 'success',
+        runUrl: RUN_URL,
+        gh,
+        readReport: () => REPORT,
+        log: quiet,
+      });
+
+      expect(result).toBe('commented');
+      expect(calls.some(args => args[1] === 'close')).toBe(false);
+    });
+
+    it('closes the open alert only when both Node and Python audits pass', () => {
+      const { gh, calls } = fakeGh([{ number: 42, body: `${MARKER}\nold` }]);
+      const result = syncAuditIssue({
+        outcome: 'success',
+        pythonOutcome: 'success',
+        runUrl: RUN_URL,
+        gh,
+        log: quiet,
+      });
+
+      expect(result).toBe('closed');
+      const close = calls.find(args => args[1] === 'close') ?? [];
+      expect(close.slice(2, 5)).toEqual(['42', '--reason', 'completed']);
+    });
+
+    it('does not close active alert when run is cancelled', () => {
+      const { gh, calls } = fakeGh([{ number: 42, body: `${MARKER}\nold` }]);
+      const result = syncAuditIssue({
+        outcome: 'success',
+        pythonOutcome: 'cancelled',
+        runUrl: RUN_URL,
+        gh,
+        log: quiet,
+      });
+
+      expect(result).toBe('none');
+      expect(calls.some(args => args[1] === 'close')).toBe(false);
+      expect(calls.some(args => args[1] === 'comment')).toBe(false);
+    });
+  });
+});
+
+describe('resolveAuditOutcome', () => {
+  it('preserves failure when either tool fails', () => {
+    expect(resolveAuditOutcome('failure', 'success')).toBe('failure');
+    expect(resolveAuditOutcome('success', 'failure')).toBe('failure');
+    expect(resolveAuditOutcome('failure', 'failure')).toBe('failure');
+    expect(resolveAuditOutcome('failure', undefined)).toBe('failure');
+    expect(resolveAuditOutcome(undefined, 'failure')).toBe('failure');
+  });
+
+  it('preserves failure even if another tool was cancelled', () => {
+    expect(resolveAuditOutcome('failure', 'cancelled')).toBe('failure');
+    expect(resolveAuditOutcome('cancelled', 'failure')).toBe('failure');
+  });
+
+  it('returns cancelled when cancelled and not failing', () => {
+    expect(resolveAuditOutcome('cancelled', 'success')).toBe('cancelled');
+    expect(resolveAuditOutcome('success', 'cancelled')).toBe('cancelled');
+    expect(resolveAuditOutcome('cancelled', 'cancelled')).toBe('cancelled');
+    expect(resolveAuditOutcome('cancelled', undefined)).toBe('cancelled');
+  });
+
+  it('returns success when both tools pass or when single tool passes', () => {
+    expect(resolveAuditOutcome('success', 'success')).toBe('success');
+    expect(resolveAuditOutcome('success', undefined)).toBe('success');
+    expect(resolveAuditOutcome(undefined, 'success')).toBe('success');
   });
 });
