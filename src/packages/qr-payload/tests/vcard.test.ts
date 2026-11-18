@@ -34,6 +34,7 @@ describe('VCard generator', () => {
       website: 'https://example.com',
       street: '123 Main St',
       city: 'Anytown',
+      state: '',
       zip: '12345',
       country: 'USA',
     };
@@ -55,6 +56,7 @@ describe('VCard generator', () => {
       website: '',
       street: '',
       city: '',
+      state: '',
       zip: '',
       country: '',
       photo: '',
@@ -257,7 +259,11 @@ describe('VCard generator', () => {
     // Empty or undefined values return undefined
     expect(vCardFieldError('firstName', '')).toBeUndefined();
     expect(vCardFieldError('firstName', undefined)).toBeUndefined();
-    expect(CARD_FIELDS.length).toBe(17);
+    expect(vCardFieldError('state', 'California')).toBeUndefined();
+    expect(vCardFieldError('state', 'CA\x00')).toBe(
+      'Contains invalid control or zero-width characters.'
+    );
+    expect(CARD_FIELDS.length).toBe(18);
   });
 
   it('supports vCard 2.1, 3.0, and 4.0 versions', () => {
@@ -393,6 +399,63 @@ describe('VCard generator', () => {
     const hydrated = hydrateVCardData(str);
     expect(hydrated.city).toBe('Metropolis');
     expect(hydrated.street).toBe('');
+    expect(hydrated.state).toBe('');
+  });
+
+  it('serializes and hydrates regional state component in vCard ADR', () => {
+    const fullAddressData = {
+      version: '3.0' as const,
+      firstName: 'Jane',
+      lastName: 'Smith',
+      organization: 'TechCorp',
+      title: 'Architect',
+      phone: '555-1234',
+      email: 'jane@example.com',
+      website: 'https://example.com',
+      street: '123 Market St',
+      city: 'San Francisco',
+      state: 'CA',
+      zip: '94105',
+      country: 'USA',
+    };
+
+    const str30 = constructVCardString(fullAddressData);
+    expect(str30).toContain('ADR:;;123 Market St;San Francisco;CA;94105;USA');
+    const hydrated30 = hydrateVCardData(str30);
+    expect(hydrated30.street).toBe('123 Market St');
+    expect(hydrated30.city).toBe('San Francisco');
+    expect(hydrated30.state).toBe('CA');
+    expect(hydrated30.zip).toBe('94105');
+    expect(hydrated30.country).toBe('USA');
+
+    const str40 = constructVCardString({ ...fullAddressData, version: '4.0' });
+    expect(str40).toContain('ADR:;;123 Market St;San Francisco;CA;94105;USA');
+    const hydrated40 = hydrateVCardData(str40);
+    expect(hydrated40.state).toBe('CA');
+
+    const str21 = constructVCardString({ ...fullAddressData, version: '2.1' });
+    expect(str21).toContain('ADR:;;123 Market St;San Francisco;CA;94105;USA');
+    const hydrated21 = hydrateVCardData(str21);
+    expect(hydrated21.state).toBe('CA');
+
+    // Emits ADR line when only state is populated
+    const onlyState = constructVCardString({
+      version: '3.0' as const,
+      firstName: 'Solo',
+      lastName: 'State',
+      organization: '',
+      title: '',
+      phone: '',
+      email: '',
+      website: '',
+      street: '',
+      city: '',
+      state: 'New York',
+      zip: '',
+      country: '',
+    });
+    expect(onlyState).toContain('ADR:;;;;New York;;');
+    expect(hydrateVCardData(onlyState).state).toBe('New York');
   });
 
   it('omits empty optional property lines in MECard format while preserving structural tags', () => {
@@ -461,7 +524,7 @@ describe('VCard generator', () => {
 
     it('still reads the positional DoCoMo form', () => {
       const hydrated = hydrateVCardData('MECARD:N:Lee,Ann;ADR:,,1 Main,Springfield,IL,62701,US;;');
-      expect(hydrated).toMatchObject({ street: '1 Main', city: 'Springfield', zip: '62701', country: 'US' });
+      expect(hydrated).toMatchObject({ street: '1 Main', city: 'Springfield', state: 'IL', zip: '62701', country: 'US' });
     });
   });
   describe('a card with no person name (#1481)', () => {
@@ -495,6 +558,7 @@ describe('Social profiles (#1470)', () => {
     website: '',
     street: '',
     city: '',
+    state: '',
     zip: '',
     country: '',
     photo: '',

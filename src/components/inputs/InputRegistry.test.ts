@@ -83,10 +83,12 @@ describe('validate', () => {
     expect(validateInput(QRType.EMAIL, { ...email, email: 'a@example.com, b@example.com' })).toBeNull();
   });
 
-  it('refuses a script link as a contact website and a control character in a name', () => {
+  it('refuses a script link as a contact website and a control character in a name or state', () => {
     expect(validateInput(QRType.VCARD, { ...vcard, website: 'javascript:alert(1)' })).toBe('Unsafe URL scheme or malicious protocol detected.');
     expect(validateInput(QRType.VCARD, { ...vcard, firstName: 'Ann\u0007' })).toBe('Contains invalid control or zero-width characters.');
-    expect(validateInput(QRType.VCARD, { ...vcard, firstName: '   ' })).toBeNull();
+    expect(validateInput(QRType.VCARD, { ...vcard, state: 'CA\u0007' })).toBe('Contains invalid control or zero-width characters.');
+    expect(validateInput(QRType.VCARD, { ...vcard, firstName: '   ', state: 'California' })).toBeNull();
+    expect(vcard.state).toBe('');
   });
 
   it('refuses a script link as a payment address', () => {
