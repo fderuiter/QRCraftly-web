@@ -73,6 +73,7 @@ export {
   constructEventString,
   hydrateEventData,
   parseRecurrenceRule,
+  hasChronologicalViolation,
   buildGoogleCalendarUrl,
   buildOutlookCalendarUrl,
   buildYahooCalendarUrl,

@@ -85,6 +85,43 @@ export const parseRecurrenceRule = (
 };
 
 /**
+ * Evaluates whether an event's end timestamp precedes its start timestamp (RFC 5545 §3.6.1).
+ *
+ * Both dates must be present and parseable as dates. If either date is missing
+ * or unreadable, returns false so typing is not blocked halfway.
+ *
+ * @param startDate - The event start date or datetime string, or an object with startDate and endDate.
+ * @param endDate - The event end date or datetime string.
+ * @returns True when end date/time precedes start date/time.
+ */
+export function hasChronologicalViolation(startDate?: string, endDate?: string): boolean;
+export function hasChronologicalViolation(data: { startDate?: string; endDate?: string }): boolean;
+export function hasChronologicalViolation(
+  startOrData?: string | { startDate?: string; endDate?: string },
+  endDate?: string
+): boolean {
+  let start: string | undefined;
+  let end: string | undefined = endDate;
+  if (typeof startOrData === 'object' && startOrData !== null) {
+    start = startOrData.startDate;
+    end = startOrData.endDate;
+  } else {
+    start = startOrData;
+  }
+  if (!start || !end) return false;
+  const parsedStart = parseEventDateTime(start.trim());
+  const parsedEnd = parseEventDateTime(end.trim());
+  const cleanStart = (parsedStart || start).replace(/;TZID=[^;:\s\n]+/i, '');
+  const cleanEnd = (parsedEnd || end).replace(/;TZID=[^;:\s\n]+/i, '');
+  const startSecs = new Date(cleanStart).getTime();
+  const endSecs = new Date(cleanEnd).getTime();
+  if (Number.isNaN(startSecs) || Number.isNaN(endSecs)) {
+    return false;
+  }
+  return endSecs < startSecs;
+}
+
+/**
  * Hydrates EventData from a raw string.
  */
 export const hydrateEventData = (raw: string): EventData => {
@@ -584,16 +621,8 @@ export const EventContract: QRGeneratorContract<EventData> = {
     }
 
     // 3. Check for Chronological Consistency (EVENT_CHRONOLOGICAL_VIOLATION)
-    if (data.startDate && data.endDate) {
-      const cleanStart = data.startDate.replace(/;TZID=[^;:\s\n]+/i, '');
-      const cleanEnd = data.endDate.replace(/;TZID=[^;:\s\n]+/i, '');
-      const startSecs = new Date(cleanStart).getTime();
-      const endSecs = new Date(cleanEnd).getTime();
-      if (!Number.isNaN(startSecs) && !Number.isNaN(endSecs)) {
-        if (endSecs < startSecs) {
-          violations.push('EVENT_CHRONOLOGICAL_VIOLATION');
-        }
-      }
+    if (hasChronologicalViolation(data.startDate, data.endDate)) {
+      violations.push('EVENT_CHRONOLOGICAL_VIOLATION');
     }
 
     return violations;
