@@ -54,12 +54,13 @@ overrides:
   # GHSA-g3hv-75wg-m249 (minimatch globparts DoS, < 11.0.1). typescript-estree pins minimatch 10.
   "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
 
-# Upstream advisories with no patched version available yet.
-# GHSA-fc5q-39xc-vjpf / CVE-2026-112366 (picomatch <=4.0.7 ReDoS through single-branch repeated extglobs);
-# picomatch is used only by dev/build tooling (knip, tinyglobby, vike, vite, vitest) and has no patched release yet.
+# Known upstream advisories with no patched release available yet.
+# Remove once upstream publishes a patched version.
 auditConfig:
+  # GHSA-fc5q-39xc-vjpf / CVE-2026-112366 (picomatch ReDoS <= 4.0.7); transitive dependency in
+  # Vite, Vike, Vitest, Knip, and typescript-estree. Upstream picomatch has no patched release yet
+  # (first_patched_version is null, npm latest is 4.0.7).
   ignoreGhsas:
     - GHSA-fc5q-39xc-vjpf
   ignoreCves:
     - CVE-2026-112366
-
