@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { getContrastRatio, normalizeHex, hexToRgba, srgbToLinear, linearToSrgb, getLuminanceFromLinearRgb, getLuminanceFromRgb, rgbToCmyk } from '../encoding';
+import { getContrastRatio, normalizeHex, hexToRgba, srgbToLinear, linearToSrgb, getLuminanceFromLinearRgb, getLuminanceFromRgb, rgbToCmyk, SRGB_TO_LINEAR_LUT } from '../encoding';
 
 describe('colorUtils', () => {
   describe('getContrastRatio', () => {
@@ -129,6 +129,35 @@ describe('linear-light helpers', () => {
     const [r, g, b] = [0.2, 0.6, 0.9];
     expect(getLuminanceFromLinearRgb(srgbToLinear(r), srgbToLinear(g), srgbToLinear(b))).toBeCloseTo(getLuminanceFromRgb(r, g, b), 12);
     expect(getLuminanceFromLinearRgb(1, 1, 1)).toBeCloseTo(1, 12);
+  });
+
+  describe('SRGB_TO_LINEAR_LUT', () => {
+    it('is a 256-element Float64Array', () => {
+      expect(SRGB_TO_LINEAR_LUT).toBeInstanceOf(Float64Array);
+      expect(SRGB_TO_LINEAR_LUT).toHaveLength(256);
+    });
+
+    it('matches exact srgbToLinear calculations for all 8-bit values', () => {
+      expect(SRGB_TO_LINEAR_LUT[0]).toBe(0);
+      expect(SRGB_TO_LINEAR_LUT[255]).toBe(1);
+      for (let i = 0; i < 256; i++) {
+        expect(SRGB_TO_LINEAR_LUT[i]).toBe(srgbToLinear(i / 255));
+      }
+    });
+
+    it('faithfully computes WCAG 2.0 relative luminance using table lookups', () => {
+      // Test sample 8-bit RGB color (200, 100, 50)
+      const r = 200;
+      const g = 100;
+      const b = 50;
+      const lumFromLut = getLuminanceFromLinearRgb(
+        SRGB_TO_LINEAR_LUT[r],
+        SRGB_TO_LINEAR_LUT[g],
+        SRGB_TO_LINEAR_LUT[b]
+      );
+      const lumFromMath = getLuminanceFromRgb(r / 255, g / 255, b / 255);
+      expect(lumFromLut).toBe(lumFromMath);
+    });
   });
 });
 
