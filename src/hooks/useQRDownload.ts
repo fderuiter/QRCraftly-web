@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect } from 'react';
 import { type QRConfig, TemplateStyle, SocialFormat } from '@/packages/core/types';
-import { generateQRSvg, PayloadRejectedError, renderQRRaster, validateSvgScannability } from '@/packages/qr-export';
+import type { PayloadRejectedError } from '@/packages/qr-export';
 import { QrEncodeError } from '@/packages/qr-matrix';
 import { describeViolation } from '@/packages/qr-payload';
 import { previewFailureMessage, tooLongMessage } from '../utils/previewFailure';
@@ -58,12 +58,20 @@ const scanValidationFailed = (): Error => {
   return error;
 };
 
+/** Checks whether an error is a PayloadRejectedError without statically importing the class or using type assertions. */
+const isPayloadRejectedError = (err: unknown): err is PayloadRejectedError => {
+  if (typeof err !== 'object' || err === null) return false;
+  if (!('name' in err) || err.name !== 'PayloadRejectedError') return false;
+  if (!('violations' in err) || !Array.isArray(err.violations)) return false;
+  return true;
+};
+
 /**
  * Turns an export failure into an error whose message can be shown to people: validation
  * codes and encoder errors become plain sentences instead of raw codes (#1255).
  */
 const describeExportError = (err: unknown, config: QRConfig): Error => {
-  if (err instanceof PayloadRejectedError) {
+  if (isPayloadRejectedError(err)) {
     return new Error(err.violations.map(describeViolation).join(' '));
   }
   if (err instanceof QrEncodeError) {
@@ -125,6 +133,7 @@ export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'svg' | 'eps' | 'pdf' | 'cl
  * @returns The canvas to export.
  */
 async function renderExportCanvas(config: QRConfig, format: string, size?: number): Promise<HTMLCanvasElement> {
+  const { renderQRRaster } = await import('@/packages/qr-export');
   const canvas = await renderQRRaster(config, size || DEFAULT_EXPORT_WIDTH);
   if (format !== 'jpeg' && format !== 'jpg') return canvas;
 
@@ -409,6 +418,7 @@ export function useQRDownload(config: QRConfig): UseQRDownloadReturn {
    */
   const buildSvg = useCallback(async (options?: AssetOptions): Promise<{ svg: string; logoOmitted: boolean } | null> => {
     let logoOmitted = false;
+    const { generateQRSvg, validateSvgScannability } = await import('@/packages/qr-export');
     const svg = await generateQRSvg(config, {
       onLogoOmitted: () => {
         logoOmitted = true;

@@ -40,6 +40,11 @@ minimumReleaseAgeExclude:
   - '@esbuild/win32-x64@0.28.1'
   - esbuild@0.28.1
 
+# GHSA-fc5q-39xc-vjpf (picomatch ReDoS in single-branch repeated extglobs <= 4.0.7; no patched version available yet).
+auditConfig:
+  ignoreGhsas:
+    - GHSA-fc5q-39xc-vjpf
+
 # Each override says why it exists. Remove one when `pnpm audit` stays clean without it: the
 # 2026-10-19 review dropped twelve that no longer changed what resolves (the tree passed
 # `pnpm audit` with none of them), including an undici pin that held jsdom below the ^8 it asks for.
