@@ -55,11 +55,13 @@ overrides:
   "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
 
 
-# Upstream advisories ignored until a patched version is published upstream.
-# GHSA-fc5q-39xc-vjpf / CVE-2026-112366: picomatch <= 4.0.7 ReDoS through single-branch repeated extglobs.
-# Currently picomatch 4.0.7 is the latest version published on npm and no patched release (> 4.0.7) exists yet.
+# Known upstream advisories with no patched release available yet.
+# Remove once upstream publishes a patched version.
 auditConfig:
-  ignoreCves:
-    - CVE-2026-112366
+  # GHSA-fc5q-39xc-vjpf / CVE-2026-112366 (picomatch ReDoS <= 4.0.7); transitive dependency in
+  # Vite, Vike, Vitest, Knip, and typescript-estree. Upstream picomatch has no patched release yet
+  # (first_patched_version is null, npm latest is 4.0.7).
   ignoreGhsas:
     - GHSA-fc5q-39xc-vjpf
+  ignoreCves:
+    - CVE-2026-112366
