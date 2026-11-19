@@ -29,6 +29,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { sidebarControls } from '@/registry';
 import { ToolWorkspaceLayout, ToolWorkspaceHeader } from './ToolWorkspaceLayout';
 import { usePageContent } from '@/data/PageContentContext';
+import { MiniPreview } from './MiniPreview';
 import type { ScanFix } from '@/packages/scannability';
 import { fixPatch, resetPatch } from './generator/decisions';
 import { SafetyGateModal } from './generator/SafetyGateModal';
@@ -40,10 +41,6 @@ import { useTextEntryFocus } from '@/hooks/useTextEntryFocus';
 
 // The phone wallet dialog (ADR 0048) loads only when it is opened.
 const WalletDialog = React.lazy(() => import('./wallet/WalletDialog'));
-// The mini preview thumbnail for mobile loads asynchronously.
-const MiniPreview = React.lazy(() =>
-  import('./MiniPreview').then((m) => ({ default: m.MiniPreview })),
-);
 
 /** One-line promise under every generator heading. */
 const GENERATOR_SUBTITLE = 'No sign-up, no ads, never expires.';
@@ -155,9 +152,7 @@ function QRToolInner({ title, toolId = 'index' }: { title?: string, toolId?: str
       )}
       <GeneratorCommands actions={commandActions} onDownload={() => flow.run('download')} />
       {/* No thumbnail while there is no code to mirror: it would be an empty box. */}
-      <Suspense fallback={null}>
-        <MiniPreview sourceRef={canvasRef} targetId={PREVIEW_ID} renderKey={debouncedConfig} suppressed={inputFocused || noVerdict} />
-      </Suspense>
+      <MiniPreview sourceRef={canvasRef} targetId={PREVIEW_ID} renderKey={debouncedConfig} suppressed={inputFocused || noVerdict} />
       {/* Keeps the last content clear of the mobile action bar. */}
       <div aria-hidden="true" className="h-20 md:hidden" />
 

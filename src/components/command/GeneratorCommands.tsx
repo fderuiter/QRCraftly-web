@@ -5,6 +5,7 @@ import { useUndoToast } from '@/hooks/useUndoToast';
 import { useLatestSelection } from '@/hooks/useLatestSelection';
 import { usesCommandKey, useGeneratorShortcuts } from './useGeneratorShortcuts';
 import type { buildCommands, Command, GeneratorActions } from './commands';
+import type { StyleFileResult } from '@/utils/styleFile';
 
 // The palette, its command list and the style file code load on first use, so they cost
 // nothing on a page that never opens them.
@@ -42,19 +43,34 @@ export function GeneratorCommands({ actions, onDownload }: GeneratorCommandsProp
   // reading when the generator unmounts, changes nothing and shows no toast (#1705).
   const styleSelection = useLatestSelection();
   const applyStyleFile = useCallback(
-    (file: File) => {
+    async (file: File) => {
       const isCurrent = styleSelection.begin();
-      void import('./styleFileActions').then(({ readAndApplyStyleFile }) => {
-        void readAndApplyStyleFile(file, store, addToast, notifyUndo, isCurrent);
-      });
+      const showError = (message: string) => addToast({ type: 'error', message, duration: 6000 });
+      let result: StyleFileResult;
+      try {
+        const { parseStyleFile, MAX_STYLE_FILE_BYTES } = await import('@/utils/styleFile');
+        result = file.size > MAX_STYLE_FILE_BYTES
+          ? ({ ok: false, reason: 'That file is too large to be a QRCraftly style file.' } as const)
+          : parseStyleFile(await file.text());
+      } catch {
+        if (isCurrent()) showError('That style file could not be read. Try again.');
+        return;
+      }
+      if (!isCurrent()) return;
+      if (!result.ok) {
+        showError(result.reason);
+        return;
+      }
+      store.updateConfig(result.style);
+      notifyUndo(result.skipped > 0 ? `Style loaded; ${result.skipped} setting${result.skipped === 1 ? '' : 's'} could not be used.` : 'Style loaded');
     },
     [store, addToast, notifyUndo, styleSelection]
   );
 
-  const exportStyleFile = useCallback(() => {
-    void import('./styleFileActions').then(({ exportStyleFileAction }) => {
-      void exportStyleFileAction(store, addToast);
-    });
+  const exportStyleFile = useCallback(async () => {
+    const [{ serializeStyle }, { triggerFileDownload }] = await Promise.all([import('@/utils/styleFile'), import('@/utils/downloadManager')]);
+    triggerFileDownload(new TextEncoder().encode(serializeStyle(store.getState().config)), 'qrcraftly-style.qrcraftly.json', 'application/json');
+    addToast({ type: 'success', message: 'Style saved. It holds colors and layout only, never your content.', duration: 5000 });
   }, [store, addToast]);
 
   useGeneratorShortcuts({
@@ -70,19 +86,18 @@ export function GeneratorCommands({ actions, onDownload }: GeneratorCommandsProp
   // A style file dropped anywhere on the page. Zones that handle their own drops (the logo
   // upload) mark the event as handled first and are left alone.
   useEffect(() => {
+    const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files');
     const onDragOver = (event: DragEvent) => {
-      if (!event.defaultPrevented && event.dataTransfer?.types?.includes('Files')) {
-        event.preventDefault();
-        if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
-      }
+      if (event.defaultPrevented || !hasFiles(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
     };
     const onDrop = (event: DragEvent) => {
-      if (event.defaultPrevented) return;
+      if (event.defaultPrevented || !hasFiles(event)) return;
       event.preventDefault();
-      const isCurrent = styleSelection.begin();
-      void import('./styleFileActions').then(({ handleStyleDrop }) => {
-        void handleStyleDrop(event, store, addToast, notifyUndo, isCurrent);
-      });
+      const file = Array.from(event.dataTransfer?.files ?? []).find((f) => /\.json$/i.test(f.name));
+      if (file) void applyStyleFile(file);
+      else addToast({ type: 'info', message: 'Drop a .qrcraftly.json style file to load a style.', duration: 5000 });
     };
     window.addEventListener('dragover', onDragOver);
     window.addEventListener('drop', onDrop);
@@ -90,7 +105,7 @@ export function GeneratorCommands({ actions, onDownload }: GeneratorCommandsProp
       window.removeEventListener('dragover', onDragOver);
       window.removeEventListener('drop', onDrop);
     };
-  }, [store, addToast, notifyUndo, styleSelection]);
+  }, [applyStyleFile, addToast]);
 
   const close = useCallback(() => setPanel('closed'), []);
   const [commands, setCommands] = useState<Command[]>([]);

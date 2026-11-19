@@ -52,12 +52,7 @@ export default defineConfig({
     {
       name: 'chromium',
       testIgnore: CSP_ENFORCED_SPECS,
-      use: {
-        ...devices['Desktop Chrome'],
-        launchOptions: {
-          args: ['--no-sandbox', '--disable-dev-shm-usage'],
-        },
-      },
+      use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'firefox',
@@ -75,13 +70,7 @@ export default defineConfig({
          source fail here instead of only in production. */
       name: 'chromium-csp',
       testMatch: CSP_ENFORCED_SPECS,
-      use: {
-        ...devices['Desktop Chrome'],
-        bypassCSP: false,
-        launchOptions: {
-          args: ['--no-sandbox', '--disable-dev-shm-usage'],
-        },
-      },
+      use: { ...devices['Desktop Chrome'], bypassCSP: false },
     },
   ],
   /* Serve the production build before starting the tests. Locally this builds
