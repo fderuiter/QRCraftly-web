@@ -31,6 +31,7 @@ import { getQrTypeLabel } from '@/packages/qr-payload';
 import { calculateCanvasDimensions } from './qr-canvas/canvasDimensions';
 import { crossfadeFrom } from './qr-canvas/crossfade';
 import { scheduleVirtualRender, type RenderedInfo, type ScheduledRender } from './qr-canvas/virtualRender';
+import { hasPaintConfigChanged } from './qr-canvas/paintDependencies';
 import { useMazeData } from './qr-canvas/useMazeData';
 import { useQrAnimation } from './qr-canvas/useQrAnimation';
 
@@ -367,11 +368,11 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     };
   }, [paintMatrix, clearCanvasAndResize, requestMatrixCalculation]);
 
-  // Monitor value and error correction level to request calculations
+  // Monitor type, value, and error correction level to request calculations
   useLayoutEffect(() => {
     if (activeIsAnimating) return;
     requestMatrixCalculation();
-  }, [config.value, config.errorCorrectionLevel, activeIsAnimating, requestMatrixCalculation]);
+  }, [config.type, config.value, config.errorCorrectionLevel, activeIsAnimating, requestMatrixCalculation]);
 
   // Repaint canvas when computed background maze data updates without triggering a new calculation
   useLayoutEffect(() => {
@@ -381,61 +382,43 @@ const QRCanvas = React.forwardRef<HTMLCanvasElement, QRCanvasProps>(({
     }
   }, [computedMazeData, activeIsAnimating, repaintCanvasOnly]);
 
+  const prevPaintInputsRef = useRef<{
+    config: QRConfig;
+    mosaicSourceVersion: number;
+    logoImg: HTMLImageElement | null;
+    borderLogoImg: HTMLImageElement | null;
+    size: number;
+    paintMatrix: (modules: QRModules) => void;
+  } | null>(null);
+
   // Monitor structural and aesthetic changes to repaint immediately. Every design field the renderer
-  // reads belongs here: one left out (frames, eye colours) only showed after some other change.
+  // reads is checked via hasPaintConfigChanged so newly added QRConfig fields cannot be omitted.
   useLayoutEffect(() => {
-    if (activeIsAnimating) return;
-    if (lastModulesRef.current) {
+    const prev = prevPaintInputsRef.current;
+    prevPaintInputsRef.current = {
+      config: activeConfig,
+      mosaicSourceVersion,
+      logoImg,
+      borderLogoImg,
+      size,
+      paintMatrix,
+    };
+
+    if (!prev || activeIsAnimating || !lastModulesRef.current) return;
+
+    const didPaintInputsChange =
+      hasPaintConfigChanged(prev.config, activeConfig) ||
+      prev.mosaicSourceVersion !== mosaicSourceVersion ||
+      prev.logoImg !== logoImg ||
+      prev.borderLogoImg !== borderLogoImg ||
+      prev.size !== size ||
+      prev.paintMatrix !== paintMatrix;
+
+    if (didPaintInputsChange) {
       paintMatrix(lastModulesRef.current);
     }
   }, [
-    config.fgColor,
-    config.bgColor,
-    config.eyeColor,
-    config.eyeFrameColor,
-    config.eyeBallColor,
-    config.eyeFrameShape,
-    config.eyeBallShape,
-    config.frameStyle,
-    config.frameText,
-    config.frameBgColor,
-    config.frameTextColor,
-    config.framePosition,
-    config.frameIcon,
-    config.gradientType,
-    config.gradientColorStops,
-    config.gradientAngle,
-    config.style,
-    config.logoUrl,
-    config.logoSize,
-    config.logoPaddingStyle,
-    config.logoPadding,
-    config.logoBackgroundColor,
-    config.isBorderEnabled,
-    config.borderSize,
-    config.borderColor,
-    config.borderStyle,
-    config.borderText,
-    config.borderTextPosition,
-    config.borderTextColor,
-    config.borderLogoUrl,
-    config.borderLogoPosition,
-    config.socialFormat,
-    config.templateStyle,
-    config.templateHeadline,
-    config.templateSubtext,
-    config.templateBgColor,
-    config.templateTextColor,
-    config.templateQrScale,
-    config.backgroundImageUrl,
-    activeConfig.isMazeEnabled,
-    activeConfig.isMazeBridgesEnabled,
-    activeConfig.mazeColor,
-    activeConfig.mazePathWidth,
-    activeConfig.showMazeSolution,
-    config.mosaicImageUrl,
-    config.mosaicMode,
-    config.mosaicContrast,
+    activeConfig,
     mosaicSourceVersion,
     logoImg,
     borderLogoImg,
