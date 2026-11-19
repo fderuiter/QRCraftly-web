@@ -34,14 +34,16 @@ export const renderLogo = (
 
     if (config.logoPaddingStyle !== 'none') {
       const bgColor = config.logoBackgroundColor || config.bgColor;
-      drawLogoBackground(
-        ctx,
-        displaySize,
-        logoSizePx,
-        logoPaddingPx,
-        config.logoPaddingStyle,
-        bgColor
-      );
+      if (bgColor && bgColor !== 'transparent') {
+        drawLogoBackground(
+          ctx,
+          displaySize,
+          logoSizePx,
+          logoPaddingPx,
+          config.logoPaddingStyle,
+          bgColor
+        );
+      }
     }
 
     ctx.drawImage(logoImg, lx, ly, logoSizePx, logoSizePx);
@@ -65,6 +67,7 @@ export const drawLogoBackground = (
   paddingStyle: 'circle' | 'square' | string,
   backgroundColor: string
 ) => {
+  if (!backgroundColor || backgroundColor === 'transparent') return;
   ctx.fillStyle = backgroundColor;
   if (paddingStyle === 'circle') {
     ctx.beginPath();

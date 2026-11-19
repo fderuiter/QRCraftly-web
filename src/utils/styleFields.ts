@@ -3,7 +3,7 @@ import { normalizeHex } from '@/packages/core/encoding';
 
 type FieldRule =
   | { kind: 'enum'; values: readonly string[] }
-  | { kind: 'color'; allowTransparent?: boolean }
+  | { kind: 'color'; allowTransparent?: boolean; allowEmpty?: boolean }
   | { kind: 'number'; min: number; max: number }
   | { kind: 'boolean' }
   | { kind: 'colorStops' };
@@ -31,7 +31,8 @@ const STYLE_FIELDS: Partial<Record<keyof QRConfig, FieldRule>> = {
   logoSize: { kind: 'number', min: 0.1, max: 0.3 },
   logoPaddingStyle: enumOf(['square', 'circle', 'none'] satisfies LogoPaddingStyle[]),
   logoPadding: { kind: 'number', min: 0, max: 4 },
-  logoBackgroundColor: { kind: 'color' },
+  // An empty string inherits bgColor; 'transparent' omits the logo backing fill while keeping the module gap.
+  logoBackgroundColor: { kind: 'color', allowTransparent: true, allowEmpty: true },
   isBorderEnabled: { kind: 'boolean' },
   borderSize: { kind: 'number', min: 0.01, max: 0.15 },
   borderColor: { kind: 'color' },
@@ -86,7 +87,7 @@ export const STYLE_BASELINE: Readonly<Partial<QRConfig>> = {
   logoSize: 0.2,
   logoPaddingStyle: 'square',
   logoPadding: 1,
-  logoBackgroundColor: '#ffffff',
+  logoBackgroundColor: '',
   isBorderEnabled: false,
   borderSize: 0.05,
   borderColor: '#000000',
@@ -200,6 +201,7 @@ function cleanValue(rule: FieldRule, value: unknown): string | number | boolean 
     case 'enum':
       return typeof value === 'string' && rule.values.includes(value) ? value : undefined;
     case 'color':
+      if (rule.allowEmpty && value === '') return value;
       if (rule.allowTransparent && value === 'transparent') return value;
       return typeof value === 'string' ? (normalizeHex(value) ?? undefined) : undefined;
     case 'number':

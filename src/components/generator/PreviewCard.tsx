@@ -111,7 +111,12 @@ export function PreviewCard({
        )}
 
        {/* Preview stage: the QR is the largest thing on the page. */}
-       <div className="mb-4 flex justify-center rounded-xl bg-surface-sunken p-3 md:p-2" data-testid="qr-stage">
+       <div
+         className={`mb-4 flex justify-center rounded-xl p-3 md:p-2 ${
+           debouncedConfig.bgColor === 'transparent' ? 'qr-checkerboard' : 'bg-surface-sunken'
+         }`}
+         data-testid="qr-stage"
+       >
           {/* Pass debounced config to QRCanvas to prevent heavy rendering on every keystroke */}
           <QRCanvas ref={canvasRef} onRendered={onRendered} onRenderFailed={onRenderFailed} config={debouncedConfig} className={`rounded-lg shadow-raised ${STAGE_SIZE_CLASSES[debouncedConfig.socialFormat] ?? STAGE_SIZE_CLASSES[SocialFormat.SQUARE_1_1]}`} />
        </div>

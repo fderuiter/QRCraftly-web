@@ -33,7 +33,7 @@ export const DEFAULT_CONFIG = {
   logoSize: 0.2,
   logoPaddingStyle: 'square' as const,
   logoPadding: 1,
-  logoBackgroundColor: '#ffffff',
+  logoBackgroundColor: '',
   eyeColor: '#000000',
   errorCorrectionLevel: QRErrorCorrectionLevel.H,
   isBorderEnabled: false,

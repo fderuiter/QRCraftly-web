@@ -5,6 +5,7 @@ import { type QRConfig, type LogoPaddingStyle, QRErrorCorrectionLevel } from '@/
 import { Upload, X, Square, Circle, Minus } from 'lucide-react';
 import { ColorInput } from '../ui/ColorInput';
 import { RangeInput } from '../ui/RangeInput';
+import { ToggleSwitch } from '../ui/ToggleSwitch';
 import { useImageUpload } from '../../hooks/useImageUpload';
 import { IMAGE_UPLOAD_LIMITS } from '@/packages/core/security';
 import { SYSTEM_LIMITS } from '@/packages/scannability';
@@ -60,6 +61,8 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
   const filteredPresets = PRESET_LOGOS.filter(
     (p) => selectedCategory === 'all' || p.category === selectedCategory
   );
+  const resolvedLogoBg = config.logoBackgroundColor || config.bgColor;
+  const isLogoBgTransparent = resolvedLogoBg === 'transparent';
 
   return (
     <div>
@@ -193,14 +196,32 @@ export const LogoControls: React.FC<LogoControlsProps> = ({ config, onChange }) 
                   onChange={(val) => onChange({ logoPadding: val })}
                 />
               </div>
-              <ColorInput
-                id="logo-bg-color"
-                label="Background Color"
-                value={config.logoBackgroundColor || config.bgColor}
-                onChange={(val) => onChange({ logoBackgroundColor: val })}
-                displayValue={config.logoBackgroundColor || 'Auto'}
-                sizeClass="w-8 h-8"
-              />
+              <div className="space-y-2">
+                <ColorInput
+                  id="logo-bg-color"
+                  label="Background Color"
+                  value={isLogoBgTransparent ? '#ffffff' : resolvedLogoBg}
+                  onChange={(val) => onChange({ logoBackgroundColor: val })}
+                  displayValue={isLogoBgTransparent ? undefined : (config.logoBackgroundColor || 'Auto')}
+                  sizeClass="w-8 h-8"
+                  disabled={isLogoBgTransparent}
+                />
+                <ToggleSwitch
+                  id="transparent-logo-bg"
+                  label="Transparent Backing"
+                  checked={isLogoBgTransparent}
+                  onChange={(checked) =>
+                    onChange({
+                      logoBackgroundColor: checked
+                        ? 'transparent'
+                        : config.bgColor === 'transparent'
+                          ? '#ffffff'
+                          : '',
+                    })
+                  }
+                  labelClassName="text-xs font-medium text-fg-muted"
+                />
+              </div>
             </div>
           )}
 
