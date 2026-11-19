@@ -409,6 +409,7 @@ export class SvgContext {
   fill(): void {
     if (!this._pathData.trim()) return;
     const fill = this._cssColor(this.fillStyle);
+    if (this._isTransparentFill(fill)) return;
     this._elements.push(`<path d="${this._pathData.trim()}" fill="${fill}" fill-rule="evenodd"/>`);
   }
 
@@ -426,6 +427,7 @@ export class SvgContext {
   /** Fills a rectangle directly (without modifying the current path). */
   fillRect(x: number, y: number, w: number, h: number): void {
     const fill = this._cssColor(this.fillStyle);
+    if (this._isTransparentFill(fill)) return;
     const d = `M ${this._pt(x, y)} L ${this._pt(x + w, y)} L ${this._pt(x + w, y + h)} L ${this._pt(x, y + h)} Z`;
     this._elements.push(`<path d="${d}" fill="${fill}"/>`);
   }
@@ -627,6 +629,11 @@ export class SvgContext {
       return `url(#${color.id})`;
     }
     return color || 'none';
+  }
+
+  private _isTransparentFill(fill: string): boolean {
+    const normalized = fill.trim().toLowerCase();
+    return normalized === 'transparent' || normalized === 'none';
   }
 
   private _svgTextAnchor(align: string): string {

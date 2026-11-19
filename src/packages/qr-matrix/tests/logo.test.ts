@@ -17,7 +17,7 @@
 */
 
 import { describe, it, expect, vi } from 'vitest';
-import { renderLogo, type LogoMetrics } from '../index';
+import { renderLogo, getLogoMetrics, getIsCoveredByLogo, MIN_LOGO_BACKING_PADDING, type LogoMetrics } from '../index';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import type { QRConfig } from '@/packages/core/types';
 
@@ -110,5 +110,70 @@ describe('renderLogo', () => {
     expect(ctx.fillStyle).toBe('#00ff00');
     expect(ctx.fillRect).toHaveBeenCalledWith(75, 75, 50, 50);
     expect(ctx.drawImage).toHaveBeenCalledWith(mockImg, 80, 80, 40, 40);
+  });
+
+  it.each(['square', 'circle'] as const)(
+    'omits %s backing fill when logoBackgroundColor is transparent while still drawing the logo',
+    (logoPaddingStyle) => {
+      const ctx = createMockContext();
+      const config: QRConfig = {
+        ...DEFAULT_CONFIG,
+        logoUrl: 'logo.png',
+        bgColor: '#ffffff',
+        logoPaddingStyle,
+        logoBackgroundColor: 'transparent',
+      };
+      const mockImg = {} as HTMLImageElement;
+      renderLogo(ctx, config, mockImg, 200, mockMetrics);
+      expect(ctx.fillRect).not.toHaveBeenCalled();
+      expect(ctx.fill).not.toHaveBeenCalled();
+      expect(ctx.beginPath).not.toHaveBeenCalled();
+      expect(ctx.drawImage).toHaveBeenCalledWith(mockImg, 80, 80, 40, 40);
+    }
+  );
+
+  it('omits backing fill when uncustomized logo inherits transparent bgColor', () => {
+    const ctx = createMockContext();
+    const config: QRConfig = {
+      ...DEFAULT_CONFIG,
+      logoUrl: 'logo.png',
+      bgColor: 'transparent',
+      logoPaddingStyle: 'circle',
+      logoBackgroundColor: '',
+    };
+    const mockImg = {} as HTMLImageElement;
+    renderLogo(ctx, config, mockImg, 200, mockMetrics);
+    expect(ctx.fillRect).not.toHaveBeenCalled();
+    expect(ctx.fill).not.toHaveBeenCalled();
+    expect(ctx.drawImage).toHaveBeenCalledWith(mockImg, 80, 80, 40, 40);
+  });
+
+  it('preserves cutoutModuleSize gap for transparent square/circle backings and zero gap for none', () => {
+    const moduleCount = 29;
+    const cellSize = 10;
+
+    const transparentSquareConfig: QRConfig = {
+      ...DEFAULT_CONFIG,
+      logoUrl: 'logo.png',
+      bgColor: 'transparent',
+      logoBackgroundColor: 'transparent',
+      logoPaddingStyle: 'square',
+      logoPadding: 1,
+    };
+    const squareMetrics = getLogoMetrics(transparentSquareConfig, moduleCount, cellSize);
+    expect(squareMetrics.effectivePaddingModules).toBeGreaterThanOrEqual(MIN_LOGO_BACKING_PADDING);
+    expect(squareMetrics.cutoutModuleSize).toBeCloseTo(
+      squareMetrics.effectiveLogoSizeModules + squareMetrics.effectivePaddingModules * 2
+    );
+    const isCoveredSquare = getIsCoveredByLogo(transparentSquareConfig, moduleCount, squareMetrics);
+    expect(isCoveredSquare(14, 14)).toBe(true);
+
+    const noneConfig: QRConfig = {
+      ...transparentSquareConfig,
+      logoPaddingStyle: 'none',
+    };
+    const noneMetrics = getLogoMetrics(noneConfig, moduleCount, cellSize);
+    expect(noneMetrics.effectivePaddingModules).toBe(0);
+    expect(noneMetrics.cutoutModuleSize).toBeCloseTo(noneMetrics.effectiveLogoSizeModules);
   });
 });

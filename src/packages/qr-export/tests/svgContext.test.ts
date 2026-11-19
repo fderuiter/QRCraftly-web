@@ -47,6 +47,14 @@ describe('SvgContext', () => {
       // Should form a closed rect path
       expect(svg).toContain('<path');
     });
+
+    it.each(['transparent', 'none', ''])('omits <path> when fillStyle resolves to %j', (fillStyle) => {
+      const ctx = new SvgContext(200, 200);
+      ctx.fillStyle = fillStyle;
+      ctx.fillRect(10, 10, 50, 50);
+      const svg = ctx.serialize();
+      expect(svg).not.toContain('<path');
+    });
   });
 
   describe('strokeRect', () => {
@@ -90,6 +98,24 @@ describe('SvgContext', () => {
       // Only the SVG wrapper, no paths
       expect(svg).not.toContain('<path');
     });
+
+    it.each(['transparent', 'none', ''])(
+      'fill() omits <path> when fillStyle is %j while retaining path data for stroke()',
+      (fillStyle) => {
+        const ctx = new SvgContext(200, 200);
+        ctx.beginPath();
+        ctx.rect(10, 10, 30, 30);
+        ctx.fillStyle = fillStyle;
+        ctx.strokeStyle = '#000000';
+        ctx.fill();
+        expect(ctx.serialize()).not.toContain('<path');
+
+        ctx.stroke();
+        const svg = ctx.serialize();
+        expect(svg).toContain('stroke="#000000"');
+        expect(svg).not.toContain('fill="transparent"');
+      }
+    );
 
     it('moveTo/lineTo/closePath builds correct path data', () => {
       const ctx = new SvgContext(200, 200);

@@ -805,6 +805,8 @@ describe('generateQRSvg', () => {
   });
 
   describe('transparent background SVG export', () => {
+    const sampleLogoDataUrl = 'data:image/png;base64,iVBORw0KGgo=';
+
     it('omits background fill elements when bgColor is transparent for TemplateStyle.NONE', async () => {
       const config: QRConfig = {
         ...(DEFAULT_CONFIG as QRConfig),
@@ -815,6 +817,82 @@ describe('generateQRSvg', () => {
       parseAndAssertValidSvg(svg);
       // Full canvas background rect "M 0 0 L 1080 0 L 1080 1080 L 0 1080 Z" should not be rendered
       expect(svg).not.toContain('d="M 0 0 L 1080 0 L 1080 1080 L 0 1080 Z"');
+    });
+
+    it.each(['square', 'circle'] as const)(
+      'omits logo backing <path> when logo inherits transparent bgColor with %s padding',
+      async (logoPaddingStyle) => {
+        const config: QRConfig = {
+          ...(DEFAULT_CONFIG as QRConfig),
+          fgColor: '#000000',
+          bgColor: 'transparent',
+          logoUrl: sampleLogoDataUrl,
+          logoPaddingStyle,
+          logoBackgroundColor: '',
+          templateStyle: TemplateStyle.NONE,
+        };
+        const svg = await generateQRSvg(config);
+        const doc = parseAndAssertValidSvg(svg);
+        expect(svg).toContain('<image');
+        expect(svg).not.toContain('fill="transparent"');
+        expect(svg).not.toContain('fill="#ffffff"');
+        const paths = Array.from(doc.querySelectorAll('path'));
+        expect(paths.length).toBeGreaterThan(0);
+        for (const p of paths) {
+          expect(p.getAttribute('fill')).toBe('#000000');
+        }
+      }
+    );
+
+    it('omits logo backing <path> when logoBackgroundColor is transparent on an opaque QR background', async () => {
+      const config: QRConfig = {
+        ...(DEFAULT_CONFIG as QRConfig),
+        fgColor: '#000000',
+        bgColor: '#f0fdf4',
+        logoUrl: sampleLogoDataUrl,
+        logoPaddingStyle: 'square',
+        logoBackgroundColor: 'transparent',
+        templateStyle: TemplateStyle.NONE,
+      };
+      const svg = await generateQRSvg(config);
+      parseAndAssertValidSvg(svg);
+      expect(svg).toContain('<image');
+      expect(svg).not.toContain('fill="transparent"');
+      expect(svg).not.toContain('fill="#ffffff"');
+      expect(svg).toContain('fill="#f0fdf4"');
+    });
+
+    it('keeps explicit opaque logoBackgroundColor <path> when bgColor is transparent', async () => {
+      const config: QRConfig = {
+        ...(DEFAULT_CONFIG as QRConfig),
+        fgColor: '#000000',
+        bgColor: 'transparent',
+        logoUrl: sampleLogoDataUrl,
+        logoPaddingStyle: 'square',
+        logoBackgroundColor: '#ffffff',
+        templateStyle: TemplateStyle.NONE,
+      };
+      const svg = await generateQRSvg(config);
+      parseAndAssertValidSvg(svg);
+      expect(svg).toContain('<image');
+      expect(svg).toContain('fill="#ffffff"');
+      expect(svg).not.toContain('fill="transparent"');
+    });
+
+    it('preserves white safe-zone card on framed templates when bgColor and logo backing are transparent', async () => {
+      const config: QRConfig = {
+        ...(DEFAULT_CONFIG as QRConfig),
+        fgColor: '#000000',
+        bgColor: 'transparent',
+        logoUrl: sampleLogoDataUrl,
+        logoPaddingStyle: 'circle',
+        logoBackgroundColor: 'transparent',
+        templateStyle: TemplateStyle.MINIMALIST,
+      };
+      const svg = await generateQRSvg(config);
+      parseAndAssertValidSvg(svg);
+      expect(svg).toContain('fill="#ffffff"');
+      expect(svg).not.toContain('fill="transparent"');
     });
   });
 
