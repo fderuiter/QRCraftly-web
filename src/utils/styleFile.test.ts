@@ -63,6 +63,27 @@ describe('style file', () => {
     expect(parsed.ok && parsed.style).toEqual({ bgColor: 'transparent' });
   });
 
+  it('round-trips empty and transparent logoBackgroundColor while rejecting empty strings on other colors', () => {
+    const autoParsed = parseStyleFile(serializeStyle(config({ logoBackgroundColor: '' })));
+    expect(autoParsed.ok).toBe(true);
+    if (autoParsed.ok) {
+      expect(autoParsed.skipped).toBe(0);
+      expect(autoParsed.style.logoBackgroundColor).toBe('');
+    }
+
+    const transparentParsed = parseStyleFile(serializeStyle(config({ logoBackgroundColor: 'transparent' })));
+    expect(transparentParsed.ok).toBe(true);
+    if (transparentParsed.ok) {
+      expect(transparentParsed.skipped).toBe(0);
+      expect(transparentParsed.style.logoBackgroundColor).toBe('transparent');
+    }
+
+    expect(pickStyle({ logoBackgroundColor: '', bgColor: '', fgColor: '' })).toEqual({
+      style: { logoBackgroundColor: '' },
+      skipped: 2,
+    });
+  });
+
   it('round-trips the eye frame and ball shapes', () => {
     const parsed = parseStyleFile(serializeStyle(config({ eyeFrameShape: EyeShape.LEAF, eyeBallShape: EyeShape.CIRCLE })));
     expect(parsed.ok).toBe(true);
