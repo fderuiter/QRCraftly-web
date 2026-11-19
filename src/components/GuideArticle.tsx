@@ -24,30 +24,59 @@ import type { GuideArticleContent, GuideBlock } from '@/data/guides';
 import { usePageContent } from '@/data/PageContentContext';
 import { isDangerousUrl } from '@/packages/core/security';
 
-const LINK_PATTERN = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+const INLINE_PATTERN = /`([^`\n]+)`|\[([^\]]+)\]\(([^)\s]+)\)/g;
+const CODE_PATTERN = /`([^`\n]+)`/g;
 const LINK_CLASSES = 'font-medium text-accent underline underline-offset-2';
+const INLINE_CODE_CLASSES = 'rounded-sm bg-surface-hover px-1.5 py-0.5 font-mono text-sm text-fg';
 const LIST_CLASSES = 'my-3 space-y-1.5 pl-6';
 
+function renderCodeSpans(text: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let from = 0;
+  for (const match of text.matchAll(CODE_PATTERN)) {
+    const [whole, code] = match;
+    if (match.index > from) {
+      nodes.push(text.slice(from, match.index));
+    }
+    nodes.push(
+      <code key={`${keyPrefix}-${match.index}`} className={INLINE_CODE_CLASSES}>
+        {code}
+      </code>
+    );
+    from = match.index + whole.length;
+  }
+  if (from < text.length || nodes.length === 0) {
+    nodes.push(text.slice(from));
+  }
+  return nodes;
+}
+
 /**
- * Turns the `[label](href)` links of a guide's text into anchors. A link with a script or data
- * address is shown as plain text.
- * @param text - Text with optional links.
- * @returns Text and anchor nodes.
+ * Turns single-backtick `` `code` `` spans into styled `<code>` elements and `[label](href)` links
+ * into anchors. A link with a script or data address is shown without an anchor.
+ * @param text - Text with optional inline code spans and links.
+ * @returns Text, inline code, and anchor nodes.
  */
 export function renderInline(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
   let from = 0;
-  for (const match of text.matchAll(LINK_PATTERN)) {
-    const [whole, label, href] = match;
+  for (const match of text.matchAll(INLINE_PATTERN)) {
+    const [whole, code, label, href] = match;
     nodes.push(text.slice(from, match.index));
-    if (!isDangerousUrl(href)) {
+    if (code !== undefined) {
+      nodes.push(
+        <code key={match.index} className={INLINE_CODE_CLASSES}>
+          {code}
+        </code>
+      );
+    } else if (!isDangerousUrl(href)) {
       nodes.push(
         <a key={match.index} href={href} className={LINK_CLASSES}>
-          {label}
+          {renderCodeSpans(label, String(match.index))}
         </a>
       );
     } else {
-      nodes.push(label);
+      nodes.push(...renderCodeSpans(label, String(match.index)));
     }
     from = match.index + whole.length;
   }
@@ -149,7 +178,7 @@ function Block({ block }: { block: GuideBlock }) {
               <tr>
                 {block.head.map((cell) => (
                   <th key={cell} scope="col" className="px-3 py-2 font-semibold">
-                    {cell}
+                    {renderInline(cell)}
                   </th>
                 ))}
               </tr>
@@ -160,7 +189,7 @@ function Block({ block }: { block: GuideBlock }) {
                   {row.map((cell, index) =>
                     index === 0 ? (
                       <th key={cell} scope="row" className="px-3 py-2 font-medium text-fg">
-                        {cell}
+                        {renderInline(cell)}
                       </th>
                     ) : (
                       <td key={cell} className="px-3 py-2">
