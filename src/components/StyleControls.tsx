@@ -18,8 +18,13 @@
 
 
 import React, { createContext, lazy, Suspense, useContext, useEffect, useState } from 'react';
+import { Redo2, RotateCcw, Undo2 } from 'lucide-react';
 import type { QRConfig } from '@/packages/core/types';
 import type { LandingPrimaryAction } from '../data/landingPages';
+import { useOptionalQRStore, useOptionalQRStoreSelector } from '../context/QRContext';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import { useUndoToast } from '../hooks/useUndoToast';
+import { isStyleAtBaseline, resetStylePatch } from '../utils/styleFields';
 import { PatternControls } from './style-controls/PatternControls';
 import { ColorControls } from './style-controls/ColorControls';
 import { MosaicControls } from './style-controls/MosaicControls';
@@ -27,7 +32,7 @@ import { AdvancedControls } from './style-controls/AdvancedControls';
 import { Accordion, AccordionItem } from './ui/Accordion';
 import { Button } from './ui/Button';
 import { Skeleton } from './ui/Skeleton';
-import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import { Tooltip } from './ui/Tooltip';
 
 // The gallery draws a thumbnail of the person's QR for every look, so it loads (and draws)
 // only once its section is first opened.
@@ -96,6 +101,11 @@ interface StyleControlsProps {
  * @returns The StyleControls component.
  */
 const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
+  const store = useOptionalQRStore();
+  const canUndo = useOptionalQRStoreSelector((s) => s.canUndo) ?? false;
+  const canRedo = useOptionalQRStoreSelector((s) => s.canRedo) ?? false;
+  const notifyUndo = useUndoToast();
+  const isAtBaseline = isStyleAtBaseline(config);
   const presetOpen = useContext(PresetOpenSections);
   const primaryAction = useContext(PresetPrimaryAction);
   const reduceMotion = usePrefersReducedMotion();
@@ -106,6 +116,12 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
   // Each press of the call to action counts up, so the section reopens even after the person closed it.
   const [openRequest, setOpenRequest] = useState<{ section: string; count: number } | null>(null);
   const requestFor = (title: string) => (openRequest?.section === title ? openRequest.count : undefined);
+
+  const handleResetStyle = () => {
+    if (isAtBaseline) return;
+    onChange(resetStylePatch());
+    notifyUndo('Style reset');
+  };
 
   // Runs after the section has opened (its request renders first), so the control is visible.
   useEffect(() => {
@@ -118,6 +134,50 @@ const StyleControls: React.FC<StyleControlsProps> = ({ config, onChange }) => {
 
   return (
     <Accordion>
+      <div
+        role="group"
+        aria-label="Appearance actions"
+        className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface-raised px-3 py-2"
+      >
+        <div className="flex items-center gap-1">
+          <Tooltip content="Undo">
+            <Button
+              variant="ghost"
+              iconOnly
+              size="sm"
+              aria-label="Undo style change"
+              disabled={!canUndo}
+              onClick={() => void store?.undo()}
+            >
+              <Undo2 className="size-4" aria-hidden="true" />
+            </Button>
+          </Tooltip>
+          <Tooltip content="Redo">
+            <Button
+              variant="ghost"
+              iconOnly
+              size="sm"
+              aria-label="Redo style change"
+              disabled={!canRedo}
+              onClick={() => void store?.redo()}
+            >
+              <Redo2 className="size-4" aria-hidden="true" />
+            </Button>
+          </Tooltip>
+        </div>
+        <Tooltip content="Restore default appearance">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isAtBaseline}
+            onClick={handleResetStyle}
+          >
+            <RotateCcw className="size-4" aria-hidden="true" />
+            Reset style
+          </Button>
+        </Tooltip>
+      </div>
+
       {primaryAction && (
         <div className="mb-4">
           <Button
@@ -230,8 +290,7 @@ function arePropsEqual(prev: StyleControlsProps, next: StyleControlsProps) {
   if (prev.config === next.config) return true;
 
   // Compare all config properties except 'value' and 'type'
-  // We iterate over keys of next.config to ensure we catch any new properties
-  const keys = Object.keys(next.config) as (keyof QRConfig)[];
+  const keys = new Set([...Object.keys(prev.config), ...Object.keys(next.config)] as (keyof QRConfig)[]);
 
   for (const key of keys) {
     // Skip content-related properties
