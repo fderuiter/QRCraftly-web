@@ -42,7 +42,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
       {
         question: 'Is this an AI QR code?',
         answer:
-          'No. There is no AI model and no image generation. Your picture is shrunk to one color per module, and each module is pulled toward dark or light to match it. The result is your own picture, made in your browser.',
+          'No. There is no AI model and no image generation. In Halftone mode, each data module is split into a 3x3 grid of sub-cells: the center Mosaic Core holds strict dark-or-light contrast for scanners while the eight outer sub-cells carry your picture’s detail. In Tiles mode, each module uses a single 1x1 color pulled toward dark or light. Either way, the result is your own picture, made in your browser.',
       },
       {
         question: 'Will an image QR code still scan?',
@@ -79,7 +79,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'Print a test copy and scan it with an iPhone and an Android phone before printing a batch.',
       ],
       privacy:
-        'Your picture is read by your browser, reduced to one color per module and forgotten when you close the tab. It is never uploaded, and saved style templates leave it out.',
+        'Your picture is read by your browser, sampled into 3x3 Halftone sub-cells around each module’s Mosaic Core (or one 1x1 color per module in Tiles mode), and forgotten when you close the tab. It is never uploaded, and saved style templates leave it out.',
     },
   },
   'qr-code-with-logo': {
@@ -495,12 +495,12 @@ export const landingPageContent: Record<string, LandingCopy> = {
       {
         question: 'SVG, EPS or PDF: which should I send to a printer?',
         answer:
-          'Ask the printer. SVG suits the web and most modern design tools, EPS suits older print workflows, and PDF is the safest choice to email to a print shop. All three are vector and download free here.',
+          'Ask the printer. SVG suits the web and most modern design tools, EPS suits older print workflows, and PDF is the safest choice to email to a print shop. Both EPS and PDF offer a built-in CMYK Color Space option alongside RGB for commercial four-color prepress, and all three download free here.',
       },
       {
         question: 'Can I paste the SVG into a web page?',
         answer:
-          'Yes. Use “Copy SVG code” in the download options and paste it into your HTML. The code then scales with the page and needs no image file.',
+          'Yes. Use “Copy as SVG” in the download options and paste it into your HTML. The code then scales with the page and needs no image file.',
       },
       {
         question: 'Is the SVG made on a server?',
@@ -527,7 +527,7 @@ export const landingPageContent: Record<string, LandingCopy> = {
       ],
       checks: [
         'Scan the code from your finished layout, not just the downloaded file.',
-        'If your print shop converts colors to CMYK, check the contrast on the proof.',
+        'For commercial print, select CMYK under Color Space when exporting EPS or PDF, and check the contrast on the printed proof.',
         'Make sure the content is final: a static code cannot be edited after printing.',
       ],
       privacy:
