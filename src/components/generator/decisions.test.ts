@@ -18,9 +18,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
-import { QRErrorCorrectionLevel, QRStyle, QRType, type QRConfig } from '@/packages/core/types';
+import { QRErrorCorrectionLevel, QRStyle, QRType, type QRConfig, type QRModules } from '@/packages/core/types';
+import { calculateLayout, getLogoMetrics, renderModules } from '@/packages/qr-matrix';
 import { getSamplePayload } from '@/packages/qr-payload';
-import { SYSTEM_LIMITS } from '@/packages/scannability';
+import { calculateScannabilityHealth, SYSTEM_LIMITS } from '@/packages/scannability';
 import { SCAN_VALIDATION_ERROR } from '@/hooks/useQRDownload';
 import {
   deriveVerdict,
@@ -138,26 +139,118 @@ describe('fixPatch', () => {
     expect(fixPatch('smaller-logo')).toEqual({ logoSize: SYSTEM_LIMITS.MAX_LOGO_SIZE });
   });
 
-  it('restores black on white for more contrast', () => {
+  it('restores black on white and clears gradients for more contrast', () => {
     expect(fixPatch('increase-contrast')).toEqual({
       fgColor: '#000000',
       bgColor: '#ffffff',
       eyeColor: '#000000',
       eyeFrameColor: '#000000',
       eyeBallColor: '#000000',
+      gradientType: 'none',
+      gradientColorStops: undefined,
     });
+  });
+
+  it('recovers scannability health and solid rendering when applied over an active pale gradient', () => {
+    const paleGradientConfig: QRConfig = {
+      ...DEFAULT_CONFIG,
+      value: 'https://example.com',
+      fgColor: '#000000',
+      bgColor: '#ffffff',
+      gradientType: 'linear',
+      gradientColorStops: [
+        { offset: 0, color: '#fafafa' },
+        { offset: 1, color: '#f4f4f5' },
+      ],
+    };
+
+    const beforeHealth = calculateScannabilityHealth(paleGradientConfig);
+    expect((beforeHealth.criticalWarnings ?? []).length).toBeGreaterThan(0);
+    expect(beforeHealth.score).toBeLessThan(100);
+
+    const fixedConfig: QRConfig = { ...paleGradientConfig, ...fixPatch('increase-contrast') };
+    const afterHealth = calculateScannabilityHealth(fixedConfig);
+    expect(afterHealth.criticalWarnings ?? []).toEqual([]);
+    expect(afterHealth.score).toBe(100);
+
+    const modules: QRModules = { size: 21, get: (r, c) => (r + c) % 2 === 0 };
+    const layout = calculateLayout(fixedConfig, 256, modules.size);
+    const logoMetrics = getLogoMetrics(fixedConfig, modules.size, layout.cellSize);
+    let gradientCreated = false;
+    const ctx = {
+      fillStyle: '',
+      beginPath: () => {},
+      rect: () => {},
+      fill: () => {},
+      save: () => {},
+      restore: () => {},
+      createLinearGradient: () => {
+        gradientCreated = true;
+        return { addColorStop: () => {} };
+      },
+      createRadialGradient: () => {
+        gradientCreated = true;
+        return { addColorStop: () => {} };
+      },
+    } as unknown as CanvasRenderingContext2D;
+
+    renderModules(
+      ctx,
+      modules,
+      paleGradientConfig,
+      layout.drawX,
+      layout.drawY,
+      layout.cellSize,
+      modules.size,
+      logoMetrics
+    );
+    expect(gradientCreated).toBe(true);
+
+    gradientCreated = false;
+    renderModules(
+      ctx,
+      modules,
+      fixedConfig,
+      layout.drawX,
+      layout.drawY,
+      layout.cellSize,
+      modules.size,
+      logoMetrics
+    );
+    expect(gradientCreated).toBe(false);
+    expect(ctx.fillStyle).toBe('#000000');
   });
 });
 
 describe('resetPatch', () => {
-  it('puts the default colors back and clears the eye overrides', () => {
+  it('puts the default colors back and clears eye overrides and gradients', () => {
     expect(resetPatch()).toEqual({
       fgColor: DEFAULT_CONFIG.fgColor,
       bgColor: DEFAULT_CONFIG.bgColor,
       eyeColor: DEFAULT_CONFIG.eyeColor,
       eyeFrameColor: undefined,
       eyeBallColor: undefined,
+      gradientType: 'none',
+      gradientColorStops: undefined,
     });
+  });
+
+  it('restores scannability health when resetting colors over a low-contrast gradient', () => {
+    const radialGradientConfig: QRConfig = {
+      ...DEFAULT_CONFIG,
+      value: 'https://example.com',
+      gradientType: 'radial',
+      gradientColorStops: [
+        { offset: 0, color: '#fefefe' },
+        { offset: 1, color: '#e5e7eb' },
+      ],
+    };
+    expect((calculateScannabilityHealth(radialGradientConfig).criticalWarnings ?? []).length).toBeGreaterThan(0);
+
+    const resetConfig: QRConfig = { ...radialGradientConfig, ...resetPatch() };
+    const afterHealth = calculateScannabilityHealth(resetConfig);
+    expect(afterHealth.criticalWarnings ?? []).toEqual([]);
+    expect(afterHealth.score).toBe(100);
   });
 });
 
