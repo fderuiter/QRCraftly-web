@@ -32,9 +32,13 @@ const BulkCsvInput = React.lazy(() =>
 const Placeholder = () => (
   <div className="space-y-6">
     <BulkCsvDropZone>
+      <div className="mt-5 w-full max-w-xs text-left">
+        <Skeleton shape="text" className="mb-1 h-5 w-24" />
+        <Skeleton className="h-10 w-full rounded-lg" />
+      </div>
       <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-        <Skeleton className="h-9 w-32 rounded-lg" />
-        <Skeleton className="h-9 w-48 rounded-lg" />
+        <Skeleton className="h-10 w-32 rounded-xl" />
+        <Skeleton className="h-10 w-56 rounded-xl" />
       </div>
     </BulkCsvDropZone>
   </div>
