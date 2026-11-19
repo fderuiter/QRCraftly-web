@@ -112,9 +112,12 @@ export {
   type PreviewRowOptions,
 } from './lib/bulkCsv/preview';
 export {
+  BULK_CONTACT_FIELDS,
   autoDetectContactMapping,
   synthesizeVCardPayload,
   isContactContentType,
+  type BulkContactFieldDescriptor,
+  type BulkContactFieldGroup,
 } from './lib/bulkCsv/contactMapping';
 
 // Wallet address checksums (Base58Check, bech32/bech32m, EIP-55)

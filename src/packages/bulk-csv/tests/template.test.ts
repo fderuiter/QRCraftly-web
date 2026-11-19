@@ -17,10 +17,19 @@
 */
 
 import { describe, it, expect } from 'vitest';
-import { SAMPLE_CSV_TEMPLATE, parseCsv } from '../index';
+import {
+  BULK_CONTACT_FIELDS,
+  SAMPLE_CSV_TEMPLATE,
+  SAMPLE_TEXT_CSV_TEMPLATE,
+  SAMPLE_VCARD_CSV_TEMPLATE,
+  autoDetectContactMapping,
+  categorizeCsvRows,
+  getBulkCsvTemplate,
+  parseCsv,
+} from '../index';
 
-describe('SAMPLE_CSV_TEMPLATE', () => {
-  it('contains valid headers url and filename and parses cleanly', () => {
+describe('Bulk CSV starter templates', () => {
+  it('contains valid headers url and filename in SAMPLE_CSV_TEMPLATE and parses cleanly', () => {
     expect(SAMPLE_CSV_TEMPLATE).toBeDefined();
     expect(SAMPLE_CSV_TEMPLATE).toContain('url,filename');
 
@@ -29,5 +38,58 @@ describe('SAMPLE_CSV_TEMPLATE', () => {
     expect(table.rows.length).toBeGreaterThan(0);
     expect(table.rows[0]).toHaveProperty('url');
     expect(table.rows[0]).toHaveProperty('filename');
+  });
+
+  it('contains valid headers text and filename in SAMPLE_TEXT_CSV_TEMPLATE and parses cleanly', () => {
+    const table = parseCsv(SAMPLE_TEXT_CSV_TEMPLATE);
+    expect(table.headers).toEqual(['text', 'filename']);
+    expect(table.rows.length).toBeGreaterThan(0);
+    expect(table.rows[0].text).toBeTruthy();
+    expect(table.rows[0].filename).toBeTruthy();
+  });
+
+  it('derives SAMPLE_VCARD_CSV_TEMPLATE headers from BULK_CONTACT_FIELDS plus filename and auto-matches all 11 fields', () => {
+    const table = parseCsv(SAMPLE_VCARD_CSV_TEMPLATE);
+    expect(table.headers).toEqual([...BULK_CONTACT_FIELDS.map((f) => f.header), 'filename']);
+    expect(table.rows.length).toBeGreaterThanOrEqual(2);
+
+    const detected = autoDetectContactMapping(table.headers, table.rows);
+    for (const field of BULK_CONTACT_FIELDS) {
+      expect(detected[field.key]).toBe(field.header);
+    }
+
+    const report = categorizeCsvRows(table.rows, '', undefined, undefined, {
+      contentType: 'vcard',
+      contactMapping: detected,
+    });
+    expect(report.validCount).toBe(table.rows.length);
+    expect(report.emptyCount).toBe(0);
+    expect(report.unsafeCount).toBe(0);
+    expect(report.cautionCount).toBe(0);
+    expect(report.validPayloads[0]).toContain('URL:https://example.com/jane');
+    expect(report.validPayloads[0]).toContain('ADR:;;100 Market St\\, Suite 400;San Francisco;;94105;United States');
+  });
+
+  it('returns the matching template CSV and download filename via getBulkCsvTemplate', () => {
+    expect(getBulkCsvTemplate()).toEqual({
+      csv: SAMPLE_CSV_TEMPLATE,
+      fileName: 'qrcraftly-sample-template.csv',
+    });
+    expect(getBulkCsvTemplate('link')).toEqual({
+      csv: SAMPLE_CSV_TEMPLATE,
+      fileName: 'qrcraftly-sample-template.csv',
+    });
+    expect(getBulkCsvTemplate('text')).toEqual({
+      csv: SAMPLE_TEXT_CSV_TEMPLATE,
+      fileName: 'qrcraftly-text-template.csv',
+    });
+    expect(getBulkCsvTemplate('vcard')).toEqual({
+      csv: SAMPLE_VCARD_CSV_TEMPLATE,
+      fileName: 'qrcraftly-vcard-template.csv',
+    });
+    expect(getBulkCsvTemplate('contact')).toEqual({
+      csv: SAMPLE_VCARD_CSV_TEMPLATE,
+      fileName: 'qrcraftly-vcard-template.csv',
+    });
   });
 });

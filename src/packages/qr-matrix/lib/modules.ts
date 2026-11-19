@@ -36,6 +36,8 @@ export interface ModuleRenderOptions {
   fgColorLight?: string;
   /** Relative luminance threshold separating bright and dark background cells (0..1). Default: 0.25. */
   luminanceThreshold?: number;
+  /** Optional prebuilt gradient shared across data modules and finder patterns. */
+  moduleGradient?: CanvasGradient | null;
 }
 
 type DrawModuleFn = (r: number, c: number, x: number, y: number, cx: number, cy: number) => void;
@@ -124,7 +126,7 @@ const getModuleDrawer = (
       const validGrid = new Uint8Array(moduleCount * moduleCount);
 
       iterateMatrix(moduleCount, (r, c) => {
-        if (modules.get(r, c) && !isCoveredByLogo(r, c)) {
+        if (modules.get(r, c) && !isCoveredByLogo(r, c) && !isFinderPattern(r, c, moduleCount)) {
           validGrid[r * moduleCount + c] = 1;
         }
       });
@@ -270,18 +272,20 @@ export const renderModules = (
   // 2. Select contrast-optimized foreground colors for dark and light contrast groups
   const drawSize = moduleCount * cellSize;
   const gradientFill = (!options?.fgColorDark && !config.fgColorDark && config.gradientType && config.gradientType !== 'none')
-    ? createModuleGradient(ctx, config, drawX, drawY, drawSize)
+    ? (options?.moduleGradient !== undefined ? options.moduleGradient : createModuleGradient(ctx, config, drawX, drawY, drawSize))
     : null;
 
-  let fgColorDark: string | CanvasGradient = gradientFill || options?.fgColorDark || config.fgColorDark || config.fgColor;
+  let solidDark = options?.fgColorDark || config.fgColorDark || config.fgColor;
   let fgColorLight = options?.fgColorLight || config.fgColorLight || '#ffffff';
 
   if (!gradientFill && !options?.fgColorDark && !config.fgColorDark) {
-    const defaultDarkLum = getLuminance(fgColorDark as string);
+    const defaultDarkLum = getLuminance(solidDark);
     if ((1.0 + 0.05) / (defaultDarkLum + 0.05) < 3.0) {
-      fgColorDark = '#000000';
+      solidDark = '#000000';
     }
   }
+
+  const fgColorDark: string | CanvasGradient = gradientFill || solidDark;
 
   if (!options?.fgColorLight && !config.fgColorLight) {
     const defaultLightLum = getLuminance(fgColorLight);
@@ -306,7 +310,7 @@ export const renderModules = (
   for (let r = 0; r < moduleCount; r++) {
     for (let c = 0; c < moduleCount; c++) {
       if (modules.get(r, c)) {
-        if (isCoveredByLogo(r, c)) continue;
+        if (isCoveredByLogo(r, c) || isFinderPattern(r, c, moduleCount)) continue;
 
         const idx = r * moduleCount + c;
         const bgLum = cellLuminance ? cellLuminance[idx] : flatBgLum;

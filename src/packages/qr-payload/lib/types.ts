@@ -266,6 +266,14 @@ export interface BulkContactMapping {
   email?: string;
   /** Column holding the contact's website URL. */
   website?: string;
+  /** Column holding the contact's street address. */
+  street?: string;
+  /** Column holding the contact's city or locality. */
+  city?: string;
+  /** Column holding the contact's postal or ZIP code. */
+  zip?: string;
+  /** Column holding the contact's country. */
+  country?: string;
 }
 
 /**

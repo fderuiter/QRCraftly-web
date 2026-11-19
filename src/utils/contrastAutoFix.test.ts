@@ -122,5 +122,17 @@ describe('contrastAutoFix', () => {
       expect(getContrastRatio(patch.eyeFrameColor!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
       expect(getContrastRatio(patch.eyeBallColor!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
     });
+
+    it('keeps eyeColor synchronized with adjusted fgColor when custom eye colors are inactive', () => {
+      const patch = calculateAutoFixColorPatch({
+        bgColor: '#ffffff',
+        fgColor: '#cbd5e1',
+        eyeColor: '#cbd5e1',
+        isCustomEyeColor: false,
+      });
+      expect(patch.fgColor).toBeDefined();
+      expect(patch.eyeColor).toBe(patch.fgColor);
+      expect(getContrastRatio(patch.fgColor!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+    });
   });
 });

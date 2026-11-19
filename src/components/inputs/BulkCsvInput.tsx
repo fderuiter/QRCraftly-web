@@ -17,6 +17,7 @@
 */
 
 import { Progress } from '../ui/Progress';
+import { AccordionItem } from '../ui/Accordion';
 import { BulkCsvDropZone } from './BulkCsvDropZone';
 import React, { useState, useEffect, useMemo, useCallback, useRef, type ChangeEvent } from 'react';
 import {
@@ -31,7 +32,8 @@ import {
   pickColumn,
   PAYLOAD_COLUMN_WORDS,
   FILENAME_COLUMN_WORDS,
-  SAMPLE_CSV_TEMPLATE,
+  BULK_CONTACT_FIELDS,
+  getBulkCsvTemplate,
   categorizeCsvRows,
   runBatch,
   batchRows,
@@ -42,6 +44,7 @@ import {
   errorLogFileName,
   isContactContentType,
   autoDetectContactMapping,
+  type BulkContactFieldDescriptor,
   type BulkContactMapping,
   type BulkContentType,
   type SkippedRow,
@@ -107,19 +110,8 @@ function isContentType(value: string): value is BulkContentType {
   return value === 'link' || value === 'text' || value === 'vcard' || value === 'contact';
 }
 
-const CONTACT_FIELD_CONTROLS: readonly {
-  key: keyof BulkContactMapping;
-  label: string;
-  id: string;
-  testId: string;
-}[] = [
-  { key: 'firstName', label: 'First Name', id: 'bulk-contact-firstname', testId: 'bulk-contact-firstname' },
-  { key: 'lastName', label: 'Last Name', id: 'bulk-contact-lastname', testId: 'bulk-contact-lastname' },
-  { key: 'phone', label: 'Phone', id: 'bulk-contact-phone', testId: 'bulk-contact-phone' },
-  { key: 'email', label: 'Email', id: 'bulk-contact-email', testId: 'bulk-contact-email' },
-  { key: 'organization', label: 'Organization', id: 'bulk-contact-organization', testId: 'bulk-contact-organization' },
-  { key: 'title', label: 'Job Title', id: 'bulk-contact-title', testId: 'bulk-contact-title' },
-];
+const CORE_CONTACT_FIELDS = BULK_CONTACT_FIELDS.filter((field) => field.group === 'core');
+const POSTAL_CONTACT_FIELDS = BULK_CONTACT_FIELDS.filter((field) => field.group === 'postal');
 
 type ColumnMappingStatus = 'auto-matched' | 'mapped' | 'optional';
 
@@ -319,19 +311,21 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
 
   const effectiveContactMapping = useMemo<BulkContactMapping>(() => {
     if (!isContact) return {};
-    const emailFieldValue =
-      contactMapping?.email !== undefined
-        ? contactMapping.email
-        : (autoContactMapping.email ?? '');
-    return {
-      firstName: contactMapping?.firstName !== undefined ? contactMapping.firstName : (autoContactMapping.firstName ?? ''),
-      lastName: contactMapping?.lastName !== undefined ? contactMapping.lastName : (autoContactMapping.lastName ?? ''),
-      phone: contactMapping?.phone !== undefined ? contactMapping.phone : (autoContactMapping.phone ?? ''),
-      ['email']: emailFieldValue,
-      organization: contactMapping?.organization !== undefined ? contactMapping.organization : (autoContactMapping.organization ?? ''),
-      title: contactMapping?.title !== undefined ? contactMapping.title : (autoContactMapping.title ?? ''),
-    };
-  }, [isContact, contactMapping, autoContactMapping]);
+    const next: BulkContactMapping = {};
+    for (const { key } of BULK_CONTACT_FIELDS) {
+      const saved = contactMapping?.[key];
+      next[key] =
+        saved !== undefined && (saved === '' || columns.includes(saved))
+          ? saved
+          : (autoContactMapping[key] ?? '');
+    }
+    return next;
+  }, [isContact, contactMapping, columns, autoContactMapping]);
+
+  const hasPostalMatch = useMemo(
+    () => POSTAL_CONTACT_FIELDS.some(({ key }) => Boolean(effectiveContactMapping[key])),
+    [effectiveContactMapping]
+  );
 
   const rowCount = rows.length;
   const preview = useMemo(
@@ -456,7 +450,11 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
         content = decodeCsvBytes(new Uint8Array(arrayBuffer));
       }
 
-      onChange({ csvContent: content, fileName: file.name });
+      onChange(
+        data.contactMapping !== undefined
+          ? { csvContent: content, fileName: file.name, contactMapping: undefined }
+          : { csvContent: content, fileName: file.name }
+      );
       addToast({ type: 'success', message: `Loaded ${file.name}.`, duration: 3000 });
     } catch {
       if (!isCurrentLoad()) return;
@@ -465,8 +463,9 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
   };
 
   const handleDownloadTemplate = () => {
-    const bytes = new TextEncoder().encode(SAMPLE_CSV_TEMPLATE);
-    triggerFileDownload(bytes, 'qrcraftly-sample-template.csv', 'text/csv');
+    const { csv, fileName } = getBulkCsvTemplate(contentType);
+    const bytes = new TextEncoder().encode(csv);
+    triggerFileDownload(bytes, fileName, 'text/csv');
   };
 
   const handleExportErrorLog = () => {
@@ -643,6 +642,61 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
     if (runRef.current) runRef.current.cancelled = true;
   };
 
+  const renderContentTypeSelect = (inputClassName?: string) => (
+    <SelectField
+      id="bulk-content-type"
+      label="Content Type"
+      inputClassName={inputClassName}
+      value={contentType === 'contact' ? 'vcard' : contentType}
+      onChange={(e) => {
+        const value = e.target.value;
+        if (isContentType(value)) onChange({ contentType: value });
+      }}
+    >
+      <option value="link">Links (web addresses)</option>
+      <option value="text">Plain text (exactly as typed)</option>
+      <option value="vcard">Contact Card</option>
+    </SelectField>
+  );
+
+  const renderContactCard = ({ key, label, controlId }: BulkContactFieldDescriptor) => {
+    const currentVal = effectiveContactMapping[key] ?? '';
+    const autoVal = autoContactMapping[key] ?? '';
+    const savedVal = contactMapping?.[key];
+    const hasValidSavedVal =
+      savedVal !== undefined && (savedVal === '' || columns.includes(savedVal));
+    const isFieldAutoMatched = Boolean(
+      currentVal && (!hasValidSavedVal || savedVal === autoVal)
+    );
+    const status: ColumnMappingStatus = isFieldAutoMatched
+      ? 'auto-matched'
+      : currentVal
+        ? 'mapped'
+        : 'optional';
+
+    return (
+      <ColumnMappingCard
+        key={key}
+        heading={label}
+        badgePrefix={controlId}
+        status={status}
+        selectId={controlId}
+        selectLabel={label}
+        selectTestId={controlId}
+        value={currentVal}
+        columns={columns}
+        emptyOptionLabel="(None)"
+        sampleValue={currentVal ? rows[0]?.[currentVal] : undefined}
+        sampleTestId={`${controlId}-sample-preview`}
+        onChange={(selectedColumn) =>
+          onChange({
+            contactMapping: { ...effectiveContactMapping, [key]: selectedColumn },
+          })
+        }
+      />
+    );
+  };
+
   const filenameCard = (
     <ColumnMappingCard
       heading="File Name"
@@ -674,8 +728,11 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
       />
       {!data.csvContent ? (
         <BulkCsvDropZone>
+          <div className="mt-5 w-full max-w-xs text-left">
+            {renderContentTypeSelect('h-10')}
+          </div>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-            <Button type="button" variant="primary" size="md" onClick={chooseFile} className="flex items-center gap-2">
+            <Button type="button" variant="primary" size="md" onClick={chooseFile} className="flex h-10 items-center gap-2">
               <Upload className="size-4" aria-hidden="true" />
               Choose File
             </Button>
@@ -684,9 +741,9 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
               variant="outline"
               size="md"
               onClick={handleDownloadTemplate}
-              className="flex items-center gap-2"
+              className="flex h-10 items-center gap-2"
             >
-              <Download className="size-4" />
+              <Download className="size-4" aria-hidden="true" />
               Download Sample Template
             </Button>
           </div>
@@ -784,62 +841,51 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
                     : 'Match your CSV columns to QR code content and file names'}
                 </p>
               </div>
-              {!isContact && columns.length > 1 && (
+              <div className="flex flex-wrap items-center gap-2">
+                {!isContact && columns.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onChange({ payloadColumn: filenameCol, filenameColumn: payloadCol })}
+                    className="flex items-center gap-1.5 text-xs"
+                    aria-label="Swap payload and filename columns"
+                    title="Swap Content and File Name columns"
+                  >
+                    <ArrowLeftRight className="size-3.5" aria-hidden="true" />
+                    Swap Columns
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => onChange({ payloadColumn: filenameCol, filenameColumn: payloadCol })}
+                  onClick={handleDownloadTemplate}
                   className="flex items-center gap-1.5 text-xs"
-                  aria-label="Swap payload and filename columns"
-                  title="Swap Content and File Name columns"
                 >
-                  <ArrowLeftRight className="size-3.5" aria-hidden="true" />
-                  Swap Columns
+                  <Download className="size-3.5" aria-hidden="true" />
+                  Download Sample Template
                 </Button>
-              )}
+              </div>
             </div>
 
             {isContact ? (
               <div className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {CONTACT_FIELD_CONTROLS.map(({ key, label, id, testId }) => {
-                    const currentVal = effectiveContactMapping[key] ?? '';
-                    const autoVal = autoContactMapping[key] ?? '';
-                    const isFieldAutoMatched = Boolean(
-                      currentVal && (!contactMapping?.[key] || contactMapping[key] === autoVal)
-                    );
-                    const status: ColumnMappingStatus = isFieldAutoMatched
-                      ? 'auto-matched'
-                      : currentVal
-                        ? 'mapped'
-                        : 'optional';
-
-                    return (
-                      <ColumnMappingCard
-                        key={key}
-                        heading={label}
-                        badgePrefix={testId}
-                        status={status}
-                        selectId={id}
-                        selectLabel={label}
-                        selectTestId={testId}
-                        value={currentVal}
-                        columns={columns}
-                        emptyOptionLabel="(None)"
-                        sampleValue={currentVal ? rows[0]?.[currentVal] : undefined}
-                        sampleTestId={`${testId}-sample-preview`}
-                        onChange={(selectedColumn) =>
-                          onChange({
-                            contactMapping: { ...effectiveContactMapping, [key]: selectedColumn },
-                          })
-                        }
-                      />
-                    );
-                  })}
-
+                  {CORE_CONTACT_FIELDS.map(renderContactCard)}
                   {filenameCard}
                 </div>
+
+                <AccordionItem
+                  key={data.csvContent}
+                  title="Postal Address"
+                  defaultOpen={hasPostalMatch}
+                  panelId="bulk-contact-postal-panel"
+                >
+                  <div className="grid gap-4 pt-1 sm:grid-cols-2">
+                    {POSTAL_CONTACT_FIELDS.map(renderContactCard)}
+                  </div>
+                </AccordionItem>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
@@ -863,19 +909,7 @@ export const BulkCsvInput: React.FC<BulkCsvInputProps> = ({ data, onChange }) =>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <SelectField
-              id="bulk-content-type"
-              label="Content Type"
-              value={contentType === 'contact' ? 'vcard' : contentType}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (isContentType(value)) onChange({ contentType: value });
-              }}
-            >
-              <option value="link">Links (web addresses)</option>
-              <option value="text">Plain text (exactly as typed)</option>
-              <option value="vcard">Contact Card</option>
-            </SelectField>
+            {renderContentTypeSelect()}
 
             <SelectField
               id="bulk-export-format"

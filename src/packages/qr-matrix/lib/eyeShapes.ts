@@ -94,7 +94,7 @@ const traceEyeShape = (
  * @param size The size of the eye (7 * cellSize).
  * @param cellSize Sizing properties.
  * @param style Style theme.
- * @param eyeColor Eye color.
+ * @param eyeColor Eye fill color or shared matrix gradient.
  * @param bgColor Background color to clear/punch holes.
  */
 export const drawEyeFrame = (
@@ -104,7 +104,7 @@ export const drawEyeFrame = (
   size: number,
   cellSize: number,
   style: QRStyle,
-  eyeColor: string,
+  eyeColor: string | CanvasGradient,
   bgColor: string,
   shape?: EyeShape,
   eye: EyePosition = EYE_POSITIONS[0]
@@ -213,7 +213,7 @@ export const drawEyeFrame = (
  * @param size The size of the eye (7 * cellSize).
  * @param cellSize Sizing properties.
  * @param style Style theme.
- * @param eyeColor Eye color.
+ * @param eyeColor Eye fill color or shared matrix gradient.
  * @param bgColor Background color to clear/punch holes.
  * @param eyeId Which finder this is ('top-left', 'top-right' or 'bottom-left'). It seeds the
  * Grunge scribble, so each eye has its own shape that never changes between renders.
@@ -225,7 +225,7 @@ export const drawEyeball = (
   size: number,
   cellSize: number,
   style: QRStyle,
-  eyeColor: string,
+  eyeColor: string | CanvasGradient,
   bgColor: string,
   eyeId = 'top-left',
   shape?: EyeShape,

@@ -38,6 +38,7 @@ const choiceOf = (config: QRConfig, patch: Partial<QRConfig>): StyleChoice => ({
   eyeColor: patch.eyeColor ?? config.eyeColor,
   eyeFrameColor: patch.eyeFrameColor ?? config.eyeFrameColor ?? patch.eyeColor ?? config.eyeColor,
   eyeBallColor: patch.eyeBallColor ?? config.eyeBallColor ?? patch.eyeColor ?? config.eyeColor,
+  isCustomEyeColor: 'isCustomEyeColor' in patch ? patch.isCustomEyeColor : config.isCustomEyeColor,
 });
 
 /** The config a thumbnail is drawn from, and the key its picture is cached under. */
@@ -160,7 +161,7 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
       ...PATTERNS.map((p) => ({ id: `pattern:${p.id}`, choice: choiceOf(settled, { style: p.id }) })),
       ...PRESET_COLORS.map((c) => ({
         id: `color:${c.label}`,
-        choice: choiceOf(settled, { fgColor: c.fg, bgColor: c.bg, eyeColor: c.eye, eyeFrameColor: c.eye, eyeBallColor: c.eye }),
+        choice: choiceOf(settled, { fgColor: c.fg, bgColor: c.bg, eyeColor: c.eye, eyeFrameColor: c.eye, eyeBallColor: c.eye, isCustomEyeColor: undefined }),
       })),
     ];
 

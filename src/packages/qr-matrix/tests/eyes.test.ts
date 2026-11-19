@@ -217,4 +217,104 @@ describe('renderEyes', () => {
     expect(fillStyleSetter).not.toHaveBeenCalledWith('#ff00ff');
     expect(fillStyleSetter).toHaveBeenCalledWith('#111111');
   });
+
+  it('inherits fgColor when isCustomEyeColor is false even if legacy eyeColor differs', () => {
+    const fillStyleSetter = vi.fn();
+    const ctx = createMockCtx();
+    Object.defineProperty(ctx, 'fillStyle', {
+      set: fillStyleSetter,
+      get: () => '',
+      configurable: true,
+    });
+
+    renderEyes(
+      ctx,
+      {
+        ...baseConfig,
+        style: QRStyle.STANDARD,
+        fgColor: '#e11d48',
+        eyeColor: '#000000',
+        isCustomEyeColor: false,
+      },
+      0,
+      0,
+      10,
+      21
+    );
+
+    expect(fillStyleSetter).toHaveBeenCalledWith('#e11d48');
+    expect(fillStyleSetter).not.toHaveBeenCalledWith('#000000');
+  });
+
+  it('inherits the shared moduleGradient when custom eye colors are inactive', () => {
+    const fillStyleSetter = vi.fn();
+    const ctx = createMockCtx();
+    const sharedGradient = { addColorStop: vi.fn() } as unknown as CanvasGradient;
+    Object.defineProperty(ctx, 'fillStyle', {
+      set: fillStyleSetter,
+      get: () => '',
+      configurable: true,
+    });
+
+    renderEyes(
+      ctx,
+      {
+        ...baseConfig,
+        style: QRStyle.MODERN,
+        fgColor: '#111111',
+        eyeColor: '#111111',
+        isCustomEyeColor: false,
+        gradientType: 'linear',
+        gradientColorStops: [
+          { offset: 0, color: '#111111' },
+          { offset: 1, color: '#2563eb' },
+        ],
+      },
+      0,
+      0,
+      10,
+      21,
+      { moduleGradient: sharedGradient }
+    );
+
+    expect(fillStyleSetter).toHaveBeenCalledWith(sharedGradient);
+  });
+
+  it('paints solid eye overrides over a matrix gradient when isCustomEyeColor is true', () => {
+    const fillStyleSetter = vi.fn();
+    const ctx = createMockCtx();
+    const sharedGradient = { addColorStop: vi.fn() } as unknown as CanvasGradient;
+    Object.defineProperty(ctx, 'fillStyle', {
+      set: fillStyleSetter,
+      get: () => '',
+      configurable: true,
+    });
+
+    renderEyes(
+      ctx,
+      {
+        ...baseConfig,
+        style: QRStyle.MODERN,
+        fgColor: '#111111',
+        eyeColor: '#111111',
+        eyeFrameColor: '#9333ea',
+        eyeBallColor: '#0f172a',
+        isCustomEyeColor: true,
+        gradientType: 'linear',
+        gradientColorStops: [
+          { offset: 0, color: '#111111' },
+          { offset: 1, color: '#2563eb' },
+        ],
+      },
+      0,
+      0,
+      10,
+      21,
+      { moduleGradient: sharedGradient }
+    );
+
+    expect(fillStyleSetter).not.toHaveBeenCalledWith(sharedGradient);
+    expect(fillStyleSetter).toHaveBeenCalledWith('#9333ea');
+    expect(fillStyleSetter).toHaveBeenCalledWith('#0f172a');
+  });
 });

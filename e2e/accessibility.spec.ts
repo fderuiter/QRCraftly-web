@@ -51,6 +51,7 @@ test.describe('Accessibility Suite', () => {
     const bgColorInput = page.locator('input#bg-color');
     await bgColorInput.fill('#ffffff');
 
+    await page.getByText('Custom Eye Colors', { exact: true }).click();
     const eyeColorInput = page.locator('input#eye-frame-color');
     await eyeColorInput.fill('#ff0000');
 

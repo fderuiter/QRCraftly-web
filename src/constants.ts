@@ -57,12 +57,14 @@ export function buildPresetColorPatch(
   const currentStops = config?.gradientColorStops;
   // The end colour is the last stop, also for an imported gradient with more than two.
   const stop1 = currentStops?.[currentStops.length - 1]?.color ?? DEFAULT_GRADIENT_END_COLOR;
+  const resetCustomEyeFlag = config?.isCustomEyeColor !== undefined ? { isCustomEyeColor: undefined } : {};
   return {
     fgColor: preset.fg,
     bgColor: preset.bg,
     eyeColor: preset.eye,
     eyeFrameColor: preset.eye,
     eyeBallColor: preset.eye,
+    ...resetCustomEyeFlag,
     gradientColorStops: [
       { offset: 0, color: preset.fg },
       { offset: 1, color: stop1 },

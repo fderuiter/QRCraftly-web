@@ -16,9 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { hasCustomEyeColor } from '@/packages/core/config';
 import type { QRConfig } from '@/packages/core/types';
 import { drawEyeFrame, drawEyeball, EYE_POSITIONS, type EyePosition } from './eyeShapes';
-import { type ModuleRenderOptions, sampleCellLuminances } from './modules';
+import { createModuleGradient, type ModuleRenderOptions, sampleCellLuminances } from './modules';
 import { getLuminance } from '@/packages/core/encoding';
 import type { RenderSurface } from './surface';
 
@@ -37,8 +38,13 @@ export const renderEyes = (
   }
 
   const threshold = options?.luminanceThreshold ?? config.luminanceThreshold ?? 0.25;
+  const customEyes = hasCustomEyeColor(config);
+  const drawSize = moduleCount * cellSize;
+  const gradientFill = (!customEyes && !options?.fgColorDark && !config.fgColorDark && config.gradientType && config.gradientType !== 'none')
+    ? (options?.moduleGradient !== undefined ? options.moduleGradient : createModuleGradient(ctx, config, drawX, drawY, drawSize))
+    : null;
 
-  let fgColorDark = options?.fgColorDark || config.fgColorDark || config.eyeFrameColor || config.eyeColor || config.fgColor;
+  let fgColorDark = options?.fgColorDark || config.fgColorDark || (customEyes ? (config.eyeFrameColor || config.eyeColor || config.fgColor) : config.fgColor);
   let fgColorLight = options?.fgColorLight || config.fgColorLight || '#ffffff';
 
   if (!options?.fgColorDark && !config.fgColorDark) {
@@ -55,6 +61,13 @@ export const renderEyes = (
     }
   }
 
+  const defaultFrameFill: string | CanvasGradient = customEyes
+    ? (config.eyeFrameColor || config.eyeColor || config.fgColor)
+    : (gradientFill || config.fgColor);
+  const defaultBallFill: string | CanvasGradient = customEyes
+    ? (config.eyeBallColor || config.eyeColor || config.fgColor)
+    : (gradientFill || config.fgColor);
+
   const drawEyePattern = (eye: EyePosition) => {
     const r = eye.atBottom ? moduleCount - 7 : 0;
     const c = eye.atRight ? moduleCount - 7 : 0;
@@ -62,8 +75,8 @@ export const renderEyes = (
     const y = drawY + r * cellSize;
     const size = 7 * cellSize;
 
-    let frameColor = config.eyeFrameColor || config.eyeColor;
-    let ballColor = config.eyeBallColor || config.eyeColor;
+    let frameColor: string | CanvasGradient = defaultFrameFill;
+    let ballColor: string | CanvasGradient = defaultBallFill;
     let holeColor = config.bgColor;
 
     if (cellLuminance || config.isLuminanceMaskingEnabled) {

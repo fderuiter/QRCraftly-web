@@ -4,7 +4,7 @@ import { LOW_RELIABILITY_PATTERNS } from '@/packages/scannability';
 import { getContrastRatio } from '@/packages/core/encoding';
 
 /** The settings a gallery tile or "Surprise me" changes. */
-export type StyleChoice = Pick<QRConfig, 'style' | 'fgColor' | 'bgColor' | 'eyeColor' | 'eyeFrameColor' | 'eyeBallColor'>;
+export type StyleChoice = Pick<QRConfig, 'style' | 'fgColor' | 'bgColor' | 'eyeColor' | 'eyeFrameColor' | 'eyeBallColor' | 'isCustomEyeColor'>;
 
 /** Scan outlook shown by the dot on a gallery tile. */
 export type StyleScanTone = 'good' | 'check';

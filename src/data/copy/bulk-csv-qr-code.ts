@@ -8,7 +8,7 @@ export const copy: ToolCopy = {
     steps: [
       {
         name: 'Choose a CSV file',
-        text: 'Choose or drop a .csv or .txt file. Download the sample template if you want a file to start from.',
+        text: 'Select Links, Plain text, or Contact Card, download the matching starter template if needed, and upload your spreadsheet.',
       },
       {
         name: 'Pick the columns',
@@ -33,7 +33,7 @@ export const copy: ToolCopy = {
     {
       question: 'How does Contact Card column mapping work?',
       answer:
-        'When you select Contact Card, recognized headers for first name, last name, phone, email, organization, and job title match automatically, or you can map columns manually. Every contact requires at least a first name, last name, or organization to synthesize a valid card.',
+        'When you select Contact Card, recognized headers for first name, last name, phone, email, organization, and job title—plus website, street, city, postal code, and country—match automatically, or you can map columns manually. Every contact requires at least a first name, last name, or organization to synthesize a valid card.',
     },
     {
       question: 'How many rows can one batch have?',

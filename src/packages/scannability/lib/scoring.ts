@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { hasCustomEyeColor } from '@/packages/core/config';
 import type { QRConfig } from '@/packages/core/types';
 import { LOW_RELIABILITY_PATTERNS, SYSTEM_LIMITS } from './constants';
 import { getContrastRatio } from '@/packages/core/encoding';
@@ -49,8 +50,13 @@ export function calculateScannabilityHealth(
     : [config.fgColor];
 
   const fgContrast = Math.min(...moduleColors.map((color) => getContrastRatio(color, bgForContrast)));
-  const eyeFrameContrast = getContrastRatio(config.eyeFrameColor || config.eyeColor, bgForContrast);
-  const eyeBallContrast = getContrastRatio(config.eyeBallColor || config.eyeColor, bgForContrast);
+  const customEyes = hasCustomEyeColor(config);
+  const eyeFrameContrast = customEyes
+    ? getContrastRatio(config.eyeFrameColor || config.eyeColor || config.fgColor, bgForContrast)
+    : fgContrast;
+  const eyeBallContrast = customEyes
+    ? getContrastRatio(config.eyeBallColor || config.eyeColor || config.fgColor, bgForContrast)
+    : fgContrast;
   const worstContrast = Math.min(fgContrast, eyeFrameContrast, eyeBallContrast);
 
   if (worstContrast < 3.0) {
