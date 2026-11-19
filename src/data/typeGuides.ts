@@ -88,8 +88,8 @@ export const typeGuides: Record<string, TypeGuide> = {
       'Print and scan a few sample labels before running a large batch through a label printer or commercial press.',
     ],
     checks: [
-      'Confirm column headers match your intended content or contact card fields (first name, last name, phone, email, organization, title) and file naming column.',
-      'Preflight synthesis checks verify contact identity (first name, last name, or organization) and valid email formatting before generation.',
+      'Confirm column headers match your intended content or contact card fields (first name, last name, organization, job title, phone, email, website, street, city, postal code, country) and file naming column.',
+      'Preflight synthesis checks verify contact identity (first name, last name, or organization), website safety, and valid email formatting before generation.',
       'Review any flagged empty, invalid, or caution rows shown on screen before downloading the archive.',
       'Upload .csv, .txt, or .xlsx files with 500 rows or fewer; re-save legacy .xls spreadsheets as .xlsx or .csv before uploading.',
     ],

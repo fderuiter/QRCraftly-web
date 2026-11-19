@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BookmarkPlus, Download, Upload, Trash2, Edit3, Check, Sparkles } from 'lucide-react';
 import type { BrandTemplate } from '../../types';
+import { hasCustomEyeColor } from '@/packages/core/config';
 import type { QRConfig } from '@/packages/core/types';
 import { PREBUILT_TEMPLATES } from '../../data/brandTemplates';
 import {
@@ -242,7 +243,14 @@ export const BrandTemplateGallery: React.FC<BrandTemplateGalleryProps> = ({ conf
           const isSelected = selectedId === template.id;
           const bg = template.config.bgColor || '#ffffff';
           const fg = template.config.fgColor || '#000000';
-          const eyeFrame = template.config.eyeFrameColor || template.config.eyeColor || fg;
+          const customEyes = hasCustomEyeColor({
+            fgColor: fg,
+            eyeColor: template.config.eyeColor || fg,
+            isCustomEyeColor: template.config.isCustomEyeColor,
+            eyeFrameColor: template.config.eyeFrameColor,
+            eyeBallColor: template.config.eyeBallColor,
+          });
+          const eyeFrame = customEyes ? (template.config.eyeFrameColor || template.config.eyeColor || fg) : fg;
           const borderColor = template.config.borderColor || fg;
           const hasBorder = template.config.isBorderEnabled;
 

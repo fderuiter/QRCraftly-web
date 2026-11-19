@@ -27,7 +27,7 @@ import { describe, it, expect } from 'vitest';
 import { qrEncoder as QRCode } from '../../../../tests/fixtures/qrEncoder';
 import { qrReader } from '../../../../tests/fixtures/qrReader';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
-import { type QRConfig, QRStyle, QRErrorCorrectionLevel } from '@/packages/core/types';
+import { EyeShape, type QRConfig, QRStyle, QRErrorCorrectionLevel } from '@/packages/core/types';
 import { drawQRInternal, calculateLayout, clearFluidCache } from '../index';
 import { RasterContext, toContext } from '../../../../tests/fixtures/rasterContext';
 
@@ -165,4 +165,63 @@ describe('Grunge draws the same picture every time (#1397)', () => {
     expect(Buffer.from(second.raster.data).equals(Buffer.from(first.raster.data))).toBe(true);
     expect(first.decoded).toBe(VALUE);
   });
+});
+
+describe('unified finder fills, clean shaped corners, and custom eye overrides decode across styles and eye shapes', () => {
+  for (const style of Object.values(QRStyle)) {
+    it(`decodes ${style} with unified linear gradient across modules and finder patterns`, () => {
+      const { decoded } = render({
+        style,
+        errorCorrectionLevel: QRErrorCorrectionLevel.H,
+        isCustomEyeColor: false,
+        fgColor: '#0f172a',
+        eyeColor: '#0f172a',
+        gradientType: 'linear',
+        gradientAngle: 45,
+        gradientColorStops: [
+          { offset: 0, color: '#0f172a' },
+          { offset: 1, color: '#1d4ed8' },
+        ],
+      });
+      expect(decoded).toBe(VALUE);
+    });
+  }
+
+  for (const shape of Object.values(EyeShape)) {
+    it(`decodes ${shape} eye shape with clean corners and no square module bleed`, () => {
+      const { raster, layout, decoded } = render({
+        style: QRStyle.STANDARD,
+        errorCorrectionLevel: QRErrorCorrectionLevel.H,
+        bgColor: 'transparent',
+        eyeFrameShape: shape,
+        eyeBallShape: shape,
+        fgColor: '#1e293b',
+        eyeColor: '#1e293b',
+      });
+      expect(decoded).toBe(VALUE);
+      if (shape === EyeShape.CIRCLE) {
+        // Extreme outer corner of the 7x7 finder box lies outside the circular ring and must have zero square module bleed.
+        const { drawX, drawY, cellSize } = layout;
+        expect(raster.colorAt(drawX + 0.05 * cellSize, drawY + 0.05 * cellSize)).toEqual([255, 255, 255]);
+      }
+    });
+
+    it(`decodes ${shape} eye shape with custom solid eye overrides over a radial gradient`, () => {
+      const { decoded } = render({
+        style: QRStyle.MODERN,
+        errorCorrectionLevel: QRErrorCorrectionLevel.H,
+        eyeFrameShape: shape,
+        eyeBallShape: shape,
+        isCustomEyeColor: true,
+        eyeFrameColor: '#0f172a',
+        eyeBallColor: '#1e40af',
+        gradientType: 'radial',
+        gradientColorStops: [
+          { offset: 0, color: '#111827' },
+          { offset: 1, color: '#334155' },
+        ],
+      });
+      expect(decoded).toBe(VALUE);
+    });
+  }
 });

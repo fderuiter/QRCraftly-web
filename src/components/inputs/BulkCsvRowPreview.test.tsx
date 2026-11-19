@@ -141,6 +141,69 @@ describe('BulkCsvRowPreview', () => {
     expect(screen.getByText('badge-1')).toBeInTheDocument();
   });
 
+  it('shows all eleven mapped contact roles including website and postal address fields with no accessibility violations', async () => {
+    const fullContactRows: CsvRow[] = [
+      {
+        FName: 'Jane',
+        LName: 'Doe',
+        Org: 'Acme',
+        Role: 'Architect',
+        Phone: '+1-555-0100',
+        Email: 'jane@example.com',
+        Web: 'https://example.com',
+        Street: '100 Market St',
+        City: 'San Francisco',
+        Zip: '94105',
+        Country: 'United States',
+        FileId: 'jane-card',
+      },
+    ];
+    const fullMapping = {
+      firstName: 'FName',
+      lastName: 'LName',
+      organization: 'Org',
+      title: 'Role',
+      phone: 'Phone',
+      email: 'Email',
+      website: 'Web',
+      street: 'Street',
+      city: 'City',
+      zip: 'Zip',
+      country: 'Country',
+    };
+
+    const { container } = render(
+      <BulkCsvRowPreview
+        rows={fullContactRows}
+        rowNumbers={[2]}
+        contentType="vcard"
+        contactMapping={fullMapping}
+        filenameColumn="FileId"
+      />
+    );
+
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers.map((h) => h.textContent)).toEqual([
+      'Row',
+      'FNameFirst Name',
+      'LNameLast Name',
+      'OrgOrganization',
+      'RoleJob Title',
+      'PhonePhone',
+      'EmailEmail',
+      'WebWebsite',
+      'StreetStreet',
+      'CityCity',
+      'ZipPostal Code',
+      'CountryCountry',
+      'FileIdFile name',
+    ]);
+    expect(screen.getByText('https://example.com')).toBeInTheDocument();
+    expect(screen.getByText('100 Market St')).toBeInTheDocument();
+    expect(screen.getByText('94105')).toBeInTheDocument();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(<BulkCsvRowPreview rows={rows} rowNumbers={rowNumbers} payloadColumn="URL" filenameColumn="Name" />);
     expect(await axe(container)).toHaveNoViolations();

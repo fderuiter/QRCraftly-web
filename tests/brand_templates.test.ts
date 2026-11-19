@@ -516,5 +516,61 @@ describe('Brand Template Gallery & Persistence System', () => {
       });
       expect(imported.template?.config).toEqual(saved.template?.config);
     });
+
+    it('preserves distinct solid eyeColor from PREBUILT_TEMPLATES and legacy saved templates when isCustomEyeColor is omitted', async () => {
+      const { hasCustomEyeColor } = await import('@/packages/core/config');
+
+      // Start from a canvas where the user explicitly turned off custom eye colors over a gradient
+      const activeUnifiedGradient: QRConfig = {
+        ...DEFAULT_CONFIG,
+        fgColor: '#111827',
+        eyeColor: '#111827',
+        isCustomEyeColor: false,
+        gradientType: 'linear',
+        gradientColorStops: [
+          { offset: 0, color: '#111827' },
+          { offset: 1, color: '#2563eb' },
+        ],
+      };
+      expect(hasCustomEyeColor(activeUnifiedGradient)).toBe(false);
+
+      // Every prebuilt template with a distinct eyeColor must preserve its solid eye color after applyTemplateToConfig
+      for (const prebuilt of PREBUILT_TEMPLATES) {
+        const merged: QRConfig = {
+          ...activeUnifiedGradient,
+          ...applyTemplateToConfig(activeUnifiedGradient, prebuilt.config),
+        };
+        expect(merged.isCustomEyeColor).toBeUndefined();
+        expect(merged.eyeColor).toBe(prebuilt.config.eyeColor);
+        expect(hasCustomEyeColor(merged)).toBe(true);
+      }
+
+      // Legacy qrcraftly:brand-templates entry without isCustomEyeColor also preserves distinct eyeColor
+      localStorage.setItem(
+        'qrcraftly:brand-templates',
+        JSON.stringify([
+          {
+            id: 'legacy-brand-1',
+            name: 'Legacy Brand',
+            isPreset: false,
+            createdAt: 1700000000000,
+            updatedAt: 1700000000000,
+            config: {
+              fgColor: '#0f766e',
+              bgColor: '#f0fdfa',
+              eyeColor: '#134e4a',
+              style: QRStyle.MODERN,
+            },
+          },
+        ])
+      );
+      const [legacyStored] = getStoredTemplates();
+      const legacyMerged: QRConfig = {
+        ...activeUnifiedGradient,
+        ...applyTemplateToConfig(activeUnifiedGradient, legacyStored.config),
+      };
+      expect(legacyMerged.eyeColor).toBe('#134e4a');
+      expect(hasCustomEyeColor(legacyMerged)).toBe(true);
+    });
   });
 });

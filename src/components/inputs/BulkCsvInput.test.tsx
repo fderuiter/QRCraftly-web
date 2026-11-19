@@ -19,6 +19,7 @@
 import React from 'react';
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { axe } from '../../../tests/utils/axe';
 import { BulkCsvInput } from './BulkCsvInput';
 import { LazyBulkCsvInput } from './LazyBulkCsvInput';
 import type { BulkCsvData } from '@/packages/qr-payload';
@@ -28,7 +29,12 @@ import { ToastProvider } from '../ui/Toast';
 import * as downloadManager from '@/utils/downloadManager';
 import * as qrExport from '@/packages/qr-export';
 import * as bulkCsv from '@/packages/bulk-csv';
-import { MAX_BULK_CSV_ROWS, SAMPLE_CSV_TEMPLATE } from '@/packages/bulk-csv';
+import {
+  MAX_BULK_CSV_ROWS,
+  SAMPLE_CSV_TEMPLATE,
+  SAMPLE_TEXT_CSV_TEMPLATE,
+  SAMPLE_VCARD_CSV_TEMPLATE,
+} from '@/packages/bulk-csv';
 
 // The real row check and Excel parser, wrapped so a test can count calls or hold one open.
 vi.mock('@/packages/bulk-csv', async (importOriginal) => {
@@ -1367,11 +1373,12 @@ describe('Excel Spreadsheet Parsing (.xlsx)', () => {
       expect(screen.getByTestId('bulk-contact-organization-mapped-badge')).toHaveTextContent('Mapped');
       expect(screen.getByTestId('bulk-contact-organization-sample-preview')).toHaveTextContent('Engineering');
 
-      // Unmapped contact columns show Optional and hide sample previews
-      expect(screen.getAllByText('Optional')).toHaveLength(3);
+      // Unmapped contact columns show Optional and hide sample previews (8 of 11 fields unmapped)
+      expect(screen.getAllByText('Optional')).toHaveLength(8);
       expect(screen.queryByTestId('bulk-contact-phone-sample-preview')).not.toBeInTheDocument();
       expect(screen.queryByTestId('bulk-contact-email-sample-preview')).not.toBeInTheDocument();
       expect(screen.queryByTestId('bulk-contact-title-sample-preview')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('bulk-contact-website-sample-preview')).not.toBeInTheDocument();
 
       // Blank first-row cells in mapped contact and filename cards display (empty)
       expect(screen.getByTestId('bulk-contact-firstname-sample-preview')).toHaveTextContent('(empty)');
@@ -1451,6 +1458,126 @@ describe('Excel Spreadsheet Parsing (.xlsx)', () => {
       expect(text).toContain('Row Number,Category,Reason,Payload');
       expect(text).toContain('Missing required contact identity');
       expect(text).toContain('Invalid email address format');
+    });
+
+    it('lets users pick Links, Plain text, or Contact Card before upload and downloads the matching starter CSV template', () => {
+      const StatefulBulkCsv = () => {
+        const [state, setState] = React.useState<BulkCsvData>(initialData);
+        return (
+          <BulkCsvInput
+            data={state}
+            onChange={(updates) => setState((prev) => ({ ...prev, ...updates }))}
+          />
+        );
+      };
+      renderWithProvider(<StatefulBulkCsv />);
+
+      const contentTypeSelect = screen.getByLabelText('Content Type');
+      expect(contentTypeSelect).toHaveValue('link');
+
+      fireEvent.click(screen.getByRole('button', { name: /Download Sample Template/i }));
+      expect(downloadManager.triggerFileDownload).toHaveBeenLastCalledWith(
+        new TextEncoder().encode(SAMPLE_CSV_TEMPLATE),
+        'qrcraftly-sample-template.csv',
+        'text/csv'
+      );
+
+      fireEvent.change(contentTypeSelect, { target: { value: 'text' } });
+      expect(contentTypeSelect).toHaveValue('text');
+      fireEvent.click(screen.getByRole('button', { name: /Download Sample Template/i }));
+      expect(downloadManager.triggerFileDownload).toHaveBeenLastCalledWith(
+        new TextEncoder().encode(SAMPLE_TEXT_CSV_TEMPLATE),
+        'qrcraftly-text-template.csv',
+        'text/csv'
+      );
+
+      fireEvent.change(contentTypeSelect, { target: { value: 'vcard' } });
+      expect(contentTypeSelect).toHaveValue('vcard');
+      fireEvent.click(screen.getByRole('button', { name: /Download Sample Template/i }));
+      expect(downloadManager.triggerFileDownload).toHaveBeenLastCalledWith(
+        new TextEncoder().encode(SAMPLE_VCARD_CSV_TEMPLATE),
+        'qrcraftly-vcard-template.csv',
+        'text/csv'
+      );
+    });
+
+    it('downloads the active content type starter template from the post-upload mapping header', () => {
+      const StatefulBulkCsv = () => {
+        const [state, setState] = React.useState<BulkCsvData>({
+          ...initialData,
+          csvContent: 'col_a,col_b\nhello,item-1',
+          contentType: 'text',
+        });
+        return (
+          <BulkCsvInput
+            data={state}
+            onChange={(updates) => setState((prev) => ({ ...prev, ...updates }))}
+          />
+        );
+      };
+      renderWithProvider(<StatefulBulkCsv />);
+
+      fireEvent.click(screen.getByRole('button', { name: /Download Sample Template/i }));
+      expect(downloadManager.triggerFileDownload).toHaveBeenLastCalledWith(
+        new TextEncoder().encode(SAMPLE_TEXT_CSV_TEMPLATE),
+        'qrcraftly-text-template.csv',
+        'text/csv'
+      );
+
+      fireEvent.change(screen.getByLabelText('Content Type'), { target: { value: 'vcard' } });
+      fireEvent.click(screen.getByRole('button', { name: /Download Sample Template/i }));
+      expect(downloadManager.triggerFileDownload).toHaveBeenLastCalledWith(
+        new TextEncoder().encode(SAMPLE_VCARD_CSV_TEMPLATE),
+        'qrcraftly-vcard-template.csv',
+        'text/csv'
+      );
+    });
+
+    it('keeps Postal Address collapsed for basic rosters and auto-expands when any postal column matches', async () => {
+      const svgSpy = vi.spyOn(qrExport, 'generateQRSvg');
+
+      const basicRender = renderWithProvider(
+        <BulkCsvInput
+          data={{ ...initialData, csvContent: contactCsv, contentType: 'vcard' }}
+          onChange={vi.fn()}
+        />
+      );
+      const collapsedPostalButton = screen.getByRole('button', { name: 'Postal Address' });
+      expect(collapsedPostalButton).toHaveAttribute('aria-expanded', 'false');
+      basicRender.unmount();
+
+      const { container } = renderWithProvider(
+        <BulkCsvInput
+          data={{
+            ...initialData,
+            csvContent: SAMPLE_VCARD_CSV_TEMPLATE,
+            contentType: 'vcard',
+            exportFormat: 'svg',
+          }}
+          onChange={vi.fn()}
+        />
+      );
+
+      const expandedPostalButton = screen.getByRole('button', { name: 'Postal Address' });
+      expect(expandedPostalButton).toHaveAttribute('aria-expanded', 'true');
+
+      expect(screen.getByLabelText('Website')).toHaveValue('website');
+      expect(screen.getByLabelText('Street')).toHaveValue('street');
+      expect(screen.getByLabelText('City')).toHaveValue('city');
+      expect(screen.getByLabelText('Postal Code')).toHaveValue('postal_code');
+      expect(screen.getByLabelText('Country')).toHaveValue('country');
+      expect(screen.getByLabelText('File Name Column')).toHaveValue('filename');
+
+      expect(await axe(container)).toHaveNoViolations();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Generate Batch' }));
+      await waitFor(() => expect(downloadManager.triggerFileDownload).toHaveBeenCalled());
+
+      const encoded = encodedValues(svgSpy);
+      expect(encoded[0]).toContain('URL:https://example.com/jane');
+      expect(encoded[0]).toContain('ADR:;;100 Market St\\, Suite 400;San Francisco;;94105;United States');
+
+      svgSpy.mockRestore();
     });
   });
 });

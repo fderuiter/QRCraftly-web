@@ -17,7 +17,25 @@
 */
 
 import { getPublicDomain } from './site';
-import { QRErrorCorrectionLevel, QRStyle, QRType, SocialFormat, TemplateStyle } from './types';
+import { type QRConfig, QRErrorCorrectionLevel, QRStyle, QRType, SocialFormat, TemplateStyle } from './types';
+
+/**
+ * Determines whether independent solid finder pattern eye colors are active.
+ * Explicit `isCustomEyeColor` booleans take precedence; when `undefined` (such as
+ * `DEFAULT_CONFIG`, `STYLE_BASELINE`, or legacy templates), custom eye colors are
+ * inferred whenever the effective outer frame or inner ball color differs from `fgColor`.
+ */
+export function hasCustomEyeColor(
+  config: Pick<QRConfig, 'isCustomEyeColor' | 'fgColor' | 'eyeColor' | 'eyeFrameColor' | 'eyeBallColor'>
+): boolean {
+  if (typeof config.isCustomEyeColor === 'boolean') {
+    return config.isCustomEyeColor;
+  }
+  const fg = config.fgColor.trim().toLowerCase();
+  const frame = (config.eyeFrameColor || config.eyeColor || config.fgColor).trim().toLowerCase();
+  const ball = (config.eyeBallColor || config.eyeColor || config.fgColor).trim().toLowerCase();
+  return frame !== fg || ball !== fg;
+}
 
 /**
  * The default configuration settings for the QR code generator.

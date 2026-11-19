@@ -100,6 +100,29 @@ describe('Scannability Deep Module (Public Entry Points)', () => {
       expect(health.criticalWarnings).toContain('critical-contrast');
     });
 
+    it('evaluates inherited finder contrast from gradient stops when isCustomEyeColor is false and ignores stale eyeColor', () => {
+      const healthyUnified: QRConfig = {
+        ...getBaseConfig(),
+        fgColor: '#0f172a',
+        bgColor: '#ffffff',
+        eyeColor: '#ffffff',
+        isCustomEyeColor: false,
+        gradientType: 'radial',
+        gradientColorStops: [
+          { offset: 0, color: '#0f172a' },
+          { offset: 1, color: '#1e3a8a' },
+        ],
+      };
+      expect(calculateScannabilityHealth(healthyUnified).score).toBe(100);
+
+      const lowContrastCustomEye: QRConfig = {
+        ...healthyUnified,
+        isCustomEyeColor: true,
+        eyeFrameColor: '#f1f5f9',
+      };
+      expect(calculateScannabilityHealth(lowContrastCustomEye).criticalWarnings).toContain('critical-contrast');
+    });
+
     it('deducts score when localized contrast violations occur', () => {
       const config = getBaseConfig();
       const health = calculateScannabilityHealth(config, { violations: 4, minContrast: 2.2 });

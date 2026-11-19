@@ -60,9 +60,29 @@ describe('ColorControls', () => {
     });
   });
 
-  it('allows updating eye frame and eye ball colors independently', () => {
+  it('updates fgColor and eyeColor together by default and reveals Eye Frame and Eye Ball when Custom Eye Colors is toggled on', () => {
     const handleChange = vi.fn();
-    render(<ColorControls config={{ ...DEFAULT_CONFIG, fgColor: '#000000', bgColor: '#ffffff', eyeColor: '#000000' }} onChange={handleChange} />);
+    const { rerender } = render(
+      <ColorControls config={{ ...DEFAULT_CONFIG, fgColor: '#000000', bgColor: '#ffffff', eyeColor: '#000000' }} onChange={handleChange} />
+    );
+
+    expect(screen.queryByLabelText('Eye Frame')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Eye Ball')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Foreground'), { target: { value: '#e11d48' } });
+    expect(handleChange).toHaveBeenCalledWith({ fgColor: '#e11d48', eyeColor: '#e11d48' });
+
+    const customEyesSwitch = screen.getByRole('switch', { name: /custom eye colors/i });
+    expect(customEyesSwitch).not.toBeChecked();
+    fireEvent.click(customEyesSwitch);
+    expect(handleChange).toHaveBeenCalledWith({ isCustomEyeColor: true, eyeColor: '#000000' });
+
+    rerender(
+      <ColorControls
+        config={{ ...DEFAULT_CONFIG, fgColor: '#000000', bgColor: '#ffffff', eyeColor: '#000000', isCustomEyeColor: true }}
+        onChange={handleChange}
+      />
+    );
 
     const eyeFrameInput = screen.getByLabelText('Eye Frame');
     fireEvent.change(eyeFrameInput, { target: { value: '#ff0000' } });
@@ -71,6 +91,15 @@ describe('ColorControls', () => {
     const eyeBallInput = screen.getByLabelText('Eye Ball');
     fireEvent.change(eyeBallInput, { target: { value: '#00ff00' } });
     expect(handleChange).toHaveBeenCalledWith({ eyeBallColor: '#00ff00' });
+
+    // Turning off Custom Eye Colors clears overrides and restores inheritance
+    fireEvent.click(screen.getByRole('switch', { name: /custom eye colors/i }));
+    expect(handleChange).toHaveBeenCalledWith({
+      isCustomEyeColor: false,
+      eyeColor: '#000000',
+      eyeFrameColor: undefined,
+      eyeBallColor: undefined,
+    });
   });
 
   it('triggers low contrast warning when either eye frame or eye ball color has low contrast against background', () => {
@@ -204,6 +233,7 @@ describe('ColorControls', () => {
     fireEvent.change(screen.getByLabelText(/^start color$/i), { target: { value: '#00ff00' } });
     expect(handleChange).toHaveBeenCalledWith({
       fgColor: '#00ff00',
+      eyeColor: '#00ff00',
       gradientColorStops: [
         { offset: 0, color: '#00ff00' },
         { offset: 1, color: '#0000ff' },

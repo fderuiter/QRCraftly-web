@@ -18,8 +18,10 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  BULK_CONTACT_FIELDS,
   BulkCsvContract,
   constructBulkCsvString,
+  constructVCardString,
   hydrateBulkCsvData,
   autoDetectContactMapping,
   synthesizeVCardPayload,
@@ -110,20 +112,67 @@ describe('BulkCsvContract', () => {
       expect(mapping.organization).toBe('Organization');
     });
 
-    it('detects email and phone from sample rows when headers are ambiguous', () => {
-      const headers = ['ColA', 'ColB', 'ColC'];
+    it('detects email, phone, and website from sample rows when headers are ambiguous', () => {
+      const headers = ['ColA', 'ColB', 'ColC', 'ColD'];
       const rows = [
-        { ColA: 'Alice', ColB: 'alice@example.com', ColC: '+1-555-0199' },
-        { ColB: 'bob@example.com', ColC: '+1-555-0188', ColA: 'Bob' },
+        { ColA: 'Alice', ColB: 'alice@example.com', ColC: '+1-555-0199', ColD: 'https://example.com/alice' },
+        { ColB: 'bob@example.com', ColC: '+1-555-0188', ColA: 'Bob', ColD: 'www.example.com/bob' },
       ];
       const mapping = autoDetectContactMapping(headers, rows);
       expect(mapping.email).toBe('ColB');
       expect(mapping.phone).toBe('ColC');
+      expect(mapping.website).toBe('ColD');
+    });
+
+    it('defines all eleven contact fields in BULK_CONTACT_FIELDS and detects website and postal headers', () => {
+      expect(BULK_CONTACT_FIELDS.map((f) => f.key)).toEqual([
+        'firstName',
+        'lastName',
+        'organization',
+        'title',
+        'phone',
+        'email',
+        'website',
+        'street',
+        'city',
+        'zip',
+        'country',
+      ]);
+      expect(BULK_CONTACT_FIELDS.filter((f) => f.group === 'core')).toHaveLength(7);
+      expect(BULK_CONTACT_FIELDS.filter((f) => f.group === 'postal')).toHaveLength(4);
+
+      const headers = [
+        'Given Name',
+        'Surname',
+        'Employer',
+        'Designation',
+        'Telephone',
+        'E-mail',
+        'Company Website',
+        'Street Address',
+        'Locality',
+        'Postcode',
+        'Nation',
+      ];
+      const mapping = autoDetectContactMapping(headers);
+      expect(mapping).toEqual({
+        firstName: 'Given Name',
+        lastName: 'Surname',
+        organization: 'Employer',
+        title: 'Designation',
+        phone: 'Telephone',
+        email: 'E-mail',
+        website: 'Company Website',
+        street: 'Street Address',
+        city: 'Locality',
+        zip: 'Postcode',
+        country: 'Nation',
+      });
     });
   });
 
   describe('synthesizeVCardPayload', () => {
-    it('synthesizes valid RFC 6350 vCard payload from mapped contact fields', () => {
+    it('synthesizes valid RFC 6350 vCard payload matching single-card constructVCardString for all 11 fields', () => {
       const row = {
         fname: 'Jane',
         lname: 'Doe',
@@ -131,6 +180,11 @@ describe('BulkCsvContract', () => {
         mail: 'jane.doe@example.com',
         org: 'Acme Corp',
         role: 'Lead Architect',
+        web: 'https://example.com/jane',
+        street: '100 Market St, Suite 4; Floor 2',
+        city: 'San Francisco',
+        zip: '94105',
+        country: 'United States',
       };
       const mapping: BulkContactMapping = {
         firstName: 'fname',
@@ -139,20 +193,35 @@ describe('BulkCsvContract', () => {
         email: 'mail',
         organization: 'org',
         title: 'role',
+        website: 'web',
+        street: 'street',
+        city: 'city',
+        zip: 'zip',
+        country: 'country',
       };
       const result = synthesizeVCardPayload(row, mapping);
       expect(result.hasAnyData).toBe(true);
       expect(result.hasIdentity).toBe(true);
       expect(result.violations).toHaveLength(0);
-      expect(result.payload).toContain('BEGIN:VCARD');
-      expect(result.payload).toContain('VERSION:3.0');
-      expect(result.payload).toContain('FN:Jane Doe');
-      expect(result.payload).toContain('N:Doe;Jane;;;');
-      expect(result.payload).toContain('TEL:+1 555 123 4567');
-      expect(result.payload).toContain('EMAIL:jane.doe@example.com');
-      expect(result.payload).toContain('ORG:Acme Corp');
-      expect(result.payload).toContain('TITLE:Lead Architect');
-      expect(result.payload).toContain('END:VCARD');
+
+      const expectedSingleCard = constructVCardString({
+        firstName: row.fname,
+        lastName: row.lname,
+        phone: row.tel,
+        email: row.mail,
+        organization: row.org,
+        title: row.role,
+        website: row.web,
+        street: row.street,
+        city: row.city,
+        state: '',
+        zip: row.zip,
+        country: row.country,
+        version: '3.0',
+      });
+      expect(result.payload).toBe(expectedSingleCard);
+      expect(result.payload).toContain('URL:https://example.com/jane');
+      expect(result.payload).toContain('ADR:;;100 Market St\\, Suite 4\\; Floor 2;San Francisco;;94105;United States');
     });
 
     it('flags row missing required identity when only phone/email is present', () => {
@@ -163,21 +232,34 @@ describe('BulkCsvContract', () => {
       expect(result.hasIdentity).toBe(false);
     });
 
-    it('flags control characters and dangerous URLs in contact fields', () => {
+    it('flags control characters, BiDi overrides, and dangerous URLs across all contact fields', () => {
       const row = {
         name: 'Jane\x00Doe',
         email: 'javascript:alert(1)',
         phone: '12345',
+        web: 'javascript:evil()',
+        street: '100 Main\u202E St',
+        city: 'Austin\u200B',
+        zip: '78701\x07',
+        country: 'US\u2066',
       };
       const mapping: BulkContactMapping = {
         firstName: 'name',
         email: 'email',
         phone: 'phone',
+        website: 'web',
+        street: 'street',
+        city: 'city',
+        zip: 'zip',
+        country: 'country',
       };
       const result = synthesizeVCardPayload(row, mapping);
-      expect(result.violations.length).toBeGreaterThan(0);
-      expect(result.violations.some((v) => v.includes('control'))).toBe(true);
-      expect(result.violations.some((v) => v.includes('unsafe') || v.includes('dangerous') || v.includes('Invalid email'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('First Name contains invalid control'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('Website contains unsafe URL scheme'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('Street contains hidden text-direction'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('City contains invalid control or zero-width'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('Postal Code contains invalid control'))).toBe(true);
+      expect(result.violations.some((v) => v.includes('Country contains hidden text-direction'))).toBe(true);
     });
   });
 
