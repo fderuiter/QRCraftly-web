@@ -160,4 +160,26 @@ describe('EPS eye shapes', () => {
     expect(shaped.length).toBeGreaterThan(0);
     expect(shaped).not.toBe(defaultEps);
   });
+
+  it.each(['linear', 'radial'] as const)('shares one %s gradient coordinate space across modules and finder patterns when isCustomEyeColor is false', async (gradientType) => {
+    const eps = await generateQREps({
+      ...DEFAULT_CONFIG,
+      fgColor: '#0f172a',
+      eyeColor: '#0f172a',
+      isCustomEyeColor: false,
+      gradientType,
+      gradientAngle: 30,
+      gradientColorStops: [
+        { offset: 0, color: '#0f172a' },
+        { offset: 1, color: '#2563eb' },
+      ],
+    });
+
+    expect(eps).toContain('%%LanguageLevel: 3');
+    const shfillMatches = eps.match(/\bshfill\b/g) ?? [];
+    // Data module path + 3 finder frames + 3 finder balls all shade with the shared gradient
+    expect(shfillMatches.length).toBeGreaterThanOrEqual(7);
+    const coordMatches = [...eps.matchAll(/\/Coords \[([^\]]+)\]/g)].map((m) => m[1]);
+    expect(new Set(coordMatches).size).toBe(1);
+  });
 });

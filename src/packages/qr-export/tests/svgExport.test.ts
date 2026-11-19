@@ -1055,3 +1055,55 @@ describe('generateQRSvg precomputed matrix injection', () => {
     expect(svgWithoutOptions).toContain('<svg');
   });
 });
+
+describe('generateQRSvg unified gradient and custom eye overrides', () => {
+  it.each(['linear', 'radial'] as const)('emits one shared %s gradient across modules and finder patterns when isCustomEyeColor is false', async (gradientType) => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      fgColor: '#0f172a',
+      eyeColor: '#0f172a',
+      isCustomEyeColor: false,
+      gradientType,
+      gradientAngle: 45,
+      gradientColorStops: [
+        { offset: 0, color: '#0f172a' },
+        { offset: 1, color: '#2563eb' },
+      ],
+    };
+
+    const svg = await generateQRSvg(config);
+    const doc = parseAndAssertValidSvg(svg);
+    const tag = gradientType === 'linear' ? 'linearGradient' : 'radialGradient';
+    const defsGradients = doc.getElementsByTagName(tag);
+    expect(defsGradients).toHaveLength(1);
+
+    const gradId = defsGradients[0].getAttribute('id');
+    const pathsWithSharedGrad = Array.from(doc.getElementsByTagName('path')).filter(
+      (p) => p.getAttribute('fill') === `url(#${gradId})`
+    );
+    // Data modules (1) + 3 finder frames + 3 finder balls = at least 7 paths referencing the single shared gradient
+    expect(pathsWithSharedGrad.length).toBeGreaterThanOrEqual(7);
+  });
+
+  it('paints solid hex overrides on finder patterns over a matrix gradient when isCustomEyeColor is true', async () => {
+    const config: QRConfig = {
+      ...(DEFAULT_CONFIG as QRConfig),
+      fgColor: '#0f172a',
+      eyeColor: '#0f172a',
+      isCustomEyeColor: true,
+      eyeFrameColor: '#dc2626',
+      eyeBallColor: '#16a34a',
+      gradientType: 'linear',
+      gradientColorStops: [
+        { offset: 0, color: '#0f172a' },
+        { offset: 1, color: '#2563eb' },
+      ],
+    };
+
+    const svg = await generateQRSvg(config);
+    const doc = parseAndAssertValidSvg(svg);
+    expect(doc.getElementsByTagName('linearGradient')).toHaveLength(1);
+    expect(svg).toContain('fill="#dc2626"');
+    expect(svg).toContain('fill="#16a34a"');
+  });
+});

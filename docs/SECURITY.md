@@ -132,7 +132,7 @@ Maze overlay configurations in `QRConfig` (`src/packages/core/types.ts`) (e.g., 
 
 ## Independent Eye Colors
 
-Finder pattern color properties in `src/packages/core/types.ts` (`eyeFrameColor` and `eyeBallColor`) are statically typed visual parameters. They allow distinct outer frame and inner eyeball styling while falling back safely to `eyeColor`.
+Finder pattern color properties in `src/packages/core/types.ts` (`isCustomEyeColor`, `eyeFrameColor`, and `eyeBallColor`) are statically typed visual parameters kept in volatile client-side state. By default, finder patterns inherit the active foreground color or matrix gradient; enabling `isCustomEyeColor` applies distinct outer frame and inner eyeball hex colors while falling back safely to `eyeColor` and `fgColor`.
 
 ## Eye Shapes
 

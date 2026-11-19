@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { hasCustomEyeColor } from '@/packages/core/config';
 import type { GradientType, QRConfig } from '@/packages/core/types';
 import { PRESET_COLORS, MIN_CONTRAST_THRESHOLD, buildPresetColorPatch, DEFAULT_GRADIENT_END_COLOR } from '../../constants';
 import { getContrastRatio } from '@/packages/core/encoding';
@@ -73,28 +74,45 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
   const stop1Color = colorStops[colorStops.length - 1]?.color ?? DEFAULT_GRADIENT_END_COLOR;
   const stopColors = colorStops.map((stop) => stop.color).join(',');
 
+  const isCustomEyes = hasCustomEyeColor(config);
+  const staleEyeOverrides = !isCustomEyes && (config.eyeFrameColor !== undefined || config.eyeBallColor !== undefined)
+    ? { eyeFrameColor: undefined, eyeBallColor: undefined }
+    : {};
+
   const contrastRatios = useMemo(() => {
     const bgForContrast = config.bgColor === 'transparent' ? '#ffffff' : config.bgColor;
     // A gradient is only as scannable as its weakest stop, so every stop is checked (an imported style can have more than two).
     const moduleColors = activeGradientType !== 'none' ? stopColors.split(',') : [config.fgColor];
     const fgContrast = Math.min(...moduleColors.map((color) => getContrastRatio(color, bgForContrast)));
-    const eyeFrameContrast = getContrastRatio(config.eyeFrameColor || config.eyeColor, bgForContrast);
-    const eyeBallContrast = getContrastRatio(config.eyeBallColor || config.eyeColor, bgForContrast);
+    const eyeFrameContrast = isCustomEyes
+      ? getContrastRatio(config.eyeFrameColor || config.eyeColor || config.fgColor, bgForContrast)
+      : fgContrast;
+    const eyeBallContrast = isCustomEyes
+      ? getContrastRatio(config.eyeBallColor || config.eyeColor || config.fgColor, bgForContrast)
+      : fgContrast;
     return { fg: fgContrast, eyeFrame: eyeFrameContrast, eyeBall: eyeBallContrast };
-  }, [activeGradientType, stopColors, config.fgColor, config.bgColor, config.eyeColor, config.eyeFrameColor, config.eyeBallColor]);
+  }, [activeGradientType, stopColors, config.fgColor, config.bgColor, config.eyeColor, config.eyeFrameColor, config.eyeBallColor, isCustomEyes]);
 
   const isLowContrast =
     contrastRatios.fg < MIN_CONTRAST_THRESHOLD ||
     contrastRatios.eyeFrame < MIN_CONTRAST_THRESHOLD ||
     contrastRatios.eyeBall < MIN_CONTRAST_THRESHOLD;
   const worstContrast = Math.min(contrastRatios.fg, contrastRatios.eyeFrame, contrastRatios.eyeBall);
-  const selectedPreset = PRESET_COLORS.find(
-    (preset) =>
-      config.fgColor === preset.fg &&
-      config.bgColor === preset.bg &&
-      (config.eyeFrameColor || config.eyeColor) === preset.eye &&
-      (config.eyeBallColor || config.eyeColor) === preset.eye
-  );
+  const selectedPreset = activeGradientType === 'none'
+    ? PRESET_COLORS.find((preset) => {
+        const presetHasCustomEyes = preset.eye.toLowerCase() !== preset.fg.toLowerCase();
+        if (config.fgColor !== preset.fg || config.bgColor !== preset.bg || isCustomEyes !== presetHasCustomEyes) {
+          return false;
+        }
+        if (!isCustomEyes) {
+          return true;
+        }
+        return (
+          (config.eyeFrameColor || config.eyeColor) === preset.eye &&
+          (config.eyeBallColor || config.eyeColor) === preset.eye
+        );
+      })
+    : undefined;
 
   return (
     <div>
@@ -153,21 +171,11 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
             id="fg-color"
             label="Foreground"
             value={config.fgColor}
-            onChange={(val) => onChange({ fgColor: val })}
+            onChange={(val) =>
+              onChange(isCustomEyes ? { fgColor: val } : { fgColor: val, eyeColor: val, ...staleEyeOverrides })
+            }
           />
           <BackgroundColorField config={config} onChange={onChange} />
-          <ColorInput
-            id="eye-frame-color"
-            label="Eye Frame"
-            value={config.eyeFrameColor || config.eyeColor}
-            onChange={(val) => onChange({ eyeFrameColor: val })}
-          />
-          <ColorInput
-            id="eye-ball-color"
-            label="Eye Ball"
-            value={config.eyeBallColor || config.eyeColor}
-            onChange={(val) => onChange({ eyeBallColor: val })}
-          />
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4">
@@ -180,7 +188,11 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
                 { offset: 0, color: val },
                 { offset: 1, color: stop1Color },
               ];
-              onChange({ fgColor: val, gradientColorStops: newStops });
+              onChange(
+                isCustomEyes
+                  ? { fgColor: val, gradientColorStops: newStops }
+                  : { fgColor: val, eyeColor: val, gradientColorStops: newStops, ...staleEyeOverrides }
+              );
             }}
           />
           <ColorInput
@@ -210,20 +222,48 @@ export const ColorControls: React.FC<ColorControlsProps> = ({ config, onChange }
             </div>
           )}
           <BackgroundColorField config={config} onChange={onChange} />
-          <ColorInput
-            id="eye-frame-color"
-            label="Eye Frame"
-            value={config.eyeFrameColor || config.eyeColor}
-            onChange={(val) => onChange({ eyeFrameColor: val })}
-          />
-          <ColorInput
-            id="eye-ball-color"
-            label="Eye Ball"
-            value={config.eyeBallColor || config.eyeColor}
-            onChange={(val) => onChange({ eyeBallColor: val })}
-          />
         </div>
       )}
+
+      <div className="mt-4 space-y-3 border-t border-line pt-4">
+        <ToggleSwitch
+          id="custom-eye-colors"
+          label="Custom Eye Colors"
+          checked={isCustomEyes}
+          onChange={(checked) => {
+            if (checked) {
+              onChange({
+                isCustomEyeColor: true,
+                eyeColor: config.eyeColor || config.fgColor,
+              });
+            } else {
+              onChange({
+                isCustomEyeColor: false,
+                eyeColor: config.fgColor,
+                eyeFrameColor: undefined,
+                eyeBallColor: undefined,
+              });
+            }
+          }}
+          labelClassName="text-xs font-medium text-fg-muted"
+        />
+        {isCustomEyes && (
+          <div className="grid grid-cols-2 gap-4">
+            <ColorInput
+              id="eye-frame-color"
+              label="Eye Frame"
+              value={config.eyeFrameColor || config.eyeColor || config.fgColor}
+              onChange={(val) => onChange({ eyeFrameColor: val })}
+            />
+            <ColorInput
+              id="eye-ball-color"
+              label="Eye Ball"
+              value={config.eyeBallColor || config.eyeColor || config.fgColor}
+              onChange={(val) => onChange({ eyeBallColor: val })}
+            />
+          </div>
+        )}
+      </div>
 
       <ContrastBanner
         isVisible={isLowContrast}

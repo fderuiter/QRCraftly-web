@@ -215,4 +215,24 @@ describe('PDF eye shapes', () => {
     expect(shaped.length).toBeGreaterThan(0);
     expect(new TextDecoder().decode(shaped)).not.toBe(new TextDecoder().decode(defaultPdf));
   });
+
+  it.each(['linear', 'radial'] as const)('emits a single shared /Sh1 PDF shading across modules and finder patterns when isCustomEyeColor is false', async (gradientType) => {
+    const pdfBytes = await generateQRPdf({
+      ...DEFAULT_CONFIG,
+      fgColor: '#0f172a',
+      eyeColor: '#0f172a',
+      isCustomEyeColor: false,
+      gradientType,
+      gradientAngle: 60,
+      gradientColorStops: [
+        { offset: 0, color: '#0f172a' },
+        { offset: 1, color: '#2563eb' },
+      ],
+    });
+    const pdfStr = new TextDecoder('latin1').decode(pdfBytes);
+
+    const sh1Matches = pdfStr.match(/\/Sh1 sh/g) ?? [];
+    expect(sh1Matches.length).toBeGreaterThanOrEqual(7);
+    expect(pdfStr).not.toContain('/Sh2');
+  });
 });

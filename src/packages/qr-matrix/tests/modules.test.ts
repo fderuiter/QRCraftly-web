@@ -202,5 +202,42 @@ describe('renderModules', () => {
     expect(ctx.createRadialGradient).toHaveBeenCalled();
     expect(ctx.fill).toHaveBeenCalled();
   });
+
+  it.each(Object.values(QRStyle))('skips 7x7 finder pattern cells in renderModules for %s style', (style) => {
+    const ctx = createMockCtx();
+    const finderOnlyCoords: [number, number][] = [
+      [0, 0],
+      [6, 6],
+      [0, 20],
+      [6, 14],
+      [20, 0],
+      [14, 6],
+    ];
+    const modules = createMockModules(21, finderOnlyCoords);
+    renderModules(ctx, modules, { ...baseConfig, style }, 0, 0, 10, 21, mockLogoMetrics, false);
+
+    expect(ctx.fill).not.toHaveBeenCalled();
+  });
+
+  it('reuses a prebuilt moduleGradient from options instead of creating a duplicate gradient', () => {
+    const ctx = createMockCtx();
+    const sharedGradient = { addColorStop: vi.fn() } as unknown as CanvasGradient;
+    const modules = createMockModules(21, [[10, 10]]);
+    const linearConfig = {
+      ...baseConfig,
+      gradientType: 'linear',
+      gradientColorStops: [
+        { offset: 0, color: '#ff0000' },
+        { offset: 1, color: '#0000ff' },
+      ],
+    };
+
+    renderModules(ctx, modules, linearConfig, 0, 0, 10, 21, mockLogoMetrics, false, {
+      moduleGradient: sharedGradient,
+    });
+
+    expect(ctx.createLinearGradient).not.toHaveBeenCalled();
+    expect(ctx.fillStyle).toBe(sharedGradient);
+  });
 });
 

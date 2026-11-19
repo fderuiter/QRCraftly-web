@@ -19,7 +19,7 @@
 import type { QRConfig, QRModules } from '@/packages/core/types';
 import { calculateLayout, getLogoMetrics, getIsCoveredByLogo } from './utils';
 import { renderBorder, renderBorderDecoration } from './border';
-import { renderModules, type ModuleRenderOptions } from './modules';
+import { createModuleGradient, renderModules, type ModuleRenderOptions } from './modules';
 import { renderEyes } from './eyes';
 import { renderLogo } from './logo';
 import { renderMaze, type MazeData } from './maze';
@@ -153,6 +153,7 @@ export const drawQRInternal = (
 
   // 4. Render Modules (or the Mosaic QR tiles, which include the finder patterns)
   const mosaicSource = getMosaicSource(config.mosaicImageUrl);
+  let sharedRenderOptions: ModuleRenderOptions | undefined = options;
   if (mosaicSource) {
     const plan = planMosaic(modules, mosaicSource, {
       mode: config.mosaicMode ?? DEFAULT_MOSAIC_OPTIONS.mode,
@@ -160,7 +161,11 @@ export const drawQRInternal = (
     });
     renderMosaic(ctx, plan, drawX, drawY, cellSize, getIsCoveredByLogo(config, moduleCount, logoMetrics));
   } else {
-    renderModules(ctx, modules, config, drawX, drawY, cellSize, moduleCount, logoMetrics, isVirtual, options);
+    const moduleGradient = (!options?.fgColorDark && !config.fgColorDark && config.gradientType && config.gradientType !== 'none')
+      ? (options?.moduleGradient !== undefined ? options.moduleGradient : createModuleGradient(ctx, config, drawX, drawY, drawSize))
+      : null;
+    sharedRenderOptions = { ...options, moduleGradient };
+    renderModules(ctx, modules, config, drawX, drawY, cellSize, moduleCount, logoMetrics, isVirtual, sharedRenderOptions);
   }
 
   // 4b. Render Maze (if enabled)
@@ -168,7 +173,7 @@ export const drawQRInternal = (
 
   // 5. Render Eyes
   if (!mosaicSource) {
-    renderEyes(ctx, config, drawX, drawY, cellSize, moduleCount, options);
+    renderEyes(ctx, config, drawX, drawY, cellSize, moduleCount, sharedRenderOptions);
   }
 
   // 6. Render Center Logo
