@@ -484,7 +484,7 @@ export const guides: Guide[] = [
       'The size, quiet zone, contrast and file format that decide whether a printed QR code scans, with a checklist you can run before you send anything to print.',
     lead: 'Most QR codes that fail in the real world fail because of how they were printed, not how they were made. Four things decide it: how big the code is, the empty margin around it, the contrast of the squares, and what the paper or surface does to them. Here is how to get each one right before you print a thousand copies.',
     datePublished: '2026-10-03',
-    dateModified: '2026-10-16',
+    dateModified: '2026-11-19',
     sections: [
       {
         id: 'short-answer',
@@ -496,7 +496,7 @@ export const guides: Guide[] = [
               'Keep a blank margin of at least four squares on every side. Cropping it is the most common mistake.',
               'Use dark squares on a light background, with strong contrast. Do not invert the colors.',
               'Print big enough for the distance it will be scanned from, and give a long address more room than a short one.',
-              'Export a vector file (SVG or PDF) for print, and test a proof with more than one phone before the full run.',
+              'Export a vector file (SVG, EPS or PDF) for print, switch Color Space to CMYK for commercial four-color presses when exporting EPS or PDF, and test a proof with more than one phone before the full run.',
             ],
           },
         ],
@@ -532,7 +532,7 @@ export const guides: Guide[] = [
         blocks: [
           {
             type: 'p',
-            text: 'The standard asks for a blank border, called the quiet zone, four squares wide on every side. It is how a reader finds where the code starts. Designers crop it because it looks like wasted space, and then the code scans only sometimes. If your code sits on a colored panel or an image, the margin must be a plain light area, not a busy photo. If you are unsure whether a design leaves enough room, check a photo of it with the [QR code checker](/qr-code-checker).',
+            text: 'The standard asks for a blank border, called the quiet zone, four squares wide on every side. It is how a reader finds where the code starts. Under Advanced Mode in the generator, Quiet Zone Margin (modules) adjusts from 2 to 10 modules (default 4). Keep at least 4 modules for printed material, and reserve 2 or 3 modules for tight screen layouts you have tested yourself. Designers often crop the margin because it looks like wasted space, and then the code scans only sometimes. If your code sits on a colored panel or an image, the margin must be a plain light area, not a busy photo. If you are unsure whether a design leaves enough room, check a photo of it with the [QR code checker](/qr-code-checker).',
           },
         ],
       },
@@ -573,7 +573,7 @@ export const guides: Guide[] = [
         blocks: [
           {
             type: 'p',
-            text: 'A QR code is a grid of squares, so it stays sharp at any size only as a vector file. Export SVG or PDF for anything printed, and send the printer that file, not a screenshot. If you must use PNG, export it large and at a size where each square is a whole number of pixels, so the edges stay crisp. Do not let a layout tool smooth or resample the image.',
+            text: 'A QR code is a grid of squares, so it stays sharp at any size only as a vector file. Export SVG, EPS or PDF for anything printed, and send the printer that file, not a screenshot. When you choose EPS or PDF in Download options, you can switch Color Space from RGB to CMYK for commercial four-color process printing. Note that PDF and EPS exports always substitute Helvetica for Frame & CTA Badge fonts so print shops never hit missing-font errors, and embed uploaded logos as raster images. See [export formats and phone wallets](/guides/qr-code-export-and-wallet-options) for every download setting. If you must use PNG, export it large (2048 px or 4096 px) and do not let a layout tool smooth or resample the image.',
           },
         ],
       },
@@ -610,7 +610,7 @@ export const guides: Guide[] = [
         supports: 'The specification of the symbol, including its quiet zone and contrast requirements.',
       },
     ],
-    related: ['qr-code-error-correction-explained', 'why-qr-codes-stop-working'],
+    related: ['qr-code-export-and-wallet-options', 'qr-code-error-correction-explained', 'why-qr-codes-stop-working'],
   },
   {
     slug: 'qr-code-error-correction-explained',
@@ -1559,14 +1559,14 @@ console.log(\`Prism session ready, symbol size: \${session.symbolSize} bytes\`);
   },
   {
     slug: 'qr-code-customization-parameters',
-    title: 'QR code customization guide: styling, contrast and export parameters',
+    title: 'QR code customization guide: templates, patterns, colors, frames, logos and mosaic',
     shortTitle: 'QR code customization guide',
-    seoTitle: 'QR Code Customization Guide: Styles, Contrast & Formats | QRCraftly',
+    seoTitle: 'QR Code Customization Guide: Styles, Colors & Logos | QRCraftly',
     description:
-      'Complete reference for QR code visual styling: 8 pattern styles, locator eye shapes, 4.5:1 contrast rules, logo sizing caps, and export formats.',
-    lead: 'A customized QR code helps your brand stand out on marketing materials, packaging, and digital signage. However, aggressive styling can make codes difficult or impossible for camera lenses to read. This reference guide outlines the visual parameters, scannability boundaries, contrast thresholds, and export formats you need to produce beautiful, reliable QR codes.',
+      'Reference for QR code visual styling: templates, 8 patterns, gradients, 4.5:1 contrast, layouts, borders, CTA frames, logo width caps and Mosaic.',
+    lead: 'Every control under Customize Appearance changes how a camera reads your QR code. This reference covers every visual styling setting in the studio, including brand templates, the live Style Gallery, module patterns, locator eye shapes, gradients, 4.5:1 contrast rules, export layouts, borders, CTA frames, center logo cutouts, Mosaic image tiling, and quiet zone margins.',
     datePublished: '2026-11-16',
-    dateModified: '2026-11-16',
+    dateModified: '2026-11-19',
     sections: [
       {
         id: 'overview',
@@ -1574,178 +1574,178 @@ console.log(\`Prism session ready, symbol size: \${session.symbolSize} bytes\`);
         blocks: [
           {
             type: 'p',
-            text: 'Every QR code is built on an underlying grid of square modules and three corner finder patterns. When you customize styling, colors, or embedded artwork, you alter how camera sensors distinguish dark modules from light background spaces.',
+            text: 'Every QR code is built on a square module matrix and three corner finder patterns. Styling alters module shapes, colors, surrounding frames, or overlaid images while keeping the encoded binary data intact.',
           },
           {
             type: 'p',
-            text: 'Customization gives your codes personality, but scanners require clear optical boundaries. To avoid unreadable prints, adhere to four essential rules:',
+            text: 'To keep styled codes readable across phone cameras and dedicated scanners, follow four core boundaries:',
           },
           {
             type: 'ol',
             items: [
-              'Maintain at least 4.5:1 contrast between foreground elements and background surfaces across all lighting conditions.',
-              'Keep embedded center logos under 30 percent of the total code area, paired with error correction level H.',
-              'Use robust module patterns for small prints or long-distance scanning, reserving decorative patterns for high-contrast, large formats.',
-              'Export vector formats (SVG, EPS, PDF) for commercial print and crisp raster formats (PNG, WebP) for screens.',
+              'Keep at least a 4.5:1 contrast ratio between dark foreground modules (including both gradient stops and custom eye colors) and the background surface.',
+              'Keep embedded center logos within the 10% to 30% side-width range (up to 9% of the unpadded matrix area), paired with Error Correction Level H.',
+              'Pick crisp module patterns for small prints or long-distance signs, and save decorative patterns for larger, high-contrast prints.',
+              'Keep at least a 4-module quiet zone for printed codes, and choose vector or wallet outputs using the [export formats and phone wallets](/guides/qr-code-export-and-wallet-options) reference.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'templates-and-style-gallery',
+        heading: 'Brand templates and the live Style Gallery',
+        blocks: [
+          {
+            type: 'p',
+            text: 'The top of Customize Appearance gives you two fast starting points before you tune individual sliders: reusable Templates and the live Style Gallery.',
+          },
+          {
+            type: 'ul',
+            items: [
+              'Presets and My Templates: The Templates panel includes 8 ready-made presets under Presets and stores up to 50 custom templates under My Templates in your browser’s local storage (key qrcraftly:brand-templates).',
+              'Save, Import JSON, and Export JSON: Use “Save as template” to store your current visual settings, “Export JSON” to download a portable template file, and “Import JSON” to load a saved template on another device. Templates save visual style fields only: QR payload content, headline or badge text, and uploaded logo or Mosaic images are stripped so private content is never written to template files.',
+              'Live Style Gallery thumbnails: Style Gallery draws 17 live previews directly on your own QR code content across two tabs: 8 module styles under Patterns and 9 palettes under Colors. Hovering a tile with a mouse previews that look on the main canvas without committing it.',
+              'Surprise me and Undo / Redo: Clicking “Surprise me” picks a randomized pattern and color combination that satisfies contrast and scan checks. Every gallery pick or slider edit can be stepped back or forward with the “Undo style change” and “Redo style change” buttons.',
             ],
           },
         ],
       },
       {
         id: 'pattern-styles',
-        heading: 'The eight module pattern styles',
+        heading: 'The eight module patterns and Eye Shape options',
         blocks: [
           {
             type: 'p',
-            text: 'QRCraftly provides eight distinct module pattern styles. Each pattern alters the geometry of the interior data modules while preserving the underlying binary matrix:',
+            text: 'Under Pattern & Colors, QRCraftly offers 8 module pattern styles. Each style reshapes interior data modules while keeping the underlying grid coordinates intact:',
           },
           {
             type: 'table',
-            caption: 'QR code pattern styles and characteristics',
-            head: ['Pattern', 'Visual appearance', 'Best suited for'],
+            caption: 'QR code pattern styles and scan characteristics',
+            head: ['Pattern (Style Gallery name)', 'Visual geometry', 'Recommended use'],
             rows: [
-              ['Standard', 'Traditional solid square modules with sharp corners', 'Maximum scanner compatibility, industrial labels, small prints'],
-              ['Modern', 'Gently rounded squares with smooth corners', 'Corporate branding, business cards, clean interfaces'],
-              ['Swiss', 'Crisp disconnected circular dots with uniform spacing', 'Editorial layouts, high-end packaging, minimalist print'],
-              ['Fluid', 'Continuous organic contours and connected liquid shapes', 'Creative agencies, modern product labels, vibrant marketing'],
-              ['Circuit', 'Angular electronic traces and microchip interconnects', 'Technology companies, software services, hardware gear'],
-              ['Hive', 'Hexagonal honeycomb geometry inspired by nature', 'Craft beverages, eco-conscious goods, geometric packaging'],
-              ['Grunge', 'Rough, distressed textures with organic imperfections', 'Streetwear, concert posters, artistic branding'],
-              ['Starburst', 'Faceted diamond and star-shaped module geometry', 'Promotional event flyers, entertainment, high-impact campaigns'],
-            ],
-          },
-          {
-            type: 'p',
-            text: 'You can test any pattern in real time with our [static QR code generator](/) or inspect scanned codes with the [QR code scanner](/qr-code-scanner).',
-          },
-        ],
-      },
-      {
-        id: 'scanning-reliability',
-        heading: 'Pattern reliability and scanning recommendations',
-        blocks: [
-          {
-            type: 'p',
-            text: 'Standard, Modern, Swiss, Fluid, and Hive patterns deliver strong optical clarity across virtually all phone cameras and handheld barcode scanners. In contrast, three decorative patterns require extra care:',
-          },
-          {
-            type: 'ul',
-            items: [
-              'Grunge: Distressed outer edges introduce fine optical noise that low-resolution lenses or angled cameras can misread as module damage.',
-              'Circuit: Angular traces create visual bridges between neighboring modules, making grid alignment harder in poor lighting.',
-              'Starburst: Tapered star points reduce the effective ink coverage in module centers, demanding sharper lens focus.',
+              ['Standard (Standard Industrial)', 'Solid square modules with sharp corners', 'Highest scanner compatibility, small labels, long distances'],
+              ['Modern (Modern Soft)', 'Rounded squares with softened corners', 'Business cards, product packaging, clean interfaces'],
+              ['Swiss (Swiss Dot)', 'Separated circular dots on a regular grid', 'Editorial layouts, menus, minimalist print'],
+              ['Fluid (Fluid Ink)', 'Connected liquid contours across adjacent dark modules', 'Brand campaigns, modern labels, medium-to-large print'],
+              ['Circuit (Cyber Circuit)', 'Angular traces and circuit-board interconnects', 'Hardware, developer events, large high-contrast signs'],
+              ['Hive (The Hive)', 'Hexagonal honeycomb cells', 'Craft goods, geometric packaging, posters'],
+              ['Grunge', 'Distressed edges with irregular texture', 'Posters and merchandise printed at 3.5 cm wide or larger'],
+              ['Starburst', 'Faceted four-point star modules', 'Large event flyers and high-contrast promotional displays'],
             ],
           },
           {
             type: 'note',
-            title: 'Recommendations for low-reliability patterns',
-            text: 'When using Grunge, Circuit, or Starburst styles, set error correction to Level Q (25%) or Level H (30%), avoid subtle color gradients, print at least 35 mm (1.4 inches) wide, and verify physical test proofs using the [QR code checker](/qr-code-checker) before full production.',
+            title: 'Extra care for Grunge, Circuit, and Starburst',
+            text: 'Grunge, Circuit, and Starburst reduce ink fill or add fine edge detail that angled or low-light cameras can misread. When selecting them, use Error Correction Level Q or H, skip subtle gradients, print at least 3.5 cm (1.4 in) wide, and verify a physical proof with the [QR code checker](/qr-code-checker).',
+          },
+          {
+            type: 'p',
+            text: 'Below the pattern grid, Eye Shape controls the three corner finder targets. Each finder target has an outer 7x7 Frame and an inner 3x3 Ball, and both Frame and Ball can be set together or independently to five options: Pattern (matches the active module pattern), Square, Rounded, Circle, or Leaf. When Leaf is chosen, each corner eye rotates so its sharp diagonal axis points inward toward the center of the matrix.',
           },
         ],
       },
       {
-        id: 'locator-eyes',
-        heading: 'Locator eye frame and ball geometries',
+        id: 'colors-gradients-and-contrast',
+        heading: 'Color presets, gradients, transparency and the 4.5:1 rule',
         blocks: [
           {
             type: 'p',
-            text: 'The three large square targets in the corners of every QR code are locator eyes (also called finder patterns). Camera software searches for their concentric 1:1:3:1:1 black-and-white module ratio to determine the code’s position, orientation, and angle.',
-          },
-          {
-            type: 'p',
-            text: 'Each eye consists of an outer 7x7 module frame and an inner 3x3 module ball. QRCraftly lets you configure frame and ball geometries together or independently across four options:',
+            text: 'Camera decoders convert your code to grayscale luminance to separate dark modules from light spaces. All foreground elements should maintain at least a 4.5:1 contrast ratio against the background, matching the WCAG 2.1 Level AA contrast formula.',
           },
           {
             type: 'ul',
             items: [
-              'Square: Traditional sharp-cornered frame and ball matching standard ISO symbology.',
-              'Rounded: Smooth outer corners that soften the silhouette while preserving the inner module ratio.',
-              'Circle: Concentric circular ring and solid circular center for rounded, modern designs.',
-              'Leaf: Organic teardrop styling with two sharp opposing corners and two rounded corners.',
-            ],
-          },
-          {
-            type: 'p',
-            text: 'When no custom eye shape is selected, the eyes automatically adopt the visual character of the chosen pattern style. When you select the Leaf shape, each corner eye dynamically points its sharp diagonal axis toward the center of the code, maintaining natural geometric harmony.',
-          },
-        ],
-      },
-      {
-        id: 'contrast-rules',
-        heading: 'Color contrast and the 4.5:1 rule',
-        blocks: [
-          {
-            type: 'p',
-            text: 'Camera sensors do not perceive color the way human eyes do; they convert incoming light into relative luminance values to separate dark modules from light modules. If the luminance difference is too small, the scanner cannot differentiate binary data.',
-          },
-          {
-            type: 'p',
-            text: 'To guarantee universal scanning, all color combinations must meet a minimum contrast ratio of 4.5:1. This standard aligns with the W3C Web Content Accessibility Guidelines (WCAG) 2.1 Level AA threshold for readable visual presentations.',
-          },
-          {
-            type: 'ul',
-            items: [
-              'Modules and Background: Foreground modules must maintain at least 4.5:1 contrast against the background surface. Never place pale yellow, light grey, or pastel foregrounds on white.',
-              'Locator Eye Contrast: Custom eye frames and balls must each satisfy 4.5:1 contrast against the background. Mismatched eye contrast causes cameras to miss the entire symbol.',
-              'Gradient Color Stops: Linear gradients transition smoothly between start and end color stops. Every stop along the gradient must independently meet the 4.5:1 threshold against the background.',
-              'Quiet Zone: The four-module clear margin surrounding the code must remain unpatterned and match the light background color to prevent neighboring graphic elements from bleeding into the finder rings.',
+              'Color Presets: Choose from 9 curated palettes that synchronize module, background, and finder eye colors in one click.',
+              'Transparent Background: Turn on Transparent Background to export background-free PNG, WebP, or SVG artwork for placement over light surfaces in your own layout tool. Make sure the surface behind the placed code stays light and plain across the entire quiet zone.',
+              'Fill Mode and Gradient Angle: Switch Foreground Modules between Solid, Linear, and Radial fill modes. Solid uses a single Color; Linear blends Start Color into End Color across a Gradient Angle from 0° to 360° (in 15° steps); Radial blends Start Color at the center toward End Color at the outer edges.',
+              'Custom Eye Colors: Eye Frame and Eye Ball each accept an independent hex color so corner targets can carry a brand accent while data modules stay dark.',
+              'Fix contrast auto-adjustment: Whenever module colors, gradient stops, or custom eye colors drop below 4.5:1 against the background (or invert light modules onto a dark background), a warning banner appears with a “Fix contrast” button that darkens foreground stops and lightens the background to a scannable ratio automatically.',
             ],
           },
           {
             type: 'note',
-            title: 'Dark backgrounds and inverted codes',
-            text: 'While inverted QR codes (light modules on dark surfaces) are popular in screen designs, many older or budget smartphone cameras fail to recognize inverted finders. For broad public use in print, always use dark modules on a light background.',
+            title: 'Avoid inverted colors in public print',
+            text: 'Light modules on a dark background fail in several older camera apps and handheld barcode readers. Keep dark modules on a light background for any code printed for the public.',
           },
         ],
       },
       {
-        id: 'logo-limits',
-        heading: 'Embedding logos and upload safeguards',
+        id: 'layout-border-and-frames',
+        heading: 'Export Layout, Border and Frame & CTA Badge controls',
         blocks: [
           {
             type: 'p',
-            text: 'Adding a company logo or emblem reinforces brand recognition and helps people trust where the code leads. You can create a branded code using our [QR code with logo](/qr-code-with-logo) tool. However, placing an image over modules deliberately obscures underlying data.',
+            text: 'The Layout & Border accordion groups three outer presentation layers that wrap around the QR code without altering its internal matrix:',
           },
           {
+            type: 'table',
+            caption: 'Outer layout, border, and CTA badge parameters',
+            head: ['Control group', 'Available options and ranges', 'Behavior and scan notes'],
+            rows: [
+              ['Export Layout', 'Aspect ratios: Square (1:1), Portrait (4:5), Story (9:16). Templates: None, Minimalist, Gradient, Solid Frame, and Wi-Fi Card. QR Scale: 50% to 150% (default 100%).', 'Adds a styled card canvas with optional Headline and Subtext. Wi-Fi Card is available for Wi-Fi codes and resets to Solid Frame if you switch to another QR type. Template Background and Template Text Color each toggle between Inherit and Custom (checked against 4.5:1 text contrast).'],
+              ['Border', 'Enable Border switch. Border Style: Solid, Dashed, Dotted, Double. Border Width: 1.0% to 15.0% (default 5.0%). Border Color, Border text (Top Center or Bottom Center) with Border Text Color, plus secondary border logo (Bottom Center or Bottom Right).', 'Drawn outside the quiet zone margin so a dark border never touches or crowds the three corner finder patterns. Secondary border logos accept JPEG, PNG, WebP, or SVG up to 2 MB via Add Logo / Change, and Border Text Color warns below 4.5:1 against Solid borders.'],
+              ['Frame & CTA Badge', 'Frame Shape: None, Pill Badge, Banner Bar, Speech Bubble, Full Card. Position: Bottom, Top, Left, Right (4 positions). Badge Icon: None plus 6 icons (QR Scan, Camera, Star, Heart, Info, Phone). Call-to-Action Text with 4 presets (SCAN ME, VISIT US, DOWNLOAD APP, VIEW MENU). Badge Font: 5 options (Sans Serif, Serif, Monospace, Display, Cursive).', 'Pairs a call-to-action label with Frame Background and Text & Icon Color (checked for 4.5:1 contrast). Note that PDF and EPS vector exports always substitute Helvetica for Badge Font so print prepress Rip workflows never fail on missing system fonts.'],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'logos-and-cutout-math',
+        heading: 'Center logos, width caps and per-ECC cutout clamping',
+        blocks: [
+          {
             type: 'p',
-            text: 'QRCraftly enforces client-side safeguards to protect performance, privacy, and code readability:',
+            text: 'Placing a mark in the center of a QR code intentionally hides interior modules, relying on Reed-Solomon error correction to reconstruct the covered data. You can start directly on the [QR code with logo](/qr-code-with-logo) page or open the Logo panel in the studio.',
           },
           {
             type: 'ul',
             items: [
-              'File Upload Limit: Image uploads are strictly capped at 2 MB. All processing occurs securely within your browser; nothing is uploaded to external servers.',
-              'Allowed File Types: Logos must be in JPEG, PNG, WebP, or SVG format. Vector SVG logos provide the sharpest results across both small and large exports.',
-              '30 Percent Area Cap: Embedded logos cannot cover more than 30 percent of the total code area. Going beyond this limit destroys too many modules for error correction to reconstruct.',
-              'Error Correction Level H: Because an embedded logo consumes error correction budget, always select Level H (recovers up to 30% of missing data) or Level Q (recovers up to 25%). Learn more in our [error correction explained](/guides/qr-code-error-correction-explained) guide.',
-              'Protective Backing Margin: The generator adds a clear padding border around your logo so surrounding data modules do not visually merge with logo edges.',
+              'Preset SVG marks and custom uploads: Pick from 11 built-in generic SVG marks organized across Social, Messaging, Payment, and General categories (Network, Profile, Video, Chat, Send, Card, Bitcoin, Website, Email, Phone, and Location), or upload a JPEG, PNG, WebP, or SVG file up to 2 MB. Uploaded files stay in browser memory and are never sent to a server.',
+              'Automatic Level H promotion: Selecting a preset mark or uploading a custom logo automatically sets Error Correction Level to H (High, ~30% recovery) so the code has maximum repair capacity.',
+              '10% to 30% side-width cap (9% unpadded area): The Size slider sets logo width from 10% to 30% of the QR matrix side length (default 20%). Because area scales with width squared, a 30% width cap covers 9% of the unpadded matrix area, not 30% of total area.',
+              'Backing shape and Padding: Border Style places a Square, Circle, or None backing behind the logo in your chosen Background Color. When Square or Circle is active, Padding adjusts the clear gap around the logo from 0.5 to 4 modules (default 1 module; values below 0.5 clamp to 0.5 so the backing remains visible).',
+              'Per-ECC safe cutout clamping: Before drawing, the matrix layout engine clamps the combined cutout width (logo width plus backing padding on both sides) to safe per-level ceilings of the matrix side width: 22% at Level L, 35% at Level M, 42% at Level Q, and 50% at Level H. If logo size plus padding exceeds your current level’s ceiling, both scale down proportionally so finder and timing structures survive.',
             ],
           },
         ],
       },
       {
-        id: 'export-formats',
-        heading: 'Raster versus vector export formats',
+        id: 'mosaic-image-tiling',
+        heading: 'Mosaic image tiling: Halftone versus Tiles',
         blocks: [
           {
             type: 'p',
-            text: 'Choosing the right download format ensures your QR code looks razor-sharp whether displayed on a mobile screen, printed on a business card, or scaled across a billboard:',
+            text: 'Inside the Logo accordion, the Mosaic section blends a photograph or illustration across the QR matrix in your browser (also available on the [image QR code](/mosaic-qr-code) page). Uploads accept JPEG, PNG, WebP, or SVG up to 2 MB, stay strictly in volatile browser memory, and automatically promote Error Correction Level to H.',
           },
           {
-            type: 'table',
-            caption: 'Export formats and recommended applications',
-            head: ['Format', 'Type', 'Best use cases', 'Key characteristics'],
-            rows: [
-              ['PNG', 'Raster', 'Websites, email signatures, presentation decks', 'Lossless compression with full alpha transparency support.'],
-              ['SVG', 'Vector', 'Web development, UI design, print production', 'Infinitely scalable without pixelation; editable in design software.'],
-              ['EPS', 'Vector', 'Commercial print shops, signage, apparel', 'Standard vector exchange format for professional commercial prepress.'],
-              ['PDF', 'Vector', 'Direct printing, documentation, client proofs', 'Self-contained, vector-accurate document for print and distribution.'],
-              ['JPEG', 'Raster', 'Legacy document systems, simple web images', 'Smallest raster file size; solid background with no transparency.'],
-              ['WebP', 'Raster', 'Modern websites, web applications, mobile apps', 'Modern web standard delivering small file sizes and high image clarity.'],
+            type: 'ul',
+            items: [
+              'Halftone (3x3 sub-cells with Mosaic Core): The default Halftone mode splits each interior data module into a 3x3 grid of sub-cells. The center sub-cell—the Mosaic Core—is locked to strict dark-or-light luminance contrast so cameras read the binary bit accurately, while the 8 surrounding sub-cells preserve full-color detail from your picture.',
+              'Tiles (1x1 whole-module color): Tiles mode assigns a single luminance-clamped color to each 1x1 data module. It shows less fine picture detail than Halftone, but creates bolder blocks that scan from further away or on smaller prints.',
+              'Protected function patterns: In both Mosaic Layout modes, Structural function modules—the three corner finder patterns, their white separators, timing lines, alignment targets, and format/version cells—are never subdivided and always render as whole high-contrast tiles.',
+              'Scan Contrast slider: Scan Contrast runs from 0% to 100% (default 50%), tightening the luminance floor and ceiling of dark and light modules from roughly 5:1 core contrast at 0% up to roughly 13:1 at 100%. Raise Scan Contrast first if the scan badge reports “Scans, but fragile”.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'advanced-mode',
+        heading: 'Advanced Mode: Error Correction Level and Quiet Zone Margin',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Opening Advanced Mode exposes two low-level symbology parameters that govern matrix density and outer blank space:',
+          },
+          {
+            type: 'ul',
+            items: [
+              'Error Correction Level: Choose Low (~7%) [L], Medium (~15%) [M], Quartile (~25%) [Q], or High (~30%) [H]. Higher levels restore more covered or scuffed modules at the cost of a denser grid; see [error correction explained](/guides/qr-code-error-correction-explained) for how Reed-Solomon recovery works.',
+              'Quiet Zone Margin (modules): Adjusts the blank margin around the QR matrix from 2 to 10 modules (default 4 modules). ISO/IEC 18004 specifies at least 4 modules on all four sides. Lowering the slider to 2 or 3 modules helps fit tight digital cards you test yourself, while 4 or more modules is recommended for all print runs. Phone wallet cards exported from Download options always enforce a fixed 4-module quiet zone.',
             ],
           },
           {
             type: 'p',
-            text: 'For raster downloads (PNG, JPEG, WebP), presets are available for Screen (512 px), Print (2048 px), and Poster (4096 px), or you can specify custom widths from 128 px to 8192 px. For professional print, always favor vector formats (SVG, EPS, PDF) to eliminate raster scaling artifacts, as detailed in our guide on [how to print a QR code that scans](/guides/how-to-print-a-qr-code-that-scans).',
+            text: 'Once your appearance settings pass the live scan check (“Scans reliably”), read [export formats and phone wallets](/guides/qr-code-export-and-wallet-options) to pick between PNG, SVG, EPS, PDF, JPEG, WebP, CMYK prepress output, and phone wallet cards.',
           },
         ],
       },
@@ -1754,20 +1754,183 @@ console.log(\`Prism session ready, symbol size: \${session.symbolSize} bytes\`);
       {
         label: 'ISO/IEC 18004:2015, “Information technology — Automatic identification and data capture techniques — QR Code bar code symbology specification”',
         url: 'https://www.iso.org/standard/62021.html',
-        supports: 'Symbology structure, locator finder patterns, module grid definitions, and Reed-Solomon error correction capacities.',
+        supports: 'Symbology structure, locator finder patterns, quiet zone width of four modules, and Reed-Solomon error correction capacities.',
       },
       {
         label: 'W3C, “Web Content Accessibility Guidelines (WCAG) 2.1 — Guideline 1.4.3 Contrast (Minimum)”',
         url: 'https://www.w3.org/TR/WCAG21/#contrast-minimum',
-        supports: 'The 4.5:1 relative luminance contrast ratio requirement for visual readability.',
+        supports: 'The 4.5:1 relative luminance contrast ratio threshold enforced on modules, gradient stops, eye colors, and badge text.',
       },
       {
-        label: 'Denso Wave, “QR Code Technology and Finder Pattern Structure”, qrcode.com',
+        label: 'Denso Wave, “QR Code Standardization and Finder Pattern Structure”, qrcode.com',
         url: 'https://www.qrcode.com/en/about/standards.html',
-        supports: 'Finder pattern 1:1:3:1:1 module geometry and scanning synchronization standards.',
+        supports: 'Finder pattern 1:1:3:1:1 module geometry and scanning alignment rules.',
+      },
+      {
+        label: 'QRCraftly ADR 0019, “Mosaic QR: Module-Level Image Tiling”, docs/adr/0019-mosaic-qr-module-level-image-tiling.md',
+        url: 'https://github.com/fderuiter/QRCraftly-web/blob/HEAD/docs/adr/0019-mosaic-qr-module-level-image-tiling.md',
+        supports: '3x3 Halftone Mosaic Core sub-cell geometry, 1x1 Tiles mode, protected function modules, and luminance contrast clamping.',
       },
     ],
-    related: ['how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained', 'static-vs-dynamic-qr-codes'],
+    related: ['qr-code-export-and-wallet-options', 'how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained'],
+  },
+  {
+    slug: 'qr-code-export-and-wallet-options',
+    title: 'QR code export and phone wallet guide: formats, CMYK prepress and wallet cards',
+    shortTitle: 'Export formats and phone wallets',
+    seoTitle: 'QR Code Export Formats, CMYK Prepress & Wallet Cards | QRCraftly',
+    description:
+      'Reference for QR code downloads: PNG, SVG, EPS, PDF, JPEG and WebP, 128 to 8192 px sizes, CMYK vector prepress, clipboard copy and phone wallet cards.',
+    lead: 'Choosing the right export setting keeps a QR code crisp on screens, commercial printing presses, and phone lock screens. This reference covers all six download formats in QRCraftly, pixel size presets, RGB and CMYK vector prepress rules, clipboard actions, and client-side phone wallet cards and passes.',
+    datePublished: '2026-11-19',
+    dateModified: '2026-11-19',
+    sections: [
+      {
+        id: 'download-formats',
+        heading: 'The six download formats compared',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Opening Download options next to the main Download button lets you switch Format across three raster image types and three resolution-independent vector types, all generated locally in your browser:',
+          },
+          {
+            type: 'table',
+            caption: 'QRCraftly download formats and characteristics',
+            head: ['Format', 'Kind', 'Transparency and color', 'Best suited for'],
+            rows: [
+              ['PNG', 'Raster', 'RGB with full alpha transparency when Transparent Background is on', 'General web images, slides, documents, and messaging apps'],
+              ['SVG', 'Vector', 'RGB vector paths and inline data-URL assets; supports Transparent Background', 'Design software (Figma, Illustrator, Inkscape, Affinity), responsive web pages, and sharp print layouts'],
+              ['EPS', 'Vector', 'RGB or CMYK Color Space; solid light backing; logos embedded as raster images', 'Commercial print shops, signage RIP software, packaging, and legacy prepress workflows'],
+              ['PDF', 'Vector', 'RGB or CMYK Color Space; self-contained vector page; logos embedded as raster images', 'Direct office or print-shop delivery, proofs, and multi-page print layouts'],
+              ['JPEG', 'Raster', 'RGB only, always opaque with no alpha channel', 'Smallest file size for older CMS uploads and email attachments'],
+              ['WebP', 'Raster', 'RGB with alpha transparency support and compact compression', 'Modern websites and mobile apps where fast page load matters'],
+            ],
+          },
+          {
+            type: 'p',
+            text: 'You can set the base download name in the File name field before exporting; QRCraftly appends the matching file extension automatically.',
+          },
+        ],
+      },
+      {
+        id: 'raster-sizes-and-print-scale',
+        heading: 'Raster pixel sizes and 300 dpi print widths',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Vector formats (SVG, EPS, and PDF) describe mathematical paths rather than pixels, so they stay sharp at any physical dimension. When you pick a raster format (PNG, JPEG, or WebP), the Size control offers three presets plus a Custom pixel width:',
+          },
+          {
+            type: 'table',
+            caption: 'Raster Size presets, custom range, and 300 dpi print equivalents',
+            head: ['Size option', 'Width in pixels', 'Printed width at 300 dpi', 'Approximate scan distance'],
+            rows: [
+              ['Screen', '512 px', '4.3 cm (1.7 in)', 'About 0.4 m, plus crisp display on phones and laptops'],
+              ['Print', '2048 px', '17.3 cm (6.8 in)', 'About 1.7 m (flyers, table tents, and handouts)'],
+              ['Poster', '4096 px', '34.7 cm (13.7 in)', 'About 3.5 m (posters and shop windows)'],
+              ['Custom', '128 to 8192 px', '1.1 cm (0.4 in) up to 69.4 cm (27.3 in)', 'Roughly 10 times the printed width'],
+            ],
+          },
+          {
+            type: 'p',
+            text: 'Typing a number outside the supported range into Width in pixels clamps automatically to the nearest boundary between 128 and 8192 pixels. To work out the exact physical width for your payload density and viewing distance before printing, use the [QR code size calculator](/qr-code-size-calculator).',
+          },
+        ],
+      },
+      {
+        id: 'vector-prepress-and-cmyk',
+        heading: 'CMYK prepress rules and clipboard actions',
+        blocks: [
+          {
+            type: 'p',
+            text: 'When Format is set to EPS or PDF, Download options reveals a Color Space toggle with two modes:',
+          },
+          {
+            type: 'ul',
+            items: [
+              'RGB: Standard digital color space for screen viewing, office laser printers, and digital workflows.',
+              'CMYK: Four-color process output for commercial offset and digital presses, converting module, eye, border, and frame colors directly into cyan, magenta, yellow, and key (black) channels so your print shop does not perform an unexpected RGB conversion.',
+              'Helvetica badge substitution and embedded logos: Both EPS and PDF always substitute Helvetica for Frame & CTA Badge text so prepress RIP systems never substitute or drop missing fonts, and both rasterize uploaded center or border logos into embedded images inside the vector document. Keep SVG if you need editable custom font names or raw vector logo paths (also available on the [SVG QR code](/svg-qr-code) page).',
+            ],
+          },
+          {
+            type: 'p',
+            text: 'Below the File name field, two one-click clipboard buttons let you skip saving a file altogether:',
+          },
+          {
+            type: 'ul',
+            items: [
+              '“Copy image”: Renders a crisp PNG of your styled code and copies the bitmap straight to your clipboard for pasting into slides, documents, or chat messages.',
+              '“Copy as SVG”: Generates self-contained vector SVG XML markup and copies the text to your clipboard for pasting inline into HTML, React components, Figma, or Illustrator.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'phone-wallet-cards',
+        heading: 'Add to phone wallet: 1080x1920 Wallet Cards',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Clicking “Add to phone wallet” in Download options opens a client-side dialog that builds a lock-screen-ready Wallet Card PNG on your device with zero server uploads:',
+          },
+          {
+            type: 'ul',
+            items: [
+              '1080x1920 PNG layout and fixed 4-module quiet zone: The generator renders a 1080 × 1920 px portrait PNG card featuring a plain black-on-white QR code with a fixed 4-module quiet zone below an optional Title (up to 60 characters, prefilled from your Wi-Fi network name, domain, or QR type) and Subtitle (optional) (up to 80 characters). Decorative colors and logos are intentionally omitted on the card so another phone’s camera can read it off a dim or angled screen.',
+              'Optical scannability gate: Before enabling “Download PNG” or “Share to phone”, QRCraftly runs an on-device optical decode check against the rendered 1080x1920 canvas. If a very dense payload fails verification, saving is blocked until you shorten the content.',
+              'Android and iPhone steps: On Android, open Google Wallet, tap Add to Wallet, choose Photo, and pick the downloaded Wallet Card image to create a pass from the photo. On iPhone, save the image to Photos (or share it via AirDrop) and pin it in Favorites, a dedicated album, or a Photos widget—Apple Wallet only accepts Apple-signed .pkpass bundles, not plain images.',
+              'Payment and Bulk CSV refusals: Wallet export refuses Payment QR codes because a payment request accessible from a locked screen poses an unauthorized-charge risk, and refuses Bulk CSV mode because a wallet card holds a single QR code at a time.',
+            ],
+          },
+        ],
+      },
+      {
+        id: 'signed-developer-passes',
+        heading: 'Signed Apple Wallet (.pkpass) and Google Wallet passes (Beta)',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Apple Wallet and Google Wallet require cryptographic signatures from paid developer accounts to install native passes. Because QRCraftly runs no backend server and never holds shared signing keys or sees your QR content, native pass signing is offered through the collapsed Beta section labeled “Have your own Apple or Google developer keys?” inside the wallet dialog:',
+          },
+          {
+            type: 'ul',
+            items: [
+              'Apple Wallet pass (.pkpass): Supply your own Apple Pass Type ID certificate (.pem or .cer), the Apple WWDR G4 certificate, and your unencrypted private key (.pem), along with your Pass Type Identifier, Team Identifier, and Organization Name. Your browser assembles and CMS-signs the .pkpass archive locally using Web Crypto and downloads it straight to your device.',
+              'Google Wallet pass (JWT save link): Supply your own Google Cloud service-account JSON key file and Google Wallet Issuer ID. Your browser signs the Generic pass JWT locally with RS256 and produces a “Save to Google Wallet” link (wallet.google.com/gp/v/save/...). Because that link carries the encoded payload to Google when opened, only click it if you intend to store the pass with Google.',
+              'Volatile key handling: Certificates and private keys stay strictly in volatile browser memory while the dialog is open, are never written to localStorage or IndexedDB, and are discarded as soon as the dialog closes.',
+            ],
+          },
+          {
+            type: 'p',
+            text: 'For print sizing and proof testing once your file is exported, continue to [how to print a QR code that scans](/guides/how-to-print-a-qr-code-that-scans).',
+          },
+        ],
+      },
+    ],
+    sources: [
+      {
+        label: 'QRCraftly ADR 0048, “Wallet Passes Built in the Browser”, docs/adr/0048-wallet-passes-built-in-the-browser.md',
+        url: 'https://github.com/fderuiter/QRCraftly-web/blob/HEAD/docs/adr/0048-wallet-passes-built-in-the-browser.md',
+        supports: 'Client-side 1080x1920 PNG Wallet Card design, Payment and Bulk CSV refusal rules, and browser-only .pkpass and Google Wallet JWT signing.',
+      },
+      {
+        label: 'W3C, “Scalable Vector Graphics (SVG) 1.1 (Second Edition)”',
+        url: 'https://www.w3.org/TR/SVG11/',
+        supports: 'Resolution-independent XML vector geometry used by Download SVG and Copy as SVG.',
+      },
+      {
+        label: 'ISO/IEC 18004:2015, “Information technology — Automatic identification and data capture techniques — QR Code bar code symbology specification”',
+        url: 'https://www.iso.org/standard/62021.html',
+        supports: 'Four-module quiet zone standard enforced on Wallet Cards and recommended for print exports.',
+      },
+      {
+        label: 'Google Wallet Help, “Add items to Google Wallet with a photo”',
+        url: 'https://support.google.com/wallet/answer/12060039',
+        supports: 'Creating a Google Wallet pass on Android from a saved barcode or QR photo.',
+      },
+    ],
+    related: ['qr-code-customization-parameters', 'how-to-print-a-qr-code-that-scans', 'qr-code-scams-quishing'],
   },
 ];
 
