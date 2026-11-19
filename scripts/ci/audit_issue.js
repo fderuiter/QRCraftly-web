@@ -102,6 +102,28 @@ function readAuditReport() {
 }
 
 /**
+ * Resolves the overall outcome from Node and Python audit outcomes.
+ * @param {string} [nodeOutcome]
+ * @param {string} [pythonOutcome]
+ * @returns {string}
+ */
+export function resolveAuditOutcome(nodeOutcome, pythonOutcome) {
+  if (nodeOutcome === 'failure' || pythonOutcome === 'failure') {
+    return 'failure';
+  }
+  if (nodeOutcome === 'cancelled' || pythonOutcome === 'cancelled') {
+    return 'cancelled';
+  }
+  if (nodeOutcome === 'success' && (!pythonOutcome || pythonOutcome === 'success')) {
+    return 'success';
+  }
+  if (pythonOutcome === 'success' && (!nodeOutcome || nodeOutcome === 'success')) {
+    return 'success';
+  }
+  return nodeOutcome || pythonOutcome || '';
+}
+
+/**
  * Finds the open audit alert's number, or null.
  * @param {(args: string[]) => string} gh
  * @param {string} [marker] Hidden marker that identifies the alert issue.
@@ -113,16 +135,17 @@ export function findOpenAlert(gh, marker = MARKER) {
 
 /**
  * Opens, updates or closes the alert issue for one audit outcome.
- * @param {{ outcome: string, runUrl: string, gh?: (args: string[]) => string,
+ * @param {{ outcome?: string, pythonOutcome?: string, runUrl: string, gh?: (args: string[]) => string,
  *   readReport?: () => string | null, log?: (message: string) => void }} options
  * @returns {'opened' | 'commented' | 'closed' | 'none'}
  */
-export function syncAuditIssue({ outcome, runUrl, gh = runGh, readReport = readAuditReport, log = console.log }) {
+export function syncAuditIssue({ outcome, pythonOutcome, runUrl, gh = runGh, readReport = readAuditReport, log = console.log }) {
+  const resolvedOutcome = resolveAuditOutcome(outcome, pythonOutcome);
   // Read the report only for a failure, and only once.
   let summary = null;
   const failureSummary = () => (summary ??= summarizeAudit(readReport()));
   return syncAlertIssue({
-    outcome,
+    outcome: resolvedOutcome,
     runUrl,
     gh,
     log,
@@ -148,5 +171,9 @@ export function syncAuditIssue({ outcome, runUrl, gh = runGh, readReport = readA
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === fs.realpathSync(process.argv[1])) {
-  syncAuditIssue({ outcome: process.env.AUDIT_OUTCOME ?? '', runUrl: process.env.RUN_URL ?? '' });
+  syncAuditIssue({
+    outcome: process.env.AUDIT_OUTCOME ?? '',
+    pythonOutcome: process.env.PYTHON_AUDIT_OUTCOME ?? '',
+    runUrl: process.env.RUN_URL ?? '',
+  });
 }

@@ -198,7 +198,7 @@ describe('scheduled dependency audit alert', () => {
   });
 
   it('still fails the job when the audit fails', () => {
-    expect(workflow).toContain("if: steps.audit.outcome == 'failure'");
+    expect(workflow).toContain("if: steps.audit.outcome == 'failure' || steps.python_audit.outcome == 'failure'");
     expect(workflow).toContain('exit 1');
   });
 });

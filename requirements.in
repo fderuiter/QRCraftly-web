@@ -1,1 +1,2 @@
 semgrep==1.185.0
+pip-audit==2.10.1
