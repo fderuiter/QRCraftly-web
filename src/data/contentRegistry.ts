@@ -616,10 +616,20 @@ export const auxiliaryRegistry: Record<string, AuxiliaryContent> = {
   "guides/qr-code-customization-parameters": {
     "id": "guides/qr-code-customization-parameters",
     "name": "QR code customization guide",
-    "seoTitle": "QR Code Customization Guide: Styles, Contrast & Formats | QRCraftly",
-    "description": "Complete reference for QR code visual styling: 8 pattern styles, locator eye shapes, 4.5:1 contrast rules, logo sizing caps, and export formats.",
+    "seoTitle": "QR Code Customization Guide: Styles, Colors & Logos | QRCraftly",
+    "description": "Reference for QR code visual styling: templates, 8 patterns, gradients, 4.5:1 contrast, layouts, borders, CTA frames, logo width caps and Mosaic.",
     "image": "/og/guides-qr-code-customization-parameters.png",
     "imageAlt": "QR code customization guide",
+    "personas": [TargetPersona.SecurityConsciousEnterprise],
+    "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty
+  },
+  "guides/qr-code-export-and-wallet-options": {
+    "id": "guides/qr-code-export-and-wallet-options",
+    "name": "Export formats and phone wallets",
+    "seoTitle": "QR Code Export Formats, CMYK Prepress & Wallet Cards | QRCraftly",
+    "description": "Reference for QR code downloads: PNG, SVG, EPS, PDF, JPEG and WebP, 128 to 8192 px sizes, CMYK vector prepress, clipboard copy and phone wallet cards.",
+    "image": "/og/guides-qr-code-export-and-wallet-options.png",
+    "imageAlt": "Export formats and phone wallets",
     "personas": [TargetPersona.SecurityConsciousEnterprise],
     "valueProposition": StrategicValueCategory.ZeroTransitPrivacySovereignty
   },

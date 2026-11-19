@@ -50,6 +50,14 @@ describe('GuideArticle', () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
+  it('renders the qr-code-export-and-wallet-options guide without axe violations', async () => {
+    const article = getGuideArticle('qr-code-export-and-wallet-options')!;
+    expect(article).toBeDefined();
+    const { container } = render(<GuideArticle article={article} />);
+    expect(screen.getByRole('heading', { level: 1, name: article.guide.title })).toBeInTheDocument();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
   it('links the related guides it is given (#1597)', () => {
     const article = getGuideArticle(guides[0].slug)!;
     render(<GuideArticle article={article} />);
