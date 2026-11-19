@@ -174,9 +174,11 @@ describe('BulkCsvInput Component', () => {
     const formatSelect = screen.getByLabelText('Image Format');
     expect(formatSelect).toHaveValue('png');
 
-    // Accessibility test: aria-describedby linkage
+    // Accessibility test: aria-describedby linkage and select attributes
     expect(payloadSelect).toHaveAttribute('aria-describedby', 'bulk-payload-column-desc');
     expect(filenameSelect).toHaveAttribute('aria-describedby', 'bulk-filename-column-desc');
+    expect(payloadSelect).not.toHaveAttribute('data-testid');
+    expect(filenameSelect).not.toHaveAttribute('data-testid');
     expect(document.getElementById('bulk-payload-column-desc')).toHaveTextContent('Auto-matched column choice');
     expect(document.getElementById('bulk-filename-column-desc')).toHaveTextContent('Auto-matched column choice');
   });
@@ -1002,16 +1004,35 @@ describe('Interactive CSV Column Mapping UI', () => {
   });
 
   it('updates badge to Mapped when a column is manually chosen', () => {
-    const csvContent = 'promo_link,member_id\nhttps://example.com/promo1,MEM001';
+    const csvContent = 'promo_link,member_id,extra_col,notes\nhttps://example.com/promo1,MEM001,EXT1,Note1';
     const onChange = vi.fn();
     renderWithProvider(
       <BulkCsvInput
-        data={{ csvContent, payloadColumn: 'member_id', filenameColumn: 'promo_link', exportFormat: 'png' }}
+        data={{ csvContent, payloadColumn: 'member_id', filenameColumn: 'notes', exportFormat: 'png' }}
         onChange={onChange}
       />
     );
 
     expect(screen.getByTestId('payload-mapped-badge')).toHaveTextContent('Mapped');
+    expect(screen.getByTestId('filename-mapped-badge')).toHaveTextContent('Mapped');
+    expect(document.getElementById('bulk-payload-column-desc')).toHaveTextContent('Manually mapped column choice');
+    expect(document.getElementById('bulk-filename-column-desc')).toHaveTextContent('Manually mapped column choice');
+    expect(within(screen.getByLabelText('Content Column')).queryByRole('option', { name: '(None)' })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('File Name Column')).queryByRole('option', { name: '(None)' })).not.toBeInTheDocument();
+    expect(screen.getByText('File Name')).toHaveClass('text-fg-soft');
+  });
+
+  it('displays (empty) in sample previews when first-row cells are blank', () => {
+    const csvContent = 'URL,Name,Notes\n,,first-row-note\nhttps://example.com/2,Code2,ok';
+    renderWithProvider(
+      <BulkCsvInput
+        data={{ csvContent, payloadColumn: 'URL', filenameColumn: 'Name', exportFormat: 'png' }}
+        onChange={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('bulk-payload-sample-preview')).toHaveTextContent('(empty)');
+    expect(screen.getByTestId('bulk-filename-sample-preview')).toHaveTextContent('(empty)');
   });
 
   it('swaps payload and filename columns when Swap Columns button is clicked', () => {
@@ -1288,6 +1309,19 @@ describe('Excel Spreadsheet Parsing (.xlsx)', () => {
       expect(screen.getByTestId('bulk-contact-phone-auto-matched-badge')).toBeInTheDocument();
       expect(screen.getByTestId('bulk-contact-email-auto-matched-badge')).toBeInTheDocument();
       expect(screen.getByTestId('bulk-contact-organization-auto-matched-badge')).toBeInTheDocument();
+      expect(screen.getByTestId('filename-auto-matched-badge')).toHaveTextContent('Auto-matched');
+
+      expect(firstNameSelect).toHaveAttribute('data-testid', 'bulk-contact-firstname');
+      expect(firstNameSelect).not.toHaveAttribute('aria-describedby');
+      expect(within(firstNameSelect).getByRole('option', { name: '(None)' })).toHaveValue('');
+
+      expect(fileSelect).toHaveAttribute('aria-describedby', 'bulk-filename-column-desc');
+      expect(fileSelect).not.toHaveAttribute('data-testid');
+      expect(document.getElementById('bulk-filename-column-desc')).toHaveTextContent('Auto-matched column choice');
+      expect(screen.getByText('File Name')).toHaveClass('text-fg-soft');
+
+      expect(screen.getByTestId('bulk-contact-firstname-sample-preview')).toHaveTextContent('Jane');
+      expect(screen.getByTestId('bulk-filename-sample-preview')).toHaveTextContent('ID001');
     });
 
     it('allows changing contact column mapping and updates mapping', () => {
@@ -1305,6 +1339,47 @@ describe('Excel Spreadsheet Parsing (.xlsx)', () => {
           contactMapping: expect.objectContaining({ organization: 'Role' }),
         })
       );
+    });
+
+    it('renders Mapped badges, Optional labels, blank cell previews, and manual filename status in contact mode', () => {
+      const blankFirstRowContactCsv = [
+        'First Name,Last Name,CustomDept,AltSlug,BadgeID',
+        ',Doe,Engineering,,ID001',
+        'Alice,Smith,Design,alice-slug,ID002',
+      ].join('\n');
+      const data: BulkCsvData = {
+        ...initialData,
+        csvContent: blankFirstRowContactCsv,
+        contentType: 'vcard',
+        filenameColumn: 'AltSlug',
+        contactMapping: {
+          firstName: 'First Name',
+          lastName: 'Last Name',
+          phone: '',
+          email: '',
+          organization: 'CustomDept',
+          title: '',
+        },
+      };
+      renderWithProvider(<BulkCsvInput data={data} onChange={vi.fn()} />);
+
+      // Manually mapped contact column displays Mapped badge and sample preview
+      expect(screen.getByTestId('bulk-contact-organization-mapped-badge')).toHaveTextContent('Mapped');
+      expect(screen.getByTestId('bulk-contact-organization-sample-preview')).toHaveTextContent('Engineering');
+
+      // Unmapped contact columns show Optional and hide sample previews
+      expect(screen.getAllByText('Optional')).toHaveLength(3);
+      expect(screen.queryByTestId('bulk-contact-phone-sample-preview')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('bulk-contact-email-sample-preview')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('bulk-contact-title-sample-preview')).not.toBeInTheDocument();
+
+      // Blank first-row cells in mapped contact and filename cards display (empty)
+      expect(screen.getByTestId('bulk-contact-firstname-sample-preview')).toHaveTextContent('(empty)');
+      expect(screen.getByTestId('bulk-filename-sample-preview')).toHaveTextContent('(empty)');
+
+      // Manually mapped filename column in contact mode shows Mapped badge and sr-only status
+      expect(screen.getByTestId('filename-mapped-badge')).toHaveTextContent('Mapped');
+      expect(document.getElementById('bulk-filename-column-desc')).toHaveTextContent('Manually mapped column choice');
     });
 
     it('flags rows without valid contact information in the preflight summary', () => {
