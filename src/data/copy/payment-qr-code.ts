@@ -7,8 +7,14 @@ export const copy: ToolCopy = {
     name: 'How to Create a Payment QR Code',
     description: 'Make a code that asks for a payment.',
     steps: [
-      { name: 'Pick the payment type', text: 'Choose a crypto network, a SEPA bank transfer, PayPal, Venmo or Cash App.' },
-      { name: 'Enter your details', text: 'Paste your address, IBAN or username, and an amount if you want one.' },
+      {
+        name: 'Pick the payment type',
+        text: 'Choose Bitcoin, Ethereum, Solana, Litecoin, SEPA Credit Transfer (EPC QR), UPI (India), PayPal, Venmo, Cash App, or Custom / Raw Address in Currency / Network.',
+      },
+      {
+        name: 'Enter the required details',
+        text: 'Enter your wallet address, username, SEPA IBAN and Beneficiary Name, or UPI ID and Payee Name, plus an optional amount.',
+      },
       { name: 'Download it', text: 'Save the code, then send a small test payment before you print it.' },
     ],
   },
@@ -16,7 +22,7 @@ export const copy: ToolCopy = {
     {
       question: 'Which payment types are supported?',
       answer:
-        'Bitcoin, Ethereum, Solana and Litecoin payment links (BIP 21 for Bitcoin, EIP-681 for Ethereum), SEPA credit transfers in the EPC QR format, PayPal.me, Venmo and Cash App links, and a custom option for any other payment link.',
+        'Bitcoin (BIP 21), Ethereum (EIP-681), Solana, and Litecoin payment requests, SEPA Credit Transfer (EPC QR, requiring IBAN and Beneficiary Name), UPI (India) requests in INR (upi://pay, requiring UPI ID and Payee Name), PayPal.me, Venmo, and Cash App links, plus Custom / Raw Address for any other payment URI.',
     },
     {
       question: 'Can I request a specific amount?',

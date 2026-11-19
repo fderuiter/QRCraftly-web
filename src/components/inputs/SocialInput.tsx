@@ -12,6 +12,7 @@ let yt: typeof import('@/packages/qr-payload/youtube') | null = null;
 
 export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
   const isYt = data.platform === SocialPlatform.YOUTUBE;
+  const isWa = data.platform === SocialPlatform.WHATSAPP;
   const [, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -22,6 +23,17 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
       });
     }
   }, [isYt]);
+
+  const handleLabel = isWa
+    ? 'Phone Number'
+    : isYt
+      ? yt?.YT_LABEL || 'Username / Channel / Video Link'
+      : 'Username / Handle';
+  const handlePlaceholder = isWa
+    ? '15551234567'
+    : isYt
+      ? yt?.YT_PLACEHOLDER || '@channel, video link, or channel ID'
+      : '@username';
 
   return (
     <FormBlock legend="Social Media Profile">
@@ -42,9 +54,10 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
       </SelectField>
       <TextField
         id="social-handle"
-        label={isYt ? yt?.YT_LABEL || 'Username / Channel / Video Link' : 'Username / Handle'}
-        type="text"
-        placeholder={isYt ? yt?.YT_PLACEHOLDER || '@channel, video link, or channel ID' : '@username'}
+        label={handleLabel}
+        type={isWa ? 'tel' : 'text'}
+        autoComplete={isWa ? 'tel' : undefined}
+        placeholder={handlePlaceholder}
         maxLength={isYt ? 256 : 64}
         value={data.handle}
         onChange={(e) => {
@@ -53,7 +66,7 @@ export const SocialInput: React.FC<SocialInputProps> = ({ data, onChange }) => {
         }}
         showCharCount
       />
-      {data.platform === SocialPlatform.WHATSAPP && (
+      {isWa && (
         <TextAreaField
           id="social-message"
           label="Pre-filled Message"

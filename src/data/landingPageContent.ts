@@ -309,24 +309,30 @@ export const landingPageContent: Record<string, LandingCopy> = {
   'whatsapp-qr-code': {
     howTo: {
       name: 'How to Make a WhatsApp QR Code',
-      description: 'Turn your WhatsApp number into a tap-to-chat code.',
+      description: 'Turn your WhatsApp number and optional greeting into a tap-to-chat code.',
       steps: [
-        { name: 'Add your number to the link', text: 'The box above starts with https://wa.me/. Add your number after it in international format, digits only: no plus sign, no spaces, no leading zeros. For example, https://wa.me/15551234567.' },
-        { name: 'Add a first message (optional)', text: 'To pre-fill a message, add ?text= and your message after the number, with spaces written as %20.' },
+        {
+          name: 'Enter your WhatsApp phone number',
+          text: 'Platform starts on WhatsApp. Type your number in Phone Number in international format, digits only: country code plus number, with no plus sign, spaces, dashes, or leading zeros (for example, 15551234567).',
+        },
+        {
+          name: 'Add a Pre-filled Message (optional)',
+          text: 'Type an opening greeting or question in Pre-filled Message. Spaces, punctuation, and line breaks are encoded into the wa.me chat link automatically.',
+        },
         { name: 'Style the code', text: 'Add your colors or logo and wait for “Scans reliably”.' },
-        { name: 'Download and test', text: 'Scan the code with a phone and check that it opens a chat with the right number.' },
+        { name: 'Download and test', text: 'Scan the code with a phone and check that it opens a chat with the right number and message.' },
       ],
     },
     faqs: [
       {
-        question: 'What format should the number be in?',
+        question: 'What format should Phone Number be in?',
         answer:
-          'International format with digits only: the country code followed by the number, with no plus sign, brackets, dashes, spaces or leading zeros. For a US number, 1 followed by the ten digits.',
+          'International format with digits only: the country code followed by the number, with no plus sign, brackets, dashes, spaces, or leading zeros. For a US number, enter 1 followed by the ten digits.',
       },
       {
         question: 'Can I add a message that is already typed?',
         answer:
-          'Yes. Add ?text= after the number and then your message, with spaces written as %20. The visitor still has to press send.',
+          'Yes. Type your greeting in Pre-filled Message and QRCraftly encodes spaces, punctuation, and line breaks into the wa.me link automatically. The visitor still has to press send.',
       },
       {
         question: 'Does the code work if the person has no WhatsApp?',
@@ -336,10 +342,10 @@ export const landingPageContent: Record<string, LandingCopy> = {
     ],
     guide: {
       intro:
-        'Make a QR code that opens a WhatsApp chat with you. Add your number to the wa.me link, style the code and download it.',
+        'Make a QR code that opens a WhatsApp chat with you. Enter your phone number and an optional Pre-filled Message, style the code, and download it.',
       scanned: [
-        'WhatsApp opens a chat with your number, with your message already typed if you added one. Nothing is sent until the person presses send.',
-        'On a computer, the link opens WhatsApp Web or the desktop app.',
+        'WhatsApp opens a chat with your number, with your Pre-filled Message already typed if you added one. Nothing is sent until the person presses send.',
+        'On a computer, the wa.me link opens WhatsApp Web or the desktop app.',
       ],
       useCases: [
         'A shop or salon sign for bookings and questions.',
@@ -351,12 +357,12 @@ export const landingPageContent: Record<string, LandingCopy> = {
         'Add a line such as “Chat with us on WhatsApp”.',
       ],
       checks: [
-        'Use the international format, digits only, and test it. A missing country code opens the wrong chat or none.',
+        'Enter Phone Number in international format, digits only, and test it. A missing country code opens the wrong chat or none.',
         'Use a number you will keep; the code cannot follow you to a new one.',
         'Anyone who scans can see your number, so consider a separate business number.',
       ],
       privacy:
-        'The number is put into the code in your browser. QRCraftly never sees it, never contacts WhatsApp and adds no tracking. Anyone who scans the code can read the number.',
+        'Your number and message are turned into a wa.me link in your browser. QRCraftly never sees them, never contacts WhatsApp, and adds no tracking. Anyone who scans the code can read the number.',
     },
   },
   'pdf-qr-code': {

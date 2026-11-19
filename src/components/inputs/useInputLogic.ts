@@ -16,8 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { useState, useRef, useEffect, type ElementType } from "react";
+import { createContext, useContext, useState, useRef, useEffect, type ElementType } from "react";
 import { type QRConfig, QRType } from "@/packages/core/types";
+import type { SocialPlatform } from "@/packages/qr-payload";
 import { INPUT_REGISTRY, constructInput, hydrateInput, validateInput, type InputDataMap, type InputProps } from "./InputRegistry";
 import { usePresetLogoPlacement } from "./usePresetLogoPlacement";
 import { getRetainedInputStates, setRetainedInputStates, type InputStates } from "./retainedDrafts";
@@ -25,11 +26,27 @@ import { getRetainedInputStates, setRetainedInputStates, type InputStates } from
 /** Quiet time in milliseconds that ends a burst of typing; a burst is written when it pauses. */
 const COMMIT_DELAY_MS = 100;
 
+/** Social platform a landing page asks the Social generator to start on. */
+export const PresetSocialPlatform = createContext<SocialPlatform | null>(null);
+
 /** Stores one type's form data, keeping the key and the data's type tied together. */
 const withState = <K extends QRType>(states: InputStates, type: K, data: InputDataMap[K]): InputStates => ({ ...states, [type]: data });
 
+/** A type's starting state, honoring a landing page's social platform preset. */
+const defaultStateFor = <K extends QRType>(type: K, presetSocialPlatform: SocialPlatform | null): InputDataMap[K] => {
+  const presetStates =
+    presetSocialPlatform !== null
+      ? withState({}, QRType.SOCIAL, { ...INPUT_REGISTRY[QRType.SOCIAL].initialState, platform: presetSocialPlatform })
+      : {};
+  return presetStates[type] ?? INPUT_REGISTRY[type].initialState;
+};
+
 /** A type's form data, or its starting state when the form has not been touched. */
-const stateFor = <K extends QRType>(states: InputStates, type: K): InputDataMap[K] => states[type] ?? INPUT_REGISTRY[type].initialState;
+const stateFor = <K extends QRType>(
+  states: InputStates,
+  type: K,
+  presetSocialPlatform: SocialPlatform | null = null,
+): InputDataMap[K] => states[type] ?? defaultStateFor(type, presetSocialPlatform);
 
 /**
  * Hook to encapsulate the state management and component selection logic for the InputPanel.
@@ -46,11 +63,21 @@ export function useInputLogic(
   onRefusedChange?: (refused: boolean) => void,
 ): { InputComponent: ElementType; inputProps: InputProps<QRType>; flush: () => void } {
   usePresetLogoPlacement(config.type);
+  const presetSocialPlatform = useContext(PresetSocialPlatform);
   // Initialize state for all types from registry or volatile retained cache
   const [inputStates, setInputStates] = useState<InputStates>(() => {
     let states: InputStates = {};
+    const retainedStates = getRetainedInputStates();
+    const retainedSocial = retainedStates[QRType.SOCIAL];
     for (const key of Object.values(QRType)) {
-      const retained = getRetainedInputStates()[key];
+      if (key === QRType.SOCIAL && presetSocialPlatform !== null && retainedSocial?.platform !== presetSocialPlatform) {
+        states = withState(states, QRType.SOCIAL, {
+          ...INPUT_REGISTRY[QRType.SOCIAL].initialState,
+          platform: presetSocialPlatform,
+        });
+        continue;
+      }
+      const retained = retainedStates[key];
       if (retained !== undefined) {
         states = withState(states, key, { ...retained });
       } else if (key === config.type && config.value) {
@@ -87,7 +114,7 @@ export function useInputLogic(
     const prevType = prevTypeRef.current;
     prevTypeRef.current = config.type;
 
-    const currentLocalState = stateFor(latestInputStates.current, config.type);
+    const currentLocalState = stateFor(latestInputStates.current, config.type, presetSocialPlatform);
     if (prevType !== config.type) {
       // A form kept from an earlier visit to this type may still hold a refused value.
       onRefusedChangeRef.current?.(validateInput(config.type, currentLocalState) !== null);
@@ -103,7 +130,13 @@ export function useInputLogic(
 
       // If we switched types, or on initial mount where retained state exists for this type:
       // Preserve local retained state and push its constructed value to global state.
-      if (getRetainedInputStates()[config.type] !== undefined && (prevType !== config.type || prevType === null)) {
+      const retainedStates = getRetainedInputStates();
+      const retainedSocial = retainedStates[QRType.SOCIAL];
+      const matchesSocialPreset =
+        config.type !== QRType.SOCIAL ||
+        presetSocialPlatform === null ||
+        retainedSocial?.platform === presetSocialPlatform;
+      if (retainedStates[config.type] !== undefined && matchesSocialPreset && (prevType !== config.type || prevType === null)) {
         onChange({ value: currentConstructed });
         return;
       }
@@ -118,7 +151,7 @@ export function useInputLogic(
 
       const updateStateForType = <K extends QRType>(type: K, nextData: InputDataMap[K]) => {
         setInputStates((prev) => {
-          if (JSON.stringify(stateFor(prev, type)) === JSON.stringify(nextData)) {
+          if (JSON.stringify(stateFor(prev, type, presetSocialPlatform)) === JSON.stringify(nextData)) {
             return prev;
           }
           return withState(prev, type, nextData);
@@ -133,14 +166,14 @@ export function useInputLogic(
           updateStateForType(config.type, hydrated);
           setRetainedInputStates(withState(getRetainedInputStates(), config.type, hydrated));
         } else {
-          updateStateForType(config.type, INPUT_REGISTRY[config.type].initialState);
+          updateStateForType(config.type, defaultStateFor(config.type, presetSocialPlatform));
         }
       } catch (e) {
         console.warn(`Failed to hydrate state for ${config.type} on external change`, e);
-        updateStateForType(config.type, INPUT_REGISTRY[config.type].initialState);
+        updateStateForType(config.type, defaultStateFor(config.type, presetSocialPlatform));
       }
     }
-  }, [config.type, config.value, onChange]);
+  }, [config.type, config.value, onChange, presetSocialPlatform]);
 
   // Clear timeout if type changes to prevent race conditions (simulating unmount of previous input)
   useEffect(() => {
@@ -157,7 +190,7 @@ export function useInputLogic(
     type: K,
     updates: Partial<InputDataMap[K]>,
   ) => {
-    const newData: InputDataMap[K] = { ...stateFor(inputStates, type), ...updates };
+    const newData: InputDataMap[K] = { ...stateFor(inputStates, type, presetSocialPlatform), ...updates };
 
     setInputStates((prev) => withState(prev, type, newData));
     setRetainedInputStates(withState(getRetainedInputStates(), type, newData));
@@ -204,7 +237,7 @@ export function useInputLogic(
   return {
     InputComponent: INPUT_REGISTRY[config.type].Component,
     inputProps: {
-      data: stateFor(inputStates, config.type),
+      data: stateFor(inputStates, config.type, presetSocialPlatform),
       onChange: (updates) => handleInputChange(config.type, updates),
     },
     flush,

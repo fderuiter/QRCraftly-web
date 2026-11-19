@@ -1,8 +1,9 @@
+import React from "react";
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { useInputLogic } from "./useInputLogic";
-import { acceptIncomingContent, clearRetainedInputStates } from "./retainedDrafts";
-import { CryptoNetwork, type EmailData } from "@/packages/qr-payload";
+import { PresetSocialPlatform, useInputLogic } from "./useInputLogic";
+import { acceptIncomingContent, clearRetainedInputStates, setRetainedInputStates } from "./retainedDrafts";
+import { CryptoNetwork, SocialPlatform, type EmailData } from "@/packages/qr-payload";
 import { type QRConfig, QRType, QRStyle, QRErrorCorrectionLevel, SocialFormat, TemplateStyle } from "@/packages/core/types";
 
 const createMockConfig = (type: QRType, value: string): QRConfig => ({
@@ -666,5 +667,74 @@ describe("useInputLogic flush", () => {
       result.current.flush();
     });
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("useInputLogic PresetSocialPlatform", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    clearRetainedInputStates();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const withSocialPreset = (platform: SocialPlatform) => {
+    const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+      <PresetSocialPlatform.Provider value={platform}>{children}</PresetSocialPlatform.Provider>
+    );
+    return Wrapper;
+  };
+
+  it("initializes QRType.SOCIAL to the preset platform while keeping config.value empty", () => {
+    const onChange = vi.fn();
+    const { result } = renderHook(
+      () => useInputLogic(createMockConfig(QRType.SOCIAL, ""), onChange),
+      { wrapper: withSocialPreset(SocialPlatform.WHATSAPP) },
+    );
+
+    expect(result.current.inputProps.data).toEqual({
+      platform: SocialPlatform.WHATSAPP,
+      handle: "",
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("replaces a retained draft from another social platform with an empty preset platform state", () => {
+    setRetainedInputStates({
+      [QRType.SOCIAL]: { platform: SocialPlatform.INSTAGRAM, handle: "alice" },
+    });
+    const onChange = vi.fn();
+    const { result } = renderHook(
+      () => useInputLogic(createMockConfig(QRType.SOCIAL, ""), onChange),
+      { wrapper: withSocialPreset(SocialPlatform.WHATSAPP) },
+    );
+
+    expect(result.current.inputProps.data).toEqual({
+      platform: SocialPlatform.WHATSAPP,
+      handle: "",
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("preserves a retained draft when its platform already matches the preset", () => {
+    setRetainedInputStates({
+      [QRType.SOCIAL]: { platform: SocialPlatform.WHATSAPP, handle: "15551234567", message: "Hello there" },
+    });
+    const onChange = vi.fn();
+    const { result } = renderHook(
+      () => useInputLogic(createMockConfig(QRType.SOCIAL, ""), onChange),
+      { wrapper: withSocialPreset(SocialPlatform.WHATSAPP) },
+    );
+
+    expect(result.current.inputProps.data).toEqual({
+      platform: SocialPlatform.WHATSAPP,
+      handle: "15551234567",
+      message: "Hello there",
+    });
+    expect(onChange).toHaveBeenCalledWith({
+      value: "https://wa.me/15551234567?text=Hello%20there",
+    });
   });
 });

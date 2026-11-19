@@ -113,11 +113,11 @@ export const landingPageMeta: Record<string, LandingMeta> = {
     seoTitle: 'Free WhatsApp QR Code Generator for Chat Links | QRCraftly',
     heading: 'Free WhatsApp QR Code Generator',
     description:
-      'Make a QR code that opens a WhatsApp chat with you. Add your number to a wa.me link and download the code. Free, no sign-up, no ads, never expires.',
+      'Make a QR code that opens a WhatsApp chat. Enter your phone number and an optional message, then download. Free, no sign-up, no ads, never expires.',
     imageAlt: 'A QR code that opens a WhatsApp chat, made with the QRCraftly WhatsApp QR code generator',
     features: [
-      'Builds on a standard wa.me chat link',
-      'Optionally add a ready-typed first message',
+      'Preset to WhatsApp with Phone Number and Pre-filled Message fields',
+      'Encodes your wa.me chat link and greeting automatically',
       'A static code that never expires',
       'Colors and a logo to match your business',
       'Download as PNG, JPEG, WebP or SVG',

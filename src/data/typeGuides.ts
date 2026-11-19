@@ -91,10 +91,10 @@ export const typeGuides: Record<string, TypeGuide> = {
       'Confirm column headers match your intended content or contact card fields (first name, last name, phone, email, organization, title) and file naming column.',
       'Preflight synthesis checks verify contact identity (first name, last name, or organization) and valid email formatting before generation.',
       'Review any flagged empty, invalid, or caution rows shown on screen before downloading the archive.',
-      'Keep batches to 500 rows or fewer; split larger spreadsheets into separate CSV files.',
+      'Upload .csv, .txt, or .xlsx files with 500 rows or fewer; re-save legacy .xls spreadsheets as .xlsx or .csv before uploading.',
     ],
     privacy:
-      'All CSV parsing, QR code rendering and ZIP packaging happen entirely in your browser. Your spreadsheet data is never uploaded to any server.',
+      'All CSV, TXT, and Excel (.xlsx) parsing, QR code rendering, and ZIP packaging happen entirely in your browser. Your spreadsheet data is never uploaded to any server.',
   },
   'wifi-qr-code': {
     intro:
@@ -115,7 +115,7 @@ export const typeGuides: Record<string, TypeGuide> = {
     ],
     checks: [
       'Type the network name exactly as the router shows it, capitals and spaces included.',
-      'Pick the security type your router uses. WPA/WPA2/WPA3 covers almost every home and office router.',
+      'Pick the Encryption mode your router uses: WPA / WPA2 / WPA3 covers almost every router, while WPA3 only (SAE) is only for strict WPA3-only networks because Android phones read it whereas iPhone cameras may not.',
       'Select Hidden Network only if the router does not broadcast its name.',
       'Enterprise (EAP) networks are less widely supported by phone cameras than password networks, so test those codes on the phones your guests use.',
     ],
@@ -139,12 +139,12 @@ export const typeGuides: Record<string, TypeGuide> = {
       'On a business card, make the code at least 2 cm (0.8 in) wide and test it on a printed copy.',
     ],
     checks: [
-      'Write the phone number with its country code, such as +44, so it works for people abroad.',
+      'Write the phone number with its country code, such as +1 or +44, or import an existing .vcf contact card with Choose a .vcf file.',
       'Scan your own code and open the saved contact to check every field landed in the right place.',
-      'vCard 3.0 is the default and reads on most phones. Pick MECARD for the smallest code, or 4.0 only if you know the reader supports it.',
+      'vCard 3.0 is the default and reads on most phones. Pick MECard for the smallest code—noting that MECard omits Profile Photo URL, Social Profiles, and State or Province—or vCard 4.0 only if you know the reader supports it.',
     ],
     privacy:
-      'Your details are written into the code in your browser and never sent to QRCraftly. Anyone who sees a printed code can read them, so only include what you would hand to a stranger.',
+      'Your typed details and any imported .vcf file stay in your browser and are never sent to QRCraftly. Anyone who sees a printed code can read them, so only include what you would hand to a stranger.',
   },
   'email-qr-code': {
     intro:
@@ -232,16 +232,16 @@ export const typeGuides: Record<string, TypeGuide> = {
       'Keep the description short so the code stays easy to scan.',
     ],
     checks: [
-      'Check the start and end times against your invitation. Swapped am and pm is the usual mistake.',
-      'Pick a time zone if guests may be elsewhere. Floating time shows the same clock time wherever the code is scanned.',
-      'Put the full address in the location field so the calendar can show it on a map.',
+      'Check that the end date and time come on or after the start; inverted times are blocked so calendars do not reject the event.',
+      'Use All-day event for full-day dates, or pick a Timezone if guests may be elsewhere. Repeat and Occurrence Count work on iCalendar (.ics) and Google Calendar and clear when switching to Outlook Web, Office 365, or Yahoo Calendar.',
+      'Put the full address in Location so the calendar can show it on a map.',
     ],
     privacy:
-      'The event details are put into the code in your browser. QRCraftly receives nothing and keeps no guest list. Anyone who scans can read the details.',
+      'With iCalendar (.ics), the event stays inside the QR code in your browser and QRCraftly receives nothing. Choosing Google Calendar, Outlook Web, Office 365, or Yahoo Calendar builds a web link carrying the title, times, location, and description, so opening that link shares those details with Google, Microsoft, or Yahoo.',
   },
   'location-qr-code': {
     intro:
-      'Make a QR code for a point on the map from its latitude and longitude. Scanning it opens that spot in a maps app.',
+      'Make a QR code for a point on the map from a Google Maps link, geo: URI, DMS coordinates, or latitude and longitude. Scanning opens that spot in a maps app.',
     scanned: [
       'The code holds a standard geo: link. Android phones usually open it in the default maps app. On iPhone it depends on the iOS version and the scanner, so test it on the phones you care about.',
       'If it has to work everywhere, put a link to your preferred map service in a URL code instead.',
@@ -256,12 +256,12 @@ export const typeGuides: Record<string, TypeGuide> = {
       'Five decimal places are accurate to about a meter (3 feet), which is enough for a door.',
     ],
     checks: [
-      'Latitude comes first. South and west are negative, so do not drop the minus sign.',
+      'Paste a Google Maps link, geo: URI, or DMS string into Google Maps Link or Coordinates, or enter Latitude first with minus signs for south and west.',
       'Drop a pin on the exact entrance or meeting point, not the middle of the building.',
       'Scan the code and compare the pin with where you are before you print it.',
     ],
     privacy:
-      'The coordinates are put into the code in your browser. QRCraftly never receives them and never asks for your device’s location.',
+      'The coordinates are put into the code in your browser and QRCraftly never receives them. Clicking Use Current Location asks your browser for location permission once and keeps the coordinates local on your device.',
   },
   'meeting-qr-code': {
     intro:
@@ -304,17 +304,17 @@ export const typeGuides: Record<string, TypeGuide> = {
     ],
     checks: [
       'Pick the network that matches the address. Funds sent on the wrong network can be lost.',
-      'Compare the first and last characters of the address with your wallet after you paste it.',
-      'Leave the amount empty for tips and donations. Some wallets ignore it anyway, so print the amount in text when it matters.',
+      'For SEPA Credit Transfer (EPC QR), enter both IBAN and Beneficiary Name; for UPI (India), enter both UPI ID and Payee Name.',
+      'Compare the first and last characters of the address, IBAN, or UPI ID after pasting, and leave Amount empty for tips and donations.',
     ],
     privacy:
       'The details are put into the code in your browser. QRCraftly never receives them, never processes payments and never touches funds. Never put a private key or recovery phrase in a QR code.',
   },
   'social-qr-code': {
     intro:
-      'Make a QR code that opens your profile. Pick Instagram, X, TikTok, LinkedIn, YouTube, Facebook, WhatsApp or GitHub, then type your username.',
+      'Make a QR code for Instagram, X, TikTok, LinkedIn, YouTube, Facebook, WhatsApp, or GitHub. Enter your username—or your WhatsApp phone number and greeting—to open directly.',
     scanned: [
-      'The code holds the normal web address of your profile. It opens in the app if it is installed, otherwise in the browser. Some platforms ask people to sign in before they can follow you.',
+      'Profile codes hold your direct web address and open in the app if installed, otherwise in the browser. WhatsApp codes open a wa.me chat with your number and any Pre-filled Message ready to send.',
     ],
     useCases: [
       'A market stall or shop counter.',
@@ -322,16 +322,16 @@ export const typeGuides: Record<string, TypeGuide> = {
       'The last slide of a talk.',
     ],
     printing: [
-      'Print your username in text beside the code, so people can still find you if it will not scan.',
-      'If you rename your account, the code still points at the old name. Make a new one.',
+      'Print your username or WhatsApp number in text beside the code, so people can still reach you if it will not scan.',
+      'If you rename your account or change your number, the code still points at the old one. Make a new code.',
     ],
     checks: [
-      'Type the username with or without the @. The generator builds the profile address.',
-      'Check the platform before you download. The same name can belong to someone else elsewhere.',
+      'Type usernames with or without @; for YouTube you can also paste a channel or video link.',
+      'For WhatsApp, enter Phone Number in international digits only (no plus sign, spaces, or leading zeros); Pre-filled Message encodes spaces and punctuation automatically.',
       'Open the code on a phone that is not signed in. A private account shows a login or follow request, not your posts.',
     ],
     privacy:
-      'The profile link is made in your browser and QRCraftly does not see it. Once someone opens it, the platform’s own rules and tracking apply.',
+      'The profile or wa.me link is made in your browser and QRCraftly does not see it. Once someone opens it, the platform’s own rules and tracking apply.',
   },
   'text-qr-code': {
     intro:

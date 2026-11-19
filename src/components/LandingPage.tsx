@@ -35,6 +35,7 @@ export function LandingPage({ id }: { id: string }) {
   return (
     <QRTypePage
       type={preset.type}
+      socialPlatform={preset.socialPlatform}
       title={preset.title}
       toolId={id}
       copy={copy}

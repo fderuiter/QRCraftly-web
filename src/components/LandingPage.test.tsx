@@ -16,16 +16,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { axe } from '../../tests/utils/axe';
 import LayoutDefault from '@/layouts/LayoutDefault';
 import { LandingPage } from '@/components/LandingPage';
+import { clearRetainedInputStates } from '@/components/inputs/retainedDrafts';
 import { clearRetainedAppearance } from '@/context/QRContext';
 import { getMetadataForPath } from '@/data/contentRegistry';
 import { LANDING_PRESETS } from '@/data/landingPages';
-import { QRErrorCorrectionLevel } from '@/packages/core/types';
+import { QRErrorCorrectionLevel, QRType } from '@/packages/core/types';
+import { SocialPlatform } from '@/packages/qr-payload';
 import { withPageContent } from '../../tests/utils/pageContent';
 
 function renderLanding(id: string) {
@@ -42,6 +44,7 @@ describe('landing pages that preset the generator (#1035, #1037)', () => {
     expect(LANDING_PRESETS['qr-code-with-logo'].presetConfig?.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.H);
     expect(LANDING_PRESETS['mosaic-qr-code'].presetConfig?.errorCorrectionLevel).toBe(QRErrorCorrectionLevel.H);
     clearRetainedAppearance();
+    clearRetainedInputStates();
     renderLanding('qr-code-with-logo');
     expect(screen.getByRole('heading', { level: 1, name: 'Free QR Code Generator with Logo' })).toBeInTheDocument();
   });
@@ -50,8 +53,53 @@ describe('landing pages that preset the generator (#1035, #1037)', () => {
     // The social input is lazy-loaded; load its module first so the cold transform is not counted in the wait.
     await import('@/components/inputs/SocialInput');
     clearRetainedAppearance();
+    clearRetainedInputStates();
     renderLanding('instagram-qr-code');
     expect(await screen.findByLabelText('Username / Handle')).toBeInTheDocument();
+  });
+
+  it('presets /whatsapp-qr-code to WhatsApp with Phone Number and Pre-filled Message in an empty sample state and zero %20 instructions', async () => {
+    await import('@/components/inputs/SocialInput');
+    clearRetainedAppearance();
+    clearRetainedInputStates();
+
+    expect(LANDING_PRESETS['whatsapp-qr-code']).toMatchObject({
+      type: QRType.SOCIAL,
+      socialPlatform: SocialPlatform.WHATSAPP,
+    });
+    expect(LANDING_PRESETS['whatsapp-qr-code'].presetConfig?.value).toBeUndefined();
+
+    const { container } = renderLanding('whatsapp-qr-code');
+
+    const platformSelect = await screen.findByLabelText('Platform');
+    expect(platformSelect).toHaveValue(SocialPlatform.WHATSAPP);
+
+    const phoneInput = screen.getByLabelText('Phone Number');
+    expect(phoneInput).toHaveAttribute('type', 'tel');
+    expect(phoneInput).toHaveValue('');
+
+    const messageInput = screen.getByLabelText(/Pre-filled Message/);
+    expect(messageInput).toHaveValue('');
+
+    // Empty on load: Sample Preview is shown and Download stays disabled until digits are typed.
+    expect(screen.getByText('Sample Preview')).toBeInTheDocument();
+    const downloadButton = screen.getByRole('button', { name: 'Download PNG' });
+    expect(downloadButton).toHaveAttribute('aria-disabled', 'true');
+
+    expect(container.textContent).not.toContain('%20');
+
+    fireEvent.change(phoneInput, { target: { value: '15551234567' } });
+    await waitFor(() => expect(screen.queryByText('Sample Preview')).not.toBeInTheDocument());
+    expect(downloadButton).not.toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('has no axe violations on the WhatsApp page', async () => {
+    await import('@/components/inputs/SocialInput');
+    clearRetainedAppearance();
+    clearRetainedInputStates();
+    const { container } = renderLanding('whatsapp-qr-code');
+    await screen.findByLabelText('Phone Number');
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('shows the mosaic gallery with alt text, and the guide, how-to and FAQ on every page', () => {

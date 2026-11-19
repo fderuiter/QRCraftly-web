@@ -20,6 +20,8 @@ import React from 'react';
 import QRTool from '@/components/QRTool';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 import { QRType, type QRConfig } from '@/packages/core/types';
+import type { SocialPlatform } from '@/packages/qr-payload';
+import { PresetSocialPlatform } from '@/components/inputs/useInputLogic';
 import { PresetOpenSections, PresetPrimaryAction } from '@/components/StyleControls';
 import type { LandingPrimaryAction } from '@/data/landingPages';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
@@ -28,6 +30,8 @@ import type { ToolCopy } from '@/data/copy/types';
 interface QRTypePageProps {
   /** The QR code type to pre-select. */
   type: QRType;
+  /** Social platform to pre-select when opening the Social generator. */
+  socialPlatform?: SocialPlatform;
   /** The title to display in the QRTool header. */
   title: string;
   /** The tool ID for loading content. */
@@ -52,7 +56,7 @@ const NO_SECTIONS: readonly string[] = [];
  * A reusable page component for specific QR code type landing pages.
  * It sets up the QRTool with the correct type. Head renders the page's structured data.
  */
-export const QRTypePage: React.FC<QRTypePageProps> = ({ type, title, toolId, copy, presetConfig, openSections = NO_SECTIONS, primaryAction = null }) => {
+export const QRTypePage: React.FC<QRTypePageProps> = ({ type, socialPlatform = null, title, toolId, copy, presetConfig, openSections = NO_SECTIONS, primaryAction = null }) => {
   // Only the link generator starts with an example link; every other type starts empty, so its
   // preview shows the type's sample with exports off until something is typed (#1272).
   const config = {
@@ -63,11 +67,13 @@ export const QRTypePage: React.FC<QRTypePageProps> = ({ type, title, toolId, cop
 
   return (
     <PageCopyContext.Provider value={copy ?? NO_COPY}>
-      <PresetOpenSections.Provider value={openSections}>
-        <PresetPrimaryAction.Provider value={primaryAction}>
-          <QRTool initialConfig={config} presetConfig={presetConfig} title={title} toolId={toolId} />
-        </PresetPrimaryAction.Provider>
-      </PresetOpenSections.Provider>
+      <PresetSocialPlatform.Provider value={socialPlatform}>
+        <PresetOpenSections.Provider value={openSections}>
+          <PresetPrimaryAction.Provider value={primaryAction}>
+            <QRTool initialConfig={config} presetConfig={presetConfig} title={title} toolId={toolId} />
+          </PresetPrimaryAction.Provider>
+        </PresetOpenSections.Provider>
+      </PresetSocialPlatform.Provider>
     </PageCopyContext.Provider>
   );
 };

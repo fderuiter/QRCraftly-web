@@ -326,12 +326,12 @@ export const contentRegistry: Record<string, ToolContent> = {
     "id": "bulk-csv-qr-code",
     "name": "Bulk CSV Batch QR Code Generator",
     "url": getPublicDomain() + "/bulk-csv-qr-code",
-    "description": "Make one QR code for each row of a CSV or TXT file, in your browser, and download them all as a ZIP.",
-    "seoTitle": "Free Bulk QR Code Generator from a CSV File | QRCraftly",
+    "description": "Make one QR code per row from a CSV, TXT, or Excel (.xlsx) file in your browser and download the batch as a ZIP.",
+    "seoTitle": "Free Bulk QR Code Generator from CSV or Excel | QRCraftly",
     "image": "/og/bulk-csv-qr-code.png",
     "imageAlt": "Preview of Bulk CSV Batch QR Code Generator tool",
     "features": [
-      "One QR code per row of a CSV or TXT file",
+      "One QR code per row of a CSV, TXT, or Excel (.xlsx) file",
       "Download them all as a ZIP",
       "Made in your browser"
     ],
