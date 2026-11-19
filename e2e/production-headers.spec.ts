@@ -85,6 +85,7 @@ function expectStrictCsp(csp: string | undefined, label: string) {
   expect(directives.get('default-src'), `${label}: default-src`).toEqual(["'self'"]);
   expect(directives.get('object-src'), `${label}: object-src`).toEqual(["'none'"]);
   expect(directives.get('base-uri'), `${label}: base-uri`).toEqual(["'self'"]);
+  expect(directives.get('frame-ancestors'), `${label}: frame-ancestors`).toEqual(["'none'"]);
   expect(directives.get('script-src') ?? [], `${label}: script-src`).not.toContain("'unsafe-inline'");
   expect(directives.get('script-src') ?? [], `${label}: script-src`).not.toContain("'unsafe-eval'");
   expect(csp, `${label}: no third-party origins`).not.toMatch(/https?:\/\//);
@@ -97,16 +98,22 @@ test.describe('Production headers and deployment integrity (#1353)', { tag: '@pr
   test.skip(!process.env.PLAYWRIGHT_TEST_BASE_URL, 'Needs a deployed site; vite preview does not apply _headers');
   test.skip(({ browserName }) => browserName !== 'chromium', 'HTTP checks run once');
 
-  test('every page sends the security headers and a CSP identical to its meta tag', async ({ request }) => {
+  test('every page sends the security headers and a CSP with frame-ancestors matching its meta tag', async ({ request }) => {
     for (const page of PAGES) {
       const response = await fetchRaw(request, page);
       expect(response.status(), page).toBe(200);
       expectGlobalHeaders(response, page);
       const headerCsp = response.headers()['content-security-policy'];
       expectStrictCsp(headerCsp, page);
-      // csp_hash_injector.js writes the same policy to both; a host or edge rule that rewrites
-      // one of them would leave the browser enforcing a policy nobody reviewed.
-      expect(readMetaCsp(await response.text()), `${page}: meta CSP`).toBe(headerCsp);
+      // csp_hash_injector.js writes the base policy to the meta tag and appends frame-ancestors 'none'
+      // to the HTTP response header (HTML meta tags disallow framing directives). A host or edge rule that
+      // rewrites them would leave the browser enforcing a policy nobody reviewed.
+      const metaCsp = readMetaCsp(await response.text());
+      expect(metaCsp, `${page}: meta CSP`).toBeTruthy();
+      expect(metaCsp, `${page}: meta CSP has no frame-ancestors`).not.toContain('frame-ancestors');
+      expect(headerCsp, `${page}: header CSP includes meta CSP and frame-ancestors`).toBe(
+        `${metaCsp} frame-ancestors 'none';`
+      );
     }
   });
 

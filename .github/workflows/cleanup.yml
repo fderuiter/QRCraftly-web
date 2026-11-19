@@ -25,7 +25,16 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
-            const defaultBranch = context.payload.repository.default_branch;
+            let defaultBranch = context.payload?.repository?.default_branch;
+            if (!defaultBranch) {
+              try {
+                const { data } = await github.rest.repos.get({ owner, repo });
+                defaultBranch = data?.default_branch;
+              } catch (e) {
+                console.log(`Failed to fetch repository default branch: ${e.message}`);
+              }
+            }
+            defaultBranch = defaultBranch || 'main';
             const minAgeMs = 7 * 24 * 60 * 60 * 1000;
 
             // Get all unprotected branches (paginated past the first 100)

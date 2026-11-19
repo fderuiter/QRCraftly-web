@@ -29,6 +29,8 @@
  * runs whenever the module has not loaded (or failed to). Both give the same bytes.
  */
 
+import { createMulberry32 } from '@/packages/core/math';
+
 /** Raw RGBA pixels with their dimensions (an `ImageData` satisfies it). */
 export interface PixelFrame {
   data: Uint8ClampedArray;
@@ -156,17 +158,6 @@ function boxPass(src: Float32Array, dst: Float32Array, side: number, radius: num
   }
 }
 
-/** Seeded uniform generator in [0, 1) (mulberry32), so the noise is the same on every run. */
-function seededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 function reuse<T extends Float32Array | Uint8ClampedArray>(buffer: T | undefined, length: number, make: (length: number) => T): T {
   return buffer && buffer.length === length ? buffer : make(length);
 }
@@ -237,7 +228,7 @@ export function simulatePrint(frame: PixelFrame, placement: PrintPlacement, scra
     boxPass(temp, luma, side, radius, false);
   }
 
-  const random = seededRandom(NOISE_SEED);
+  const random = createMulberry32(NOISE_SEED);
   for (let i = 0; i < count; i++) {
     grey[i] = luma[i] + (random() - 0.5) * PRINT_NOISE_LEVEL;
   }

@@ -33,5 +33,6 @@ export {
   normalizeHex,
   rgbToCmyk,
   srgbToLinear,
+  SRGB_TO_LINEAR_LUT,
   type CmykColor,
 } from './lib/color';

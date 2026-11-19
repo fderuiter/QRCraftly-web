@@ -2,7 +2,7 @@ import { getPublicDomain } from "@/packages/core/site";
 import type { ComponentType } from "react";
 import { CryptoNetwork, SocialPlatform, type UrlData, type TextData, type EmailData, type VCardData, type PhoneData, type SmsData, type PaymentData, type EventData, CalendarProvider, type LocationData, type MeetingData, type SocialData, type BulkCsvData } from "@/packages/qr-payload";
 import { QRType, WifiEncryption, type WifiData } from "@/packages/core/types";
-import { QR_GENERATORS, CONTAINMENT_PROFILES, emailListError, cardFieldsFor, vCardFieldError, paymentRefusal } from "@/packages/qr-payload";
+import { QR_GENERATORS, CONTAINMENT_PROFILES, emailListError, cardFieldsFor, vCardFieldError, paymentRefusal, hasChronologicalViolation } from "@/packages/qr-payload";
 import { isDangerousUrl } from "@/packages/core/security";
 import { findBlockingViolation } from "./linkViolations";
 
@@ -13,7 +13,7 @@ import { EmailInput } from "./EmailInput";
 import { VCardInput } from "./VCardInput";
 import { PhoneInput } from "./PhoneInput";
 import { SmsInput } from "./SmsInput";
-import { PaymentInput } from "./PaymentInput";
+import { LazyPaymentInput } from "./LazyPaymentInput";
 import { LazyEventInput } from "./LazyEventInput";
 import { LocationInput } from "./LocationInput";
 import { MeetingInput } from "./MeetingInput";
@@ -92,6 +92,11 @@ const validatePayment = (payment: PaymentData): string | null => {
   return paymentRefusal(payment);
 };
 
+/** Refuses inverted event timestamps where the end time precedes the start time. */
+const validateEvent = (event: EventData): string | null => {
+  return hasChronologicalViolation(event.startDate, event.endDate) ? 'EVENT_CHRONOLOGICAL_VIOLATION' : null;
+};
+
 export const INPUT_REGISTRY: Registry = {
   [QRType.URL]: {
     Component: UrlInput,
@@ -138,7 +143,7 @@ export const INPUT_REGISTRY: Registry = {
       description: "",
       provider: CalendarProvider.ICAL,
     },
-    validate: acceptAll,
+    validate: validateEvent,
     construct: QR_GENERATORS[QRType.EVENT].construct,
     hydrate: QR_GENERATORS[QRType.EVENT].hydrate,
     canHydrate: QR_GENERATORS[QRType.EVENT].matches,
@@ -170,6 +175,7 @@ export const INPUT_REGISTRY: Registry = {
       website: "",
       street: "",
       city: "",
+      state: "",
       zip: "",
       country: "",
     },
@@ -200,7 +206,7 @@ export const INPUT_REGISTRY: Registry = {
     canHydrate: QR_GENERATORS[QRType.SMS].matches,
   },
   [QRType.PAYMENT]: {
-    Component: PaymentInput,
+    Component: LazyPaymentInput,
     initialState: {
       network: CryptoNetwork.BITCOIN,
       address: "",

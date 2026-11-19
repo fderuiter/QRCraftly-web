@@ -52,6 +52,7 @@ describe('validate', () => {
   const email = INPUT_REGISTRY[QRType.EMAIL].initialState;
   const vcard = INPUT_REGISTRY[QRType.VCARD].initialState;
   const payment = INPUT_REGISTRY[QRType.PAYMENT].initialState;
+  const event = INPUT_REGISTRY[QRType.EVENT].initialState;
 
   it.each([
     [QRType.URL, { url: '' }],
@@ -83,10 +84,12 @@ describe('validate', () => {
     expect(validateInput(QRType.EMAIL, { ...email, email: 'a@example.com, b@example.com' })).toBeNull();
   });
 
-  it('refuses a script link as a contact website and a control character in a name', () => {
+  it('refuses a script link as a contact website and a control character in a name or state', () => {
     expect(validateInput(QRType.VCARD, { ...vcard, website: 'javascript:alert(1)' })).toBe('Unsafe URL scheme or malicious protocol detected.');
     expect(validateInput(QRType.VCARD, { ...vcard, firstName: 'Ann\u0007' })).toBe('Contains invalid control or zero-width characters.');
-    expect(validateInput(QRType.VCARD, { ...vcard, firstName: '   ' })).toBeNull();
+    expect(validateInput(QRType.VCARD, { ...vcard, state: 'CA\u0007' })).toBe('Contains invalid control or zero-width characters.');
+    expect(validateInput(QRType.VCARD, { ...vcard, firstName: '   ', state: 'California' })).toBeNull();
+    expect(vcard.state).toBe('');
   });
 
   it('refuses a script link as a payment address', () => {
@@ -98,5 +101,63 @@ describe('validate', () => {
     expect(validateInput(QRType.PAYMENT, { ...payment, amount: '0.000000001' })).toBe('PAYMENT_AMOUNT_VIOLATION');
     expect(validateInput(QRType.PAYMENT, { ...payment, amount: '-1' })).toBe('PAYMENT_AMOUNT_VIOLATION');
     expect(validateInput(QRType.PAYMENT, { ...payment, network: CryptoNetwork.EPC_SEPA, amount: '1000000000' })).toBe('PAYMENT_AMOUNT_VIOLATION');
+  });
+
+  it('accepts initial event form and valid or single date configurations', () => {
+    expect(validateInput(QRType.EVENT, event)).toBeNull();
+    expect(
+      validateInput(QRType.EVENT, {
+        ...event,
+        startDate: '2026-10-15T09:00',
+        endDate: '2026-10-15T10:00',
+      })
+    ).toBeNull();
+    expect(
+      validateInput(QRType.EVENT, {
+        ...event,
+        startDate: '2026-10-15T10:00',
+        endDate: '2026-10-15T10:00',
+      })
+    ).toBeNull();
+    expect(
+      validateInput(QRType.EVENT, {
+        ...event,
+        startDate: '2026-10-15T10:00',
+        endDate: '',
+      })
+    ).toBeNull();
+    expect(
+      validateInput(QRType.EVENT, {
+        ...event,
+        startDate: '',
+        endDate: '2026-10-15T10:00',
+      })
+    ).toBeNull();
+    expect(
+      validateInput(QRType.EVENT, {
+        ...event,
+        allDay: true,
+        startDate: '2026-10-15',
+        endDate: '2026-10-18',
+      })
+    ).toBeNull();
+  });
+
+  it('refuses inverted timed or all-day event timestamps', () => {
+    expect(
+      validateInput(QRType.EVENT, {
+        ...event,
+        startDate: '2026-10-15T11:00',
+        endDate: '2026-10-15T10:00',
+      })
+    ).toBe('EVENT_CHRONOLOGICAL_VIOLATION');
+    expect(
+      validateInput(QRType.EVENT, {
+        ...event,
+        allDay: true,
+        startDate: '2026-10-18',
+        endDate: '2026-10-15',
+      })
+    ).toBe('EVENT_CHRONOLOGICAL_VIOLATION');
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen, act, fireEvent } from '@testing-library/react';
+import { render, screen, act, fireEvent, within } from '@testing-library/react';
 import { ToastProvider, useToast } from './Toast';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
@@ -309,5 +309,202 @@ describe('Toast Timing and Interactive Controls', () => {
     });
     expect(screen.queryByText('Test message')).not.toBeInTheDocument();
     expect(document.activeElement).toBe(other);
+  });
+});
+
+describe('Persistent Live Regions and Actionable Notifications (WCAG 2.2 SC 4.1.3 & SC 2.2.1)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const MultiToastTrigger = () => {
+    const { addToast } = useToast();
+    return (
+      <div>
+        <button onClick={() => addToast({ type: 'info', message: 'Info notice' })}>
+          Trigger Info
+        </button>
+        <button onClick={() => addToast({ type: 'success', message: 'Success notice' })}>
+          Trigger Success
+        </button>
+        <button onClick={() => addToast({ type: 'warning', message: 'Warning alert' })}>
+          Trigger Warning
+        </button>
+        <button onClick={() => addToast({ type: 'error', message: 'Error alert' })}>
+          Trigger Error
+        </button>
+        <button
+          onClick={() =>
+            addToast({
+              type: 'info',
+              message: 'Actionable notice',
+              action: { label: 'Perform Action', onClick: vi.fn() },
+            })
+          }
+        >
+          Trigger Action
+        </button>
+      </div>
+    );
+  };
+
+  it('maintains both polite and assertive live region containers in the DOM when empty', () => {
+    const { container } = render(
+      <ToastProvider>
+        <div>Content</div>
+      </ToastProvider>
+    );
+
+    const politeRegion = container.querySelector('[aria-live="polite"]');
+    const assertiveRegion = container.querySelector('[aria-live="assertive"]');
+
+    expect(politeRegion).toBeInTheDocument();
+    expect(assertiveRegion).toBeInTheDocument();
+    expect(politeRegion).toBeEmptyDOMElement();
+    expect(assertiveRegion).toBeEmptyDOMElement();
+  });
+
+  it('routes info and success toasts to the polite live container (W3C ARIA22) without stealing focus', () => {
+    const { container } = render(
+      <ToastProvider>
+        <MultiToastTrigger />
+      </ToastProvider>
+    );
+
+    const politeRegion = container.querySelector('[aria-live="polite"]');
+    const assertiveRegion = container.querySelector('[aria-live="assertive"]');
+    const infoBtn = screen.getByText('Trigger Info');
+
+    infoBtn.focus();
+    fireEvent.click(infoBtn);
+
+    // Focus remains on trigger element
+    expect(document.activeElement).toBe(infoBtn);
+
+    // Toast is in polite live region, not in assertive
+    expect(within(politeRegion as HTMLElement).getByText('Info notice')).toBeInTheDocument();
+    expect(within(assertiveRegion as HTMLElement).queryByText('Info notice')).not.toBeInTheDocument();
+
+    const successBtn = screen.getByText('Trigger Success');
+    fireEvent.click(successBtn);
+
+    expect(within(politeRegion as HTMLElement).getByText('Success notice')).toBeInTheDocument();
+    expect(within(assertiveRegion as HTMLElement).queryByText('Success notice')).not.toBeInTheDocument();
+  });
+
+  it('routes warning and error toasts to the assertive live container (W3C ARIA19) without stealing focus', () => {
+    const { container } = render(
+      <ToastProvider>
+        <MultiToastTrigger />
+      </ToastProvider>
+    );
+
+    const politeRegion = container.querySelector('[aria-live="polite"]');
+    const assertiveRegion = container.querySelector('[aria-live="assertive"]');
+    const warningBtn = screen.getByText('Trigger Warning');
+
+    warningBtn.focus();
+    fireEvent.click(warningBtn);
+
+    // Focus remains on trigger element
+    expect(document.activeElement).toBe(warningBtn);
+
+    // Toast is in assertive live region, not in polite
+    expect(within(assertiveRegion as HTMLElement).getByText('Warning alert')).toBeInTheDocument();
+    expect(within(politeRegion as HTMLElement).queryByText('Warning alert')).not.toBeInTheDocument();
+
+    const errorBtn = screen.getByText('Trigger Error');
+    fireEvent.click(errorBtn);
+
+    expect(within(assertiveRegion as HTMLElement).getByText('Error alert')).toBeInTheDocument();
+    expect(within(politeRegion as HTMLElement).queryByText('Error alert')).not.toBeInTheDocument();
+  });
+
+  it('marks actionable toasts as persistent so they never automatically dismiss on a timer', () => {
+    render(
+      <ToastProvider>
+        <MultiToastTrigger />
+      </ToastProvider>
+    );
+
+    fireEvent.click(screen.getByText('Trigger Action'));
+    expect(screen.getByText('Actionable notice')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Perform Action' })).toBeInTheDocument();
+
+    // Advance time far beyond 5000ms or 8000ms
+    act(() => {
+      vi.advanceTimersByTime(30000);
+    });
+
+    // Toast must remain visible
+    expect(screen.getByText('Actionable notice')).toBeInTheDocument();
+  });
+
+  it('allows dismissing persistent actionable toasts via the close button or Escape key', () => {
+    const actionSpy = vi.fn();
+    const ActionComponent = () => {
+      const { addToast } = useToast();
+      return (
+        <button
+          onClick={() =>
+            addToast({
+              type: 'info',
+              message: 'Action Item',
+              action: { label: 'Click Me', onClick: actionSpy },
+            })
+          }
+        >
+          Open Toast
+        </button>
+      );
+    };
+
+    render(
+      <ToastProvider>
+        <ActionComponent />
+      </ToastProvider>
+    );
+
+    const trigger = screen.getByText('Open Toast');
+    trigger.focus();
+    act(() => {
+      fireEvent.click(trigger);
+    });
+
+    const toastElement = screen.getByText('Action Item').closest('[role="status"]') as HTMLElement;
+    expect(toastElement).toBeInTheDocument();
+
+    // Focus close button and press Escape
+    const closeBtn = screen.getByRole('button', { name: 'Close notification' });
+    act(() => {
+      closeBtn.focus();
+    });
+
+    act(() => {
+      fireEvent.keyDown(closeBtn, { key: 'Escape' });
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(screen.queryByText('Action Item')).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(trigger);
+
+    // Open again and click action button
+    act(() => {
+      fireEvent.click(trigger);
+    });
+    const actionBtn = screen.getByRole('button', { name: 'Click Me' });
+    act(() => {
+      fireEvent.click(actionBtn);
+    });
+
+    expect(actionSpy).toHaveBeenCalledTimes(1);
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(screen.queryByText('Action Item')).not.toBeInTheDocument();
   });
 });

@@ -119,7 +119,7 @@ export function isContactContentType(contentType?: BulkContentType): boolean {
 }
 
 /** Splits a header into lowercase words and normalized tokens. */
-function headerWords(header: string): string[] {
+export function headerWords(header: string): string[] {
   const normalized = header.toLowerCase().trim();
   const rawClean = normalized.replace(/[^\p{L}\p{N}]+/gu, '');
   const rawUnderscore = normalized.replace(/[^\p{L}\p{N}]+/gu, '_');
@@ -343,6 +343,7 @@ export function synthesizeVCardPayload(
     website,
     street: '',
     city: '',
+    state: '',
     zip: '',
     country: '',
   };

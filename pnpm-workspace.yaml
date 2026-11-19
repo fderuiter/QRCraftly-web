@@ -54,7 +54,6 @@ overrides:
   # GHSA-g3hv-75wg-m249 (minimatch globparts DoS, < 11.0.1). typescript-estree pins minimatch 10.
   "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
 
-
 # Known upstream advisories with no patched release available yet.
 # Remove once upstream publishes a patched version.
 auditConfig:

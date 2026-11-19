@@ -1,5 +1,5 @@
 import React from "react";
-import { type EventData, CalendarProvider } from "@/packages/qr-payload";
+import { type EventData, CalendarProvider, describeViolation, hasChronologicalViolation } from "@/packages/qr-payload";
 import { TextField, TextAreaField, SelectField } from "../ui/FormFields";
 import { FieldNotes, LinkHints, firstWebAddress, hintsId } from "./FieldHints";
 import { CONTAINER_SPACING_CLASSES } from "../ui/styles";
@@ -50,6 +50,10 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
   const currentProvider = data.provider || CalendarProvider.ICAL;
   const supportsRecurrence =
     currentProvider === CalendarProvider.ICAL || currentProvider === CalendarProvider.GOOGLE;
+  const chronologicalViolation = hasChronologicalViolation(data.startDate, data.endDate);
+  const endDateError = chronologicalViolation
+    ? describeViolation("EVENT_CHRONOLOGICAL_VIOLATION")
+    : undefined;
 
   return (
     <div className={CONTAINER_SPACING_CLASSES}>
@@ -106,6 +110,7 @@ export const EventInput: React.FC<EventInputProps> = ({ data, onChange }) => {
         type={data.allDay ? "date" : "datetime-local"}
         value={data.endDate}
         onChange={(e) => onChange({ endDate: e.target.value })}
+        error={endDateError}
       />
       {!data.allDay && (
       <SelectField

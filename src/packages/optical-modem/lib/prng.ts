@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { createMulberry32 } from '@/packages/core/math';
+
 /** A small seeded generator (mulberry32). Integer maths only, so it is identical everywhere. */
 export interface Rng {
   /** Next unsigned 32-bit integer. */
@@ -32,20 +34,13 @@ export interface Rng {
  * @returns The generator.
  */
 export function createRng(seed: number): Rng {
-  let state = seed >>> 0;
-  const nextUint32 = (): number => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return (t ^ (t >>> 14)) >>> 0;
-  };
-  const nextFloat = (): number => nextUint32() / 4294967296;
+  const gen = createMulberry32(seed);
   return {
-    nextUint32,
-    nextFloat,
+    nextUint32: gen.nextUint32,
+    nextFloat: gen,
     nextGaussian: () => {
       let sum = 0;
-      for (let i = 0; i < 12; i++) sum += nextFloat();
+      for (let i = 0; i < 12; i++) sum += gen();
       return sum - 6;
     },
   };

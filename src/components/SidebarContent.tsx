@@ -1,5 +1,4 @@
 import { useContext } from 'react';
-import { copy as indexCopy } from '@/data/copy/index';
 import { PageCopyContext } from '@/data/copy/PageCopyContext';
 import { usePageContent } from '@/data/PageContentContext';
 import { getGuideFaqs } from '@/data/guideFaqs';
@@ -36,9 +35,7 @@ export function SidebarContent({ toolId }: SidebarContentProps) {
 
   if (!page || !content) return null;
 
-  const displayFaqs = (copy.faqs && copy.faqs.length > 0)
-    ? copy.faqs
-    : indexCopy.faqs ?? [];
+  const displayFaqs = copy?.faqs ?? [];
 
   const { example, related, gallery, guide } = page;
   // Background reading lives in the FAQ, below the tool, so it never sits in the way (#1354).

@@ -6,6 +6,7 @@ export * from './InputRegistry';
 export * from './LocationInput';
 export * from './MeetingInput';
 export * from './PaymentInput';
+export * from './LazyPaymentInput';
 export * from './PhoneInput';
 export * from './SmsInput';
 export * from './SocialInput';

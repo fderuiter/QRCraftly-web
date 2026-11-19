@@ -27,6 +27,7 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
   const photoError = vCardFieldError("photo", data.photo);
   const streetError = vCardFieldError("street", data.street);
   const cityError = vCardFieldError("city", data.city);
+  const stateError = vCardFieldError("state", data.state);
   const zipError = vCardFieldError("zip", data.zip);
   const countryError = vCardFieldError("country", data.country);
   // A half-typed profile link is not yet on its network's host, so its error waits for blur (#1435).
@@ -228,6 +229,17 @@ export const VCardInput: React.FC<VCardInputProps> = ({ data, onChange }) => {
               value={data.city}
               onChange={(e) => edit({ city: e.target.value })}
               error={cityError}
+            />
+            <TextField
+              id="vcard-state"
+              name="state"
+              label="State or Province"
+              autoComplete="address-level1"
+              maxLength={100}
+              placeholder="State or Province"
+              value={data.state || ""}
+              onChange={(e) => edit({ state: e.target.value })}
+              error={stateError}
             />
             <TextField
               id="vcard-zip"

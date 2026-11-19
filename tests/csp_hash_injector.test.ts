@@ -24,10 +24,17 @@ describe('CSP Hash Injector Unit Tests', () => {
 
       const generated = generateHeadersContent(existingHeaders, baseCsp);
 
-      expect(generated).toContain(`/*\n  Content-Security-Policy: ${baseCsp}\n  X-Frame-Options: DENY`);
+      expect(generated).toContain(`/*\n  Content-Security-Policy: ${baseCsp} frame-ancestors 'none';\n  X-Frame-Options: DENY`);
       expect(generated).toContain('/about\n  X-Robots-Tag: noindex');
       expect(generated.match(/Content-Security-Policy:/g)).toHaveLength(1);
       expect(() => validateHeaders(baseCsp, generated)).not.toThrow();
+    });
+
+    it('does not duplicate frame-ancestors if already present in base CSP', () => {
+      const cspWithFrameAncestors = `${BASE_CSP_PATTERN} frame-ancestors 'none';`;
+      const generated = generateHeadersContent('', cspWithFrameAncestors);
+      expect(generated.match(/frame-ancestors/g)).toHaveLength(1);
+      expect(generated).toContain(`Content-Security-Policy: ${cspWithFrameAncestors}`);
     });
   });
 
@@ -99,12 +106,17 @@ describe('CSP Hash Injector Unit Tests', () => {
 
   describe('validateHeaders', () => {
     it('should pass valid headers configuration', () => {
-      const csp = "default-src 'self';";
+      const csp = "default-src 'self'; frame-ancestors 'none';";
       const content = `/*\n  Content-Security-Policy: ${csp}\n  X-Frame-Options: DENY\n`;
       const results = validateHeaders(csp, content);
-      expect(results.cspLength).toBe(19);
+      expect(results.cspLength).toBe(csp.length);
       expect(results.totalHeadersSize).toBeGreaterThan(0);
       expect(results.routeHeaders['/*']).toHaveLength(2);
+    });
+
+    it('rejects a _headers file where Content-Security-Policy lacks frame-ancestors', () => {
+      const headers = "/*\n  Content-Security-Policy: default-src 'self';\n";
+      expect(() => validateHeaders(headers)).toThrow(/must include "frame-ancestors 'none'"/);
     });
 
     it('should throw error when CSP is too long', () => {
