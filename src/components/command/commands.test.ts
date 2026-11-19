@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildCommands, filterCommands, type CommandHost } from './commands';
-import { QRStyle } from '@/packages/core/types';
+import { QRStyle, QRType } from '@/packages/core/types';
 import type { QRStore } from '../../context/QRContext';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
+import { resetPatch } from '../generator/decisions';
+import { resetStylePatch } from '../../utils/styleFields';
 
 function host(overrides: Partial<CommandHost> = {}, state: Partial<ReturnType<QRStore['getState']>> = {}) {
   const store = {
@@ -50,20 +52,51 @@ describe('buildCommands', () => {
     expect(value.notifyUndo).toHaveBeenCalled();
   });
 
-  it('disables Undo, Redo and Remove logo when there is nothing to do', () => {
-    const commands = buildCommands(host().value);
-    for (const id of ['undo', 'redo', 'remove-logo']) expect(commands.find((c) => c.id === id)?.disabled).toBe(true);
-    const ready = buildCommands(host({}, { canUndo: true, canRedo: true, config: { ...DEFAULT_CONFIG, logoUrl: 'data:image/png;base64,AA' } }).value);
-    for (const id of ['undo', 'redo', 'remove-logo']) expect(ready.find((c) => c.id === id)?.disabled).toBeFalsy();
+  it('disables Undo, Redo, Reset style, and Remove logo when there is nothing to do', () => {
+    const commands = buildCommands(
+      host({}, { config: { ...DEFAULT_CONFIG, type: QRType.WIFI, value: 'WIFI:T:WPA;S:Lab;P:pw;;' } }).value
+    );
+    for (const id of ['undo', 'redo', 'reset-style', 'remove-logo']) {
+      expect(commands.find((c) => c.id === id)?.disabled).toBe(true);
+    }
+    expect(commands.find((c) => c.id === 'reset-style')?.group).toBe('Edit');
+
+    const ready = buildCommands(
+      host({}, { canUndo: true, canRedo: true, config: { ...DEFAULT_CONFIG, logoUrl: 'data:image/png;base64,AA' } }).value
+    );
+    for (const id of ['undo', 'redo', 'reset-style', 'remove-logo']) {
+      expect(ready.find((c) => c.id === id)?.disabled).toBeFalsy();
+    }
   });
 
-  it('runs Surprise me and the Edit actions through the store', () => {
-    const { value, store } = host();
+  it('runs Surprise me, Reset colors, and Reset style through shared patches and undo toast', () => {
+    const { value, store } = host(
+      {},
+      {
+        config: {
+          ...DEFAULT_CONFIG,
+          style: QRStyle.SWISS,
+          gradientType: 'linear',
+          gradientColorStops: [
+            { offset: 0, color: '#111111' },
+            { offset: 1, color: '#999999' },
+          ],
+          logoUrl: 'data:image/png;base64,AA',
+          frameText: 'SCAN ME',
+        },
+      }
+    );
     const commands = buildCommands(value);
     commands.find((c) => c.id === 'surprise')?.run();
     commands.find((c) => c.id === 'toggle-border')?.run();
     commands.find((c) => c.id === 'reset-colors')?.run();
-    expect(store.updateConfig).toHaveBeenCalledTimes(3);
+    expect(store.updateConfig).toHaveBeenLastCalledWith(resetPatch());
+    expect(value.notifyUndo).toHaveBeenLastCalledWith('Colors reset');
+
+    commands.find((c) => c.id === 'reset-style')?.run();
+    expect(store.updateConfig).toHaveBeenLastCalledWith(resetStylePatch());
+    expect(value.notifyUndo).toHaveBeenLastCalledWith('Style reset');
+    expect(store.updateConfig).toHaveBeenCalledTimes(4);
   });
 
   it('preserves the gradient end color when applying a color preset command', () => {

@@ -1,8 +1,9 @@
 import { QRErrorCorrectionLevel } from '@/packages/core/types';
 import { PATTERNS, PRESET_COLORS, buildPresetColorPatch } from '../../constants';
-import { DEFAULT_CONFIG } from '@/packages/core/config';
 import type { QRStore } from '../../context/QRContext';
 import type { DownloadFormat } from '../ExportOptions';
+import { resetPatch } from '../generator/decisions';
+import { isStyleAtBaseline, resetStylePatch } from '../../utils/styleFields';
 import { surpriseStyle } from '../../utils/styleGallery';
 
 /** Group heading a command is listed under. */
@@ -124,18 +125,23 @@ export function buildCommands(host: CommandHost): Command[] {
       },
     },
     {
+      id: 'reset-style',
+      label: 'Reset style',
+      group: 'Edit',
+      keywords: 'default clear appearance template border frame logo',
+      disabled: isStyleAtBaseline(config),
+      run: () => {
+        store.updateConfig(resetStylePatch());
+        notifyUndo('Style reset');
+      },
+    },
+    {
       id: 'reset-colors',
       label: 'Reset colors',
       group: 'Edit',
-      keywords: 'black white default',
+      keywords: 'black white default gradient solid',
       run: () => {
-        store.updateConfig({
-          fgColor: DEFAULT_CONFIG.fgColor,
-          bgColor: DEFAULT_CONFIG.bgColor,
-          eyeColor: DEFAULT_CONFIG.eyeColor,
-          eyeFrameColor: undefined,
-          eyeBallColor: undefined,
-        });
+        store.updateConfig(resetPatch());
         notifyUndo('Colors reset');
       },
     },
