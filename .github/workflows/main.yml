@@ -143,7 +143,7 @@ jobs:
         # Upstream Semgrep 1.185.0 pins mcp==1.29.0 and opentelemetry-api~=1.37.0 (see .github/dependabot.yml);
         # ignore known CVEs in those pinned versions until Semgrep upgrades them upstream.
         run: |
-          pip install pip-audit
+          pip install --require-hashes -r requirements.txt
           pip-audit -r requirements.txt \
             --ignore-vuln CVE-2026-59951 \
             --ignore-vuln CVE-2026-116685 \
