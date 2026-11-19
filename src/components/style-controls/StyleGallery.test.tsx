@@ -50,12 +50,15 @@ describe('StyleGallery', () => {
     expect(container.querySelector('img')?.getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
   });
 
-  it('applies a tile as one undoable step', async () => {
+  it('applies a tile as one undoable step without rendering duplicate undo/redo buttons inside the gallery', async () => {
     const { store } = setup();
+    expect(screen.queryByRole('button', { name: 'Undo style change' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Redo style change' })).not.toBeInTheDocument();
+
     await userEvent.click(screen.getByRole('radio', { name: /Swiss Dot pattern/ }));
     expect(store().getState().config.style).toBe(QRStyle.SWISS);
     expect(screen.getByRole('radio', { name: /Swiss Dot pattern/ })).toHaveAttribute('aria-checked', 'true');
-    await userEvent.click(screen.getByRole('button', { name: 'Undo style change' }));
+    act(() => void store().undo());
     expect(store().getState().config.style).toBe(DEFAULT_CONFIG.style);
   });
 

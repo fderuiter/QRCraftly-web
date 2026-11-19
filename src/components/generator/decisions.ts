@@ -122,6 +122,8 @@ export function fixPatch(fix: ScanFix): Partial<QRConfig> {
     eyeColor: '#000000',
     eyeFrameColor: '#000000',
     eyeBallColor: '#000000',
+    gradientType: 'none',
+    gradientColorStops: undefined,
   };
 }
 
@@ -133,6 +135,8 @@ export function resetPatch(): Partial<QRConfig> {
     eyeColor: DEFAULT_CONFIG.eyeColor,
     eyeFrameColor: undefined,
     eyeBallColor: undefined,
+    gradientType: 'none',
+    gradientColorStops: undefined,
   };
 }
 

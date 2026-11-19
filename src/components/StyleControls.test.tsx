@@ -15,13 +15,17 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import StyleControls from './StyleControls';
 import { PRESET_LOGOS } from '../constants/presetLogos';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
-import { QRStyle, type LogoPaddingStyle, QRErrorCorrectionLevel, type QRConfig, SocialFormat, TemplateStyle } from '@/packages/core/types';
+import { QRStyle, QRType, type LogoPaddingStyle, QRErrorCorrectionLevel, type QRConfig, SocialFormat, TemplateStyle } from '@/packages/core/types';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { expandAppearanceSections } from '../../tests/utils/expandAppearanceSections';
+import { axe } from '../../tests/utils/axe';
+import { QRProvider, useQRStore, useQRStoreSelector } from '../context/QRContext';
+import { ToastProvider } from './ui/Toast';
+import { isStyleAtBaseline } from '../utils/styleFields';
 import userEvent from '@testing-library/user-event';
 
 describe('StyleControls Component', () => {
@@ -980,4 +984,137 @@ describe('Preset Logo Gallery', () => {
     expect(mockOnChange).toHaveBeenCalledWith({ logoUrl: null });
   });
 });
+
+describe('Appearance recovery toolbar', () => {
+  function StudioHarness({
+    initialConfig,
+    onStore,
+  }: {
+    initialConfig?: Partial<QRConfig>;
+    onStore?: (store: ReturnType<typeof useQRStore>) => void;
+  }) {
+    function Inner() {
+      const store = useQRStore();
+      const config = useQRStoreSelector((s) => s.config);
+      onStore?.(store);
+      return <StyleControls config={config} onChange={store.updateConfig} />;
+    }
+
+    return (
+      <ToastProvider>
+        <QRProvider initialConfig={initialConfig}>
+          <Inner />
+        </QRProvider>
+      </ToastProvider>
+    );
+  }
+
+  it('renders Undo, Redo, and Reset style above all accordions without opening Style Gallery', async () => {
+    const { container } = render(<StudioHarness />);
+    const toolbar = screen.getByRole('group', { name: 'Appearance actions' });
+    expect(within(toolbar).getByRole('button', { name: 'Undo style change' })).toBeDisabled();
+    expect(within(toolbar).getByRole('button', { name: 'Redo style change' })).toBeDisabled();
+    expect(within(toolbar).getByRole('button', { name: 'Reset style' })).toBeDisabled();
+
+    // Style Gallery remains collapsed and unloaded
+    expect(screen.getByRole('button', { name: 'Style Gallery' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('radiogroup', { name: 'Patterns' })).not.toBeInTheDocument();
+
+    // Toolbar sits before the first accordion heading in DOM order
+    const templatesToggle = screen.getByRole('button', { name: 'Templates' });
+    expect(toolbar.compareDocumentPosition(templatesToggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('steps Undo and Redo and resets all customized style fields, media, and frame text in one undoable step while preserving QR content', async () => {
+    const user = userEvent.setup();
+    let store!: ReturnType<typeof useQRStore>;
+    render(
+      <StudioHarness
+        initialConfig={{
+          type: QRType.WIFI,
+          value: 'WIFI:T:WPA;S:StudioGuest;P:pass1234;;',
+          borderText: 'Guest Wi-Fi',
+          templateHeadline: 'Welcome',
+          templateSubtext: 'Scan to join',
+        }}
+        onStore={(s) => {
+          store = s;
+        }}
+      />
+    );
+
+    const toolbar = screen.getByRole('group', { name: 'Appearance actions' });
+    const undoBtn = within(toolbar).getByRole('button', { name: 'Undo style change' });
+    const redoBtn = within(toolbar).getByRole('button', { name: 'Redo style change' });
+    const resetBtn = within(toolbar).getByRole('button', { name: 'Reset style' });
+
+    // Custom content alone leaves Reset style disabled
+    expect(resetBtn).toBeDisabled();
+
+    // Apply rich visual customizations including gradients, logos, images, and frame text
+    act(() => {
+      store.updateConfig({
+        style: QRStyle.SWISS,
+        fgColor: '#334155',
+        bgColor: '#f8fafc',
+        gradientType: 'linear',
+        gradientColorStops: [
+          { offset: 0, color: '#334155' },
+          { offset: 1, color: '#0ea5e9' },
+        ],
+        isBorderEnabled: true,
+        socialFormat: SocialFormat.STORY_9_16,
+        templateStyle: TemplateStyle.MINIMALIST,
+        logoUrl: 'data:image/png;base64,LOGO',
+        borderLogoUrl: 'data:image/png;base64,BORDER',
+        backgroundImageUrl: 'data:image/png;base64,BG',
+        mosaicImageUrl: 'data:image/png;base64,MOSAIC',
+        frameStyle: 'pill',
+        frameText: 'SCAN ME',
+      });
+    });
+
+    expect(undoBtn).toBeEnabled();
+    expect(redoBtn).toBeDisabled();
+    expect(resetBtn).toBeEnabled();
+
+    await user.click(resetBtn);
+
+    const afterReset = store.getState().config;
+    expect(isStyleAtBaseline(afterReset)).toBe(true);
+    expect(afterReset.logoUrl).toBeNull();
+    expect(afterReset.borderLogoUrl).toBeNull();
+    expect(afterReset.backgroundImageUrl).toBeNull();
+    expect(afterReset.mosaicImageUrl).toBeNull();
+    expect(afterReset.frameText).toBe('');
+    expect(afterReset.gradientType).toBe('none');
+    expect(afterReset.gradientColorStops).toBeUndefined();
+
+    // QR payload and free-text content fields remain untouched
+    expect(afterReset.type).toBe(QRType.WIFI);
+    expect(afterReset.value).toBe('WIFI:T:WPA;S:StudioGuest;P:pass1234;;');
+    expect(afterReset.borderText).toBe('Guest Wi-Fi');
+    expect(afterReset.templateHeadline).toBe('Welcome');
+    expect(afterReset.templateSubtext).toBe('Scan to join');
+
+    // Reset style disables itself at baseline and shows the undo toast
+    expect(resetBtn).toBeDisabled();
+    expect(await screen.findByText('Style reset')).toBeInTheDocument();
+
+    // Clicking Undo restores the customized style in a single step, and Redo re-applies the reset
+    await user.click(undoBtn);
+    expect(store.getState().config.style).toBe(QRStyle.SWISS);
+    expect(store.getState().config.logoUrl).toBe('data:image/png;base64,LOGO');
+    expect(store.getState().config.frameText).toBe('SCAN ME');
+    expect(redoBtn).toBeEnabled();
+    expect(resetBtn).toBeEnabled();
+
+    await user.click(redoBtn);
+    expect(isStyleAtBaseline(store.getState().config)).toBe(true);
+    expect(resetBtn).toBeDisabled();
+  });
+});
+
 

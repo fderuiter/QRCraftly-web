@@ -21,6 +21,7 @@ import { render, renderHook, act, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   clearRetainedAppearance,
+  MAX_HISTORY_STEPS,
   QRProvider,
   stageGeneratorContent,
   useQRStore,
@@ -28,7 +29,7 @@ import {
   useOptionalQRStoreSelector,
 } from './QRContext';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
-import { type QRConfig, QRErrorCorrectionLevel, QRType, SocialFormat } from '@/packages/core/types';
+import { type QRConfig, QRErrorCorrectionLevel, QRStyle, QRType, SocialFormat } from '@/packages/core/types';
 
 // ---------------------------------------------------------------------------
 // Helper wrapper
@@ -458,12 +459,141 @@ describe('QRProvider retainAppearance', () => {
   });
 
   it('never writes retained appearance to persistent storage', () => {
-    const { result } = renderHook(() => useQRStore(), { wrapper: retainingWrapper({}) });
+    const localSetSpy = vi.spyOn(window.localStorage, 'setItem');
+    const sessionSetSpy = vi.spyOn(window.sessionStorage, 'setItem');
+    const { result, unmount } = renderHook(() => useQRStore(), { wrapper: retainingWrapper({}) });
     act(() => {
       result.current.updateConfig({ fgColor: '#010203' });
+      result.current.undo();
+      result.current.redo();
     });
-    expect(Object.keys(window.localStorage)).not.toContain('fgColor');
-    expect(JSON.stringify({ ...window.localStorage })).not.toContain('#010203');
+    unmount();
+    expect(localSetSpy).not.toHaveBeenCalled();
+    expect(sessionSetSpy).not.toHaveBeenCalled();
+    expect(Object.keys(window.localStorage)).toHaveLength(0);
+    expect(Object.keys(window.sessionStorage)).toHaveLength(0);
+  });
+
+  it('retains undo and redo appearance stacks across generator routes while preserving the new route content', () => {
+    vi.useFakeTimers();
+    const urlRoute = renderHook(() => useQRStore(), {
+      wrapper: retainingWrapper({ ...DEFAULT_CONFIG, type: QRType.URL, value: 'https://secret.example/url' }),
+    });
+
+    act(() => {
+      urlRoute.result.current.updateConfig({
+        style: QRStyle.SWISS,
+        fgColor: '#1e293b',
+        borderText: 'Private URL border',
+        templateHeadline: 'Private URL headline',
+      });
+      vi.advanceTimersByTime(1000);
+      urlRoute.result.current.updateConfig({
+        gradientType: 'linear',
+        gradientColorStops: [
+          { offset: 0, color: '#1e293b' },
+          { offset: 1, color: '#3b82f6' },
+        ],
+      });
+      // Step back once so both past and future have entries before switching routes
+      urlRoute.result.current.undo();
+    });
+
+    expect(urlRoute.result.current.getState().canUndo).toBe(true);
+    expect(urlRoute.result.current.getState().canRedo).toBe(true);
+    expect(urlRoute.result.current.getState().config.gradientType).toBeUndefined();
+    urlRoute.unmount();
+
+    // Switch to Wi-Fi route with fresh content
+    const wifiRoute = renderHook(() => useQRStore(), {
+      wrapper: retainingWrapper({
+        ...DEFAULT_CONFIG,
+        type: QRType.WIFI,
+        value: 'WIFI:T:WPA;S:StudioWifi;P:pw;;',
+      }),
+    });
+
+    expect(wifiRoute.result.current.getState().canUndo).toBe(true);
+    expect(wifiRoute.result.current.getState().canRedo).toBe(true);
+    expect(wifiRoute.result.current.getState().config.style).toBe(QRStyle.SWISS);
+    expect(wifiRoute.result.current.getState().config.type).toBe(QRType.WIFI);
+    expect(wifiRoute.result.current.getState().config.value).toBe('WIFI:T:WPA;S:StudioWifi;P:pw;;');
+    expect(wifiRoute.result.current.getState().config.borderText).toBe(DEFAULT_CONFIG.borderText);
+    expect(wifiRoute.result.current.getState().config.templateHeadline).toBe(DEFAULT_CONFIG.templateHeadline);
+
+    // Redo restores the gradient step made on the URL route without altering Wi-Fi content
+    act(() => {
+      expect(wifiRoute.result.current.redo()).toBe(true);
+    });
+    expect(wifiRoute.result.current.getState().config.gradientType).toBe('linear');
+    expect(wifiRoute.result.current.getState().config.gradientColorStops).toEqual([
+      { offset: 0, color: '#1e293b' },
+      { offset: 1, color: '#3b82f6' },
+    ]);
+    expect(wifiRoute.result.current.getState().config.type).toBe(QRType.WIFI);
+    expect(wifiRoute.result.current.getState().config.value).toBe('WIFI:T:WPA;S:StudioWifi;P:pw;;');
+
+    // Undo twice returns all the way to initial baseline while keeping Wi-Fi content
+    act(() => {
+      expect(wifiRoute.result.current.undo()).toBe(true);
+      expect(wifiRoute.result.current.undo()).toBe(true);
+    });
+    expect(wifiRoute.result.current.getState().canUndo).toBe(false);
+    expect(wifiRoute.result.current.getState().canRedo).toBe(true);
+    expect(wifiRoute.result.current.getState().config.style).toBe(DEFAULT_CONFIG.style);
+    expect(wifiRoute.result.current.getState().config.fgColor).toBe(DEFAULT_CONFIG.fgColor);
+    expect(wifiRoute.result.current.getState().config.gradientType).toBeUndefined();
+    expect(wifiRoute.result.current.getState().config.gradientColorStops).toBeUndefined();
+    expect(wifiRoute.result.current.getState().config.type).toBe(QRType.WIFI);
+    expect(wifiRoute.result.current.getState().config.value).toBe('WIFI:T:WPA;S:StudioWifi;P:pw;;');
+
+    vi.useRealTimers();
+  });
+
+  it('caps retained undo history at MAX_HISTORY_STEPS across routes and clears both stacks in clearRetainedAppearance', () => {
+    vi.useFakeTimers();
+    const firstRoute = renderHook(() => useQRStore(), { wrapper: retainingWrapper({ type: QRType.URL }) });
+    act(() => {
+      for (let i = 0; i < 35; i += 1) {
+        firstRoute.result.current.updateConfig({
+          borderSize: i % 2 ? 0.05 : 0.07,
+          isBorderEnabled: i % 2 === 0,
+        });
+        vi.advanceTimersByTime(1000);
+      }
+    });
+    firstRoute.unmount();
+
+    const secondRoute = renderHook(() => useQRStore(), { wrapper: retainingWrapper({ type: QRType.TEXT }) });
+    act(() => {
+      for (let i = 0; i < 30; i += 1) {
+        secondRoute.result.current.updateConfig({
+          quietZoneModules: (i % 5) + 3,
+        });
+        vi.advanceTimersByTime(1000);
+      }
+      // Leave one item on the future stack as well
+      secondRoute.result.current.undo();
+    });
+    secondRoute.unmount();
+
+    const thirdRoute = renderHook(() => useQRStore(), { wrapper: retainingWrapper({ type: QRType.EMAIL }) });
+    expect(thirdRoute.result.current.getState().canUndo).toBe(true);
+    expect(thirdRoute.result.current.getState().canRedo).toBe(true);
+    let undone = 0;
+    act(() => {
+      while (thirdRoute.result.current.undo()) undone += 1;
+    });
+    // 50 retained past steps minus the 1 undone before unmounting = 49 remaining undo steps
+    expect(undone).toBe(MAX_HISTORY_STEPS - 1);
+    thirdRoute.unmount();
+
+    clearRetainedAppearance();
+    const freshRoute = renderHook(() => useQRStore(), { wrapper: retainingWrapper({ type: QRType.URL }) });
+    expect(freshRoute.result.current.getState().canUndo).toBe(false);
+    expect(freshRoute.result.current.getState().canRedo).toBe(false);
+    expect(freshRoute.result.current.getState().config.isBorderEnabled).toBe(DEFAULT_CONFIG.isBorderEnabled);
+    vi.useRealTimers();
   });
 });
 

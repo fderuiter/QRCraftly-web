@@ -123,10 +123,13 @@ const NON_RETAINED_FIELDS: ReadonlySet<keyof QRConfig> = new Set<keyof QRConfig>
 ]);
 
 /**
- * Appearance-only settings kept in volatile module memory so they survive client-side
- * navigation between generator routes. Never persisted: a reload or new tab starts fresh.
+ * Appearance-only settings and undo/redo stacks kept in volatile module memory so they
+ * survive client-side navigation between generator routes. Never persisted: a reload or new
+ * tab starts fresh.
  */
 let retainedAppearance: Partial<QRConfig> | null = null;
+let retainedPast: Partial<QRConfig>[] = [];
+let retainedFuture: Partial<QRConfig>[] = [];
 
 function pickAppearance(config: QRConfig): Partial<QRConfig> {
   const appearance: Partial<QRConfig> = {};
@@ -139,10 +142,12 @@ function pickAppearance(config: QRConfig): Partial<QRConfig> {
 }
 
 /**
- * Forgets appearance retained from earlier generator routes.
+ * Forgets appearance and undo/redo history retained from earlier generator routes.
  */
 export function clearRetainedAppearance(): void {
   retainedAppearance = null;
+  retainedPast = [];
+  retainedFuture = [];
 }
 
 /**
@@ -170,11 +175,35 @@ export const MAX_HISTORY_STEPS = 50;
 const COALESCE_MS = 600;
 
 function sameAppearance(a: Partial<QRConfig>, b: Partial<QRConfig>): boolean {
-  const keys = Object.keys(a) as (keyof QRConfig)[];
-  return keys.every(key => Object.is(a[key], b[key]));
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)] as (keyof QRConfig)[]);
+  for (const key of keys) {
+    if (!Object.is(a[key], b[key])) return false;
+  }
+  return true;
+}
+
+function applyAppearance(current: QRConfig, appearance: Partial<QRConfig>): QRConfig {
+  const next: QRConfig = {
+    ...DEFAULT_CONFIG,
+    ...appearance,
+    type: current.type,
+    value: current.value,
+    borderText: current.borderText,
+    templateHeadline: current.templateHeadline,
+    templateSubtext: current.templateSubtext,
+  };
+  if ('animationValues' in current) next.animationValues = current.animationValues;
+  if ('isAnimating' in current) next.isAnimating = current.isAnimating;
+  return sanitizeConfig(next);
 }
 
 function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = false, presetConfig?: Partial<QRConfig>): QRStore {
+  // Undo history holds appearance snapshots in memory only (never persisted).
+  let past: Partial<QRConfig>[] = retainAppearance ? retainedPast.slice(-MAX_HISTORY_STEPS) : [];
+  let future: Partial<QRConfig>[] = retainAppearance ? retainedFuture.slice(-MAX_HISTORY_STEPS) : [];
+  let lastPush: { keys: string; at: number } | null = null;
+  let previewBase: Partial<QRConfig> | null = null;
+
   let state: QRState = {
     config: {
       ...DEFAULT_CONFIG,
@@ -186,15 +215,9 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
     moduleCount: 0,
     isScannabilityFallbackActive: false,
     contentRefused: false,
-    canUndo: false,
-    canRedo: false,
+    canUndo: past.length > 0,
+    canRedo: future.length > 0,
   };
-
-  // Undo history holds appearance snapshots in memory only (never persisted).
-  let past: Partial<QRConfig>[] = [];
-  let future: Partial<QRConfig>[] = [];
-  let lastPush: { keys: string; at: number } | null = null;
-  let previewBase: Partial<QRConfig> | null = null;
 
   const listeners = new Set<() => void>();
   const signals: { [N in SignalName]: Set<SignalCallback<N>> } = {
@@ -230,6 +253,10 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
         }
         lastPush = { keys, at: now };
         future = [];
+        if (retainAppearance) {
+          retainedPast = past;
+          retainedFuture = future;
+        }
       }
       if (retainAppearance && previewBase === null) retainedAppearance = after;
       const resetsFallback = FALLBACK_RESET_FIELDS.some(key => !Object.is(sanitized[key], state.config[key]));
@@ -244,23 +271,49 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
     undo: () => {
       const target = past[past.length - 1];
       if (!target) return false;
+      const currentAppearance = previewBase ?? pickAppearance(state.config);
+      previewBase = null;
       past = past.slice(0, -1);
-      future = [...future, pickAppearance(state.config)];
+      future = [...future.slice(-(MAX_HISTORY_STEPS - 1)), currentAppearance];
       lastPush = null;
-      const sanitized = sanitizeConfig({ ...state.config, ...target });
-      if (retainAppearance) retainedAppearance = pickAppearance(sanitized);
-      setState({ ...state, config: sanitized, canUndo: past.length > 0, canRedo: true });
+      const sanitized = applyAppearance(state.config, target);
+      if (retainAppearance) {
+        retainedAppearance = pickAppearance(sanitized);
+        retainedPast = past;
+        retainedFuture = future;
+      }
+      const resetsFallback = FALLBACK_RESET_FIELDS.some(key => !Object.is(sanitized[key], state.config[key]));
+      setState({
+        ...state,
+        config: sanitized,
+        isScannabilityFallbackActive: resetsFallback ? false : state.isScannabilityFallbackActive,
+        canUndo: past.length > 0,
+        canRedo: true,
+      });
       return true;
     },
     redo: () => {
       const target = future[future.length - 1];
       if (!target) return false;
+      const currentAppearance = previewBase ?? pickAppearance(state.config);
+      previewBase = null;
       future = future.slice(0, -1);
-      past = [...past, pickAppearance(state.config)];
+      past = [...past.slice(-(MAX_HISTORY_STEPS - 1)), currentAppearance];
       lastPush = null;
-      const sanitized = sanitizeConfig({ ...state.config, ...target });
-      if (retainAppearance) retainedAppearance = pickAppearance(sanitized);
-      setState({ ...state, config: sanitized, canUndo: true, canRedo: future.length > 0 });
+      const sanitized = applyAppearance(state.config, target);
+      if (retainAppearance) {
+        retainedAppearance = pickAppearance(sanitized);
+        retainedPast = past;
+        retainedFuture = future;
+      }
+      const resetsFallback = FALLBACK_RESET_FIELDS.some(key => !Object.is(sanitized[key], state.config[key]));
+      setState({
+        ...state,
+        config: sanitized,
+        isScannabilityFallbackActive: resetsFallback ? false : state.isScannabilityFallbackActive,
+        canUndo: true,
+        canRedo: future.length > 0,
+      });
       return true;
     },
     preview: (updates) => {
@@ -268,7 +321,7 @@ function createQRStore(initialConfig?: Partial<QRConfig>, retainAppearance = fal
         if (previewBase === null) return;
         const base = previewBase;
         previewBase = null;
-        const restored = sanitizeConfig({ ...state.config, ...base });
+        const restored = applyAppearance(state.config, base);
         if (!shallowEqualConfig(restored, state.config)) setState({ ...state, config: restored });
         return;
       }

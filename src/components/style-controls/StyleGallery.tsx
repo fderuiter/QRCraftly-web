@@ -1,16 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CircleCheck, Dices, Redo2, TriangleAlert, Undo2 } from 'lucide-react';
+import { CircleCheck, Dices, TriangleAlert } from 'lucide-react';
 import { type QRConfig, type QRModules, SocialFormat, TemplateStyle } from '@/packages/core/types';
 import { PATTERNS, PRESET_COLORS, buildPresetColorPatch } from '../../constants';
 import { getSamplePayload } from '@/packages/qr-payload';
 import { buildMatrix, loadQrEncoder, type MatrixSource } from '@/packages/qr-matrix';
-import { useOptionalQRStore, useOptionalQRStoreSelector } from '../../context/QRContext';
+import { useOptionalQRStore } from '../../context/QRContext';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useUndoToast } from '../../hooks/useUndoToast';
 import { styleScanTone, surpriseStyle, type StyleChoice } from '../../utils/styleGallery';
 import { Button } from '../ui/Button';
 import { SegmentedControl } from '../ui/SegmentedControl';
-import { Tooltip } from '../ui/Tooltip';
 
 interface StyleGalleryProps {
   /** The current QR code configuration. */
@@ -132,8 +131,6 @@ function TileFace({ tile, src }: { tile: Tile; src?: string }) {
  */
 const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
   const store = useOptionalQRStore();
-  const canUndo = useOptionalQRStoreSelector((s) => s.canUndo) ?? false;
-  const canRedo = useOptionalQRStoreSelector((s) => s.canRedo) ?? false;
   const notifyUndo = useUndoToast();
   // While a tile is previewed the main config shows the preview, so the gallery keeps drawing from the look underneath.
   const [baseChoice, setBaseChoice] = useState<StyleChoice | null>(null);
@@ -290,18 +287,6 @@ const StyleGallery: React.FC<StyleGalleryProps> = ({ config, onChange }) => {
           <Dices className="size-4" aria-hidden="true" />
           Surprise me
         </Button>
-        <div className="ml-auto flex gap-1">
-          <Tooltip content="Undo">
-            <Button variant="ghost" iconOnly size="sm" aria-label="Undo style change" aria-disabled={canUndo ? undefined : 'true'} onClick={() => void store?.undo()}>
-              <Undo2 className="size-4" aria-hidden="true" />
-            </Button>
-          </Tooltip>
-          <Tooltip content="Redo">
-            <Button variant="ghost" iconOnly size="sm" aria-label="Redo style change" aria-disabled={canRedo ? undefined : 'true'} onClick={() => void store?.redo()}>
-              <Redo2 className="size-4" aria-hidden="true" />
-            </Button>
-          </Tooltip>
-        </div>
       </div>
 
       <div>
