@@ -92,4 +92,19 @@ describe('PreviewCard', () => {
     expect(screen.getByText(/The validator has recovered/)).toBeInTheDocument();
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  it('applies qr-checkerboard on qr-stage when debouncedConfig.bgColor is transparent and bg-surface-sunken otherwise', async () => {
+    const opaqueRender = renderCard(preview({ debouncedConfig: { ...config, bgColor: '#ffffff' } }));
+    const opaqueStage = screen.getByTestId('qr-stage');
+    expect(opaqueStage).toHaveClass('bg-surface-sunken');
+    expect(opaqueStage).not.toHaveClass('qr-checkerboard');
+    opaqueRender.unmount();
+
+    const transparentConfig: QRConfig = { ...config, bgColor: 'transparent' };
+    const { container } = renderCard(preview({ effectiveConfig: transparentConfig, debouncedConfig: transparentConfig }));
+    const transparentStage = screen.getByTestId('qr-stage');
+    expect(transparentStage).toHaveClass('qr-checkerboard');
+    expect(transparentStage).not.toHaveClass('bg-surface-sunken');
+    expect(await axe(container)).toHaveNoViolations();
+  });
 });
