@@ -61,4 +61,49 @@ test.describe('Generator power features (#1059, #1061)', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toHaveCount(0);
   });
+
+  test('the persistent appearance toolbar preserves undo/redo across generator routes and resets style while keeping content', async ({ page }) => {
+    await gotoHydrated(page, '/');
+
+    const toolbar = page.getByRole('group', { name: 'Appearance actions' });
+    const undoBtn = toolbar.getByRole('button', { name: 'Undo style change' });
+    const redoBtn = toolbar.getByRole('button', { name: 'Redo style change' });
+    const resetBtn = toolbar.getByRole('button', { name: 'Reset style' });
+
+    await expect(undoBtn).toBeDisabled();
+    await expect(redoBtn).toBeDisabled();
+    await expect(resetBtn).toBeDisabled();
+
+    // Customize appearance on URL generator without opening Style Gallery
+    await page.getByRole('radio', { name: 'Select Modern Soft pattern' }).click();
+    await expect(undoBtn).toBeEnabled();
+    await expect(resetBtn).toBeEnabled();
+
+    // Switch QR type to WiFi via client-side route navigation
+    await page.getByRole('navigation', { name: 'QR code types' }).getByRole('link', { name: 'WiFi' }).click();
+    await expect(page).toHaveURL(/\/wifi-qr-code/);
+    await page.waitForSelector('main[data-hydrated="true"]');
+    const ssidInput = page.getByLabel(/Network Name/i);
+    await ssidInput.fill('StudioRecoveryWifi');
+
+    // Cross-route history stays intact and never overwrites Wi-Fi content
+    await expect(undoBtn).toBeEnabled();
+    await expect(page.getByRole('radio', { name: 'Select Modern Soft pattern' })).toBeChecked();
+
+    await undoBtn.click();
+    await expect(page.getByRole('radio', { name: 'Select Standard Industrial pattern' })).toBeChecked();
+    await expect(ssidInput).toHaveValue('StudioRecoveryWifi');
+    await expect(redoBtn).toBeEnabled();
+
+    await redoBtn.click();
+    await expect(page.getByRole('radio', { name: 'Select Modern Soft pattern' })).toBeChecked();
+    await expect(resetBtn).toBeEnabled();
+
+    // Reset style restores baseline defaults, preserves Wi-Fi content, and shows undo toast
+    await resetBtn.click();
+    await expect(page.getByRole('radio', { name: 'Select Standard Industrial pattern' })).toBeChecked();
+    await expect(resetBtn).toBeDisabled();
+    await expect(ssidInput).toHaveValue('StudioRecoveryWifi');
+    await expect(page.getByText('Style reset')).toBeVisible();
+  });
 });

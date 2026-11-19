@@ -128,6 +128,59 @@ export const STYLE_BASELINE: Readonly<Partial<QRConfig>> = {
 /** Valid property keys for QR visual style configuration. */
 export type StyleField = Extract<keyof QRConfig, string>;
 
+const BASELINE_ENTRIES = Object.entries(STYLE_BASELINE);
+
+/**
+ * Complete patch restoring all visual settings, logos, images, and frame text
+ * to clean baseline defaults while leaving QR payload and content fields untouched.
+ * @returns Partial QRConfig updates to pass to updateConfig.
+ */
+export function resetStylePatch(): Partial<QRConfig> {
+  return {
+    ...STYLE_BASELINE,
+    logoUrl: null,
+    borderLogoUrl: null,
+    backgroundImageUrl: null,
+    mosaicImageUrl: null,
+    frameText: '',
+  };
+}
+
+/**
+ * Reports whether all visual settings, logos, images, and frame text already match
+ * clean baseline defaults, ignoring QR payload and free-text content fields.
+ * @param config - Active QR configuration.
+ * @returns True when Reset style would have nothing to reset.
+ */
+export function isStyleAtBaseline(config: QRConfig): boolean {
+  if (
+    (config.logoUrl ?? null) !== null ||
+    (config.borderLogoUrl ?? null) !== null ||
+    (config.backgroundImageUrl ?? null) !== null ||
+    (config.mosaicImageUrl ?? null) !== null ||
+    (config.frameText ?? '') !== ''
+  ) {
+    return false;
+  }
+
+  for (const [key, baselineValue] of BASELINE_ENTRIES) {
+    const currentValue: unknown = Reflect.get(config, key);
+    if (key === 'gradientColorStops') {
+      if (Array.isArray(currentValue) && currentValue.length > 0) return false;
+      continue;
+    }
+    if (baselineValue === undefined) {
+      if (currentValue !== undefined) return false;
+      continue;
+    }
+    if ((currentValue ?? baselineValue) !== baselineValue) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 /**
  * Reports whether a config key is a style setting that style files and templates may carry.
  * @param key - Config key.
