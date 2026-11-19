@@ -62,7 +62,7 @@ function readDeclaredQrConfigKeys(): string[] {
   return declaredKeys;
 }
 
-/** Distinct non-default value for each of the 53 'paint' keys in QRConfig. */
+/** Distinct non-default value for each of the 54 'paint' keys in QRConfig. */
 const DISTINCT_PAINT_MUTATIONS: { [K in PaintConfigKey]-?: QRConfig[K] } = {
   fgColor: '#123456',
   bgColor: '#fafafa',
@@ -73,6 +73,7 @@ const DISTINCT_PAINT_MUTATIONS: { [K in PaintConfigKey]-?: QRConfig[K] } = {
   logoPadding: 3,
   logoBackgroundColor: '#eeeeee',
   eyeColor: '#654321',
+  isCustomEyeColor: true,
   eyeFrameColor: '#112233',
   eyeBallColor: '#445566',
   eyeFrameShape: EyeShape.LEAF,
@@ -125,7 +126,7 @@ const DISTINCT_PAINT_MUTATIONS: { [K in PaintConfigKey]-?: QRConfig[K] } = {
 describe('QRCanvas paintDependencies', () => {
   it('classifies every declared QRConfig key into encode, animation, or paint', () => {
     const declaredKeys = readDeclaredQrConfigKeys();
-    expect(declaredKeys).toHaveLength(59);
+    expect(declaredKeys).toHaveLength(60);
 
     expect(Object.keys(QR_CONFIG_DEPENDENCIES).sort()).toEqual([...declaredKeys].sort());
 
@@ -141,14 +142,14 @@ describe('QRCanvas paintDependencies', () => {
 
     expect(encodeKeys.sort()).toEqual(['errorCorrectionLevel', 'type', 'value']);
     expect(animationKeys.sort()).toEqual(['animationFps', 'animationValues', 'isAnimating']);
-    expect(paintKeys).toHaveLength(53);
+    expect(paintKeys).toHaveLength(54);
     expect([...PAINT_CONFIG_KEYS].sort()).toEqual(paintKeys.sort());
   });
 
   it('tracks every visual style field from styleFields.ts as a paint dependency', () => {
     const declaredKeys = readDeclaredQrConfigKeys();
     const styleKeys = declaredKeys.filter((key) => isStyleField(key));
-    expect(styleKeys).toHaveLength(47);
+    expect(styleKeys).toHaveLength(48);
 
     const nonPaintStyleKeys = styleKeys.filter(
       (key) => Reflect.get(QR_CONFIG_DEPENDENCIES, key) !== 'paint',

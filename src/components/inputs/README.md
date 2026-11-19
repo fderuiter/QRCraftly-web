@@ -114,7 +114,7 @@ These parameters are controlled via `AdvancedControls.tsx`.
 
 ## Independent Eye Frame and Ball Configuration
 
-`QRConfig` in `src/packages/core/types.ts` includes optional `eyeFrameColor` and `eyeBallColor` properties for setting distinct outer finder frame and inner eyeball colors, falling back to `eyeColor` when omitted. Optional `eyeFrameShape` and `eyeBallShape` (`EyeShape`: square, rounded, circle or leaf) shape the frame and the eyeball apart from the module pattern; when omitted, the eyes follow `style` exactly as before. They are style fields, controlled by `EyeShapeControls.tsx`.
+`QRConfig` in `src/packages/core/types.ts` includes optional `isCustomEyeColor`, `eyeFrameColor`, and `eyeBallColor` properties. Finder patterns inherit the active foreground color or full-matrix gradient by default (`ColorControls.tsx`), while enabling `isCustomEyeColor` applies distinct solid outer finder frame and inner eyeball hex colors (falling back to `eyeColor` when omitted, and preserving legacy distinct `eyeColor` templates when `isCustomEyeColor` is unset). Optional `eyeFrameShape` and `eyeBallShape` (`EyeShape`: square, rounded, circle or leaf) shape the frame and the eyeball apart from the module pattern; when omitted, the eyes follow `style` exactly as before. They are style fields, controlled by `ColorControls.tsx` and `EyeShapeControls.tsx`.
 
 ## Template Export Configuration
 

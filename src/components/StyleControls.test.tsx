@@ -69,16 +69,21 @@ describe('StyleControls Component', () => {
   });
 
   it('updates colors via inputs', () => {
-    render(<StyleControls config={DEFAULT_CONFIG} onChange={mockOnChange} />);
+    const { rerender } = render(<StyleControls config={DEFAULT_CONFIG} onChange={mockOnChange} />);
     expandAppearanceSections();
 
     const fgInput = screen.getByLabelText('Foreground');
     fireEvent.change(fgInput, { target: { value: '#ff0000' } });
-    expect(mockOnChange).toHaveBeenCalledWith({ fgColor: '#ff0000' });
+    expect(mockOnChange).toHaveBeenCalledWith({ fgColor: '#ff0000', eyeColor: '#ff0000' });
 
     const bgInput = screen.getByLabelText('Background');
     fireEvent.change(bgInput, { target: { value: '#00ff00' } });
     expect(mockOnChange).toHaveBeenCalledWith({ bgColor: '#00ff00' });
+
+    fireEvent.click(screen.getByRole('switch', { name: /custom eye colors/i }));
+    expect(mockOnChange).toHaveBeenCalledWith({ isCustomEyeColor: true, eyeColor: '#000000' });
+
+    rerender(<StyleControls config={{ ...DEFAULT_CONFIG, isCustomEyeColor: true }} onChange={mockOnChange} />);
 
     const eyeFrameInput = screen.getByLabelText('Eye Frame');
     fireEvent.change(eyeFrameInput, { target: { value: '#0000ff' } });
@@ -95,12 +100,12 @@ describe('StyleControls Component', () => {
 
     const fgHexInput = screen.getByLabelText('Foreground Hex Code');
     fireEvent.change(fgHexInput, { target: { value: '#123456' } });
-    expect(mockOnChange).toHaveBeenCalledWith({ fgColor: '#123456' });
+    expect(mockOnChange).toHaveBeenCalledWith({ fgColor: '#123456', eyeColor: '#123456' });
 
     // Test 3-digit hex expansion (shorthand is taken when the field is left)
     fireEvent.change(fgHexInput, { target: { value: '#abc' } });
     fireEvent.blur(fgHexInput);
-    expect(mockOnChange).toHaveBeenCalledWith({ fgColor: '#aabbcc' });
+    expect(mockOnChange).toHaveBeenCalledWith({ fgColor: '#aabbcc', eyeColor: '#aabbcc' });
 
     // Test invalid hex (should not trigger onChange)
     mockOnChange.mockClear();

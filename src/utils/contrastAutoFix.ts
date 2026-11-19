@@ -1,3 +1,4 @@
+import { hasCustomEyeColor } from '@/packages/core/config';
 import type { QRConfig } from '@/packages/core/types';
 import { normalizeHex, getContrastRatio, getLuminance } from '@/packages/core/encoding';
 
@@ -84,18 +85,36 @@ export const calculateAutoFixColorPatch = (config?: Partial<QRConfig> | null): P
   if (!config) return {};
   const bg = (config.bgColor && normalizeHex(config.bgColor)) || '#ffffff';
   const patch: Partial<QRConfig> = {};
+  const fgFallback = config.fgColor ?? '#000000';
+  const customEyes = hasCustomEyeColor({
+    fgColor: fgFallback,
+    eyeColor: config.eyeColor ?? fgFallback,
+    isCustomEyeColor: config.isCustomEyeColor,
+    eyeFrameColor: config.eyeFrameColor,
+    eyeBallColor: config.eyeBallColor,
+  });
 
   if (config.gradientType && config.gradientType !== 'none' && config.gradientColorStops?.length) {
     const stops = config.gradientColorStops.map((stop) => ({ ...stop, color: adjustColorForContrast(stop.color, bg) }));
     patch.gradientColorStops = stops;
     patch.fgColor = stops[0]?.color ?? config.fgColor;
   } else {
-    patch.fgColor = adjustColorForContrast(config.fgColor ?? '#000000', bg);
+    patch.fgColor = adjustColorForContrast(fgFallback, bg);
   }
 
-  if (config.eyeFrameColor) patch.eyeFrameColor = adjustColorForContrast(config.eyeFrameColor, bg);
-  if (config.eyeBallColor) patch.eyeBallColor = adjustColorForContrast(config.eyeBallColor, bg);
-  if (config.eyeColor && (!config.eyeFrameColor || !config.eyeBallColor)) patch.eyeColor = adjustColorForContrast(config.eyeColor, bg);
+  if (customEyes) {
+    if (config.eyeFrameColor) patch.eyeFrameColor = adjustColorForContrast(config.eyeFrameColor, bg);
+    if (config.eyeBallColor) patch.eyeBallColor = adjustColorForContrast(config.eyeBallColor, bg);
+    if (config.eyeColor && (!config.eyeFrameColor || !config.eyeBallColor)) {
+      patch.eyeColor = adjustColorForContrast(config.eyeColor, bg);
+    } else if (!config.eyeColor && !config.eyeFrameColor && !config.eyeBallColor) {
+      patch.eyeColor = patch.fgColor;
+    }
+  } else {
+    if (config.eyeColor !== undefined) patch.eyeColor = patch.fgColor;
+    if (config.eyeFrameColor !== undefined) patch.eyeFrameColor = undefined;
+    if (config.eyeBallColor !== undefined) patch.eyeBallColor = undefined;
+  }
 
   return patch;
 };

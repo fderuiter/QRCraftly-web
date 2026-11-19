@@ -35,7 +35,7 @@ interface Edge {
 
 interface FillOp {
   edges: Edge[];
-  rgb: [number, number, number];
+  paint: [number, number, number] | RasterGradient;
   evenOdd: boolean;
 }
 
@@ -50,6 +50,60 @@ const parseColor = (style: unknown): [number, number, number] | null => {
   }
   return [0, 0, 0];
 };
+
+type GradientCoords =
+  | { kind: 'linear'; x0: number; y0: number; x1: number; y1: number }
+  | { kind: 'radial'; cx: number; cy: number; r0: number; r1: number };
+
+class RasterGradient implements CanvasGradient {
+  private readonly stops: Array<{ offset: number; rgb: [number, number, number] }> = [];
+  private readonly coords: GradientCoords;
+
+  constructor(coords: GradientCoords) {
+    this.coords = coords;
+  }
+
+  addColorStop(offset: number, color: string): void {
+    this.stops.push({ offset: Math.max(0, Math.min(1, offset)), rgb: parseColor(color) ?? [0, 0, 0] });
+    this.stops.sort((a, b) => a.offset - b.offset);
+  }
+
+  sampleAt(x: number, y: number): [number, number, number] {
+    if (this.stops.length === 0) return [0, 0, 0];
+    if (this.stops.length === 1) return this.stops[0].rgb;
+
+    let t = 0;
+    if (this.coords.kind === 'linear') {
+      const dx = this.coords.x1 - this.coords.x0;
+      const dy = this.coords.y1 - this.coords.y0;
+      const len2 = dx * dx + dy * dy;
+      t = len2 > 0 ? Math.max(0, Math.min(1, ((x - this.coords.x0) * dx + (y - this.coords.y0) * dy) / len2)) : 0;
+    } else {
+      const dist = Math.hypot(x - this.coords.cx, y - this.coords.cy);
+      const span = this.coords.r1 - this.coords.r0;
+      t = span > 0 ? Math.max(0, Math.min(1, (dist - this.coords.r0) / span)) : 0;
+    }
+
+    if (t <= this.stops[0].offset) return this.stops[0].rgb;
+    const last = this.stops[this.stops.length - 1];
+    if (t >= last.offset) return last.rgb;
+
+    for (let i = 0; i < this.stops.length - 1; i++) {
+      const a = this.stops[i];
+      const b = this.stops[i + 1];
+      if (t >= a.offset && t <= b.offset) {
+        const span = b.offset - a.offset;
+        const u = span > 0 ? (t - a.offset) / span : 0;
+        return [
+          Math.round(a.rgb[0] + (b.rgb[0] - a.rgb[0]) * u),
+          Math.round(a.rgb[1] + (b.rgb[1] - a.rgb[1]) * u),
+          Math.round(a.rgb[2] + (b.rgb[2] - a.rgb[2]) * u),
+        ];
+      }
+    }
+    return last.rgb;
+  }
+}
 
 /**
  * Minimal CanvasRenderingContext2D implementation that rasterizes filled paths.
@@ -161,10 +215,30 @@ export class RasterContext {
     this.fillStyle = style;
   }
 
+  createLinearGradient(x0: number, y0: number, x1: number, y1: number): CanvasGradient {
+    return new RasterGradient({
+      kind: 'linear',
+      x0: x0 + this.offset.x,
+      y0: y0 + this.offset.y,
+      x1: x1 + this.offset.x,
+      y1: y1 + this.offset.y,
+    });
+  }
+
+  createRadialGradient(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number): CanvasGradient {
+    return new RasterGradient({
+      kind: 'radial',
+      cx: (x0 + x1) / 2 + this.offset.x,
+      cy: (y0 + y1) / 2 + this.offset.y,
+      r0,
+      r1,
+    });
+  }
+
   fill(rule?: unknown): void {
     // A transparent fill paints nothing.
-    const rgb = parseColor(this.fillStyle);
-    if (rgb === null) return;
+    const paint = this.fillStyle instanceof RasterGradient ? this.fillStyle : parseColor(this.fillStyle);
+    if (paint === null) return;
     const edges: Edge[] = [];
     for (const sp of this.subpaths) {
       for (let i = 0; i < sp.length; i++) {
@@ -173,7 +247,7 @@ export class RasterContext {
         if (a.y !== b.y) edges.push({ x0: a.x, y0: a.y, x1: b.x, y1: b.y });
       }
     }
-    const op: FillOp = { edges, rgb, evenOdd: rule === 'evenodd' };
+    const op: FillOp = { edges, paint, evenOdd: rule === 'evenodd' };
     this.fills.push(op);
     this.rasterize(op);
   }
@@ -207,10 +281,11 @@ export class RasterContext {
         const from = Math.max(0, Math.ceil(xs[i].x - 0.5));
         const to = Math.min(width - 1, Math.floor(xs[i + 1].x - 0.5));
         for (let px = from; px <= to; px++) {
+          const rgb = op.paint instanceof RasterGradient ? op.paint.sampleAt(px + 0.5, y) : op.paint;
           const idx = (py * width + px) * 4;
-          this.data[idx] = op.rgb[0];
-          this.data[idx + 1] = op.rgb[1];
-          this.data[idx + 2] = op.rgb[2];
+          this.data[idx] = rgb[0];
+          this.data[idx + 1] = rgb[1];
+          this.data[idx + 2] = rgb[2];
           this.data[idx + 3] = 255;
         }
       }
@@ -231,7 +306,9 @@ export class RasterContext {
         const ix = e.x0 + ((y - e.y0) / (e.y1 - e.y0)) * (e.x1 - e.x0);
         if (ix > x) winding += op.evenOdd ? 1 : e.y1 > e.y0 ? 1 : -1;
       }
-      if (op.evenOdd ? winding % 2 === 1 : winding !== 0) return op.rgb;
+      if (op.evenOdd ? winding % 2 === 1 : winding !== 0) {
+        return op.paint instanceof RasterGradient ? op.paint.sampleAt(x, y) : op.paint;
+      }
     }
     return [255, 255, 255];
   }

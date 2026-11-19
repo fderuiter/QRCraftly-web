@@ -54,6 +54,7 @@ export const QR_CONFIG_DEPENDENCIES = {
 
   // Finder pattern colors & shapes
   eyeColor: 'paint',
+  isCustomEyeColor: 'paint',
   eyeFrameColor: 'paint',
   eyeBallColor: 'paint',
   eyeFrameShape: 'paint',
