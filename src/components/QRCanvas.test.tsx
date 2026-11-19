@@ -891,6 +891,180 @@ describe('QRCanvas Rendering Logic Extended', () => {
     rerender(<QRCanvas config={{ ...base, ...change }} />);
     await waitFor(() => expect(mockContext.fillText.mock.calls.some(([text]: [string]) => text.includes('SCAN ME'))).toBe(true));
   });
+
+  it.each<[string, QRConfig, Partial<QRConfig>, () => void]>([
+    [
+      'quietZoneModules',
+      { ...DEFAULT_CONFIG, value: 'https://qrcraftly.com', quietZoneModules: 4 },
+      { quietZoneModules: 8 },
+      () => {
+        // With 21 modules + 2*8 quiet zone = 37 cells across 1024px, top-left eye starts at 8 * (1024 / 37)
+        const expectedQuietPx = (8 * 1024) / 37;
+        expect(
+          mockContext.fillRect.mock.calls.some(
+            ([x, y]: [number, number]) =>
+              Math.abs(x - expectedQuietPx) < 0.01 && Math.abs(y - expectedQuietPx) < 0.01,
+          ),
+        ).toBe(true);
+      },
+    ],
+    [
+      'frameFontFamily',
+      {
+        ...DEFAULT_CONFIG,
+        value: 'https://qrcraftly.com',
+        frameStyle: 'banner',
+        frameText: 'SCAN ME',
+        frameFontFamily: 'sans-serif',
+      },
+      { frameFontFamily: 'monospace' },
+      () => {
+        expect(mockContext.font).toContain('monospace');
+      },
+    ],
+    [
+      'isLuminanceMaskingEnabled',
+      { ...DEFAULT_CONFIG, value: 'https://qrcraftly.com', isLuminanceMaskingEnabled: false },
+      { isLuminanceMaskingEnabled: true },
+      () => {
+        expect(mockContext.getImageData).toHaveBeenCalled();
+      },
+    ],
+    [
+      'fgColorDark',
+      {
+        ...DEFAULT_CONFIG,
+        value: 'https://qrcraftly.com',
+        isLuminanceMaskingEnabled: true,
+        luminanceThreshold: 0,
+        fgColorDark: '#112233',
+      },
+      { fgColorDark: '#334455' },
+      () => {
+        expect(mockContext.fillRect).toHaveBeenCalled();
+      },
+    ],
+    [
+      'fgColorLight',
+      {
+        ...DEFAULT_CONFIG,
+        value: 'https://qrcraftly.com',
+        isLuminanceMaskingEnabled: true,
+        luminanceThreshold: 0.5,
+        fgColorLight: '#eeddcc',
+      },
+      { fgColorLight: '#fafafa' },
+      () => {
+        expect(mockContext.fillRect).toHaveBeenCalled();
+      },
+    ],
+    [
+      'luminanceThreshold',
+      {
+        ...DEFAULT_CONFIG,
+        value: 'https://qrcraftly.com',
+        isLuminanceMaskingEnabled: true,
+        luminanceThreshold: 0.2,
+      },
+      { luminanceThreshold: 0.8 },
+      () => {
+        expect(mockContext.fillRect).toHaveBeenCalled();
+      },
+    ],
+  ])(
+    'repaints immediately and invokes onRendered when %s changes',
+    async (_field, initialConfig, update, assertRepaint) => {
+      setModule(10, 10, true);
+      mockContext.getImageData = vi.fn((_x: number, _y: number, width: number, height: number) => ({
+        width,
+        height,
+        data: new Uint8ClampedArray(width * height * 4),
+      }));
+      const onRendered = vi.fn();
+
+      const { rerender } = render(<QRCanvas config={initialConfig} onRendered={onRendered} />);
+      await waitFor(() => expect(onRendered).toHaveBeenCalledTimes(1));
+
+      mockContext.clearRect.mockClear();
+      mockContext.fillRect.mockClear();
+      mockContext.getImageData.mockClear();
+      onRendered.mockClear();
+
+      rerender(<QRCanvas config={{ ...initialConfig, ...update }} onRendered={onRendered} />);
+
+      // Layout effect repaints synchronously before waitFor timers flush
+      expect(mockContext.fillRect).toHaveBeenCalled();
+      assertRepaint();
+
+      await waitFor(() => expect(onRendered).toHaveBeenCalledTimes(1));
+    },
+  );
+
+  it('re-encodes the matrix when config.type changes with the same raw value', async () => {
+    const initialConfig: QRConfig = {
+      ...DEFAULT_CONFIG,
+      type: QRType.TEXT,
+      value: 'example.com',
+    };
+
+    const { rerender } = render(<QRCanvas config={initialConfig} />);
+    await waitFor(() => {
+      expect(QRCode.create).toHaveBeenCalledWith('example.com', {
+        errorCorrectionLevel: DEFAULT_CONFIG.errorCorrectionLevel,
+      });
+    });
+
+    vi.mocked(QRCode.create).mockClear();
+    rerender(<QRCanvas config={{ ...initialConfig, type: QRType.URL }} />);
+
+    await waitFor(() => {
+      expect(QRCode.create).toHaveBeenCalledWith('https://example.com/', {
+        errorCorrectionLevel: DEFAULT_CONFIG.errorCorrectionLevel,
+      });
+    });
+  });
+
+  it('skips repainting when gradientColorStops receives an identical stop array and repaints on stop edit', async () => {
+    setModule(10, 10, true);
+    const initialConfig: QRConfig = {
+      ...DEFAULT_CONFIG,
+      gradientType: 'linear',
+      gradientColorStops: [
+        { offset: 0, color: '#ff0000' },
+        { offset: 1, color: '#0000ff' },
+      ],
+    };
+
+    const { rerender } = render(<QRCanvas config={initialConfig} />);
+    await waitFor(() => expect(mockContext.createLinearGradient).toHaveBeenCalled());
+    mockContext.createLinearGradient.mockClear();
+
+    rerender(
+      <QRCanvas
+        config={{
+          ...initialConfig,
+          gradientColorStops: [
+            { offset: 0, color: '#ff0000' },
+            { offset: 1, color: '#0000ff' },
+          ],
+        }}
+      />,
+    );
+    expect(mockContext.createLinearGradient).not.toHaveBeenCalled();
+
+    rerender(
+      <QRCanvas
+        config={{
+          ...initialConfig,
+          gradientColorStops: [
+            { offset: 0, color: '#ff0000' },
+            { offset: 1, color: '#00ff00' },
+          ],
+        }}
+      />,
+    );
+    expect(mockContext.createLinearGradient).toHaveBeenCalled();
+  });
 });
 
 describe('QRCanvas Batch Rendering', () => {

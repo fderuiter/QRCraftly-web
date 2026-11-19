@@ -337,6 +337,16 @@
     min-height: 0;
     overflow: hidden;
   }
+
+  /* Transparency checkerboard for the QR preview stage when the background is transparent. */
+  .qr-checkerboard {
+    background-color: var(--color-surface);
+    background-image: repeating-conic-gradient(
+      var(--color-line) 0% 25%,
+      transparent 0% 50%
+    );
+    background-size: 1rem 1rem;
+  }
 }
 
 /* Same-document view transition when switching QR types (progressive enhancement). */

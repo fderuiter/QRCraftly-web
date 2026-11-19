@@ -17,6 +17,7 @@
 */
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import { axe } from '../../../tests/utils/axe';
 import { LogoControls } from './LogoControls';
 import { ToastProvider } from '../ui/Toast';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
@@ -75,6 +76,68 @@ describe('LogoControls error correction level auto-elevation', () => {
     fireEvent.change(fileInput, { target: { files: [file] } });
 
     expect(fileInput).toBeInTheDocument();
+  });
+});
+
+describe('LogoControls transparent backing toggle', () => {
+  const sampleLogo = PRESET_LOGOS[0].dataUrl;
+
+  it('toggles transparent backing on from an opaque config', () => {
+    const onChange = vi.fn();
+    renderControls({ logoUrl: sampleLogo, bgColor: '#ffffff', logoBackgroundColor: '', logoPaddingStyle: 'square' }, onChange);
+
+    const colorInput = screen.getByLabelText('Background Color');
+    const hexInput = screen.getByLabelText('Background Color Hex Code');
+    const toggle = screen.getByRole('switch', { name: 'Transparent Backing' });
+
+    expect(colorInput).not.toBeDisabled();
+    expect(colorInput).toHaveValue('#ffffff');
+    expect(hexInput).toHaveValue('Auto');
+    expect(toggle).not.toBeChecked();
+
+    fireEvent.click(toggle);
+    expect(onChange).toHaveBeenCalledWith({ logoBackgroundColor: 'transparent' });
+  });
+
+  it('disables ColorInput with #ffffff when logoBackgroundColor is transparent and restores Auto when unchecked on opaque bg', async () => {
+    const onChange = vi.fn();
+    const { container } = renderControls(
+      { logoUrl: sampleLogo, bgColor: '#020617', logoBackgroundColor: 'transparent', logoPaddingStyle: 'circle' },
+      onChange
+    );
+
+    const colorInput = screen.getByLabelText('Background Color');
+    const hexInput = screen.getByLabelText('Background Color Hex Code');
+    const toggle = screen.getByRole('switch', { name: 'Transparent Backing' });
+
+    expect(colorInput).toBeDisabled();
+    expect(colorInput).toHaveValue('#ffffff');
+    expect(hexInput).toBeDisabled();
+    expect(toggle).toBeChecked();
+    expect(await axe(container)).toHaveNoViolations();
+
+    fireEvent.click(toggle);
+    expect(onChange).toHaveBeenCalledWith({ logoBackgroundColor: '' });
+  });
+
+  it('inherits transparent backing when bgColor is transparent and sets explicit #ffffff when unchecked', () => {
+    const onChange = vi.fn();
+    renderControls({ logoUrl: sampleLogo, bgColor: 'transparent', logoBackgroundColor: '', logoPaddingStyle: 'square' }, onChange);
+
+    const colorInput = screen.getByLabelText('Background Color');
+    const toggle = screen.getByRole('switch', { name: 'Transparent Backing' });
+
+    expect(colorInput).toBeDisabled();
+    expect(colorInput).toHaveValue('#ffffff');
+    expect(toggle).toBeChecked();
+
+    fireEvent.click(toggle);
+    expect(onChange).toHaveBeenCalledWith({ logoBackgroundColor: '#ffffff' });
+  });
+
+  it('hides Transparent Backing switch when logoPaddingStyle is none', () => {
+    renderControls({ logoUrl: sampleLogo, logoPaddingStyle: 'none' });
+    expect(screen.queryByRole('switch', { name: 'Transparent Backing' })).not.toBeInTheDocument();
   });
 });
 
