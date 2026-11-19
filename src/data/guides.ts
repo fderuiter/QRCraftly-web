@@ -1767,8 +1767,13 @@ console.log(\`Prism session ready, symbol size: \${session.symbolSize} bytes\`);
         supports: 'Finder pattern 1:1:3:1:1 module geometry and scanning alignment rules.',
       },
       {
-        label: 'QRCraftly ADR 0019, “Mosaic QR: Module-Level Image Tiling”, docs/adr/0019-mosaic-qr-module-level-image-tiling.md',
-        url: 'https://github.com/fderuiter/QRCraftly-web/blob/HEAD/docs/adr/0019-mosaic-qr-module-level-image-tiling.md',
+        label: 'Hung-Kuo Chu, Chia-Sheng Chang, Ruen-Rone Lee, and Niloy J. Mitra, “Halftone QR Codes”, ACM Transactions on Graphics 32, 6 (SIGGRAPH Asia 2013)',
+        url: 'https://doi.org/10.1145/2508363.2508408',
+        supports: '3x3 sub-cell module recoloring that preserves center module sampling contrast and standard QR matrix polarity.',
+      },
+      {
+        label: 'QRCraftly Mosaic QR Code Generator, qrcraftly.com/mosaic-qr-code',
+        url: 'https://qrcraftly.com/mosaic-qr-code',
         supports: '3x3 Halftone Mosaic Core sub-cell geometry, 1x1 Tiles mode, protected function modules, and luminance contrast clamping.',
       },
     ],
@@ -1910,9 +1915,14 @@ console.log(\`Prism session ready, symbol size: \${session.symbolSize} bytes\`);
     ],
     sources: [
       {
-        label: 'QRCraftly ADR 0048, “Wallet Passes Built in the Browser”, docs/adr/0048-wallet-passes-built-in-the-browser.md',
-        url: 'https://github.com/fderuiter/QRCraftly-web/blob/HEAD/docs/adr/0048-wallet-passes-built-in-the-browser.md',
-        supports: 'Client-side 1080x1920 PNG Wallet Card design, Payment and Bulk CSV refusal rules, and browser-only .pkpass and Google Wallet JWT signing.',
+        label: 'QRCraftly Security & Privacy Architecture, qrcraftly.com/security',
+        url: 'https://qrcraftly.com/security',
+        supports: 'Client-side 1080x1920 PNG Wallet Card design, Payment and Bulk CSV refusal rules, and volatile WebCrypto .pkpass and Google Wallet JWT signing.',
+      },
+      {
+        label: 'Apple Developer, “Apple Wallet — Passes and PassKit (.pkpass)”',
+        url: 'https://developer.apple.com/wallet/',
+        supports: 'Pass Type ID certificate and Apple WWDR intermediate signature requirements for native .pkpass bundles.',
       },
       {
         label: 'W3C, “Scalable Vector Graphics (SVG) 1.1 (Second Edition)”',
