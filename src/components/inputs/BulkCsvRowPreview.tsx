@@ -18,7 +18,7 @@
 
 import React from 'react';
 import type { CsvRow, BulkContentType, BulkContactMapping } from '@/packages/bulk-csv';
-import { isContactContentType } from '@/packages/bulk-csv';
+import { BULK_CONTACT_FIELDS, isContactContentType } from '@/packages/bulk-csv';
 
 // Data rows shown in the preview table.
 export const PREVIEW_ROW_COUNT = 3;
@@ -70,17 +70,8 @@ export const BulkCsvRowPreview: React.FC<BulkCsvRowPreviewProps> = ({
   const seenColumns = new Set<string>();
 
   if (isContact) {
-    const contactRoles: { key: keyof BulkContactMapping; label: string }[] = [
-      { key: 'firstName', label: 'First Name' },
-      { key: 'lastName', label: 'Last Name' },
-      { key: 'organization', label: 'Organization' },
-      { key: 'title', label: 'Job Title' },
-      { key: 'phone', label: 'Phone' },
-      { key: 'email', label: 'Email' },
-    ];
-
     if (contactMapping) {
-      for (const { key, label } of contactRoles) {
+      for (const { key, label } of BULK_CONTACT_FIELDS) {
         const col = contactMapping[key];
         if (col && !seenColumns.has(col)) {
           seenColumns.add(col);

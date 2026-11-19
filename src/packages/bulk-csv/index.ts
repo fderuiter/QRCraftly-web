@@ -44,15 +44,24 @@ export {
   type BulkCsvPreview,
   encodeBulkCell,
   type BulkContentType,
+  BULK_CONTACT_FIELDS,
   autoDetectContactMapping,
   isContactContentType,
+  type BulkContactFieldDescriptor,
+  type BulkContactFieldGroup,
   type BulkContactMapping,
 } from '@/packages/qr-payload';
 export { formatErrorLogCsv, type ErrorLogItem } from './lib/errorLog';
 export { createZip, type ZipEntry, type CreateZipOptions } from '@/packages/core/zip';
 export { sanitizeFileStem, allocateFileName, errorLogFileName } from './lib/fileNames';
 export { parseExcelToCsv } from './lib/excel';
-export { SAMPLE_CSV_TEMPLATE } from './lib/template';
+export {
+  SAMPLE_CSV_TEMPLATE,
+  SAMPLE_TEXT_CSV_TEMPLATE,
+  SAMPLE_VCARD_CSV_TEMPLATE,
+  getBulkCsvTemplate,
+  type BulkCsvTemplateSpec,
+} from './lib/template';
 export { escapeCsvCell } from './lib/csvEscape';
 export {
   categorizeCsvRows,

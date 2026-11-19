@@ -299,5 +299,58 @@ describe('categorizeCsvRows Contact Card (vCard) Mode', () => {
     expect(report.invalidDetails[1].reason).toContain('unsafe URL scheme');
     expect(report.invalidDetails[2].reason).toContain('Invalid email address format');
   });
+
+  it('synthesizes website and postal address fields and runs link-safety caution checks on contact websites', () => {
+    const extendedMapping = {
+      ...contactMapping,
+      website: 'Website',
+      street: 'Street',
+      city: 'City',
+      zip: 'Zip',
+      country: 'Country',
+    };
+    const rows: CsvRow[] = [
+      {
+        First: 'Jane',
+        Last: 'Doe',
+        Phone: '+1-555-1234',
+        Email: 'jane@example.com',
+        Company: 'Acme',
+        Role: 'Engineer',
+        Website: 'https://example.com/jane',
+        Street: '100 Market St',
+        City: 'San Francisco',
+        Zip: '94105',
+        Country: 'United States',
+      },
+      {
+        First: 'Alex',
+        Last: 'Rivera',
+        Phone: '+1-555-9876',
+        Email: 'alex@example.com',
+        Company: 'Acme',
+        Role: 'Ops',
+        Website: 'http://93.184.216.34/card',
+        Street: '42 High St',
+        City: 'London',
+        Zip: 'SW1A 1AA',
+        Country: 'United Kingdom',
+      },
+    ];
+
+    const report = categorizeCsvRows(rows, '', undefined, undefined, {
+      contentType: 'vcard',
+      contactMapping: extendedMapping,
+    });
+
+    expect(report.validCount).toBe(2);
+    expect(report.unsafeCount).toBe(0);
+    expect(report.cautionCount).toBe(1);
+    expect(report.validPayloads[0]).toContain('URL:https://example.com/jane');
+    expect(report.validPayloads[0]).toContain('ADR:;;100 Market St;San Francisco;;94105;United States');
+    expect(report.invalidDetails).toHaveLength(1);
+    expect(report.invalidDetails[0].rowNumber).toBe(2);
+    expect(report.invalidDetails[0].category).toBe('caution');
+  });
 });
 
