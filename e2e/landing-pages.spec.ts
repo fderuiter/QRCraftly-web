@@ -39,7 +39,7 @@ test.describe('Landing pages that preset the generator', () => {
     await expect(page.getByRole('button', { name: 'Logo', exact: true })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  test('the mosaic page shows both example pictures and the WhatsApp page starts on a wa.me link', async ({ page }) => {
+  test('the mosaic page shows both example pictures and the WhatsApp page presets the WhatsApp social builder', async ({ page }) => {
     await open(page, '/mosaic-qr-code');
     await expect(page.getByRole('heading', { level: 1, name: 'Image QR Code Generator (Mosaic)' })).toBeVisible();
     for (const image of await page.getByRole('region', { name: 'Examples' }).getByRole('img').all()) {
@@ -47,7 +47,9 @@ test.describe('Landing pages that preset the generator', () => {
       await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBeGreaterThan(0);
     }
     await open(page, '/whatsapp-qr-code');
-    await expect(page.locator('#url-input')).toHaveValue('https://wa.me/');
+    await expect(page.getByLabel('Platform')).toHaveValue('whatsapp');
+    await expect(page.getByLabel('Phone Number', { exact: true })).toHaveValue('');
+    await expect(page.getByLabel(/Pre-filled Message/)).toHaveValue('');
   });
 });
 

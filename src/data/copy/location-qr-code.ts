@@ -7,16 +7,19 @@ export const copy: ToolCopy = {
     name: 'How to Create a Location QR Code',
     description: 'Make a code that opens a place in a maps app.',
     steps: [
-      { name: 'Enter the coordinates', text: 'Type the latitude and longitude of the spot.' },
-      { name: 'Style it', text: 'Pick colors and shapes if you like.' },
-      { name: 'Download it', text: 'Save the code for an invitation or sign.' },
+      {
+        name: 'Add the place or coordinates',
+        text: 'Paste a Google Maps link, geo: URI, or DMS coordinates into Google Maps Link or Coordinates, click Use Current Location, or type Latitude and Longitude.',
+      },
+      { name: 'Style it', text: 'Pick colors and shapes if you like, and wait for “Scans reliably”.' },
+      { name: 'Download it', text: 'Save the code for an invitation, flyer, or sign.' },
     ],
   },
   faqs: [
     {
-      question: 'How do I find the coordinates of a place?',
+      question: 'How do I find or enter the coordinates of a place?',
       answer:
-        'In Google Maps, press and hold (or right-click) the spot and the coordinates appear. In Apple Maps, drop a pin and swipe up to see them. Copy them into the latitude and longitude fields.',
+        'Paste a Google Maps link, a geo: URI, or degrees-minutes-seconds (DMS) coordinates into Google Maps Link or Coordinates and the Latitude and Longitude fields fill automatically. You can also click Use Current Location (which asks your browser for permission once and keeps the coordinates local on your device) or copy decimal coordinates from Google Maps or Apple Maps.',
     },
     NEVER_EXPIRES,
   ],

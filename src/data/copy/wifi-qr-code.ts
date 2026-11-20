@@ -9,7 +9,7 @@ export const copy: ToolCopy = {
     steps: [
       { name: 'Enter the network name', text: 'Type the name exactly as your router shows it.' },
       { name: 'Enter the password', text: 'Leave it empty for an open network.' },
-      { name: 'Pick the security type', text: 'WPA/WPA2/WPA3 fits almost every router.' },
+      { name: 'Pick the security type', text: 'Choose WPA / WPA2 / WPA3 for most routers, or WPA3 only (SAE) only for strict WPA3-only networks.' },
       { name: 'Download it', text: 'Save the code, or let guests scan it straight from your screen.' },
     ],
   },
@@ -27,7 +27,7 @@ export const copy: ToolCopy = {
     {
       question: 'Does it work with hidden networks and WPA3?',
       answer:
-        'Yes. Select Hidden Network if your router does not broadcast its name, and choose WPA/WPA2/WPA3 for almost any home or office router. WEP, WPA2 Enterprise (EAP) and open networks are there too.',
+        'Yes. Turn on Hidden Network if your router hides its SSID, and choose WPA / WPA2 / WPA3 for almost every home or office router, including mixed WPA2/WPA3 routers. Pick WPA3 only (SAE) only when your router is set to WPA3 only: Android phones read it, while iPhone cameras may not. WEP, WPA2 Enterprise (EAP), and None (Open Network) are supported too.',
     },
     {
       question: 'What happens if I change my Wi-Fi password?',

@@ -103,13 +103,20 @@ describe('SocialInput', () => {
     expect(screen.queryByLabelText(/Pre-filled Message/i)).not.toBeInTheDocument();
   });
 
-  it('renders multi-line TextAreaField for WhatsApp platform with character count and passes axe accessibility check', async () => {
+  it('renders Phone Number tel input and multi-line TextAreaField for WhatsApp platform with character count and passes axe accessibility check', async () => {
     const whatsappData: SocialData = {
       platform: SocialPlatform.WHATSAPP,
       handle: '15551234567',
       message: 'Hello\nWorld',
     };
     const { container } = render(<SocialInput data={whatsappData} onChange={mockOnChange} />);
+
+    const phoneInput = screen.getByLabelText('Phone Number');
+    expect(phoneInput).toBeInTheDocument();
+    expect(phoneInput).toHaveAttribute('type', 'tel');
+    expect(phoneInput).toHaveAttribute('placeholder', '15551234567');
+    expect(phoneInput).toHaveValue('15551234567');
+    expect(screen.queryByLabelText('Username / Handle')).not.toBeInTheDocument();
 
     const messageInput = screen.getByLabelText(/Pre-filled Message/i) as HTMLTextAreaElement;
     expect(messageInput).toBeInTheDocument();

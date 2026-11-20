@@ -17,6 +17,7 @@
 */
 
 import { QRErrorCorrectionLevel, QRType, type QRConfig } from '@/packages/core/types';
+import { SocialPlatform } from '@/packages/qr-payload';
 
 /** A call to action above the generator's controls: opens an appearance section and focuses one control in it. */
 export interface LandingPrimaryAction {
@@ -32,6 +33,8 @@ export interface LandingPrimaryAction {
 export interface LandingPreset {
   /** QR type the generator starts on. */
   type: QRType;
+  /** Social platform to pre-select when the generator opens on the Social type. */
+  socialPlatform?: SocialPlatform;
   /** Settings that win over appearance kept from earlier routes. */
   presetConfig?: Partial<QRConfig>;
   /** Appearance sections that start expanded. */
@@ -62,8 +65,8 @@ export const LANDING_PRESETS: Readonly<Record<string, LandingPreset>> = {
   'qr-code-with-logo': { type: QRType.URL, title: 'QR Code with Logo', ...HIGH_EC_LOGO },
   'google-review-qr-code': { type: QRType.URL, title: 'Google Review QR Code' },
   'menu-qr-code': { type: QRType.URL, title: 'Menu QR Code' },
-  'instagram-qr-code': { type: QRType.SOCIAL, title: 'Instagram QR Code' },
-  'whatsapp-qr-code': { type: QRType.URL, title: 'WhatsApp QR Code', presetConfig: { value: 'https://wa.me/' } },
+  'instagram-qr-code': { type: QRType.SOCIAL, socialPlatform: SocialPlatform.INSTAGRAM, title: 'Instagram QR Code' },
+  'whatsapp-qr-code': { type: QRType.SOCIAL, socialPlatform: SocialPlatform.WHATSAPP, title: 'WhatsApp QR Code' },
   'pdf-qr-code': { type: QRType.URL, title: 'PDF QR Code' },
   'static-qr-code-generator': { type: QRType.URL, title: 'Static QR Code' },
   'svg-qr-code': { type: QRType.URL, title: 'SVG QR Code' },

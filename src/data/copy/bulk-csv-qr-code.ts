@@ -3,12 +3,12 @@ import type { ToolCopy } from './types';
 /** The how-to steps and FAQs of the bulk-csv-qr-code page. */
 export const copy: ToolCopy = {
   howTo: {
-    name: 'How to Make Bulk QR Codes from a CSV File',
+    name: 'How to Make Bulk QR Codes from a CSV or Excel File',
     description: 'Turn each row of a spreadsheet into its own QR code and download them all in one ZIP file.',
     steps: [
       {
-        name: 'Choose a CSV file',
-        text: 'Select Links, Plain text, or Contact Card, download the matching starter template if needed, and upload your spreadsheet.',
+        name: 'Choose a CSV, TXT, or Excel file',
+        text: 'Select Links, Plain text, or Contact Card, download the matching starter template if needed, and choose or drop a .csv, .txt, or .xlsx file (save legacy .xls workbooks as .xlsx or .csv first).',
       },
       {
         name: 'Pick the columns',
@@ -22,8 +22,9 @@ export const copy: ToolCopy = {
   },
   faqs: [
     {
-      question: 'Is my CSV file uploaded to a server?',
-      answer: 'No. Your browser reads the file and builds the ZIP itself. Nothing is sent to a server.',
+      question: 'Which spreadsheet files work, and is my file uploaded to a server?',
+      answer:
+        'Upload .csv, .txt, or Excel .xlsx files with a header row; legacy .xls files are rejected, so save them as .xlsx or .csv first. Your browser parses the file and builds the ZIP locally—nothing is sent to a server.',
     },
     {
       question: 'Which formats can I download?',
