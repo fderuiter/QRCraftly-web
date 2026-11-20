@@ -83,6 +83,17 @@ export default [
     commands: [prettier()],
   },
   {
+    name: 'Guides data',
+    match: (file) => file === 'src/data/guides.ts',
+    commands: [
+      {
+        label: 'Markdown audit',
+        run: ['node', 'scripts/audit_markdown.js'],
+        files: false,
+      },
+    ],
+  },
+  {
     // The docs:lint suite minus the UI catalog check, which the first rule
     // already runs on the staged files. The audits cover the whole doc set,
     // so they run once without file arguments.

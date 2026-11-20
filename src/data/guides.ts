@@ -17,8 +17,9 @@
 */
 
 /**
- * One block of a guide's body. Text may hold `[label](href)` links and nothing else: guides are
- * plain data, so the page renders them without a Markdown parser and without raw HTML.
+ * One block of a guide's body. Text may hold `[label](href)` links and single-backtick `` `code` ``
+ * spans and nothing else: guides are plain data, so the page renders them as React elements without
+ * a Markdown parser and without raw HTML.
  */
 export type GuideBlock =
   | { type: 'p'; text: string }
@@ -999,10 +1000,10 @@ export const guides: Guide[] = [
     shortTitle: 'Developer integration guide',
     seoTitle: 'Developer Integration Guide & Architecture Manual | QRCraftly',
     description:
-      'Programmatic integration recipes and Web Worker message contracts for embedding QRCraftly QR matrix generation, contrast audits and vector export.',
-    lead: 'QRCraftly is engineered as a set of modular client-side packages designed for self-serve integration in custom web applications. This guide provides runnable TypeScript recipes, typed Web Worker message protocols, and architectural boundary guidelines for embedding our core QR and optical transfer modules.',
+      'TypeScript recipes and Web Worker contracts for QRCraftly QR matrices, RFC payloads, contrast audits, CMYK exports, CSV batches and optical transfer.',
+    lead: 'QRCraftly is built as standalone client-side packages under src/packages/ with zero server roundtrips. This manual covers runnable TypeScript recipes, Web Worker message contracts, and module boundary rules across all 14 packages and 11 core subpaths.',
     datePublished: '2026-11-16',
-    dateModified: '2026-11-16',
+    dateModified: '2026-11-19',
     sections: [
       {
         id: 'architecture-boundaries',
@@ -1010,31 +1011,31 @@ export const guides: Guide[] = [
         blocks: [
           {
             type: 'p',
-            text: 'QRCraftly runs entirely on the client: matrix calculation, contrast audits, SVG generation and optical transfers execute inside the browser with zero server roundtrips. Core capabilities are split into standalone deep modules under `src/packages/`.',
+            text: 'Every calculation in QRCraftly runs on the user device: matrix encoding, contrast auditing, vector export, batch archiving and optical transfer execute in the browser or Node.js without server APIs. Capabilities live in deep modules under `src/packages/`.',
           },
           {
             type: 'ul',
             items: [
-              'Entry-point boundary: External application code may only import root entry points (`@/packages/<name>` or `@/packages/<name>/<entry>`), never internal `lib/` files.',
-              'No app layers in packages: Deep modules never import React context, hooks or UI components; dependencies and callbacks are injected from the caller.',
-              'Shared leaf package: Common utility types, checksums and formatting reside in `@/packages/core`, which imports nothing else in `src/`.',
-              'Boundary verification: Automated boundary rules are verified with `pnpm run lint:boundaries`.',
+              'Entry-point boundary: Application code imports only root entry points (`@/packages/<name>` or `@/packages/<name>/<entry>`), never private `lib/` or `tests/` files.',
+              'Framework-free packages: Core logic never imports React context or UI components; callers inject callbacks, clocks and canvas handles.',
+              'Barrel-free leaf core: Cross-package types, sanitizers and checksums live in `@/packages/core/<subpath>`, which imports nothing else in `src/` and has no `index.ts` barrel.',
+              'Automated verification: Boundary rules run in CI via `pnpm run lint:boundaries`.',
             ],
           },
           {
             type: 'note',
-            title: 'Zero-transit privacy model',
-            text: 'All QR payloads, contact records, encryption keys and image buffers remain strictly in volatile client memory. Packages never make unsolicited external network calls.',
+            title: 'Volatile memory privacy model',
+            text: 'QR payloads, contact cards, signing keys and pixel buffers stay in ephemeral client memory. Packages make zero network requests. Read the [security and privacy overview](/security) for details.',
           },
         ],
       },
       {
         id: 'matrix-generation',
-        heading: 'QR matrix generation recipe',
+        heading: 'QR matrix generation and worker statuses',
         blocks: [
           {
             type: 'p',
-            text: 'The `@/packages/qr-matrix` module owns the single canonical implementation that transforms a configuration into a 2D boolean module matrix. The WebAssembly encoder (`qr-encode.wasm`) is loaded once asynchronously via `loadQrEncoder`, after which matrix generation runs synchronously.',
+            text: 'The `@/packages/qr-matrix` package turns a configuration into a binary module matrix (`QRModules`). Load the Rust WebAssembly encoder (`qr-encode.wasm`) once with `loadQrEncoder`, then call `buildMatrix` synchronously.',
           },
           {
             type: 'code',
@@ -1043,44 +1044,48 @@ export const guides: Guide[] = [
             code: `import { loadQrEncoder, buildMatrix, resolveEncodedValue, type MatrixSource } from '@/packages/qr-matrix';
 import { QRType, type QRModules } from '@/packages/core/types';
 
-// 1. Load the WebAssembly QR encoder instance once
 const encoder = await loadQrEncoder();
 
-// 2. Define the matrix source payload and error correction level
 const source: MatrixSource = {
   type: QRType.URL,
   value: 'https://qrcraftly.com',
   errorCorrectionLevel: 'M',
 };
 
-// 3. Normalize payload format (e.g. ensuring URL protocols)
 const resolvedPayload = resolveEncodedValue(source);
 console.log('Encoded payload:', resolvedPayload);
 
-// 4. Build the QR module matrix synchronously
 const matrix: QRModules = buildMatrix(source, encoder);
 console.log(\`Matrix size: \${matrix.size}x\${matrix.size} modules\`);`,
           },
           {
             type: 'p',
-            text: 'To avoid blocking the main UI thread during intensive generation or batch operations, spawn the dedicated background worker using `createMatrixWorker()`.',
+            text: 'To keep heavy matrix encoding off the UI thread, spawn the background worker with `createMatrixWorker()`. Handle `success`, `validationFailed` (rejected configuration fields) and `error` (encoding failures such as `QrEncodeError` capacity limits).',
           },
           {
             type: 'code',
             language: 'typescript',
             title: 'matrix-worker.ts',
-            code: `import { createMatrixWorker } from '@/packages/qr-matrix';
+            code: `import { createMatrixWorker, type QrEncodeError } from '@/packages/qr-matrix';
 import { QRType, type QRConfig } from '@/packages/core/types';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 
-// Spawn background worker to compute matrix off-thread
+type MatrixWorkerReply =
+  | { status: 'success'; sequenceId: number; size: number; matrix: Uint8Array }
+  | { status: 'validationFailed'; sequenceId: number; violations: string[] }
+  | { status: 'error'; sequenceId: number; error: string; kind?: QrEncodeError['kind'] };
+
 const worker = createMatrixWorker();
 
 if (worker) {
-  worker.onmessage = (event: MessageEvent) => {
-    const { status, matrix, size } = event.data;
-    if (status === 'success') {
-      console.log(\`Background matrix generated: \${size}x\${size}\`);
+  worker.onmessage = (event: MessageEvent<MatrixWorkerReply>) => {
+    const reply = event.data;
+    if (reply.status === 'success') {
+      console.log(\`Background matrix ready: \${reply.size}x\${reply.size} modules\`);
+    } else if (reply.status === 'validationFailed') {
+      console.error('Configuration failed validation:', reply.violations.join('; '));
+    } else if (reply.status === 'error') {
+      console.error(\`Matrix worker error (\${reply.kind ?? 'general'}): \${reply.error}\`);
     }
   };
 
@@ -1089,7 +1094,7 @@ if (worker) {
     type: QRType.URL,
     value: 'https://qrcraftly.com',
     errorCorrectionLevel: 'M',
-  } as QRConfig;
+  };
 
   worker.postMessage({ config, sequenceId: 1 });
 }`,
@@ -1097,24 +1102,117 @@ if (worker) {
         ],
       },
       {
-        id: 'scannability-worker',
-        heading: 'Off-thread scannability audits and Web Worker protocols',
+        id: 'structured-payloads',
+        heading: 'Structured RFC payloads with qr-payload',
         blocks: [
           {
             type: 'p',
-            text: 'The `@/packages/scannability` package performs real-time scannability checks, contrast validation, and optical decode simulation off the main thread. Callers communicate with the background worker using strictly typed request and response contracts.',
+            text: 'The `@/packages/qr-payload` package formats, hydrates and validates structured strings for RFC 6350 vCard contacts (versions 2.1, 3.0, 4.0 and MECARD), Wi-Fi credentials, RFC 5545 calendar events, crypto and SEPA EPC payments, GPS coordinates, emails, phone numbers, SMS and meeting invites. Contact `.vcf` file parsing lives in `@/packages/qr-payload/vcardFile`.',
+          },
+          {
+            type: 'code',
+            language: 'typescript',
+            title: 'vcard-payload.ts',
+            code: `import {
+  formatPayload,
+  validatePayload,
+  validateConfig,
+  identifyProtocol,
+  VCardContract,
+  type VCardData,
+} from '@/packages/qr-payload';
+import { QRType, type QRConfig } from '@/packages/core/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+
+const contact: VCardData = {
+  version: '4.0',
+  firstName: 'Grace',
+  lastName: 'Hopper',
+  organization: 'Compiler Research',
+  title: 'Rear Admiral',
+  phone: '+12025550147',
+  email: 'grace@example.com',
+  website: 'https://qrcraftly.com',
+  street: '100 Pentagon Way',
+  city: 'Arlington',
+  state: 'VA',
+  zip: '22202',
+  country: 'USA',
+};
+
+const rawVCard = formatPayload(QRType.VCARD, contact);
+const payloadIssues = validatePayload(rawVCard, QRType.VCARD);
+const config: QRConfig = { ...DEFAULT_CONFIG, type: QRType.VCARD, value: rawVCard };
+const configIssues = validateConfig(config);
+
+if (payloadIssues.length > 0 || configIssues.length > 0) {
+  throw new Error([...payloadIssues, ...configIssues].join('; '));
+}
+
+console.log('Detected protocol:', identifyProtocol(rawVCard));
+console.log('Hydrated organization:', VCardContract.hydrate(rawVCard).organization);`,
+          },
+        ],
+      },
+      {
+        id: 'scannability-worker',
+        heading: 'Scannability evaluator and Web Worker contracts',
+        blocks: [
+          {
+            type: 'p',
+            text: 'The `@/packages/scannability` package runs module contrast audits, two-pass WebAssembly decoding and module-unit print simulation. Use `createScannabilityEvaluator` when you want one `ScannabilityAssessment` answer (`status`, `health`, `exportRisk`, `workerRecoveryActive`) with built-in 1500 ms watchdog recovery, backpressure and main-thread fallback.',
+          },
+          {
+            type: 'code',
+            language: 'typescript',
+            title: 'scannability-evaluator.ts',
+            code: `import { createScannabilityEvaluator } from '@/packages/scannability';
+import { loadQrEncoder, buildMatrix } from '@/packages/qr-matrix';
+import { QRType, type QRConfig } from '@/packages/core/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+
+const config: QRConfig = {
+  ...DEFAULT_CONFIG,
+  type: QRType.URL,
+  value: 'https://qrcraftly.com',
+  quietZoneModules: 4,
+};
+
+const encoder = await loadQrEncoder();
+const matrix = buildMatrix(config, encoder);
+const evaluator = createScannabilityEvaluator({ config });
+
+const width = 296;
+const height = 296;
+const pixels = new Uint8ClampedArray(width * height * 4);
+
+const assessment = await evaluator.check({
+  imageData: { data: pixels, width, height },
+  moduleCount: matrix.size, // Exclude quietZoneModules
+  quietZoneModules: config.quietZoneModules,
+});
+
+console.log('Assessment status:', assessment?.status, 'Health score:', assessment?.health.score);
+evaluator.destroy();`,
+          },
+          {
+            type: 'p',
+            text: 'When posting directly to `createScannabilityWorker()`, every `WorkerRequest` requires positive `width` and `height` values. Pass `moduleCount` as `matrix.size` without adding `quietZoneModules`: `auditModuleContrast` adds `2 * quietZoneModules` internally, so including the quiet zone shifts module boundaries and produces false contrast violations.',
           },
           {
             type: 'table',
-            caption: 'Scannability Worker contract properties',
-            head: ['Contract Field', 'Type', 'Description'],
+            caption: 'Scannability WorkerRequest contract fields',
+            head: ['Contract Field', 'Type', 'Requirement and Behavior'],
             rows: [
-              ['imageData', '{ data: Uint8ClampedArray; width?: number; height?: number }', 'Raw pixel buffer from canvas or bitmap extraction'],
-              ['imageBitmap', 'ImageBitmap', 'Transferred ImageBitmap handle for zero-copy offscreen decoding'],
-              ['buffer', 'ArrayBuffer', 'Transferable buffer returned back to main thread for recycling'],
-              ['moduleCount', 'number', 'QR matrix grid dimension including quiet zone modules'],
-              ['quietZoneModules', 'number', 'Margin padding modules (minimum 2, default 4)'],
-              ['sequenceId', 'number', 'Monotonically increasing request identifier for frame ordering'],
+              ['`width`', '`number`', 'Required positive rendered frame width in pixels (`> 0`).'],
+              ['`height`', '`number`', 'Required positive rendered frame height in pixels (`> 0`).'],
+              ['`imageData`', '`{ data: Uint8ClampedArray; width?: number; height?: number }`', 'Required unless `imageBitmap` is set; RGBA pixel buffer from canvas capture.'],
+              ['`imageBitmap`', '`ImageBitmap`', 'Required unless `imageData` is set; transferred bitmap for offscreen decoding.'],
+              ['`configId`', '`string | null`', 'Optional configuration identifier echoed on responses and required on `dropped` or `retryWithImageData`.'],
+              ['`sequenceId`', '`number`', 'Optional monotonically increasing request counter for ordering frames.'],
+              ['`moduleCount`', '`number`', 'Optional positive QR matrix size in modules per side, excluding `quietZoneModules` (`matrix.size`).'],
+              ['`quietZoneModules`', '`number`', 'Optional non-negative quiet zone width in modules around the matrix (`>= 0`, default `4`).'],
+              ['`buffer`', '`ArrayBuffer`', 'Optional transferable backing buffer returned to the main thread for zero-copy reuse.'],
             ],
           },
           {
@@ -1129,16 +1227,15 @@ if (worker) {
   type WorkerRequest,
 } from '@/packages/scannability';
 
-// 1. Spawn the dedicated scannability background worker
 const worker = createScannabilityWorker();
 
 if (worker) {
   worker.onmessage = (e: MessageEvent<unknown>) => {
     if (isWorkerResponse(e.data)) {
       if ('dropped' in e.data && e.data.dropped) {
-        console.warn('Scan frame was superseded by a newer request');
+        console.warn('Frame superseded for config:', e.data.configId);
       } else if ('retryWithImageData' in e.data && e.data.retryWithImageData) {
-        console.info('Worker requested raw pixel buffer fallback');
+        console.info('Worker requested ImageData fallback for config:', e.data.configId);
       } else if ('success' in e.data) {
         assertWorkerResponse(e.data);
         console.log(\`Verdict: success=\${e.data.success}, physicalReady=\${e.data.physicalReady}\`);
@@ -1146,9 +1243,8 @@ if (worker) {
     }
   };
 
-  // 2. Prepare pixel buffer and construct request
-  const width = 256;
-  const height = 256;
+  const width = 296;
+  const height = 296;
   const pixels = new Uint8ClampedArray(width * height * 4);
 
   const request: WorkerRequest = {
@@ -1157,12 +1253,11 @@ if (worker) {
     height,
     sequenceId: 1,
     configId: 'cfg-sample',
-    moduleCount: 29,
+    moduleCount: 29, // Matrix modules per side excluding quietZoneModules
     quietZoneModules: 4,
     buffer: pixels.buffer,
   };
 
-  // 3. Verify request conforms to protocol and transfer buffer zero-copy
   assertWorkerRequest(request);
   worker.postMessage(request, [pixels.buffer]);
 }`,
@@ -1171,17 +1266,26 @@ if (worker) {
       },
       {
         id: 'vector-export',
-        heading: 'Vector SVG export recipe',
+        heading: 'Vector SVG, EPS, PDF and CMYK print exports',
         blocks: [
           {
             type: 'p',
-            text: 'The `@/packages/qr-export` package provides `generateQRSvg` to produce resolution-independent, self-contained SVG files. Custom logos and mosaic images are automatically resolved and embedded as inline base64 data URLs, eliminating external network dependencies.',
+            text: 'The `@/packages/qr-export` package powers the [SVG QR code generator](/svg-qr-code) and commercial print downloads. Beyond self-contained SVG markup (`generateQRSvg`), it exports Encapsulated PostScript (`generateQREps`, `convertSvgToEps`) and single-page vector PDFs (`generateQRPdf`, `convertSvgToPdf`) with RGB or CMYK `VectorExportOptions`.',
           },
           {
             type: 'code',
             language: 'typescript',
-            title: 'vector-export.ts',
-            code: `import { generateQRSvg, PayloadRejectedError } from '@/packages/qr-export';
+            title: 'vector-print-export.ts',
+            code: `import {
+  generateQRSvg,
+  generateQREps,
+  convertSvgToEps,
+  generateQRPdf,
+  convertSvgToPdf,
+  PayloadRejectedError,
+  MissingImageError,
+  type VectorExportOptions,
+} from '@/packages/qr-export';
 import { QRType, type QRConfig } from '@/packages/core/types';
 import { DEFAULT_CONFIG } from '@/packages/core/config';
 
@@ -1190,22 +1294,134 @@ const config: QRConfig = {
   type: QRType.URL,
   value: 'https://qrcraftly.com',
   errorCorrectionLevel: 'H',
-} as QRConfig;
+};
+
+const cmykOptions: VectorExportOptions = { colorSpace: 'cmyk' };
 
 try {
-  // Generate self-contained SVG XML markup
-  const svgContent: string = await generateQRSvg(config, {
-    onLogoOmitted: () => console.warn('Logo asset unavailable, continuing export without logo'),
+  // Build SVG once, then convert to CMYK EPS and PDF
+  const svg = await generateQRSvg(config, {
+    onLogoOmitted: () => console.warn('Logo unavailable; continuing without logo'),
   });
+  const epsFromSvg = await convertSvgToEps(svg, cmykOptions);
+  const pdfFromSvg = await convertSvgToPdf(svg, cmykOptions);
 
-  console.log('SVG markup generated, byte length:', svgContent.length);
+  // Or call direct one-step CMYK generators
+  const epsDirect = await generateQREps(config, cmykOptions);
+  const pdfDirect = await generateQRPdf(config, cmykOptions);
+
+  console.log('CMYK print assets:', epsFromSvg.length, pdfFromSvg.byteLength, epsDirect.length, pdfDirect.byteLength);
 } catch (error) {
   if (error instanceof PayloadRejectedError) {
-    console.error('Payload rejected due to security policy:', error.violations);
+    console.error('Payload rejected by security policy:', error.violations);
+  } else if (error instanceof MissingImageError) {
+    console.error('Logo could not be decoded for EPS or PDF export:', error.message);
   } else {
     throw error;
   }
 }`,
+          },
+        ],
+      },
+      {
+        id: 'bulk-csv-batch',
+        heading: 'Bulk CSV batch automation',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Visitors arriving from the [Bulk CSV QR generator](/bulk-csv-qr-code) can run the same in-memory batch pipeline headlessly via `@/packages/bulk-csv`. It parses RFC 4180 CSV tables up to `MAX_BULK_CSV_ROWS` (500 rows), checks every row for dangerous schemes and lookalike links, renders valid rows and writes a stored ZIP archive with `createZip`.',
+          },
+          {
+            type: 'code',
+            language: 'typescript',
+            title: 'bulk-csv-batch.ts',
+            code: `import {
+  parseCsv,
+  pickColumn,
+  PAYLOAD_COLUMN_WORDS,
+  FILENAME_COLUMN_WORDS,
+  categorizeCsvRows,
+  batchRows,
+  skippedFromReport,
+  runBatch,
+  formatErrorLogCsv,
+  errorLogFileName,
+  createZip,
+  MAX_BULK_CSV_ROWS,
+} from '@/packages/bulk-csv';
+import { generateQRSvg } from '@/packages/qr-export';
+import { QRType, type QRConfig } from '@/packages/core/types';
+import { DEFAULT_CONFIG } from '@/packages/core/config';
+
+const csvInput = 'url,name\\nhttps://qrcraftly.com,homepage\\nhttps://qrcraftly.com/guides,guides';
+const table = parseCsv(csvInput, { maxRows: MAX_BULK_CSV_ROWS });
+const urlColumn = pickColumn(table.headers, PAYLOAD_COLUMN_WORDS) ?? 'url';
+const stemColumn = pickColumn(table.headers, FILENAME_COLUMN_WORDS, { exclude: urlColumn }) ?? 'name';
+
+const report = categorizeCsvRows(table.rows, urlColumn, DEFAULT_CONFIG, undefined, {
+  contentType: 'link',
+  rowNumbers: table.rowNumbers,
+});
+
+const batch = await runBatch(batchRows(report, stemColumn, table.rowNumbers), {
+  format: 'svg',
+  render: async (payload) => {
+    const rowConfig: QRConfig = { ...DEFAULT_CONFIG, type: QRType.URL, value: payload };
+    return generateQRSvg(rowConfig);
+  },
+  describeFailure: (err) => (err instanceof Error ? err.message : 'Row export failed'),
+  isCancelled: () => false,
+});
+
+const skipped = [...skippedFromReport(report), ...batch.skipped];
+const archiveEntries = [...batch.entries];
+if (skipped.length > 0) {
+  archiveEntries.push({
+    name: errorLogFileName(),
+    data: formatErrorLogCsv(skipped),
+  });
+}
+
+const zipBytes = createZip(archiveEntries);
+console.log('Generated ZIP archive bytes:', zipBytes.byteLength);`,
+          },
+        ],
+      },
+      {
+        id: 'arcade-damage',
+        heading: 'Arcade Reed-Solomon and finder damage modeling',
+        blocks: [
+          {
+            type: 'p',
+            text: 'The `@/packages/arcade` package drives the [QR Arcade](/arcade). Integrators can use `buildTargetMatrix`, `applyBlast`, `planBarrage` and `analyzeDamage` to test Reed-Solomon codeword budgets, interleaved block saturation and the 20 percent finder pattern damage threshold, or wire `EmpiricalScanPipeline` to verify damaged frames against real decoders.',
+          },
+          {
+            type: 'code',
+            language: 'typescript',
+            title: 'arcade-damage.ts',
+            code: `import {
+  buildTargetMatrix,
+  applyBlast,
+  planBarrage,
+  analyzeDamage,
+  healthTone,
+} from '@/packages/arcade';
+import { loadQrEncoder } from '@/packages/qr-matrix';
+import { createMulberry32 } from '@/packages/core/math';
+
+const encoder = await loadQrEncoder();
+const target = buildTargetMatrix('https://qrcraftly.com', 'H', encoder);
+
+const strikes = planBarrage(target.size, 3, [1, 2], createMulberry32(7));
+let damaged: ReadonlySet<number> = new Set<number>();
+for (const strike of strikes) {
+  damaged = applyBlast(damaged, target.size, strike.row, strike.col, strike.radius);
+}
+
+const report = analyzeDamage(damaged, target.size, target.ecc);
+console.log(
+  \`Damaged \${report.damagedCount}/\${report.budget} modules, tone=\${healthTone(report.healthPercent)}, decodes=\${report.failure === null}\`
+);`,
           },
         ],
       },
@@ -1215,7 +1431,7 @@ try {
         blocks: [
           {
             type: 'p',
-            text: 'The `@/packages/optical-transfer` module powers one-way air-gapped optical transmission using animated QR code streams framed with Luby Transform rateless fountain codes (Prism session protocol). External integrators can plan transmission capacity and initialize sessions headlessly.',
+            text: 'The `@/packages/optical-transfer` package transmits files across air gaps over animated QR streams framed with Luby Transform rateless fountain codes (Prism wire format) and wallet-compatible BC-UR (`@/packages/optical-transfer/bcur`). Callers can estimate frame counts and open sender sessions headlessly.',
           },
           {
             type: 'code',
@@ -1227,12 +1443,10 @@ try {
   TRANSFER_DENSITY_PROFILES,
 } from '@/packages/optical-transfer';
 
-// 1. Estimate transmission overhead and symbol parameters
-const payloadBytes = new Uint8Array(64 * 1024); // 64 KB payload
+const payloadBytes = new Uint8Array(64 * 1024);
 const estimate = estimateTransferFrames(payloadBytes.length, 'balanced', 'lt');
 console.log(\`Estimated source symbols K=\${estimate.k}, total frames=\${estimate.frames}\`);
 
-// 2. Initialize a sender session
 const session = await createPrismSession(payloadBytes, {
   fileName: 'transfer-sample.bin',
   mimeType: 'application/octet-stream',
@@ -1245,18 +1459,71 @@ console.log(\`Prism session ready, symbol size: \${session.symbolSize} bytes\`);
         ],
       },
       {
-        id: 'boundary-verification',
-        heading: 'Boundary verification and CI guardrails',
+        id: 'package-catalog',
+        heading: 'Complete package catalog and core subpaths',
         blocks: [
           {
             type: 'p',
-            text: 'All QRCraftly packages adhere to the deep module architecture verified by `scripts/check_boundaries.js`. External integrators adopting these patterns should verify package imports and prevent leaking private library internals.',
+            text: 'All 14 packages in `src/packages/` enforce strict entry-point boundaries checked by `scripts/check_boundaries.js`:',
+          },
+          {
+            type: 'table',
+            caption: 'Registered client-side packages in src/packages/',
+            head: ['Package', 'Entry Points', 'Primary Exports and Purpose'],
+            rows: [
+              ['`arcade`', '`@/packages/arcade`, `client`, `handoff`', '`buildTargetMatrix`, `analyzeDamage`, `applyBlast`, `planBarrage`, `EmpiricalScanPipeline`.'],
+              ['`bulk-csv`', '`@/packages/bulk-csv`', '`parseCsv`, `categorizeCsvRows`, `batchRows`, `runBatch`, `formatErrorLogCsv`, `createZip`.'],
+              ['`core`', '`@/packages/core/<subpath>`', 'Barrel-free leaf package shared across modules; import its 11 subpaths below directly.'],
+              ['`link-safety`', '`@/packages/link-safety`', '`analyseLink` offline inspection for UTS #39 lookalikes, IP hosts, non-default ports and redirectors.'],
+              ['`optical-modem`', '`@/packages/optical-modem`, `crosstalk`, `gpu`, `flag`', 'Experimental (`VITE_OPTICAL_MODEM=true`): color-grid modem codec, channel simulator and `ProbeRun`.'],
+              ['`optical-scanner`', '`@/packages/optical-scanner`, `client`, `scheduler`, `worker`', '`scan`, `createCameraScannerEngine`, `useQrScanner`, `AdaptiveFrameScheduler`.'],
+              ['`optical-transfer`', '`@/packages/optical-transfer`, `protocol`, `multicode`, `feedback`, `colour`, `client`, `bcur`', '`createPrismSession`, `estimateTransferFrames`, `PrismReceiver`, `FountainEncoder`, `BcUrEncoder`.'],
+              ['`qr-decode`', '`@/packages/qr-decode`', '`loadQrReader`, `createQrReader` Rust WebAssembly multi-code and tracked-tile QR reader.'],
+              ['`qr-export`', '`@/packages/qr-export`, `scene`', '`generateQRSvg`, `generateQREps`, `convertSvgToEps`, `generateQRPdf`, `convertSvgToPdf`, `VectorExportOptions`.'],
+              ['`qr-matrix`', '`@/packages/qr-matrix`, `encoder`, `mosaic`, `maze`, `canvas`', '`buildMatrix`, `loadQrEncoder`, `resolveEncodedValue`, `createMatrixWorker`, `drawQR`, `planMosaic`.'],
+              ['`qr-payload`', '`@/packages/qr-payload`, `vcardFile`, `youtube`', '`formatPayload`, `validatePayload`, `validateConfig`, `identifyProtocol`, `readVCardFile`.'],
+              ['`scannability`', '`@/packages/scannability`, `client`, `checker`, `scan`, `worker`', '`createScannabilityEvaluator`, `createScannabilityWorker`, `auditModuleContrast`, `simulatePrint`.'],
+              ['`wallet-pass`', '`@/packages/wallet-pass`', '`createPassSigner`, `buildApplePass`, `buildGoogleSaveLink` in-browser WebCrypto `.pkpass` signing.'],
+              ['`wasm-runtime`', '`@/packages/wasm-runtime`', '`compileWasmUrl`, `compileWasmBytes`, `instantiateWasm`, `WasmModuleError`.'],
+            ],
+          },
+          {
+            type: 'p',
+            text: 'The `@/packages/core` leaf package intentionally omits an `index.ts` barrel so tree-shaking and dependency boundaries stay explicit across all 11 subpaths:',
+          },
+          {
+            type: 'table',
+            caption: 'Barrel-free entry subpaths in @/packages/core',
+            head: ['Core Subpath', 'Primary Exports'],
+            rows: [
+              ['`@/packages/core/checksum`', '`crc32`, `crc32c` and `crc32Hex` integrity primitives.'],
+              ['`@/packages/core/config`', '`DEFAULT_CONFIG` generator settings.'],
+              ['`@/packages/core/ecc`', '`EccLevel` and `ECC_LEVELS` error correction tiers.'],
+              ['`@/packages/core/encoding`', 'Byte arrays, hex strings, sRGB luminance lookup tables and `sha256`.'],
+              ['`@/packages/core/files`', 'File-name cleaning, invisible-character checks and received-file inspection.'],
+              ['`@/packages/core/math`', '`createMulberry32` seeded PRNG and `fnv1a` hashing.'],
+              ['`@/packages/core/security`', '`isDangerousUrl`, `sanitizeSvg`, upload limits and Trusted Types helpers.'],
+              ['`@/packages/core/site`', '`getPublicDomain` canonical site origin.'],
+              ['`@/packages/core/types`', '`QRConfig`, `QRType`, `QRStyle`, `QRErrorCorrectionLevel`, `QRModules` and Wi-Fi types.'],
+              ['`@/packages/core/url`', 'URL normalization utilities.'],
+              ['`@/packages/core/zip`', '`createZip`, `ZipEntry` and `CreateZipOptions` stored archive writer.'],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'boundary-verification',
+        heading: 'Boundary and documentation CI guardrails',
+        blocks: [
+          {
+            type: 'p',
+            text: 'Run `pnpm run lint:boundaries` to verify deep module imports via `scripts/check_boundaries.js`, and `pnpm run docs:lint` to type-check every TypeScript snippet, inline code path, link and package entry across Markdown manuals and `src/data/guides.ts`.',
           },
           {
             type: 'code',
             language: 'bash',
             title: 'terminal',
-            code: `pnpm run lint:boundaries`,
+            code: `pnpm run lint:boundaries && pnpm run docs:lint`,
           },
         ],
       },
@@ -1265,12 +1532,27 @@ console.log(\`Prism session ready, symbol size: \${session.symbolSize} bytes\`);
       {
         label: 'Denso Wave (the inventor of QR Code), “Standardization”, qrcode.com',
         url: 'https://www.qrcode.com/en/about/standards.html',
-        supports: 'QR Code is specified by ISO/IEC 18004, the standard defining symbol geometry and error correction.',
+        supports: 'ISO/IEC 18004 symbol geometry, finder patterns, four-module quiet zones and Reed-Solomon error correction.',
       },
       {
-        label: 'QRCraftly Scalability Analysis & Capacity Planning, docs/public/SCALING.md',
-        url: 'https://github.com/fderuiter/QRCraftly-web/blob/HEAD/docs/public/SCALING.md',
-        supports: 'Client-side Web Worker architecture, watchdog timers, and transferable ArrayBuffer zero-copy pipelines.',
+        label: 'WHATWG HTML Living Standard — “Web Workers” and transferable objects',
+        url: 'https://html.spec.whatwg.org/multipage/workers.html',
+        supports: 'Dedicated Web Worker execution and zero-copy ArrayBuffer and ImageBitmap transfer semantics.',
+      },
+      {
+        label: 'IETF RFC 6350, “vCard Format Specification”, rfc-editor.org',
+        url: 'https://www.rfc-editor.org/rfc/rfc6350',
+        supports: 'vCard 4.0 contact structure and property escaping implemented in @/packages/qr-payload.',
+      },
+      {
+        label: 'IETF RFC 4180, “Common Format and MIME Type for Comma-Separated Values (CSV) Files”, rfc-editor.org',
+        url: 'https://www.rfc-editor.org/rfc/rfc4180',
+        supports: 'CSV quoting, delimiter and record rules enforced by parseCsv in @/packages/bulk-csv.',
+      },
+      {
+        label: 'QRCraftly Security & Privacy Architecture, qrcraftly.com/security',
+        url: 'https://qrcraftly.com/security',
+        supports: 'Client-side WebAssembly execution, volatile memory guarantees and zero-network-transit boundaries.',
       },
     ],
     related: ['how-to-print-a-qr-code-that-scans', 'qr-code-error-correction-explained', 'static-vs-dynamic-qr-codes'],
@@ -1485,8 +1767,13 @@ console.log(\`Prism session ready, symbol size: \${session.symbolSize} bytes\`);
         supports: 'Finder pattern 1:1:3:1:1 module geometry and scanning alignment rules.',
       },
       {
-        label: 'QRCraftly ADR 0019, “Mosaic QR: Module-Level Image Tiling”, docs/adr/0019-mosaic-qr-module-level-image-tiling.md',
-        url: 'https://github.com/fderuiter/QRCraftly-web/blob/HEAD/docs/adr/0019-mosaic-qr-module-level-image-tiling.md',
+        label: 'Hung-Kuo Chu, Chia-Sheng Chang, Ruen-Rone Lee, and Niloy J. Mitra, “Halftone QR Codes”, ACM Transactions on Graphics 32, 6 (SIGGRAPH Asia 2013)',
+        url: 'https://doi.org/10.1145/2508363.2508408',
+        supports: '3x3 sub-cell module recoloring that preserves center module sampling contrast and standard QR matrix polarity.',
+      },
+      {
+        label: 'QRCraftly Mosaic QR Code Generator, qrcraftly.com/mosaic-qr-code',
+        url: 'https://qrcraftly.com/mosaic-qr-code',
         supports: '3x3 Halftone Mosaic Core sub-cell geometry, 1x1 Tiles mode, protected function modules, and luminance contrast clamping.',
       },
     ],
@@ -1628,9 +1915,14 @@ console.log(\`Prism session ready, symbol size: \${session.symbolSize} bytes\`);
     ],
     sources: [
       {
-        label: 'QRCraftly ADR 0048, “Wallet Passes Built in the Browser”, docs/adr/0048-wallet-passes-built-in-the-browser.md',
-        url: 'https://github.com/fderuiter/QRCraftly-web/blob/HEAD/docs/adr/0048-wallet-passes-built-in-the-browser.md',
-        supports: 'Client-side 1080x1920 PNG Wallet Card design, Payment and Bulk CSV refusal rules, and browser-only .pkpass and Google Wallet JWT signing.',
+        label: 'QRCraftly Security & Privacy Architecture, qrcraftly.com/security',
+        url: 'https://qrcraftly.com/security',
+        supports: 'Client-side 1080x1920 PNG Wallet Card design, Payment and Bulk CSV refusal rules, and volatile WebCrypto .pkpass and Google Wallet JWT signing.',
+      },
+      {
+        label: 'Apple Developer, “Apple Wallet — Passes and PassKit (.pkpass)”',
+        url: 'https://developer.apple.com/wallet/',
+        supports: 'Pass Type ID certificate and Apple WWDR intermediate signature requirements for native .pkpass bundles.',
       },
       {
         label: 'W3C, “Scalable Vector Graphics (SVG) 1.1 (Second Edition)”',

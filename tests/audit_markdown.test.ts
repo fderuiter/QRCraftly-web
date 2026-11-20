@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { getFilesToAudit, reportError, REMEDIATION_HINTS, slugify, checkPlaceholders, buildFileHeadings, verifyLinks, resetErrors, checkCodeSnippets, existsSyncCaseSensitive, checkPublishApproved, checkInlinePaths } from '../scripts/audit_markdown.js';
+import { getFilesToAudit, reportError, REMEDIATION_HINTS, slugify, checkPlaceholders, buildFileHeadings, verifyLinks, resetErrors, checkCodeSnippets, existsSyncCaseSensitive, checkPublishApproved, checkInlinePaths, auditGuidesData, checkIntegrationPackageCoverage, GUIDES_FILE } from '../scripts/audit_markdown.js';
 
 describe('audit_markdown', () => {
   beforeEach(() => {
@@ -357,7 +357,8 @@ describe('audit_markdown', () => {
       try {
         const kinds: Array<keyof typeof REMEDIATION_HINTS> = [
           'missingFile', 'publishApproved', 'placeholder', 'outsideRoot',
-          'brokenFile', 'brokenAnchor', 'snippet', 'unsupported', 'inlinePath'
+          'brokenFile', 'brokenAnchor', 'snippet', 'unsupported', 'inlinePath',
+          'unmatchedBacktick', 'privateRepoUrl', 'dangerousUrl', 'packageCoverage'
         ];
         expect([...kinds].sort()).toEqual(Object.keys(REMEDIATION_HINTS).sort());
         for (const kind of kinds) {
@@ -367,6 +368,99 @@ describe('audit_markdown', () => {
         for (const call of errorSpy.mock.calls) {
           expect(String(call[0])).toContain('Fix: ');
         }
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('guides and package coverage auditing', () => {
+    it('passes auditGuidesData and checkIntegrationPackageCoverage on repository files', () => {
+      expect(auditGuidesData()).toBe(false);
+      expect(checkIntegrationPackageCoverage()).toBe(false);
+    });
+
+    it('rejects unmatched backticks, private repo URLs, dangerous links, and broken anchors in guides.ts', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const badGuides = `export const guides = [
+          {
+            slug: 'sample-guide',
+            title: 'Sample',
+            lead: 'Has \`unmatched backtick',
+            sections: [
+              {
+                id: 'intro',
+                heading: 'Intro',
+                blocks: [
+                  { type: 'p', text: 'Private [doc](https://github.com/fderuiter/QRCraftly-web/blob/HEAD/README.md) and [xss](javascript:alert(1)) and [missing](#no-such-anchor).' }
+                ]
+              }
+            ],
+            sources: [
+              { label: 'Repo', url: 'https://github.com/fderuiter/QRCraftly-web', supports: 'Everything' }
+            ]
+          }
+        ];`;
+
+        expect(auditGuidesData(badGuides)).toBe(true);
+        const messages = errorSpy.mock.calls.map(call => String(call[0])).join('\n');
+        expect(messages).toContain(REMEDIATION_HINTS.unmatchedBacktick);
+        expect(messages).toContain(REMEDIATION_HINTS.privateRepoUrl);
+        expect(messages).toContain(REMEDIATION_HINTS.dangerousUrl);
+        expect(messages).toContain(REMEDIATION_HINTS.brokenAnchor);
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('flags private repository links in docs/public Markdown files', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const content = '[Scaling](https://github.com/fderuiter/QRCraftly-web/blob/HEAD/docs/public/SCALING.md)';
+        expect(verifyLinks('docs/public/INTEGRATION.md', content, {})).toBe(true);
+        expect(String(errorSpy.mock.calls[0][0])).toContain(REMEDIATION_HINTS.privateRepoUrl);
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('type-checks code blocks inside src/data/guides.ts', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const invalidSnippetGuides = `export const guides = [
+          {
+            slug: 'sample-guide',
+            title: 'Sample',
+            lead: 'Lead',
+            sections: [
+              {
+                id: 'snippet',
+                heading: 'Snippet',
+                blocks: [
+                  { type: 'code', language: 'typescript', code: 'const brokenCount: number = "wrong";' }
+                ]
+              }
+            ],
+            sources: []
+          }
+        ];`;
+
+        expect(checkCodeSnippets([GUIDES_FILE], { guidesContent: invalidSnippetGuides })).toBe(true);
+        expect(String(errorSpy.mock.calls[0][0])).toContain('sample-guide#snippet');
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('flags missing packages or unmarked experimental optical-modem in package coverage check', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const incompleteMd = 'Only mentions `@/packages/qr-matrix` and `@/packages/optical-modem` without marking it.';
+        expect(checkIntegrationPackageCoverage({ integrationMdContent: incompleteMd })).toBe(true);
+        const messages = errorSpy.mock.calls.map(call => String(call[0])).join('\n');
+        expect(messages).toContain(REMEDIATION_HINTS.packageCoverage);
+        expect(messages).toContain("Package '@/packages/optical-modem' must be marked experimental.");
       } finally {
         errorSpy.mockRestore();
       }

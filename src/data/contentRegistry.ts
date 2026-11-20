@@ -607,7 +607,7 @@ export const auxiliaryRegistry: Record<string, AuxiliaryContent> = {
     "id": "guides/developer-integration-guide",
     "name": "Developer integration guide",
     "seoTitle": "Developer Integration Guide & Architecture Manual | QRCraftly",
-    "description": "Programmatic integration recipes and Web Worker message contracts for embedding QRCraftly QR matrix generation, contrast audits and vector export.",
+    "description": "TypeScript recipes and Web Worker contracts for QRCraftly QR matrices, RFC payloads, contrast audits, CMYK exports, CSV batches and optical transfer.",
     "image": "/og/guides-developer-integration-guide.png",
     "imageAlt": "Developer integration guide",
     "personas": [TargetPersona.SecurityConsciousEnterprise],

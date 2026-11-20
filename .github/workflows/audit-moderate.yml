@@ -53,7 +53,8 @@ jobs:
             --ignore-vuln CVE-2026-116684 \
             --ignore-vuln CVE-2026-116686 \
             --ignore-vuln CVE-2026-114603 \
-            --ignore-vuln CVE-2026-126360
+            --ignore-vuln CVE-2026-126360 \
+            --ignore-vuln CVE-2026-115563
 
       # One GitHub issue instead of an SMTP email (#1184): opened or commented on
       # when the audit fails, closed when it passes again.

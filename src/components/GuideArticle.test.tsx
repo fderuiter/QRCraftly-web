@@ -20,7 +20,10 @@ describe('guides data', () => {
       expect(guide.dateModified >= guide.datePublished).toBe(true);
       expect(readingMinutes(guide)).toBeGreaterThan(0);
       for (const related of guide.related) expect(slugs).toContain(related);
-      for (const source of guide.sources) expect(source.url.startsWith('https://')).toBe(true);
+      for (const source of guide.sources) {
+        expect(source.url.startsWith('https://')).toBe(true);
+        expect(source.url.toLowerCase()).not.toContain('github.com/fderuiter/qrcraftly-web');
+      }
     }
   });
 
@@ -87,10 +90,46 @@ describe('GuideArticle', () => {
   });
 
   it('turns safe links into anchors and drops dangerous ones to plain text', () => {
-    render(<p>{renderInline('See [home](/guides) and [bad](javascript:alert(1)).')}</p>);
+    render(
+      <p>
+        {renderInline(
+          'See [home](/guides), [`codeLink`](/arcade), `[literal](javascript:alert(1))`, and [bad](javascript:alert(1)) or [dataBad](data:text/html,hi).'
+        )}
+      </p>
+    );
     expect(screen.getByRole('link', { name: 'home' })).toHaveAttribute('href', '/guides');
+    const codeLink = screen.getByRole('link', { name: 'codeLink' });
+    expect(codeLink).toHaveAttribute('href', '/arcade');
+    expect(codeLink.querySelector('code')?.textContent).toBe('codeLink');
     expect(screen.queryByRole('link', { name: 'bad' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'dataBad' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'literal' })).toBeNull();
+    expect(screen.getByText('[literal](javascript:alert(1))').tagName).toBe('CODE');
     expect(screen.getByText(/bad/)).toBeInTheDocument();
+  });
+
+  it('renders single-backtick spans as styled inline code and leaves zero literal backticks across all guides', async () => {
+    for (const guide of guides) {
+      const { container, unmount } = render(<GuideArticle article={getGuideArticle(guide.slug)!} />);
+      const clone = container.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll('pre').forEach((pre) => pre.remove());
+      expect(clone.textContent ?? '').not.toContain('`');
+      unmount();
+    }
+
+    const devArticle = getGuideArticle('developer-integration-guide')!;
+    const { container: darkWrapper } = render(
+      <div className="dark">
+        <GuideArticle article={devArticle} />
+      </div>
+    );
+    const inlineCodes = Array.from(darkWrapper.querySelectorAll('code')).filter(
+      (el) => !el.closest('pre')
+    );
+    expect(inlineCodes.length).toBeGreaterThan(20);
+    expect(inlineCodes.some((el) => el.textContent === 'loadQrEncoder')).toBe(true);
+    expect(inlineCodes.some((el) => el.textContent === 'moduleCount')).toBe(true);
+    expect(await axe(darkWrapper)).toHaveNoViolations();
   });
 
   it('renders code blocks with copy buttons and triggers clipboard write without axe violations', async () => {
